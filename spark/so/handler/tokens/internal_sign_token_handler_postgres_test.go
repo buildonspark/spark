@@ -603,5 +603,11 @@ func TestExchangeRevocationSecretsShares_TransferTransaction_HappyPath(t *testin
 		require.NotNil(t, resp)
 
 		require.NotEmpty(t, resp.ReceivedOperatorShares, "response should include revocation secret shares")
+		require.Len(t, resp.ReceivedOperatorShares, 1)
+		assert.Equal(t, setup.handler.config.SigningOperatorMap[operatorIDs[1]].IdentityPublicKey.Serialize(), resp.ReceivedOperatorShares[0].OperatorIdentityPublicKey)
+		require.Len(t, resp.ReceivedOperatorShares[0].Shares, 1)
+		require.NotNil(t, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef)
+		assert.Equal(t, spentOutput.CreatedTransactionFinalizedHash, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionHash)
+		assert.Equal(t, uint32(spentOutput.CreatedTransactionOutputVout), resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionVout)
 	})
 }

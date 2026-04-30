@@ -205,7 +205,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	logger.Sugar().Infof("Length of inputOperatorShareMap built from first exchange response: ByUUID=%d, ByHashVout=%d", len(inputOperatorShareMap.ByUUID), len(inputOperatorShareMap.ByHashVout))
 	// Persist the secret shares from all operators.
 	internalHandler := NewInternalSignTokenHandler(h.config)
-	finalized, err := internalHandler.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, tokenTransactionHash)
+	_, finalized, err := internalHandler.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, tokenTransactionHash)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to persist partial revocation secret shares", tokenTransactionProto, err)
 	}

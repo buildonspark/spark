@@ -281,12 +281,12 @@ func (h *InternalSignTokenHandler) exchangeTransferRevocationSecrets(
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to build input operator share map", tokenTransaction, err)
 	}
-	finalized, err := h.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, req.FinalTokenTransactionHash)
+	spentOutputs, finalized, err := h.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, req.FinalTokenTransactionHash)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to persist partial revocation secret shares", tokenTransaction, err)
 	}
 
-	response, err := h.prepareResponseForExchangeRevocationSecretsShare(ctx, inputOperatorShareMap)
+	response, err := h.prepareResponseForExchangeRevocationSecretsShare(inputOperatorShareMap, spentOutputs)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to prepare response for exchange revocation secrets share", tokenTransaction, err)
 	}
@@ -335,8 +335,11 @@ func (h *InternalSignTokenHandler) validateAndSignTransactionWithProvidedOwnSign
 	return nil
 }
 
-func (h *InternalSignTokenHandler) prepareResponseForExchangeRevocationSecretsShare(ctx context.Context, inputOperatorShareMap *InputOperatorShareMaps) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
-	operatorShares, err := h.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
+func (h *InternalSignTokenHandler) prepareResponseForExchangeRevocationSecretsShare(
+	inputOperatorShareMap *InputOperatorShareMaps,
+	spentOutputs []*ent.TokenOutput,
+) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
+	operatorShares, err := h.getSecretSharesNotInInputFromSpentOutputs(inputOperatorShareMap, spentOutputs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token outputs with shares: %w", err)
 	}
@@ -351,6 +354,16 @@ func (h *InternalSignTokenHandler) prepareResponseForExchangeRevocationSecretsSh
 	return &pbtkinternal.ExchangeRevocationSecretsSharesResponse{
 		ReceivedOperatorShares: secretSharesToReturn,
 	}, nil
+}
+
+func newRevocationSecretShareForOutput(output *ent.TokenOutput, secretShare []byte) *pbtkinternal.RevocationSecretShare {
+	return &pbtkinternal.RevocationSecretShare{
+		SecretShare: secretShare,
+		InputTtxoRef: &tokenpb.TokenOutputToSpend{
+			PrevTokenTransactionHash: output.CreatedTransactionFinalizedHash,
+			PrevTokenTransactionVout: uint32(output.CreatedTransactionOutputVout),
+		},
+	}
 }
 
 type TokenOutputHashVoutKey struct {
@@ -535,6 +548,83 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 	if err != nil {
 		return nil, fmt.Errorf("failed to build operator pubkey to revocation secret share map: %w", err)
 	}
+	return operatorShares, nil
+}
+
+func (h *InternalSignTokenHandler) getSecretSharesNotInInputFromSpentOutputs(
+	inputOperatorShareMap *InputOperatorShareMaps,
+	spentOutputs []*ent.TokenOutput,
+) (operatorSharesMap, error) {
+	if len(inputOperatorShareMap.ByUUID) == 0 && len(inputOperatorShareMap.ByHashVout) == 0 {
+		return nil, fmt.Errorf("no input operator shares provided")
+	}
+
+	excludedShares := make(map[ShareKey]struct{})
+	excludeOwnRevocationShare := make(map[uuid.UUID]struct{})
+	useHashVoutFormat := len(inputOperatorShareMap.ByHashVout) > 0
+
+	if useHashVoutFormat {
+		outputByOutpoint := make(map[TxOutpoint]*ent.TokenOutput, len(spentOutputs))
+		for _, output := range spentOutputs {
+			var hashKey [32]byte
+			copy(hashKey[:], output.CreatedTransactionFinalizedHash)
+			outputByOutpoint[TxOutpoint{
+				Hash: hashKey,
+				Vout: uint32(output.CreatedTransactionOutputVout),
+			}] = output
+		}
+
+		for shareKey := range inputOperatorShareMap.ByHashVout {
+			output, ok := outputByOutpoint[TxOutpoint{
+				Hash: shareKey.PrevTxHash,
+				Vout: shareKey.PrevVout,
+			}]
+			if !ok {
+				return nil, fmt.Errorf("failed to map input share to spent output for hash %x vout %d", shareKey.PrevTxHash, shareKey.PrevVout)
+			}
+			excludedShares[ShareKey{
+				TokenOutputID:             output.ID,
+				OperatorIdentityPublicKey: shareKey.OperatorIdentityPublicKey,
+			}] = struct{}{}
+			if shareKey.OperatorIdentityPublicKey == h.config.IdentityPublicKey() {
+				excludeOwnRevocationShare[output.ID] = struct{}{}
+			}
+		}
+	} else {
+		for shareKey := range inputOperatorShareMap.ByUUID {
+			excludedShares[shareKey] = struct{}{}
+			if shareKey.OperatorIdentityPublicKey == h.config.IdentityPublicKey() {
+				excludeOwnRevocationShare[shareKey.TokenOutputID] = struct{}{}
+			}
+		}
+	}
+
+	operatorShares := make(operatorSharesMap)
+	thisOperatorIdentityPubkey := h.config.IdentityPublicKey()
+	for _, output := range spentOutputs {
+		if share := output.Edges.RevocationKeyshare; share != nil {
+			if _, excluded := excludeOwnRevocationShare[output.ID]; !excluded {
+				operatorShares[thisOperatorIdentityPubkey] = append(
+					operatorShares[thisOperatorIdentityPubkey],
+					newRevocationSecretShareForOutput(output, share.SecretShare.Serialize()),
+				)
+			}
+		}
+
+		for _, partialShare := range output.Edges.TokenPartialRevocationSecretShares {
+			if _, excluded := excludedShares[ShareKey{
+				TokenOutputID:             output.ID,
+				OperatorIdentityPublicKey: partialShare.OperatorIdentityPublicKey,
+			}]; excluded {
+				continue
+			}
+			operatorShares[partialShare.OperatorIdentityPublicKey] = append(
+				operatorShares[partialShare.OperatorIdentityPublicKey],
+				newRevocationSecretShareForOutput(output, partialShare.SecretShare.Serialize()),
+			)
+		}
+	}
+
 	return operatorShares, nil
 }
 
@@ -803,25 +893,17 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation keyshare %s has no secret share", share.ID))
 			}
 			operatorIdentityPubkey := h.config.IdentityPublicKey()
-			revShare := &pbtkinternal.RevocationSecretShare{
-				SecretShare: share.SecretShare.Serialize(),
-				InputTtxoRef: &tokenpb.TokenOutputToSpend{
-					PrevTokenTransactionHash: to.CreatedTransactionFinalizedHash,
-					PrevTokenTransactionVout: uint32(to.CreatedTransactionOutputVout),
-				},
-			}
-			operatorShares[operatorIdentityPubkey] = append(operatorShares[operatorIdentityPubkey], revShare)
+			operatorShares[operatorIdentityPubkey] = append(
+				operatorShares[operatorIdentityPubkey],
+				newRevocationSecretShareForOutput(to, share.SecretShare.Serialize()),
+			)
 		}
 		for _, partialShare := range to.Edges.TokenPartialRevocationSecretShares {
 			idPubKey := partialShare.OperatorIdentityPublicKey
-			revShare := &pbtkinternal.RevocationSecretShare{
-				SecretShare: partialShare.SecretShare.Serialize(),
-				InputTtxoRef: &tokenpb.TokenOutputToSpend{
-					PrevTokenTransactionHash: to.CreatedTransactionFinalizedHash,
-					PrevTokenTransactionVout: uint32(to.CreatedTransactionOutputVout),
-				},
-			}
-			operatorShares[idPubKey] = append(operatorShares[idPubKey], revShare)
+			operatorShares[idPubKey] = append(
+				operatorShares[idPubKey],
+				newRevocationSecretShareForOutput(to, partialShare.SecretShare.Serialize()),
+			)
 		}
 	}
 	return operatorShares, nil
@@ -831,13 +913,13 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 	ctx context.Context,
 	inputOperatorShareMap *InputOperatorShareMaps,
 	transactionHash []byte,
-) (finalized bool, err error) {
+) (spentOutputs []*ent.TokenOutput, finalized bool, err error) {
 	if len(inputOperatorShareMap.ByUUID) == 0 && len(inputOperatorShareMap.ByHashVout) == 0 {
-		return false, nil
+		return nil, false, nil
 	}
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, false, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
 	tx, err := db.TokenTransaction.
@@ -848,7 +930,7 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 		}).
 		Only(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to load token transaction with txHash in persistPartialRevocationSecretShares: %x: %w", transactionHash, err)
+		return nil, false, fmt.Errorf("failed to load token transaction with txHash in persistPartialRevocationSecretShares: %x: %w", transactionHash, err)
 	}
 
 	// Build a map from (hash, vout) -> TokenOutput ID for local outputs
@@ -862,27 +944,20 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 		hashVoutToOutputID[hashKey][uint32(spentOutput.CreatedTransactionOutputVout)] = spentOutput.ID
 	}
 
-	revocationKeyshares := make(map[uuid.UUID]*ent.SigningKeyshare)
-	for _, spentOutput := range tx.Edges.SpentOutput {
-		if revocationKeyshare := spentOutput.Edges.RevocationKeyshare; revocationKeyshare != nil {
-			revocationKeyshares[spentOutput.ID] = revocationKeyshare
-		}
-	}
-
 	var newShares []*ent.TokenPartialRevocationSecretShareCreate
 	// Process shares from one format only - they are mutually exclusive
 	if len(inputOperatorShareMap.ByHashVout) > 0 {
 		err = validateInputTokenOutputsMatchSpentTokenOutputsHashVout(inputOperatorShareMap.ByHashVout, tx.Edges.SpentOutput, hashVoutToOutputID)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs by hash vout", tx, err)
+			return nil, false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs by hash vout", tx, err)
 		}
 		// Process shares from ByHashVout map (preferred format)
 		for sk, sv := range inputOperatorShareMap.ByHashVout {
 			if sv.OperatorIdentityPublicKey == (keys.Public{}) {
-				return false, fmt.Errorf("nil operator identity public key bytes found in input operator share map")
+				return nil, false, fmt.Errorf("nil operator identity public key bytes found in input operator share map")
 			}
 			if sv.SecretShare.IsZero() {
-				return false, fmt.Errorf("zero secret share found in input operator share map")
+				return nil, false, fmt.Errorf("zero secret share found in input operator share map")
 			}
 			// Do not write shares that belong to this server to the TokenPartialRevocationSecretShare table.
 			if sv.OperatorIdentityPublicKey.Equals(h.config.IdentityPublicKey()) {
@@ -891,11 +966,11 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 			// Look up local output ID from (hash, vout)
 			voutMap, ok := hashVoutToOutputID[sk.PrevTxHash]
 			if !ok {
-				return false, fmt.Errorf("no output found for hash %x", sk.PrevTxHash[:])
+				return nil, false, fmt.Errorf("no output found for hash %x", sk.PrevTxHash[:])
 			}
 			outputID, ok := voutMap[sk.PrevVout]
 			if !ok {
-				return false, fmt.Errorf("no output found for hash %x vout %d", sk.PrevTxHash[:], sk.PrevVout)
+				return nil, false, fmt.Errorf("no output found for hash %x vout %d", sk.PrevTxHash[:], sk.PrevVout)
 			}
 			newShares = append(newShares, db.TokenPartialRevocationSecretShare.Create().
 				SetOperatorIdentityPublicKey(sv.OperatorIdentityPublicKey).
@@ -914,14 +989,14 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 		}
 		err = validateInputTokenOutputsMatchSpentTokenOutputs(uniqueOutputIDs, tx.Edges.SpentOutput)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs by uuid", tx, err)
+			return nil, false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs by uuid", tx, err)
 		}
 		for sk, sv := range inputOperatorShareMap.ByUUID {
 			if sv.OperatorIdentityPublicKey == (keys.Public{}) {
-				return false, fmt.Errorf("nil operator identity public key bytes found in input operator share map")
+				return nil, false, fmt.Errorf("nil operator identity public key bytes found in input operator share map")
 			}
 			if sv.SecretShare.IsZero() {
-				return false, fmt.Errorf("zero secret share found in input operator share map")
+				return nil, false, fmt.Errorf("zero secret share found in input operator share map")
 			}
 			// Do not write shares that belong to this server to the TokenPartialRevocationSecretShare table.
 			if sv.OperatorIdentityPublicKey.Equals(h.config.IdentityPublicKey()) {
@@ -946,20 +1021,19 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 			DoNothing().
 			Exec(ctx)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("failed to save new secret shares", tx, sparkerrors.InternalDatabaseWriteError(err))
+			return nil, false, tokens.FormatErrorWithTransactionEnt("failed to save new secret shares", tx, sparkerrors.InternalDatabaseWriteError(err))
 		}
 	}
-	finalized, err = h.recoverFullRevocationSecretsAndFinalize(ctx, transactionHash)
+	finalized, err = h.recoverFullRevocationSecretsAndFinalizeLoadedTransaction(ctx, tx)
 	if err != nil {
-		return false, fmt.Errorf("failed to finalize token transaction: %w", err)
+		return nil, false, fmt.Errorf("failed to finalize token transaction: %w", err)
 	}
-	return finalized, nil
+	return tx.Edges.SpentOutput, finalized, nil
 }
 
 func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx context.Context, tokenTransactionHash []byte) (finalized bool, err error) {
 	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.recoverFullRevocationSecretsAndFinalize")
 	defer span.End()
-	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -973,58 +1047,77 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 				st.TokenTransactionStatusRevealed,
 				st.TokenTransactionStatusFinalized,
 			)).
-		WithSpentOutput().
+		WithSpentOutput(func(q *ent.TokenOutputQuery) {
+			q.WithRevocationKeyshare()
+		}).
 		Only(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to load token transaction with txHash in recoverFullRevocationSecretsAndFinalize: %x: %w", tokenTransactionHash, err)
 	}
-	// Token transaction is already finalized, so we can return early.
+
+	return h.recoverFullRevocationSecretsAndFinalizeLoadedTransaction(ctx, tokenTransaction)
+}
+
+// recoverFullRevocationSecretsAndFinalizeLoadedTransaction reuses already-loaded spent outputs.
+// PRECONDITION: each spent output must already have Edges.RevocationKeyshare populated.
+func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalizeLoadedTransaction(
+	ctx context.Context,
+	tokenTransaction *ent.TokenTransaction,
+) (finalized bool, err error) {
 	if tokenTransaction.Status == st.TokenTransactionStatusFinalized {
 		return true, nil
 	}
 	if len(tokenTransaction.Edges.SpentOutput) == 0 {
-		return false, fmt.Errorf("transaction %x has no spent outputs loaded", tokenTransactionHash)
+		return false, fmt.Errorf("transaction %x has no spent outputs loaded", tokenTransaction.FinalizedTokenTransactionHash)
 	}
 
-	outputIDs := make([]uuid.UUID, len(tokenTransaction.Edges.SpentOutput))
-	for i, output := range tokenTransaction.Edges.SpentOutput {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	if err := h.loadPartialRevocationSecretSharesForOutputs(ctx, db, tokenTransaction.Edges.SpentOutput); err != nil {
+		return false, tokens.FormatErrorWithTransactionEnt("failed to load partial revocation secret shares", tokenTransaction, err)
+	}
+
+	logger := logging.GetLoggerFromContext(ctx)
+	for _, output := range tokenTransaction.Edges.SpentOutput {
+		shares := 0
+		if output.Edges.TokenPartialRevocationSecretShares != nil {
+			shares = len(output.Edges.TokenPartialRevocationSecretShares)
+		}
+		logger.Info(fmt.Sprintf("output: %s, has %d revocation keyshares", output.ID, shares))
+	}
+	return h.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
+}
+
+// loadPartialRevocationSecretSharesForOutputs refreshes only
+// Edges.TokenPartialRevocationSecretShares for the provided outputs.
+// It does not populate Edges.RevocationKeyshare.
+func (h *InternalSignTokenHandler) loadPartialRevocationSecretSharesForOutputs(
+	ctx context.Context,
+	db *ent.Client,
+	outputs []*ent.TokenOutput,
+) error {
+	outputIDs := make([]uuid.UUID, len(outputs))
+	outputsByID := make(map[uuid.UUID]*ent.TokenOutput, len(outputs))
+	for i, output := range outputs {
 		outputIDs[i] = output.ID
+		outputsByID[output.ID] = output
 	}
 
 	const batchSize = queryTokenOutputsWithPartialRevocationSecretSharesBatchSize
-	outputsWithShares := make(map[uuid.UUID]*ent.TokenOutput)
-
 	for i := 0; i < len(outputIDs); i += batchSize {
 		end := min(i+batchSize, len(outputIDs))
-
 		batchOutputIDs := outputIDs[i:end]
-		batchOutputs, err := db.TokenOutput.Query().
-			Where(tokenoutput.IDIn(batchOutputIDs...)).
-			WithTokenPartialRevocationSecretShares().
-			WithRevocationKeyshare().
-			All(ctx)
+		partialSharesByOutput, err := h.getPartialRevocationSecretShares(ctx, db, batchOutputIDs, nil)
 		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("failed to load shares for outputs batch (%d-%d)", i, end-1), tokenTransaction, sparkerrors.InternalDatabaseReadError(err))
+			return fmt.Errorf("failed to load partial shares batch %d-%d: %w", i, end-1, err)
 		}
-
-		for _, output := range batchOutputs {
-			outputsWithShares[output.ID] = output
-			shares := 0
-			if output.Edges.TokenPartialRevocationSecretShares != nil {
-				shares = len(output.Edges.TokenPartialRevocationSecretShares)
-			}
-			logger.Info(fmt.Sprintf("output: %s, has %d revocation keyshares", output.ID, shares))
+		for _, outputID := range batchOutputIDs {
+			outputsByID[outputID].Edges.TokenPartialRevocationSecretShares = partialSharesByOutput[outputID]
 		}
 	}
-
-	// Replace the spent outputs with the ones that have shares loaded
-	for i, spentOutput := range tokenTransaction.Edges.SpentOutput {
-		if outputWithShares, exists := outputsWithShares[spentOutput.ID]; exists {
-			tokenTransaction.Edges.SpentOutput[i] = outputWithShares
-		}
-	}
-
-	return h.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
+	return nil
 }
 
 func (h *InternalSignTokenHandler) RecoverFullRevocationSecretsAndFinalize(ctx context.Context, tokenTransaction *ent.TokenTransaction) (finalized bool, err error) {
