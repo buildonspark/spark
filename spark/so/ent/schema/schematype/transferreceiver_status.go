@@ -3,8 +3,8 @@ package schematype
 type TransferReceiverStatus string
 
 const (
-	// TransferReceiverStatusSenderInitiated is the status of a transfer receiver that has been initiated.
-	TransferReceiverStatusSenderInitiated TransferReceiverStatus = "INITIATED"
+	// TransferReceiverStatusInitiated is the status of a transfer receiver that has been initiated.
+	TransferReceiverStatusInitiated TransferReceiverStatus = "INITIATED"
 	// TransferReceiverStatusReceiverClaimPending is the status of a transfer receiver where the key has been tweaked by the sender and the receiver should now claim.
 	TransferReceiverStatusReceiverClaimPending TransferReceiverStatus = "RECEIVER_CLAIM_PENDING"
 	// TransferReceiverStatusKeyTweaked is the status of transfer receiver where key has been tweaked for the receiver.
@@ -23,7 +23,7 @@ const (
 
 func (TransferReceiverStatus) Values() []string {
 	return []string{
-		string(TransferReceiverStatusSenderInitiated),
+		string(TransferReceiverStatusInitiated),
 		string(TransferReceiverStatusReceiverClaimPending),
 		string(TransferReceiverStatusKeyTweaked),
 		string(TransferReceiverStatusKeyTweakLocked),

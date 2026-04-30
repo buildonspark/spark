@@ -940,14 +940,14 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 	_, err = dbClient.TransferReceiver.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(primaryReceiverKey).
-		SetStatus(schematype.TransferReceiverStatusSenderInitiated).
+		SetStatus(schematype.TransferReceiverStatusInitiated).
 		Save(t.Context())
 	require.NoError(t, err)
 
 	_, err = dbClient.TransferReceiver.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(secondaryReceiverKey).
-		SetStatus(schematype.TransferReceiverStatusSenderInitiated).
+		SetStatus(schematype.TransferReceiverStatusInitiated).
 		Save(t.Context())
 	require.NoError(t, err)
 

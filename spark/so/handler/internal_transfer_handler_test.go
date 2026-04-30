@@ -1090,7 +1090,7 @@ func TestFinalizeTransferReceiver_RejectsEarlyTransferStatus(t *testing.T) {
 		_, err = dbCtx.Client.TransferReceiver.Create().
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverPrivKey.Public()).
-			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			SetStatus(st.TransferReceiverStatusInitiated).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1119,7 +1119,7 @@ func TestFinalizeTransferReceiver_RejectsEarlyTransferStatus(t *testing.T) {
 		_, err = dbCtx.Client.TransferReceiver.Create().
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverPrivKey.Public()).
-			SetStatus(st.TransferReceiverStatusSenderInitiated).
+			SetStatus(st.TransferReceiverStatusInitiated).
 			Save(ctx)
 		require.NoError(t, err)
 

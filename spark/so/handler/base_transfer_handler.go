@@ -491,7 +491,7 @@ func (h *BaseTransferHandler) createTransfer(
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer sender: %w", err)
 	}
-	transferReceiver, err := createTransferReceiver(ctx, db, transfer, receiverIdentityPubKey, st.TransferReceiverStatusSenderInitiated)
+	transferReceiver, err := createTransferReceiver(ctx, db, transfer, receiverIdentityPubKey, st.TransferReceiverStatusInitiated)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
 	}
@@ -668,7 +668,7 @@ func (h *BaseTransferHandler) createTransferV3(
 
 	// Create one TransferReceiver per receiver, then create transfer leaves for each group.
 	for _, g := range groupsByReceiver {
-		transferReceiver, err := createTransferReceiver(ctx, db, transfer, g.receiverPubKey, st.TransferReceiverStatusSenderInitiated)
+		transferReceiver, err := createTransferReceiver(ctx, db, transfer, g.receiverPubKey, st.TransferReceiverStatusInitiated)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create transfer receiver: %w", err)
 		}
@@ -1301,7 +1301,7 @@ func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfe
 		switch r.Status {
 		case st.TransferReceiverStatusCancelled:
 			// Already cancelled, nothing to do.
-		case st.TransferReceiverStatusSenderInitiated:
+		case st.TransferReceiverStatusInitiated:
 			if _, err := r.Update().SetStatus(st.TransferReceiverStatusCancelled).Save(ctx); err != nil {
 				return fmt.Errorf("unable to update transfer receiver %s to cancelled: %w", r.ID, err)
 			}

@@ -482,7 +482,7 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 		_, err = dbTx.TransferReceiver.Create().
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiver).
-			SetStatus(schematype.TransferReceiverStatusSenderInitiated).
+			SetStatus(schematype.TransferReceiverStatusInitiated).
 			Save(ctx)
 		require.NoError(t, err)
 		return transfer

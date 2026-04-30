@@ -122,7 +122,7 @@ func receiverStatusForTransfer(s st.TransferStatus) st.TransferReceiverStatus {
 		st.TransferStatusSenderInitiatedCoordinator,
 		st.TransferStatusSenderKeyTweakPending,
 		st.TransferStatusApplyingSenderKeyTweak:
-		return st.TransferReceiverStatusSenderInitiated
+		return st.TransferReceiverStatusInitiated
 	case st.TransferStatusSenderKeyTweaked:
 		return st.TransferReceiverStatusReceiverClaimPending
 	case st.TransferStatusReceiverKeyTweaked:

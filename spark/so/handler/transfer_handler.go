@@ -2969,7 +2969,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 			return nil, err
 		}
 		switch receiver.Status {
-		case st.TransferReceiverStatusSenderInitiated:
+		case st.TransferReceiverStatusInitiated:
 		case st.TransferReceiverStatusReceiverClaimPending:
 		case st.TransferReceiverStatusKeyTweaked:
 		case st.TransferReceiverStatusKeyTweakLocked:
@@ -3040,7 +3040,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 			st.TransferReceiverStatusKeyTweakApplied,
 			st.TransferReceiverStatusRefundSigned:
 			useStoredKeyTweaks = true
-		case st.TransferReceiverStatusSenderInitiated,
+		case st.TransferReceiverStatusInitiated,
 			st.TransferReceiverStatusReceiverClaimPending,
 			st.TransferReceiverStatusKeyTweaked,
 			st.TransferReceiverStatusCompleted,
@@ -4102,7 +4102,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	if isMimoReceiveEnabled {
 		if receiver != nil {
 			switch receiver.Status {
-			case st.TransferReceiverStatusSenderInitiated,
+			case st.TransferReceiverStatusInitiated,
 				st.TransferReceiverStatusReceiverClaimPending:
 				if !hasClaimPackage {
 					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status %s but no encrypted_claim_key_tweak_package provided", receiver.ID, receiver.Status))
@@ -4210,7 +4210,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		// or RECEIVER_CLAIM_PENDING. Both pre-tweak states fold into the same
 		// post-tweak state. (SenderInitiated handling preserved for any
 		// not-yet-backfilled rows during the rollout transition.)
-		if receiver != nil && (receiver.Status == st.TransferReceiverStatusSenderInitiated ||
+		if receiver != nil && (receiver.Status == st.TransferReceiverStatusInitiated ||
 			receiver.Status == st.TransferReceiverStatusReceiverClaimPending) {
 			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweaked).Save(ctx)
 			if err != nil {
@@ -4311,7 +4311,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			return nil
 		case st.TransferReceiverStatusKeyTweakLocked,
 			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusSenderInitiated,
+			st.TransferReceiverStatusInitiated,
 			st.TransferReceiverStatusReceiverClaimPending:
 			// Do nothing
 		default:

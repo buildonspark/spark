@@ -27,14 +27,14 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 	receiverA, err := client.TransferReceiver.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverAPub).
-		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		SetStatus(st.TransferReceiverStatusInitiated).
 		Save(ctx)
 	require.NoError(t, err)
 
 	receiverB, err := client.TransferReceiver.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverBPub).
-		SetStatus(st.TransferReceiverStatusSenderInitiated).
+		SetStatus(st.TransferReceiverStatusInitiated).
 		Save(ctx)
 	require.NoError(t, err)
 

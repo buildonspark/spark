@@ -39,7 +39,7 @@ func MapTransferToReceiverStatus(s st.TransferStatus) st.TransferReceiverStatus 
 		st.TransferStatusSenderInitiatedCoordinator,
 		st.TransferStatusSenderKeyTweakPending,
 		st.TransferStatusApplyingSenderKeyTweak:
-		return st.TransferReceiverStatusSenderInitiated
+		return st.TransferReceiverStatusInitiated
 	case st.TransferStatusSenderKeyTweaked:
 		return st.TransferReceiverStatusReceiverClaimPending
 	case st.TransferStatusReceiverKeyTweaked:
@@ -55,7 +55,7 @@ func MapTransferToReceiverStatus(s st.TransferStatus) st.TransferReceiverStatus 
 	case st.TransferStatusExpired, st.TransferStatusReturned:
 		return st.TransferReceiverStatusCancelled
 	default:
-		return st.TransferReceiverStatusSenderInitiated
+		return st.TransferReceiverStatusInitiated
 	}
 }
 
@@ -73,7 +73,7 @@ func MarkReceiversClaimPending(ctx context.Context, db *ent.Client, transferID u
 	_, err := db.TransferReceiver.Update().
 		Where(
 			enttransferreceiver.TransferIDEQ(transferID),
-			enttransferreceiver.StatusEQ(st.TransferReceiverStatusSenderInitiated),
+			enttransferreceiver.StatusEQ(st.TransferReceiverStatusInitiated),
 		).
 		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
 		Save(ctx)
