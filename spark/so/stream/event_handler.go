@@ -17,7 +17,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/grpc/grpcutil"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
@@ -102,20 +101,11 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 		},
 	}
 
-	// Native gRPC clients receive HTTP/2 GOAWAY on graceful shutdown and close
-	// their stream, which surfaces as stream.Context().Done(). gRPC-web has no
-	// such mechanism, so for gRPC-web requests we proactively return on the
-	// shutdown signal so http.Server.Shutdown() does not hang on the stream.
-	var shutdownDone <-chan struct{}
-	if grpcutil.IsGrpcWebRequest(stream.Context()) {
-		shutdownDone = s.shutdownCtx.Done()
-	}
-
 	for {
 		select {
 		case <-stream.Context().Done():
 			return nil
-		case <-shutdownDone:
+		case <-s.shutdownCtx.Done():
 			return sparkerrors.ErrShuttingDown
 		case <-heartbeatEvents:
 			if err := stream.Send(heartbeatEvent); err != nil {

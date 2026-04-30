@@ -1471,7 +1471,7 @@ func TestSubscribeToEventsShutdownReturnsUnavailableForGrpcWeb(t *testing.T) {
 	}
 }
 
-func TestSubscribeToEventsShutdownIgnoredForNativeGrpc(t *testing.T) {
+func TestSubscribeToEventsShutdownReturnsUnavailableForNativeGrpc(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
@@ -1483,9 +1483,7 @@ func TestSubscribeToEventsShutdownIgnoredForNativeGrpc(t *testing.T) {
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// No gRPC-web marker: simulates a request arriving via the native gRPC port.
-	streamCtx, cancelStream := context.WithCancel(t.Context())
-	defer cancelStream()
-	stream := &mockStream{ctx: streamCtx}
+	stream := &mockStream{ctx: t.Context()}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -1495,19 +1493,10 @@ func TestSubscribeToEventsShutdownIgnoredForNativeGrpc(t *testing.T) {
 	waitForConnectedEvent(t, stream)
 	stopShutdown()
 
-	// Handler must keep running on the native path; HTTP/2 GOAWAY is what closes
-	// these streams in production (surfacing as stream context cancellation).
 	select {
 	case err := <-errCh:
-		t.Fatalf("native handler returned unexpectedly on shutdown: %v", err)
-	case <-time.After(200 * time.Millisecond):
-	}
-
-	cancelStream()
-	select {
-	case err := <-errCh:
-		require.NoError(t, err)
+		require.ErrorIs(t, err, sparkerrors.ErrShuttingDown)
 	case <-time.After(2 * time.Second):
-		t.Fatal("handler did not return after stream context cancel")
+		t.Fatal("handler did not return after shutdown signal")
 	}
 }
