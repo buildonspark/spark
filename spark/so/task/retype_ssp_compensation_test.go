@@ -156,7 +156,7 @@ func TestRetypeSSPCompensation(t *testing.T) {
 	alreadyRetyped := createRetypeTestTransfer(t, ctx, client, mainnetSSP, alreadyReceiver, btcnetwork.Mainnet, st.TransferTypeCounterSwap)
 	createRetypeTestTransfer(t, ctx, client, alreadyReceiver, mainnetSSP, btcnetwork.Mainnet, st.TransferTypeSwap)
 
-	updated, err := retypeSSPCompensationTransfers(ctx, cfg, client, retypeSSPCompensationBatchSize)
+	updated, err := retypeSSPCompensationTransfers(ctx, cfg, client, retypeSSPCompensationDefaultBatchSize)
 	require.NoError(t, err)
 
 	expected := 0

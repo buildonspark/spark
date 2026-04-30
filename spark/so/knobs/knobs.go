@@ -157,6 +157,8 @@ const (
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
 
+	KnobRetypeSSPCompensationBatchSize = "spark.so.retype_ssp_compensation_batch_size"
+
 	// Enable consensus engine for renew leaf operations.
 	KnobUseConsensusRenew = "spark.so.use_consensus_renew"
 

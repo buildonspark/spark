@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	retypeSSPCompensationBatchSize = 1000
+	retypeSSPCompensationDefaultBatchSize = 100
 	// Bump the version suffix to invalidate stale cursors and force a restart from the seed.
 	retypeCursorKeyPrefix = "retype_ssp_compensation_cursor_v1"
 	// Buffer subtracted from the task deadline so we can finish the current batch,
@@ -171,7 +171,8 @@ func seedRetypeCursor() retypeCursor {
 //     an empty batch.
 //
 // Gating is handled by the generic spark.so.task.enabled@retype_ssp_compensation knob
-// via the task middleware; no task-specific knob is needed.
+// via the task middleware; no task-specific gating knob is needed. Batch size is
+// tunable at runtime via spark.so.retype_ssp_compensation_batch_size (default 100).
 func retypeSSPCompensationTransfers(ctx context.Context, config *so.Config, client *ent.Client, batchSize int) (int, error) {
 	if !retypeMu.TryLock() {
 		return 0, nil
