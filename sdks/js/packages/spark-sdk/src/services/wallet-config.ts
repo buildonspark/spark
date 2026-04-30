@@ -2,6 +2,7 @@ import {
   MayHaveSspClientOptions,
   SspClientOptions,
 } from "../graphql/client.js";
+import { isReactNative } from "../constants.js";
 import type { SparkWalletEvents } from "../spark-wallet/types.js";
 import { isBare } from "@lightsparkdev/core";
 import { isHermeticTest } from "../tests/isHermeticTest.js";
@@ -153,6 +154,12 @@ const LOCAL_OPERATOR_PUBLIC_KEYS = [
   "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
 ] as const;
 
+export function getDefaultUseTokenPrimitivesBindings(
+  isReactNativeRuntime = isReactNative,
+): boolean {
+  return !isReactNativeRuntime;
+}
+
 function getLocalFrostSignerAddress(): string {
   return isHermeticTest ? "localhost:9999" : "unix:///tmp/frost_0.sock";
 }
@@ -188,7 +195,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   },
   tokenOutputLockExpiryMs: 20000, // 20 seconds
   tokenTransactionVersion: "V3",
-  useTokenPrimitivesBindings: false,
+  useTokenPrimitivesBindings: getDefaultUseTokenPrimitivesBindings(),
 };
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
