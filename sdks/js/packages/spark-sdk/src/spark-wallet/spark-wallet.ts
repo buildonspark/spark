@@ -98,8 +98,8 @@ import {
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import type { WalletGetUtxosForIdentityParams } from "../spark-readonly-client/types.js";
-import { getSparkTokenPrimitives } from "../token-primitives-bindings/token-primitives-bindings.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
+import { getSparkTokenPrimitives } from "../token-primitives-bindings/token-primitives-bindings.js";
 import { Interval } from "../types/index.js";
 import {
   mapSettingsProtoToWalletSettings,
@@ -1335,17 +1335,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     };
     tokenBalances: TokenBalanceMap;
   }> {
-    // Queries coordinator for fresh AVAILABLE leaves and updates the cache.
-    // `available` is computed directly from the fresh response (not from the
-    // cache) so stale AVAILABLE entries from concurrent-wallet spends can't
-    // inflate the value. owned/incoming are read from the event-driven cache.
-    const freshLeaves = await this.leafManager.getLeaves(true);
+    // Use the cross-SO consistency-checked path so freshLeaves excludes leaves
+    // diverged on peer SOs — keeps the reported `available` and the selectable
+    // cache aligned with what's actually spendable.
+    const freshLeaves = await this.leafManager.getLeaves();
     await this.syncTokenOutputs();
 
-    // Update cache with fresh AVAILABLE data and evict stale AVAILABLE entries
-    // not reported by the coordinator. Only evicts entries with source "none"
-    // (from addLeaves/sync) — freshly claimed leaves (source "transfer") are
-    // preserved since they may not yet appear in the coordinator response.
     const freshIds = new Set(freshLeaves.map((l) => l.id));
     await this.leafManager.addLeaves(freshLeaves);
     await this.leafManager.evictStaleAvailable(freshIds);
