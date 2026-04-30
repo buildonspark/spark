@@ -623,7 +623,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 				UserCommitments: cpfpTransaction.SigningNonceCommitment,
 			},
 			wrapErr: func(err error) error {
-				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), ownerPubKey))
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for tree_node id: %s, sighash: %v, user pubkey: %v", err, nodeID, hex.EncodeToString(sighash), ownerPubKey))
 			},
 		})
 	}
@@ -701,7 +701,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 				UserCommitments: directTransaction.SigningNonceCommitment,
 			},
 			wrapErr: func(err error) error {
-				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), ownerPubKey))
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for tree_node id: %s, sighash: %v, user pubkey: %v", err, nodeID, hex.EncodeToString(sighash), ownerPubKey))
 			},
 		})
 	}
@@ -778,7 +778,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 				UserCommitments: directFromCpfpTransaction.SigningNonceCommitment,
 			},
 			wrapErr: func(err error) error {
-				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), ownerPubKey))
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for tree_node id: %s, sighash: %v, user pubkey: %v", err, nodeID, hex.EncodeToString(sighash), ownerPubKey))
 			},
 		})
 	}
