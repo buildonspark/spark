@@ -148,6 +148,8 @@ export type LogServiceName = (typeof LOG_SERVICE_NAMES)[number];
 export type LogConfig = {
   level: LoggingLevelArg;
   timestamps: boolean;
+  console: boolean;
+  file?: string;
   services: Record<LogServiceName, ServiceLoggingConfig>;
 };
 
@@ -158,6 +160,8 @@ export type LogServicesOptions =
 export type LogOptionsObject = {
   level?: LoggingLevelArg;
   timestamps?: boolean;
+  console?: boolean;
+  file?: string;
   services?: LogServicesOptions;
 };
 

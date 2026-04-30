@@ -29,6 +29,28 @@ function isTraceLevel(level: LoggingLevelArg | undefined): boolean {
   return level === "TRACE" || level === "Trace" || level === "trace";
 }
 
+function normalizeLogFilePath(file: string | undefined): string | undefined {
+  if (file === undefined) {
+    return undefined;
+  }
+
+  const trimmedFile = file.trim();
+  if (!trimmedFile) {
+    throw new SparkError("log.file must be a non-empty path");
+  }
+
+  return trimmedFile;
+}
+
+function validateLogOutputOptions(
+  consoleEnabled: boolean,
+  file: string | undefined,
+) {
+  if (!consoleEnabled && file === undefined) {
+    throw new SparkError("log.console can only be false when log.file is set");
+  }
+}
+
 const DEFAULT_METHOD_LOGGING_CONFIG: MethodLoggingConfig = {
   enabled: false,
   collapseConsecutive: true,
@@ -306,6 +328,7 @@ export class WalletConfigService implements HasSspClientOptions {
     const baseConfig: LogConfig = {
       level: "WARN",
       timestamps: true,
+      console: true,
       services,
     };
 
@@ -318,6 +341,9 @@ export class WalletConfigService implements HasSspClientOptions {
 
     baseConfig.level = level;
     baseConfig.timestamps = objectOptions?.timestamps ?? baseConfig.timestamps;
+    baseConfig.console = objectOptions?.console ?? baseConfig.console;
+    baseConfig.file = normalizeLogFilePath(objectOptions?.file);
+    validateLogOutputOptions(baseConfig.console, baseConfig.file);
 
     if (objectOptions?.services === "all") {
       for (const serviceName of LOG_SERVICE_NAMES) {

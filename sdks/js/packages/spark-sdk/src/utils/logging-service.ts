@@ -1,4 +1,4 @@
-import { Logger, LoggingLevel } from "@lightsparkdev/core";
+import { LoggingLevel, type Logger } from "@lightsparkdev/core";
 import type {
   LogConfig,
   LogServiceName,
@@ -7,7 +7,9 @@ import type {
 } from "../services/wallet-config.js";
 import { LOG_SERVICE_NAMES } from "../services/wallet-config.js";
 import type { WalletConfigService } from "../services/config.js";
+import { createLogFileWriter, type LogFileWriter } from "./log-file-writer.js";
 import { MethodCallLogger } from "./method-logger.js";
+import { createSdkLogger } from "./sdk-logger.js";
 
 type WrappedMethod = (...args: unknown[]) => unknown;
 
@@ -92,6 +94,7 @@ function disabledLogConfig(): LogConfig {
   return {
     level: "WARN",
     timestamps: true,
+    console: true,
     services: Object.fromEntries(
       LOG_SERVICE_NAMES.map((serviceName) => [
         serviceName,
@@ -103,8 +106,10 @@ function disabledLogConfig(): LogConfig {
 
 export class LoggingService {
   private readonly config: LogConfig;
+  private readonly fileWriter?: LogFileWriter;
   private readonly states = new Map<LogServiceName, ServiceLoggingState>();
   private readonly instanceId: number;
+  private closePromise?: Promise<void>;
   private instanceSuffix?: string;
 
   static fromConfig(config: WalletConfigService): LoggingService {
@@ -121,6 +126,7 @@ export class LoggingService {
 
   constructor(config: LogConfig) {
     this.config = config;
+    this.fileWriter = createLogFileWriter(config.file);
     loggingServiceInstanceCounter += 1;
     this.instanceId = loggingServiceInstanceCounter;
   }
@@ -168,6 +174,18 @@ export class LoggingService {
     this.getState(
       this.resolveServiceName(serviceName),
     ).methodCallLogger.flushPendingLogs();
+  }
+
+  public async close() {
+    for (const state of this.states.values()) {
+      state.methodCallLogger.flushPendingLogs();
+    }
+
+    this.closePromise ??= Promise.resolve(this.fileWriter?.close?.()).then(
+      () => undefined,
+      () => undefined,
+    );
+    await this.closePromise;
   }
 
   public setMethodLoggingEnabled(
@@ -290,11 +308,18 @@ export class LoggingService {
 
     const config = this.config.services[serviceName];
     const loggerName = this.getLoggerName(serviceName);
-    const logger = new Logger(loggerName, {
-      enabled: false,
-      level: config.level,
-      timestamps: this.config.timestamps,
-    });
+    const logger = createSdkLogger(
+      loggerName,
+      {
+        enabled: false,
+        level: config.level,
+        timestamps: this.config.timestamps,
+      },
+      {
+        console: this.config.console,
+        fileWriter: this.fileWriter,
+      },
+    );
     const state: ServiceLoggingState = {
       config,
       logger,

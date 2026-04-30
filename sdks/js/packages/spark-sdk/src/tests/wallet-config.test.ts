@@ -50,6 +50,7 @@ describe("WalletConfigService logging normalization", () => {
     expect(service.getLoggingConfig()).toEqual({
       level: "WARN",
       timestamps: true,
+      console: true,
       services: Object.fromEntries(
         LOG_SERVICE_NAMES.map((serviceName) => [
           serviceName,
@@ -275,6 +276,43 @@ describe("WalletConfigService logging normalization", () => {
       level: "WARN",
       methods: { enabled: false },
     });
+  });
+
+  it("allows configuring file output while keeping console output enabled", () => {
+    const service = createConfigService({ file: "./spark.log" });
+
+    expect(service.getLog()).toBe(true);
+    expect(service.getLoggingConfig()).toMatchObject({
+      level: "WARN",
+      timestamps: true,
+      console: true,
+      file: "./spark.log",
+    });
+  });
+
+  it("allows disabling console output when file output is configured", () => {
+    const service = createConfigService({
+      file: "./spark.log",
+      console: false,
+    });
+
+    expect(service.getLog()).toBe(true);
+    expect(service.getLoggingConfig()).toMatchObject({
+      console: false,
+      file: "./spark.log",
+    });
+  });
+
+  it("rejects blank file output paths", () => {
+    expect(() => createConfigService({ file: " " }).getLoggingConfig()).toThrow(
+      "log.file must be a non-empty path",
+    );
+  });
+
+  it("rejects disabling console output without file output", () => {
+    expect(() =>
+      createConfigService({ console: false }).getLoggingConfig(),
+    ).toThrow("log.console can only be false when log.file is set");
   });
 
   it("ignores undefined and null service entries", () => {

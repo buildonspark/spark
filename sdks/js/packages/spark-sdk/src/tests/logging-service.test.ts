@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { LoggingLevel, type Logger } from "@lightsparkdev/core";
 import {
   LoggingService,
@@ -11,6 +11,7 @@ import {
   type LogServiceName,
   type ServiceLoggingConfig,
 } from "../services/wallet-config.js";
+import { setLogFileWriterFactory } from "../utils/log-file-writer.js";
 
 function serviceConfig(
   overrides?: Partial<ServiceLoggingConfig>,
@@ -35,6 +36,7 @@ function createLogConfig(
   return {
     level: "WARN",
     timestamps: true,
+    console: true,
     services: Object.fromEntries(
       LOG_SERVICE_NAMES.map((name) => [
         name,
@@ -82,6 +84,11 @@ class WrappedTarget extends WrappedTargetBase {
 }
 
 describe("LoggingService", () => {
+  afterEach(() => {
+    setLogFileWriterFactory(undefined);
+    jest.restoreAllMocks();
+  });
+
   it("keeps the service logger stable while enabling method logging on demand", () => {
     const logging = createLoggingService();
     const logger = logging.logger("SparkWallet");
@@ -311,5 +318,153 @@ describe("LoggingService", () => {
     expect(logging.logger("SparkWallet")).toBe(logger);
     expect(logger.context).toBe("SparkWallet:abcd1234");
     expect(logger.options.enabled).toBe(true);
+  });
+
+  it("mirrors service logs to a configured file sink", () => {
+    const fileLines: string[] = [];
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    setLogFileWriterFactory((filePath) => {
+      expect(filePath).toBe("./spark.log");
+      return {
+        write(line: string) {
+          fileLines.push(line);
+        },
+      };
+    });
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      timestamps: false,
+      file: "./spark.log",
+    });
+
+    const logger = logging.logger("SparkWallet");
+    logger.warn("wallet warning");
+
+    expect(warnSpy).toHaveBeenCalledWith(`[${logger.context}] wallet warning`);
+    expect(fileLines).toEqual([`[${logger.context}] wallet warning`]);
+  });
+
+  it("can write service logs to file without console output", () => {
+    const fileLines: string[] = [];
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    setLogFileWriterFactory(() => ({
+      write(line: string) {
+        fileLines.push(line);
+      },
+    }));
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      timestamps: false,
+      console: false,
+      file: "./spark.log",
+    });
+
+    const logger = logging.logger("SparkWallet");
+    logger.warn("wallet warning");
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(fileLines).toEqual([`[${logger.context}] wallet warning`]);
+  });
+
+  it("closes configured file sinks once", async () => {
+    const close = jest.fn(async () => {});
+    setLogFileWriterFactory(
+      jest.fn(() => ({
+        write() {},
+        close,
+      })),
+    );
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      console: false,
+      file: "./spark.log",
+    });
+
+    logging.logger("SparkWallet").warn("wallet warning");
+    await logging.close();
+    await logging.close();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not create file sinks before the first file log", async () => {
+    const write = jest.fn();
+    const createWriter = jest.fn(() => ({
+      write,
+    }));
+    setLogFileWriterFactory(createWriter);
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      console: false,
+      file: "./spark.log",
+    });
+
+    expect(createWriter).not.toHaveBeenCalled();
+
+    await logging.close();
+    logging.logger("SparkWallet").warn("wallet warning");
+
+    expect(createWriter).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("does not propagate file sink close failures", async () => {
+    setLogFileWriterFactory(() => ({
+      write() {},
+      close: async () => {
+        throw new Error("close failed");
+      },
+    }));
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      console: false,
+      file: "./spark.log",
+    });
+
+    logging.logger("SparkWallet").warn("wallet warning");
+    await expect(logging.close()).resolves.toBeUndefined();
+  });
+
+  it("does not propagate lazy file sink creation failures", () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const createWriter = jest.fn(() => {
+      throw new Error("create failed");
+    });
+    setLogFileWriterFactory(createWriter);
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      file: "./spark.log",
+    });
+    const logger = logging.logger("SparkWallet");
+
+    expect(() => logger.warn("wallet warning")).not.toThrow();
+    expect(() => logger.warn("second warning")).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+    expect(createWriter).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails fast when file output is configured without a file writer", () => {
+    expect(
+      () =>
+        new LoggingService({
+          ...createLogConfig("sparkWallet", {
+            enabled: true,
+          }),
+          file: "./spark.log",
+        }),
+    ).toThrow("log.file is only supported by the Node.js SDK entrypoint");
   });
 });
