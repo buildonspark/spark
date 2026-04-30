@@ -149,56 +149,20 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		endSpanWithError(span, retErr)
 	}()
 
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusPreimageShare, 0) > 0 {
-		consensusCtx, consensusSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.consensusExecute", spanOpt)
-		prepareReq := &pbinternal.StorePreimageSharePrepareRequest{OriginalRequest: req}
-		flow := &preimageShareCoordinatorFlow{
-			PreimageShareFlowHandler: NewPreimageShareFlowHandler(h.config),
-			prepareReq:               prepareReq,
-		}
-		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-		engine := consensus.NewTwoPCEngine(h.config, NewSendGossipHandler(h.config))
-		_, err := engine.Execute(consensusCtx,
-			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
-			&selection, flow)
-		endSpanWithError(consensusSpan, err)
-		if err != nil {
-			return fmt.Errorf("consensus store preimage share failed: %w", err)
-		}
-	} else {
-		// Legacy path
-		storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.coordinatorStore", spanOpt)
-		err := h.decryptAndStorePreimageShare(storeCtx, req)
-		endSpanWithError(storeSpan, err)
-		if err != nil {
-			return fmt.Errorf("unable to store coordinator preimage share: %w", err)
-		}
-
-		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.fanout", spanOpt)
-		_, err = helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (_ []byte, retErr error) {
-			operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.fanout.operator", spanOpt)
-			defer func() {
-				endSpanWithError(operatorSpan, retErr)
-			}()
-
-			conn, err := operator.NewOperatorGRPCConnection()
-			if err != nil {
-				return nil, err
-			}
-			defer conn.Close()
-
-			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.StorePreimageShare(operatorCtx, req)
-			if err != nil {
-				return nil, fmt.Errorf("unable to store preimage share on operator %s: %w", operator.Identifier, err)
-			}
-			return nil, nil
-		})
-		endSpanWithError(fanoutSpan, err)
-		if err != nil {
-			return fmt.Errorf("unable to store preimage share on all operators: %w", err)
-		}
+	consensusCtx, consensusSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.consensusExecute", spanOpt)
+	prepareReq := &pbinternal.StorePreimageSharePrepareRequest{OriginalRequest: req}
+	flow := &preimageShareCoordinatorFlow{
+		PreimageShareFlowHandler: NewPreimageShareFlowHandler(h.config),
+		prepareReq:               prepareReq,
+	}
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	engine := consensus.NewTwoPCEngine(h.config, NewSendGossipHandler(h.config))
+	_, err := engine.Execute(consensusCtx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
+		&selection, flow)
+	endSpanWithError(consensusSpan, err)
+	if err != nil {
+		return fmt.Errorf("consensus store preimage share failed: %w", err)
 	}
 
 	// Save partner attribution on the coordinator only.
