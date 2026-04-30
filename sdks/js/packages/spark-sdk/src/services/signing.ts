@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { Transaction } from "@scure/btc-signer";
 import { SparkValidationError } from "../errors/types.js";
 import { SigningCommitment } from "../proto/common.js";
@@ -14,6 +15,7 @@ import {
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
 import { getNetwork } from "../utils/network.js";
+import { LoggingService } from "../utils/logging-service.js";
 import {
   createConnectorRefundTxs,
   createCurrentTimelockRefundTxs,
@@ -32,11 +34,18 @@ export type UserSignedTxSigningJobWithSelfCommitment =
   UserSignedTxSigningJob & {
     selfCommitment: SigningCommitmentWithOptionalNonce;
   };
+
 export class SigningService {
   private readonly config: WalletConfigService;
+  protected readonly logger: Logger;
 
-  constructor(config: WalletConfigService) {
+  constructor(
+    config: WalletConfigService,
+    logging = LoggingService.fromConfig(config),
+  ) {
     this.config = config;
+    this.logger = logging.logger("SigningService");
+    logging.wrapPrototypeMethods("SigningService", this);
   }
 
   private async signRefundsInternal(

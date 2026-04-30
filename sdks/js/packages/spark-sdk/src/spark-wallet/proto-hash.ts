@@ -31,6 +31,19 @@ function isGoogleProtobufValueNull(value: any): boolean {
   return false;
 }
 
+function formatDebugList(values: string[], limit: number = 20): string {
+  const uniqueValues = [...new Set(values)];
+  if (uniqueValues.length === 0) {
+    return "<none>";
+  }
+
+  const visibleValues = uniqueValues.slice(0, limit).join(", ");
+  const remainingCount = uniqueValues.length - limit;
+  return remainingCount > 0
+    ? `${visibleValues}, ... (${remainingCount} more)`
+    : visibleValues;
+}
+
 const TOP_LEVEL_DISALLOWED = new Set<string>([
   "google.protobuf.Value",
   "google.protobuf.ListValue",
@@ -507,13 +520,8 @@ export class ProtoHasher {
       const dbgAllKeys = Object.getOwnPropertyNames(message).concat(
         Object.keys(message),
       );
-      console.log("proto-hash: no fields found", {
-        messageTypeName,
-        reflectionKeys: dbgReflectionKeys,
-        messageKeys: Array.from(new Set(dbgAllKeys)),
-      });
       throw new Error(
-        "No fields found in message (missing or invalid messageTypeName)",
+        `No fields found in message for ${messageTypeName ?? "<unknown>"}; descriptor fields: ${formatDebugList(dbgReflectionKeys)}; message keys: ${formatDebugList(dbgAllKeys)}. This usually means messageTypeName is missing or invalid, or the message has no set fields.`,
       );
     }
 

@@ -1,8 +1,8 @@
-import { describe, it, expect } from "@jest/globals";
+import { afterEach, describe, expect, it } from "@jest/globals";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { getTestWalletConfig } from "./test-utils.js";
-import { SparkWallet } from "../index.node.js";
 import { SparkError } from "../errors/base.js";
+import { SparkWallet } from "../spark-wallet/spark-wallet.js";
 
 class TestableWallet extends SparkWalletTesting {
   public async testThrowError(): Promise<void> {
@@ -14,6 +14,7 @@ const TEST_IDENTITY_SEED = Uint8Array.from(
   { length: 32 },
   (_, index) => index + 1,
 );
+const walletsToCleanup = new Set<TestableWallet>();
 
 async function prepareWallet(wallet: TestableWallet) {
   await wallet.getSigner().createSparkWalletFromSeed(TEST_IDENTITY_SEED);
@@ -23,12 +24,22 @@ async function prepareWallet(wallet: TestableWallet) {
 async function makeTestWallet() {
   const config = getTestWalletConfig();
   const wallet = new TestableWallet(config, undefined);
-  return await prepareWallet(wallet);
+  const prepared = await prepareWallet(wallet);
+  walletsToCleanup.add(prepared);
+  return prepared;
 }
 
 function wrapTestMethod(wallet: TestableWallet) {
   wallet["wrapPublicMethod"]("testThrowError" as unknown as keyof SparkWallet);
 }
+
+afterEach(async () => {
+  for (const wallet of walletsToCleanup) {
+    await wallet.cleanupConnections();
+  }
+  walletsToCleanup.clear();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
 
 describe("wrapPublicMethod", () => {
   it("wraps errors and adds idPubKey without a client traceId", async () => {
@@ -62,5 +73,18 @@ describe("wrapPublicMethod", () => {
 
     expect(first).toBe(second);
     expect(second.message).toBe(first.message);
+  });
+
+  it("reconfigures the wallet logger when method logging is enabled later", async () => {
+    const wallet = await makeTestWallet();
+    const logger = wallet["logger"];
+
+    expect(logger.options.enabled).toBe(false);
+
+    wallet.setMethodLoggingEnabled(true);
+
+    expect(wallet.isMethodLoggingEnabled()).toBe(true);
+    expect(wallet["logger"]).toBe(logger);
+    expect(logger.options.enabled).toBe(true);
   });
 });

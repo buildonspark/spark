@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
@@ -45,20 +46,7 @@ import {
   SENDER_PENDING_STATUSES,
 } from "../services/transfer.js";
 import { parseCompressedPublicKeyHex } from "../utils/keys.js";
-
-// ── Constants ─────────────────────────────────────────────────────
-
-const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
-
-const DEFAULT_TRANSFER_TYPES = [
-  TransferType.TRANSFER,
-  TransferType.PREIMAGE_SWAP,
-  TransferType.COOPERATIVE_EXIT,
-  TransferType.UTXO_SWAP,
-];
-
-// ── Param Types ───────────────────────────────────────────────────
-
+import { LoggingService } from "../utils/logging-service.js";
 import type {
   QueryTransfersParams,
   QueryDepositAddressesParams,
@@ -76,11 +64,20 @@ export type {
   QueryTokenTransactionsParams,
 } from "./types.js";
 
-// ── Client ────────────────────────────────────────────────────────
+const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
+
+const DEFAULT_TRANSFER_TYPES = [
+  TransferType.TRANSFER,
+  TransferType.PREIMAGE_SWAP,
+  TransferType.COOPERATIVE_EXIT,
+  TransferType.UTXO_SWAP,
+];
 
 export abstract class SparkReadonlyClient {
   protected readonly connectionManager: ConnectionManager;
   protected readonly config: WalletConfigService;
+  protected readonly logging: LoggingService;
+  protected readonly logger: Logger;
 
   constructor(
     config: ConfigOptions | undefined,
@@ -88,7 +85,16 @@ export abstract class SparkReadonlyClient {
     authMode: AuthMode = "identity",
   ) {
     this.config = new WalletConfigService(config, signer);
-    this.connectionManager = this.buildConnectionManager(this.config, authMode);
+    this.logging = LoggingService.fromConfig(this.config);
+    this.logger = this.logging.logger("SparkReadonlyClient");
+    this.connectionManager = this.buildConnectionManager(
+      this.config,
+      authMode,
+      this.logging,
+    );
+    this.logging.wrapPrototypeMethods("SparkReadonlyClient", this, {
+      startAtPrototype: SparkReadonlyClient.prototype,
+    });
   }
 
   static createPublic<T extends SparkReadonlyClient>(
@@ -928,5 +934,6 @@ export abstract class SparkReadonlyClient {
   protected abstract buildConnectionManager(
     config: WalletConfigService,
     authMode: AuthMode,
+    logging: LoggingService,
   ): ConnectionManager;
 }

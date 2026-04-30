@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import type { Logger } from "@lightsparkdev/core";
 import { getMonotonicTime, ServerTimeSync } from "../services/time-sync.js";
 
 describe("ServerTimeSync", () => {
@@ -85,13 +86,25 @@ describe("ServerTimeSync", () => {
     const now = getMonotonicTime();
     timeSync.recordSync("invalid-date", 13, now - 100, now);
 
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      "Invalid server date header:",
-      "invalid-date",
-    );
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
     expect(timeSync.isSynced()).toBe(false);
 
     consoleWarnSpy.mockRestore();
+  });
+
+  it("should log invalid date headers as warnings when a logger is provided", () => {
+    const warn = jest.fn();
+    const timeSync = new ServerTimeSync({
+      logger: { warn } as unknown as Logger,
+    });
+
+    const now = getMonotonicTime();
+    timeSync.recordSync("invalid-date", 13, now - 100, now);
+
+    expect(warn).toHaveBeenCalledWith(
+      "Invalid server date header: invalid-date",
+    );
+    expect(timeSync.isSynced()).toBe(false);
   });
 
   it("should reset all sync data", () => {

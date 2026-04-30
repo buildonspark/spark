@@ -27,9 +27,7 @@ class SparkTokenPrimitivesBrowser extends SparkTokenPrimitivesBase {
     }
 
     if (SparkTokenPrimitivesBrowser.initError) {
-      throw new Error(
-        `SparkTokenPrimitives: WASM module failed to initialize: ${SparkTokenPrimitivesBrowser.initError.message}`,
-      );
+      throw SparkTokenPrimitivesBrowser.initError;
     }
 
     if (SparkTokenPrimitivesBrowser.initPromise) {
@@ -43,10 +41,12 @@ class SparkTokenPrimitivesBrowser extends SparkTokenPrimitivesBase {
         SparkTokenPrimitivesBrowser.initialized = true;
         return result;
       } catch (err) {
-        console.error("SparkTokenPrimitives: WASM initialization failed:", err);
         SparkTokenPrimitivesBrowser.initPromise = null;
-        SparkTokenPrimitivesBrowser.initError =
-          err instanceof Error ? err : new Error(String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        SparkTokenPrimitivesBrowser.initError = new Error(
+          `SparkTokenPrimitives: WASM initialization failed: ${message}`,
+          { cause: err },
+        );
         throw SparkTokenPrimitivesBrowser.initError;
       }
     })();

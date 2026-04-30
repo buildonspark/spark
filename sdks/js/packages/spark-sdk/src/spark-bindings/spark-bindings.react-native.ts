@@ -12,6 +12,27 @@ const { SparkFrostModule } = NativeModules;
 const toNumberArray = (arr: Uint8Array): number[] => Array.from(arr);
 const toUint8Array = (arr: number[]): Uint8Array => new Uint8Array(arr);
 
+function describeCreateDummyTxResult(result: unknown): string {
+  if (result === null) {
+    return "null";
+  }
+  if (result === undefined) {
+    return "undefined";
+  }
+  if (Array.isArray(result)) {
+    return `array(length=${result.length})`;
+  }
+  if (typeof result !== "object") {
+    return typeof result;
+  }
+
+  const record = result as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  const tx = record.tx;
+  const txShape = Array.isArray(tx) ? `array(length=${tx.length})` : typeof tx;
+  return `object(keys=[${keys.join(",")}], tx=${txShape}, txid=${typeof record.txid})`;
+}
+
 class SparkFrostReactNative extends SparkFrostBase {
   async signFrost(params: SignFrostBindingParams) {
     if (!SparkFrostModule) {
@@ -92,41 +113,41 @@ class SparkFrostReactNative extends SparkFrostBase {
 
   async createDummyTx(address: string, amountSats: bigint): Promise<DummyTx> {
     if (!SparkFrostModule) {
-      console.error("NativeSparkFrost.ts: SparkFrostModule is not available.");
-      throw new Error("SparkFrostModule is not available");
+      throw new Error("SparkFrostModule is not available in this environment");
     }
-    try {
-      const bridgeParams = {
-        address,
-        amountSats: amountSats.toString(), // JS sends string for bigint
-      };
-      const result = await SparkFrostModule.createDummyTx(bridgeParams);
 
-      if (
-        result &&
-        Array.isArray(result.tx) &&
-        typeof result.txid === "string"
-      ) {
-        return {
-          tx: toUint8Array(result.tx as number[]),
-          txid: result.txid,
-        };
-      } else {
-        console.error(
-          "NativeSparkFrost.ts: Invalid result structure from native call. Result:",
-          result,
-        );
-        throw new Error(
-          "Invalid result structure from createDummyTx native call",
-        );
-      }
-    } catch (e) {
-      console.error(
-        "NativeSparkFrost.ts: Error during SparkFrostModule.createDummyTx call:",
-        e,
-      );
-      throw e;
+    const bridgeParams = {
+      address,
+      amountSats: amountSats.toString(), // JS sends string for bigint
+    };
+
+    let result: unknown;
+    try {
+      result = await SparkFrostModule.createDummyTx(bridgeParams);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`SparkFrostModule.createDummyTx failed: ${message}`, {
+        cause: error,
+      });
     }
+
+    if (
+      result &&
+      typeof result === "object" &&
+      Array.isArray((result as { tx?: unknown }).tx) &&
+      typeof (result as { txid?: unknown }).txid === "string"
+    ) {
+      return {
+        tx: toUint8Array((result as { tx: number[] }).tx),
+        txid: (result as { txid: string }).txid,
+      };
+    }
+
+    throw new Error(
+      `Invalid result structure from createDummyTx native call: expected { tx: number[]; txid: string }, received ${describeCreateDummyTxResult(
+        result,
+      )}`,
+    );
   }
 
   async encryptEcies(

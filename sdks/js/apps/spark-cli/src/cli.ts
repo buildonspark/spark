@@ -19,7 +19,6 @@ import {
   protoToNetwork,
   SparkAddressFormat,
   SparkReadonlyClient,
-  SparkSdkLogger,
   SparkWalletEvent,
   validateSparkInvoiceSignature,
   WalletConfig,
@@ -43,7 +42,6 @@ import {
   SparkUserRequestType,
   SparkWalletWebhookEventType,
 } from "@buildonspark/spark-sdk/types";
-import { LoggingLevel } from "@lightsparkdev/core";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { ripemd160 } from "@noble/hashes/legacy";
@@ -280,8 +278,6 @@ const commands = [
   "ro:invoices",
   "ro:tokentransactions",
 
-  "enablelogging",
-  "setloggerlevel",
   "help",
   "exit",
   "quit",
@@ -884,8 +880,6 @@ async function runCLI() {
   ro:invoices <invoice1> [invoice2] ... [--limit N] [--offset N]      - Query spark invoice statuses
   ro:tokentransactions [--sparkAddresses] [--issuerPublicKeys] [--tokenIdentifiers] [--pageSize] [--cursor] [--direction] - Query token transactions
 
-  enablelogging <true|false>                                          - Enable or disable logging
-  setloggerlevel <trace|info>                                         - Set the logging level
   help                                                                - Show this help message
   exit/quit                                                           - Exit the program
 `;
@@ -930,14 +924,6 @@ async function runCLI() {
       switch (lowerCommand) {
         case "help":
           console.log(helpMessage);
-          break;
-        case "enablelogging":
-          SparkSdkLogger.setAllEnabled(args[0] === "true");
-          break;
-        case "setloggerlevel":
-          SparkSdkLogger.setAllLevels(
-            args[0] === "trace" ? LoggingLevel.Trace : LoggingLevel.Info,
-          );
           break;
         case "setprivacyenabled":
           if (!wallet) {

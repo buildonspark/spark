@@ -1,5 +1,6 @@
 import http from "http";
 import https from "https";
+import type { Logger } from "@lightsparkdev/core";
 import { Base64 } from "js-base64";
 import { throwIfAborted, waitForEvent } from "abort-controller-x";
 import {
@@ -9,6 +10,7 @@ import {
   type CallOptions,
 } from "nice-grpc-common";
 import type { Transport } from "nice-grpc-web/lib/client/Transport.js";
+import type { LoggingService } from "../../utils/logging-service.js";
 
 /* This is essentially identical to nice-grpc-web NodeHttpTransport except
    for types and unref on responseStream RPCs to ensure the process can exit
@@ -20,22 +22,13 @@ export type BareTransportState = {
   nextRequestId: number;
 };
 
-function debugTs() {
-  return new Date().toISOString();
-}
-
-function makeTransportLogger(
-  path: string,
-  requestId: number,
-  enabled: boolean = false,
-) {
-  if (!enabled) {
+function makeTransportLogger(path: string, requestId: number, logger?: Logger) {
+  if (!logger) {
     return () => {};
   }
+
   return (message: string) => {
-    console.info(
-      `[${debugTs()}] [spark-sdk][bare-stream] #${requestId} ${path} ${message}`,
-    );
+    logger.trace(`bareHttpTransport: #${requestId} ${path} ${message}`);
   };
 }
 
@@ -68,9 +61,9 @@ export function attachPrematureSocketCloseGuard(
   path: string,
   requestId: number,
   res: http.IncomingMessage,
-  loggingEnabled: boolean = false,
+  logger?: Logger,
 ) {
-  const log = makeTransportLogger(path, requestId, loggingEnabled);
+  const log = makeTransportLogger(path, requestId, logger);
   const socket = res.socket;
   if (!socket) {
     log("response has no socket to guard");
@@ -138,11 +131,16 @@ export function attachPrematureSocketCloseGuard(
 }
 
 export function BareHttpTransport({
-  log: loggingEnabled = false,
-}: { log?: boolean } = {}): Transport {
+  logger,
+  logging,
+}: {
+  logger?: Logger;
+  logging?: LoggingService;
+} = {}): Transport {
   const transportState = createBareTransportState();
+  let transportLogger = logging?.logger("BareHttpTransport") ?? logger;
 
-  return async function* bareHttpTransport({
+  const transport = async function* bareHttpTransport({
     url,
     body,
     metadata,
@@ -150,7 +148,7 @@ export function BareHttpTransport({
     method,
   }) {
     const requestId = nextBareTransportRequestId(transportState);
-    const log = makeTransportLogger(method.path, requestId, loggingEnabled);
+    const log = makeTransportLogger(method.path, requestId, transportLogger);
     let bodyBuffer: Uint8Array | undefined;
     let pipeAbortController: AbortController | undefined;
 
@@ -429,7 +427,7 @@ export function BareHttpTransport({
       method.path,
       requestId,
       res,
-      loggingEnabled,
+      transportLogger,
     );
 
     let chunkCount = 0;
@@ -460,6 +458,13 @@ export function BareHttpTransport({
       throwIfAborted(signal);
     }
   };
+
+  return (logging?.wrap(
+    "BareHttpTransport",
+    "bareHttpTransport",
+    transport as (...args: unknown[]) => unknown,
+    undefined,
+  ) ?? transport) as Transport;
 }
 
 function metadataToHeaders(metadata: Metadata): http.OutgoingHttpHeaders {

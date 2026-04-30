@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { equalBytes } from "@noble/curves/utils";
 import { Mutex } from "async-mutex";
 import { SparkValidationError } from "../errors/index.js";
@@ -17,6 +18,7 @@ import {
   isZeroTimelock,
 } from "../utils/index.js";
 import { addPublicKeys } from "../utils/keys.js";
+import { LoggingService } from "../utils/logging-service.js";
 import { optimize, shouldOptimize } from "../utils/optimize.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
@@ -92,6 +94,7 @@ export type BalanceSnapshot = {
 };
 
 export type OnBalanceUpdate = (balance: BalanceSnapshot) => void;
+
 export default class LeafManager {
   private optimizationInProgress = false;
   private hasSynced = false;
@@ -104,6 +107,7 @@ export default class LeafManager {
   // synchronous iterations can't be interleaved.
   private leavesMutex = new Mutex();
   private identityPublicKey: Uint8Array | undefined;
+  private readonly logger: Logger;
 
   constructor(
     private readonly config: WalletConfigService,
@@ -112,13 +116,14 @@ export default class LeafManager {
     private readonly connectionManager: ConnectionManager,
     private readonly onBalanceUpdate?: OnBalanceUpdate,
     private readonly onAutoOptimize?: () => Promise<void>,
-  ) {}
+    logging = LoggingService.fromConfig(config),
+  ) {
+    this.logger = logging.logger("LeafManager");
+    logging.wrapPrototypeMethods("LeafManager", this);
+  }
 
-  private log(tag: string, message: string): void {
-    if (!this.config.getLog()) return;
-    console.info(
-      `[${new Date().toISOString()}][${this.connectionManager.getSessionId()}] [spark-sdk][${tag}] ${message}`,
-    );
+  private log(functionName: string, message: string): void {
+    this.logger.trace(`${functionName}: ${message}`);
   }
 
   private emitBalanceUpdate(): void {
@@ -257,7 +262,7 @@ export default class LeafManager {
 
     this.log(
       "sync",
-      `Sync complete. Post-sync: ${this.leaves.size} leaves, available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+      `Complete. Post-sync: ${this.leaves.size} leaves, available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
     );
     this.autoOptimizeIfNeeded();
     this.emitBalanceUpdate();
@@ -427,9 +432,10 @@ export default class LeafManager {
       if (renewed.length < allFlat.length) {
         const renewedIds = new Set(renewed.map((l) => l.id));
         const dropped = allFlat.filter((l) => !renewedIds.has(l.id));
-        console.warn(
-          `[LeafManager] ${dropped.length} leaf(es) dropped during renewal — will cause stale-leaf retry`,
-          dropped.map((l) => l.id),
+        this.logger.warn(
+          `${dropped.length} leaf(es) dropped during renewal — will cause stale-leaf retry. Leaf IDs: ${dropped
+            .map((l) => l.id)
+            .join(",")}`,
         );
       }
       if (renewed.length > 0) {
@@ -502,7 +508,7 @@ export default class LeafManager {
         const existing = this.leaves.get(leaf.id);
         if (existing && IN_FLIGHT_STATUSES.has(existing.status)) {
           this.log(
-            "add-leaves",
+            "addLeaves",
             `Skipping leaf=${leaf.id} value=${leaf.value} — in-flight (${existing.status})`,
           );
           continue;
@@ -514,7 +520,7 @@ export default class LeafManager {
         )
           continue;
         this.log(
-          "add-leaves",
+          "addLeaves",
           `Adding leaf=${leaf.id} value=${leaf.value}${existing ? ` (was ${existing.status})` : ""}`,
         );
         this.leaves.set(leaf.id, {
@@ -532,7 +538,7 @@ export default class LeafManager {
    *  Does not overwrite leaves already in the cache with a non-INCOMING status. */
   public async addIncomingLeaves(leaves: TreeNode[], transferId: string) {
     this.log(
-      "incoming",
+      "addIncomingLeaves",
       `Adding ${leaves.length} incoming leaves (${leaves.reduce((a, l) => a + l.value, 0)} sats) transfer=${transferId} ids=[${leaves.map((l) => l.id).join(",")}]`,
     );
     let changed = false;
@@ -541,7 +547,7 @@ export default class LeafManager {
         const existing = this.leaves.get(leaf.id);
         if (existing && existing.status !== LeafStatus.INCOMING) {
           this.log(
-            "incoming",
+            "addIncomingLeaves",
             `Skipping leaf=${leaf.id} — already ${existing.status}`,
           );
           continue;
@@ -579,7 +585,7 @@ export default class LeafManager {
     });
     if (evicted.length > 0) {
       this.log(
-        "evict",
+        "evictStaleAvailable",
         `Evicted ${evicted.length} stale leaves: [${evicted.join(",")}]`,
       );
     }
@@ -588,7 +594,7 @@ export default class LeafManager {
 
   public async removeLeaves(leafIds: string[]) {
     this.log(
-      "remove-leaves",
+      "removeLeaves",
       `Removing ${leafIds.length} leaves: [${leafIds.join(",")}]`,
     );
     let changed = false;
@@ -608,7 +614,7 @@ export default class LeafManager {
     transferId?: string,
   ): Promise<TreeNode[]> {
     this.log(
-      "claim",
+      "registerClaimedLeaves",
       `Registering ${leaves.length} claimed leaves (${leaves.reduce((a, l) => a + l.value, 0)} sats) transferId=${transferId ?? "none"} ids=[${leaves.map((l) => l.id).join(",")}]`,
     );
     const renewed = await this.checkRenewLeaves(leaves);
@@ -617,7 +623,7 @@ export default class LeafManager {
         const existing = this.leaves.get(leaf.id);
         if (existing) {
           this.log(
-            "claim",
+            "registerClaimedLeaves",
             `Overwriting leaf ${leaf.id}: ${existing.status} → AVAILABLE`,
           );
         }
@@ -633,7 +639,7 @@ export default class LeafManager {
       }
     });
     this.log(
-      "claim",
+      "registerClaimedLeaves",
       `Post-claim balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
     );
     this.emitBalanceUpdate();
@@ -664,9 +670,8 @@ export default class LeafManager {
       const droppedIds = available
         .filter((l) => !renewedIds.has(l.id))
         .map((l) => l.id);
-      console.warn(
-        `[LeafManager] ${droppedIds.length} leaf(es) dropped during renewal`,
-        droppedIds,
+      this.logger.warn(
+        `${droppedIds.length} leaf(es) dropped during renewal. Leaf IDs: ${droppedIds.join(",")}`,
       );
       this.restoreLocalLockedToAvailable(droppedIds);
     }
@@ -699,7 +704,7 @@ export default class LeafManager {
   /** Returns true if the deposit was added/updated in the cache. */
   public async handleDepositEvent(deposit: TreeNode): Promise<boolean> {
     this.log(
-      "deposit-event",
+      "handleDepositEvent",
       `deposit=${deposit.id} status=${deposit.status} value=${deposit.value}`,
     );
     let needsVerification = false;
@@ -710,7 +715,10 @@ export default class LeafManager {
       if (deposit.status === "CREATING") {
         const existing = this.leaves.get(deposit.id);
         if (!existing) {
-          this.log("deposit-event", `leaf=${deposit.id} CREATING → INCOMING`);
+          this.log(
+            "handleDepositEvent",
+            `leaf=${deposit.id} CREATING → INCOMING`,
+          );
           this.leaves.set(deposit.id, {
             treeNode: deposit,
             status: LeafStatus.INCOMING,
@@ -720,7 +728,7 @@ export default class LeafManager {
           added = true;
         } else {
           this.log(
-            "deposit-event",
+            "handleDepositEvent",
             `leaf=${deposit.id} CREATING — already in cache (${existing.status}), skipped`,
           );
         }
@@ -732,7 +740,7 @@ export default class LeafManager {
             existing.status !== LeafStatus.AVAILABLE
           ) {
             this.log(
-              "deposit-event",
+              "handleDepositEvent",
               `leaf=${deposit.id} ${existing.status} → AVAILABLE`,
             );
             existing.treeNode = deposit;
@@ -741,12 +749,15 @@ export default class LeafManager {
             added = true;
           } else {
             this.log(
-              "deposit-event",
+              "handleDepositEvent",
               `leaf=${deposit.id} already ${existing.status}, skipped`,
             );
           }
         } else if (!this.hasSynced) {
-          this.log("deposit-event", `leaf=${deposit.id} pre-sync → AVAILABLE`);
+          this.log(
+            "handleDepositEvent",
+            `leaf=${deposit.id} pre-sync → AVAILABLE`,
+          );
           this.leaves.set(deposit.id, {
             treeNode: deposit,
             status: LeafStatus.AVAILABLE,
@@ -763,14 +774,14 @@ export default class LeafManager {
 
     if (needsVerification) {
       this.log(
-        "deposit-event",
+        "handleDepositEvent",
         `Deposit ${deposit.id} needs verification (post-sync unknown leaf)`,
       );
       added = await this.verifyAndAddLeaf(deposit.id);
     }
 
     this.log(
-      "deposit-event",
+      "handleDepositEvent",
       `Deposit ${deposit.id} result: added=${added} balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
     );
     return added;
@@ -828,7 +839,7 @@ export default class LeafManager {
     );
 
     this.log(
-      "transfer-event",
+      "handleTransferEvent",
       `transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leaves=[${leafIds.join(",")}]`,
     );
 
@@ -854,7 +865,7 @@ export default class LeafManager {
         case TransferStatus.TRANSFER_STATUS_RETURNED:
         case TransferStatus.TRANSFER_STATUS_EXPIRED:
           this.log(
-            "transfer-event",
+            "handleTransferEvent",
             `Returned/expired → restoring ${activeLeafIds.length} leaves to AVAILABLE`,
           );
           this.transition(activeLeafIds, LeafStatus.AVAILABLE, {
@@ -873,7 +884,7 @@ export default class LeafManager {
             ? LeafStatus.SWAP_PENDING
             : LeafStatus.OUTGOING;
           this.log(
-            "transfer-event",
+            "handleTransferEvent",
             `Sender initiated → ${targetStatus} for ${activeLeafIds.length} leaves (isSwap=${isSwap}), current statuses: [${activeLeafIds
               .map((id) => {
                 const r = this.leaves.get(id);
@@ -902,12 +913,12 @@ export default class LeafManager {
             );
             if (skippedSwapIds.length > 0) {
               this.log(
-                "transfer-event",
+                "handleTransferEvent",
                 `Terminal status=${transfer.status} — skipping ${skippedSwapIds.length} SWAP_PENDING leaves: [${skippedSwapIds.join(",")}]`,
               );
             }
             this.log(
-              "transfer-event",
+              "handleTransferEvent",
               `Terminal status=${transfer.status} → SPENT for ${nonSwapIds.length} leaves: [${nonSwapIds.join(",")}]`,
             );
             this.transition(nonSwapIds, LeafStatus.SPENT, { source });
@@ -918,7 +929,7 @@ export default class LeafManager {
     });
     if (changed) {
       this.log(
-        "transfer-event",
+        "handleTransferEvent",
         `Post-event balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
       );
       this.emitBalanceUpdate();
@@ -1049,18 +1060,18 @@ export default class LeafManager {
         // Partial renewal — one or more nodes were silently dropped. Cache
         // the originals so Phase 4 can still select the correct amounts;
         // low-timelock leaves will be renewed on next sync() or access.
-        console.warn(
-          "[LeafManager] checkRenewLeaves returned fewer leaves after swap, caching originals",
-          { before: preRenewalLeaves.length, after: renewedLeaves.length },
+        this.logger.warn(
+          `checkRenewLeaves returned fewer leaves after swap, caching originals. before=${preRenewalLeaves.length} after=${renewedLeaves.length}`,
         );
       }
     } catch (err) {
       // Renewal failed (e.g. network error). Cache the original leaves so
       // Phase 4 can still update state and preserve the user's balance.
       // Low-timelock leaves will be renewed on the next sync() or access.
-      console.warn(
-        "[LeafManager] checkRenewLeaves failed after swap, caching original leaves",
-        err,
+      this.logger.warn(
+        `checkRenewLeaves failed after swap, caching original leaves. Error: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
     }
 
@@ -1161,14 +1172,8 @@ export default class LeafManager {
   // Optimization
   // ---------------------------------------------------------------------------
 
-  private logOptimize(message: string) {
-    const loggingEnabled = this.config.getLog();
-    if (!loggingEnabled) {
-      return;
-    }
-    console.info(
-      `[${new Date().toISOString()}][${this.connectionManager.getSessionId()}] [spark-sdk][optimize] ${message}`,
-    );
+  private logOptimizeLeaves(message: string) {
+    this.log("optimizeLeaves", message);
   }
 
   private async autoOptimizeIfNeeded(): Promise<void> {
@@ -1181,14 +1186,18 @@ export default class LeafManager {
           this.config.getOptimizationOptions().multiplicity ?? 0,
         )
       ) {
-        this.logOptimize(
+        this.log(
+          "autoOptimizeIfNeeded",
           `No optimization needed for ${available.length} leaves`,
         );
         return;
       }
 
       if (!this.onAutoOptimize) return;
-      this.logOptimize(`Optimizing leaves for ${available.length} leaves`);
+      this.log(
+        "autoOptimizeIfNeeded",
+        `Optimizing leaves for ${available.length} leaves`,
+      );
       await this.onAutoOptimize();
     } catch {
       // Optimization is best-effort. If it fails (e.g., config error, another
@@ -1212,11 +1221,11 @@ export default class LeafManager {
       throw new SparkValidationError("Multiplicity cannot be greater than 5");
     }
 
-    this.logOptimize(
+    this.logOptimizeLeaves(
       `Starting optimization with multiplicity ${multiplicityValue}`,
     );
     if (this.optimizationInProgress) {
-      this.logOptimize(`Optimization already in progress`);
+      this.logOptimizeLeaves(`Optimization already in progress`);
       return;
     }
 
@@ -1229,7 +1238,7 @@ export default class LeafManager {
       // Second check under lock — guards against TOCTOU where two callers
       // both pass the optimistic check before either acquires the mutex.
       if (this.optimizationInProgress) {
-        this.logOptimize(
+        this.logOptimizeLeaves(
           `Second check under lock — Optimization already in progress`,
         );
         return;
@@ -1243,13 +1252,13 @@ export default class LeafManager {
         multiplicityValue,
       );
       if (swaps.length === 0) {
-        this.logOptimize(
+        this.logOptimizeLeaves(
           `No swaps needed for ${availableLeaves.length} leaves`,
         );
         return;
       }
 
-      this.logOptimize(
+      this.logOptimizeLeaves(
         `Planned ${swaps.length} swap(s): ${JSON.stringify(swaps.map((s) => ({ in: s.inLeaves, out: s.outLeaves })))}`,
       );
 
@@ -1273,7 +1282,7 @@ export default class LeafManager {
           }
         }
         swapBatches.push({ leavesToSend, outLeaves: swap.outLeaves });
-        this.logOptimize(
+        this.logOptimizeLeaves(
           `Batch ${swapBatches.length}: LOCAL_LOCKED ${leavesToSend.length} leaves (${leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0)} sats) ids=[${leavesToSend.map((l) => l.id).join(",")}]`,
         );
         this.transition(
@@ -1298,14 +1307,14 @@ export default class LeafManager {
           0,
         );
         try {
-          this.logOptimize(
+          this.logOptimizeLeaves(
             `Requesting swap ${i + 1} of ${swapBatches.length}: ${totalValue} sats, ids=[${swapLeafIds.join(",")}] -> [${swap.outLeaves.join(",")}]`,
           );
           const newLeaves = await this.swapService.requestLeavesSwap({
             leaves: swap.leavesToSend,
             targetAmounts: swap.outLeaves,
             onSwapInitiated: async () => {
-              this.logOptimize(
+              this.logOptimizeLeaves(
                 `Swap ${i + 1} initiated. Transitioning leaves to SWAP_PENDING: ${totalValue} sats`,
               );
               await this.leavesMutex.runExclusive(() => {
@@ -1321,7 +1330,7 @@ export default class LeafManager {
           });
 
           await this.leavesMutex.runExclusive(() => {
-            this.logOptimize(
+            this.logOptimizeLeaves(
               `Swap ${i + 1} completed. SPENT ${totalValue} sats ids=[${swapLeafIds.join(",")}], received ${newLeaves.length} leaves (${newLeaves.reduce((acc, leaf) => acc + leaf.value, 0)} sats) ids=[${newLeaves.map((l) => l.id).join(",")}]`,
             );
             this.transition(swapLeafIds, LeafStatus.SPENT);
@@ -1333,12 +1342,12 @@ export default class LeafManager {
               });
             }
             this.emitBalanceUpdate();
-            this.logOptimize(
+            this.logOptimizeLeaves(
               `Post-swap balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
             );
           });
         } catch (error) {
-          this.logOptimize(
+          this.logOptimizeLeaves(
             `Error requesting swap ${i + 1} of ${swapBatches.length}: ${error}. Restoring ids=[${swapLeafIds.join(",")}]`,
           );
           // Only restore LOCAL_LOCKED leaves — SWAP_PENDING means the SO was
@@ -1347,7 +1356,7 @@ export default class LeafManager {
           // Restore all remaining unprocessed batches (always LOCAL_LOCKED)
           for (let j = i + 1; j < swapBatches.length; j++) {
             const remainingIds = swapBatches[j]!.leavesToSend.map((l) => l.id);
-            this.logOptimize(
+            this.logOptimizeLeaves(
               `Restoring remaining batch ${j + 1} ids=[${remainingIds.join(",")}]`,
             );
             this.restoreLocalLockedToAvailable(remainingIds);
@@ -1367,12 +1376,14 @@ export default class LeafManager {
         if (swapBatches.length > 0) {
           for (const swap of swapBatches) {
             const ids = swap.leavesToSend.map((l) => l.id);
-            this.logOptimize(`Cleanup: restoring batch ids=[${ids.join(",")}]`);
+            this.logOptimizeLeaves(
+              `Cleanup: restoring batch ids=[${ids.join(",")}]`,
+            );
             this.restoreLocalLockedToAvailable(ids);
           }
           this.emitBalanceUpdate();
         }
-        this.logOptimize(
+        this.logOptimizeLeaves(
           `Optimization complete. Final balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
         );
       }
@@ -1489,9 +1500,10 @@ export default class LeafManager {
         }
       } catch (err) {
         // Skip this node — don't let one malformed leaf abort the entire batch.
-        console.warn(
-          `[LeafManager] checkRenewLeaves validation failed for node ${node.id}`,
-          err,
+        this.logger.warn(
+          `checkRenewLeaves validation failed for node ${node.id}. Error: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
         );
       }
     }
@@ -1527,9 +1539,10 @@ export default class LeafManager {
           validNodes.push(renewedNode);
         } catch (err) {
           // Skip — don't let one failed renewal discard the rest.
-          console.warn(
-            `[LeafManager] renewNodeTxn failed for node ${node.id}`,
-            err,
+          this.logger.warn(
+            `renewNodeTxn failed for node ${node.id}. Error: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
           );
         }
       }),
@@ -1543,9 +1556,10 @@ export default class LeafManager {
           validNodes.push(renewedNode);
         } catch (err) {
           // Skip — don't let one failed renewal discard the rest.
-          console.warn(
-            `[LeafManager] renewRefundTxn failed for node ${node.id}`,
-            err,
+          this.logger.warn(
+            `renewRefundTxn failed for node ${node.id}. Error: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
           );
         }
       }),
@@ -1556,9 +1570,10 @@ export default class LeafManager {
           validNodes.push(renewedNode);
         } catch (err) {
           // Skip — don't let one failed renewal discard the rest.
-          console.warn(
-            `[LeafManager] renewZeroTimelockNodeTxn failed for node ${node.id}`,
-            err,
+          this.logger.warn(
+            `renewZeroTimelockNodeTxn failed for node ${node.id}. Error: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
           );
         }
       }),

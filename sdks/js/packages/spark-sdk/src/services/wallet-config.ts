@@ -1,3 +1,4 @@
+import type { LoggingLevelArg } from "@lightsparkdev/core";
 import {
   MayHaveSspClientOptions,
   SspClientOptions,
@@ -99,6 +100,69 @@ export type SigningOperator = {
   readonly identityPublicKey: string;
 };
 
+export type MethodLoggingConfig = {
+  enabled: boolean;
+  collapseConsecutive: boolean;
+  excludedMethods: readonly string[];
+  exitOnly: boolean;
+};
+
+export type MethodLoggingOptions = boolean | Partial<MethodLoggingConfig>;
+
+export type ServiceLogOptions =
+  | boolean
+  | {
+      enabled?: boolean;
+      level?: LoggingLevelArg;
+      methods?: MethodLoggingOptions;
+    };
+
+export type ServiceLoggingConfig = {
+  enabled: boolean;
+  level: LoggingLevelArg;
+  methods: MethodLoggingConfig;
+};
+
+export const LOG_SERVICE_NAMES = [
+  "sparkWallet",
+  "sparkReadonlyClient",
+  "connectionManager",
+  "serverTimeSync",
+  "sspClient",
+  "sparkAuthProvider",
+  "signingService",
+  "transferService",
+  "lightningService",
+  "depositService",
+  "tokenTransactionService",
+  "tokenOutputManager",
+  "coopExitService",
+  "swapService",
+  "leafManager",
+  "bareHttpTransport",
+  "xhrTransport",
+] as const;
+
+export type LogServiceName = (typeof LOG_SERVICE_NAMES)[number];
+
+export type LogConfig = {
+  level: LoggingLevelArg;
+  timestamps: boolean;
+  services: Record<LogServiceName, ServiceLoggingConfig>;
+};
+
+export type LogServicesOptions =
+  | "all"
+  | Partial<Record<LogServiceName, ServiceLogOptions>>;
+
+export type LogOptionsObject = {
+  level?: LoggingLevelArg;
+  timestamps?: boolean;
+  services?: LogServicesOptions;
+};
+
+export type LogOptions = boolean | LogOptionsObject;
+
 export type OptimizationOptions = {
   readonly auto?: boolean;
   readonly multiplicity?: number;
@@ -111,7 +175,7 @@ export type TokenOptimizationOptions = {
 };
 
 export type ConfigOptions = MayHaveSspClientOptions & {
-  readonly log?: boolean;
+  readonly log?: LogOptions;
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
   readonly coordinatorIdentifier?: string;

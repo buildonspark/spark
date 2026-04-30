@@ -9,6 +9,7 @@ import {
   Transfer,
 } from "../proto/spark.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
+import { LoggingService } from "../utils/logging-service.js";
 import { Network } from "../utils/network.js";
 import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
@@ -34,8 +35,16 @@ export class CoopExitService extends BaseTransferService {
     config: WalletConfigService,
     connectionManager: ConnectionManager,
     signingService: SigningService,
+    logging = LoggingService.fromConfig(config),
   ) {
-    super(config, connectionManager, signingService);
+    super(
+      config,
+      connectionManager,
+      signingService,
+      logging,
+      "CoopExitService",
+    );
+    logging.wrapPrototypeMethods("CoopExitService", this);
   }
 
   async getConnectorRefundSignatures({

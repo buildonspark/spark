@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToNumberBE,
@@ -26,6 +27,7 @@ import {
   optionsWithIdempotencyKey,
   type IdempotencyOptions,
 } from "../utils/idempotency.js";
+import { LoggingService } from "../utils/logging-service.js";
 import { decodeInvoice } from "./bolt11-spark.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
@@ -67,14 +69,19 @@ export class LightningService {
   private readonly config: WalletConfigService;
   private readonly connectionManager: ConnectionManager;
   private readonly signingService: SigningService;
+  private readonly logger: Logger;
+
   constructor(
     config: WalletConfigService,
     connectionManager: ConnectionManager,
     signingService: SigningService,
+    logging = LoggingService.fromConfig(config),
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
     this.signingService = signingService;
+    this.logger = logging.logger("LightningService");
+    logging.wrapPrototypeMethods("LightningService", this);
   }
 
   async createLightningInvoice({
@@ -253,7 +260,11 @@ export class LightningService {
       try {
         amountMsats = Number(decodedInvoice.amountMSats);
       } catch (error) {
-        console.error("Error decoding invoice", error);
+        this.logger.error(
+          `Error decoding invoice: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
 
       const isZeroAmountInvoice = !amountMsats;

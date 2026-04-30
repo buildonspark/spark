@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { equalBytes, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
@@ -50,6 +51,10 @@ import {
   getTxFromRawTxBytes,
 } from "../utils/bitcoin.js";
 import { optionsWithIdempotencyKey } from "../utils/idempotency.js";
+import {
+  LoggingService,
+  type LogServiceDisplayName,
+} from "../utils/logging-service.js";
 import { NetworkToProto } from "../utils/network.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
@@ -192,15 +197,19 @@ export class BaseTransferService {
   protected readonly config: WalletConfigService;
   protected readonly connectionManager: ConnectionManager;
   protected readonly signingService: SigningService;
+  protected readonly logger: Logger;
 
   constructor(
     config: WalletConfigService,
     connectionManager: ConnectionManager,
     signingService: SigningService,
+    logging = LoggingService.fromConfig(config),
+    serviceName: LogServiceDisplayName = "TransferService",
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
     this.signingService = signingService;
+    this.logger = logging.logger(serviceName);
   }
 
   async deliverTransferPackage(
@@ -974,8 +983,16 @@ export class TransferService extends BaseTransferService {
     config: WalletConfigService,
     connectionManager: ConnectionManager,
     signingService: SigningService,
+    logging = LoggingService.fromConfig(config),
   ) {
-    super(config, connectionManager, signingService);
+    super(
+      config,
+      connectionManager,
+      signingService,
+      logging,
+      "TransferService",
+    );
+    logging.wrapPrototypeMethods("TransferService", this);
   }
 
   async claimTransferCore(transfer: Transfer): Promise<TreeNode[]> {
@@ -2410,9 +2427,10 @@ export class TransferService extends BaseTransferService {
 
       return result;
     } catch (error) {
-      console.warn(
-        `Failed to claim transfer after all retries. Please try reinitializing your wallet in a few minutes. Transfer ID: ${transfer.id}`,
-        error,
+      this.logger.warn(
+        `Failed to claim transfer after all retries. Please try reinitializing your wallet in a few minutes. Transfer ID: ${transfer.id}. Error: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
 
       throw new SparkError("Failed to claim transfer", { error });

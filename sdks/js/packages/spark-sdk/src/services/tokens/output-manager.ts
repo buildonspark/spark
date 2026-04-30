@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { Mutex } from "async-mutex";
 import { SparkValidationError } from "../../errors/types.js";
 import {
@@ -5,6 +6,7 @@ import {
   TokenOutputStatus,
 } from "../../proto/spark_token.js";
 import { TokenOutputsMap } from "../../spark-wallet/types.js";
+import { LoggingService } from "../../utils/logging-service.js";
 import { Bech32mTokenIdentifier } from "../../utils/token-identifier.js";
 
 export type TokenOutputLock = {
@@ -34,9 +36,15 @@ export class TokenOutputManager {
   private serverPendingMap: TokenOutputsMap = new Map();
   private readonly mutex = new Mutex();
   private readonly lockExpiryMs: number;
+  protected readonly logger: Logger;
 
-  constructor(lockExpiryMs: number = 30000) {
+  constructor(
+    lockExpiryMs: number = 30000,
+    logging = LoggingService.disabled(),
+  ) {
     this.lockExpiryMs = lockExpiryMs;
+    this.logger = logging.logger("TokenOutputManager");
+    logging.wrapPrototypeMethods("TokenOutputManager", this);
   }
 
   /**

@@ -20,6 +20,7 @@ import { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
 import { WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
+import type { LoggingService } from "../../utils/logging-service.js";
 import { AuthMode, ConnectionManager } from "./connection.js";
 
 // The default @grpc/grpc-js message size limit is 4 MB. Wallets with many
@@ -49,8 +50,12 @@ const CHANNEL_OPTIONS = {
 export class ConnectionManagerNodeJS extends ConnectionManager {
   private certPath: string | null = null;
 
-  constructor(config: WalletConfigService, authMode: AuthMode = "identity") {
-    super(config, authMode);
+  constructor(
+    config: WalletConfigService,
+    authMode: AuthMode = "identity",
+    logging?: LoggingService,
+  ) {
+    super(config, authMode, logging);
   }
 
   protected getMonotonicTime(): number {
@@ -91,7 +96,11 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
             CHANNEL_OPTIONS,
           );
         } catch (error) {
-          console.error("Error reading certificate:", error);
+          this.logger.warn(
+            `Error reading certificate: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
           return createChannel(
             address,
             ChannelCredentials.createSsl(null, null, null, {

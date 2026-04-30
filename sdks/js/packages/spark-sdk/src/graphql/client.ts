@@ -3,6 +3,7 @@ import {
   bytesToHex,
   DefaultCrypto,
   isError,
+  type Logger,
   NodeKeyCache,
   Query,
   Requester,
@@ -15,6 +16,8 @@ import {
 import { SparkSigner } from "../signer/signer.js";
 import { UserRequestType } from "../types/sdk-types.js";
 import { getFetch } from "../utils/fetch.js";
+import { NoopLogger } from "../utils/logging.js";
+import type { LoggingService } from "../utils/logging-service.js";
 import { ClaimInstantStaticDeposit } from "./mutations/ClaimInstantStaticDeposit.js";
 import { ClaimStaticDeposit } from "./mutations/ClaimStaticDeposit.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
@@ -114,67 +117,6 @@ export interface SspClientOptions {
   schemaEndpoint?: string;
 }
 
-// HTTP status codes that indicate transient errors worth retrying
-const RETRYABLE_STATUS_CODES = new Set([
-  502, // Bad Gateway
-  503, // Service Unavailable
-  504, // Gateway Timeout
-]);
-
-/** @internal Exported for testing only. */
-export function createRetryFetch(
-  baseFetch: typeof globalThis.fetch,
-  maxRetries: number = 5,
-  baseDelayMs: number = 1000,
-): typeof globalThis.fetch {
-  return async (input, init) => {
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      let response: Response;
-      try {
-        response = await baseFetch(input, init);
-      } catch (error) {
-        // Abort/timeout errors should fail immediately — retrying would
-        // exceed caller deadlines or replay after intentional cancellation.
-        if (
-          isError(error) &&
-          (error.name === "AbortError" || error.name === "TimeoutError")
-        ) {
-          throw error;
-        }
-        // Network errors (ECONNRESET, DNS failure) can occur after the server
-        // committed a mutation but before the response arrived. SSP mutations
-        // are protected from retry side effects via idempotency keys, unique
-        // constraints, or state machine checks.
-        if (attempt < maxRetries) {
-          lastError = error;
-          const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 10000);
-          console.warn(
-            `[SspClient] fetch error (attempt ${attempt + 1}/${maxRetries + 1}): ${error instanceof Error ? error.message : error}, retrying in ${delay}ms`,
-          );
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
-        }
-        throw error;
-      }
-
-      if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < maxRetries) {
-        const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 10000);
-        console.warn(
-          `[SspClient] HTTP ${response.status} (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms`,
-        );
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-
-      return response;
-    }
-
-    throw lastError ?? new Error("Retry loop exited unexpectedly");
-  };
-}
-
 export interface TransferWithUserRequest extends Transfer {
   userRequest?: UserRequestType;
 }
@@ -201,22 +143,33 @@ export default class SspClient {
   private readonly signer: SparkSigner;
   private readonly authProvider: SparkAuthProvider;
   private authPromise?: Promise<void>;
+  private readonly logger?: Logger;
+  private readonly logging?: LoggingService;
 
   constructor(
     config: HasSspClientOptions & {
       signer: SparkSigner;
     },
+    options?: {
+      logging?: LoggingService;
+      logger?: Logger;
+    },
   ) {
     this.signer = config.signer;
-    this.authProvider = new SparkAuthProvider();
+    this.logging = options?.logging;
+    this.authProvider = new SparkAuthProvider(this.logging);
+    this.logger = options?.logging?.logger("SspClient") ?? options?.logger;
 
-    const { fetch } = getFetch();
-    const options = config.sspClientOptions;
-
-    const retryFetch = createRetryFetch(fetch as typeof globalThis.fetch);
+    const { fetch } = getFetch({ logger: this.logger, retry: true });
+    const sspOptions = config.sspClientOptions;
+    const schemaEndpoint =
+      sspOptions.schemaEndpoint || `graphql/spark/2025-03-19`;
 
     const authAwareFetch: typeof globalThis.fetch = async (input, init) => {
-      const response = await retryFetch(input, init);
+      const response = await (fetch as unknown as typeof globalThis.fetch)(
+        input,
+        init,
+      );
       if (response.status === 401) {
         throw new Error("Request unauthorized");
       }
@@ -225,14 +178,16 @@ export default class SspClient {
 
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
-      options.schemaEndpoint || `graphql/spark/2025-03-19`,
+      schemaEndpoint,
       `spark-sdk/0.0.0`,
       this.authProvider,
-      options.baseUrl,
+      sspOptions.baseUrl,
       DefaultCrypto,
       undefined,
       authAwareFetch,
     );
+
+    this.logging?.wrapPrototypeMethods("SspClient", this);
   }
 
   async executeRawQuery<T>(
@@ -862,6 +817,12 @@ export default class SspClient {
 class SparkAuthProvider implements AuthProvider {
   private sessionToken: string | undefined;
   private validUntil: Date | undefined;
+  private readonly logger: Logger;
+
+  constructor(logging?: LoggingService) {
+    this.logger = logging?.logger("SparkAuthProvider") ?? NoopLogger;
+    logging?.wrapPrototypeMethods("SparkAuthProvider", this);
+  }
 
   async addAuthHeaders(
     headers: Record<string, string>,

@@ -18,6 +18,7 @@ import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import type { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
 import { WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
+import type { LoggingService } from "../../utils/logging-service.js";
 import { AuthMode, ConnectionManager } from "./connection.js";
 
 export type Transport = NonNullable<Parameters<typeof createChannel>[1]>;
@@ -29,8 +30,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     config: WalletConfigService,
     authMode: AuthMode = "identity",
     transport = FetchTransport(),
+    logging?: LoggingService,
   ) {
-    super(config, authMode);
+    super(config, authMode, logging);
     this.transport = transport;
   }
 

@@ -1,5 +1,6 @@
 // unilateral-exit.ts
 
+import type { Logger } from "@lightsparkdev/core";
 import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { ripemd160 } from "@noble/hashes/legacy";
 import { sha256 } from "@noble/hashes/sha2";
@@ -84,6 +85,14 @@ const EXIT_CHAIN_STATUSES = new Set([
   getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_SPLITTED),
   getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_ON_CHAIN),
 ]);
+
+function formatErrorForLog(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function warnUnilateralExit(logger: Logger | undefined, message: string) {
+  logger?.warn(`constructUnilateralExitFeeBumpPackages: ${message}`);
+}
 
 export async function buildUnilateralExitChain(
   node: TreeNode,
@@ -185,6 +194,7 @@ export async function constructUnilateralExitFeeBumpPackages(
   feeRate: FeeRate,
   network: Network,
   sparkClient?: SparkServiceClient,
+  logger?: Logger,
 ): Promise<FeeBumpTxChain[]> {
   const result: FeeBumpTxChain[] = [];
 
@@ -295,17 +305,9 @@ export async function constructUnilateralExitFeeBumpPackages(
           }
         }
       } catch (parseError) {
-        console.error(
-          `❌ Error parsing nodeTx for anchor check (node ${chainNode.id}): ${parseError}`,
-        );
-        console.log(
-          `    This may indicate a corrupted transaction in the TreeNode.`,
-        );
-        console.log(`    Transaction hex: ${nodeTxHex}`);
-
-        // Try to proceed anyway, but warn the user
-        console.log(
-          `    Attempting to continue with original hex, but fee bump may fail.`,
+        warnUnilateralExit(
+          logger,
+          `unable to parse nodeTx for anchor check on node ${chainNode.id}: ${formatErrorForLog(parseError)}. This may indicate a corrupted transaction in the TreeNode; continuing with the original transaction hex, but fee bump may fail.`,
         );
       }
 
@@ -313,7 +315,13 @@ export async function constructUnilateralExitFeeBumpPackages(
         feeBumpPsbt: nodeFeeBumpPsbt,
         usedUtxos,
         parentTx,
-      } = constructFeeBumpTx(nodeTxHex, availableUtxos, feeRate, undefined);
+      } = constructFeeBumpTx(
+        nodeTxHex,
+        availableUtxos,
+        feeRate,
+        undefined,
+        logger,
+      );
 
       const feeBumpTx = btc.Transaction.fromPSBT(hexToBytes(nodeFeeBumpPsbt));
 
@@ -366,17 +374,9 @@ export async function constructUnilateralExitFeeBumpPackages(
             }
           }
         } catch (parseError) {
-          console.error(
-            `❌ Error parsing refundTx for anchor check (node ${chainNode.id}): ${parseError}`,
-          );
-          console.log(
-            `    This may indicate a corrupted refund transaction in the TreeNode.`,
-          );
-          console.log(`    Refund transaction hex: ${refundTxHex}`);
-
-          // Try to proceed anyway, but warn the user
-          console.log(
-            `    Attempting to continue with original refund hex, but this transaction may be invalid.`,
+          warnUnilateralExit(
+            logger,
+            `unable to parse refundTx for anchor check on node ${chainNode.id}: ${formatErrorForLog(parseError)}. This may indicate a corrupted refund transaction in the TreeNode; continuing with the original refund hex, but this transaction may be invalid.`,
           );
         }
 
@@ -385,6 +385,7 @@ export async function constructUnilateralExitFeeBumpPackages(
           availableUtxos,
           feeRate,
           undefined,
+          logger,
         );
 
         const feeBumpTx = btc.Transaction.fromPSBT(
@@ -443,7 +444,10 @@ export function hash160(data: Uint8Array): Uint8Array {
 }
 
 // Helper function to calculate transaction vSize from hex
-function calculateTransactionVSize(txHex: string): number {
+function calculateTransactionVSize(
+  txHex: string,
+  logger: Logger | undefined,
+): number {
   try {
     const txBytes = hexToBytes(txHex);
     const tx = getTxFromRawTxHex(txHex);
@@ -457,8 +461,8 @@ function calculateTransactionVSize(txHex: string): number {
 
     return txBytes.length;
   } catch (error) {
-    console.warn(
-      `Failed to calculate transaction vSize: ${error}, falling back to default estimate`,
+    logger?.warn(
+      `calculateTransactionVSize: failed to calculate transaction vSize: ${formatErrorForLog(error)}; falling back to default estimate`,
     );
     // Fall back to default for typical transactions
     return 191;
@@ -549,6 +553,7 @@ export function constructFeeBumpTx(
   utxos: Utxo[],
   feeRate: FeeRate,
   previousFeeBumpTx?: string, // Optional previous fee bump tx to chain from
+  logger?: Logger,
 ): { feeBumpPsbt: string; usedUtxos: Utxo[]; parentTx?: string } {
   // Validate inputs first
   if (!txHex || txHex.length === 0) {
@@ -629,7 +634,7 @@ export function constructFeeBumpTx(
   }
 
   // Calculate parent transaction size for CPFP fee calculation
-  const parentTxSize = calculateTransactionVSize(txHex);
+  const parentTxSize = calculateTransactionVSize(txHex, logger);
 
   // Select optimal UTXOs based on fee requirements
   const selectedUtxos = selectUtxosForFee(utxos, parentTxSize, feeRate);

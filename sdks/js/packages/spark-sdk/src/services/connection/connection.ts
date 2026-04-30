@@ -1,4 +1,4 @@
-import { isError } from "@lightsparkdev/core";
+import { isError, type Logger } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import type { Channel } from "nice-grpc";
 import type { RetryOptions } from "nice-grpc-client-middleware-retry";
@@ -27,6 +27,8 @@ import {
   SparkTokenServiceDefinition,
 } from "../../proto/spark_token.js";
 import { SparkCallOptions } from "../../types/grpc.js";
+import { formatUrlForLogs } from "../../utils/logging.js";
+import { LoggingService } from "../../utils/logging-service.js";
 import { WalletConfigService } from "../config.js";
 import { ServerTimeSync, getMonotonicTime } from "../time-sync.js";
 
@@ -258,6 +260,8 @@ export abstract class ConnectionManager {
   private timeSync: ServerTimeSync;
   private authMode: AuthMode;
   protected readonly sessionId: string;
+  protected readonly logger: Logger;
+  private readonly logging: LoggingService;
 
   // Note clientsByType is a per instance cache whereas channelCache is static and shared by all instances
   private clientsByType: Map<
@@ -271,11 +275,18 @@ export abstract class ConnectionManager {
 
   private identityPublicKeyHex?: string;
 
-  constructor(config: WalletConfigService, authMode: AuthMode = "identity") {
+  constructor(
+    config: WalletConfigService,
+    authMode: AuthMode = "identity",
+    logging = LoggingService.fromConfig(config),
+  ) {
     this.config = config;
-    this.timeSync = new ServerTimeSync();
     this.authMode = authMode;
     this.sessionId = uuidv7();
+    this.logging = logging;
+    this.logger = this.logging.logger("ConnectionManager");
+    this.timeSync = new ServerTimeSync({ logging: this.logging });
+    this.logging.wrapPrototypeMethods("ConnectionManager", this);
   }
 
   public getSessionId(): string {
@@ -408,6 +419,10 @@ export abstract class ConnectionManager {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
     this.identityPublicKeyHex = hex;
+    this.logging.rename(
+      "ConnectionManager",
+      `ConnectionManager:${hex.slice(0, 8)}`,
+    );
     return hex;
   }
 
@@ -466,12 +481,18 @@ export abstract class ConnectionManager {
               };
             } catch (error: unknown) {
               if (isError(error)) {
-                if (isExpiredChallengeError(error, attempt)) {
+                if (isExpiredChallengeError(error)) {
+                  this.logger.trace(
+                    `Authentication attempt ${attempt + 1} failed due to expired challenge, retrying...`,
+                  );
                   lastError = error;
                   continue;
                 }
 
-                if (isConnectionError(error, attempt)) {
+                if (isConnectionError(error)) {
+                  this.logger.trace(
+                    `Connection error: ${error.message}, retrying...`,
+                  );
                   lastError = error;
                   await new Promise((resolve) => setTimeout(resolve, 250));
                   continue;
@@ -556,6 +577,12 @@ export abstract class ConnectionManager {
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
+      const methodPath = call.method.path;
+      const safeAddress = formatUrlForLogs(address);
+      const startTime = this.getMonotonicTime();
+
+      this.logger.trace(`gRPC ${methodPath} ${safeAddress} -> start`);
+
       const metadata = this.prepareMetadata(Metadata(options.metadata));
       const authToken =
         this.authMode === "identity"
@@ -610,10 +637,18 @@ export abstract class ConnectionManager {
           result = await generator.next();
         }
 
-        if (result.value !== undefined) {
-          return result.value;
-        }
+        const durationMs = this.getMonotonicTime() - startTime;
+        this.logger.trace(
+          `gRPC ${methodPath} ${safeAddress} -> completed (+${durationMs}ms)`,
+        );
+        return result.value;
       } catch (error: unknown) {
+        const durationMs = this.getMonotonicTime() - startTime;
+        const message =
+          error instanceof Error ? error.message : String(error ?? "unknown");
+        this.logger.trace(
+          `gRPC ${methodPath} ${safeAddress} -> error (+${durationMs}ms): ${message}`,
+        );
         return yield* this.handleMiddlewareError(
           error,
           address,
@@ -669,27 +704,18 @@ export abstract class ConnectionManager {
   }
 }
 
-function isExpiredChallengeError(error: Error, attempt: number) {
-  const isExpired = error.message.includes("challenge expired");
-  if (isExpired) {
-    console.warn(
-      `Authentication attempt ${attempt + 1} failed due to expired challenge, retrying...`,
-    );
-  }
-  return isExpired;
+function isExpiredChallengeError(error: Error) {
+  return error.message.includes("challenge expired");
 }
 
-function isConnectionError(error: Error, attempt: number) {
-  const isConnectionError =
+function isConnectionError(error: Error) {
+  return (
     error.message.includes("RST_STREAM") ||
     error.message.includes("INTERNAL") ||
     error.message.includes("Internal server error") ||
     error.message.includes("unavailable") ||
     error.message.includes("UNAVAILABLE") ||
     error.message.includes("UNKNOWN") ||
-    error.message.includes("Received HTTP status code");
-  if (isConnectionError) {
-    console.warn(`Connection error: ${error.message}, retrying...`);
-  }
-  return isConnectionError;
+    error.message.includes("Received HTTP status code")
+  );
 }

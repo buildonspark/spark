@@ -144,7 +144,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.5",
-    "@lightsparkdev/core": "^1.4.9",
+    "@lightsparkdev/core": "^1.5.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.7.0",
     "@scure/base": "^1.2.4",

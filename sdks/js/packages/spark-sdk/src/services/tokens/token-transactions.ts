@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -43,6 +44,7 @@ import {
 } from "../../utils/token-identifier.js";
 import { validateTokenTransaction } from "../../utils/token-transaction-validation.js";
 import { sumTokenOutputs } from "../../utils/token-transactions.js";
+import { LoggingService } from "../../utils/logging-service.js";
 import { WalletConfigService } from "../config.js";
 import { ConnectionManager } from "../connection/connection.js";
 import { SigningOperator } from "../wallet-config.js";
@@ -85,13 +87,17 @@ export interface QueryTokenTransactionsWithFiltersParams {
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
   protected readonly connectionManager: ConnectionManager;
+  protected readonly logger: Logger;
 
   constructor(
     config: WalletConfigService,
     connectionManager: ConnectionManager,
+    logging = LoggingService.fromConfig(config),
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
+    this.logger = logging.logger("TokenTransactionService");
+    logging.wrapPrototypeMethods("TokenTransactionService", this);
   }
 
   private shouldUseTokenPrimitivesBindings(): boolean {

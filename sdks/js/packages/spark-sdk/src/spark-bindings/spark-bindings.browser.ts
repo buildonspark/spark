@@ -63,9 +63,7 @@ class SparkFrostBrowser extends SparkFrostBase {
     }
 
     if (SparkFrostBrowser.initError) {
-      throw new Error(
-        `SparkFrost: WASM module failed to initialize: ${SparkFrostBrowser.initError.message}`,
-      );
+      throw SparkFrostBrowser.initError;
     }
 
     if (SparkFrostBrowser.initPromise) {
@@ -79,10 +77,12 @@ class SparkFrostBrowser extends SparkFrostBase {
         SparkFrostBrowser.initialized = true;
         return result;
       } catch (err) {
-        console.error("SparkFrost: WASM initialization failed:", err);
         SparkFrostBrowser.initPromise = null;
-        SparkFrostBrowser.initError =
-          err instanceof Error ? err : new Error(String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        SparkFrostBrowser.initError = new Error(
+          `SparkFrost: WASM initialization failed: ${message}`,
+          { cause: err },
+        );
         throw SparkFrostBrowser.initError;
       }
     })();

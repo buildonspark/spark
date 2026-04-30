@@ -1,7 +1,10 @@
+import type { Logger } from "@lightsparkdev/core";
 import { throwIfAborted } from "abort-controller-x";
 import { Base64 } from "js-base64";
 import { ClientError, Metadata, Status } from "nice-grpc-common";
 import type { Transport } from "nice-grpc-web/lib/client/Transport.js";
+import { NoopLogger } from "../utils/logging.js";
+import type { LoggingService } from "../utils/logging-service.js";
 
 class GrpcCallData {
   responseHeaders: Metadata = new Metadata();
@@ -12,6 +15,8 @@ class GrpcCallData {
 
 export interface XHRTransportConfig {
   credentials?: boolean;
+  logger?: Logger;
+  logging?: LoggingService;
 }
 
 async function xhrPost(
@@ -19,6 +24,7 @@ async function xhrPost(
   metadata: Metadata,
   requestBody: BodyInit,
   config?: XHRTransportConfig,
+  logger: Logger = NoopLogger,
 ): Promise<GrpcCallData> {
   const callData: GrpcCallData = new GrpcCallData();
   return new Promise(function (resolve, reject) {
@@ -41,6 +47,7 @@ async function xhrPost(
       if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
         callData.responseHeaders = headersToMetadata(
           xhr.getAllResponseHeaders(),
+          logger,
         );
       } else if (xhr.readyState === XMLHttpRequest.DONE) {
         resolve(callData);
@@ -82,7 +89,10 @@ function concatenateChunks(chunks: Uint8Array[]): Uint8Array {
  * Transport for browsers based on `XMLHttpRequest` API.
  */
 export function XHRTransport(config?: XHRTransportConfig): Transport {
-  return async function* fetchTransport({
+  const logger =
+    config?.logging?.logger("XHRTransport") ?? config?.logger ?? NoopLogger;
+
+  const transport = async function* xhrTransport({
     url,
     body,
     metadata,
@@ -126,7 +136,7 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
       });
     }
 
-    const xhrData = await xhrPost(url, metadata, requestBody, config);
+    const xhrData = await xhrPost(url, metadata, requestBody, config, logger);
 
     yield {
       type: "header",
@@ -136,7 +146,7 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
     if (xhrData.grpcStatus !== Status.OK) {
       const decoder = new TextDecoder();
       const message = decoder.decode(concatenateChunks(xhrData.responseChunks));
-      console.warn(message, xhrData.statusMessage);
+      logger.warn(`${message} ${xhrData.statusMessage}`);
       throw new ClientError(
         method.path,
         xhrData.grpcStatus,
@@ -159,9 +169,19 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
       throwIfAborted(signal);
     }
   };
+
+  return (config?.logging?.wrap(
+    "XHRTransport",
+    "xhrTransport",
+    transport as (...args: unknown[]) => unknown,
+    undefined,
+  ) ?? transport) as Transport;
 }
 
-function headersToMetadata(headers: string): Metadata {
+function headersToMetadata(
+  headers: string,
+  logger: Logger = NoopLogger,
+): Metadata {
   const metadata = new Metadata();
   const arr = headers.trim().split(/[\r\n]+/);
 
@@ -174,7 +194,11 @@ function headersToMetadata(headers: string): Metadata {
       try {
         metadata.set(header, Base64.toUint8Array(value));
       } catch (e) {
-        console.warn(`Failed to decode binary metadata ${header}:`, e);
+        logger.warn(
+          `Failed to decode binary metadata ${header}: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
         metadata.set(header, value);
       }
     } else {

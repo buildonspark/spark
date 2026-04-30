@@ -1,4 +1,4 @@
-import { bytesToHex, hexToBytes } from "@lightsparkdev/core";
+import { bytesToHex, hexToBytes, type Logger } from "@lightsparkdev/core";
 import { uuidv7 } from "uuidv7";
 import { SparkValidationError } from "../errors/index.js";
 import SspClient from "../graphql/client.js";
@@ -6,6 +6,7 @@ import { TreeNode } from "../proto/spark.js";
 import { KeyDerivationType } from "../signer/types.js";
 import { SparkLeavesSwapRequestStatus, UserLeafInput } from "../types/index.js";
 import { chunkArray } from "../utils/chunkArray.js";
+import { LoggingService } from "../utils/logging-service.js";
 import { WalletConfigService } from "./config.js";
 import { LeafKeyTweak, TransferService } from "./transfer.js";
 
@@ -19,11 +20,17 @@ type RequestLeavesSwapParams = {
 };
 
 export default class SwapService {
+  private readonly logger: Logger;
+
   constructor(
     private readonly config: WalletConfigService,
     private readonly transferService: TransferService,
     private readonly sspClient: SspClient,
-  ) {}
+    logging = LoggingService.fromConfig(config),
+  ) {
+    this.logger = logging.logger("SwapService");
+    logging.wrapPrototypeMethods("SwapService", this);
+  }
 
   public async requestLeavesSwap({
     leaves,
@@ -168,7 +175,7 @@ export default class SwapService {
       for (let i = 0; i < transfer.leaves.length; i++) {
         const leaf = transfer.leaves[i];
         if (!leaf?.leaf) {
-          console.error(`[processSwapBatch] Leaf ${i + 1} is missing`);
+          this.logger.error(`executeSingleSwap: Leaf ${i + 1} is missing`);
           throw new Error("Failed to get leaf");
         }
 
@@ -215,7 +222,9 @@ export default class SwapService {
         request.status === SparkLeavesSwapRequestStatus.FAILED ||
         !request.inboundTransfer?.sparkId
       ) {
-        console.error("[processSwapBatch] Leave swap request returned null");
+        this.logger.error(
+          "executeSingleSwap: Leave swap request returned null",
+        );
         throw new Error("Failed to request leaves swap. Request failed.");
       }
 
@@ -224,17 +233,17 @@ export default class SwapService {
       );
 
       if (!incomingTransfer) {
-        console.error("[processSwapBatch] No incoming transfer found");
+        this.logger.error("executeSingleSwap: No incoming transfer found");
         throw new Error("Failed to get incoming transfer");
       }
 
       return await this.transferService.claimTransfer(incomingTransfer);
     } catch (e) {
-      console.error("[processSwapBatch] Error details:", {
-        error: e,
-        message: (e as Error).message,
-        stack: (e as Error).stack,
-      });
+      this.logger.error(
+        `executeSingleSwap: Error details: message=${
+          e instanceof Error ? e.message : String(e)
+        } stack=${e instanceof Error ? e.stack : undefined}`,
+      );
       throw new Error(`Failed to request leaves swap: ${e}`, { cause: e });
     }
   }

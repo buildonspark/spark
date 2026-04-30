@@ -1,4 +1,4 @@
-import { CurrencyUnit } from "@lightsparkdev/core";
+import { CurrencyUnit, type Logger } from "@lightsparkdev/core";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -139,6 +139,10 @@ import {
 import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 import {
+  LoggingService,
+  type ServiceMethodDecorator,
+} from "../utils/logging-service.js";
+import {
   getNetwork,
   Network,
   NetworkToProto,
@@ -202,8 +206,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected sspClient: SspClient | null = null;
   protected tokenTransactionService: TokenTransactionService;
   protected transferService: TransferService;
-  protected swapService: SwapService;
-  protected leafManager: LeafManager;
+  protected swapService!: SwapService;
+  protected leafManager!: LeafManager;
+  protected readonly logger: Logger;
+  private readonly logging: LoggingService;
 
   private claimTransferMutex = new Mutex();
   private claimTransfersInterval: Interval | null = null;
@@ -224,6 +230,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   protected abstract buildConnectionManager(
     config: WalletConfigService,
+    logging: LoggingService,
   ): ConnectionManager;
 
   constructor(options?: ConfigOptions, signerArg?: SparkSigner) {
@@ -239,39 +246,51 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       });
     }
-    this.connectionManager = this.buildConnectionManager(this.config);
-    this.signingService = new SigningService(this.config);
+    this.logging = LoggingService.fromConfig(this.config);
+    this.logger = this.logging.logger("SparkWallet");
+    this.connectionManager = this.buildConnectionManager(
+      this.config,
+      this.logging,
+    );
+    this.signingService = new SigningService(this.config, this.logging);
     this.depositService = new DepositService(
       this.config,
       this.connectionManager,
+      this.logging,
     );
     this.transferService = new TransferService(
       this.config,
       this.connectionManager,
       this.signingService,
+      this.logging,
     );
     this.tokenTransactionService = new TokenTransactionService(
       this.config,
       this.connectionManager,
+      this.logging,
     );
     this.tokenOutputManager = new TokenOutputManager(
       this.config.getTokenOutputLockExpiryMs(),
+      this.logging,
     );
     this.lightningService = new LightningService(
       this.config,
       this.connectionManager,
       this.signingService,
+      this.logging,
     );
     this.coopExitService = new CoopExitService(
       this.config,
       this.connectionManager,
       this.signingService,
+      this.logging,
     );
-    this.sspClient = new SspClient(this.config);
+    this.sspClient = new SspClient(this.config, { logging: this.logging });
     this.swapService = new SwapService(
       this.config,
       this.transferService,
       this.sspClient,
+      this.logging,
     );
     this.leafManager = new LeafManager(
       this.config,
@@ -290,9 +309,23 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           // run all steps
         }
       },
+      this.logging,
     );
 
     this.wrapPublicMethods();
+  }
+
+  private async updateLoggerContextWithIdentityPrefix() {
+    try {
+      const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+      const hex = Array.from(identityPublicKey)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      const suffix = hex.slice(0, 8);
+      this.logging.setInstanceSuffix(suffix);
+    } catch {
+      /* ignore */
+    }
   }
 
   public static async initialize<T extends SparkWallet>(
@@ -315,6 +348,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
 
     const initWalletResponse = await wrappedInit();
+    wallet.flushPendingMethodLogs();
     return initWalletResponse as InitWalletResponse<T>;
   }
 
@@ -410,10 +444,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     );
 
     const initWalletResponse = await wrappedInit();
+    wallet.flushPendingMethodLogs();
     return initWalletResponse as InitWalletResponse<T>;
   }
 
   private async createClientsAndSyncWallet() {
+    await this.updateLoggerContextWithIdentityPrefix();
     await this.connectionManager.createClients();
 
     // Initialize leaf manager before the stream starts so
@@ -436,10 +472,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   private logEvent(message: string) {
-    if (!this.config.getLog()) return;
-    console.info(
-      `[${new Date().toISOString()}][${this.connectionManager.getSessionId()}] [spark-sdk][event] ${message}`,
-    );
+    this.logger.trace(message);
+  }
+
+  private logStream(message: string) {
+    this.logger.trace(`setupBackgroundStream: ${message}`);
   }
 
   private getSspClient() {
@@ -460,9 +497,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       ) {
         const transfer = event.receiverTransfer.transfer;
         const traceId = event.receiverTransfer.traceId;
-        if (this.config.getLog() && traceId) {
-          console.info(
-            `[spark-sdk][stream] receiver transfer ${transfer.id} [traceId: ${traceId}]`,
+        if (traceId) {
+          this.logEvent(
+            `handleStreamEvent: Receiver transfer ${transfer.id} traceId=${traceId}`,
           );
         }
         const { senderIdentityPublicKey, receiverIdentityPublicKey } = transfer;
@@ -471,7 +508,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           receiverIdentityPublicKey,
         );
         this.logEvent(
-          `Receiver transfer: id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leaves=${transfer.leaves.length} selfTransfer=${isSelf}`,
+          `handleStreamEvent: Receiver transfer: id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leaves=${transfer.leaves.length} selfTransfer=${isSelf}`,
         );
 
         // Don't claim if this is a self transfer, that's handled elsewhere
@@ -482,7 +519,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             .filter((l): l is TreeNode => !!l);
           if (incomingLeaves.length > 0) {
             this.logEvent(
-              `Receiver transfer ${transfer.id}: adding ${incomingLeaves.length} incoming leaves (${incomingLeaves.reduce((a, l) => a + l.value, 0)} sats) ids=[${incomingLeaves.map((l) => l.id).join(",")}]`,
+              `handleStreamEvent: Receiver transfer ${transfer.id}: adding ${incomingLeaves.length} incoming leaves (${incomingLeaves.reduce((a, l) => a + l.value, 0)} sats) ids=[${incomingLeaves.map((l) => l.id).join(",")}]`,
             );
             await this.leafManager.addIncomingLeaves(
               incomingLeaves,
@@ -505,31 +542,31 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           l.leaf ? [l.leaf.id] : [],
         );
         this.logEvent(
-          `Counter-swap receiver transfer (skipped): id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${counterSwapLeafIds.join(",")}]`,
+          `handleStreamEvent: Counter-swap receiver transfer (skipped): id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${counterSwapLeafIds.join(",")}]`,
         );
       } else if (isSenderTransferStreamEvent(event)) {
-        if (this.config.getLog() && event.senderTransfer.traceId) {
-          console.info(
-            `[spark-sdk][stream] sender transfer ${event.senderTransfer.transfer.id} [traceId: ${event.senderTransfer.traceId}]`,
+        const transfer = event.senderTransfer.transfer;
+        if (event.senderTransfer.traceId) {
+          this.logEvent(
+            `handleStreamEvent: Sender transfer ${transfer.id} traceId=${event.senderTransfer.traceId}`,
           );
         }
-        const transfer = event.senderTransfer.transfer;
         const senderLeafIds = transfer.leaves.flatMap((l) =>
           l.leaf ? [l.leaf.id] : [],
         );
         this.logEvent(
-          `Sender transfer: id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${senderLeafIds.join(",")}]`,
+          `handleStreamEvent: Sender transfer: id=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue} leafIds=[${senderLeafIds.join(",")}]`,
         );
         await this.leafManager.handleTransferEvent(transfer);
       } else if (isDepositStreamEvent(event)) {
         const deposit = event.deposit.deposit;
-        if (this.config.getLog() && event.deposit.traceId) {
-          console.info(
-            `[spark-sdk][stream] deposit ${deposit.id} [traceId: ${event.deposit.traceId}]`,
+        if (event.deposit.traceId) {
+          this.logEvent(
+            `handleStreamEvent: Deposit ${deposit.id} traceId=${event.deposit.traceId}`,
           );
         }
         this.logEvent(
-          `Deposit: id=${deposit.id} status=${deposit.status} value=${deposit.value}`,
+          `handleStreamEvent: Deposit: id=${deposit.id} status=${deposit.status} value=${deposit.value}`,
         );
         const wasAdded = await this.leafManager.handleDepositEvent(deposit);
         if (deposit.status === "AVAILABLE" && wasAdded) {
@@ -554,7 +591,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         });
       }
     } catch (error) {
-      console.error("Error processing event", error);
+      this.logger.error(
+        `Error processing event: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 
@@ -599,7 +640,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         tokenBalances,
       });
     } catch (error) {
-      console.error("Error flushing token sync", error);
+      this.logger.error(
+        `Error flushing token sync: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       for (const id of ids) {
         this.tokenSyncPendingIds.add(id);
       }
@@ -614,15 +659,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const STREAM_HEARTBEAT_TIMEOUT_MS = 15_000;
     type StreamActivityTimeoutHandle = ReturnType<typeof setTimeout> & {
       unref?: () => void;
-    };
-    const loggingEnabled = this.config.getLog();
-    const logStream = (message: string) => {
-      if (!loggingEnabled) {
-        return;
-      }
-      console.info(
-        `[${new Date().toISOString()}] [spark-sdk][stream] ${message}`,
-      );
     };
 
     const delay = (ms: number, signal: AbortSignal) => {
@@ -699,7 +735,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         heartbeatTimeoutError = new Error(
           `UNAVAILABLE: stream heartbeat timed out after ${STREAM_HEARTBEAT_TIMEOUT_MS}ms`,
         );
-        logStream(
+        this.logStream(
           `heartbeat timeout after ${STREAM_HEARTBEAT_TIMEOUT_MS}ms; aborting current stream attempt`,
         );
         streamAttemptController.abort();
@@ -707,14 +743,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       try {
         const address = this.config.getCoordinatorAddress();
-        logStream(`subscribing to ${address} (retry=${retryCount})`);
+        this.logStream(`subscribing to ${address} (retry=${retryCount})`);
         const stream = await this.connectionManager.subscribeToEvents(
           address,
           streamAttemptController.signal,
         );
-        logStream("subscribeToEvents returned async iterator");
+        this.logStream("subscribeToEvents returned async iterator");
         const claimedTransfersIds = await this.claimTransfers();
-        logStream(
+        this.logStream(
           `claimTransfers completed claimedTransfers=${claimedTransfersIds.length}`,
         );
         let heartbeatListenerEnabled = false;
@@ -723,7 +759,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         try {
           for await (const data of stream) {
             if (streamController.signal.aborted) {
-              logStream("stream controller aborted while iterating");
+              this.logStream("stream controller aborted while iterating");
               break;
             }
 
@@ -740,11 +776,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               continue;
             }
 
-            logStream(
+            this.logStream(
               `stream event received type=${describeStreamEvent(data.event)}`,
             );
             if (isConnectedStreamEvent(data.event)) {
-              logStream("connected");
+              this.logStream("connected");
               this.emit(SparkWalletEvent.StreamConnected);
               retryCount = 0;
             }
@@ -770,7 +806,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               streamActivityTimeout.arm();
             }
           }
-          logStream("stream iterator completed without throwing");
+          this.logStream("stream iterator completed without throwing");
           if (
             heartbeatTimeoutError != null &&
             !streamController.signal.aborted
@@ -778,7 +814,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             throw heartbeatTimeoutError;
           }
         } catch (error) {
-          logStream(
+          this.logStream(
             `stream iterator threw: ${
               error instanceof Error ? error.message : String(error)
             }`,
@@ -788,7 +824,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       } catch (error) {
         const retryError = heartbeatTimeoutError ?? error;
         if (streamController.signal.aborted) {
-          logStream("stream loop aborted");
+          this.logStream("stream loop aborted");
           break;
         }
 
@@ -799,7 +835,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
         retryCount = attempt;
 
-        logStream(
+        this.logStream(
           `error: ${
             retryError instanceof Error
               ? retryError.message
@@ -826,7 +862,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       } finally {
         streamActivityTimeout.clear();
         cleanupAttempt();
-        logStream(
+        this.logStream(
           `stream loop iteration finished retryCount=${retryCount} aborted=${streamController.signal.aborted}`,
         );
       }
@@ -926,11 +962,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           selectedOutputs,
         });
 
-        console.log(
+        this.logger.trace(
           `Consolidated ${selectedOutputs.length} outputs across ${receiverOutputs.length} tokens in transaction ${txId}`,
         );
       } catch (error) {
-        console.error("Failed to optimize token outputs:", error);
+        this.logger.error(
+          `Failed to optimize token outputs: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     } finally {
       this.tokenOptimizationInProgress = false;
@@ -955,7 +995,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       try {
         await this.optimizeTokenOutputs();
       } catch (error) {
-        console.error("Error in periodic token output optimization:", error);
+        this.logger.error(
+          `Error in periodic token output optimization: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }, intervalMs);
   }
@@ -2534,7 +2578,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     while (offset >= 0) {
       // Prevent infinite loop in case error with coordinator
       if (pastOffsets.has(offset)) {
-        console.warn("Offset has already been seen, stopping");
+        this.logger.warn("Offset has already been seen, stopping");
         break;
       }
 
@@ -3262,7 +3306,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         this.claimTransfer({ transfer, emit })
           .then(() => transfer.id)
           .catch((error) => {
-            console.warn(`Failed to claim transfer ${transfer.id}:`, error);
+            this.logger.warn(
+              `Failed to claim transfer ${transfer.id}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
             return null;
           }),
       );
@@ -3493,9 +3541,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       const sparkFallbackAddress = decodedInvoice.fallbackAddress;
 
       if (!sparkFallbackAddress) {
-        console.warn(
-          "No spark fallback address found in lightning invoice",
-          invoice.invoice.encodedInvoice,
+        this.logger.warn(
+          `No spark fallback address found in lightning invoice ${invoice.invoice.encodedInvoice}`,
         );
         throw new SparkValidationError(
           "No spark fallback address found in lightning invoice",
@@ -3614,7 +3661,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   ): Promise<WalletTransfer | undefined> {
     const fallbackAddress = decodedInvoice.fallbackAddress;
     if (!fallbackAddress) {
-      console.warn("No fallback address found in invoice");
+      this.logger.warn("No fallback address found in invoice");
       return undefined;
     }
 
@@ -3624,7 +3671,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     // spark address prefixes (sparkrt vs sparkl)
     const sparkNetwork = this.tryGetNetworkFromSparkAddress(fallbackAddress);
     if (sparkNetwork && !this.isCompatibleNetwork(network, sparkNetwork)) {
-      console.warn(
+      this.logger.warn(
         `Spark address network ${sparkNetwork} incompatible with invoice network ${Network[network]}`,
       );
       return undefined;
@@ -3651,7 +3698,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     if (!isValidSparkAddressFallback(fallbackAddress)) {
-      console.warn("Invalid spark fallback address", fallbackAddress);
+      this.logger.warn(`Invalid spark fallback address ${fallbackAddress}`);
       return undefined;
     }
 
@@ -3846,7 +3893,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (sparkPayment) {
         return sparkPayment;
       }
-      console.warn(
+      this.logger.warn(
         "No valid spark data found in invoice. Defaulting to lightning.",
       );
     }
@@ -5562,7 +5609,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       return signedTxHex;
     } catch (error) {
-      console.error("❌ Error signing transaction:", error);
+      this.logger.error(
+        `Error signing transaction: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       throw error;
     }
   }
@@ -5614,7 +5665,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       return null;
     } catch (error) {
-      console.warn("Error during key auto-detection:", error);
+      this.logger.warn(
+        `Error during key auto-detection: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       return null;
     }
   }
@@ -5860,7 +5915,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           true,
         );
       } catch (error) {
-        console.error("Error in periodic transfer claiming:", error);
+        this.logger.error(
+          `Error in periodic transfer claiming: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }, 10000);
   }
@@ -5969,48 +6028,63 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     originalFn: (...args: unknown[]) => Promise<unknown>,
     wallet: SparkWallet,
   ) {
-    return async (...args: unknown[]) => {
-      const startTime = Date.now();
-      try {
-        const result = await originalFn.apply(wallet, args);
-        if (wallet.config.getLog()) {
-          const serverTraceId = wallet.connectionManager.lastServerTraceId;
-          console.info(
-            `[spark-sdk] ${methodName} completed in ${Date.now() - startTime}ms` +
-              (serverTraceId ? ` [serverTraceId: ${serverTraceId}]` : ""),
-          );
+    return wallet.logging.wrap(
+      "SparkWallet",
+      methodName,
+      originalFn,
+      wallet,
+      wallet.getPublicMethodDecorator(),
+    ) as (...args: unknown[]) => Promise<unknown>;
+  }
+
+  private getPublicMethodDecorator(): ServiceMethodDecorator {
+    return (_methodName, originalFn, receiver) =>
+      (async (...args: unknown[]) => {
+        try {
+          return await originalFn.apply(receiver, args);
+        } catch (error) {
+          const serverTraceId = this.connectionManager.lastServerTraceId;
+          throw await SparkWallet.handlePublicMethodError(error, {
+            wallet: this,
+            serverTraceId,
+          });
         }
-        return result;
-      } catch (error) {
-        const serverTraceId = wallet.connectionManager.lastServerTraceId;
-        const err = await SparkWallet.handlePublicMethodError(error, {
-          wallet,
-          serverTraceId,
-        });
-        throw err;
-      }
-    };
+      }) as (...args: unknown[]) => Promise<unknown>;
   }
 
   protected wrapPublicMethod<M extends keyof SparkWallet>(methodName: M) {
-    const original = this[methodName];
+    this.logging.wrapMethodOnTarget("SparkWallet", this, String(methodName), {
+      decorator: this.getPublicMethodDecorator(),
+      errorMessage: `Method ${String(methodName)} is not a function on SparkWallet.`,
+    });
+  }
 
-    if (typeof original !== "function") {
-      throw new Error(`Method ${methodName} is not a function on SparkWallet.`);
-    }
+  protected flushPendingMethodLogs() {
+    this.logging.flushPendingLogs("SparkWallet");
+  }
 
-    const originalFn = original as (...args: unknown[]) => Promise<unknown>;
-    const wrapped = SparkWallet.wrapMethod(
-      String(methodName),
-      originalFn,
-      this,
-    ) as SparkWallet[M];
-    (this as SparkWallet)[methodName] = wrapped;
+  public setMethodLoggingEnabled(enabled: boolean) {
+    this.logging.setMethodLoggingEnabled("SparkWallet", enabled);
+  }
+
+  public isMethodLoggingEnabled() {
+    return this.logging.isMethodLoggingEnabled("SparkWallet");
+  }
+
+  protected getPublicMethodNames(): readonly string[] {
+    return PUBLIC_SPARK_WALLET_METHODS;
   }
 
   private wrapPublicMethods() {
-    PUBLIC_SPARK_WALLET_METHODS.forEach((methodName) =>
-      this.wrapPublicMethod(methodName),
+    this.logging.wrapNamedMethods(
+      "SparkWallet",
+      this,
+      this.getPublicMethodNames(),
+      {
+        decorator: this.getPublicMethodDecorator(),
+        errorMessage: (methodName) =>
+          `Method ${methodName} is not a function on SparkWallet.`,
+      },
     );
   }
 }

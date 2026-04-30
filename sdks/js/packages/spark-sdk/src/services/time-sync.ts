@@ -2,6 +2,10 @@
  * Cross-platform monotonic clock
  * Returns time in milliseconds with sub-millisecond precision.
  */
+import type { Logger } from "@lightsparkdev/core";
+import { NoopLogger } from "../utils/logging.js";
+import { LoggingService } from "../utils/logging-service.js";
+
 function getMonotonicTime(): number {
   // Node.js
   if (typeof process !== "undefined" && process.hrtime) {
@@ -19,6 +23,19 @@ function getMonotonicTime(): number {
 
 export class ServerTimeSync {
   private estimatedServerOffsetMs: number | null = null;
+  private logger: Logger;
+
+  constructor({
+    logger,
+    logging,
+  }: { logger?: Logger; logging?: LoggingService } = {}) {
+    this.logger = logging?.logger("ServerTimeSync") ?? logger ?? NoopLogger;
+    logging?.wrapPrototypeMethods("ServerTimeSync", this);
+  }
+
+  public setLogger(logger: Logger) {
+    this.logger = logger;
+  }
 
   /**
    * Records a time synchronization sample from a gRPC response.
@@ -37,7 +54,7 @@ export class ServerTimeSync {
     const serverEndTimeMs = new Date(serverEndDateHeader).getTime();
 
     if (isNaN(serverEndTimeMs)) {
-      console.warn("Invalid server date header:", serverEndDateHeader);
+      this.logger.warn(`Invalid server date header: ${serverEndDateHeader}`);
       return;
     }
 

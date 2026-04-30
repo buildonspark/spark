@@ -1,3 +1,4 @@
+import type { Logger } from "@lightsparkdev/core";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha2";
 import { hexToBytes } from "@noble/hashes/utils";
@@ -16,6 +17,7 @@ import {
   getSigHashFromTx,
 } from "../utils/bitcoin.js";
 import { subtractPublicKeys } from "../utils/keys.js";
+import { LoggingService } from "../utils/logging-service.js";
 import { getNetwork } from "../utils/network.js";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js";
 import {
@@ -58,13 +60,17 @@ export type CreateTreeRootMultiUtxoParams = {
 export class DepositService {
   private readonly config: WalletConfigService;
   private readonly connectionManager: ConnectionManager;
+  protected readonly logger: Logger;
 
   constructor(
     config: WalletConfigService,
     connectionManager: ConnectionManager,
+    logging = LoggingService.fromConfig(config),
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
+    this.logger = logging.logger("DepositService");
+    logging.wrapPrototypeMethods("DepositService", this);
   }
 
   private async validateDepositAddress({

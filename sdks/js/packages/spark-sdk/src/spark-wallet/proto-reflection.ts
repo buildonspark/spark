@@ -9,6 +9,10 @@ import { getSparkDescriptorBytes } from "./proto-descriptors.js";
 // Cache for the registry to avoid reloading descriptors
 let _registry: any = null;
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Helper function to process nested messages recursively
  */
@@ -77,8 +81,10 @@ function getRegistry() {
 
     return _registry;
   } catch (error) {
-    console.error("Failed to load protobuf descriptors:", error);
-    throw error;
+    throw new Error(
+      `Failed to load protobuf descriptors: ${formatErrorMessage(error)}`,
+      { cause: error },
+    );
   }
 }
 
@@ -97,11 +103,6 @@ export function getFieldNumbers(
     const messageDescriptor = registry.messageMap.get(messageTypeName);
 
     if (!messageDescriptor) {
-      console.warn(`Message type not found: ${messageTypeName}`);
-      console.log(
-        "Available message types:",
-        Array.from(registry.messageMap.keys()),
-      );
       return {};
     }
 
@@ -115,8 +116,7 @@ export function getFieldNumbers(
     }
 
     return fieldNumbers;
-  } catch (error) {
-    console.error(`Failed to get field numbers for ${messageTypeName}:`, error);
+  } catch {
     return {};
   }
 }
@@ -132,8 +132,7 @@ export function listMessageTypes(): string[] {
     const types = Array.from(registry.messageMap.keys()) as string[];
 
     return types.sort();
-  } catch (error) {
-    console.error("Failed to list message types:", error);
+  } catch {
     return [];
   }
 }
