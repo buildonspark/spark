@@ -34,19 +34,10 @@ func NewCooperativeExitHandler(config *so.Config) *CooperativeExitHandler {
 	}
 }
 
-// CooperativeExit signs refund transactions for leaves, spending connector outputs.
+// CooperativeExitV2 signs refund transactions for leaves, spending connector outputs.
 // It will lock the transferred leaves based on seeing a txid confirming on-chain.
-func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	return h.cooperativeExit(ctx, req, false)
-}
-
-// CooperativeExitV2 is the same as above, but it enforces the use of direct
-// transactions for unilateral exits.
-func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	return h.cooperativeExit(ctx, req, true)
-}
-
-func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (resp *pb.CooperativeExitResponse, retErr error) {
+// It enforces the use of direct transactions for unilateral exits.
+func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.CooperativeExitRequest) (resp *pb.CooperativeExitResponse, retErr error) {
 	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer owner identity public key: %w", err))
@@ -56,7 +47,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	}
 
 	if req.Transfer.TransferPackage != nil {
-		return h.cooperativeExitWithTransferPackage(ctx, req, requireDirectTx)
+		return h.cooperativeExitWithTransferPackage(ctx, req)
 	}
 
 	transferHandler := NewTransferHandler(h.config)
@@ -69,11 +60,10 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		if job.DirectRefundTxSigningJob != nil {
 			directLeafRefundMap[job.LeafId] = job.DirectRefundTxSigningJob.RawTx
 		}
-		if job.DirectFromCpfpRefundTxSigningJob != nil {
-			directFromCpfpLeafRefundMap[job.LeafId] = job.DirectFromCpfpRefundTxSigningJob.RawTx
-		} else if requireDirectTx {
+		if job.DirectFromCpfpRefundTxSigningJob == nil {
 			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
+		directFromCpfpLeafRefundMap[job.LeafId] = job.DirectFromCpfpRefundTxSigningJob.RawTx
 	}
 
 	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
@@ -125,7 +115,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		directFromCpfpLeafRefundMap,
 		nil,
 		TransferRoleCoordinator,
-		requireDirectTx,
+		true,
 		"",
 		uuid.Nil,
 		req.GetConnectorTx(),
@@ -219,7 +209,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 // the client includes the TransferPackage directly. The SO aggregates signatures internally
 // and syncs with other operators in one call, instead of requiring a separate
 // FinalizeTransferWithTransferPackage call.
-func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (*pb.CooperativeExitResponse, error) {
+func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	transferHandler := NewTransferHandler(h.config)
 
@@ -268,7 +258,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		leafDirectFromCpfpRefundMap,
 		leafTweakMap,
 		TransferRoleCoordinator,
-		requireDirectTx,
+		true,
 		"",
 		uuid.Nil,
 		req.GetConnectorTx(),
