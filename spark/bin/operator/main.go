@@ -839,6 +839,15 @@ func main() {
 	}))
 	mux.Handle("/metrics", promhttp.Handler())
 
+	otelHTTPOpts := []otelhttp.Option{
+		otelhttp.WithTracerProvider(noop.TracerProvider{}), // Disable tracing, let gRPC server handle it.
+		otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
+			return []attribute.KeyValue{
+				attribute.String(string(semconv.HTTPRouteKey), r.URL.Path),
+			}
+		}),
+	}
+
 	var grpcListener net.Listener
 	if useNativeGRPC {
 		logger.Info("Starting with separate gRPC + HTTP servers",
@@ -860,7 +869,7 @@ func main() {
 			return nil
 		})
 
-		mux.Handle("/", wrappedGrpc)
+		mux.Handle("/", otelhttp.NewHandler(wrappedGrpc, "server", otelHTTPOpts...))
 	} else {
 		logger.Info("Starting with ServeHTTP multiplexing",
 			zap.Uint64("port", args.HttpPort))
@@ -885,12 +894,7 @@ func main() {
 					},
 				),
 				"server",
-				otelhttp.WithTracerProvider(noop.TracerProvider{}), // Disable tracing, let gRPC server handle it.
-				otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
-					return []attribute.KeyValue{
-						attribute.String(string(semconv.HTTPRouteKey), r.URL.Path),
-					}
-				}),
+				otelHTTPOpts...,
 			),
 		)
 	}
