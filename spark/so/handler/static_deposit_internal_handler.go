@@ -555,7 +555,8 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 		return nil, fmt.Errorf("failed to verify on-chain utxo: %w", err)
 	}
 	if targetUtxo == nil {
-		return nil, fmt.Errorf("on-chain utxo not found or not confirmed")
+		return nil, errors.FailedPreconditionInsufficientConfirmations(
+			fmt.Errorf("on-chain utxo not found or not confirmed"))
 	}
 
 	swap, err := db.UtxoSwap.Query().
