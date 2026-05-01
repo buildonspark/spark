@@ -37,6 +37,10 @@ const (
 	KnobReadMIMODataModelQueryPendingTransfers = "spark.so.read_mimo_data_model_query_pending_transfers"
 	KnobReadMIMODataModelGetStuckTransfers     = "spark.so.read_mimo_data_model_get_stuck_transfers"
 
+	// Per-call sampling rate (0–100) for the "transfer query invoked" caller-attribution log.
+	// Default 0 = off; bump to 100 (or a small percentage) during diagnosis.
+	KnobLogTransferQueryInvocations = "spark.so.log_transfer_query_invocations"
+
 	KnobSoSigningCommitmentNodeLimit  = "spark.so.signing_commitments.nodes_limit"
 	KnobSoSigningCommitmentCountLimit = "spark.so.signing_commitments.count_limit"
 

@@ -1932,9 +1932,26 @@ func (h *TransferHandler) checkTransferAccessMIMO(
 	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, senderPubkey, receiverPubkey, accessMap)
 }
 
-func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, pendingOnly bool, isSSP bool) (*pb.QueryTransfersResponse, error) {
+func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, pendingOnly bool, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
+
+	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
+	start := time.Now()
+	defer func() {
+		resultCount := 0
+		if resp != nil {
+			resultCount = len(resp.Transfers)
+		}
+		logQueryTransfersInvocation(ctx, "query_transfers", filter,
+			zap.Bool("pending_only", pendingOnly),
+			zap.Bool("is_ssp", isSSP),
+			zap.Bool("use_mimo", useMIMO),
+			zap.Duration("elapsed", time.Since(start)),
+			zap.Int("result_count", resultCount),
+			zap.Error(err),
+		)
+	}()
 
 	if filter.GetParticipant() == nil && len(filter.TransferIds) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "must specify either filter.Participant or filter.TransferIds")
@@ -1966,20 +1983,29 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	// query strategy here needs reworking before multi-sender support is
 	// enabled — both the inverted lookups and the counter-swap filter (which
 	// assumes a single SSP identity per swap).
-	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
-
 	var filterType string
-	switch filter.Participant.(type) {
+	var hasPubkey bool
+	switch p := filter.Participant.(type) {
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
 		filterType = "receiver"
+		hasPubkey = len(p.ReceiverIdentityPublicKey) > 0
 	case *pb.TransferFilter_SenderIdentityPublicKey:
 		filterType = "sender"
+		hasPubkey = len(p.SenderIdentityPublicKey) > 0
 	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
 		filterType = "sender_or_receiver"
+		hasPubkey = len(p.SenderOrReceiverIdentityPublicKey) > 0
 	default:
 		filterType = "none"
 	}
-	metrics := newTransferQueryRecorder("query_transfers", useMIMO, filterType)
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:       "query_transfers",
+		MIMOEnabled:     useMIMO,
+		FilterType:      filterType,
+		HasPubkey:       hasPubkey,
+		HasStatusFilter: len(filter.Statuses) > 0,
+		HasTypeFilter:   len(filter.Types) > 0,
+	})
 
 	var transferPredicate []predicate.Transfer
 
@@ -2283,7 +2309,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
-	metrics := newTransferQueryRecorder("get_ssp_counter_swap_filter", false, "sender")
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:   "get_ssp_counter_swap_filter",
+		MIMOEnabled: false,
+		FilterType:  "sender",
+		HasPubkey:   true,
+	})
 	var resultCount int
 	var internalErr error
 	defer func() { metrics.record(ctx, resultCount, internalErr) }()
@@ -2399,9 +2430,23 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 //
 // The participant-nil branch from legacy queryTransfers is intentionally
 // not implemented here — the routing layer handles it.
-func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter *pb.TransferFilter) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryPendingTransfersMIMO")
 	defer span.End()
+
+	start := time.Now()
+	defer func() {
+		resultCount := 0
+		if resp != nil {
+			resultCount = len(resp.Transfers)
+		}
+		logQueryTransfersInvocation(ctx, "query_pending_transfers", filter,
+			zap.Bool("use_mimo", true),
+			zap.Duration("elapsed", time.Since(start)),
+			zap.Int("result_count", resultCount),
+			zap.Error(err),
+		)
+	}()
 
 	if filter.GetParticipant() == nil {
 		// Defensive: routing should have sent us to legacy. If we got here
@@ -2446,7 +2491,13 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		return nil, fmt.Errorf("invalid participant identity public key: %w", err)
 	}
 
-	metrics := newTransferQueryRecorder("query_pending_transfers", true, filterType)
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:     "query_pending_transfers",
+		MIMOEnabled:   true,
+		FilterType:    filterType,
+		HasPubkey:     true,
+		HasTypeFilter: len(filter.Types) > 0,
+	})
 
 	// Upfront access check.
 	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletIdentityPubkey)
