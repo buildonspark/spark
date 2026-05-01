@@ -26,7 +26,7 @@ import (
 const (
 	retypeSSPCompensationDefaultBatchSize = 100
 	// Bump the version suffix to invalidate stale cursors and force a restart from the seed.
-	retypeCursorKeyPrefix = "retype_ssp_compensation_cursor_v1"
+	retypeCursorKeyPrefix = "retype_ssp_compensation_cursor_v2"
 	// Buffer subtracted from the task deadline so we can finish the current batch,
 	// save the cursor, and return gracefully before the middleware cancels us.
 	retypeSoftDeadlineBuffer = 30 * time.Second
