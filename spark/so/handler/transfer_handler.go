@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"slices"
@@ -49,6 +50,7 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/mimo"
 	"github.com/lightsparkdev/spark/so/partner"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -2166,6 +2168,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		// Filter out legacy SSP "recovery transfers" — when a counter-swap
 		// failed, the SSP sent a plain transfer instead. No longer occurs
 		// with swap v3, but historical data still needs filtering.
+		// TODO(SP-2727): https://lightspark.atlassian.net/browse/SP-2727
 		if filterSSPCounterSwap && walletIdentityPubkey != nil {
 			if pred := h.getSSPCounterSwapFilter(ctx, db, network, *walletIdentityPubkey); pred != nil {
 				transferPredicate = append(transferPredicate, pred)
@@ -2209,6 +2212,8 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}
 
+	// ORDER BY create_time only — tied rows return in indeterminate Postgres
+	// order. Pre-existing; MIMO path fixes this- orders by (create_time, id).
 	var query *ent.TransferQuery
 	if filter.Order == pb.Order_ASCENDING {
 		query = baseQuery.Order(ent.Asc(enttransfer.FieldCreateTime))
@@ -2216,8 +2221,8 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		query = baseQuery.Order(ent.Desc(enttransfer.FieldCreateTime))
 	}
 
-	if filter.Limit > 100 || filter.Limit == 0 {
-		filter.Limit = 100
+	if filter.Limit > maxTransferPageSize || filter.Limit == 0 {
+		filter.Limit = maxTransferPageSize
 	}
 	query = query.Limit(int(filter.Limit))
 
@@ -2231,6 +2236,8 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		return nil, fmt.Errorf("unable to query transfers: %w", err)
 	}
 
+	// Pre-existing bug: pagination already ran, so dropping access-rejected rows here
+	// returns a short page.
 	var transferProtos []*pb.Transfer
 	accessMap := make(map[keys.Public]bool)
 	for _, transfer := range transfers {
@@ -2307,7 +2314,64 @@ func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.C
 	)
 }
 
+// participantPubkeyHex returns a lowercase-hex representation of the
+// pubkey from filter.Participant, or "" if no participant is set. Used as
+// a knob target so RolloutRandomTarget below can be ramped per wallet.
+//
+// Each proto-generated Get* accessor returns nil if a different variant
+// is set, so we walk the three variants in order and hex-encode whichever
+// is non-nil. hex.EncodeToString(nil) returns "", which falls through to
+// the nil-participant audit branch.
+func participantPubkeyHex(filter *pb.TransferFilter) string {
+	pk := filter.GetReceiverIdentityPublicKey()
+	if pk == nil {
+		pk = filter.GetSenderIdentityPublicKey()
+	}
+	if pk == nil {
+		pk = filter.GetSenderOrReceiverIdentityPublicKey()
+	}
+	return hex.EncodeToString(pk)
+}
+
 func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+	// Routing strategy:
+	//   - Bare knob value covers the broad rollout %.
+	//   - Per-pubkey overrides via @<pubkeyHex> let us pin specific wallets
+	//     (notably the SSP) above or below the broad rate during ramp-up,
+	//     including hard 0% killswitches per wallet.
+	//
+	// RolloutRandomTarget falls back to the defaultValue argument when no
+	// @target value is set; passing the bare knob value as the default
+	// gives "broad rate, with per-wallet overrides" semantics in a single
+	// call.
+	knobsSvc := knobs.GetKnobsService(ctx)
+	pubkeyHex := participantPubkeyHex(filter)
+	var useMIMO bool
+	if pubkeyHex != "" {
+		bareValue := knobsSvc.GetValue(knobs.KnobReadMIMODataModelQueryPendingTransfers, 0)
+		useMIMO = knobsSvc.RolloutRandomTarget(
+			knobs.KnobReadMIMODataModelQueryPendingTransfers, &pubkeyHex, bareValue)
+	}
+
+	if useMIMO {
+		return h.queryPendingTransfersMIMO(ctx, filter)
+	}
+
+	// Nil-participant audit log: if the broad rollout would have routed this
+	// to MIMO, record that we couldn't (MIMO requires a participant). No
+	// production caller (JS SDK, sparkcore SSP) sends nil-participant on this
+	// RPC; any non-zero rate in prod warrants investigating the call surface.
+	if pubkeyHex == "" && knobsSvc.RolloutRandom(knobs.KnobReadMIMODataModelQueryPendingTransfers, 0) {
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Sugar().Warnf(
+			"QueryPendingTransfers nil-participant fallback to legacy: transfer_ids=%d types=%d limit=%d offset=%d",
+			len(filter.TransferIds), len(filter.Types), filter.Limit, filter.Offset,
+		)
+		queryPendingNilParticipantFallback.Add(ctx, 1)
+	}
+
+	// Legacy path also handles the (Participant != nil, knob off / not
+	// targeted) case for the safe transition from old to new behavior.
 	return h.queryTransfers(ctx, filter, true, false)
 }
 
@@ -2315,7 +2379,188 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 	return h.queryTransfers(ctx, filter, false, isSSP)
 }
 
+// queryPendingTransfersMIMO is the MIMO-native implementation of
+// QueryPendingTransfers. The routing in QueryPendingTransfers guarantees:
+//   - filter.Participant is non-nil (caller-required; nil-participant traffic
+//     is logged + counted and routed to legacy queryTransfers)
+//   - KnobReadMIMODataModelQueryPendingTransfers is on
+//   - this is the pendingOnly path; isSSP is irrelevant — the public RPC
+//     never sets it. SSP traffic lands here.
+//
+// Status filtering is partitioned by participant role:
+//   - receiver-side filters on transfer_receivers.status (per-receiver claim
+//     state) for the 5 pending statuses (RECEIVER_CLAIM_PENDING + 4
+//     RECEIVER_*). Drives idx_transferreceiver_claim_pending_pubkey_time.
+//   - sender-side filters on transfers.status + expiry_time < NOW().
+//
+// Marshaling: when the participant is a receiver of the transfer,
+// MarshalProtoForReceiver filters leaves to just that receiver's leaves
+// (claim flow). For multi-receiver MIMO transfers this is load-bearing.
+//
+// The participant-nil branch from legacy queryTransfers is intentionally
+// not implemented here — the routing layer handles it.
+func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.queryPendingTransfersMIMO")
+	defer span.End()
+
+	if filter.GetParticipant() == nil {
+		// Defensive: routing should have sent us to legacy. If we got here
+		// with nil participant, the routing has a bug.
+		return nil, status.Error(codes.InvalidArgument, "queryPendingTransfersMIMO requires a participant")
+	}
+	if len(filter.Statuses) > 0 {
+		return nil, status.Error(codes.InvalidArgument, "cannot specify filter.Statuses on QueryPendingTransfers")
+	}
+	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
+		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
+	}
+	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	var filterType string
+	var walletIdentityPubkey keys.Public
+	var role pendingParticipantRole
+	switch p := filter.Participant.(type) {
+	case *pb.TransferFilter_ReceiverIdentityPublicKey:
+		walletIdentityPubkey, err = keys.ParsePublicKey(p.ReceiverIdentityPublicKey)
+		role = pendingParticipantRoleReceiver
+		filterType = "receiver"
+	case *pb.TransferFilter_SenderIdentityPublicKey:
+		walletIdentityPubkey, err = keys.ParsePublicKey(p.SenderIdentityPublicKey)
+		role = pendingParticipantRoleSender
+		filterType = "sender"
+	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		walletIdentityPubkey, err = keys.ParsePublicKey(p.SenderOrReceiverIdentityPublicKey)
+		role = pendingParticipantRoleSenderOrReceiver
+		filterType = "sender_or_receiver"
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "unsupported participant variant: %T", p)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("invalid participant identity public key: %w", err)
+	}
+
+	metrics := newTransferQueryRecorder("query_pending_transfers", true, filterType)
+
+	// Upfront access check.
+	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletIdentityPubkey, err)
+	}
+	if !hasReadAccess {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+
+	limit, offset := normalizePendingPagination(filter.Limit, filter.Offset)
+
+	// Step 1: raw-SQL UNION ALL returning paginated transfer IDs. All filter
+	// predicates and pagination are applied here so step 2 just loads by ID.
+	transferIDs, err := queryMIMOPendingTransferIDs(ctx, db, queryMIMOPendingArgs{
+		participant:       role,
+		walletPubkey:      walletIdentityPubkey,
+		network:           filter.GetNetwork(),
+		types:             filter.GetTypes(),
+		transferIDsFilter: filter.GetTransferIds(),
+		createdAfter:      timeOrZero(filter.GetCreatedAfter()),
+		createdBefore:     timeOrZero(filter.GetCreatedBefore()),
+		hasCreatedAfter:   filter.GetCreatedAfter() != nil,
+		hasCreatedBefore:  filter.GetCreatedBefore() != nil,
+		order:             filter.Order,
+		limit:             limit,
+		offset:            offset,
+	})
+	if err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, fmt.Errorf("failed to query pending transfer IDs: %w", err)
+	}
+	if len(transferIDs) == 0 {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+
+	// Step 2: load transfers + edges by ID. Pagination + filters applied in
+	// step 1; this load just preserves ordering for marshaling.
+	//
+	// Both ORDER BY columns must use the same direction as the step-1 SQL
+	// builders (which apply `ORDER BY create_time <dir>, id <dir>` with a
+	// single `<dir>`). Mismatching the secondary sort would reverse tied-row
+	// order across the knob flip, breaking equivalence on transfers that
+	// share a `create_time`.
+	orderFn := ent.Desc(enttransfer.FieldCreateTime)
+	idOrderFn := ent.Desc(enttransfer.FieldID)
+	if filter.Order == pb.Order_ASCENDING {
+		orderFn = ent.Asc(enttransfer.FieldCreateTime)
+		idOrderFn = ent.Asc(enttransfer.FieldID)
+	}
+	transfers, err := db.Transfer.Query().
+		Where(enttransfer.IDIn(transferIDs...)).
+		WithSparkInvoice().
+		WithTransferSenders().
+		WithTransferReceivers().
+		Order(orderFn, idOrderFn).
+		All(ctx)
+	metrics.record(ctx, len(transfers), err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load pending transfers: %w", err)
+	}
+
+	// Marshal — when participant is a receiver of the transfer, filter leaves
+	// to just that receiver's leaves (claim flow; load-bearing for multi-
+	// receiver MIMO transfers).
+	transferProtos := make([]*pb.Transfer, 0, len(transfers))
+	for _, t := range transfers {
+		var transferProto *pb.Transfer
+		if t.HasReceiver(walletIdentityPubkey) {
+			transferProto, err = t.MarshalProtoForReceiver(ctx, walletIdentityPubkey)
+		} else {
+			transferProto, err = t.MarshalProto(ctx)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal transfer %s: %w", t.ID, err)
+		}
+		transferProtos = append(transferProtos, transferProto)
+	}
+
+	nextOffset := int64(-1)
+	if len(transfers) == limit {
+		nextOffset = int64(offset + len(transfers))
+	}
+	return &pb.QueryTransfersResponse{
+		Transfers: transferProtos,
+		Offset:    nextOffset,
+	}, nil
+}
+
+func normalizePendingPagination(limit, offset int64) (int, int) {
+	if limit <= 0 || limit > maxTransferPageSize {
+		limit = maxTransferPageSize
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return int(limit), int(offset)
+}
+
+func timeOrZero(ts *timestamppb.Timestamp) time.Time {
+	if ts == nil {
+		return time.Time{}
+	}
+	return ts.AsTime().UTC()
+}
+
 const CoopExitConfirmationThreshold = 6
+
+// maxTransferPageSize caps the LIMIT on QueryPendingTransfers /
+// QueryAllTransfers responses. Mirrors the maxTokenTransactionPageSize
+// pattern in so/handler/tokens.
+const maxTransferPageSize = 100
 
 // maxMIMOTransferIDs caps the number of transfer IDs fetched from
 // TransferSender/TransferReceiver to stay within PostgreSQL's bind
@@ -2347,6 +2592,353 @@ func querySenderTransferIDs(ctx context.Context, db *ent.Client, pubkey keys.Pub
 		Select(enttransfersender.FieldTransferID).
 		Scan(ctx, &ids)
 	return ids, err
+}
+
+// pendingParticipantRole enumerates which arm of the pending-transfer query
+// to dispatch. Replaces an `any` field that previously held the proto
+// oneof variant directly — typed enum dedup the participant-discrimination
+// type-switch between queryPendingTransfersMIMO (which extracts the pubkey)
+// and queryMIMOPendingTransferIDs (which dispatches to a per-arm builder).
+type pendingParticipantRole int
+
+const (
+	pendingParticipantRoleReceiver pendingParticipantRole = iota
+	pendingParticipantRoleSender
+	pendingParticipantRoleSenderOrReceiver
+)
+
+type queryMIMOPendingArgs struct {
+	participant       pendingParticipantRole
+	walletPubkey      keys.Public
+	network           pb.Network
+	types             []pb.TransferType
+	transferIDsFilter []string
+	createdAfter      time.Time
+	createdBefore     time.Time
+	hasCreatedAfter   bool
+	hasCreatedBefore  bool
+	order             pb.Order
+	limit             int
+	offset            int
+}
+
+// queryMIMOPendingTransferIDs returns paginated pending-transfer IDs ordered
+// by create_time and id (direction per args.order). Dispatches to the per-arm
+// SQL builder matching args.participant. Each arm produces a stream sorted
+// on (create_time, id) with consistent column aliases at the union level so
+// the planner picks Merge Append for the UNION ALL variant.
+//
+// Receiver-arm ordering uses r.create_time. The cross-participant
+// create_time invariant (app-layer enforced) makes this equivalent
+// to t.create_time, keeping the union's merge key uniform across
+// both arms.
+func queryMIMOPendingTransferIDs(ctx context.Context, db *ent.Client, args queryMIMOPendingArgs) ([]uuid.UUID, error) {
+	var query string
+	var sqlArgs []any
+	var err error
+
+	switch args.participant {
+	case pendingParticipantRoleReceiver:
+		query, sqlArgs, err = buildPendingIDsQueryReceiver(args)
+	case pendingParticipantRoleSender:
+		query, sqlArgs, err = buildPendingIDsQuerySender(args)
+	case pendingParticipantRoleSenderOrReceiver:
+		query, sqlArgs, err = buildPendingIDsQuerySenderOrReceiver(args)
+	default:
+		return nil, fmt.Errorf("unsupported participant role: %d", args.participant)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	//nolint:forbidigo // raw SQL needed for partial-index-driven query with role-partitioned status filter.
+	rows, err := db.QueryContext(ctx, query, sqlArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute pending-transfer-IDs query: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	ids := make([]uuid.UUID, 0, args.limit)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan pending transfer ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// pendingCommonFilters builds the network, types, and transfer_ids clauses
+// for pending-transfer SQL. These reference the transfers table (t.) since
+// the relevant columns only exist there. Returns the appended args slice
+// and the SQL fragment using dynamic param positions based on len(sqlArgs).
+func pendingCommonFilters(sqlArgs []any, args queryMIMOPendingArgs) ([]any, string, error) {
+	var sb strings.Builder
+	if args.network != pb.Network_UNSPECIFIED {
+		n, err := btcnetwork.FromProtoNetwork(args.network)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid network: %w", err)
+		}
+		sqlArgs = append(sqlArgs, n.String())
+		fmt.Fprintf(&sb, " AND t.network = $%d", len(sqlArgs))
+	}
+	if len(args.types) > 0 {
+		typeStrs := make([]string, len(args.types))
+		for i, t := range args.types {
+			schemaType, err := st.TransferTypeFromProto(t.String())
+			if err != nil {
+				return nil, "", fmt.Errorf("invalid transfer type %s: %w", t.String(), err)
+			}
+			typeStrs[i] = string(schemaType)
+		}
+		sqlArgs = append(sqlArgs, pq.Array(typeStrs))
+		fmt.Fprintf(&sb, " AND t.type = ANY($%d::text[])", len(sqlArgs))
+	}
+	if len(args.transferIDsFilter) > 0 {
+		ids, err := uuids.ParseSlice(args.transferIDsFilter)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid transfer IDs: %w", err)
+		}
+		idStrs := make([]string, len(ids))
+		for i, id := range ids {
+			idStrs[i] = id.String()
+		}
+		sqlArgs = append(sqlArgs, pq.Array(idStrs))
+		fmt.Fprintf(&sb, " AND t.id = ANY($%d::uuid[])", len(sqlArgs))
+	}
+	return sqlArgs, sb.String(), nil
+}
+
+// pendingTimeColumn enumerates the valid create_time column references
+// used by pendingTimeFilter. Typed alias instead of a plain string so a
+// future caller can't accidentally interpolate user input into the SQL
+// fragment — the column reference is %s-interpolated, not parameterized,
+// and would be a SQLi vector if sourced from the request.
+type pendingTimeColumn string
+
+const (
+	receiverCreateTimeColumn pendingTimeColumn = "r.create_time"
+	senderCreateTimeColumn   pendingTimeColumn = "t.create_time"
+)
+
+// pendingTimeFilter builds the created_after/created_before clauses against
+// the given column reference. Each arm uses its own table's column for
+// index-drive efficiency.
+func pendingTimeFilter(sqlArgs []any, args queryMIMOPendingArgs, col pendingTimeColumn) ([]any, string) {
+	var sb strings.Builder
+	if args.hasCreatedAfter {
+		sqlArgs = append(sqlArgs, args.createdAfter)
+		fmt.Fprintf(&sb, " AND %s > $%d", col, len(sqlArgs))
+	}
+	if args.hasCreatedBefore {
+		sqlArgs = append(sqlArgs, args.createdBefore)
+		fmt.Fprintf(&sb, " AND %s < $%d", col, len(sqlArgs))
+	}
+	return sqlArgs, sb.String()
+}
+
+// buildPendingIDsQueryReceiver builds the receiver-only pending-IDs query.
+// Drives idx_transferreceiver_claim_pending_pubkey_time:
+//
+//	transfer_receivers (identity_pubkey, create_time DESC, transfer_id DESC)
+//	WHERE status IN (RECEIVER_CLAIM_PENDING + 4 RECEIVER_* statuses)
+//
+// Outer ordering uses r.create_time, equivalent to t.create_time under the
+// cross-participant create_time invariant.
+func buildPendingIDsQueryReceiver(args queryMIMOPendingArgs) (string, []any, error) {
+	sqlArgs := []any{
+		args.walletPubkey.Serialize(),            // $1 - identity_pubkey
+		pq.Array(mimo.PendingReceiverStatuses()), // $2 - r.status
+		args.limit,                               // $3 - LIMIT
+		args.offset,                              // $4 - OFFSET
+	}
+
+	sqlArgs, commonFilters, err := pendingCommonFilters(sqlArgs, args)
+	if err != nil {
+		return "", nil, err
+	}
+	sqlArgs, timeFilter := pendingTimeFilter(sqlArgs, args, receiverCreateTimeColumn)
+
+	direction := "DESC"
+	if args.order == pb.Order_ASCENDING {
+		direction = "ASC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT r.transfer_id
+		FROM transfer_receivers r
+		INNER JOIN transfers t ON t.id = r.transfer_id
+		WHERE r.identity_pubkey = $1
+		  AND r.status = ANY($2::text[])%s%s
+		ORDER BY r.create_time %s, r.transfer_id %s
+		LIMIT $3 OFFSET $4
+	`, commonFilters, timeFilter, direction, direction)
+
+	return query, sqlArgs, nil
+}
+
+// buildPendingIDsQuerySender builds the sender-only pending-IDs query.
+// Joins transfer_senders for pubkey scope via UNIQUE(transfer_id,
+// identity_pubkey). Sender-pending requires expiry_time < NOW() — the
+// sender has missed its handoff window.
+//
+// **Known planner-flip footgun (MIMO MVP only).** With the new
+// idx_transfers_pending_sender_pubkey_time partial in scope, the planner can
+// pick that partial for this JOIN-based query at medium cardinality —
+// without the leading-equality predicate it needs (the query supplies
+// s.identity_pubkey, not t.sender_identity_pubkey), so the partial gets
+// walked without the leading-column scope, materialized, sorted, and
+// JOINed. ~80 ms warm at ~100 sender-pending vs <1 ms in the column-based
+// shape. Acceptable to ship as-is because (i) participant=Sender has zero
+// production callers per audit on the parent PR, and (ii) SP-2914 retires
+// both this shape and the SR sender arm in lockstep when transfer_senders
+// gets a denormalized status column + its own partial — at which point both
+// arms switch to JOIN-with-s.status filtering, mirroring the receiver arm.
+// Until then, this code path's perf is bounded by the no-prod-callers fact,
+// not by planner stability.
+//
+// See buildPendingIDsQuerySenderOrReceiver below for the contrasting
+// column-based sender-arm shape used by SR1 — same logical query, different
+// physical predicate (t.sender_identity_pubkey directly), driving the new
+// partial cleanly without the planner-flip risk.
+func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error) {
+	sqlArgs := []any{
+		args.walletPubkey.Serialize(),          // $1 - identity_pubkey
+		pq.Array(mimo.PendingSenderStatuses()), // $2 - t.status
+		args.limit,                             // $3 - LIMIT
+		args.offset,                            // $4 - OFFSET
+	}
+
+	sqlArgs, commonFilters, err := pendingCommonFilters(sqlArgs, args)
+	if err != nil {
+		return "", nil, err
+	}
+	sqlArgs, timeFilter := pendingTimeFilter(sqlArgs, args, senderCreateTimeColumn)
+
+	direction := "DESC"
+	if args.order == pb.Order_ASCENDING {
+		direction = "ASC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT t.id
+		FROM transfers t
+		INNER JOIN transfer_senders s ON s.transfer_id = t.id AND s.identity_pubkey = $1
+		WHERE t.status = ANY($2::text[])
+		  AND t.expiry_time < NOW()%s%s
+		ORDER BY t.create_time %s, t.id %s
+		LIMIT $3 OFFSET $4
+	`, commonFilters, timeFilter, direction, direction)
+
+	return query, sqlArgs, nil
+}
+
+// buildPendingIDsQuerySenderOrReceiver UNIONs the sender and receiver arms,
+// applies the outer ORDER BY on the merged stream, then paginates. Per-arm
+// LIMIT is offset+limit so the outer pagination has enough candidates.
+//
+// Both arms apply the same network / types / transfer_ids filters. Time
+// filters use each arm's own table column (t.create_time vs r.create_time)
+// sharing the same param positions for index-drive efficiency.
+//
+// **Asymmetric arm structure (intentional, MIMO MVP only):**
+//
+// Receiver arm uses transfer_receivers + idx_transferreceiver_claim_pending_pubkey_time
+// (per-row receiver status, multi-receiver-ready today). Sender arm uses the
+// direct column predicate t.sender_identity_pubkey + idx_transfers_pending_sender_pubkey_time
+// rather than JOINing transfer_senders. This is correct in MIMO MVP because
+// every transfer has exactly one sender (transfers.sender_identity_pubkey ==
+// transfer_senders.identity_pubkey 1:1), and it sidesteps a planner-flip on
+// the JOIN-based shape that wipes out at medium-cardinality pubkeys (~10s
+// vs ~10ms; verified with EXPLAIN ANALYZE against a 65M-row dbseed).
+//
+// When MIMO v1 multi-sender lands (SP-2208), this asymmetry must be retired:
+// transfer_senders gets a status column, sender arm switches to filter on
+// s.status directly, and idx_transfers_pending_sender_pubkey_time is dropped
+// in favor of an edge-table partial mirroring the receiver pattern. Tracked
+// in SP-2914.
+//
+// SR1 returns each transfer at most once thanks to two invariants:
+//
+//  1. PendingSenderStatuses() ∩ PendingReceiverStatuses() = ∅ — a single
+//     transfer's t.status / r.status pair (kept consistent by the dual-write
+//     contract from SP-2923 Phase 2b) matches at most one arm's status
+//     filter. Locked by TestPendingStatusesDisjoint in so/mimo.
+//
+//  2. UNIQUE(transfer_id, identity_pubkey) on transfer_receivers + the
+//     single-sender-per-transfer invariant (MIMO MVP) — at most one row per
+//     (transfer, pubkey) per arm.
+//
+// If invariant #1 is ever broken (a status added to both sets, a state-
+// machine path that produces overlap), SR1 silently emits duplicates and
+// the dual-role fixture in the equivalence test doesn't catch it because
+// the statuses it uses are in receiverPending only. The unit test is the
+// guard.
+func buildPendingIDsQuerySenderOrReceiver(args queryMIMOPendingArgs) (string, []any, error) {
+	perArmLimit := args.offset + args.limit
+
+	sqlArgs := []any{
+		args.walletPubkey.Serialize(),            // $1 - identity_pubkey (used by both arms)
+		pq.Array(mimo.PendingSenderStatuses()),   // $2 - sender pending statuses
+		pq.Array(mimo.PendingReceiverStatuses()), // $3 - receiver pending statuses
+		perArmLimit,                              // $4 - per-arm LIMIT
+		args.limit,                               // $5 - outer LIMIT
+		args.offset,                              // $6 - outer OFFSET
+	}
+
+	sqlArgs, commonFilters, err := pendingCommonFilters(sqlArgs, args)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Bind time-filter args once and reference from both arms with each
+	// arm's own column alias.
+	var senderTimeFilter, receiverTimeFilter strings.Builder
+	if args.hasCreatedAfter {
+		sqlArgs = append(sqlArgs, args.createdAfter)
+		pos := len(sqlArgs)
+		fmt.Fprintf(&senderTimeFilter, " AND t.create_time > $%d", pos)
+		fmt.Fprintf(&receiverTimeFilter, " AND r.create_time > $%d", pos)
+	}
+	if args.hasCreatedBefore {
+		sqlArgs = append(sqlArgs, args.createdBefore)
+		pos := len(sqlArgs)
+		fmt.Fprintf(&senderTimeFilter, " AND t.create_time < $%d", pos)
+		fmt.Fprintf(&receiverTimeFilter, " AND r.create_time < $%d", pos)
+	}
+
+	direction := "DESC"
+	if args.order == pb.Order_ASCENDING {
+		direction = "ASC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id FROM (
+			(SELECT t.id AS id, t.create_time AS ct
+			 FROM transfers t
+			 WHERE t.sender_identity_pubkey = $1
+			   AND t.status = ANY($2::text[])
+			   AND t.expiry_time < NOW()%s%s
+			 ORDER BY t.create_time %s, t.id %s
+			 LIMIT $4)
+			UNION ALL
+			(SELECT r.transfer_id AS id, r.create_time AS ct
+			 FROM transfer_receivers r
+			 INNER JOIN transfers t ON t.id = r.transfer_id
+			 WHERE r.identity_pubkey = $1
+			   AND r.status = ANY($3::text[])%s%s
+			 ORDER BY r.create_time %s, r.transfer_id %s
+			 LIMIT $4)
+		) u
+		ORDER BY ct %s, id %s
+		LIMIT $5 OFFSET $6
+	`,
+		commonFilters, senderTimeFilter.String(), direction, direction,
+		commonFilters, receiverTimeFilter.String(), direction, direction,
+		direction, direction)
+
+	return query, sqlArgs, nil
 }
 
 func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *ent.Transfer) error {

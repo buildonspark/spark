@@ -7,12 +7,18 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 )
 
 var transferQueryMeter = otel.Meter("handler.transfers")
 
 var transferQueryDuration metric.Float64Histogram
 var transferQueryResultCount metric.Float64Histogram
+
+// queryPendingNilParticipantFallback counts QueryPendingTransfers calls that
+// fell through to the legacy queryTransfers path because filter.Participant
+// was nil under KnobReadMIMODataModelQueryPendingTransfers.
+var queryPendingNilParticipantFallback metric.Int64Counter
 
 func init() {
 	var err error
@@ -24,7 +30,10 @@ func init() {
 		metric.WithExplicitBucketBoundaries(1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000),
 	)
 	if err != nil {
-		panic(err)
+		otel.Handle(err)
+		if transferQueryDuration == nil {
+			transferQueryDuration = noop.Float64Histogram{}
+		}
 	}
 
 	transferQueryResultCount, err = transferQueryMeter.Float64Histogram(
@@ -34,7 +43,21 @@ func init() {
 		metric.WithExplicitBucketBoundaries(0, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000, 50000),
 	)
 	if err != nil {
-		panic(err)
+		otel.Handle(err)
+		if transferQueryResultCount == nil {
+			transferQueryResultCount = noop.Float64Histogram{}
+		}
+	}
+
+	queryPendingNilParticipantFallback, err = transferQueryMeter.Int64Counter(
+		"spark_query_pending_transfers_nil_participant_fallback",
+		metric.WithDescription("QueryPendingTransfers calls that fell through to legacy because Participant was nil under the MIMO knob"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if queryPendingNilParticipantFallback == nil {
+			queryPendingNilParticipantFallback = noop.Int64Counter{}
+		}
 	}
 }
 

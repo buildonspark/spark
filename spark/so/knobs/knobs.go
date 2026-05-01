@@ -32,9 +32,10 @@ const (
 	KnobRateLimitMemcacheMaxIdleConns = "spark.so.ratelimit.memcache.max_idle_conns"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 
-	KnobReadMIMODataModelTransferSend      = "spark.so.read_mimo_data_model_transfer_send"
-	KnobReadMIMODataModelQueryTransfers    = "spark.so.read_mimo_data_model_query_transfers"
-	KnobReadMIMODataModelGetStuckTransfers = "spark.so.read_mimo_data_model_get_stuck_transfers"
+	KnobReadMIMODataModelTransferSend          = "spark.so.read_mimo_data_model_transfer_send"
+	KnobReadMIMODataModelQueryTransfers        = "spark.so.read_mimo_data_model_query_transfers"
+	KnobReadMIMODataModelQueryPendingTransfers = "spark.so.read_mimo_data_model_query_pending_transfers"
+	KnobReadMIMODataModelGetStuckTransfers     = "spark.so.read_mimo_data_model_get_stuck_transfers"
 
 	KnobSoSigningCommitmentNodeLimit  = "spark.so.signing_commitments.nodes_limit"
 	KnobSoSigningCommitmentCountLimit = "spark.so.signing_commitments.count_limit"

@@ -74,6 +74,7 @@ knobs:
     # MIMO
     spark.so.mimo_transfer_multi_receiver_enabled: 1
     spark.so.read_mimo_data_model_query_transfers: 1
+    spark.so.read_mimo_data_model_query_pending_transfers: 1
     spark.so.read_mimo_data_model_get_stuck_transfers: 1
     spark.so.read_mimo_data_model_transfer_send: 1
     # Tokens

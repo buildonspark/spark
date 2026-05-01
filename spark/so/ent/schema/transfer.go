@@ -139,6 +139,17 @@ func (Transfer) Indexes() []ent.Index {
 			).
 			StorageKey("idx_transfers_active_network_time"),
 
+		// Partial index covering the two sender-pending statuses for the
+		// queryPendingTransfersMIMO SR sender arm. Required for plan stability —
+		// without it the planner picks a wrong index at medium-cardinality
+		// pubkeys. Retired when MIMO v1 multi-sender lands (SP-2914).
+		index.Fields("sender_identity_pubkey", "create_time", "id").
+			Annotations(
+				entsql.DescColumns("create_time", "id"),
+				entsql.IndexWhere("status IN ('SENDER_KEY_TWEAK_PENDING', 'SENDER_INITIATED')"),
+			).
+			StorageKey("idx_transfers_pending_sender_pubkey_time"),
+
 		index.Fields("spark_invoice_id").
 			Unique().
 			Annotations(
