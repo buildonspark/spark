@@ -3,6 +3,7 @@ import { type Logger } from "@lightsparkdev/core";
 export const NoopLogger = {
   options: {},
   trace() {},
+  debug() {},
   info() {},
   warn() {},
   error() {},

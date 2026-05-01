@@ -482,7 +482,7 @@ export abstract class ConnectionManager {
             } catch (error: unknown) {
               if (isError(error)) {
                 if (isExpiredChallengeError(error)) {
-                  this.logger.trace(
+                  this.logger.debug(
                     `Authentication attempt ${attempt + 1} failed due to expired challenge, retrying...`,
                   );
                   lastError = error;
@@ -490,7 +490,7 @@ export abstract class ConnectionManager {
                 }
 
                 if (isConnectionError(error)) {
-                  this.logger.trace(
+                  this.logger.debug(
                     `Connection error: ${error.message}, retrying...`,
                   );
                   lastError = error;
@@ -581,7 +581,9 @@ export abstract class ConnectionManager {
       const safeAddress = formatUrlForLogs(address);
       const startTime = this.getMonotonicTime();
 
-      this.logger.trace(`gRPC ${methodPath} ${safeAddress} -> start`);
+      this.logger.debug(
+        `gRPC ${methodPath} ${safeAddress} session=${this.sessionId} -> start`,
+      );
 
       const metadata = this.prepareMetadata(Metadata(options.metadata));
       const authToken =
@@ -638,16 +640,16 @@ export abstract class ConnectionManager {
         }
 
         const durationMs = this.getMonotonicTime() - startTime;
-        this.logger.trace(
-          `gRPC ${methodPath} ${safeAddress} -> completed (+${durationMs}ms)`,
+        this.logger.debug(
+          `gRPC ${methodPath} ${safeAddress} session=${this.sessionId} -> completed (+${durationMs}ms)`,
         );
         return result.value;
       } catch (error: unknown) {
         const durationMs = this.getMonotonicTime() - startTime;
         const message =
           error instanceof Error ? error.message : String(error ?? "unknown");
-        this.logger.trace(
-          `gRPC ${methodPath} ${safeAddress} -> error (+${durationMs}ms): ${message}`,
+        this.logger.debug(
+          `gRPC ${methodPath} ${safeAddress} session=${this.sessionId} -> error (+${durationMs}ms): ${message}`,
         );
         return yield* this.handleMiddlewareError(
           error,

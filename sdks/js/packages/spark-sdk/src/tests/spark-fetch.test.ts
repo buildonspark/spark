@@ -56,7 +56,7 @@ describe("SparkFetch", () => {
 
   it("logs GET when no request method is provided", async () => {
     const logger = {
-      trace: jest.fn(),
+      debug: jest.fn(),
     };
     const mockFetch = jest
       .fn<FetchFn>()
@@ -72,9 +72,14 @@ describe("SparkFetch", () => {
 
     await fetch("https://example.com");
 
-    expect(logger.trace).toHaveBeenCalledWith(
+    expect(logger.debug).toHaveBeenCalledWith(
       expect.stringMatching(
-        /^HTTP GET \[path https:\/\/example\.com\/\] -> 200 /,
+        /^HTTP GET \[path https:\/\/example\.com\/\] -> start \(attempt 1\/1\)/,
+      ),
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^HTTP GET \[path https:\/\/example\.com\/\] -> 200 \(\+\d+ms, attempt 1\/1\)/,
       ),
     );
   });

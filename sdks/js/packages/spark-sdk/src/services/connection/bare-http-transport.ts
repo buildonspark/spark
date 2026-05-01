@@ -22,14 +22,33 @@ export type BareTransportState = {
   nextRequestId: number;
 };
 
-function makeTransportLogger(path: string, requestId: number, logger?: Logger) {
+type TransportLogLevel = "trace" | "debug";
+
+function makeTransportLevelLogger(
+  level: TransportLogLevel,
+  path: string,
+  requestId: number,
+  logger?: Logger,
+) {
   if (!logger) {
     return () => {};
   }
 
   return (message: string) => {
-    logger.trace(`bareHttpTransport: #${requestId} ${path} ${message}`);
+    logger[level]?.(`bareHttpTransport: #${requestId} ${path} ${message}`);
   };
+}
+
+function makeTransportLogger(path: string, requestId: number, logger?: Logger) {
+  return makeTransportLevelLogger("trace", path, requestId, logger);
+}
+
+function makeTransportDebugLogger(
+  path: string,
+  requestId: number,
+  logger?: Logger,
+) {
+  return makeTransportLevelLogger("debug", path, requestId, logger);
 }
 
 export function createBareTransportState(): BareTransportState {
@@ -64,6 +83,7 @@ export function attachPrematureSocketCloseGuard(
   logger?: Logger,
 ) {
   const log = makeTransportLogger(path, requestId, logger);
+  const debug = makeTransportDebugLogger(path, requestId, logger);
   const socket = res.socket;
   if (!socket) {
     log("response has no socket to guard");
@@ -91,7 +111,7 @@ export function attachPrematureSocketCloseGuard(
     // iterator completing. Destroying the response converts that silent stall
     // into the transport error the caller already retries on.
     closedPrematurely = true;
-    log(`forcing response teardown after ${reason}`);
+    debug(`forcing response teardown after ${reason}`);
     try {
       res.destroy(
         error ??
@@ -149,6 +169,11 @@ export function BareHttpTransport({
   }) {
     const requestId = nextBareTransportRequestId(transportState);
     const log = makeTransportLogger(method.path, requestId, transportLogger);
+    const debug = makeTransportDebugLogger(
+      method.path,
+      requestId,
+      transportLogger,
+    );
     let bodyBuffer: Uint8Array | undefined;
     let pipeAbortController: AbortController | undefined;
 
@@ -187,7 +212,7 @@ export function BareHttpTransport({
                 : UNARY_REQUEST_TIMEOUT_MS
             }ms`,
           );
-          log(
+          debug(
             `wall-clock timeout fired${
               response != null
                 ? " after response start"
@@ -267,6 +292,9 @@ export function BareHttpTransport({
               res.headers,
             )}`,
           );
+          debug(
+            `response received status=${res.statusCode ?? "unknown"} responseStream=${method.responseStream}`,
+          );
           // Only unref sockets for response-streaming RPCs so unary calls
           // still keep the process alive while they are in flight.
           if (method.responseStream) {
@@ -319,7 +347,7 @@ export function BareHttpTransport({
           const error = new Error(
             `UNAVAILABLE: request timed out after ${UNARY_REQUEST_TIMEOUT_MS}ms`,
           );
-          log(`request timeout after ${UNARY_REQUEST_TIMEOUT_MS}ms`);
+          debug(`request timeout after ${UNARY_REQUEST_TIMEOUT_MS}ms`);
           clearRequestTimeout();
           // Established stream liveness is handled by the heartbeat listener in
           // SparkWallet, so a unary timeout should only fail the request that
@@ -341,7 +369,7 @@ export function BareHttpTransport({
       signal.addEventListener("abort", abortListener);
 
       req.on("error", (err) => {
-        log(`request error event: ${err.message}`);
+        debug(`request error event: ${err.message}`);
         failRequestSetup(err);
       });
       req.on("close", () => {
@@ -376,7 +404,7 @@ export function BareHttpTransport({
             req.end();
           },
           (err) => {
-            log(
+            debug(
               `request stream body failed: ${
                 err instanceof Error ? err.message : String(err)
               }`,
@@ -386,7 +414,7 @@ export function BareHttpTransport({
         );
       }
     }).catch((err) => {
-      log(
+      debug(
         `request setup failed: ${
           err instanceof Error ? err.message : String(err)
         }`,
@@ -401,6 +429,7 @@ export function BareHttpTransport({
     };
 
     if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 300) {
+      debug(`non-2xx response status=${res.statusCode ?? "unknown"}`);
       try {
         const responseText = await new Promise<string>((resolve, reject) => {
           let text = "";
@@ -442,7 +471,7 @@ export function BareHttpTransport({
       }
       log(`response iterator completed after ${chunkCount} chunks`);
     } catch (err) {
-      log(
+      debug(
         `response iterator error after ${chunkCount} chunks: ${
           err instanceof Error ? err.message : String(err)
         }`,

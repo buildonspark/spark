@@ -126,6 +126,24 @@ export default class LeafManager {
     this.logger.trace(`${functionName}: ${message}`);
   }
 
+  private debug(functionName: string, message: string): void {
+    this.logger.debug(`${functionName}: ${message}`);
+  }
+
+  private formatBalanceSummary(): string {
+    return `leaves=${this.leaves.size} available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`;
+  }
+
+  private formatLeafStatusCounts(): string {
+    const counts = new Map<LeafStatus, number>();
+    for (const record of this.leaves.values()) {
+      counts.set(record.status, (counts.get(record.status) ?? 0) + 1);
+    }
+    return Object.values(LeafStatus)
+      .map((status) => `${status}=${counts.get(status) ?? 0}`)
+      .join(" ");
+  }
+
   private emitBalanceUpdate(): void {
     this.onBalanceUpdate?.({
       available: this.getAvailableBalance(),
@@ -153,7 +171,7 @@ export default class LeafManager {
       incoming: this.getIncomingBalance(),
       count: this.leaves.size,
     };
-    this.log(
+    this.debug(
       "sync",
       `Starting sync. Pre-sync: ${prevBalance.count} leaves, available=${prevBalance.available} owned=${prevBalance.owned} incoming=${prevBalance.incoming}`,
     );
@@ -166,7 +184,7 @@ export default class LeafManager {
         this.transferService.queryPendingTransfers(),
       ]);
 
-    this.log(
+    this.debug(
       "sync",
       `Fetched: ${rawLeaves.length} leaves, ${swaps.length} pending swaps, ${outgoingTransfers.length} outgoing, ${incomingTransfers.transfers.length} incoming`,
     );
@@ -260,9 +278,9 @@ export default class LeafManager {
       this.hasSynced = true;
     });
 
-    this.log(
+    this.debug(
       "sync",
-      `Complete. Post-sync: ${this.leaves.size} leaves, available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+      `Complete. Post-sync: ${this.formatBalanceSummary()} statusCounts=${this.formatLeafStatusCounts()}`,
     );
     this.autoOptimizeIfNeeded();
     this.emitBalanceUpdate();
@@ -408,6 +426,10 @@ export default class LeafManager {
     // selectLeavesWithSwap, which will fail safely if balance changed.
     const availableBalance = this.getAvailableBalance();
     if (totalTargetAmount > availableBalance) {
+      this.debug(
+        "selectLeavesAndExecute",
+        `insufficient available balance requested=${totalTargetAmount} available=${availableBalance} targets=${targetAmounts.length}`,
+      );
       throw new SparkValidationError(
         "Total target amount exceeds available balance",
         {
@@ -483,9 +505,17 @@ export default class LeafManager {
       return await executeWithCleanup();
     } catch (error) {
       if (this.isStaleLeafError(error)) {
+        this.debug(
+          "selectLeavesAndExecute",
+          `stale leaf error detected; syncing before retry requested=${totalTargetAmount} available=${this.getAvailableBalance()}`,
+        );
         await this.sync();
         const refreshedBalance = this.getAvailableBalance();
         if (totalTargetAmount > refreshedBalance) {
+          this.debug(
+            "selectLeavesAndExecute",
+            `insufficient balance after stale-leaf sync requested=${totalTargetAmount} available=${refreshedBalance}`,
+          );
           throw new SparkValidationError(
             "Total target amount exceeds available balance",
             {
@@ -495,6 +525,10 @@ export default class LeafManager {
             },
           );
         }
+        this.debug(
+          "selectLeavesAndExecute",
+          `retrying after stale-leaf sync requested=${totalTargetAmount} available=${refreshedBalance}`,
+        );
         return await executeWithCleanup();
       }
       throw error;
@@ -613,6 +647,10 @@ export default class LeafManager {
     leaves: TreeNode[],
     transferId?: string,
   ): Promise<TreeNode[]> {
+    this.debug(
+      "registerClaimedLeaves",
+      `registering claimedLeaves=${leaves.length} transferId=${transferId ?? "none"}`,
+    );
     this.log(
       "registerClaimedLeaves",
       `Registering ${leaves.length} claimed leaves (${leaves.reduce((a, l) => a + l.value, 0)} sats) transferId=${transferId ?? "none"} ids=[${leaves.map((l) => l.id).join(",")}]`,
@@ -641,6 +679,10 @@ export default class LeafManager {
     this.log(
       "registerClaimedLeaves",
       `Post-claim balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+    );
+    this.debug(
+      "registerClaimedLeaves",
+      `post-claim ${this.formatBalanceSummary()} statusCounts=${this.formatLeafStatusCounts()}`,
     );
     this.emitBalanceUpdate();
     this.autoOptimizeIfNeeded();
@@ -928,9 +970,9 @@ export default class LeafManager {
       }
     });
     if (changed) {
-      this.log(
+      this.debug(
         "handleTransferEvent",
-        `Post-event balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()} incoming=${this.getIncomingBalance()}`,
+        `post-event transfer=${transfer.id} ${this.formatBalanceSummary()} statusCounts=${this.formatLeafStatusCounts()}`,
       );
       this.emitBalanceUpdate();
     }
@@ -1186,7 +1228,7 @@ export default class LeafManager {
           this.config.getOptimizationOptions().multiplicity ?? 0,
         )
       ) {
-        this.log(
+        this.debug(
           "autoOptimizeIfNeeded",
           `No optimization needed for ${available.length} leaves`,
         );
@@ -1194,7 +1236,7 @@ export default class LeafManager {
       }
 
       if (!this.onAutoOptimize) return;
-      this.log(
+      this.debug(
         "autoOptimizeIfNeeded",
         `Optimizing leaves for ${available.length} leaves`,
       );
@@ -1221,11 +1263,12 @@ export default class LeafManager {
       throw new SparkValidationError("Multiplicity cannot be greater than 5");
     }
 
-    this.logOptimizeLeaves(
+    this.debug(
+      "optimizeLeaves",
       `Starting optimization with multiplicity ${multiplicityValue}`,
     );
     if (this.optimizationInProgress) {
-      this.logOptimizeLeaves(`Optimization already in progress`);
+      this.debug("optimizeLeaves", `Optimization already in progress`);
       return;
     }
 
@@ -1238,7 +1281,8 @@ export default class LeafManager {
       // Second check under lock — guards against TOCTOU where two callers
       // both pass the optimistic check before either acquires the mutex.
       if (this.optimizationInProgress) {
-        this.logOptimizeLeaves(
+        this.debug(
+          "optimizeLeaves",
           `Second check under lock — Optimization already in progress`,
         );
         return;
@@ -1252,12 +1296,23 @@ export default class LeafManager {
         multiplicityValue,
       );
       if (swaps.length === 0) {
-        this.logOptimizeLeaves(
+        this.debug(
+          "optimizeLeaves",
           `No swaps needed for ${availableLeaves.length} leaves`,
         );
         return;
       }
 
+      this.debug(
+        "optimizeLeaves",
+        `Planned ${swaps.length} swap(s) inputLeafCount=${swaps.reduce(
+          (count, swap) => count + swap.inLeaves.length,
+          0,
+        )} outputLeafCount=${swaps.reduce(
+          (count, swap) => count + swap.outLeaves.length,
+          0,
+        )}`,
+      );
       this.logOptimizeLeaves(
         `Planned ${swaps.length} swap(s): ${JSON.stringify(swaps.map((s) => ({ in: s.inLeaves, out: s.outLeaves })))}`,
       );

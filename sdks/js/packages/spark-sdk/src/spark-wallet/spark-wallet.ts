@@ -142,6 +142,7 @@ import {
   LoggingService,
   type ServiceMethodDecorator,
 } from "../utils/logging-service.js";
+import { formatUrlForLogs } from "../utils/logging.js";
 import {
   getNetwork,
   Network,
@@ -450,6 +451,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private async createClientsAndSyncWallet() {
     await this.updateLoggerContextWithIdentityPrefix();
+    this.logDebug(
+      "createClientsAndSyncWallet",
+      `initializing network=${this.config.getNetworkType()} coordinator=${formatUrlForLogs(
+        this.config.getCoordinatorAddress(),
+      )} signingOperators=${Object.keys(this.config.getSigningOperators()).length}`,
+    );
     await this.connectionManager.createClients();
 
     // Initialize leaf manager before the stream starts so
@@ -463,6 +470,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     await this.syncWallet();
+    this.logDebug("createClientsAndSyncWallet", "initial wallet sync complete");
 
     // Start periodic token output optimization if enabled
     const tokenOptConfig = this.config.getTokenOptimizationOptions();
@@ -475,8 +483,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     this.logger.trace(message);
   }
 
+  private logDebug(functionName: string, message: string) {
+    this.logger.debug(`${functionName}: ${message}`);
+  }
+
   private logStream(message: string) {
     this.logger.trace(`setupBackgroundStream: ${message}`);
+  }
+
+  private logStreamDebug(message: string) {
+    this.logDebug("setupBackgroundStream", message);
   }
 
   private getSspClient() {
@@ -617,6 +633,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.tokenSyncPendingIds.add(id);
     }
     this.tokenSyncPendingTransactions.push(transaction);
+    this.logDebug(
+      "scheduleTokenSync",
+      `queued token sync ids=${bech32mIds.length} pendingIds=${this.tokenSyncPendingIds.size} pendingTransactions=${this.tokenSyncPendingTransactions.length}`,
+    );
     if (this.tokenSyncDebounceTimer) {
       clearTimeout(this.tokenSyncDebounceTimer);
     }
@@ -633,12 +653,20 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     this.tokenSyncDebounceTimer = null;
 
     try {
+      this.logDebug(
+        "flushTokenSync",
+        `flushing token sync ids=${ids.length} transactions=${transactions.length}`,
+      );
       await this.syncTokenOutputs(ids.length > 0 ? ids : undefined);
       const tokenBalances = await this.getTokenBalanceMap();
       this.emit(SparkWalletEvent.TokenBalanceUpdate, {
         finalizedTokenTransactions: transactions,
         tokenBalances,
       });
+      this.logDebug(
+        "flushTokenSync",
+        `token sync emitted balance update tokenCount=${tokenBalances.size}`,
+      );
     } catch (error) {
       this.logger.error(
         `Error flushing token sync: ${
@@ -735,7 +763,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         heartbeatTimeoutError = new Error(
           `UNAVAILABLE: stream heartbeat timed out after ${STREAM_HEARTBEAT_TIMEOUT_MS}ms`,
         );
-        this.logStream(
+        this.logStreamDebug(
           `heartbeat timeout after ${STREAM_HEARTBEAT_TIMEOUT_MS}ms; aborting current stream attempt`,
         );
         streamAttemptController.abort();
@@ -743,14 +771,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       try {
         const address = this.config.getCoordinatorAddress();
-        this.logStream(`subscribing to ${address} (retry=${retryCount})`);
+        this.logStreamDebug(
+          `subscribing to ${formatUrlForLogs(address)} retry=${retryCount}`,
+        );
         const stream = await this.connectionManager.subscribeToEvents(
           address,
           streamAttemptController.signal,
         );
-        this.logStream("subscribeToEvents returned async iterator");
+        this.logStreamDebug("subscribeToEvents returned async iterator");
         const claimedTransfersIds = await this.claimTransfers();
-        this.logStream(
+        this.logStreamDebug(
           `claimTransfers completed claimedTransfers=${claimedTransfersIds.length}`,
         );
         let heartbeatListenerEnabled = false;
@@ -759,7 +789,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         try {
           for await (const data of stream) {
             if (streamController.signal.aborted) {
-              this.logStream("stream controller aborted while iterating");
+              this.logStreamDebug("stream controller aborted while iterating");
               break;
             }
 
@@ -780,7 +810,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               `stream event received type=${describeStreamEvent(data.event)}`,
             );
             if (isConnectedStreamEvent(data.event)) {
-              this.logStream("connected");
+              this.logStreamDebug("connected");
               this.emit(SparkWalletEvent.StreamConnected);
               retryCount = 0;
             }
@@ -806,7 +836,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               streamActivityTimeout.arm();
             }
           }
-          this.logStream("stream iterator completed without throwing");
+          this.logStreamDebug("stream iterator completed without throwing");
           if (
             heartbeatTimeoutError != null &&
             !streamController.signal.aborted
@@ -814,7 +844,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             throw heartbeatTimeoutError;
           }
         } catch (error) {
-          this.logStream(
+          this.logStreamDebug(
             `stream iterator threw: ${
               error instanceof Error ? error.message : String(error)
             }`,
@@ -824,7 +854,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       } catch (error) {
         const retryError = heartbeatTimeoutError ?? error;
         if (streamController.signal.aborted) {
-          this.logStream("stream loop aborted");
+          this.logStreamDebug("stream loop aborted");
           break;
         }
 
@@ -835,7 +865,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
         retryCount = attempt;
 
-        this.logStream(
+        this.logStreamDebug(
           `error: ${
             retryError instanceof Error
               ? retryError.message
@@ -3221,6 +3251,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     transfer: Transfer,
     emit?: boolean,
   ): Promise<TreeNode[]> {
+    this.logDebug(
+      "processClaimedTransferResults",
+      `transfer=${transfer.id} type=${transfer.type} claimedLeaves=${result.length}`,
+    );
     this.logEvent(
       `processClaimedTransferResults: transfer=${transfer.id} type=${transfer.type} claimed ${result.length} leaves (${result.reduce((a, l) => a + l.value, 0)} sats) ids=[${result.map((l) => l.id).join(",")}]`,
     );
@@ -3254,6 +3288,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     transfer: Transfer;
     emit?: boolean;
   }): Promise<TreeNode[]> {
+    this.logDebug(
+      "claimTransfer",
+      `transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leafCount=${transfer.leaves.length}`,
+    );
     this.logEvent(
       `claimTransfer: transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leaves=${transfer.leaves.length}`,
     );
@@ -3273,6 +3311,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     emit?: boolean,
   ): Promise<string[]> {
     const transfers = await this.transferService.queryPendingTransfers();
+    this.logDebug(
+      "claimTransfers",
+      `found pendingTransfers=${transfers.transfers.length}${types ? ` typeFilterCount=${types.length}` : ""}`,
+    );
     this.logEvent(
       `claimTransfers: found ${transfers.transfers.length} pending transfers${types ? ` (filtering types=[${types.join(",")}])` : ""}`,
     );
@@ -3299,6 +3341,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         skippedStatus++;
         continue;
       }
+      this.logDebug(
+        "claimTransfers",
+        `claiming transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leafCount=${transfer.leaves.length}`,
+      );
       this.logEvent(
         `claimTransfers: claiming transfer=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue}`,
       );
@@ -3316,6 +3362,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       );
     }
     if (skippedType > 0 || skippedStatus > 0) {
+      this.logDebug(
+        "claimTransfers",
+        `skipped byType=${skippedType} byStatus=${skippedStatus}`,
+      );
       this.logEvent(
         `claimTransfers: skipped ${skippedType} by type, ${skippedStatus} by status`,
       );
@@ -3326,6 +3376,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         (result) => result.status === "fulfilled" && result.value !== null,
       )
       .map((result) => (result as PromiseFulfilledResult<string>).value);
+    this.logDebug(
+      "claimTransfers",
+      `completed claimed=${claimed.length} attempted=${promises.length}`,
+    );
     this.logEvent(
       `claimTransfers: completed. Claimed ${claimed.length} of ${promises.length} attempted`,
     );
@@ -5138,6 +5192,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   ) {
     const filterByIdentifiers =
       Array.isArray(tokenIdentifiers) && tokenIdentifiers.length > 0;
+    this.logDebug(
+      "syncTokenOutputs",
+      `starting scope=${filterByIdentifiers ? "filtered" : "all"} tokenCount=${
+        tokenIdentifiers?.length ?? 0
+      }`,
+    );
 
     const rawTokenIdentifiers = filterByIdentifiers
       ? tokenIdentifiers.map(
@@ -5183,6 +5243,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     await this.tokenOutputManager.setOutputs(
       groupedOutputs,
       filterByIdentifiers ? tokenIdentifiers : undefined,
+    );
+    this.logDebug(
+      "syncTokenOutputs",
+      `completed outputCount=${unsortedTokenOutputs.length} tokenCount=${groupedOutputs.size}`,
     );
   }
 

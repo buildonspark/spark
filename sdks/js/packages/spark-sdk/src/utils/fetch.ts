@@ -172,12 +172,19 @@ function createSparkFetch(
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const startTime = Date.now();
+      logger?.debug?.(
+        `HTTP ${method} ${safeUrl} -> start (attempt ${attempt + 1}/${
+          maxRetries + 1
+        })`,
+      );
 
       try {
         const response = await baseFetch(cloneRequestInput(input), fetchInit);
         const durationMs = Date.now() - startTime;
-        logger?.trace?.(
-          `HTTP ${method} ${safeUrl} -> ${response.status} (+${durationMs}ms)`,
+        logger?.debug?.(
+          `HTTP ${method} ${safeUrl} -> ${response.status} (+${durationMs}ms, attempt ${
+            attempt + 1
+          }/${maxRetries + 1})`,
         );
 
         if (
@@ -185,7 +192,7 @@ function createSparkFetch(
           attempt < maxRetries
         ) {
           const delay = getRetryDelayMs(retryOptions, attempt);
-          logger?.trace?.(
+          logger?.debug?.(
             `HTTP ${method} ${safeUrl} -> ${response.status} (attempt ${
               attempt + 1
             }/${maxRetries + 1}), retrying in ${delay}ms`,
@@ -199,8 +206,10 @@ function createSparkFetch(
         const durationMs = Date.now() - startTime;
         const message =
           error instanceof Error ? error.message : String(error ?? "unknown");
-        logger?.trace?.(
-          `HTTP ${method} ${safeUrl} -> error (+${durationMs}ms): ${message}`,
+        logger?.debug?.(
+          `HTTP ${method} ${safeUrl} -> error (+${durationMs}ms, attempt ${
+            attempt + 1
+          }/${maxRetries + 1}): ${message}`,
         );
 
         if (shouldRethrowFetchError(error, signal)) {
@@ -212,7 +221,7 @@ function createSparkFetch(
         }
 
         const delay = getRetryDelayMs(retryOptions, attempt);
-        logger?.trace?.(
+        logger?.debug?.(
           `HTTP ${method} ${safeUrl} -> error (attempt ${attempt + 1}/${
             maxRetries + 1
           }), retrying in ${delay}ms: ${message}`,
