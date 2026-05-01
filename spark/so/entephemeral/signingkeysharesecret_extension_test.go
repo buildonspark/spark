@@ -48,8 +48,6 @@ func (s *testSession) GetClient(ctx context.Context) (*Client, error) {
 	return tx.Client(), nil
 }
 
-func (s *testSession) MarkTxDirty(context.Context) {}
-
 func (s *testSession) GetTxIfExists() *Tx {
 	return s.tx
 }

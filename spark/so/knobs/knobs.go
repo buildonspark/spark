@@ -14,7 +14,6 @@ import (
 const (
 	KnobDatabaseStatementTimeout          = "spark.database.statement_timeout"
 	KnobDatabaseLockTimeout               = "spark.database.lock_timeout"
-	KnobDatabaseOnlyCommitDirty           = "spark.database.only_commit_dirty"
 	KnobDatabasePoolMinConns              = "spark.database.pool.min_conns"
 	KnobDatabasePoolMaxConns              = "spark.database.pool.max_conns"
 	KnobDatabasePoolMaxConnLifetime       = "spark.database.pool.max_conn_lifetime"

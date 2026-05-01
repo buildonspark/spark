@@ -123,7 +123,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	dbSession := db.NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	// Seed a transaction in the session that we can verify is committed.
 	dbTx, err := dbSession.GetOrBeginTx(t.Context())
@@ -193,7 +193,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	dbSession := db.NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	// Seed a transaction in the session that we can verify is committed.
 	dbTx, err := dbSession.GetOrBeginTx(t.Context())
@@ -262,7 +262,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	dbSession := db.NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	task := BaseTaskSpec{
 		Name:    "Test",
@@ -288,7 +288,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 func TestDatabaseMiddleware_EphemeralCommitFailureSkipsMainCommit(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	mainClient := db.NewTestSQLiteClient(t)
-	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	mainSession := db.NewDefaultSessionFactory(mainClient).NewSession(t.Context())
 
 	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
 	defer func() {
@@ -361,7 +361,7 @@ func TestDatabaseMiddleware_EphemeralCommitFailureSkipsMainCommit(t *testing.T) 
 func TestDatabaseMiddleware_DetectsInHandlerDbCommitFailure(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	mainClient := db.NewTestSQLiteClient(t)
-	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	mainSession := db.NewDefaultSessionFactory(mainClient).NewSession(t.Context())
 
 	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
 	defer func() {
@@ -405,7 +405,7 @@ func TestDatabaseMiddleware_DetectsInHandlerDbCommitFailure(t *testing.T) {
 func TestDatabaseMiddleware_RollbacksEphemeralWhenTaskFails(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	mainClient := db.NewTestSQLiteClient(t)
-	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	mainSession := db.NewDefaultSessionFactory(mainClient).NewSession(t.Context())
 
 	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
 	defer func() {
@@ -453,7 +453,7 @@ func TestDatabaseMiddleware_RollbacksEphemeralWhenTaskFails(t *testing.T) {
 func TestDatabaseMiddleware_CommitsEphemeralBeforeMain(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	mainClient := db.NewTestSQLiteClient(t)
-	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	mainSession := db.NewDefaultSessionFactory(mainClient).NewSession(t.Context())
 
 	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
 	defer func() {
@@ -511,7 +511,7 @@ func TestDatabaseMiddleware_NoDivergenceWhenEphemeralTxNeverStarted(t *testing.T
 	// because no ephemeral writes ever occurred.
 	config := sparktesting.TestConfig(t)
 	mainClient := db.NewTestSQLiteClient(t)
-	mainSession := db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	mainSession := db.NewDefaultSessionFactory(mainClient).NewSession(t.Context())
 
 	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf("file:%s?mode=memory&_fk=1", t.Name()))
 	defer func() {

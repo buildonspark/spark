@@ -47,7 +47,7 @@ func (f *DefaultEphemeralSessionFactory) NewReadOnlySession(ctx context.Context,
 
 // EphemeralSession manages an ephemeral database transaction over a request/task lifetime.
 // Unlike Session, GetClient returns the raw client when no transaction exists (lazy begin),
-// and there is no notification buffering or dirty-commit optimization.
+// and there is no notification buffering.
 //
 // EphemeralSession is not safe for concurrent use. The underlying database connection does
 // not support concurrent queries, so all methods must be called from a single goroutine.
@@ -123,10 +123,6 @@ func (s *EphemeralSession) GetClient(context.Context) (*entephemeral.Client, err
 	return s.dbClient, nil
 }
 
-func (s *EphemeralSession) MarkTxDirty(context.Context) {
-	// No-op for ephemeral session; we don't currently optimize commit by dirty state here.
-}
-
 func (s *EphemeralSession) GetTxIfExists() *entephemeral.Tx {
 	return s.currentTx
 }
@@ -155,8 +151,6 @@ func (r *ReadOnlyEphemeralSession) GetOrBeginTx(context.Context) (*entephemeral.
 func (r *ReadOnlyEphemeralSession) GetClient(context.Context) (*entephemeral.Client, error) {
 	return r.dbClient, nil
 }
-
-func (r *ReadOnlyEphemeralSession) MarkTxDirty(context.Context) {}
 
 func (r *ReadOnlyEphemeralSession) GetTxIfExists() *entephemeral.Tx { return nil }
 

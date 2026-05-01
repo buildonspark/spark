@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,7 +56,7 @@ func TestSession_GetOrBeginTxReturnsSameTx(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx1, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -72,7 +71,7 @@ func TestSession_GetCurrentTxReturnsNilWithNoTx(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx := session.GetTxIfExists()
 	require.Nil(t, tx, "Expected no current transaction to exist")
@@ -82,7 +81,7 @@ func TestSession_GetCurrentTxReturnsNilAfterSuccessfulCommit(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -94,36 +93,34 @@ func TestSession_GetCurrentTxReturnsNilAfterSuccessfulCommit(t *testing.T) {
 	require.Nil(t, currentTx, "Expected no current transaction to exist after commit")
 }
 
-func TestSession_OnlyCommitDirtyRollsBackCleanTx(t *testing.T) {
+func TestSession_CleanCommitClearsCurrentTx(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobDatabaseOnlyCommitDirty: 100,
-	})).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
 
-	rollbackCalled := false
-	tx.OnRollback(func(fn ent.Rollbacker) ent.Rollbacker {
-		return ent.RollbackFunc(func(ctx context.Context, tx *ent.Tx) error {
-			rollbackCalled = true
-			return fn.Rollback(ctx, tx)
+	commitCalled := false
+	tx.OnCommit(func(fn ent.Committer) ent.Committer {
+		return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+			commitCalled = true
+			return fn.Commit(ctx, tx)
 		})
 	})
 
 	err = tx.Commit()
-	require.NoError(t, err, "Expected clean transaction finalization to succeed")
-	require.True(t, rollbackCalled, "Expected clean transaction to be rolled back instead of committed")
-	require.Nil(t, session.GetTxIfExists(), "Expected no current transaction to exist after clean transaction finalization")
+	require.NoError(t, err, "Expected commit of a clean transaction to succeed")
+	require.True(t, commitCalled, "Expected the commit hook to fire for a clean transaction")
+	require.Nil(t, session.GetTxIfExists(), "Expected no current transaction to exist after commit")
 }
 
 func TestSession_GetCurrentTxReturnsNilAfterSuccessfulRollback(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -139,7 +136,7 @@ func TestSession_GetCurrrentTxReturnsSameTxAfterFailedCommit(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -161,7 +158,7 @@ func TestSession_GetCurrrentTxReturnsSameTxAfterFailedRollback(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -183,7 +180,7 @@ func TestSession_GetOrBeginTxCommitAfterCancelledTransactionContext(t *testing.T
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	innerCtx, innerCancel := context.WithCancel(t.Context())
 
@@ -202,7 +199,7 @@ func TestSession_GetOrBeginTxCommitAfterCancelledSessionContext(t *testing.T) {
 	defer dbClient.Close()
 
 	sessionCtx, sessionCancel := context.WithCancel(t.Context())
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(sessionCtx)
+	session := NewDefaultSessionFactory(dbClient).NewSession(sessionCtx)
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -223,7 +220,7 @@ func TestSession_GetOrBeginTxRollbackAfterCancelledTransactionContext(t *testing
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	innerCtx, innerCancel := context.WithCancel(t.Context())
 
@@ -242,7 +239,7 @@ func TestSession_GetOrBeginTxRollbackAfterCancelledSessionContext(t *testing.T) 
 	defer dbClient.Close()
 
 	sessionCtx, sessionCancel := context.WithCancel(t.Context())
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(sessionCtx)
+	session := NewDefaultSessionFactory(dbClient).NewSession(sessionCtx)
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -262,7 +259,7 @@ func TestSession_GetOrBeginTxReturnsNewTxAfterCommit(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx1, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")

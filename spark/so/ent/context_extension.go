@@ -32,7 +32,6 @@ type TxProvider interface {
 
 type Session interface {
 	TxProvider
-	MarkTxDirty(context.Context)
 	// GetTxIfExists returns the current transaction if one exists, without starting a new one.
 	// Returns nil if no transaction is currently active.
 	GetTxIfExists() *Tx
@@ -98,12 +97,6 @@ func GetTxFromContext(ctx context.Context) (*Tx, error) {
 	}
 
 	return nil, fmt.Errorf("no transaction provider found in context")
-}
-
-func MarkTxDirty(ctx context.Context) {
-	if session, ok := ctx.Value(dbSessionKey).(Session); ok {
-		session.MarkTxDirty(ctx)
-	}
 }
 
 // DbCommit gets the transaction from the context and commits it.

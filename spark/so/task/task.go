@@ -1329,7 +1329,7 @@ func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient 
 		LogMiddleware(),
 		RawDBClientMiddleware(dbClient),
 		DatabaseMiddleware(
-			db.NewDefaultSessionFactory(dbClient, knobsService),
+			db.NewDefaultSessionFactory(dbClient),
 			ephemeralFactory,
 			config.Database.NewTxTimeout,
 		),
@@ -1350,7 +1350,7 @@ func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Conf
 		LogMiddleware(),
 		RawDBClientMiddleware(dbClient),
 		DatabaseMiddleware(
-			db.NewDefaultSessionFactory(dbClient, knobsService),
+			db.NewDefaultSessionFactory(dbClient),
 			ephemeralFactory,
 			config.Database.NewTxTimeout,
 		),

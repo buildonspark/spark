@@ -85,8 +85,6 @@ func (s *txBackedSession) GetClient(ctx context.Context) (*ent.Client, error) {
 	return tx.Client(), nil
 }
 
-func (s *txBackedSession) MarkTxDirty(context.Context) {}
-
 func (s *txBackedSession) GetTxIfExists() *ent.Tx { return s.tx }
 
 func (s *txBackedSession) Notify(context.Context, ent.Notification) error { return nil }
@@ -149,8 +147,6 @@ func (s *txBackedEphemeralSession) GetClient(context.Context) (*entephemeral.Cli
 	}
 	return s.dbClient, nil
 }
-
-func (s *txBackedEphemeralSession) MarkTxDirty(context.Context) {}
 
 func (s *txBackedEphemeralSession) GetTxIfExists() *entephemeral.Tx { return s.tx }
 

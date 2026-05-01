@@ -10,7 +10,6 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
 	soerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
@@ -33,13 +32,11 @@ type SessionFactory interface {
 // overloaded.
 type DefaultSessionFactory struct {
 	dbClient *ent.Client
-	knobs    knobs.Knobs
 }
 
-func NewDefaultSessionFactory(dbClient *ent.Client, knobs knobs.Knobs) *DefaultSessionFactory {
+func NewDefaultSessionFactory(dbClient *ent.Client) *DefaultSessionFactory {
 	return &DefaultSessionFactory{
 		dbClient: dbClient,
-		knobs:    knobs,
 	}
 }
 
@@ -86,7 +83,6 @@ func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionO
 
 	return &Session{
 		ctx:       ctx,
-		knobs:     f.knobs,
 		dbClient:  f.dbClient,
 		provider:  provider,
 		currentTx: nil,
@@ -108,8 +104,6 @@ type Session struct {
 	ctx context.Context
 	// The underlying ent.Client used to create new transactions and flush notifications.
 	dbClient *ent.Client
-	// Knobs for controlling session behavior.
-	knobs knobs.Knobs
 	// TxProvider is used to create a new transaction when needed.
 	provider ent.TxProvider
 	// The current transaction being tracked by this session if a transaction has been started. When
@@ -119,7 +113,6 @@ type Session struct {
 	// transaction is committed, these notifications are flushed. If the transaction is rolled back,
 	// these notifications are discarded.
 	currentNotifications *ent.BufferedNotifier
-	currentIsDirty       bool
 }
 
 // GetOrBeginTx retrieves the current transaction if it exists, otherwise it begins a new one.
@@ -141,19 +134,9 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 		s.currentTx = tx
 		s.currentNotifications = &notifier
-		s.currentIsDirty = false
 
 		tx.OnCommit(func(fn ent.Committer) ent.Committer {
 			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
-				if !s.currentIsDirty && s.knobs.RolloutRandom(knobs.KnobDatabaseOnlyCommitDirty, 0) {
-					rollbackErr := tx.Rollback()
-					if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, context.Canceled) {
-						logger.Error("Failed to rollback clean transaction", zap.Error(rollbackErr))
-						return rollbackErr
-					}
-					return nil
-				}
-
 				err := fn.Commit(ctx, tx)
 				if err != nil {
 					logger.Error("Failed to commit transaction", zap.Error(err))
@@ -175,7 +158,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				if err == nil || errors.Is(err, sql.ErrTxDone) || errors.Is(err, context.Canceled) {
 					s.currentTx = nil
 					s.currentNotifications = nil
-					s.currentIsDirty = false
 				}
 
 				return err
@@ -190,18 +172,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 				s.currentTx = nil
 				s.currentNotifications = nil
-				s.currentIsDirty = false
 				return err
 			})
 		})
 	}
 	return s.currentTx, nil
-}
-
-func (s *Session) MarkTxDirty(ctx context.Context) {
-	if s.currentTx != nil {
-		s.currentIsDirty = true
-	}
 }
 
 // GetTxIfExists retrieves the current transaction if it exists, without starting a new one. If
@@ -254,11 +229,6 @@ func (r *ReadOnlySession) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 // GetClient returns the underlying database client directly without a transaction.
 func (r *ReadOnlySession) GetClient(ctx context.Context) (*ent.Client, error) {
 	return r.dbClient, nil
-}
-
-// MarkTxDirty is a no-op for read-only sessions.
-func (r *ReadOnlySession) MarkTxDirty(ctx context.Context) {
-	// No-op: read-only sessions don't have transactions
 }
 
 // GetTxIfExists always returns nil for read-only sessions.

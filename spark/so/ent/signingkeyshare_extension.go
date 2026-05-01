@@ -605,7 +605,6 @@ func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Co
 	if err != nil {
 		return nil, err
 	}
-	MarkTxDirty(ctx)
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
 			// If ScanSlice already returned an error, we don't want to overwrite it,
@@ -662,7 +661,6 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	MarkTxDirty(ctx)
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
 			// If ScanSlice already returned an error, we don't want to overwrite it,

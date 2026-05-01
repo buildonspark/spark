@@ -49,7 +49,7 @@ func TestDatabaseSessionMiddleware_EphemeralCommitFailureSkipsMainCommit(t *test
 
 	interceptor := DatabaseSessionMiddleware(
 		mainClient,
-		db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()),
+		db.NewDefaultSessionFactory(mainClient),
 		db.NewDefaultEphemeralSessionFactory(ephemeralClient),
 		nil,
 	)
@@ -103,7 +103,7 @@ func TestDatabaseSessionMiddleware_CommitsEphemeralBeforeMain(t *testing.T) {
 
 	interceptor := DatabaseSessionMiddleware(
 		mainClient,
-		db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()),
+		db.NewDefaultSessionFactory(mainClient),
 		db.NewDefaultEphemeralSessionFactory(ephemeralClient),
 		nil,
 	)
@@ -159,7 +159,7 @@ func TestDatabaseSessionMiddleware_DoesNotRollbackAfterSuccessfulCommit(t *testi
 
 	interceptor := DatabaseSessionMiddleware(
 		mainClient,
-		db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()),
+		db.NewDefaultSessionFactory(mainClient),
 		db.NewDefaultEphemeralSessionFactory(ephemeralClient),
 		nil,
 	)
@@ -225,7 +225,7 @@ func TestDatabaseSessionMiddleware_PreservesEphemeralSigningKeyshareSecretAfterM
 
 	interceptor := DatabaseSessionMiddleware(
 		mainClient,
-		db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()),
+		db.NewDefaultSessionFactory(mainClient),
 		db.NewDefaultEphemeralSessionFactory(ephemeralClient),
 		nil,
 	)
@@ -281,7 +281,7 @@ func TestDatabaseSessionMiddleware_ReadOnlyPathUsesEphemeralFactory(t *testing.T
 	factory := &countingEphemeralFactory{}
 	interceptor := DatabaseSessionMiddleware(
 		mainClient,
-		db.NewDefaultSessionFactory(mainClient, knobs.NewEmptyFixedKnobs()),
+		db.NewDefaultSessionFactory(mainClient),
 		factory,
 		nil,
 	)

@@ -261,7 +261,7 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	expiry := time.Now().Add(5 * time.Minute)
-	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	sessionFactory := db.NewDefaultSessionFactory(dbClient)
 	session := sessionFactory.NewSession(t.Context())
 	mutationCtx := ent.InjectNotifier(ent.Inject(t.Context(), session), session)
 	tx, err := session.GetOrBeginTx(mutationCtx)
@@ -276,7 +276,6 @@ func TestEventRouterTransferNotification(t *testing.T) {
 		SetTotalValue(100).
 		Save(mutationCtx)
 	require.NoError(t, err)
-	ent.MarkTxDirty(mutationCtx)
 
 	require.NoError(t, tx.Commit())
 
@@ -621,7 +620,7 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
-	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	sessionFactory := db.NewDefaultSessionFactory(dbClient)
 
 	// Helper to get statuses from stream
 	getSenderStatuses := func(stream *mockStream) []pb.TransferStatus {
@@ -735,7 +734,6 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 		Save(mutationCtx)
 	require.NoError(t, err)
 
-	ent.MarkTxDirty(mutationCtx)
 	require.NoError(t, tx.Commit())
 
 	// Wait for the initial sender notifications before advancing statuses so the
@@ -754,7 +752,6 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 			SetStatus(status).
 			Save(mutationCtx)
 		require.NoError(t, err)
-		ent.MarkTxDirty(mutationCtx)
 		require.NoError(t, tx.Commit())
 
 		protoStatus := statusToProto[status]
@@ -773,7 +770,6 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 		SetStatus(schematype.TransferStatusSenderKeyTweaked).
 		Save(mutationCtx2)
 	require.NoError(t, err)
-	ent.MarkTxDirty(mutationCtx2)
 	require.NoError(t, tx2.Commit())
 	waitForStatus("self sender key tweaked (sender)", selfTransferStream, getSenderStatuses, statusToProto[schematype.TransferStatusSenderKeyTweaked])
 	waitForStatus("self sender key tweaked (receiver)", selfTransferStream, getReceiverStatuses, statusToProto[schematype.TransferStatusSenderKeyTweaked])
@@ -789,7 +785,6 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 			SetStatus(status).
 			Save(mutationCtx)
 		require.NoError(t, err)
-		ent.MarkTxDirty(mutationCtx)
 		require.NoError(t, tx.Commit())
 	}
 	time.Sleep(300 * time.Millisecond)
@@ -884,7 +879,7 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
-	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	sessionFactory := db.NewDefaultSessionFactory(dbClient)
 
 	getReceiverStatuses := func(stream *mockStream) []pb.TransferStatus {
 		stream.mu.Lock()
@@ -927,7 +922,6 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 		SetTotalValue(100).
 		Save(mutationCtx)
 	require.NoError(t, err)
-	ent.MarkTxDirty(mutationCtx)
 	require.NoError(t, tx.Commit())
 
 	// Wait for sender to receive the SenderInitiated event before proceeding.
@@ -962,7 +956,6 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 		SetStatus(schematype.TransferStatusSenderKeyTweaked).
 		Save(mutationCtx2)
 	require.NoError(t, err)
-	ent.MarkTxDirty(mutationCtx2)
 	require.NoError(t, tx2.Commit())
 
 	// Wait for the secondary receiver to get the event — this is the core assertion.
@@ -1019,7 +1012,6 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 		SetStatus(schematype.TransferStatusCompleted).
 		Save(mutationCtx3)
 	require.NoError(t, err)
-	ent.MarkTxDirty(mutationCtx3)
 	require.NoError(t, tx3.Commit())
 
 	// Give time for any spurious events to arrive.
@@ -1093,7 +1085,7 @@ func TestEventRouter_TokenTransactionFanOut(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
-	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	sessionFactory := db.NewDefaultSessionFactory(dbClient)
 
 	createKeyshare := func() *ent.SigningKeyshare {
 		return entexample.NewSigningKeyshareExample(t, dbClient).
@@ -1181,7 +1173,6 @@ func TestEventRouter_TokenTransactionFanOut(t *testing.T) {
 			SetStatus(schematype.TokenTransactionStatusFinalized).
 			Save(mutationCtx)
 		require.NoError(t, err)
-		ent.MarkTxDirty(mutationCtx)
 		require.NoError(t, tx.Commit())
 
 		return hash
@@ -1383,7 +1374,7 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 		SetRevocationKeyshare(createKeyshare()).
 		MustExec(t.Context())
 
-	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	sessionFactory := db.NewDefaultSessionFactory(dbClient)
 	session := sessionFactory.NewSession(t.Context())
 	mutationCtx := knobs.InjectKnobsService(
 		ent.InjectNotifier(ent.Inject(t.Context(), session), session),
@@ -1396,7 +1387,6 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 		SetStatus(schematype.TokenTransactionStatusFinalized).
 		Save(mutationCtx)
 	require.NoError(t, err)
-	ent.MarkTxDirty(mutationCtx)
 	require.NoError(t, tx.Commit())
 
 	// Wait long enough for events to propagate if they were going to.

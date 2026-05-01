@@ -49,7 +49,6 @@ tracing:
     block_list: []
 knobs:
   static_values:
-    spark.database.only_commit_dirty: 100
     spark.database.pool.min_conns: 4
     spark.so.enable_deposit_flow_validation@REGTEST: 100
     spark.so.enhanced_transfer_receive_validation@REGTEST: 100

@@ -34,7 +34,6 @@ type TxProvider interface {
 // (which is accessible from any goroutine), all methods must be called from a single goroutine.
 type Session interface {
 	TxProvider
-	MarkTxDirty(context.Context)
 	// GetTxIfExists returns the current transaction if one exists, without starting a new one.
 	// Returns nil if no transaction is currently active.
 	GetTxIfExists() *Tx
@@ -95,12 +94,6 @@ func GetTxFromContext(ctx context.Context) (*Tx, error) {
 	}
 
 	return nil, ErrNoTransactionProvider
-}
-
-func MarkTxDirty(ctx context.Context) {
-	if session, ok := ctx.Value(dbSessionKey).(Session); ok {
-		session.MarkTxDirty(ctx)
-	}
 }
 
 // DbCommit commits the active transaction if one exists.

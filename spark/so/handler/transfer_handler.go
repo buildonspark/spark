@@ -3119,7 +3119,6 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		if err != nil {
 			return fmt.Errorf("unable to batch update key tweaks: %w", err)
 		}
-		ent.MarkTxDirty(ctx)
 	}
 
 	// MIMO - Dual write status changes

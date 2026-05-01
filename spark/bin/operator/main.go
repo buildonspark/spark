@@ -461,12 +461,6 @@ func main() {
 		ephemeralDbClient.Use(ent.DatabaseOperationsHook("ephemeral"))
 	}
 
-	// Add hook to track whether a transaction is dirty
-	dbClient.Use(txIsDirtyHook)
-	if ephemeralDbClient != nil {
-		ephemeralDbClient.Use(txIsDirtyEphemeralHook)
-	}
-
 	defer func() {
 		_ = dbClient.Close()
 		if ephemeralDbClient != nil {
@@ -696,7 +690,7 @@ func main() {
 	// and streaming RPCs.
 	dbSessionMiddleware := sparkgrpc.DatabaseSessionMiddleware(
 		dbClient,
-		db.NewDefaultSessionFactory(dbClient, knobsService),
+		db.NewDefaultSessionFactory(dbClient),
 		ephemeralSessionFactory,
 		config.Database.NewTxTimeout,
 	)
@@ -1056,48 +1050,4 @@ func operatorPoolConfigFromKnobs(knobsService knobs.Knobs, operatorID string) so
 		UsersPerConnectionCap: getInt(knobs.KnobGrpcClientPoolUsersPerConnectionCap, defaults.UsersPerConnectionCap),
 		ScaleConcurrency:      getInt(knobs.KnobGrpcClientPoolScaleConcurrency, defaults.ScaleConcurrency),
 	}
-}
-
-func txIsDirtyHook(next ent.Mutator) ent.Mutator {
-	return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-		v, err := next.Mutate(ctx, m)
-		if err != nil {
-			return v, err
-		}
-
-		mx, ok := m.(interface {
-			Tx() (*ent.Tx, error)
-		})
-		if !ok {
-			return v, err
-		}
-
-		if tx, _ := mx.Tx(); tx != nil {
-			ent.MarkTxDirty(ctx)
-		}
-
-		return v, err
-	})
-}
-
-func txIsDirtyEphemeralHook(next entephemeral.Mutator) entephemeral.Mutator {
-	return entephemeral.MutateFunc(func(ctx context.Context, m entephemeral.Mutation) (entephemeral.Value, error) {
-		v, err := next.Mutate(ctx, m)
-		if err != nil {
-			return v, err
-		}
-
-		mx, ok := m.(interface {
-			Tx() (*entephemeral.Tx, error)
-		})
-		if !ok {
-			return v, err
-		}
-
-		if tx, _ := mx.Tx(); tx != nil {
-			entephemeral.MarkTxDirty(ctx)
-		}
-
-		return v, err
-	})
 }

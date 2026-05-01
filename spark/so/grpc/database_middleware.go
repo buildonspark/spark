@@ -106,11 +106,8 @@ func DatabaseSessionMiddleware(
 		}
 
 		// GetTxIfExists is called after handler(ctx, req) returns so a tx committed inside
-		// the handler has already cleared session currentTx to nil. For main sessions this can
-		// happen via MarkTxDirty/ent.MarkTxDirty hooks; for ephemeral sessions MarkTxDirty is
-		// intentionally a no-op, so only an explicit ephemeral tx commit in the handler clears it.
-		// This ensures the deferred Rollback below never holds a stale reference to an
-		// already-committed transaction.
+		// the handler has already cleared session currentTx to nil. This ensures the deferred
+		// Rollback below never holds a stale reference to an already-committed transaction.
 		var ephemeralTx *entephemeral.Tx
 		ephemeralCommitted := false
 		if ephemeralSession != nil {
