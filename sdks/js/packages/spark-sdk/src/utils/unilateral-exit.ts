@@ -263,7 +263,6 @@ export async function constructUnilateralExitFeeBumpPackages(
   // For each provided node, build its complete chain to the root
   for (const node of nodes) {
     const txPackages: FeeBumpTxPackage[] = [];
-    let previousFeeBumpTx: string | undefined;
 
     // Build the chain from this node to the root.
     // TODO(aakselrod): check whether
@@ -281,7 +280,7 @@ export async function constructUnilateralExitFeeBumpPackages(
       // Add node tx and its fee bump
       let nodeTxHex = bytesToHex(chainNode.nodeTx);
 
-      // Robust check for malformed ephemeral anchor in nodeTx
+      // We skip tx's which have already been broadcasted, or we've seen in the past
       try {
         const txObj = getTxFromRawTxHex(nodeTxHex);
         const txid = getTxId(txObj);
@@ -294,15 +293,6 @@ export async function constructUnilateralExitFeeBumpPackages(
         if (isBroadcast) {
           // This node has already been broadcast, so we don't need to do so.
           continue;
-        } else {
-        }
-        let anchorOutputScriptHex: string | undefined;
-        for (let i = txObj.outputsLength - 1; i >= 0; i--) {
-          const output = txObj.getOutput(i);
-          if (output?.amount === 0n && output.script) {
-            anchorOutputScriptHex = bytesToHex(output.script);
-            break;
-          }
         }
       } catch (parseError) {
         warnUnilateralExit(
@@ -311,11 +301,7 @@ export async function constructUnilateralExitFeeBumpPackages(
         );
       }
 
-      const {
-        feeBumpPsbt: nodeFeeBumpPsbt,
-        usedUtxos,
-        parentTx,
-      } = constructFeeBumpTx(
+      const { feeBumpPsbt: nodeFeeBumpPsbt, usedUtxos } = constructFeeBumpTx(
         nodeTxHex,
         availableUtxos,
         feeRate,
@@ -354,31 +340,11 @@ export async function constructUnilateralExitFeeBumpPackages(
           publicKey: feeBumpOutPubKey!,
         });
 
-      // Use the corrected parent transaction if it was fixed
-      const finalNodeTx = parentTx || nodeTxHex;
-      txPackages.push({ tx: finalNodeTx, feeBumpPsbt: nodeFeeBumpPsbt });
+      txPackages.push({ tx: nodeTxHex, feeBumpPsbt: nodeFeeBumpPsbt });
 
       // If this is the original node we started with, also add its refund tx
       if (chainNode.id === node.id) {
         let refundTxHex = bytesToHex(chainNode.refundTx);
-
-        // Robust check for malformed ephemeral anchor in refundTx
-        try {
-          const txObj = getTxFromRawTxHex(refundTxHex);
-          let anchorOutputScriptHex: string | undefined;
-          for (let i = txObj.outputsLength - 1; i >= 0; i--) {
-            const output = txObj.getOutput(i);
-            if (output?.amount === 0n && output.script) {
-              anchorOutputScriptHex = bytesToHex(output.script);
-              break;
-            }
-          }
-        } catch (parseError) {
-          warnUnilateralExit(
-            logger,
-            `unable to parse refundTx for anchor check on node ${chainNode.id}: ${formatErrorForLog(parseError)}. This may indicate a corrupted refund transaction in the TreeNode; continuing with the original refund hex, but this transaction may be invalid.`,
-          );
-        }
 
         const refundFeeBump = constructFeeBumpTx(
           refundTxHex,
@@ -554,7 +520,7 @@ export function constructFeeBumpTx(
   feeRate: FeeRate,
   previousFeeBumpTx?: string, // Optional previous fee bump tx to chain from
   logger?: Logger,
-): { feeBumpPsbt: string; usedUtxos: Utxo[]; parentTx?: string } {
+): { feeBumpPsbt: string; usedUtxos: Utxo[] } {
   // Validate inputs first
   if (!txHex || txHex.length === 0) {
     throw new Error("Transaction hex string is empty or undefined");
@@ -563,8 +529,6 @@ export function constructFeeBumpTx(
   if (utxos.length === 0) {
     throw new Error("No UTXOs available for fee bump");
   }
-
-  // Check for and fix malformed ephemeral anchor BEFORE parsing
 
   // Decode the parent tx using the utility function with error handling
   let parentTx: any;
@@ -769,10 +733,8 @@ export function constructFeeBumpTx(
     throw new Error(`Failed to extract transaction: ${error}`);
   }
 
-  // Return both the fee bump transaction hex and the UTXOs used
   return {
     feeBumpPsbt: psbtHex,
     usedUtxos: selectedUtxos,
-    parentTx: txHex !== txHex ? txHex : undefined,
   };
 }
