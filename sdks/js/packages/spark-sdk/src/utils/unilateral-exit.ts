@@ -363,7 +363,7 @@ export async function constructUnilateralExitFeeBumpPackages(
         var feeBumpOutPubKey: string | null = null;
 
         // Remove used UTXOs from the available list
-        for (const usedUtxo of usedUtxos) {
+        for (const usedUtxo of refundFeeBump.usedUtxos) {
           if (feeBumpOut && bytesToHex(feeBumpOut.script!) == usedUtxo.script) {
             feeBumpOutPubKey = usedUtxo.publicKey;
           }
