@@ -94,6 +94,31 @@ func TestSession_GetCurrentTxReturnsNilAfterSuccessfulCommit(t *testing.T) {
 	require.Nil(t, currentTx, "Expected no current transaction to exist after commit")
 }
 
+func TestSession_OnlyCommitDirtyRollsBackCleanTx(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewDefaultSessionFactory(dbClient, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobDatabaseOnlyCommitDirty: 100,
+	})).NewSession(t.Context())
+
+	tx, err := session.GetOrBeginTx(t.Context())
+	require.NoError(t, err, "Expected to retrieve a transaction")
+
+	rollbackCalled := false
+	tx.OnRollback(func(fn ent.Rollbacker) ent.Rollbacker {
+		return ent.RollbackFunc(func(ctx context.Context, tx *ent.Tx) error {
+			rollbackCalled = true
+			return fn.Rollback(ctx, tx)
+		})
+	})
+
+	err = tx.Commit()
+	require.NoError(t, err, "Expected clean transaction finalization to succeed")
+	require.True(t, rollbackCalled, "Expected clean transaction to be rolled back instead of committed")
+	require.Nil(t, session.GetTxIfExists(), "Expected no current transaction to exist after clean transaction finalization")
+}
+
 func TestSession_GetCurrentTxReturnsNilAfterSuccessfulRollback(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()

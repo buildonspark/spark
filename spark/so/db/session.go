@@ -146,8 +146,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		tx.OnCommit(func(fn ent.Committer) ent.Committer {
 			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
 				if !s.currentIsDirty && s.knobs.RolloutRandom(knobs.KnobDatabaseOnlyCommitDirty, 0) {
-					// Assume we will clear the state when we do a rollback. We should maybe just rollback but
-					// this is the least disruptive for now.
+					rollbackErr := tx.Rollback()
+					if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, context.Canceled) {
+						logger.Error("Failed to rollback clean transaction", zap.Error(rollbackErr))
+						return rollbackErr
+					}
 					return nil
 				}
 
