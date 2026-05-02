@@ -127,6 +127,38 @@ describe("WalletConfigService logging normalization", () => {
     }
   });
 
+  it("treats a plain debug log level as a logging config", () => {
+    const service = createConfigService("DEBUG");
+
+    expect(service.getLog()).toBe(true);
+    expect(service.getLoggingLevel()).toBe("DEBUG");
+    for (const serviceName of LOG_SERVICE_NAMES) {
+      expect(service.getLoggingConfig().services[serviceName]).toMatchObject({
+        enabled: true,
+        level: "DEBUG",
+        methods: { enabled: false },
+      });
+    }
+  });
+
+  it("treats a plain trace log level as trace defaults", () => {
+    const service = createConfigService("TRACE");
+
+    expect(service.getLog()).toBe(true);
+    expect(service.getLoggingLevel()).toBe("TRACE");
+    for (const serviceName of LOG_SERVICE_NAMES) {
+      expect(service.getLoggingConfig().services[serviceName]).toMatchObject({
+        enabled: true,
+        level: "TRACE",
+        methods: {
+          enabled: DEFAULT_METHOD_LOGGING_SERVICES.includes(
+            serviceName as (typeof DEFAULT_METHOD_LOGGING_SERVICES)[number],
+          ),
+        },
+      });
+    }
+  });
+
   it("treats level names as case-insensitive for trace defaults", () => {
     const service = createConfigService({ level: "trace" });
     const services = service.getLoggingConfig().services;

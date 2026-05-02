@@ -304,7 +304,10 @@ export class WalletConfigService implements HasSspClientOptions {
       typeof logOptions === "object" && logOptions !== null
         ? (logOptions as LogOptionsObject)
         : undefined;
-    const requestedLevel = objectOptions?.level;
+    const requestedLevel =
+      typeof logOptions === "string" || typeof logOptions === "number"
+        ? logOptions
+        : objectOptions?.level;
     const globalLoggingEnabled =
       !this.logOptionProvided ||
       logOptions === true ||

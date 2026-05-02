@@ -165,7 +165,7 @@ export type LogOptionsObject = {
   services?: LogServicesOptions;
 };
 
-export type LogOptions = boolean | LogOptionsObject;
+export type LogOptions = boolean | LoggingLevelArg | LogOptionsObject;
 
 export type OptimizationOptions = {
   readonly auto?: boolean;
