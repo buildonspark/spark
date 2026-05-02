@@ -1174,9 +1174,7 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 		for prevHash, vouts := range voutsByPrevHash {
 			hash := hashBytesByKey[prevHash]
 			condition := []predicate.TokenOutput{
-				tokenoutput.HasOutputCreatedTokenTransactionWith(
-					tokentransaction.FinalizedTokenTransactionHashEQ(hash),
-				),
+				tokenoutput.CreatedTransactionFinalizedHashEQ(hash),
 				tokenoutput.CreatedTransactionOutputVoutIn(vouts...),
 				tokenoutput.NetworkEQ(network),
 			}
