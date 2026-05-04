@@ -1113,30 +1113,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
-		{
-			ExecutionInterval: 30 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "retype_ssp_compensation",
-				RunInTestEnv: false,
-				Disabled:     false,
-				Timeout:      &retypeSSPCompensationTimeout,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					client, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get db client: %w", err)
-					}
-					batchSize := int(knobsService.GetValue(knobs.KnobRetypeSSPCompensationBatchSize, retypeSSPCompensationDefaultBatchSize))
-					if batchSize <= 0 {
-						logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "retype_ssp_compensation"))
-						logger.Sugar().Warnf("retype_ssp_compensation: invalid batchSize %d (knob %s), falling back to default %d",
-							batchSize, knobs.KnobRetypeSSPCompensationBatchSize, retypeSSPCompensationDefaultBatchSize)
-						batchSize = retypeSSPCompensationDefaultBatchSize
-					}
-					_, err = retypeSSPCompensationTransfers(ctx, config, client, batchSize)
-					return err
-				},
-			},
-		},
 	}
 }
 
