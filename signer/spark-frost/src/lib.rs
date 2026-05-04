@@ -60,7 +60,7 @@ mod tests {
         let merkle_root = vec![];
 
         let aggregate_pubkey_package =
-            frost::keys::PublicKeyPackage::new(pubkey_shares, verifying_key);
+            frost::keys::PublicKeyPackage::new(pubkey_shares, verifying_key, None);
 
         let user_key_package = frost::keys::KeyPackage::new(
             user_identifier,

@@ -688,12 +688,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "debugless-unwrap"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f400d0750c0c069e8493f2256cb4da6f604b6d2eeb69a0ca8863acde352f8400"
-
-[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -903,12 +897,11 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "frost-core"
-version = "2.1.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#9aaf1b6b9fa3c2c3c2c7c70da83061deda1a9180"
+version = "3.0.0"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "byteorder",
  "const-crc32-nostd",
- "debugless-unwrap",
  "derive-getters",
  "document-features",
  "hex",
@@ -918,15 +911,15 @@ dependencies = [
  "serde",
  "serdect 0.2.0",
  "thiserror 2.0.17",
- "thiserror-nostd-notrait",
  "visibility",
  "zeroize",
+ "zeroize_derive",
 ]
 
 [[package]]
 name = "frost-rerandomized"
-version = "2.1.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#9aaf1b6b9fa3c2c3c2c7c70da83061deda1a9180"
+version = "3.0.0"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "derive-getters",
  "document-features",
@@ -937,8 +930,8 @@ dependencies = [
 
 [[package]]
 name = "frost-secp256k1-tr"
-version = "2.1.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#9aaf1b6b9fa3c2c3c2c7c70da83061deda1a9180"
+version = "3.0.0"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "document-features",
  "frost-core",
@@ -1989,7 +1982,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap 0.10.1",
  "once_cell",
@@ -2022,7 +2015,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.110",
@@ -2705,26 +2698,6 @@ name = "thiserror-impl"
 version = "2.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.110",
-]
-
-[[package]]
-name = "thiserror-nostd-notrait"
-version = "1.0.57"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8444e638022c44d2a9337031dee8acb732bcc7fbf52ac654edc236b26408b61"
-dependencies = [
- "thiserror-nostd-notrait-impl",
-]
-
-[[package]]
-name = "thiserror-nostd-notrait-impl"
-version = "1.0.57"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "585e5ef40a784ce60b49c67d762110688d211d395d39e096be204535cf64590e"
 dependencies = [
  "proc-macro2",
  "quote",

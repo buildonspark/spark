@@ -125,7 +125,7 @@ pub fn frost_public_package_from_proto(
         );
     }
     tracing::info!("final_shares: {:?}", final_shares);
-    let public_key_package = PublicKeyPackage::new(final_shares, verifying_key);
+    let public_key_package = PublicKeyPackage::new(final_shares, verifying_key, None);
     Ok(public_key_package)
 }
 
@@ -173,7 +173,7 @@ pub fn frost_public_package_from_proto_v2(
             Ok((identifier, share))
         })
         .collect::<Result<BTreeMap<_, _>, String>>()?;
-    Ok(PublicKeyPackage::new(shares, verifying_key))
+    Ok(PublicKeyPackage::new(shares, verifying_key, None))
 }
 
 pub fn frost_key_package_from_proto(
@@ -771,7 +771,7 @@ mod tests {
             );
             let mut shares = BTreeMap::new();
             shares.insert(user_id, user_verifying_share);
-            let pkg = PublicKeyPackage::new(shares, user_vk);
+            let pkg = PublicKeyPackage::new(shares, user_vk, None);
             let mut kps = BTreeMap::new();
             kps.insert(user_id, kp);
             (kps, pkg)
@@ -801,7 +801,7 @@ mod tests {
         let merkle_root = vec![];
         let mut all_raw_shares = se_pubkey_pkg.verifying_shares().clone();
         all_raw_shares.extend(user_pubkey_pkg.verifying_shares().clone());
-        let combined_pubkey_pkg = PublicKeyPackage::new(all_raw_shares, combined_vk);
+        let combined_pubkey_pkg = PublicKeyPackage::new(all_raw_shares, combined_vk, None);
         let tweaked_combined_pkg = combined_pubkey_pkg.clone().tweak(Some(&merkle_root));
         let tweaked_combined_vk = *tweaked_combined_pkg.verifying_key();
 
@@ -843,13 +843,13 @@ mod tests {
         for (id, kp) in &se_key_packages {
             se_pub_shares.insert(*id, *kp.verifying_share());
         }
-        let se_final_pubkey = PublicKeyPackage::new(se_pub_shares, tweaked_combined_vk);
+        let se_final_pubkey = PublicKeyPackage::new(se_pub_shares, tweaked_combined_vk, None);
 
         let mut user_pub_shares = BTreeMap::new();
         for (id, kp) in &user_key_packages {
             user_pub_shares.insert(*id, *kp.verifying_share());
         }
-        let user_final_pubkey = PublicKeyPackage::new(user_pub_shares, combined_vk);
+        let user_final_pubkey = PublicKeyPackage::new(user_pub_shares, combined_vk, None);
 
         (
             se_key_packages,
@@ -1017,7 +1017,7 @@ mod tests {
         let merkle_root = vec![];
         let mut all_shares = se_pub.verifying_shares().clone();
         all_shares.extend(user_pub.verifying_shares().clone());
-        let combined_pkg = PublicKeyPackage::new(all_shares, *combined_vk);
+        let combined_pkg = PublicKeyPackage::new(all_shares, *combined_vk, None);
         let tweaked_pkg = combined_pkg.tweak(Some(&merkle_root));
         let frost_sig = frost_secp256k1_tr::Signature::deserialize(sig).unwrap();
         tweaked_pkg
