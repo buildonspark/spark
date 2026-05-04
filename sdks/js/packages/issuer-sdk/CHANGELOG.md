@@ -1,5 +1,12 @@
 # @buildonspark/issuer-sdk
 
+## 0.1.35
+
+### Patch Changes
+
+- Updated dependencies [26d7b8e]
+  - @buildonspark/spark-sdk@0.7.17
+
 ## 0.1.34
 
 ### Patch Changes

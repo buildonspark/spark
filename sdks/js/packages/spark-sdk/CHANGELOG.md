@@ -1,5 +1,14 @@
 # @buildonspark/spark-sdk
 
+## 0.7.17
+
+### Patch Changes
+
+- 26d7b8e: - Add configurable SDK service logging, including method/request logging, DEBUG-level support breadcrumbs, Node.js file output, and plain log-level shorthand such as `log: "DEBUG"`.
+  - Default SDK wallet initialization to use token primitive bindings when available, including React Native token bindings.
+  - Keep reported wallet balances aligned with spendable leaves by excluding leaves that fail cross-operator consistency checks.
+  - Fix unilateral exit fee bump package construction to use the UTXOs from each refund fee bump entry.
+
 ## 0.7.16
 
 ### Patch Changes

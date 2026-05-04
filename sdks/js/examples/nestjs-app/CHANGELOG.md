@@ -1,5 +1,12 @@
 # @buildonspark/nestjs-app
 
+## 0.0.125
+
+### Patch Changes
+
+- Updated dependencies [26d7b8e]
+  - @buildonspark/spark-sdk@0.7.17
+
 ## 0.0.124
 
 ### Patch Changes
