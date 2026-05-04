@@ -86,6 +86,7 @@ class WrappedTarget extends WrappedTargetBase {
 describe("LoggingService", () => {
   afterEach(() => {
     setLogFileWriterFactory(undefined);
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -433,6 +434,41 @@ describe("LoggingService", () => {
 
     logging.logger("SparkWallet").warn("wallet warning");
     await expect(logging.close()).resolves.toBeUndefined();
+  });
+
+  it("bounds file sink close when the writer never finishes closing", async () => {
+    jest.useFakeTimers();
+    const write = jest.fn();
+    const close = jest.fn(() => new Promise<void>(() => {}));
+    setLogFileWriterFactory(() => ({
+      write,
+      close,
+    }));
+    const logging = new LoggingService({
+      ...createLogConfig("sparkWallet", {
+        enabled: true,
+      }),
+      console: false,
+      file: "./spark.log",
+    });
+
+    logging.logger("SparkWallet").warn("wallet warning");
+    const closePromise = logging.close();
+    let resolved = false;
+    void closePromise.then(() => {
+      resolved = true;
+    });
+    await Promise.resolve();
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(resolved).toBe(false);
+
+    await jest.runOnlyPendingTimersAsync();
+    await expect(closePromise).resolves.toBeUndefined();
+    expect(resolved).toBe(true);
+
+    logging.logger("SparkWallet").warn("after close");
+    expect(write).toHaveBeenCalledTimes(1);
   });
 
   it("does not propagate lazy file sink creation failures", () => {

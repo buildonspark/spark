@@ -76,6 +76,31 @@ const SERVICE_NAMES_BY_LOGGER_NAME = Object.fromEntries(
 ) as Record<LogServiceDisplayName, LogServiceName>;
 
 let loggingServiceInstanceCounter = 0;
+const LOG_FILE_CLOSE_TIMEOUT_MS = 1_500;
+
+function settleFileWriterClose(
+  fileWriter: LogFileWriter | undefined,
+): Promise<void> {
+  return Promise.resolve()
+    .then(() => fileWriter?.close?.())
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+}
+
+function withTimeout(promise: Promise<void>, timeoutMs: number): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<void>((resolve) => {
+    timeoutId = setTimeout(resolve, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  });
+}
 
 function disabledServiceConfig(): ServiceLoggingConfig {
   return {
@@ -181,9 +206,9 @@ export class LoggingService {
       state.methodCallLogger.flushPendingLogs();
     }
 
-    this.closePromise ??= Promise.resolve(this.fileWriter?.close?.()).then(
-      () => undefined,
-      () => undefined,
+    this.closePromise ??= withTimeout(
+      settleFileWriterClose(this.fileWriter),
+      LOG_FILE_CLOSE_TIMEOUT_MS,
     );
     await this.closePromise;
   }
