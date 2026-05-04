@@ -1325,6 +1325,12 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 		return fmt.Errorf("failed to query transfer leaves: %w", err)
 	}
 	for _, leaf := range transferLeaves {
+		if len(leaf.KeyTweak) == 0 {
+			// A prior block's run of this loop already tweaked this leaf and
+			// cleared the field but bailed before processing the rest. Skip
+			// so subsequent leaves can be tweaked one-per-block until done.
+			continue
+		}
 		keyTweak := &pb.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
