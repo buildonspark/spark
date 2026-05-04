@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"math/rand/v2"
+	"os"
 	"testing"
 	"time"
 
@@ -37,6 +38,13 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	code := m.Run()
+	stop()
+	os.Exit(code)
+}
 
 func TestProcessTransactions(t *testing.T) {
 	// Create test network params
@@ -1191,9 +1199,6 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 
 func TestTweakKeysForCoopExit_UsesEphemeralSecrets(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{7})
-	stop := db.StartPostgresServer()
-	t.Cleanup(stop)
-
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -1345,6 +1350,306 @@ func TestTweakKeysForCoopExit_UsesEphemeralSecrets(t *testing.T) {
 	assert.Equal(t, expectedSecret, *resolvedSecret)
 }
 
+type coopExitLeafFixture struct {
+	leafID         uuid.UUID
+	transferLeafID uuid.UUID
+	keyshareID     uuid.UUID
+	initialSecret  keys.Private
+	tweakSecret    keys.Private
+}
+
+func setupCoopExitWithKeyTweaks(
+	t *testing.T,
+	ctx context.Context,
+	dbClient *ent.Client,
+	ephemeralClient *entephemeral.Client,
+	rng *rand.ChaCha8,
+	leafCount int,
+) (*ent.CooperativeExit, uuid.UUID, []coopExitLeafFixture) {
+	t.Helper()
+
+	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	treeTxid := schematype.NewRandomTxIDForTesting(t)
+	tree, err := dbClient.Tree.Create().
+		SetStatus(schematype.TreeStatusAvailable).
+		SetBaseTxid(treeTxid).
+		SetOwnerIdentityPubkey(ownerIdentity).
+		SetNetwork(btcnetwork.Testnet).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer, err := dbClient.Transfer.Create().
+		SetNetwork(btcnetwork.Testnet).
+		SetStatus(schematype.TransferStatusSenderInitiatedCoordinator).
+		SetType(schematype.TransferTypeCooperativeExit).
+		SetSenderIdentityPubkey(ownerIdentity).
+		SetReceiverIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetTotalValue(uint64(leafCount) * 1_000).
+		SetExpiryTime(time.Now().Add(1 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	baseTx := wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 1_000}},
+	}
+	var rawTxBuf bytes.Buffer
+	err = baseTx.Serialize(&rawTxBuf)
+	require.NoError(t, err)
+	rawTx := rawTxBuf.Bytes()
+
+	fixtures := make([]coopExitLeafFixture, 0, leafCount)
+	version := int32(0)
+	for i := range leafCount {
+		initialSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+		tweakSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+		verifyingPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+		keyshare, err := dbClient.SigningKeyshare.Create().
+			SetPublicKey(initialSecret.Public()).
+			SetSecretVersion(version).
+			SetMinSigners(1).
+			SetPublicShares(map[string]keys.Public{}).
+			SetStatus(schematype.KeyshareStatusInUse).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = ephemeralClient.SigningKeyshareSecret.Create().
+			SetSigningKeyshareID(keyshare.ID).
+			SetVersion(version).
+			SetSecretShare(initialSecret).
+			Save(ctx)
+		require.NoError(t, err)
+
+		leaf, err := dbClient.TreeNode.Create().
+			SetTree(tree).
+			SetNetwork(btcnetwork.Testnet).
+			SetValue(1_000).
+			SetStatus(schematype.TreeNodeStatusAvailable).
+			SetVerifyingPubkey(verifyingPub).
+			SetOwnerIdentityPubkey(ownerIdentity).
+			SetOwnerSigningPubkey(ownerIdentity).
+			SetRawTx(rawTx).
+			SetVout(int16(i)).
+			SetSigningKeyshare(keyshare).
+			Save(ctx)
+		require.NoError(t, err)
+
+		keyTweakPayload := &pbspark.SendLeafKeyTweak{
+			LeafId: leaf.ID.String(),
+			SecretShareTweak: &pbspark.SecretShare{
+				SecretShare: tweakSecret.Serialize(),
+				Proofs:      [][]byte{tweakSecret.Public().Serialize()},
+			},
+			PubkeySharesTweak: map[string][]byte{},
+		}
+		keyTweakBytes, err := proto.Marshal(keyTweakPayload)
+		require.NoError(t, err)
+
+		transferLeaf, err := dbClient.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(leaf).
+			SetPreviousRefundTx(rawTx).
+			SetIntermediateRefundTx(rawTx).
+			SetKeyTweak(keyTweakBytes).
+			Save(ctx)
+		require.NoError(t, err)
+
+		fixtures = append(fixtures, coopExitLeafFixture{
+			leafID:         leaf.ID,
+			transferLeafID: transferLeaf.ID,
+			keyshareID:     keyshare.ID,
+			initialSecret:  initialSecret,
+			tweakSecret:    tweakSecret,
+		})
+	}
+
+	coopExit, err := dbClient.CooperativeExit.Create().
+		SetTransfer(transfer).
+		SetExitTxid(schematype.NewRandomTxIDForTesting(t)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return coopExit, transfer.ID, fixtures
+}
+
+func assertCoopExitTweaked(
+	t *testing.T,
+	ctx context.Context,
+	dbClient *ent.Client,
+	transferID uuid.UUID,
+	fixtures []coopExitLeafFixture,
+) {
+	t.Helper()
+
+	updatedTransfer, err := dbClient.Transfer.Get(ctx, transferID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TransferStatusSenderKeyTweaked, updatedTransfer.Status)
+
+	for _, fixture := range fixtures {
+		updatedTransferLeaf, err := dbClient.TransferLeaf.Get(ctx, fixture.transferLeafID)
+		require.NoError(t, err)
+		assert.Nil(t, updatedTransferLeaf.KeyTweak)
+
+		updatedKeyshare, err := dbClient.SigningKeyshare.Get(ctx, fixture.keyshareID)
+		require.NoError(t, err)
+		require.NotNil(t, updatedKeyshare.SecretVersion)
+		assert.Equal(t, int32(1), *updatedKeyshare.SecretVersion)
+
+		expectedSecret := fixture.initialSecret.Add(fixture.tweakSecret)
+		resolvedSecret, err := updatedKeyshare.GetSecretShare(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, expectedSecret, *resolvedSecret)
+	}
+}
+
+func TestTweakKeysForCoopExit_TxBackedEphemeralSessionReopensForMultipleLeaves(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	rng := rand.NewChaCha8([32]byte{8})
+	mainClient := tc.Client
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_multi_leaf_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	coopExit, transferID, fixtures := setupCoopExitWithKeyTweaks(t, ctx, mainClient, ephemeralClient, rng, 2)
+
+	mainTx, err := mainClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = mainTx.Rollback() })
+
+	ephemeralTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ephemeralTx.Rollback() })
+
+	ephemeralSession := newTxBackedEphemeralSession(ephemeralClient, ephemeralTx)
+	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
+	chainCtx = entephemeral.Inject(chainCtx, ephemeralSession)
+
+	txCoopExit, err := mainTx.Client().CooperativeExit.Get(chainCtx, coopExit.ID)
+	require.NoError(t, err)
+	err = tweakKeysForCoopExit(chainCtx, txCoopExit, 200)
+	require.NoError(t, err)
+	require.Nil(t, ephemeralSession.GetTxIfExists(), "each leaf rotation should commit its ephemeral tx inline")
+
+	chainTip := Tip{Height: 1, Hash: chainhash.Hash{}}
+	var ephemeralCommitted bool
+	err = commitBlockTransactions(ephemeralSession, mainTx, chainTip, zap.NewNop(), &ephemeralCommitted)
+	require.NoError(t, err)
+
+	verifyCtx := entephemeral.Inject(ctx, db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(ctx))
+	assertCoopExitTweaked(t, verifyCtx, mainClient, transferID, fixtures)
+}
+
+func TestTweakKeysForCoopExit_ResumesWhenLeafKeyTweakAlreadyCleared(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	rng := rand.NewChaCha8([32]byte{9})
+	mainClient := tc.Client
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_resume_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	coopExit, transferID, fixtures := setupCoopExitWithKeyTweaks(t, ctx, mainClient, ephemeralClient, rng, 2)
+	appliedFixture := fixtures[0]
+	appliedSecret := appliedFixture.initialSecret.Add(appliedFixture.tweakSecret)
+	appliedPublicKey := appliedFixture.initialSecret.Public().Add(appliedFixture.tweakSecret.Public())
+
+	_, err := mainClient.SigningKeyshare.UpdateOneID(appliedFixture.keyshareID).
+		SetPublicKey(appliedPublicKey).
+		SetSecretShare(appliedSecret).
+		SetSecretVersion(1).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = ephemeralClient.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(appliedFixture.keyshareID).
+		SetVersion(1).
+		SetSecretShare(appliedSecret).
+		Save(ctx)
+	require.NoError(t, err)
+	appliedLeaf, err := mainClient.TreeNode.Get(ctx, appliedFixture.leafID)
+	require.NoError(t, err)
+	_, err = appliedLeaf.Update().
+		SetOwnerSigningPubkey(appliedLeaf.VerifyingPubkey.Sub(appliedPublicKey)).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = mainClient.TransferLeaf.UpdateOneID(appliedFixture.transferLeafID).
+		ClearKeyTweak().
+		Save(ctx)
+	require.NoError(t, err)
+
+	mainTx, err := mainClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = mainTx.Rollback() })
+
+	ephemeralTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ephemeralTx.Rollback() })
+
+	ephemeralSession := newTxBackedEphemeralSession(ephemeralClient, ephemeralTx)
+	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
+	chainCtx = entephemeral.Inject(chainCtx, ephemeralSession)
+
+	txCoopExit, err := mainTx.Client().CooperativeExit.Get(chainCtx, coopExit.ID)
+	require.NoError(t, err)
+	err = tweakKeysForCoopExit(chainCtx, txCoopExit, 200)
+	require.NoError(t, err)
+
+	chainTip := Tip{Height: 1, Hash: chainhash.Hash{}}
+	var ephemeralCommitted bool
+	err = commitBlockTransactions(ephemeralSession, mainTx, chainTip, zap.NewNop(), &ephemeralCommitted)
+	require.NoError(t, err)
+
+	verifyCtx := entephemeral.Inject(ctx, db.NewDefaultEphemeralSessionFactory(ephemeralClient).NewSession(ctx))
+	assertCoopExitTweaked(t, verifyCtx, mainClient, transferID, fixtures)
+}
+
+func TestTweakKeysForCoopExit_EmptyKeyTweakDoesNotResume(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	rng := rand.NewChaCha8([32]byte{10})
+	mainClient := tc.Client
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_empty_key_tweak_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	coopExit, transferID, fixtures := setupCoopExitWithKeyTweaks(t, ctx, mainClient, ephemeralClient, rng, 1)
+	_, err := mainClient.TransferLeaf.UpdateOneID(fixtures[0].transferLeafID).
+		SetKeyTweak([]byte{}).
+		Save(ctx)
+	require.NoError(t, err)
+
+	mainTx, err := mainClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = mainTx.Rollback() })
+
+	ephemeralTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ephemeralTx.Rollback() })
+
+	ephemeralSession := newTxBackedEphemeralSession(ephemeralClient, ephemeralTx)
+	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
+	chainCtx = entephemeral.Inject(chainCtx, ephemeralSession)
+
+	txCoopExit, err := mainTx.Client().CooperativeExit.Get(chainCtx, coopExit.ID)
+	require.NoError(t, err)
+	err = tweakKeysForCoopExit(chainCtx, txCoopExit, 200)
+	require.ErrorContains(t, err, "secret share tweak is not provided")
+
+	updatedTransfer, err := mainTx.Client().Transfer.Get(chainCtx, transferID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TransferStatusSenderInitiatedCoordinator, updatedTransfer.Status)
+}
+
 func TestUpdateSigningKeyshareWithRotatedSecret_MainRollbackCleansUpWithTxBackedEphemeralSession(t *testing.T) {
 	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
@@ -1417,6 +1722,119 @@ func TestUpdateSigningKeyshareWithRotatedSecret_MainRollbackCleansUpWithTxBacked
 		Only(ctx)
 	require.NoError(t, err)
 	require.True(t, remainingSecret.SecretShare.Equals(oldSecret))
+}
+
+func TestUpdateSigningKeyshareWithRotatedSecret_TxBackedEphemeralSessionReopensForConsecutiveRotations(t *testing.T) {
+	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	mainClient := db.NewTestSQLiteClient(t)
+	t.Cleanup(func() { _ = mainClient.Close() })
+
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_reopen_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	oldSecret := keys.MustParsePrivateKeyHex("4b0f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f89")
+	firstSecret := keys.MustParsePrivateKeyHex("2e3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2bff6")
+	secondSecret := keys.MustParsePrivateKeyHex("681d1f5c7a12d2c54e1e0a21e51afdfdbf47533e6c4c81a07e35f96cf5ab1539")
+	version := int32(0)
+
+	keyshare, err := mainClient.SigningKeyshare.Create().
+		SetPublicKey(oldSecret.Public()).
+		SetSecretShare(oldSecret).
+		SetSecretVersion(version).
+		SetMinSigners(1).
+		SetPublicShares(map[string]keys.Public{}).
+		SetStatus(schematype.KeyshareStatusInUse).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = ephemeralClient.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(keyshare.ID).
+		SetVersion(version).
+		SetSecretShare(oldSecret).
+		Save(ctx)
+	require.NoError(t, err)
+
+	mainTx, err := mainClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = mainTx.Rollback() })
+
+	ephemeralTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ephemeralTx.Rollback() })
+
+	ephemeralSession := newTxBackedEphemeralSession(ephemeralClient, ephemeralTx)
+	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
+	chainCtx = entephemeral.Inject(chainCtx, ephemeralSession)
+
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, firstSecret, nil)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, int32(1), *updated.SecretVersion)
+	require.Nil(t, ephemeralSession.GetTxIfExists(), "first rotation should commit the current ephemeral tx")
+
+	updated, err = ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, secondSecret, nil)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, int32(2), *updated.SecretVersion)
+	require.Nil(t, ephemeralSession.GetTxIfExists(), "second rotation should use a reopened tx and commit it")
+
+	chainTip := Tip{Height: 1, Hash: chainhash.Hash{}}
+	var ephemeralCommitted bool
+	err = commitBlockTransactions(ephemeralSession, mainTx, chainTip, zap.NewNop(), &ephemeralCommitted)
+	require.NoError(t, err)
+
+	reloaded, err := mainClient.SigningKeyshare.Get(ctx, keyshare.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.SecretVersion)
+	assert.Equal(t, int32(2), *reloaded.SecretVersion)
+
+	v2, err := ephemeralClient.SigningKeyshareSecret.Query().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDEQ(keyshare.ID),
+			signingkeysharesecret.VersionEQ(2),
+		).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.True(t, v2.SecretShare.Equals(secondSecret))
+}
+
+func TestTxBackedEphemeralSession_RollbackUsesCurrentReopenedTx(t *testing.T) {
+	ctx := t.Context()
+	ephemeralClient := ephemeralenttest.Open(t, "sqlite3", "file:watch_chain_rollback_current_ephemeral?mode=memory&_fk=1")
+	t.Cleanup(func() { _ = ephemeralClient.Close() })
+
+	initialTx, err := ephemeralClient.Tx(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = initialTx.Rollback() })
+
+	session := newTxBackedEphemeralSession(ephemeralClient, initialTx)
+	require.NoError(t, initialTx.Commit())
+	require.Nil(t, session.GetTxIfExists())
+
+	reopenedTx, err := session.GetOrBeginTx(ctx)
+	require.NoError(t, err)
+	require.NotEqual(t, initialTx, reopenedTx)
+
+	signingKeyshareID := uuid.New()
+	_, err = reopenedTx.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(signingKeyshareID).
+		SetVersion(0).
+		SetSecretShare(keys.GeneratePrivateKey()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	currentTx := session.GetTxIfExists()
+	require.NotNil(t, currentTx)
+	require.NoError(t, currentTx.Rollback())
+
+	count, err := ephemeralClient.SigningKeyshareSecret.Query().
+		Where(signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID)).
+		Count(ctx)
+	require.NoError(t, err)
+	assert.Zero(t, count)
 }
 
 // TestCommitBlockTransactions_SurvivesInlineEphemeralCommit covers the bug tracked

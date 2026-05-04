@@ -185,9 +185,8 @@ Examples:
 - Transactional path:
   - `prepareSigningKeyshareSecretRotation(...)` explicitly calls `entephemeral.GetTxFromContext(...)`
     before version allocation / insertion, and **commits the ephemeral transaction itself** before
-    registering compensating hooks on the main transaction. This is safe because secret rotation
-    only runs in the gRPC/task middleware path (where `EphemeralSession` manages the tx lifecycle),
-    never inside the chain watcher's block processing.
+    registering compensating hooks on the main transaction. Callers that continue processing after
+    rotation must use a session that can open another ephemeral transaction after this inline commit.
   - `GetLatestSigningKeyshareSecretVersionForUpdate(...)`,
     `CreateSigningKeyshareSecretVersion(...)`, and
     `DeleteSigningKeyshareSecretVersion(...)` all require an ephemeral transaction because they
@@ -213,9 +212,8 @@ This behavior is implemented consistently in:
     creation.
   - This is intentional because block handling wants explicit ownership of both transactions across
     the entire block-processing unit of work.
-  - Block processing does not invoke secret rotation flows (`prepareSigningKeyshareSecretRotation`,
-    `UpdateSigningKeyshareWithRotatedSecret`, `TweakKeyShare`), so there is no conflict with
-    those functions committing the ephemeral transaction mid-flow.
+  - The tx-backed session can reopen an ephemeral transaction if a keyshare secret rotation commits
+    the current one inline before block processing is finished.
 
 ## Operational Notes
 

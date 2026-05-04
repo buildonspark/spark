@@ -131,11 +131,19 @@ func (s *txBackedEphemeralSession) bindTx(tx *entephemeral.Tx) {
 	})
 }
 
-func (s *txBackedEphemeralSession) GetOrBeginTx(context.Context) (*entephemeral.Tx, error) {
+func (s *txBackedEphemeralSession) GetOrBeginTx(ctx context.Context) (*entephemeral.Tx, error) {
 	if s.tx != nil {
 		return s.tx, nil
 	}
-	return nil, fmt.Errorf("no ephemeral transaction available")
+	if s.dbClient == nil {
+		return nil, fmt.Errorf("no ephemeral client available")
+	}
+	tx, err := s.dbClient.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.bindTx(tx)
+	return tx, nil
 }
 
 func (s *txBackedEphemeralSession) GetClient(context.Context) (*entephemeral.Client, error) {
@@ -496,10 +504,9 @@ func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ btcnetwork.Ne
 // can detect a panic that lands between the ephemeral commit and the main commit
 // (the only window where divergence is possible).
 //
-// If a callee has already finalized the ephemeral tx inline (see SP-2913),
-// GetTxIfExists() returns nil and we treat the ephemeral side as committed so
-// the divergence sentinel still arms correctly. When the proper fix lands, the
-// callee will no longer commit and this branch collapses to the unconditional path.
+// If a callee has already finalized the ephemeral tx inline, GetTxIfExists()
+// returns nil and we treat the ephemeral side as committed so the divergence
+// sentinel still arms correctly.
 func commitBlockTransactions(
 	ephemeralSession *txBackedEphemeralSession,
 	dbTx *ent.Tx,
@@ -634,15 +641,15 @@ func connectBlocks(
 		if err != nil {
 			logger.Error("Failed to handle block", zap.Error(err))
 			var rollbackErr error
-			// If a callee already finalized the ephemeral tx (e.g. signing-keyshare rotation
-			// commits inline today; see SP-2913), GetTxIfExists() returns nil and we skip
-			// the redundant rollback that would otherwise fail with sql.ErrTxDone.
-			if ephemeralSession != nil && ephemeralSession.GetTxIfExists() != nil {
-				if ephemeralRollbackErr := ephemeralTx.Rollback(); ephemeralRollbackErr != nil {
-					rollbackErr = errors.Join(
-						rollbackErr,
-						fmt.Errorf("failed to rollback ephemeral transaction: %w", ephemeralRollbackErr),
-					)
+			if ephemeralSession != nil {
+				currentEphemeralTx := ephemeralSession.GetTxIfExists()
+				if currentEphemeralTx != nil {
+					if ephemeralRollbackErr := currentEphemeralTx.Rollback(); ephemeralRollbackErr != nil {
+						rollbackErr = errors.Join(
+							rollbackErr,
+							fmt.Errorf("failed to rollback ephemeral transaction: %w", ephemeralRollbackErr),
+						)
+					}
 				}
 			}
 			if dbRollbackErr := dbTx.Rollback(); dbRollbackErr != nil {
@@ -1324,8 +1331,9 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 	if err != nil {
 		return fmt.Errorf("failed to query transfer leaves: %w", err)
 	}
+	ctx = ent.FreezeSigningKeyshareSecretDualWriteDecision(ctx)
 	for _, leaf := range transferLeaves {
-		if len(leaf.KeyTweak) == 0 {
+		if leaf.KeyTweak == nil {
 			// A prior block's run of this loop already tweaked this leaf and
 			// cleared the field but bailed before processing the rest. Skip
 			// so subsequent leaves can be tweaked one-per-block until done.
@@ -1348,7 +1356,7 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 		if err != nil {
 			return fmt.Errorf("failed to update tree node: %w", err)
 		}
-		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
+		_, err = leaf.Update().ClearKeyTweak().Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to clear key tweak: %w", err)
 		}
