@@ -115,22 +115,22 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 	logger := logging.GetLoggerFromContext(ctx)
 	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
-		return nil, err
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
 	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network not supported")
+		return nil, errors.InvalidArgumentNetworkNotSupported(fmt.Errorf("network not supported"))
 	}
 
 	reqIDPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
 		return nil, err
 	}
 	reqSigningPubKey, err := keys.ParsePublicKey(req.SigningPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signing public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid signing public key: %w", err))
 	}
 
 	logger.Sugar().Infof("Generating deposit address for public key %s (signing %s)", reqIDPubKey, reqSigningPubKey)
@@ -299,14 +299,14 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 
 	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
-		return nil, err
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
 	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network not supported")
+		return nil, errors.InvalidArgumentNetworkNotSupported(fmt.Errorf("network not supported"))
 	}
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, idPubKey); err != nil {
 		return nil, err
@@ -694,10 +694,10 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 
 	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
-		return nil, err
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
 	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network not supported")
+		return nil, errors.InvalidArgumentNetworkNotSupported(fmt.Errorf("network not supported"))
 	}
 	// Get the session from context
 	session, err := authn.GetSessionFromContext(ctx)
@@ -863,10 +863,10 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 
 	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
-		return nil, err
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
 	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network not supported")
+		return nil, errors.InvalidArgumentNetworkNotSupported(fmt.Errorf("network not supported"))
 	}
 	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, network)
 	if err != nil {

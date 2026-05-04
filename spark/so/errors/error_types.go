@@ -28,13 +28,14 @@ const (
 	ReasonInternalInvalidOperatorResponse      = "INVALID_OPERATOR_RESPONSE"
 	ReasonInternalOperationTooSlow             = "OPERATION_TOO_SLOW"
 
-	ReasonInvalidArgumentMissingField      = "MISSING_FIELD"
-	ReasonInvalidArgumentMalformedField    = "MALFORMED_FIELD"
-	ReasonInvalidArgumentDuplicateField    = "DUPLICATE_FIELD"
-	ReasonInvalidArgumenMalformedKey       = "MALFORMED_KEY"
-	ReasonInvalidArgumentInvalidVersion    = "INVALID_VERSION"
-	ReasonInvalidArgumentPublicKeyMismatch = "PUBLIC_KEY_MISMATCH"
-	ReasonInvalidArgumentOutOfRange        = "OUT_OF_RANGE"
+	ReasonInvalidArgumentMissingField        = "MISSING_FIELD"
+	ReasonInvalidArgumentMalformedField      = "MALFORMED_FIELD"
+	ReasonInvalidArgumentDuplicateField      = "DUPLICATE_FIELD"
+	ReasonInvalidArgumenMalformedKey         = "MALFORMED_KEY"
+	ReasonInvalidArgumentInvalidVersion      = "INVALID_VERSION"
+	ReasonInvalidArgumentPublicKeyMismatch   = "PUBLIC_KEY_MISMATCH"
+	ReasonInvalidArgumentOutOfRange          = "OUT_OF_RANGE"
+	ReasonInvalidArgumentNetworkNotSupported = "NETWORK_NOT_SUPPORTED"
 
 	ReasonFailedPreconditionBadSignature              = "BAD_SIGNATURE"
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
@@ -159,6 +160,10 @@ func InvalidArgumentPublicKeyMismatch(err error) error {
 
 func InvalidArgumentOutOfRange(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentOutOfRange)
+}
+
+func InvalidArgumentNetworkNotSupported(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentNetworkNotSupported)
 }
 
 func FailedPreconditionBadSignature(err error) error {

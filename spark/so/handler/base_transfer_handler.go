@@ -1759,7 +1759,7 @@ func validateSingleLeafRefundTxs(
 	transferType st.TransferType,
 ) error {
 	if len(cpfpRefundTx) == 0 {
-		return fmt.Errorf("missing required CPFP refund tx for leaf")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing required CPFP refund tx for leaf"))
 	}
 
 	networkString := node.Network.String()
@@ -1772,12 +1772,12 @@ func validateSingleLeafRefundTxs(
 		refundDestPubkey,
 		networkString,
 	); err != nil {
-		return fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err))
 	}
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeCooperativeExit {
 		if len(directFromCpfpRefundTx) == 0 {
-			return fmt.Errorf("missing required direct from CPFP refund tx for leaf")
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing required direct from CPFP refund tx for leaf"))
 		}
 
 		if err := bitcointransaction.VerifyTransactionWithDatabase(
@@ -1788,14 +1788,14 @@ func validateSingleLeafRefundTxs(
 			refundDestPubkey,
 			networkString,
 		); err != nil {
-			return fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err))
 		}
 
 		hasDirectRefundTx := len(directRefundTx) > 0
 		hasDirectNodeTx := len(node.DirectTx) > 0
 		isZeroNode, err := bitcointransaction.IsZeroNode(node)
 		if err != nil {
-			return fmt.Errorf("failed to determine if node is zero node: %w", err)
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("failed to determine if node is zero node: %w", err))
 		}
 
 		// If the node is not a zero node, enforce direct refund tx validation
@@ -1811,10 +1811,10 @@ func validateSingleLeafRefundTxs(
 				refundDestPubkey,
 				networkString,
 			); err != nil {
-				return fmt.Errorf("direct refund tx validation failed for leaf: %w", err)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx validation failed for leaf: %w", err))
 			}
 		} else if !hasDirectRefundTx && hasDirectNodeTx && !isZeroNode {
-			return fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String())
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String()))
 		}
 	}
 
@@ -1877,7 +1877,7 @@ func parseConnectorTxOutputs(connectorTx []byte) (map[wire.OutPoint]*wire.TxOut,
 
 	tx, err := common.TxFromRawTxBytes(connectorTx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse connector transaction: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse connector transaction: %w", err))
 	}
 
 	connectorTxHash := tx.TxHash()
@@ -1903,24 +1903,24 @@ func validateRefundTxWithConnector(
 	networkString string,
 ) error {
 	if len(refundTxBytes) == 0 {
-		return fmt.Errorf("refund transaction is empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("refund transaction is empty"))
 	}
 
 	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
 	if err != nil {
-		return fmt.Errorf("failed to parse refund transaction: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse refund transaction: %w", err))
 	}
 
 	// Verify transaction has exactly 2 inputs
 	if len(refundTx.TxIn) != 2 {
-		return fmt.Errorf("expected 2 inputs in refund tx, got %d", len(refundTx.TxIn))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected 2 inputs in refund tx, got %d", len(refundTx.TxIn)))
 	}
 
 	// Verify input 1 references a connector output
 	connectorOutpoint := refundTx.TxIn[1].PreviousOutPoint
 	_, exists := connectorPrevOuts[connectorOutpoint]
 	if !exists {
-		return fmt.Errorf("refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint))
 	}
 
 	// Build the node tx prevout for input 0
@@ -1932,20 +1932,20 @@ func validateRefundTxWithConnector(
 	}
 	nodeTx, err := common.TxFromRawTxBytes(nodeRawTx)
 	if err != nil {
-		return fmt.Errorf("failed to parse node transaction: %w", err)
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("failed to parse node transaction: %w", err))
 	}
 	nodeTxHash := nodeTx.TxHash()
 
 	// Verify input 0 references the node tx
 	nodeOutpoint := refundTx.TxIn[0].PreviousOutPoint
 	if nodeOutpoint.Hash != nodeTxHash || nodeOutpoint.Index != 0 {
-		return fmt.Errorf("refund tx input 0 does not reference the node tx")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund tx input 0 does not reference the node tx"))
 	}
 
 	// Validate the transaction structure by stripping input 1 for structural validation
 	modifiedTxBytes, err := removeTxIn(refundTxBytes, 1)
 	if err != nil {
-		return fmt.Errorf("failed to remove connector input for structural validation: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to remove connector input for structural validation: %w", err))
 	}
 
 	if err := bitcointransaction.VerifyTransactionWithDatabase(
@@ -1956,7 +1956,7 @@ func validateRefundTxWithConnector(
 		refundDestPubkey,
 		networkString,
 	); err != nil {
-		return fmt.Errorf("transaction structure validation failed: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transaction structure validation failed: %w", err))
 	}
 
 	return nil
@@ -2008,11 +2008,11 @@ func validateLeaves_transfer(
 	for _, leaf := range pkg.LeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err))
 		}
 		leafID := parsed.String()
 		if _, exists := leavesToSendByID[leafID]; exists {
-			return fmt.Errorf("duplicate leaf id: %s", leafID)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leafID))
 		}
 		leavesToSendByID[leafID] = leaf
 	}
@@ -2021,34 +2021,34 @@ func validateLeaves_transfer(
 	for _, leaf := range pkg.DirectLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err))
 		}
 		directLeafID := parsed.String()
 		if _, ok := leavesToSendByID[directLeafID]; !ok {
-			return fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.LeafId))
 		}
 		if _, exists := directLeavesByID[directLeafID]; exists {
-			return fmt.Errorf("duplicate leaf id: %s", directLeafID)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", directLeafID))
 		}
 		directLeavesByID[directLeafID] = leaf
 	}
 
 	if len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
-		return fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend)))
 	}
 
 	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.DirectFromCpfpLeavesToSend))
 	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err))
 		}
 		directFromCpfpLeafID := parsed.String()
 		if _, ok := leavesToSendByID[directFromCpfpLeafID]; !ok {
-			return fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.LeafId)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.LeafId))
 		}
 		if _, exists := directFromCpfpLeavesByID[directFromCpfpLeafID]; exists {
-			return fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID))
 		}
 		directFromCpfpLeavesByID[directFromCpfpLeafID] = leaf
 	}
@@ -2172,19 +2172,19 @@ func validateTransactionCooperativeExitLeavesToSend(
 			// one from connector tx. SOs only verify 1st input and let SSP verifies 2nd input.
 			modifiedCpfpRefundTx, err := removeTxIn(cpfpRefundTx, 1)
 			if err != nil {
-				return fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to remove second input from CPFP refund tx %x: %w", cpfpRefundTx, err))
 			}
 
 			modifiedDirectFromCpfpRefundTx, err := removeTxIn(directFromCpfpRefundTx, 1)
 			if err != nil {
-				return fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to remove second input from Direct-from-CPFP refund tx %x: %w", directFromCpfpRefundTx, err))
 			}
 
 			var modifiedDirectRefundTx []byte
 			if len(directRefundTx) > 0 {
 				modifiedDirectRefundTx, err = removeTxIn(directRefundTx, 1)
 				if err != nil {
-					return fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err)
+					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to remove second input from Direct refund tx %x: %w", directRefundTx, err))
 				}
 			}
 

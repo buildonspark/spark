@@ -1971,7 +1971,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 	network, err := btcnetwork.FromProtoNetwork(filter.GetNetwork())
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
 	// The MIMO branches below query TransferSender/TransferReceiver by
 	// identity_pubkey using a composite (identity_pubkey, create_time DESC)

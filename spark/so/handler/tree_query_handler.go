@@ -53,18 +53,18 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		var err error
 		network, err = btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
+			return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 		}
 	}
 
 	switch req.Source.(type) {
 	case *pb.QueryNodesRequest_OwnerIdentityPubkey:
 		if limit < 0 || offset < 0 {
-			return nil, fmt.Errorf("expect non-negative offset and limit")
+			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("expect non-negative offset and limit"))
 		}
 		ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPubkey())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+			return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
 		}
 		if !isSSP {
 			hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, ownerIdentityPubKey)
@@ -102,7 +102,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		offset = -1
 		nodeIDs, err := uuids.ParseSlice(req.GetNodeIds().GetNodeIds())
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse node IDs as UUIDs: %w", err)
+			return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node IDs as UUIDs: %w", err))
 		}
 		query = query.Where(treenode.IDIn(nodeIDs...))
 	default:
@@ -174,12 +174,12 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 	}
 	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
 
 	identityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse identity public key: %w", err))
 	}
 
 	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, identityPubKey)
