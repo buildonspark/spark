@@ -2005,6 +2005,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		HasPubkey:       hasPubkey,
 		HasStatusFilter: len(filter.Statuses) > 0,
 		HasTypeFilter:   len(filter.Types) > 0,
+		PendingOnly:     pendingOnly,
 	})
 
 	var transferPredicate []predicate.Transfer
@@ -2497,6 +2498,7 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		FilterType:    filterType,
 		HasPubkey:     true,
 		HasTypeFilter: len(filter.Types) > 0,
+		PendingOnly:   true,
 	})
 
 	// Upfront access check.

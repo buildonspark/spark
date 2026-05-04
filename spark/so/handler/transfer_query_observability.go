@@ -74,6 +74,7 @@ type transferQueryAttrs struct {
 	HasPubkey       bool
 	HasStatusFilter bool
 	HasTypeFilter   bool
+	PendingOnly     bool
 }
 
 type transferQueryRecorder struct {
@@ -98,6 +99,7 @@ func (r *transferQueryRecorder) record(ctx context.Context, resultCount int, err
 		attribute.Bool("has_pubkey", r.attrs.HasPubkey),
 		attribute.Bool("has_status_filter", r.attrs.HasStatusFilter),
 		attribute.Bool("has_type_filter", r.attrs.HasTypeFilter),
+		attribute.Bool("pending_only", r.attrs.PendingOnly),
 		attribute.Bool("success", err == nil),
 	}
 	opts := metric.WithAttributes(attrs...)
