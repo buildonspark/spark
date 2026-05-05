@@ -56,6 +56,11 @@ func (FlowExecution) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Comment("Marshalled google.protobuf.Any carrying the commit or rollback payload. Populated on coordinator rows once a decision is reached so ConsensusQueryOutcome can serve the payload."),
+		field.Bytes("prepare_payload").
+			Optional().
+			Nillable().
+			Immutable().
+			Comment("Marshalled google.protobuf.Any of the prepare op. Set on PARTICIPANT rows at create time so the reconciler can synthesize a local rollback when the coordinator has lost its row (e.g., its request tx was aborted before commit)."),
 	}
 }
 
@@ -70,16 +75,18 @@ func (FlowExecution) Indexes() []ent.Index {
 	}
 }
 
-// Hooks enforces role-conditional invariants on decision_payload at row
+// Hooks enforces role-conditional invariants on payload columns at row
 // creation so the reconciliation task can rely on the shape of each row:
 //
 //	PARTICIPANT rows must not set decision_payload.
+//	COORDINATOR rows must not set prepare_payload.
 //
 // coordinator_index is a required field handled by Ent itself (no default);
 // absent SetCoordinatorIndex at Create the save fails. decision_payload is
 // legitimately set by an Update (on the coordinator's terminal transition);
 // engine code is the only caller that sets it, and ensures it runs only on
-// COORDINATOR rows.
+// COORDINATOR rows. prepare_payload is set only on PARTICIPANT Create by the
+// consensus dispatcher and is immutable thereafter.
 func (FlowExecution) Hooks() []ent.Hook {
 	return []ent.Hook{
 		func(next ent.Mutator) ent.Mutator {
@@ -94,6 +101,10 @@ func (FlowExecution) Hooks() []ent.Hook {
 				_, hasDecision := m.DecisionPayload()
 				if role == st.FlowExecutionRoleParticipant && hasDecision {
 					return nil, fmt.Errorf("flow_execution: PARTICIPANT row must not set decision_payload")
+				}
+				_, hasPrepare := m.PreparePayload()
+				if role == st.FlowExecutionRoleCoordinator && hasPrepare {
+					return nil, fmt.Errorf("flow_execution: COORDINATOR row must not set prepare_payload")
 				}
 				return next.Mutate(ctx, m)
 			})

@@ -81,6 +81,11 @@ func DecisionPayload(v []byte) predicate.FlowExecution {
 	return predicate.FlowExecution(sql.FieldEQ(FieldDecisionPayload, v))
 }
 
+// PreparePayload applies equality check predicate on the "prepare_payload" field. It's identical to PreparePayloadEQ.
+func PreparePayload(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldEQ(FieldPreparePayload, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.FlowExecution {
 	return predicate.FlowExecution(sql.FieldEQ(FieldCreateTime, v))
@@ -349,6 +354,56 @@ func DecisionPayloadIsNil() predicate.FlowExecution {
 // DecisionPayloadNotNil applies the NotNil predicate on the "decision_payload" field.
 func DecisionPayloadNotNil() predicate.FlowExecution {
 	return predicate.FlowExecution(sql.FieldNotNull(FieldDecisionPayload))
+}
+
+// PreparePayloadEQ applies the EQ predicate on the "prepare_payload" field.
+func PreparePayloadEQ(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldEQ(FieldPreparePayload, v))
+}
+
+// PreparePayloadNEQ applies the NEQ predicate on the "prepare_payload" field.
+func PreparePayloadNEQ(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldNEQ(FieldPreparePayload, v))
+}
+
+// PreparePayloadIn applies the In predicate on the "prepare_payload" field.
+func PreparePayloadIn(vs ...[]byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldIn(FieldPreparePayload, vs...))
+}
+
+// PreparePayloadNotIn applies the NotIn predicate on the "prepare_payload" field.
+func PreparePayloadNotIn(vs ...[]byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldNotIn(FieldPreparePayload, vs...))
+}
+
+// PreparePayloadGT applies the GT predicate on the "prepare_payload" field.
+func PreparePayloadGT(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldGT(FieldPreparePayload, v))
+}
+
+// PreparePayloadGTE applies the GTE predicate on the "prepare_payload" field.
+func PreparePayloadGTE(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldGTE(FieldPreparePayload, v))
+}
+
+// PreparePayloadLT applies the LT predicate on the "prepare_payload" field.
+func PreparePayloadLT(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldLT(FieldPreparePayload, v))
+}
+
+// PreparePayloadLTE applies the LTE predicate on the "prepare_payload" field.
+func PreparePayloadLTE(v []byte) predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldLTE(FieldPreparePayload, v))
+}
+
+// PreparePayloadIsNil applies the IsNil predicate on the "prepare_payload" field.
+func PreparePayloadIsNil() predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldIsNull(FieldPreparePayload))
+}
+
+// PreparePayloadNotNil applies the NotNil predicate on the "prepare_payload" field.
+func PreparePayloadNotNil() predicate.FlowExecution {
+	return predicate.FlowExecution(sql.FieldNotNull(FieldPreparePayload))
 }
 
 // And groups predicates with the AND operator between them.

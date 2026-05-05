@@ -33,7 +33,9 @@ type FlowExecution struct {
 	CoordinatorIndex uint `json:"coordinator_index,omitempty"`
 	// Marshalled google.protobuf.Any carrying the commit or rollback payload. Populated on coordinator rows once a decision is reached so ConsensusQueryOutcome can serve the payload.
 	DecisionPayload *[]byte `json:"decision_payload,omitempty"`
-	selectValues    sql.SelectValues
+	// Marshalled google.protobuf.Any of the prepare op. Set on PARTICIPANT rows at create time so the reconciler can synthesize a local rollback when the coordinator has lost its row (e.g., its request tx was aborted before commit).
+	PreparePayload *[]byte `json:"prepare_payload,omitempty"`
+	selectValues   sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -41,7 +43,7 @@ func (*FlowExecution) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case flowexecution.FieldDecisionPayload:
+		case flowexecution.FieldDecisionPayload, flowexecution.FieldPreparePayload:
 			values[i] = new([]byte)
 		case flowexecution.FieldOpType, flowexecution.FieldCoordinatorIndex:
 			values[i] = new(sql.NullInt64)
@@ -114,6 +116,12 @@ func (fe *FlowExecution) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				fe.DecisionPayload = value
 			}
+		case flowexecution.FieldPreparePayload:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field prepare_payload", values[i])
+			} else if value != nil {
+				fe.PreparePayload = value
+			}
 		default:
 			fe.selectValues.Set(columns[i], values[i])
 		}
@@ -170,6 +178,11 @@ func (fe *FlowExecution) String() string {
 	builder.WriteString(", ")
 	if v := fe.DecisionPayload; v != nil {
 		builder.WriteString("decision_payload=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := fe.PreparePayload; v != nil {
+		builder.WriteString("prepare_payload=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteByte(')')

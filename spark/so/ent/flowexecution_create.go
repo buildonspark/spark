@@ -91,6 +91,12 @@ func (fec *FlowExecutionCreate) SetDecisionPayload(b []byte) *FlowExecutionCreat
 	return fec
 }
 
+// SetPreparePayload sets the "prepare_payload" field.
+func (fec *FlowExecutionCreate) SetPreparePayload(b []byte) *FlowExecutionCreate {
+	fec.mutation.SetPreparePayload(b)
+	return fec
+}
+
 // SetID sets the "id" field.
 func (fec *FlowExecutionCreate) SetID(u uuid.UUID) *FlowExecutionCreate {
 	fec.mutation.SetID(u)
@@ -264,6 +270,10 @@ func (fec *FlowExecutionCreate) createSpec() (*FlowExecution, *sqlgraph.CreateSp
 		_spec.SetField(flowexecution.FieldDecisionPayload, field.TypeBytes, value)
 		_node.DecisionPayload = &value
 	}
+	if value, ok := fec.mutation.PreparePayload(); ok {
+		_spec.SetField(flowexecution.FieldPreparePayload, field.TypeBytes, value)
+		_node.PreparePayload = &value
+	}
 	return _node, _spec
 }
 
@@ -386,6 +396,9 @@ func (u *FlowExecutionUpsertOne) UpdateNewValues() *FlowExecutionUpsertOne {
 		}
 		if _, exists := u.create.mutation.CoordinatorIndex(); exists {
 			s.SetIgnore(flowexecution.FieldCoordinatorIndex)
+		}
+		if _, exists := u.create.mutation.PreparePayload(); exists {
+			s.SetIgnore(flowexecution.FieldPreparePayload)
 		}
 	}))
 	return u
@@ -661,6 +674,9 @@ func (u *FlowExecutionUpsertBulk) UpdateNewValues() *FlowExecutionUpsertBulk {
 			}
 			if _, exists := b.mutation.CoordinatorIndex(); exists {
 				s.SetIgnore(flowexecution.FieldCoordinatorIndex)
+			}
+			if _, exists := b.mutation.PreparePayload(); exists {
+				s.SetIgnore(flowexecution.FieldPreparePayload)
 			}
 		}
 	}))

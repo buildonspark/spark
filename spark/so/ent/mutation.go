@@ -4042,6 +4042,7 @@ type FlowExecutionMutation struct {
 	coordinator_index    *uint
 	addcoordinator_index *int
 	decision_payload     *[]byte
+	prepare_payload      *[]byte
 	clearedFields        map[string]struct{}
 	done                 bool
 	oldValue             func(context.Context) (*FlowExecution, error)
@@ -4457,6 +4458,55 @@ func (m *FlowExecutionMutation) ResetDecisionPayload() {
 	delete(m.clearedFields, flowexecution.FieldDecisionPayload)
 }
 
+// SetPreparePayload sets the "prepare_payload" field.
+func (m *FlowExecutionMutation) SetPreparePayload(b []byte) {
+	m.prepare_payload = &b
+}
+
+// PreparePayload returns the value of the "prepare_payload" field in the mutation.
+func (m *FlowExecutionMutation) PreparePayload() (r []byte, exists bool) {
+	v := m.prepare_payload
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreparePayload returns the old "prepare_payload" field's value of the FlowExecution entity.
+// If the FlowExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FlowExecutionMutation) OldPreparePayload(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreparePayload is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreparePayload requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreparePayload: %w", err)
+	}
+	return oldValue.PreparePayload, nil
+}
+
+// ClearPreparePayload clears the value of the "prepare_payload" field.
+func (m *FlowExecutionMutation) ClearPreparePayload() {
+	m.prepare_payload = nil
+	m.clearedFields[flowexecution.FieldPreparePayload] = struct{}{}
+}
+
+// PreparePayloadCleared returns if the "prepare_payload" field was cleared in this mutation.
+func (m *FlowExecutionMutation) PreparePayloadCleared() bool {
+	_, ok := m.clearedFields[flowexecution.FieldPreparePayload]
+	return ok
+}
+
+// ResetPreparePayload resets all changes to the "prepare_payload" field.
+func (m *FlowExecutionMutation) ResetPreparePayload() {
+	m.prepare_payload = nil
+	delete(m.clearedFields, flowexecution.FieldPreparePayload)
+}
+
 // Where appends a list predicates to the FlowExecutionMutation builder.
 func (m *FlowExecutionMutation) Where(ps ...predicate.FlowExecution) {
 	m.predicates = append(m.predicates, ps...)
@@ -4491,7 +4541,7 @@ func (m *FlowExecutionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FlowExecutionMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.create_time != nil {
 		fields = append(fields, flowexecution.FieldCreateTime)
 	}
@@ -4512,6 +4562,9 @@ func (m *FlowExecutionMutation) Fields() []string {
 	}
 	if m.decision_payload != nil {
 		fields = append(fields, flowexecution.FieldDecisionPayload)
+	}
+	if m.prepare_payload != nil {
+		fields = append(fields, flowexecution.FieldPreparePayload)
 	}
 	return fields
 }
@@ -4535,6 +4588,8 @@ func (m *FlowExecutionMutation) Field(name string) (ent.Value, bool) {
 		return m.CoordinatorIndex()
 	case flowexecution.FieldDecisionPayload:
 		return m.DecisionPayload()
+	case flowexecution.FieldPreparePayload:
+		return m.PreparePayload()
 	}
 	return nil, false
 }
@@ -4558,6 +4613,8 @@ func (m *FlowExecutionMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldCoordinatorIndex(ctx)
 	case flowexecution.FieldDecisionPayload:
 		return m.OldDecisionPayload(ctx)
+	case flowexecution.FieldPreparePayload:
+		return m.OldPreparePayload(ctx)
 	}
 	return nil, fmt.Errorf("unknown FlowExecution field %s", name)
 }
@@ -4615,6 +4672,13 @@ func (m *FlowExecutionMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDecisionPayload(v)
+		return nil
+	case flowexecution.FieldPreparePayload:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreparePayload(v)
 		return nil
 	}
 	return fmt.Errorf("unknown FlowExecution field %s", name)
@@ -4676,6 +4740,9 @@ func (m *FlowExecutionMutation) ClearedFields() []string {
 	if m.FieldCleared(flowexecution.FieldDecisionPayload) {
 		fields = append(fields, flowexecution.FieldDecisionPayload)
 	}
+	if m.FieldCleared(flowexecution.FieldPreparePayload) {
+		fields = append(fields, flowexecution.FieldPreparePayload)
+	}
 	return fields
 }
 
@@ -4692,6 +4759,9 @@ func (m *FlowExecutionMutation) ClearField(name string) error {
 	switch name {
 	case flowexecution.FieldDecisionPayload:
 		m.ClearDecisionPayload()
+		return nil
+	case flowexecution.FieldPreparePayload:
+		m.ClearPreparePayload()
 		return nil
 	}
 	return fmt.Errorf("unknown FlowExecution nullable field %s", name)
@@ -4721,6 +4791,9 @@ func (m *FlowExecutionMutation) ResetField(name string) error {
 		return nil
 	case flowexecution.FieldDecisionPayload:
 		m.ResetDecisionPayload()
+		return nil
+	case flowexecution.FieldPreparePayload:
+		m.ResetPreparePayload()
 		return nil
 	}
 	return fmt.Errorf("unknown FlowExecution field %s", name)

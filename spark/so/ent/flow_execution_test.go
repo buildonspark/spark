@@ -35,6 +35,34 @@ func TestFlowExecutionHook_ParticipantMustNotSetDecisionPayload(t *testing.T) {
 	require.ErrorContains(t, err, "PARTICIPANT row must not set decision_payload")
 }
 
+func TestFlowExecutionHook_CoordinatorMustNotSetPreparePayload(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	client := dbCtx.Client
+
+	_, err := client.FlowExecution.Create().
+		SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(1).
+		SetCoordinatorIndex(0).
+		SetPreparePayload([]byte{0x01}).
+		Save(ctx)
+	require.ErrorContains(t, err, "COORDINATOR row must not set prepare_payload")
+}
+
+func TestFlowExecutionHook_ParticipantMaySetPreparePayload(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	client := dbCtx.Client
+
+	row, err := client.FlowExecution.Create().
+		SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(1).
+		SetCoordinatorIndex(2).
+		SetPreparePayload([]byte{0x01, 0x02, 0x03}).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, row.PreparePayload)
+	require.Equal(t, []byte{0x01, 0x02, 0x03}, *row.PreparePayload)
+}
+
 // Models the production flow: coordinator generates a row id (recording its
 // own index as coordinator_index), and then each participant — on its own
 // DB — creates a row with that same id and the coordinator's index. These

@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -71,7 +72,7 @@ func (h *ConsensusHandler) DispatchPrepare(
 	}
 
 	if flowExecutionID != "" {
-		if err := writeParticipantFlowExecutionRow(ctx, flowExecutionID, int32(opType), coordinatorIndex); err != nil {
+		if err := writeParticipantFlowExecutionRow(ctx, flowExecutionID, int32(opType), coordinatorIndex, op); err != nil {
 			return nil, err
 		}
 	}
@@ -86,7 +87,13 @@ func (h *ConsensusHandler) DispatchPrepare(
 // its id set to flowExecutionID. The row is written on the same DB tx as the
 // flow's prepare work so the "prepared" state and the "we recorded prepare"
 // state are atomic.
-func writeParticipantFlowExecutionRow(ctx context.Context, flowExecutionID string, opType int32, coordinatorIndex uint) error {
+//
+// The marshalled prepare op is persisted on the row so the participant
+// reconciler can synthesize a local rollback if the coordinator's row never
+// landed (e.g., its request tx aborted before commit) — without it, the
+// participant would be stuck IN_FLIGHT awaiting a decision that will never
+// arrive via gossip.
+func writeParticipantFlowExecutionRow(ctx context.Context, flowExecutionID string, opType int32, coordinatorIndex uint, op *anypb.Any) error {
 	id, err := uuid.Parse(flowExecutionID)
 	if err != nil {
 		return fmt.Errorf("invalid flow_execution_id: %w", err)
@@ -95,11 +102,18 @@ func writeParticipantFlowExecutionRow(ctx context.Context, flowExecutionID strin
 	if err != nil {
 		return err
 	}
-	_, err = db.FlowExecution.Create().
+	create := db.FlowExecution.Create().
 		SetID(id).
 		SetRole(st.FlowExecutionRoleParticipant).
 		SetOpType(opType).
-		SetCoordinatorIndex(coordinatorIndex).
-		Save(ctx)
+		SetCoordinatorIndex(coordinatorIndex)
+	if op != nil {
+		prepareBytes, err := proto.Marshal(op)
+		if err != nil {
+			return fmt.Errorf("failed to marshal prepare payload: %w", err)
+		}
+		create = create.SetPreparePayload(prepareBytes)
+	}
+	_, err = create.Save(ctx)
 	return err
 }

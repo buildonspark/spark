@@ -19,6 +19,7 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -38,14 +39,25 @@ func stuckParticipantRow(t *testing.T, ctx context.Context, id uuid.UUID, coordI
 // needs a distinct update_time.
 func insertStaleParticipantRow(t *testing.T, ctx context.Context, id uuid.UUID, coordIdx uint, age time.Duration) {
 	t.Helper()
+	insertStaleParticipantRowWithPayload(t, ctx, id, coordIdx, age, nil)
+}
+
+// insertStaleParticipantRowWithPayload is the variant used by presumed-abort
+// tests that exercise the rollback-from-persisted-prepare-payload path. nil
+// payload models pre-rollout rows.
+func insertStaleParticipantRowWithPayload(t *testing.T, ctx context.Context, id uuid.UUID, coordIdx uint, age time.Duration, prepare []byte) {
+	t.Helper()
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	_, err = client.FlowExecution.Create().
+	create := client.FlowExecution.Create().
 		SetID(id).
 		SetRole(st.FlowExecutionRoleParticipant).
 		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE)).
-		SetCoordinatorIndex(coordIdx).
-		Save(ctx)
+		SetCoordinatorIndex(coordIdx)
+	if prepare != nil {
+		create = create.SetPreparePayload(prepare)
+	}
+	_, err = create.Save(ctx)
 	require.NoError(t, err)
 	// Ent's update_time has UpdateDefault(time.Now), so we have to update
 	// the column directly to backdate it.
@@ -54,6 +66,16 @@ func insertStaleParticipantRow(t *testing.T, ctx context.Context, id uuid.UUID, 
 		SetUpdateTime(time.Now().Add(-age)).
 		Save(ctx)
 	require.NoError(t, err)
+}
+
+// preparePayloadBytes returns the marshaled-Any bytes the consensus dispatcher
+// persists on a PARTICIPANT row at create time. Tests stash this on
+// fixtures so the reconciler's presumed-abort path can unmarshal it back.
+func preparePayloadBytes(t *testing.T) []byte {
+	t.Helper()
+	bytes, err := proto.Marshal(anyOperation(t))
+	require.NoError(t, err)
+	return bytes
 }
 
 // insertCoordinatorRow inserts a COORDINATOR FlowExecution row in the given
@@ -198,6 +220,9 @@ func TestReconcile_CoordinatorUnspecified_LeavesRowInFlight(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	cfg := testConfigWithOperator(t, 0)
 	id := uuid.New()
+	// Legacy row: no prepare_payload. Models a row created before the
+	// presumed-abort recovery shipped. UNSPECIFIED should fall through to
+	// the legacy "log and skip" path even at 1h age.
 	stuckParticipantRow(t, ctx, id, 0)
 
 	r := &participantReconciler{
@@ -215,7 +240,96 @@ func TestReconcile_CoordinatorUnspecified_LeavesRowInFlight(t *testing.T) {
 	row, err := client.FlowExecution.Get(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, st.FlowExecutionStatusInFlight, row.Status,
-		"UNSPECIFIED (coordinator data loss) must not prematurely terminate the row")
+		"UNSPECIFIED with no persisted prepare_payload must not prematurely terminate the row")
+}
+
+func TestReconcile_CoordinatorUnspecified_OldRowWithPayload_PresumedAbortsToRolledBack(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	id := uuid.New()
+	// Row is past the presumed-abort age and carries the persisted prepare
+	// op — this is the bug case we're recovering: coordinator's request tx
+	// rolled back so its FlowExecution row never landed, leaving the
+	// participant stuck IN_FLIGHT with no decision available via gossip or
+	// query. The reconciler should synthesize a rollback locally.
+	insertStaleParticipantRowWithPayload(t, ctx, id, 0, 1*time.Hour, preparePayloadBytes(t))
+
+	r := &participantReconciler{
+		config: cfg,
+		knobs:  recoveryEnabledKnobs(),
+		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
+			Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED,
+		}),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	require.NoError(t, r.reconcile(ctx))
+
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := client.FlowExecution.Get(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, row.Status,
+		"UNSPECIFIED past presumed-abort age with persisted prepare_payload must roll back locally")
+}
+
+func TestReconcile_CoordinatorUnspecified_YoungRowWithPayload_LeavesRowInFlight(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	id := uuid.New()
+	// Old enough to be picked up by the stuck-threshold sweep (300s) but
+	// younger than the presumed-abort age (1200s). Guards against firing
+	// presumed-abort while the coordinator may still be deciding.
+	insertStaleParticipantRowWithPayload(t, ctx, id, 0, 10*time.Minute, preparePayloadBytes(t))
+
+	r := &participantReconciler{
+		config: cfg,
+		knobs:  recoveryEnabledKnobs(),
+		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
+			Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED,
+		}),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	require.NoError(t, r.reconcile(ctx))
+
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := client.FlowExecution.Get(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusInFlight, row.Status,
+		"UNSPECIFIED below presumed-abort age must not roll back even with a payload — coordinator may still be deciding")
+}
+
+// Regression for the codex P1 review comment: Ent represents a SQL NULL
+// bytea as either a nil pointer OR a non-nil pointer to an empty slice
+// depending on driver/version. The original guard only checked nil, so a
+// row holding an empty (but non-nil) prepare_payload would slip past it
+// and fail later on proto.Unmarshal of zero bytes. Both shapes must take
+// the legacy log-and-skip path.
+func TestReconcile_CoordinatorUnspecified_EmptyPayload_LeavesRowInFlight(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	id := uuid.New()
+	// Old enough to trigger presumed-abort if not for the empty-payload
+	// guard. Empty []byte distinguishes the "non-nil pointer to empty
+	// slice" case from the "nil pointer" case the legacy test covers.
+	insertStaleParticipantRowWithPayload(t, ctx, id, 0, 1*time.Hour, []byte{})
+
+	r := &participantReconciler{
+		config: cfg,
+		knobs:  recoveryEnabledKnobs(),
+		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
+			Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED,
+		}),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	require.NoError(t, r.reconcile(ctx))
+
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := client.FlowExecution.Get(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusInFlight, row.Status,
+		"empty (non-nil) prepare_payload must take the legacy log-and-skip path, not attempt to unmarshal zero bytes")
 }
 
 func TestReconcile_RpcError_LeavesRowInFlightAndContinues(t *testing.T) {

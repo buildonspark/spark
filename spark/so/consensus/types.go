@@ -31,6 +31,24 @@ type FlowHandler interface {
 
 	// Rollback reverts any state locked during Prepare.
 	// Called via gossip dispatch if any participant rejects or the coordinator aborts.
+	//
+	// IMPORTANT: implementations must accept either of two op shapes:
+	//
+	//  1. The canonical RollbackPayload() value supplied by the coordinator
+	//     when it dispatches a real rollback gossip message.
+	//  2. The same proto type returned by PrepareOp() — used by the
+	//     participant reconciler's presumed-abort path
+	//     (so/task/flow_execution_reconcile.go) when the coordinator's
+	//     FlowExecution row is missing and the participant has to
+	//     synthesize a rollback locally from its persisted prepare op.
+	//
+	// In practice this means Rollback should be argument-tolerant: either
+	// ignore op entirely (for no-op rollback paths) or read only fields
+	// that are common to both PrepareOp and RollbackPayload (e.g., a
+	// resource id). New flows that need richer rollback metadata should
+	// arrange for PrepareOp to carry that metadata too, OR design Rollback
+	// to be a no-op and rely on the participant being able to reconstruct
+	// the desired state from local DB lookups keyed by the resource id.
 	Rollback(ctx context.Context, op proto.Message) error
 }
 

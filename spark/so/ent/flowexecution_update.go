@@ -149,6 +149,9 @@ func (feu *FlowExecutionUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if feu.mutation.DecisionPayloadCleared() {
 		_spec.ClearField(flowexecution.FieldDecisionPayload, field.TypeBytes)
 	}
+	if feu.mutation.PreparePayloadCleared() {
+		_spec.ClearField(flowexecution.FieldPreparePayload, field.TypeBytes)
+	}
 	_spec.AddModifiers(feu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, feu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -319,6 +322,9 @@ func (feuo *FlowExecutionUpdateOne) sqlSave(ctx context.Context) (_node *FlowExe
 	}
 	if feuo.mutation.DecisionPayloadCleared() {
 		_spec.ClearField(flowexecution.FieldDecisionPayload, field.TypeBytes)
+	}
+	if feuo.mutation.PreparePayloadCleared() {
+		_spec.ClearField(flowexecution.FieldPreparePayload, field.TypeBytes)
 	}
 	_spec.AddModifiers(feuo.modifiers...)
 	_node = &FlowExecution{config: feuo.config}

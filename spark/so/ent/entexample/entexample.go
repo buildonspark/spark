@@ -784,6 +784,7 @@ type FlowExecutionExample struct {
 	OpType           *int32
 	CoordinatorIndex *uint
 	DecisionPayload  *[]byte
+	PreparePayload   *[]byte
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 }
@@ -820,6 +821,12 @@ func (fe *FlowExecutionExample) SetDecisionPayload(v []byte) *FlowExecutionExamp
 	return fe
 }
 
+// SetPreparePayload sets the prepare_payload field.
+func (fe *FlowExecutionExample) SetPreparePayload(v []byte) *FlowExecutionExample {
+	fe.PreparePayload = &v
+	return fe
+}
+
 // MustExec builds and saves the FlowExecution entity to the database.
 // It panics if the save fails.
 func (fe *FlowExecutionExample) MustExec(ctx context.Context) *ent.FlowExecution {
@@ -846,6 +853,10 @@ func (fe *FlowExecutionExample) MustExec(ctx context.Context) *ent.FlowExecution
 	}
 	if fe.DecisionPayload != nil {
 		create.SetDecisionPayload(*fe.DecisionPayload)
+	} else {
+	}
+	if fe.PreparePayload != nil {
+		create.SetPreparePayload(*fe.PreparePayload)
 	} else {
 	}
 
@@ -886,6 +897,10 @@ func (fe *FlowExecutionExample) Exec(ctx context.Context) (*ent.FlowExecution, e
 	}
 	if fe.DecisionPayload != nil {
 		create.SetDecisionPayload(*fe.DecisionPayload)
+	} else {
+	}
+	if fe.PreparePayload != nil {
+		create.SetPreparePayload(*fe.PreparePayload)
 	} else {
 	}
 

@@ -31,6 +31,8 @@ const (
 	FieldCoordinatorIndex = "coordinator_index"
 	// FieldDecisionPayload holds the string denoting the decision_payload field in the database.
 	FieldDecisionPayload = "decision_payload"
+	// FieldPreparePayload holds the string denoting the prepare_payload field in the database.
+	FieldPreparePayload = "prepare_payload"
 	// Table holds the table name of the flowexecution in the database.
 	Table = "flow_executions"
 )
@@ -45,6 +47,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldCoordinatorIndex,
 	FieldDecisionPayload,
+	FieldPreparePayload,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).

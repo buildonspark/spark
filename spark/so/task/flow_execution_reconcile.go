@@ -18,6 +18,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
@@ -29,6 +31,15 @@ const (
 	// territory). 10 minutes is generous relative to the 20s gossip retry
 	// interval so noisy "young IN_FLIGHT" rows don't reach dashboards.
 	defaultFlowExecutionMetricsMinAgeSec = 600
+	// Minimum age before a participant row whose coordinator returns
+	// UNSPECIFIED is presumed-aborted and rolled back locally. Set well
+	// above defaultFlowExecutionCoordinatorStallThresholdSec so a
+	// coordinator that's still in mid-decision (and hasn't yet been swept
+	// to ROLLED_BACK by SweepStaleCoordinatorFlows) is never raced — by
+	// 1200s, either the coordinator's row exists with a real outcome or it
+	// truly never persisted (request tx aborted), making presumed-abort
+	// the correct call.
+	defaultFlowExecutionPresumedAbortAgeSec = 1200
 )
 
 // outcomeQueryFunc calls the coordinator's ConsensusQueryOutcome RPC.
@@ -251,10 +262,30 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 		return nil
 	case pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED:
 		// Under normal operation the coordinator writes its row before fan-out
-		// and retains it through the terminal transition. Seeing UNSPECIFIED
-		// here means the coordinator has no record — most likely data loss.
-		// Leave the row IN_FLIGHT; operator attention is needed. Next sweep
-		// tick will retry in case the condition is transient.
+		// and retains it through the terminal transition. UNSPECIFIED means
+		// the coordinator has no record — almost always because its request
+		// tx aborted before commit (e.g., the gRPC client cancelled mid-flow
+		// after Prepare fan-out succeeded). Without recovery the participant
+		// is stuck IN_FLIGHT forever with locked resources.
+		//
+		// Recovery: if the row carries the persisted prepare op (rows
+		// created before this field shipped won't), and it's been IN_FLIGHT
+		// long enough that the coordinator's self-sweep would have written
+		// a real ROLLED_BACK outcome had the row existed, presume-abort —
+		// synthesize a local rollback gossip using the persisted prepare op
+		// and dispatch through the same handler the real rollback path uses.
+		// dispatchPresumedAbort returns true iff it actually fired.
+		fired, err := r.dispatchPresumedAbort(ctx, row)
+		if err != nil {
+			return err
+		}
+		if fired {
+			logger.Sugar().Warnf(
+				"flow_execution reconcile: presumed-abort dispatched for %s (coordinator=%d, op_type=%d, age=%s); coordinator had no record",
+				row.ID, row.CoordinatorIndex, row.OpType, time.Since(row.UpdateTime))
+			r.recordReconciledOutcome(ctx, "presumed_abort")
+			return nil
+		}
 		logger.Sugar().Errorf(
 			"flow_execution reconcile: coordinator %d has no record of %s (op_type=%d); possible data loss",
 			row.CoordinatorIndex, row.ID, row.OpType)
@@ -263,6 +294,58 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 	default:
 		return fmt.Errorf("unexpected outcome %v for %s", resp.Outcome, row.ID)
 	}
+}
+
+// dispatchPresumedAbort fires a synthesized local rollback for a PARTICIPANT
+// row whose coordinator returned UNSPECIFIED. Returns (true, nil) when it
+// dispatched, (false, nil) when the row is too young or has no persisted
+// prepare op, and (false, err) on a fatal error.
+//
+// The rollback gossip is dispatched through gossipHandler.HandleGossipMessage
+// so it goes through the same code path as a real rollback message — runs
+// FlowHandler.Rollback to release locked resources, then transitions the row
+// to ROLLED_BACK. No second sweep tick is required.
+func (r *participantReconciler) dispatchPresumedAbort(ctx context.Context, row *ent.FlowExecution) (bool, error) {
+	// Ent represents a SQL NULL bytea as either a nil pointer OR a
+	// non-nil pointer to an empty slice depending on driver/version, so
+	// both have to be treated as "no payload persisted" — otherwise a
+	// legacy row would slip past this guard and fail later on
+	// proto.Unmarshal of zero bytes. Mirrors the existing
+	// decision_payload guard in consensus_query_handler.go.
+	if row.PreparePayload == nil || len(*row.PreparePayload) == 0 {
+		// Row predates the prepare_payload column (or stored NULL); can't
+		// synthesize. Fall through to the legacy log path so on-call
+		// still gets the signal.
+		return false, nil
+	}
+	if time.Since(row.UpdateTime) < time.Duration(defaultFlowExecutionPresumedAbortAgeSec)*time.Second {
+		// Too young — leave IN_FLIGHT and try again next tick. Guards
+		// against firing while the coordinator is genuinely mid-decision.
+		return false, nil
+	}
+	op := &anypb.Any{}
+	if err := proto.Unmarshal(*row.PreparePayload, op); err != nil {
+		return false, fmt.Errorf("unmarshal prepare_payload for %s: %w", row.ID, err)
+	}
+	msg := &pbgossip.GossipMessage{
+		// Stable, row-derived id so the "Handling gossip message with
+		// ID …" log line emitted by the gossip handler ties back to
+		// the participant row being recovered. The "presumed-abort-"
+		// prefix also disambiguates these from real coordinator-sent
+		// rollbacks in dashboards.
+		MessageId: "presumed-abort-" + row.ID.String(),
+		Message: &pbgossip.GossipMessage_ConsensusRollback{
+			ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
+				OpType:          pbgossip.ConsensusOperationType(row.OpType),
+				Operation:       op,
+				FlowExecutionId: row.ID.String(),
+			},
+		},
+	}
+	if err := r.gossipHandler.HandleGossipMessage(ctx, msg, false /* forCoordinator */); err != nil {
+		return false, fmt.Errorf("dispatch presumed-abort rollback for %s: %w", row.ID, err)
+	}
+	return true, nil
 }
 
 // defaultQueryOutcome issues the ConsensusQueryOutcome RPC to a remote

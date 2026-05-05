@@ -187,6 +187,7 @@ var (
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"IN_FLIGHT", "COMMITTED", "ROLLED_BACK"}, Default: "IN_FLIGHT"},
 		{Name: "coordinator_index", Type: field.TypeUint},
 		{Name: "decision_payload", Type: field.TypeBytes, Nullable: true},
+		{Name: "prepare_payload", Type: field.TypeBytes, Nullable: true},
 	}
 	// FlowExecutionsTable holds the schema information for the "flow_executions" table.
 	FlowExecutionsTable = &schema.Table{
