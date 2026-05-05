@@ -1511,19 +1511,6 @@ var (
 				},
 			},
 			{
-				Name:    "idx_transferreceiver_pending_pubkey_time",
-				Unique:  false,
-				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[6]},
-				Annotation: &entsql.IndexAnnotation{
-					DescColumns: map[string]bool{
-						TransferReceiversColumns[1].Name: true,
-
-						TransferReceiversColumns[6].Name: true,
-					},
-					Where: "CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
-				},
-			},
-			{
 				Name:    "idx_transferreceiver_claim_pending_pubkey_time",
 				Unique:  false,
 				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[6]},

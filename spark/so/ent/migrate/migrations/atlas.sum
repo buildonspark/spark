@@ -1,4 +1,4 @@
-h1:MQvx1YbF7XIb5TdPefPdCvoJi0z1OtU4VhFFxBV4n7s=
+h1:+N1nHqW1Geu0Hr5f4haWNf5PecnyYiOIM2ojMsM8OnY=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -157,3 +157,4 @@ h1:MQvx1YbF7XIb5TdPefPdCvoJi0z1OtU4VhFFxBV4n7s=
 20260428000000_add_partial_index_for_no_pubkey_stuck.sql h1:DyunUmGh/VbObQ6deM3BOa9Z5ksSD/scFyv13kQcsYw=
 20260428215802_add_receiver_claim_pending_partial_index.sql h1:ysaf6zmZ0EFk49QzqiP1E8MefVIwB+XBWZYgCMYhhc4=
 20260430013004_add_pending_sender_pubkey_partial_index.sql h1:AOh/LC0B3wMe2jXxUCAsHm6tAJAwiMO63/82mwMx85I=
+20260501185133_drop_legacy_pending_pubkey_time_index.sql h1:dL0vKqGWKmld5ZD9CgglOER65+vkWCByB1Y+iEujukg=

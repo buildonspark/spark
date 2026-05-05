@@ -75,24 +75,17 @@ WHERE identity_pubkey = decode('<hex>','hex');
 
 #### Partial-index population (the queryable haystack)
 
-Two receiver-pending partial indexes coexist — pick the one matching the
-query under study. The legacy `idx_transferreceiver_pending_pubkey_time`
-covers a 5-status set including `INITIATED`; the new
-`idx_transferreceiver_claim_pending_pubkey_time` covers a 5-status set
-including `RECEIVER_CLAIM_PENDING` and excluding `INITIATED`.
+The receiver-pending partial `idx_transferreceiver_claim_pending_pubkey_time`
+covers a 5-status set: `RECEIVER_CLAIM_PENDING` + 4 `RECEIVER_*` stuck
+states (no `INITIATED`).
 
 ```sql
--- Legacy pending partial
-SELECT count(*) FROM transfer_receivers
-WHERE status IN ('INITIATED','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
-                 'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
-
--- New pending partial — what queryPendingTransfersMIMO walks
+-- Receiver-pending partial
 SELECT count(*) FROM transfer_receivers
 WHERE status IN ('RECEIVER_CLAIM_PENDING','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
                  'RECEIVER_KEY_TWEAK_APPLIED','RECEIVER_REFUND_SIGNED');
 
--- Same, scoped to one pubkey (matches each partial's leading column)
+-- Same, scoped to one pubkey (matches the partial's leading column)
 SELECT count(*) FROM transfer_receivers
 WHERE identity_pubkey = decode('<hex>','hex')
   AND status IN ('RECEIVER_CLAIM_PENDING','RECEIVER_KEY_TWEAKED','RECEIVER_KEY_TWEAK_LOCKED',
@@ -320,23 +313,18 @@ to populate the receiver-union partial index. On 11M transfers, expect
 `config.go:fullConfig` status weights — they're denominated in an
 unnormalized weight space where total sums to 10000.
 
-For the receiver-side, there are two partials:
-`idx_transferreceiver_pending_pubkey_time` (legacy, covers `INITIATED` +
-4 `RECEIVER_*`) and `idx_transferreceiver_claim_pending_pubkey_time`
-(new, covers `RECEIVER_CLAIM_PENDING` + same 4 `RECEIVER_*`). Receiver
-status is derived from transfer status, so the partial populations come
-from the `TransferStatuses` weights:
+The receiver-side partial is
+`idx_transferreceiver_claim_pending_pubkey_time` (covers
+`RECEIVER_CLAIM_PENDING` + 4 `RECEIVER_*`). Receiver status is derived
+from transfer status, so the partial population comes from the
+`TransferStatuses` weights:
 
-- **Legacy partial** = `INITIATED` (= sum of pre-tweak transfer weights:
-  `SenderInitiated:2` + `SenderInitiatedCoordinator:1` +
-  `SenderKeyTweakPending:3` = 6) + 4 `RECEIVER_*` (= `ReceiverKeyTweaked:5`
-  + `ReceiverKeyTweakLocked:3` + `ReceiverKeyTweakApplied:2` +
-  `ReceiverRefundSigned:2` = 12) = **18 of 10000 (~0.18%)**.
-- **New partial** = `RECEIVER_CLAIM_PENDING` (= `SenderKeyTweaked:30`) +
-  same 4 `RECEIVER_*` (12) = **42 of 10000 (~0.42%)**.
+- **Receiver-pending partial** = `RECEIVER_CLAIM_PENDING` (=
+  `SenderKeyTweaked:30`) + 4 `RECEIVER_*` (= `ReceiverKeyTweaked:5` +
+  `ReceiverKeyTweakLocked:3` + `ReceiverKeyTweakApplied:2` +
+  `ReceiverRefundSigned:2` = 12) = **42 of 10000 (~0.42%)**.
 
-So the new partial should be ~2.3× more populated than the legacy on
-`full`. If the new partial is empty, check that
+If the partial is empty, check that
 `receiverStatusForTransfer` is wired up — every transfer status should
 map to a receiver status.
 

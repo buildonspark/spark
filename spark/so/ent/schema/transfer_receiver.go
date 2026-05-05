@@ -75,25 +75,10 @@ func (TransferReceiver) Indexes() []ent.Index {
 		index.Fields("identity_pubkey", "create_time").
 			Annotations(entsql.DescColumns("create_time")),
 
-		// Partial index covering all non-terminal receiver states (INITIATED
-		// + 4 stuck). Companion to idx_transferreceiver_stuck_create_time
-		// below; the leading identity_pubkey column makes this the per-user
-		// partial.
-		//
-		// **Deprecated** — being replaced by idx_transferreceiver_claim_pending_pubkey_time.
-		// The new partial drops INITIATED (which was only here to support the
-		// pending-receiver query path that now reads RECEIVER_CLAIM_PENDING
-		// instead). This index will be dropped after the
-		// INITIATED → RECEIVER_CLAIM_PENDING backfill completes.
-		index.Fields("identity_pubkey", "create_time", "transfer_id").
-			Annotations(
-				entsql.DescColumns("create_time", "transfer_id"),
-				entsql.IndexWhere("CAST(status AS TEXT) IN ('INITIATED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
-			).
-			StorageKey("idx_transferreceiver_pending_pubkey_time"),
-
 		// Partial index covering RECEIVER_CLAIM_PENDING + the 4 stuck states.
-		// Drives the receiver-arm of queryPendingTransfers for multi-receiver.
+		// Drives the receiver-arm of queryPendingTransfers for multi-receiver,
+		// and serves the per-user receiver arm of stuck-transfer queries
+		// (the 4 stuck statuses are a subset of the partial WHERE).
 		index.Fields("identity_pubkey", "create_time", "transfer_id").
 			Annotations(
 				entsql.DescColumns("create_time", "transfer_id"),
@@ -103,9 +88,8 @@ func (TransferReceiver) Indexes() []ent.Index {
 
 		// Partial index covering only the four receiver-stuck statuses,
 		// keyed on (create_time DESC, transfer_id DESC) — no identity_pubkey
-		// leading column. Companion to idx_transferreceiver_pending_pubkey_time
-		// above; the absence of a pubkey leading column makes this the
-		// time-ordered partial used for queries that scan across all users.
+		// leading column. Time-ordered partial for queries that scan across
+		// all users (the all-users stuck-transfer path).
 		index.Fields("create_time", "transfer_id").
 			Annotations(
 				entsql.DescColumns("create_time", "transfer_id"),

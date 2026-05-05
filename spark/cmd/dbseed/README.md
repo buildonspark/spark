@@ -140,12 +140,12 @@ the transfer-status weights above:
   `SENDER_KEY_TWEAK_PENDING`)
 - A `CANCELLED` tail (from `RETURNED` and `EXPIRED`)
 
-Both receiver-pending partial indexes get populated — the legacy
-`idx_transferreceiver_pending_pubkey_time` (5-status set including
-`INITIATED`) and the new
-`idx_transferreceiver_claim_pending_pubkey_time` (5-status set including
-`RECEIVER_CLAIM_PENDING`, excludes `INITIATED`) — so plan choice on
-either is exercised.
+The receiver-pending partial index
+`idx_transferreceiver_claim_pending_pubkey_time` (5-status set:
+`RECEIVER_CLAIM_PENDING` + 4 `RECEIVER_*` stuck states, no `INITIATED`)
+gets populated through the `RECEIVER_CLAIM_PENDING` and
+`RECEIVER_*` rows, so the receiver-arm plans for both pending and
+stuck-transfer queries are exercised.
 
 **Type distribution**: 90% `TRANSFER`, 8% `PREIMAGE_SWAP`, trace `COOPERATIVE_EXIT` / `SWAP`.
 
