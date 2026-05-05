@@ -222,7 +222,7 @@ func TestClaimTransferMIMO_LeafScopedByReceiver(t *testing.T) {
 	receiver, err := sessionCtx.Client.TransferReceiver.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
-		SetStatus(st.TransferReceiverStatusInitiated).
+		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1509,4 +1509,163 @@ func TestStartTransferV3_MultiReceiverRequiresKnob(t *testing.T) {
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "multi-receiver transfers are not enabled")
 	})
+}
+
+// -----------------------------------------------------------------------------
+// INITIATED is invalid for receivers on post-sender-tweak transfers
+// -----------------------------------------------------------------------------
+//
+// `INITIATED` semantically means the transfer never hit SENDER_KEY_TWEAKED.
+// Post-sender-tweak receiver rows always start at RECEIVER_CLAIM_PENDING
+// (per the dual-write contract). The receiver-status switches in
+// transfer_handler.go reject INITIATED on post-sender-tweak transfers; these
+// tests pin that contract at the public RPC boundary.
+
+// TestClaimTransferMIMO_RejectsInitiatedReceiver verifies that ClaimTransfer
+// rejects a receiver still at INITIATED on a post-sender-tweak transfer.
+// Mirrors TestClaimTransferMIMO_ReceiverNotClaimableStatus (which uses
+// CANCELLED) — both exercise the `default` fall-through of the claimable-
+// status switch.
+func TestClaimTransferMIMO_RejectsInitiatedReceiver(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = mimoEnabledContext(ctx)
+
+	rng := rand.NewChaCha8([32]byte{50})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderKeyTweaked)
+
+	_, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusInitiated).
+		Save(ctx)
+	require.NoError(t, err)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	req := &pb.ClaimTransferRequest{
+		TransferId:             transfer.ID.String(),
+		OwnerIdentityPublicKey: receiverPubKey.Serialize(),
+		ClaimPackage: &pb.ClaimPackage{
+			LeavesToClaim:   []*pb.UserSignedTxSigningJob{},
+			KeyTweakPackage: map[string][]byte{"so1": []byte("data")},
+		},
+	}
+	_, err = handler.ClaimTransfer(ctx, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not in a claimable status")
+	assert.Contains(t, err.Error(), "INITIATED")
+}
+
+// TestInitiateSettleReceiverKeyTweak_RejectsInitiatedReceiver verifies that
+// InitiateSettleReceiverKeyTweak rejects a receiver still at INITIATED on a
+// post-sender-tweak transfer. The receiver-status switch in the handler now
+// only accepts RECEIVER_CLAIM_PENDING in the pre-claim window; INITIATED
+// falls through to default with "unexpected transfer receiver status".
+func TestInitiateSettleReceiverKeyTweak_RejectsInitiatedReceiver(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = mimoEnabledContext(ctx)
+
+	rng := rand.NewChaCha8([32]byte{51})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderKeyTweaked)
+
+	_, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusInitiated).
+		Save(ctx)
+	require.NoError(t, err)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	req := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+		TransferId:                transfer.ID.String(),
+		ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+	}
+	err = handler.InitiateSettleReceiverKeyTweak(ctx, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected transfer receiver status")
+	assert.Contains(t, err.Error(), "INITIATED")
+}
+
+// TestSettleReceiverKeyTweak_RejectsInitiatedReceiverOnCommit verifies that
+// SettleReceiverKeyTweak with COMMIT action rejects a receiver still at
+// INITIATED on a post-sender-tweak transfer. The rollback switch's
+// "do nothing" case used to include INITIATED; it now falls through to
+// default and returns an "invalid status" error on COMMIT.
+func TestSettleReceiverKeyTweak_RejectsInitiatedReceiverOnCommit(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = mimoEnabledContext(ctx)
+
+	rng := rand.NewChaCha8([32]byte{52})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderKeyTweaked)
+
+	_, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusInitiated).
+		Save(ctx)
+	require.NoError(t, err)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	req := &pbinternal.SettleReceiverKeyTweakRequest{
+		TransferId:                transfer.ID.String(),
+		Action:                    pbinternal.SettleKeyTweakAction_COMMIT,
+		ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+	}
+	err = handler.SettleReceiverKeyTweak(ctx, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid status")
+	assert.Contains(t, err.Error(), "INITIATED")
+}
+
+// TestSettleReceiverKeyTweak_AcceptsReceiverClaimPendingOnRollback verifies
+// the positive replacement coverage for the line-4906 switch: a receiver at
+// RECEIVER_CLAIM_PENDING is still in the "do nothing" case on ROLLBACK after
+// the INITIATED arm was removed.
+func TestSettleReceiverKeyTweak_AcceptsReceiverClaimPendingOnRollback(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = mimoEnabledContext(ctx)
+
+	rng := rand.NewChaCha8([32]byte{53})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderKeyTweaked)
+
+	receiver, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+		Save(ctx)
+	require.NoError(t, err)
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	req := &pbinternal.SettleReceiverKeyTweakRequest{
+		TransferId:                transfer.ID.String(),
+		Action:                    pbinternal.SettleKeyTweakAction_ROLLBACK,
+		ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+	}
+	err = handler.SettleReceiverKeyTweak(ctx, req)
+	require.NoError(t, err)
+
+	updated, err := sessionCtx.Client.TransferReceiver.Get(ctx, receiver.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending, updated.Status,
+		"ROLLBACK on RECEIVER_CLAIM_PENDING is a no-op; status must not change")
 }

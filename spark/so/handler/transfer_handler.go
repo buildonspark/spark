@@ -3613,7 +3613,6 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 			return nil, err
 		}
 		switch receiver.Status {
-		case st.TransferReceiverStatusInitiated:
 		case st.TransferReceiverStatusReceiverClaimPending:
 		case st.TransferReceiverStatusKeyTweaked:
 		case st.TransferReceiverStatusKeyTweakLocked:
@@ -3684,11 +3683,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 			st.TransferReceiverStatusKeyTweakApplied,
 			st.TransferReceiverStatusRefundSigned:
 			useStoredKeyTweaks = true
-		case st.TransferReceiverStatusInitiated,
-			st.TransferReceiverStatusReceiverClaimPending,
-			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusCompleted,
-			st.TransferReceiverStatusCancelled:
+		default:
 			// Use the new claim package — receiver hasn't progressed past
 			// Phase 1 commit yet, so no stored key tweaks to reuse.
 		}
@@ -4746,8 +4741,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	if isMimoReceiveEnabled {
 		if receiver != nil {
 			switch receiver.Status {
-			case st.TransferReceiverStatusInitiated,
-				st.TransferReceiverStatusReceiverClaimPending:
+			case st.TransferReceiverStatusReceiverClaimPending:
 				if !hasClaimPackage {
 					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status %s but no encrypted_claim_key_tweak_package provided", receiver.ID, receiver.Status))
 				}
@@ -4850,12 +4844,9 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			transfer.Status = st.TransferStatusReceiverKeyTweaked
 		}
 
-		// Update receiver status to StatusKeyTweaked if coming from SenderInitiated
-		// or RECEIVER_CLAIM_PENDING. Both pre-tweak states fold into the same
-		// post-tweak state. (SenderInitiated handling preserved for any
-		// not-yet-backfilled rows during the rollout transition.)
-		if receiver != nil && (receiver.Status == st.TransferReceiverStatusInitiated ||
-			receiver.Status == st.TransferReceiverStatusReceiverClaimPending) {
+		// Promote the receiver from RECEIVER_CLAIM_PENDING to KeyTweaked once
+		// the claim's key tweak has been applied.
+		if receiver != nil && receiver.Status == st.TransferReceiverStatusReceiverClaimPending {
 			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweaked).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
@@ -4955,7 +4946,6 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			return nil
 		case st.TransferReceiverStatusKeyTweakLocked,
 			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusInitiated,
 			st.TransferReceiverStatusReceiverClaimPending:
 			// Do nothing
 		default:
