@@ -1,8 +1,3 @@
-// Package mimo holds shared definitions and utilities for the MIMO
-// (multi-input, multi-output) data model migration. The package is the
-// single source of truth for status sets that are queried across multiple
-// handlers, and a home for migration-phase code that bridges the legacy
-// column model and the edge-table model.
 package mimo
 
 import (
@@ -29,15 +24,43 @@ func PendingReceiverStatuses() []string {
 // side hasn't completed its key-tweak handoff yet.
 //
 // Note: this set deliberately excludes SENDER_INITIATED_COORDINATOR, which
-// IS included in mimoStuckSenderStatuses (in ssp_request_handler.go). This
-// inconsistency is preserved from the legacy queryTransfers behavior and
-// is flagged for review in SP-2917 (mimo package consolidation) — the
-// coordinator-side state is transient and historically wasn't surfaced to
-// user-facing pending queries; whether this is intentional or oversight
-// hasn't been decided.
+// IS included in StuckSenderStatuses. The pattern on the receiver side is
+// pending = stuck + INITIATED (clean superset); the sender side breaks
+// that pattern — pending is a strict subset of stuck, missing the
+// coordinator-side state. SENDER_INITIATED_COORDINATOR is transitional
+// and never set for more than a brief moment within a flow, so its
+// absence from user-facing pending queries is effectively a no-op.
 func PendingSenderStatuses() []string {
 	return []string{
 		string(st.TransferStatusSenderKeyTweakPending),
 		string(st.TransferStatusSenderInitiated),
+	}
+}
+
+// StuckSenderStatuses are the transfers.status values that mean the
+// sender side hasn't completed its key-tweak handoff yet, surfaced to
+// operators via GetStuckTransfers. Unlike PendingSenderStatuses this
+// includes SENDER_INITIATED_COORDINATOR — see the note on
+// PendingSenderStatuses for the historical reason the two sets diverge.
+func StuckSenderStatuses() []string {
+	return []string{
+		string(st.TransferStatusSenderKeyTweakPending),
+		string(st.TransferStatusSenderInitiated),
+		string(st.TransferStatusSenderInitiatedCoordinator),
+	}
+}
+
+// StuckReceiverStatuses are the transfer_receivers.status values that
+// mean a receiver's claim is in flight but not yet settled.
+//
+// RECEIVER_CLAIM_PENDING is deliberately excluded: a receiver in that
+// state has been handed off cleanly and is simply awaiting the user to
+// claim — not stuck from the operator's perspective.
+func StuckReceiverStatuses() []string {
+	return []string{
+		string(st.TransferReceiverStatusKeyTweaked),
+		string(st.TransferReceiverStatusKeyTweakLocked),
+		string(st.TransferReceiverStatusKeyTweakApplied),
+		string(st.TransferReceiverStatusRefundSigned),
 	}
 }

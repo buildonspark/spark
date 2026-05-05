@@ -1738,7 +1738,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	senderPubkey, err := GetSingleTransferSender(ctx, transfer)
+	senderPubkey, err := mimo.GetSingleTransferSender(ctx, transfer)
 	if err != nil {
 		return nil, err
 	}
@@ -1925,7 +1925,7 @@ func (h *TransferHandler) checkTransferAccessMIMO(
 	transfer *ent.Transfer,
 	accessMap map[keys.Public]bool,
 ) (bool, error) {
-	senderPubkey, receiverPubkey, err := GetSingleTransferSenderReceiver(ctx, transfer)
+	senderPubkey, receiverPubkey, err := mimo.GetSingleTransferSenderReceiver(ctx, transfer)
 	if err != nil {
 		return false, err
 	}
@@ -2722,75 +2722,6 @@ func queryMIMOPendingTransferIDs(ctx context.Context, db *ent.Client, args query
 	return ids, rows.Err()
 }
 
-// pendingCommonFilters builds the network, types, and transfer_ids clauses
-// for pending-transfer SQL. These reference the transfers table (t.) since
-// the relevant columns only exist there. Returns the appended args slice
-// and the SQL fragment using dynamic param positions based on len(sqlArgs).
-func pendingCommonFilters(sqlArgs []any, args queryMIMOPendingArgs) ([]any, string, error) {
-	var sb strings.Builder
-	if args.network != pb.Network_UNSPECIFIED {
-		n, err := btcnetwork.FromProtoNetwork(args.network)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid network: %w", err)
-		}
-		sqlArgs = append(sqlArgs, n.String())
-		fmt.Fprintf(&sb, " AND t.network = $%d", len(sqlArgs))
-	}
-	if len(args.types) > 0 {
-		typeStrs := make([]string, len(args.types))
-		for i, t := range args.types {
-			schemaType, err := st.TransferTypeFromProto(t.String())
-			if err != nil {
-				return nil, "", fmt.Errorf("invalid transfer type %s: %w", t.String(), err)
-			}
-			typeStrs[i] = string(schemaType)
-		}
-		sqlArgs = append(sqlArgs, pq.Array(typeStrs))
-		fmt.Fprintf(&sb, " AND t.type = ANY($%d::text[])", len(sqlArgs))
-	}
-	if len(args.transferIDsFilter) > 0 {
-		ids, err := uuids.ParseSlice(args.transferIDsFilter)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid transfer IDs: %w", err)
-		}
-		idStrs := make([]string, len(ids))
-		for i, id := range ids {
-			idStrs[i] = id.String()
-		}
-		sqlArgs = append(sqlArgs, pq.Array(idStrs))
-		fmt.Fprintf(&sb, " AND t.id = ANY($%d::uuid[])", len(sqlArgs))
-	}
-	return sqlArgs, sb.String(), nil
-}
-
-// pendingTimeColumn enumerates the valid create_time column references
-// used by pendingTimeFilter. Typed alias instead of a plain string so a
-// future caller can't accidentally interpolate user input into the SQL
-// fragment — the column reference is %s-interpolated, not parameterized,
-// and would be a SQLi vector if sourced from the request.
-type pendingTimeColumn string
-
-const (
-	receiverCreateTimeColumn pendingTimeColumn = "r.create_time"
-	senderCreateTimeColumn   pendingTimeColumn = "t.create_time"
-)
-
-// pendingTimeFilter builds the created_after/created_before clauses against
-// the given column reference. Each arm uses its own table's column for
-// index-drive efficiency.
-func pendingTimeFilter(sqlArgs []any, args queryMIMOPendingArgs, col pendingTimeColumn) ([]any, string) {
-	var sb strings.Builder
-	if args.hasCreatedAfter {
-		sqlArgs = append(sqlArgs, args.createdAfter)
-		fmt.Fprintf(&sb, " AND %s > $%d", col, len(sqlArgs))
-	}
-	if args.hasCreatedBefore {
-		sqlArgs = append(sqlArgs, args.createdBefore)
-		fmt.Fprintf(&sb, " AND %s < $%d", col, len(sqlArgs))
-	}
-	return sqlArgs, sb.String()
-}
-
 // buildPendingIDsQueryReceiver builds the receiver-only pending-IDs query.
 // Drives idx_transferreceiver_claim_pending_pubkey_time:
 //
@@ -2807,11 +2738,16 @@ func buildPendingIDsQueryReceiver(args queryMIMOPendingArgs) (string, []any, err
 		args.offset,                              // $4 - OFFSET
 	}
 
-	sqlArgs, commonFilters, err := pendingCommonFilters(sqlArgs, args)
+	sqlArgs, commonFilters, err := mimo.AppendPendingCommonFilters(sqlArgs, args.network, args.types, args.transferIDsFilter)
 	if err != nil {
 		return "", nil, err
 	}
-	sqlArgs, timeFilter := pendingTimeFilter(sqlArgs, args, receiverCreateTimeColumn)
+	sqlArgs, timeFilter := mimo.AppendPendingTimeFilter(
+		sqlArgs,
+		args.hasCreatedAfter, args.createdAfter,
+		args.hasCreatedBefore, args.createdBefore,
+		mimo.ReceiverCreateTimeColumn,
+	)
 
 	direction := "DESC"
 	if args.order == pb.Order_ASCENDING {
@@ -2863,11 +2799,16 @@ func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error
 		args.offset,                            // $4 - OFFSET
 	}
 
-	sqlArgs, commonFilters, err := pendingCommonFilters(sqlArgs, args)
+	sqlArgs, commonFilters, err := mimo.AppendPendingCommonFilters(sqlArgs, args.network, args.types, args.transferIDsFilter)
 	if err != nil {
 		return "", nil, err
 	}
-	sqlArgs, timeFilter := pendingTimeFilter(sqlArgs, args, senderCreateTimeColumn)
+	sqlArgs, timeFilter := mimo.AppendPendingTimeFilter(
+		sqlArgs,
+		args.hasCreatedAfter, args.createdAfter,
+		args.hasCreatedBefore, args.createdBefore,
+		mimo.SenderCreateTimeColumn,
+	)
 
 	direction := "DESC"
 	if args.order == pb.Order_ASCENDING {
@@ -2940,7 +2881,7 @@ func buildPendingIDsQuerySenderOrReceiver(args queryMIMOPendingArgs) (string, []
 		args.offset,                              // $6 - outer OFFSET
 	}
 
-	sqlArgs, commonFilters, err := pendingCommonFilters(sqlArgs, args)
+	sqlArgs, commonFilters, err := mimo.AppendPendingCommonFilters(sqlArgs, args.network, args.types, args.transferIDsFilter)
 	if err != nil {
 		return "", nil, err
 	}

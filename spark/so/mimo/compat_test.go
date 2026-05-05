@@ -1,4 +1,4 @@
-package handler
+package mimo_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/mimo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,7 +34,7 @@ func TestGetSingleTransferSenderReceiver_Success(t *testing.T) {
 		},
 	}
 
-	gotSender, gotReceiver, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
 	require.NoError(t, err)
 	require.True(t, senderPub.Equals(gotSender))
 	require.True(t, receiverPub.Equals(gotReceiver))
@@ -53,7 +54,7 @@ func TestGetSingleTransferSenderReceiver_ZeroSenders_FallsBack(t *testing.T) {
 		},
 	}
 
-	gotSender, gotReceiver, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
 	require.NoError(t, err)
 	require.True(t, senderPub.Equals(gotSender))
 	require.True(t, receiverPub.Equals(gotReceiver))
@@ -75,7 +76,7 @@ func TestGetSingleTransferSenderReceiver_MultipleSenders_ReturnsError(t *testing
 		},
 	}
 
-	_, _, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	_, _, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "transfer senders")
 	require.Contains(t, err.Error(), "expected 1")
@@ -95,7 +96,7 @@ func TestGetSingleTransferSenderReceiver_ZeroReceivers_FallsBack(t *testing.T) {
 		},
 	}
 
-	gotSender, gotReceiver, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
 	require.NoError(t, err)
 	require.True(t, senderPub.Equals(gotSender))
 	require.True(t, receiverPub.Equals(gotReceiver))
@@ -117,7 +118,7 @@ func TestGetSingleTransferSenderReceiver_MultipleReceivers_ReturnsError(t *testi
 		},
 	}
 
-	_, _, err := GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	_, _, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "transfer receivers")
 	require.Contains(t, err.Error(), "expected 1")
@@ -131,7 +132,7 @@ func TestGetSingleTransferSender_LegacyFallback(t *testing.T) {
 	}
 
 	// Knob off — should fall back to the deprecated column.
-	got, err := GetSingleTransferSender(t.Context(), transfer)
+	got, err := mimo.GetSingleTransferSender(t.Context(), transfer)
 	require.NoError(t, err)
 	require.True(t, senderPub.Equals(got))
 }

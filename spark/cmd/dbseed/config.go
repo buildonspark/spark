@@ -360,7 +360,7 @@ func realisticSSPConfig() *Config {
 // Pending phase pins transfers.status to SENDER_KEY_TWEAKED, so all
 // receivers are post-tweak / awaiting-claim — RECEIVER_CLAIM_PENDING and
 // downstream RECEIVER_* states, no INITIATED. (RECEIVER_CLAIM_PENDING is
-// not in mimoStuckReceiverStatuses by design, and the "stuck" in this
+// not in mimo.StuckReceiverStatuses by design, and the "stuck" in this
 // profile name refers to the user being stuck, not the technical
 // stuck-transfer status set.)
 //
