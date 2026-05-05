@@ -4,9 +4,47 @@ import type {
   DummyTx,
   SignFrostBindingParams,
 } from "./types.js";
-// Get SparkFrostModule from React Native if available
 import { NativeModules } from "react-native";
-const { SparkFrostModule } = NativeModules;
+
+type NativeTx = { tx: number[] };
+type NativeDummyTx = NativeTx & { txid: string };
+type NativeNodeTxPair = { cpfp: NativeTx; direct: NativeTx };
+type NativeRefundTxTrio = {
+  cpfp_refund: NativeTx;
+  direct_refund?: NativeTx;
+  direct_from_cpfp_refund: NativeTx;
+};
+type NativeSecretShare = {
+  threshold: number;
+  index: number;
+  share: number[];
+  proofs: number[][];
+};
+type SparkFrostNativeModule = {
+  signFrost(params: unknown): Promise<number[]>;
+  aggregateFrost(params: unknown): Promise<number[]>;
+  createDummyTx(params: unknown): Promise<unknown>;
+  encryptEcies(params: unknown): Promise<number[]>;
+  decryptEcies(params: unknown): Promise<number[]>;
+  constructNodeTxPair(params: unknown): Promise<NativeNodeTxPair>;
+  constructRefundTxTrio(params: unknown): Promise<NativeRefundTxTrio>;
+  computeMultiInputSighash(params: unknown): Promise<number[]>;
+  getPublicKey(params: unknown): Promise<number[]>;
+  batchGetPublicKeys(params: unknown): Promise<number[][]>;
+  verifySignature(params: unknown): Promise<boolean>;
+  [method: string]: ((params: unknown) => Promise<unknown>) | undefined;
+};
+
+const SparkFrostModule = NativeModules.SparkFrostModule as
+  | SparkFrostNativeModule
+  | undefined;
+
+function getSparkFrostModule(): SparkFrostNativeModule {
+  if (!SparkFrostModule) {
+    throw new Error("SparkFrostModule is not available in this environment");
+  }
+  return SparkFrostModule;
+}
 
 // Helper functions for converting between Uint8Array and number[]
 const toNumberArray = (arr: Uint8Array): number[] => Array.from(arr);
@@ -72,6 +110,7 @@ class SparkFrostReactNative extends SparkFrostBase {
   }
 
   async aggregateFrost(params: AggregateFrostBindingParams) {
+    const sparkFrostModule = getSparkFrostModule();
     const nativeParams = {
       msg: toNumberArray(params.message),
       statechainCommitments: Object.fromEntries(
@@ -107,7 +146,7 @@ class SparkFrostReactNative extends SparkFrostBase {
         : undefined,
     };
 
-    const result = await SparkFrostModule.aggregateFrost(nativeParams);
+    const result = await sparkFrostModule.aggregateFrost(nativeParams);
     return toUint8Array(result);
   }
 
@@ -137,9 +176,10 @@ class SparkFrostReactNative extends SparkFrostBase {
       Array.isArray((result as { tx?: unknown }).tx) &&
       typeof (result as { txid?: unknown }).txid === "string"
     ) {
+      const dummyTx = result as NativeDummyTx;
       return {
-        tx: toUint8Array((result as { tx: number[] }).tx),
-        txid: (result as { txid: string }).txid,
+        tx: toUint8Array(dummyTx.tx),
+        txid: dummyTx.txid,
       };
     }
 
@@ -154,7 +194,8 @@ class SparkFrostReactNative extends SparkFrostBase {
     msg: Uint8Array,
     publicKey: Uint8Array,
   ): Promise<Uint8Array> {
-    const result = await SparkFrostModule.encryptEcies({
+    const sparkFrostModule = getSparkFrostModule();
+    const result = await sparkFrostModule.encryptEcies({
       msg: toNumberArray(msg),
       publicKey: toNumberArray(publicKey),
     });
@@ -165,7 +206,8 @@ class SparkFrostReactNative extends SparkFrostBase {
     encryptedMsg: Uint8Array,
     privateKey: Uint8Array,
   ): Promise<Uint8Array> {
-    const result = await SparkFrostModule.decryptEcies({
+    const sparkFrostModule = getSparkFrostModule();
+    const result = await sparkFrostModule.decryptEcies({
       encryptedMsg: toNumberArray(encryptedMsg),
       privateKey: toNumberArray(privateKey),
     });
@@ -177,34 +219,19 @@ class SparkFrostReactNative extends SparkFrostBase {
     threshold: number,
     numShares: number,
   ) {
-    const result = await SparkFrostReactNative.callNativeModule(
-      "splitSecretWithProofs",
-      {
-        secret: toNumberArray(secret),
-        threshold,
-        numShares,
-      },
-    );
-    return (
-      result as {
-        threshold: number;
-        index: number;
-        share: number[];
-        proofs: number[][];
-      }[]
-    ).map(
-      (s: {
-        threshold: number;
-        index: number;
-        share: number[];
-        proofs: number[][];
-      }) => ({
-        threshold: s.threshold,
-        index: s.index,
-        share: toUint8Array(s.share),
-        proofs: s.proofs.map((p: number[]) => toUint8Array(p)),
-      }),
-    );
+    const result = await SparkFrostReactNative.callNativeModule<
+      NativeSecretShare[]
+    >("splitSecretWithProofs", {
+      secret: toNumberArray(secret),
+      threshold,
+      numShares,
+    });
+    return result.map((s) => ({
+      threshold: s.threshold,
+      index: s.index,
+      share: toUint8Array(s.share),
+      proofs: s.proofs.map((p) => toUint8Array(p)),
+    }));
   }
 
   async recoverSecret(
@@ -215,11 +242,11 @@ class SparkFrostReactNative extends SparkFrostBase {
       index: s.index,
       share: toNumberArray(s.share),
     }));
-    const result = await SparkFrostReactNative.callNativeModule(
+    const result = await SparkFrostReactNative.callNativeModule<number[]>(
       "recoverSecret",
       { shares: nativeShares },
     );
-    return toUint8Array(result as number[]);
+    return toUint8Array(result);
   }
 
   async validateShare(
@@ -322,21 +349,26 @@ class SparkFrostReactNative extends SparkFrostBase {
     return toUint8Array(result);
   }
 
-  private static async callNativeModule(
+  private static callNativeModule<T>(
     method: string,
-    params: any,
-  ): Promise<any> {
+    params: unknown,
+  ): Promise<T> {
     if (!SparkFrostModule) {
       throw new Error("SparkFrostModule is not available in this environment");
     }
-    return SparkFrostModule[method](params);
+    const nativeMethod = SparkFrostModule[method];
+    if (!nativeMethod) {
+      throw new Error(`SparkFrostModule.${method} is not available`);
+    }
+    return nativeMethod(params) as Promise<T>;
   }
 
   static async getPublicKey(
     privateKey: Uint8Array,
     compressed: boolean = true,
   ): Promise<Uint8Array> {
-    const result = await SparkFrostModule.getPublicKey({
+    const sparkFrostModule = getSparkFrostModule();
+    const result = await sparkFrostModule.getPublicKey({
       privateKey: toNumberArray(privateKey),
       compressed,
     });
@@ -347,7 +379,8 @@ class SparkFrostReactNative extends SparkFrostBase {
     privateKeys: Uint8Array[],
     compressed: boolean = true,
   ): Promise<Uint8Array[]> {
-    const result = await SparkFrostModule.batchGetPublicKeys({
+    const sparkFrostModule = getSparkFrostModule();
+    const result = await sparkFrostModule.batchGetPublicKeys({
       privateKeys: privateKeys.map(toNumberArray),
       compressed,
     });
@@ -359,7 +392,8 @@ class SparkFrostReactNative extends SparkFrostBase {
     message: Uint8Array,
     publicKey: Uint8Array,
   ): Promise<boolean> {
-    const result = await SparkFrostModule.verifySignature({
+    const sparkFrostModule = getSparkFrostModule();
+    const result = await sparkFrostModule.verifySignature({
       signature: toNumberArray(signature),
       message: toNumberArray(message),
       publicKey: toNumberArray(publicKey),

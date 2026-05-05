@@ -66,14 +66,14 @@ describe("SSP static deposit validation tests", () => {
 
     // Invalid transaction ID
     await expect(
-      userWallet.getClaimStaticDepositQuote("invalid-txid", vout!),
+      userWallet.getClaimStaticDepositQuote("invalid-txid", vout),
     ).rejects.toThrow(/InvalidInputException/);
 
     // Valid transaction ID but not same as signedTx.id
     await expect(
       userWallet.getClaimStaticDepositQuote(
         bytesToHex(sha256("invalid-txid")),
-        vout!,
+        vout,
       ),
     ).rejects.toThrow("Transaction not found");
 
@@ -87,7 +87,7 @@ describe("SSP static deposit validation tests", () => {
     const quote = await retryUntilSuccess(async () => {
       const q = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
       if (!q) throw new Error("Quote not available yet");
       return q;

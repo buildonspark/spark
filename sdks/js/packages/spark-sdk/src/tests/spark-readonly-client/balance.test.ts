@@ -11,9 +11,9 @@ import {
 } from "../../proto/spark.js";
 import { DefaultSparkSigner } from "../../signer/signer.js";
 import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.js";
-import { WalletConfigService } from "../../services/config.js";
+import { type WalletConfigService } from "../../services/config.js";
 import { type AuthMode } from "../../services/connection/connection.js";
-import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
+import { type ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import {
   ACTIVE_COUNTER_SWAP_STATUSES,
   COUNTER_SWAP_TYPES,
@@ -175,9 +175,8 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
     expect(createSparkClient).toHaveBeenCalledWith(TEST_COORDINATOR_ADDRESS);
 
     expect(query_nodes).toHaveBeenCalledTimes(2);
-    const firstNodeRequest = query_nodes.mock.calls[0]![0] as QueryNodesRequest;
-    const secondNodeRequest = query_nodes.mock
-      .calls[1]![0] as QueryNodesRequest;
+    const firstNodeRequest = query_nodes.mock.calls[0]![0];
+    const secondNodeRequest = query_nodes.mock.calls[1]![0];
     expect(firstNodeRequest.source?.$case).toBe("ownerIdentityPubkey");
     if (firstNodeRequest.source?.$case !== "ownerIdentityPubkey") {
       throw new Error("Expected node query to target ownerIdentityPubkey");
@@ -238,7 +237,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
     const query_all_transfers = jest.fn<QueryAllTransfers>().mockResolvedValue({
       transfers: [],
       offset: 0,
-    } as QueryTransfersResponse);
+    });
 
     const { client } = createTestClient({
       query_nodes,
@@ -314,7 +313,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
         return {
           transfers: [],
           offset: -1,
-        } as QueryTransfersResponse;
+        };
       });
 
     const { client } = createTestClient({
@@ -354,7 +353,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
         return {
           transfers: [],
           offset: -1,
-        } as QueryTransfersResponse;
+        };
       });
 
     const { client } = createTestClient({

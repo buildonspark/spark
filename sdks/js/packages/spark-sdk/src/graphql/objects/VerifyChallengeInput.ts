@@ -2,7 +2,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 
-import Provider from './Provider.js';
+import type Provider from './Provider.js';
 import {ProviderFromJson} from './Provider.js';
 import {ProviderToJson} from './Provider.js';
 
@@ -30,7 +30,7 @@ export const VerifyChallengeInputFromJson = (obj: any): VerifyChallengeInput => 
         identityPublicKey: obj["verify_challenge_input_identity_public_key"],
         provider: (!!obj["verify_challenge_input_provider"] ? ProviderFromJson(obj["verify_challenge_input_provider"]) : undefined),
 
-        } as VerifyChallengeInput;
+        };
 
 }
 export const VerifyChallengeInputToJson = (obj: VerifyChallengeInput): any => {

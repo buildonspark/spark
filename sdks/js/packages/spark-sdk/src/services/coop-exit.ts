@@ -1,20 +1,20 @@
 import { hexToBytes } from "@noble/curves/utils";
-import { TransactionInput } from "@scure/btc-signer/psbt";
+import { type TransactionInput } from "@scure/btc-signer/psbt";
 import { uuidv7 } from "uuidv7";
 import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import {
-  CooperativeExitResponse,
+  type CooperativeExitResponse,
   HashVariant,
   SendLeafKeyTweaks,
-  Transfer,
+  type Transfer,
 } from "../proto/spark.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import { LoggingService } from "../utils/logging-service.js";
 import { Network } from "../utils/network.js";
 import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection/connection.js";
-import { SigningService } from "./signing.js";
+import { type WalletConfigService } from "./config.js";
+import { type ConnectionManager } from "./connection/connection.js";
+import { type SigningService } from "./signing.js";
 import type { LeafKeyTweak } from "./transfer.js";
 import {
   BaseTransferService,

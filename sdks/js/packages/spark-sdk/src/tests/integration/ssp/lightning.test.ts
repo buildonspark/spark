@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { SparkValidationError } from "../../../errors/types.js";
 import { decodeInvoice } from "../../../services/bolt11-spark.js";
-import { ConfigOptions } from "../../../services/wallet-config.js";
+import { type ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
   CurrencyUnit,
@@ -9,7 +9,7 @@ import {
 } from "../../../types/index.js";
 import {
   decodeSparkAddress,
-  SparkAddressFormat,
+  type SparkAddressFormat,
   validateSparkInvoiceSignature,
 } from "../../../utils/address.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
@@ -40,7 +40,7 @@ describe("Lightning Network provider", () => {
     ])(
       `.amount(%s)`,
       async (amountSats) => {
-        let invoice = await walletStatic.createLightningInvoice({
+        const invoice = await walletStatic.createLightningInvoice({
           amountSats: amountSats,
           memo: "test",
           expirySeconds: 500,

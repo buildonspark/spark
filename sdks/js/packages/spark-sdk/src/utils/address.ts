@@ -9,11 +9,11 @@ import { Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   SatsPayment,
   SparkAddress,
-  SparkInvoiceFields,
+  type SparkInvoiceFields,
   TokensPayment,
 } from "../proto/spark.js";
 import { HashSparkInvoice } from "./invoice-hashing.js";
-import { NetworkType } from "./network.js";
+import { type NetworkType } from "./network.js";
 
 const BECH32M_LIMIT = 1024;
 
@@ -98,10 +98,7 @@ export function encodeSparkAddressWithSignature(
     const serializedPayload = w.finish();
     const words = bech32m.toWords(serializedPayload);
 
-    return bech32mEncode(
-      AddressNetwork[payload.network],
-      words,
-    ) as SparkAddressFormat;
+    return bech32mEncode(AddressNetwork[payload.network], words);
   } catch (error) {
     throw new SparkValidationError("Failed to encode Spark address", {
       field: "publicKey",
@@ -124,7 +121,7 @@ export function decodeSparkAddress(
       });
     }
 
-    const decoded = bech32mDecode(address as Bech32String);
+    const decoded = bech32mDecode(address);
 
     const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
 
@@ -186,11 +183,11 @@ export function decodeSparkAddress(
 
 const PrefixToNetwork: Record<string, NetworkType> = Object.fromEntries(
   Object.entries(AddressNetwork).map(([k, v]) => [v, k as NetworkType]),
-) as Record<string, NetworkType>;
+);
 
 const LegacyPrefixToNetwork: Record<string, NetworkType> = Object.fromEntries(
   Object.entries(LegacyAddressNetwork).map(([k, v]) => [v, k as NetworkType]),
-) as Record<string, NetworkType>;
+);
 
 export function getNetworkFromSparkAddress(address: string): NetworkType {
   const { prefix } = bech32mDecode(address);
@@ -401,7 +398,7 @@ export function validateSparkInvoiceFields(
 
 export function validateSparkInvoiceSignature(invoice: SparkAddressFormat) {
   try {
-    const decoded = bech32mDecode(invoice as SparkAddressFormat);
+    const decoded = bech32mDecode(invoice);
     const network = getNetworkFromSparkAddress(invoice);
     const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
     const { identityPublicKey, sparkInvoiceFields, signature } = payload;

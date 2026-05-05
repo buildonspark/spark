@@ -8,20 +8,23 @@ import {
 } from "nice-grpc";
 import {
   retryMiddleware,
-  RetryOptions,
+  type RetryOptions,
 } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
-import { Metadata, Status } from "nice-grpc-common";
+import { type Metadata, Status } from "nice-grpc-common";
 import { getClientEnv } from "../../constants.js";
 import { SparkRequestError } from "../../errors/types.js";
-import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
-import { SparkServiceDefinition } from "../../proto/spark.js";
-import { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
-import { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
-import { WalletConfigService } from "../config.js";
+import {
+  type MockServiceClient,
+  MockServiceDefinition,
+} from "../../proto/mock.js";
+import { type SparkServiceDefinition } from "../../proto/spark.js";
+import { type SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
+import { type SparkTokenServiceDefinition } from "../../proto/spark_token.js";
+import { type WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
 import type { LoggingService } from "../../utils/logging-service.js";
-import { AuthMode, ConnectionManager } from "./connection.js";
+import { type AuthMode, ConnectionManager } from "./connection.js";
 
 // The default @grpc/grpc-js message size limit is 4 MB. Wallets with many
 // leaves can exceed this — e.g. start_transfer_v2 responses have been observed

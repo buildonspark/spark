@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { hexToBytes } from "@noble/curves/utils";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { TransactionInput } from "@scure/btc-signer/psbt";
+import { type TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
 import { TransferStatus } from "../../proto/spark.js";
@@ -12,8 +12,8 @@ import { CoopExitService } from "../../services/coop-exit.js";
 import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
-import { ConfigOptions } from "../../services/wallet-config.js";
-import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
+import { type ConfigOptions } from "../../services/wallet-config.js";
+import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
@@ -94,7 +94,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     const intermediateAmountSats = (leafCount + 1) * dustAmountSats;
 
     const exitTx = new Transaction();
-    exitTx.addInput(faucetCoin!.outpoint);
+    exitTx.addInput(faucetCoin.outpoint);
     exitTx.addOutput({
       script: withdrawAddressScript,
       amount: amountSats,
@@ -203,8 +203,8 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     // Sign an exit tx and broadcast
     const signedExitTx = await faucet.signFaucetCoin(
       exitTx,
-      faucetCoin!.txout,
-      faucetCoin!.key,
+      faucetCoin.txout,
+      faucetCoin.key,
     );
 
     await faucet.broadcastTx(signedExitTx.hex);

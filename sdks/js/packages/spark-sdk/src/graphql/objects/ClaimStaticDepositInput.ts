@@ -53,7 +53,7 @@ export const ClaimStaticDepositInputFromJson = (obj: any): ClaimStaticDepositInp
         creditAmountSats: obj["claim_static_deposit_input_credit_amount_sats"],
         maxFeeSats: obj["claim_static_deposit_input_max_fee_sats"],
 
-        } as ClaimStaticDepositInput;
+        };
 
 }
 export const ClaimStaticDepositInputToJson = (obj: ClaimStaticDepositInput): any => {

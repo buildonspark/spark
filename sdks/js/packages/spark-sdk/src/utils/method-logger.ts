@@ -1,4 +1,4 @@
-import { Logger } from "@lightsparkdev/core";
+import { type Logger } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex, concatBytes, utf8ToBytes } from "@noble/hashes/utils";
 import type {
@@ -112,10 +112,7 @@ export class MethodCallLogger {
         }
 
         if (MethodCallLogger.isAsyncIterable(result)) {
-          return this.wrapAsyncIterable(
-            context,
-            result as AsyncIterable<unknown>,
-          );
+          return this.wrapAsyncIterable(context, result);
         }
 
         this.endMethodLogging(context, "success");
@@ -362,7 +359,7 @@ export class MethodCallLogger {
         return `[${constructorName}]`;
       }
 
-      const keys = Object.keys(value as Record<string, unknown>);
+      const keys = Object.keys(value);
       return `Object(keys=${keys.slice(0, 5).join(",")}${
         keys.length > 5 ? ",..." : ""
       })`;

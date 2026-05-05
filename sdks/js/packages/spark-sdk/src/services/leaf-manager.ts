@@ -3,15 +3,15 @@ import { equalBytes } from "@noble/curves/utils";
 import { Mutex } from "async-mutex";
 import { SparkValidationError } from "../errors/index.js";
 import {
-  QueryNodesRequest,
-  QueryNodesResponse,
-  Transfer,
+  type QueryNodesRequest,
+  type QueryNodesResponse,
+  type Transfer,
   TransferStatus,
   TransferType,
-  TreeNode,
+  type TreeNode,
   TreeNodeStatus,
 } from "../proto/spark.js";
-import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
+import { type KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import {
   doesTxnNeedRenewed,
   getTxFromRawTxBytes,
@@ -20,10 +20,10 @@ import {
 import { addPublicKeys } from "../utils/keys.js";
 import { LoggingService } from "../utils/logging-service.js";
 import { optimize, shouldOptimize } from "../utils/optimize.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection/connection.js";
-import SwapService from "./swap.js";
-import { LeafKeyTweak, TransferService } from "./transfer.js";
+import { type WalletConfigService } from "./config.js";
+import { type ConnectionManager } from "./connection/connection.js";
+import type SwapService from "./swap.js";
+import { type LeafKeyTweak, type TransferService } from "./transfer.js";
 
 type LeafSource =
   | { kind: "transfer"; transferId: string }
@@ -1064,11 +1064,11 @@ export default class LeafManager {
     }
 
     // Phase 3: Execute swap outside lock — use captured leaves, NOT getLeavesByStatus
-    const swapLeafIds = lockedForSwap!.map((l) => l.id);
+    const swapLeafIds = lockedForSwap.map((l) => l.id);
     let newLeaves: TreeNode[];
     try {
       newLeaves = await this.swapService.requestLeavesSwap({
-        leaves: lockedForSwap!,
+        leaves: lockedForSwap,
         targetAmounts,
         onSwapInitiated: async () => {
           await this.leavesMutex.runExclusive(() => {
@@ -1682,7 +1682,7 @@ export default class LeafManager {
         return {
           nodes: aggregatedNodes,
           offset: response.offset,
-        } as QueryNodesResponse;
+        };
       }
       offset += pageSize;
     }

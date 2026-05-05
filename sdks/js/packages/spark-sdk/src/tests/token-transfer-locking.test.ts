@@ -1,14 +1,14 @@
 import { numberToBytesBE } from "@noble/curves/utils";
 import { describe, expect, it, jest } from "@jest/globals";
 import {
-  OutputWithPreviousTransactionData,
+  type OutputWithPreviousTransactionData,
   PartialTokenTransaction,
   TokenOutputStatus,
 } from "../proto/spark_token.js";
-import { WalletConfigService } from "../services/config.js";
-import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
+import { type WalletConfigService } from "../services/config.js";
+import { type ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
-import { TokenTransactionService } from "../services/tokens/token-transactions.js";
+import { type TokenTransactionService } from "../services/tokens/token-transactions.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.node.js";
 import {
   setSparkTokenPrimitivesOnce,

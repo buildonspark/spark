@@ -1,6 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import CoopExitFeeEstimate, {
+import type CoopExitFeeEstimate from "./CoopExitFeeEstimate.js";
+import {
   CoopExitFeeEstimateFromJson,
   CoopExitFeeEstimateToJson,
 } from "./CoopExitFeeEstimate.js";
@@ -32,7 +33,7 @@ export const CoopExitFeeEstimatesOutputFromJson = (
           obj["coop_exit_fee_estimates_output_speed_slow"],
         )
       : undefined,
-  } as CoopExitFeeEstimatesOutput;
+  };
 };
 export const CoopExitFeeEstimatesOutputToJson = (
   obj: CoopExitFeeEstimatesOutput,

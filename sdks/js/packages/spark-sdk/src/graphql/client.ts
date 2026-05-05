@@ -1,11 +1,11 @@
 import {
-  AuthProvider,
+  type AuthProvider,
   bytesToHex,
   DefaultCrypto,
   isError,
   type Logger,
   NodeKeyCache,
-  Query,
+  type Query,
   Requester,
 } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
@@ -13,8 +13,8 @@ import {
   SparkAuthenticationError,
   SparkRequestError,
 } from "../errors/index.js";
-import { SparkSigner } from "../signer/signer.js";
-import { UserRequestType } from "../types/sdk-types.js";
+import { type SparkSigner } from "../signer/signer.js";
+import { type UserRequestType } from "../types/sdk-types.js";
 import { getFetch } from "../utils/fetch.js";
 import { NoopLogger } from "../utils/logging.js";
 import type { LoggingService } from "../utils/logging-service.js";
@@ -31,52 +31,45 @@ import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
 import { VerifyChallenge } from "./mutations/VerifyChallenge.js";
 import { ListSparkWalletWebhooks } from "./queries/ListSparkWalletWebhooks.js";
 import { ClaimStaticDepositFromJson } from "./objects/ClaimStaticDeposit.js";
-import InstantStaticDepositClaimOutput, {
-  InstantStaticDepositClaimOutputFromJson,
-} from "./objects/InstantStaticDepositClaimOutput.js";
-import InstantStaticDepositQuoteOutput, {
-  InstantStaticDepositQuoteOutputFromJson,
-} from "./objects/InstantStaticDepositQuoteOutput.js";
-import ClaimStaticDepositOutput, {
-  ClaimStaticDepositOutputFromJson,
-} from "./objects/ClaimStaticDepositOutput.js";
+import type InstantStaticDepositClaimOutput from "./objects/InstantStaticDepositClaimOutput.js";
+import { InstantStaticDepositClaimOutputFromJson } from "./objects/InstantStaticDepositClaimOutput.js";
+import type InstantStaticDepositQuoteOutput from "./objects/InstantStaticDepositQuoteOutput.js";
+import { InstantStaticDepositQuoteOutputFromJson } from "./objects/InstantStaticDepositQuoteOutput.js";
+import type ClaimStaticDepositOutput from "./objects/ClaimStaticDepositOutput.js";
+import { ClaimStaticDepositOutputFromJson } from "./objects/ClaimStaticDepositOutput.js";
 import ClaimStaticDepositRequestType from "./objects/ClaimStaticDepositRequestType.js";
 import { CoopExitFeeEstimatesOutputFromJson } from "./objects/CoopExitFeeEstimatesOutput.js";
 import { CoopExitFeeQuoteFromJson } from "./objects/CoopExitFeeQuote.js";
-import CoopExitRequest, {
-  CoopExitRequestFromJson,
-} from "./objects/CoopExitRequest.js";
+import type CoopExitRequest from "./objects/CoopExitRequest.js";
+import { CoopExitRequestFromJson } from "./objects/CoopExitRequest.js";
 import { GetChallengeOutputFromJson } from "./objects/GetChallengeOutput.js";
 import {
-  BitcoinNetwork,
-  CompleteCoopExitInput,
-  CoopExitFeeEstimatesInput,
-  CoopExitFeeEstimatesOutput,
-  CoopExitFeeQuote,
-  CoopExitFeeQuoteInput,
-  GetChallengeOutput,
-  LeavesSwapFeeEstimateOutput,
-  LightningSendRequest,
-  RequestCoopExitInput,
-  RequestLightningReceiveInput,
-  RequestLightningSendInput,
-  RequestSwapInput,
-  SparkUserRequestStatus,
-  SparkUserRequestType,
-  Transfer,
+  type BitcoinNetwork,
+  type CompleteCoopExitInput,
+  type CoopExitFeeEstimatesInput,
+  type CoopExitFeeEstimatesOutput,
+  type CoopExitFeeQuote,
+  type CoopExitFeeQuoteInput,
+  type GetChallengeOutput,
+  type LeavesSwapFeeEstimateOutput,
+  type LightningSendRequest,
+  type RequestCoopExitInput,
+  type RequestLightningReceiveInput,
+  type RequestLightningSendInput,
+  type RequestSwapInput,
+  type SparkUserRequestStatus,
+  type SparkUserRequestType,
+  type Transfer,
 } from "./objects/index.js";
 import { LeavesSwapFeeEstimateOutputFromJson } from "./objects/LeavesSwapFeeEstimateOutput.js";
-import LeavesSwapRequest, {
-  LeavesSwapRequestFromJson,
-} from "./objects/LeavesSwapRequest.js";
-import LightningReceiveRequest, {
-  LightningReceiveRequestFromJson,
-} from "./objects/LightningReceiveRequest.js";
-import LightningSendFeeEstimateOutput, {
-  LightningSendFeeEstimateOutputFromJson,
-} from "./objects/LightningSendFeeEstimateOutput.js";
+import type LeavesSwapRequest from "./objects/LeavesSwapRequest.js";
+import { LeavesSwapRequestFromJson } from "./objects/LeavesSwapRequest.js";
+import type LightningReceiveRequest from "./objects/LightningReceiveRequest.js";
+import { LightningReceiveRequestFromJson } from "./objects/LightningReceiveRequest.js";
+import type LightningSendFeeEstimateOutput from "./objects/LightningSendFeeEstimateOutput.js";
+import { LightningSendFeeEstimateOutputFromJson } from "./objects/LightningSendFeeEstimateOutput.js";
 import { LightningSendRequestFromJson } from "./objects/LightningSendRequest.js";
-import DeleteSparkWalletWebhookInput from "./objects/DeleteSparkWalletWebhookInput.js";
+import type DeleteSparkWalletWebhookInput from "./objects/DeleteSparkWalletWebhookInput.js";
 import {
   DeleteSparkWalletWebhookOutputFromJson,
   type default as DeleteSparkWalletWebhookOutput,
@@ -85,22 +78,19 @@ import {
   ListSparkWalletWebhooksOutputFromJson,
   type default as ListSparkWalletWebhooksOutput,
 } from "./objects/ListSparkWalletWebhooksOutput.js";
-import RegisterSparkWalletWebhookInput from "./objects/RegisterSparkWalletWebhookInput.js";
+import type RegisterSparkWalletWebhookInput from "./objects/RegisterSparkWalletWebhookInput.js";
 import {
   RegisterSparkWalletWebhookOutputFromJson,
   type default as RegisterSparkWalletWebhookOutput,
 } from "./objects/RegisterSparkWalletWebhookOutput.js";
-import SparkWalletUserToUserRequestsConnection, {
-  SparkWalletUserToUserRequestsConnectionFromJson,
-} from "./objects/SparkWalletUserToUserRequestsConnection.js";
-import StaticDepositQuoteInput from "./objects/StaticDepositQuoteInput.js";
-import StaticDepositQuoteOutput, {
-  StaticDepositQuoteOutputFromJson,
-} from "./objects/StaticDepositQuoteOutput.js";
+import type SparkWalletUserToUserRequestsConnection from "./objects/SparkWalletUserToUserRequestsConnection.js";
+import { SparkWalletUserToUserRequestsConnectionFromJson } from "./objects/SparkWalletUserToUserRequestsConnection.js";
+import type StaticDepositQuoteInput from "./objects/StaticDepositQuoteInput.js";
+import type StaticDepositQuoteOutput from "./objects/StaticDepositQuoteOutput.js";
+import { StaticDepositQuoteOutputFromJson } from "./objects/StaticDepositQuoteOutput.js";
 import { TransferFromJson } from "./objects/Transfer.js";
-import VerifyChallengeOutput, {
-  VerifyChallengeOutputFromJson,
-} from "./objects/VerifyChallengeOutput.js";
+import type VerifyChallengeOutput from "./objects/VerifyChallengeOutput.js";
+import { VerifyChallengeOutputFromJson } from "./objects/VerifyChallengeOutput.js";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
 import { FetchCurrentUserToUserRequestsConnection } from "./queries/FetchCurrentUserToUserRequestsConnection.js";
 import { GetInstantStaticDepositQuote } from "./mutations/GetInstantStaticDepositQuote.js";
@@ -583,9 +573,8 @@ export default class SspClient {
       },
       constructObject: (response: { transfers: any }) => {
         return response.transfers.map((transfer: any) => {
-          const transferObj: TransferWithUserRequest = TransferFromJson(
-            transfer,
-          ) as TransferWithUserRequest;
+          const transferObj: TransferWithUserRequest =
+            TransferFromJson(transfer);
 
           switch (transfer.transfer_user_request.__typename) {
             case "ClaimStaticDeposit":

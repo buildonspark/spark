@@ -1,12 +1,14 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import Leaf, { LeafFromJson, LeafToJson } from "./Leaf.js";
-import PageInfo, { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
+import type Leaf from "./Leaf.js";
+import { LeafFromJson, LeafToJson } from "./Leaf.js";
+import type PageInfo from "./PageInfo.js";
+import { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
 
 interface SparkTransferToLeavesConnection {
   /**
-   * The total count of objects in this connection, using the current filters. It is different from the
-   * number of objects returned in the current page (in the `entities` field).
+   * The total count of objects in this connection, using the current filters. It is different from
+   * the number of objects returned in the current page (in the `entities` field).
    **/
   count: number;
 
@@ -32,7 +34,7 @@ export const SparkTransferToLeavesConnectionFromJson = (
       LeafFromJson(e),
     ),
     typename: "SparkTransferToLeavesConnection",
-  } as SparkTransferToLeavesConnection;
+  };
 };
 export const SparkTransferToLeavesConnectionToJson = (
   obj: SparkTransferToLeavesConnection,

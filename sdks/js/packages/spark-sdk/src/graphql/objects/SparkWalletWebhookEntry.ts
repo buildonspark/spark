@@ -1,6 +1,6 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import SparkWalletWebhookEventType from "./SparkWalletWebhookEventType.js";
+import type SparkWalletWebhookEventType from "./SparkWalletWebhookEventType.js";
 
 interface SparkWalletWebhookEntry {
   webhook_id: string;
@@ -15,7 +15,7 @@ export const SparkWalletWebhookEntryFromJson = (
     webhook_id: obj["webhook_id"],
     url: obj["url"],
     event_types: obj["event_types"],
-  } as SparkWalletWebhookEntry;
+  };
 };
 
 export default SparkWalletWebhookEntry;

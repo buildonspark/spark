@@ -1,9 +1,9 @@
 import {
   retryMiddleware,
-  RetryOptions,
+  type RetryOptions,
 } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
-import { Metadata, Status } from "nice-grpc-common";
+import { type Metadata, Status } from "nice-grpc-common";
 import {
   createChannel,
   createClientFactory,
@@ -16,10 +16,10 @@ import { SparkRequestError } from "../../errors/types.js";
 import type { SparkServiceDefinition } from "../../proto/spark.js";
 import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import type { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
-import { WalletConfigService } from "../config.js";
+import { type WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
 import type { LoggingService } from "../../utils/logging-service.js";
-import { AuthMode, ConnectionManager } from "./connection.js";
+import { type AuthMode, ConnectionManager } from "./connection.js";
 
 export type Transport = NonNullable<Parameters<typeof createChannel>[1]>;
 

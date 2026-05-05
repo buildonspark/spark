@@ -1,21 +1,22 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import autoBind from "../../auto-bind.js";
 import type LightsparkClient from "../client.js";
-import BitcoinNetwork from "./BitcoinNetwork.js";
-import Entity from "./Entity.js";
-import SparkUserRequestStatus from "./SparkUserRequestStatus.js";
-import SparkUserRequestType from "./SparkUserRequestType.js";
-import SparkWalletUserToUserRequestsConnection, {
+import type BitcoinNetwork from "./BitcoinNetwork.js";
+import type Entity from "./Entity.js";
+import type SparkUserRequestStatus from "./SparkUserRequestStatus.js";
+import type SparkUserRequestType from "./SparkUserRequestType.js";
+import type SparkWalletUserToUserRequestsConnection from "./SparkWalletUserToUserRequestsConnection.js";
+import {
   SparkWalletUserToUserRequestsConnectionFromJson,
 } from "./SparkWalletUserToUserRequestsConnection.js";
 
 class SparkWalletUser implements Entity {
   constructor(
     /**
-     * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-     * string.
+     * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+     * opaque string.
      **/
     public readonly id: string,
     /** The date and time when the entity was first created. **/

@@ -11,9 +11,9 @@ import {
   type ConfigOptions,
   getLocalSigningOperators,
 } from "../../services/wallet-config.js";
-import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
+import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { SparkWalletEvent } from "../../spark-wallet/types.js";
-import { NetworkType } from "../../utils/network.js";
+import { type NetworkType } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
 import {
   SparkWalletTestingIntegration,
@@ -901,7 +901,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
-    await bobTransferService.claimTransfer(transfer!);
+    await bobTransferService.claimTransfer(transfer);
   });
 
   it(`${name} - test transfer with new spark address`, async () => {
@@ -951,7 +951,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(pendingTransfers.transfers.length).toBe(1);
     const transfer = pendingTransfers.transfers[0]!;
 
-    await bobTransferService.claimTransfer(transfer!);
+    await bobTransferService.claimTransfer(transfer);
   });
 });
 

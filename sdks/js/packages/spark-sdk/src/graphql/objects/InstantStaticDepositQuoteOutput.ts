@@ -1,8 +1,10 @@
 // Copyright ©, 2025-present, Lightspark Group, Inc. - All Rights Reserved
 
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import CurrencyAmount, { CurrencyAmountFromJson } from "./CurrencyAmount.js";
-import InstantStaticDepositPlan, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import { CurrencyAmountFromJson } from "./CurrencyAmount.js";
+import type InstantStaticDepositPlan from "./InstantStaticDepositPlan.js";
+import {
   InstantStaticDepositPlanFromJson,
 } from "./InstantStaticDepositPlan.js";
 
@@ -37,7 +39,7 @@ export const StaticDepositQuoteFromJson = (obj: any): StaticDepositQuote => {
       obj["static_deposit_quote_credit_amount"],
     ),
     quoteSignature: obj["static_deposit_quote_quote_signature"],
-  } as StaticDepositQuote;
+  };
 };
 
 export const InstantStaticDepositQuoteOutputFromJson = (
@@ -48,7 +50,7 @@ export const InstantStaticDepositQuoteOutputFromJson = (
     fulfillmentPlans: (
       (obj["instant_quote_output_fulfillment_plans"] as any[]) ?? []
     ).map(InstantStaticDepositPlanFromJson),
-  } as InstantStaticDepositQuoteOutput;
+  };
 };
 
 export const STATIC_DEPOSIT_QUOTE_FRAGMENT = `

@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
 import SspClient from "../../../graphql/client.js";
-import { ConfigOptions } from "../../../services/wallet-config.js";
+import { type ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWalletTesting } from "../../utils/spark-testing-wallet.js";
 import { SparkAuthenticationError } from "../../../errors/types.js";
 

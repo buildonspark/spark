@@ -42,7 +42,7 @@ function createConnectedThenIdleStream(signal: AbortSignal) {
         $case: "connected",
         connected: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     await waitForAbort(signal);
   })();
@@ -59,7 +59,7 @@ function createConnectedThenHeartbeatStream(
         $case: "connected",
         connected: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     for (let i = 0; i < heartbeatCount; i += 1) {
       await waitForDelayOrAbort(signal, intervalMs);
@@ -68,7 +68,7 @@ function createConnectedThenHeartbeatStream(
           $case: "heartbeat",
           heartbeat: {},
         },
-      } as SubscribeToEventsResponse;
+      };
     }
 
     await waitForAbort(signal);
@@ -85,7 +85,7 @@ function createConnectedThenHeartbeatThenIdleStream(
         $case: "connected",
         connected: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     await waitForDelayOrAbort(signal, intervalMs);
     yield {
@@ -93,7 +93,7 @@ function createConnectedThenHeartbeatThenIdleStream(
         $case: "heartbeat",
         heartbeat: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     await waitForAbort(signal);
   })();
@@ -106,14 +106,14 @@ function createConnectedThenImmediateHeartbeatStream(signal: AbortSignal) {
         $case: "connected",
         connected: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     yield {
       event: {
         $case: "heartbeat",
         heartbeat: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     await waitForAbort(signal);
   })();
@@ -126,7 +126,7 @@ function createConnectedThenReceiverTransferStream(signal: AbortSignal) {
         $case: "connected",
         connected: {},
       },
-    } as SubscribeToEventsResponse;
+    };
 
     yield {
       event: {
@@ -408,9 +408,7 @@ describe("SparkWallet background stream reconnects", () => {
           unref,
         }) as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
     );
-    jest
-      .spyOn(global, "clearTimeout")
-      .mockImplementation((() => {}) as typeof clearTimeout);
+    jest.spyOn(global, "clearTimeout").mockImplementation(() => {});
 
     const connectionManagerStub = {
       closeConnections: jest.fn(async () => {}),

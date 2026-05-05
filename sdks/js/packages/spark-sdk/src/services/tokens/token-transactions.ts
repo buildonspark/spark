@@ -9,27 +9,27 @@ import { SparkRequestError, SparkValidationError } from "../../errors/types.js";
 import { Direction, Order } from "../../proto/spark.js";
 import {
   BroadcastTransactionRequest,
-  BroadcastTransactionResponse,
-  CommitProgress,
-  CommitStatus,
-  CommitTransactionResponse,
-  InputTtxoSignaturesPerOperator,
-  OutputWithPreviousTransactionData,
-  PartialTokenOutput,
+  type BroadcastTransactionResponse,
+  type CommitProgress,
+  type CommitStatus,
+  type CommitTransactionResponse,
+  type InputTtxoSignaturesPerOperator,
+  type OutputWithPreviousTransactionData,
+  type PartialTokenOutput,
   PartialTokenTransaction,
-  QueryTokenTransactionsRequest,
-  QueryTokenTransactionsResponse,
-  SignatureWithIndex,
-  TokenOutput,
-  TokenTransaction,
+  type QueryTokenTransactionsRequest,
+  type QueryTokenTransactionsResponse,
+  type SignatureWithIndex,
+  type TokenOutput,
+  type TokenTransaction,
 } from "../../proto/spark_token.js";
-import { TokenOutputsMap } from "../../spark-wallet/types.js";
-import { SparkCallOptions } from "../../types/grpc.js";
+import { type TokenOutputsMap } from "../../spark-wallet/types.js";
+import { type SparkCallOptions } from "../../types/grpc.js";
 import { getSparkTokenPrimitives } from "../../token-primitives-bindings/token-primitives-bindings.js";
 import {
   decodeSparkAddress,
   isValidPublicKey,
-  SparkAddressFormat,
+  type SparkAddressFormat,
 } from "../../utils/address.js";
 import {
   hashFinalTokenTransaction,
@@ -39,15 +39,15 @@ import {
   sortInvoiceAttachments,
 } from "../../utils/token-hashing.js";
 import {
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
 } from "../../utils/token-identifier.js";
 import { validateTokenTransaction } from "../../utils/token-transaction-validation.js";
 import { sumTokenOutputs } from "../../utils/token-transactions.js";
 import { LoggingService } from "../../utils/logging-service.js";
-import { WalletConfigService } from "../config.js";
-import { ConnectionManager } from "../connection/connection.js";
-import { SigningOperator } from "../wallet-config.js";
+import { type WalletConfigService } from "../config.js";
+import { type ConnectionManager } from "../connection/connection.js";
+import { type SigningOperator } from "../wallet-config.js";
 import type {
   BroadcastBuildRequestBindingParams,
   SignatureWithIndexBindingParams,
@@ -247,7 +247,7 @@ export class TokenTransactionService {
           previousTransactionVout: output.previousTransactionVout,
           ownerPublicKey: output.output!.ownerPublicKey,
           tokenIdentifier: output.output!.tokenIdentifier!,
-          tokenAmount: output.output!.tokenAmount!,
+          tokenAmount: output.output!.tokenAmount,
         })),
         receiverOutputs: receiverOutputs.map((output) => ({
           receiverSparkAddress: output.receiverSparkAddress,
@@ -317,7 +317,7 @@ export class TokenTransactionService {
       const currentAmount = inputAmountsByToken.get(tokenId) || 0n;
       inputAmountsByToken.set(
         tokenId,
-        currentAmount + bytesToNumberBE(output.output!.tokenAmount!),
+        currentAmount + bytesToNumberBE(output.output!.tokenAmount),
       );
     }
 
@@ -485,7 +485,7 @@ export class TokenTransactionService {
       const currentAmount = availableByToken.get(tokenId) || 0n;
       availableByToken.set(
         tokenId,
-        currentAmount + bytesToNumberBE(output.output!.tokenAmount!),
+        currentAmount + bytesToNumberBE(output.output!.tokenAmount),
       );
     }
 
@@ -560,7 +560,7 @@ export class TokenTransactionService {
       const currentAmount = availableByToken.get(tokenId) || 0n;
       availableByToken.set(
         tokenId,
-        currentAmount + bytesToNumberBE(output.output!.tokenAmount!),
+        currentAmount + bytesToNumberBE(output.output!.tokenAmount),
       );
     }
 
@@ -1069,7 +1069,7 @@ export class TokenTransactionService {
     return {
       finalTokenTransaction,
       finalTokenTransactionHash,
-      threshold: startResponse.keyshareInfo!.threshold,
+      threshold: startResponse.keyshareInfo.threshold,
     };
   }
 
@@ -1223,7 +1223,7 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    let queryParams: QueryTokenTransactionsRequest = {
+    const queryParams: QueryTokenTransactionsRequest = {
       queryType: undefined,
       issuerPublicKeys: issuerPublicKeys?.map(hexToBytes)!,
       ownerPublicKeys:
@@ -1261,11 +1261,11 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    let queryParams: QueryTokenTransactionsRequest = {
+    const queryParams: QueryTokenTransactionsRequest = {
       queryType: {
         $case: "byTxHash",
         byTxHash: {
-          tokenTransactionHashes: tokenTransactionHashes.map(hexToBytes)!,
+          tokenTransactionHashes: tokenTransactionHashes.map(hexToBytes),
         },
       },
       outputIds: [],
@@ -1315,7 +1315,7 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    let queryParams: QueryTokenTransactionsRequest = {
+    const queryParams: QueryTokenTransactionsRequest = {
       queryType: {
         $case: "byFilters",
         byFilters: {
@@ -1382,7 +1382,7 @@ export class TokenTransactionService {
     // First try to find an exact match
     const exactMatch: OutputWithPreviousTransactionData | undefined =
       tokenOutputs.find(
-        (item) => bytesToNumberBE(item.output!.tokenAmount!) === tokenAmount,
+        (item) => bytesToNumberBE(item.output!.tokenAmount) === tokenAmount,
       );
 
     if (exactMatch) {
@@ -1391,8 +1391,8 @@ export class TokenTransactionService {
 
     // Sort outputs: smallest first for SMALL_FIRST, largest first for LARGE_FIRST
     const sortedOutputs = [...tokenOutputs].sort((a, b) => {
-      const amountA = bytesToNumberBE(a.output!.tokenAmount!);
-      const amountB = bytesToNumberBE(b.output!.tokenAmount!);
+      const amountA = bytesToNumberBE(a.output!.tokenAmount);
+      const amountB = bytesToNumberBE(b.output!.tokenAmount);
       return strategy === "SMALL_FIRST"
         ? Number(amountA - amountB)
         : Number(amountB - amountA);
@@ -1404,7 +1404,7 @@ export class TokenTransactionService {
       let sum = 0n;
       let count = 0;
       for (const output of sortedOutputs) {
-        sum += bytesToNumberBE(output.output!.tokenAmount!);
+        sum += bytesToNumberBE(output.output!.tokenAmount);
         count++;
         if (sum >= tokenAmount) {
           // We can reach the target with outputs
@@ -1419,7 +1419,7 @@ export class TokenTransactionService {
       const largeOutputs = sortedOutputs.slice(MAX_TOKEN_OUTPUTS_TX).reverse(); // Largest first
 
       let smallSum = smallOutputs.reduce(
-        (acc, output) => acc + bytesToNumberBE(output.output!.tokenAmount!),
+        (acc, output) => acc + bytesToNumberBE(output.output!.tokenAmount),
         0n,
       );
 
@@ -1429,12 +1429,12 @@ export class TokenTransactionService {
       let largeIdx = 0;
       while (smallSum < tokenAmount && largeIdx < largeOutputs.length) {
         const largeOutput = largeOutputs[largeIdx]!;
-        const largeAmount = bytesToNumberBE(largeOutput.output!.tokenAmount!);
+        const largeAmount = bytesToNumberBE(largeOutput.output!.tokenAmount);
 
         // Remove the smallest output from selection
         const smallestOutput = selectedOutputs.shift()!;
         const smallestAmount = bytesToNumberBE(
-          smallestOutput.output!.tokenAmount!,
+          smallestOutput.output!.tokenAmount,
         );
 
         selectedOutputs.push(largeOutput);
@@ -1462,7 +1462,7 @@ export class TokenTransactionService {
         if (selectedOutputs.length >= MAX_TOKEN_OUTPUTS_TX) break;
 
         selectedOutputs.push(output);
-        remainingAmount -= bytesToNumberBE(output.output!.tokenAmount!);
+        remainingAmount -= bytesToNumberBE(output.output!.tokenAmount);
       }
 
       if (remainingAmount > 0n) {
@@ -1482,15 +1482,15 @@ export class TokenTransactionService {
   ): void {
     if (strategy === "SMALL_FIRST") {
       tokenOutputs.sort((a, b) => {
-        const amountA = bytesToNumberBE(a.output!.tokenAmount!);
-        const amountB = bytesToNumberBE(b.output!.tokenAmount!);
+        const amountA = bytesToNumberBE(a.output!.tokenAmount);
+        const amountB = bytesToNumberBE(b.output!.tokenAmount);
 
         return amountA < amountB ? -1 : amountA > amountB ? 1 : 0;
       });
     } else {
       tokenOutputs.sort((a, b) => {
-        const amountA = bytesToNumberBE(a.output!.tokenAmount!);
-        const amountB = bytesToNumberBE(b.output!.tokenAmount!);
+        const amountA = bytesToNumberBE(a.output!.tokenAmount);
+        const amountB = bytesToNumberBE(b.output!.tokenAmount);
 
         return amountB < amountA ? -1 : amountB > amountA ? 1 : 0;
       });
@@ -1529,7 +1529,7 @@ export class TokenTransactionService {
     const inputTtxoSignaturesPerOperator: InputTtxoSignaturesPerOperator[] = [];
 
     for (const [_, operator] of Object.entries(signingOperators)) {
-      let ttxoSignatures: SignatureWithIndex[] = [];
+      const ttxoSignatures: SignatureWithIndex[] = [];
 
       if (finalTokenTransaction.tokenInputs!.$case === "mintInput") {
         const issuerPublicKey =

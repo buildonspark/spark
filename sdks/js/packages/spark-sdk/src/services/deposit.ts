@@ -2,16 +2,16 @@ import type { Logger } from "@lightsparkdev/core";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha2";
 import { hexToBytes } from "@noble/hashes/utils";
-import { p2tr, Transaction } from "@scure/btc-signer";
+import { p2tr, type Transaction } from "@scure/btc-signer";
 import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import {
-  Address,
-  FinalizeDepositTreeCreationResponse,
-  GenerateDepositAddressResponse,
-  GetSigningCommitmentsResponse,
+  type Address,
+  type FinalizeDepositTreeCreationResponse,
+  type GenerateDepositAddressResponse,
+  type GetSigningCommitmentsResponse,
   HashVariant,
 } from "../proto/spark.js";
-import { KeyDerivation } from "../signer/types.js";
+import { type KeyDerivation } from "../signer/types.js";
 import {
   getSigHashFromMultiInputTx,
   getSigHashFromTx,
@@ -25,8 +25,8 @@ import {
   createMultiInputRootTx,
   createRootNodeTx,
 } from "../utils/transaction.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection/connection.js";
+import { type WalletConfigService } from "./config.js";
+import { type ConnectionManager } from "./connection/connection.js";
 
 type ValidateDepositAddressParams = {
   address: Address;

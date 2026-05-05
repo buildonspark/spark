@@ -1,20 +1,20 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { LightsparkException, Query, isObject } from "@lightsparkdev/core";
+import { LightsparkException, type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import ClaimStaticDeposit from "./ClaimStaticDeposit.js";
+import type ClaimStaticDeposit from "./ClaimStaticDeposit.js";
 import ClaimStaticDepositStatus from "./ClaimStaticDepositStatus.js";
-import CoopExitRequest from "./CoopExitRequest.js";
+import type CoopExitRequest from "./CoopExitRequest.js";
 import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
 import ExitSpeed from "./ExitSpeed.js";
 import { InvoiceFromJson, InvoiceToJson } from "./Invoice.js";
-import LeavesSwapRequest from "./LeavesSwapRequest.js";
-import LightningReceiveRequest from "./LightningReceiveRequest.js";
+import type LeavesSwapRequest from "./LeavesSwapRequest.js";
+import type LightningReceiveRequest from "./LightningReceiveRequest.js";
 import LightningReceiveRequestStatus from "./LightningReceiveRequestStatus.js";
-import LightningSendRequest from "./LightningSendRequest.js";
+import type LightningSendRequest from "./LightningSendRequest.js";
 import LightningSendRequestStatus from "./LightningSendRequestStatus.js";
 import SparkCoopExitRequestStatus from "./SparkCoopExitRequestStatus.js";
 import SparkLeavesSwapRequestStatus from "./SparkLeavesSwapRequestStatus.js";
@@ -23,8 +23,8 @@ import { TransferFromJson } from "./Transfer.js";
 
 interface UserRequest {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 

@@ -2,12 +2,12 @@ import type { Logger } from "@lightsparkdev/core";
 import { Mutex } from "async-mutex";
 import { SparkValidationError } from "../../errors/types.js";
 import {
-  OutputWithPreviousTransactionData,
+  type OutputWithPreviousTransactionData,
   TokenOutputStatus,
 } from "../../proto/spark_token.js";
-import { TokenOutputsMap } from "../../spark-wallet/types.js";
+import { type TokenOutputsMap } from "../../spark-wallet/types.js";
 import { LoggingService } from "../../utils/logging-service.js";
-import { Bech32mTokenIdentifier } from "../../utils/token-identifier.js";
+import { type Bech32mTokenIdentifier } from "../../utils/token-identifier.js";
 
 export type TokenOutputLock = {
   lockedAt: number;
@@ -28,11 +28,12 @@ export class TokenOutputManager {
   private availableOutputs: TokenOutputsMap = new Map();
   // A local lock is created when a transaction is started from the wallet
   // It's purely meant to prevent concurrent transactions from spending the same outputs.
-  // Local locks expire after a configurable time (default: 30 seconds), if they're not returned from the server (SO) as pending.
-  // This is in the case where the transaction does not get broadcasted to the SO for whatever reason.
+  // Local locks expire after a configurable time (default: 30 seconds), if they're not returned
+  // from the server (SO) as pending. This is in the case where the transaction does not get
+  // broadcasted to the SO for whatever reason.
   private localPendingMap: Map<string, TokenOutputLock> = new Map();
-  // A server lock is created when an output is fetched from the server as pending (query_token_outputs)
-  // which removes the local lock.
+  // A server lock is created when an output is fetched from the server as pending
+  // (query_token_outputs) which removes the local lock.
   private serverPendingMap: TokenOutputsMap = new Map();
   private readonly mutex = new Mutex();
   private readonly lockExpiryMs: number;

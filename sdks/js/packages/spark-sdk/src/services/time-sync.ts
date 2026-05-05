@@ -4,7 +4,7 @@
  */
 import type { Logger } from "@lightsparkdev/core";
 import { NoopLogger } from "../utils/logging.js";
-import { LoggingService } from "../utils/logging-service.js";
+import { type LoggingService } from "../utils/logging-service.js";
 
 function getMonotonicTime(): number {
   // Node.js

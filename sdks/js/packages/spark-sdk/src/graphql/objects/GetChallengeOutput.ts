@@ -19,7 +19,7 @@ export const GetChallengeOutputFromJson = (obj: any): GetChallengeOutput => {
     return {
         protectedChallenge: obj["get_challenge_output_protected_challenge"],
 
-        } as GetChallengeOutput;
+        };
 
 }
 export const GetChallengeOutputToJson = (obj: GetChallengeOutput): any => {

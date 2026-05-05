@@ -83,10 +83,7 @@ describe("WalletConfigService logging normalization", () => {
   });
 
   it("treats explicit undefined log config as disabled", () => {
-    const service = new WalletConfigService(
-      { log: undefined } as ConfigOptions,
-      mockSigner,
-    );
+    const service = new WalletConfigService({ log: undefined }, mockSigner);
 
     expect(service.getLog()).toBe(false);
     expect(service.getLoggingLevel()).toBe("WARN");
@@ -356,7 +353,7 @@ describe("WalletConfigService logging normalization", () => {
             connectionManager: null,
           } as unknown as LogServicesOptions,
         },
-      } as ConfigOptions,
+      },
       mockSigner,
     );
 

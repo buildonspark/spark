@@ -18,9 +18,9 @@ amountSats: number;
 paymentHash: string;
 
     /**
- * Whether to embed the spark address in the fallback address field of the Bolt 11 lightning invoice.
- * Spark-aware wallets can use this field to preferentially pay over spark if they find a spark
- * address in the fallback address field.
+     * Whether to embed the spark address in the fallback address field of the Bolt 11 lightning
+     * invoice. Spark-aware wallets can use this field to preferentially pay over spark if they
+     * find a spark address in the fallback address field.
 **/
 includeSparkAddress: boolean;
 
@@ -28,21 +28,21 @@ includeSparkAddress: boolean;
 expirySecs?: number | undefined;
 
     /**
- * The memo to include in the lightning invoice. Should not be provided if the description_hash is
- * provided.
+     * The memo to include in the lightning invoice. Should not be provided if the description_hash
+     * is provided.
 **/
 memo?: string | undefined;
 
     /**
- * The public key of the user receiving the lightning invoice. If not present, the receiver will be
- * the creator of this request.
+     * The public key of the user receiving the lightning invoice. If not present, the receiver
+     * will be the creator of this request.
 **/
 receiverIdentityPubkey?: string | undefined;
 
     /**
- * The h tag of the invoice. This is the hash of a longer description to include in the lightning
- * invoice. It is used in LNURL and UMA as the hash of the metadata. This field is mutually exclusive
- * with the memo field. Only one or the other should be provided.
+     * The h tag of the invoice. This is the hash of a longer description to include in the
+     * lightning invoice. It is used in LNURL and UMA as the hash of the metadata. This field is
+     * mutually exclusive with the memo field. Only one or the other should be provided.
 **/
 descriptionHash?: string | undefined;
 
@@ -69,7 +69,7 @@ export const RequestLightningReceiveInputFromJson = (obj: any): RequestLightning
         descriptionHash: obj["request_lightning_receive_input_description_hash"],
         sparkInvoice: obj["request_lightning_receive_input_spark_invoice"],
 
-        } as RequestLightningReceiveInput;
+        };
 
 }
 export const RequestLightningReceiveInputToJson = (obj: RequestLightningReceiveInput): any => {

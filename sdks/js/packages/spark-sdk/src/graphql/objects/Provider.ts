@@ -22,7 +22,7 @@ export const ProviderFromJson = (obj: any): Provider => {
         accountId: obj["provider_account_id"],
         jwt: obj["provider_jwt"],
 
-        } as Provider;
+        };
 
 }
 export const ProviderToJson = (obj: Provider): any => {

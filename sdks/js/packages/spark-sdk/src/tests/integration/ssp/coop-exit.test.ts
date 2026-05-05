@@ -4,7 +4,7 @@ import { ExitSpeed } from "../../../types/index.js";
 import { getNewAddress } from "../../utils/regtest-test-faucet.js";
 import {
   initTestingWallet,
-  SparkWalletTesting,
+  type SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
 import { retryUntilSuccess } from "../../utils/utils.js";
 
@@ -32,7 +32,7 @@ describe("SSP coop exit integration", () => {
     const quote = await retryUntilSuccess(async () => {
       const q = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
       if (!q) throw new Error("Quote not available yet");
       return q;

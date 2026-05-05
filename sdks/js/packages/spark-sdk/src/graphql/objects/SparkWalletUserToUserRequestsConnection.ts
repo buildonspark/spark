@@ -1,15 +1,17 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import PageInfo, { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
-import UserRequest, {
+import type PageInfo from "./PageInfo.js";
+import { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
+import type UserRequest from "./UserRequest.js";
+import {
   UserRequestFromJson,
   UserRequestToJson,
 } from "./UserRequest.js";
 
 interface SparkWalletUserToUserRequestsConnection {
   /**
-   * The total count of objects in this connection, using the current filters. It is different from the
-   * number of objects returned in the current page (in the `entities` field).
+   * The total count of objects in this connection, using the current filters. It is different from
+   * the number of objects returned in the current page (in the `entities` field).
    **/
   count: number;
 
@@ -35,7 +37,7 @@ export const SparkWalletUserToUserRequestsConnectionFromJson = (
       (e) => UserRequestFromJson(e),
     ),
     typename: "SparkWalletUserToUserRequestsConnection",
-  } as SparkWalletUserToUserRequestsConnection;
+  };
 };
 export const SparkWalletUserToUserRequestsConnectionToJson = (
   obj: SparkWalletUserToUserRequestsConnection,

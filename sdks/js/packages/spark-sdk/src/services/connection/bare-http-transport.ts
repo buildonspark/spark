@@ -3,13 +3,11 @@ import https from "https";
 import type { Logger } from "@lightsparkdev/core";
 import { Base64 } from "js-base64";
 import { throwIfAborted, waitForEvent } from "abort-controller-x";
-import {
-  Metadata,
-  ClientError,
-  Status,
-  type CallOptions,
-} from "nice-grpc-common";
-import type { Transport } from "nice-grpc-web/lib/client/Transport.js";
+import { Metadata, ClientError, Status } from "nice-grpc-common";
+import type {
+  Transport,
+  TransportParams,
+} from "nice-grpc-web/lib/client/Transport.js";
 import type { LoggingService } from "../../utils/logging-service.js";
 
 /* This is essentially identical to nice-grpc-web NodeHttpTransport except
@@ -119,7 +117,9 @@ export function attachPrematureSocketCloseGuard(
             `UNAVAILABLE: response stream closed before completion (${reason}) for ${path}`,
           ),
       );
-    } catch {}
+    } catch {
+      void 0;
+    }
   };
 
   const onSocketClose = () => {
@@ -158,15 +158,15 @@ export function BareHttpTransport({
   logging?: LoggingService;
 } = {}): Transport {
   const transportState = createBareTransportState();
-  let transportLogger = logging?.logger("BareHttpTransport") ?? logger;
+  const transportLogger = logging?.logger("BareHttpTransport") ?? logger;
 
-  const transport = async function* bareHttpTransport({
+  const transport: Transport = async function* bareHttpTransport({
     url,
     body,
     metadata,
     signal,
     method,
-  }) {
+  }: TransportParams) {
     const requestId = nextBareTransportRequestId(transportState);
     const log = makeTransportLogger(method.path, requestId, transportLogger);
     const debug = makeTransportDebugLogger(
@@ -181,7 +181,7 @@ export function BareHttpTransport({
 
     if (!method.requestStream) {
       for await (const chunk of body) {
-        bodyBuffer = chunk as Uint8Array;
+        bodyBuffer = chunk;
         break;
       }
       if (bodyBuffer == null) {
@@ -195,79 +195,9 @@ export function BareHttpTransport({
       res: http.IncomingMessage;
       removeAbortListener: () => void;
     }>((resolve, reject) => {
-      let req: http.ClientRequest;
-      let clearRequestTimeout = () => {};
-      let response: http.IncomingMessage | undefined;
-      let requestSetupSettled = false;
-      let abortListener = () => {};
-      const wallClockTimeout = createWallClockTimeout(
-        method.responseStream
-          ? STREAM_CONNECT_TIMEOUT_MS
-          : UNARY_REQUEST_TIMEOUT_MS,
-        () => {
-          const error = new Error(
-            `UNAVAILABLE: request timed out after ${
-              method.responseStream
-                ? STREAM_CONNECT_TIMEOUT_MS
-                : UNARY_REQUEST_TIMEOUT_MS
-            }ms`,
-          );
-          debug(
-            `wall-clock timeout fired${
-              response != null
-                ? " after response start"
-                : " before response start"
-            }: ${error.message}`,
-          );
-          clearRequestTimeout();
-          if (response != null) {
-            try {
-              response.destroy(error);
-            } catch {}
-          } else {
-            failRequestSetup(error);
-          }
-          try {
-            req.destroy(error);
-          } catch {}
-        },
-      );
-
-      const failRequestSetup = (err: Error) => {
-        if (requestSetupSettled) {
-          return;
-        }
-        requestSetupSettled = true;
-        wallClockTimeout.clear();
-        clearRequestTimeout();
-        signal.removeEventListener("abort", abortListener);
-        try {
-          pipeAbortController?.abort();
-        } catch {}
-        reject(toTransportClientError(method.path, err));
-      };
-
-      abortListener = () => {
-        log("abort signal received, destroying request");
-        wallClockTimeout.clear();
-        clearRequestTimeout();
-        const abortError = new Error("request aborted");
-        if (response != null) {
-          try {
-            response.destroy(abortError);
-          } catch {}
-        } else {
-          failRequestSetup(abortError);
-        }
-        try {
-          pipeAbortController?.abort();
-        } catch {}
-        try {
-          req.destroy();
-        } catch {}
-      };
-
-      req = (url.startsWith("https://") ? https : http).request(
+      const req: http.ClientRequest = (
+        url.startsWith("https://") ? https : http
+      ).request(
         url,
         {
           method: "POST",
@@ -301,7 +231,9 @@ export function BareHttpTransport({
             try {
               res.socket.unref();
               log("response socket unref applied");
-            } catch {}
+            } catch {
+              void 0;
+            }
           }
           res.on("close", () => {
             log("response close event");
@@ -323,7 +255,9 @@ export function BareHttpTransport({
             );
             try {
               res.destroy();
-            } catch {}
+            } catch {
+              void 0;
+            }
             return;
           }
           requestSetupSettled = true;
@@ -337,6 +271,88 @@ export function BareHttpTransport({
           });
         },
       );
+      let clearRequestTimeout = () => {};
+      let response: http.IncomingMessage | undefined;
+      let requestSetupSettled = false;
+      let abortListener = () => {};
+      const wallClockTimeout = createWallClockTimeout(
+        method.responseStream
+          ? STREAM_CONNECT_TIMEOUT_MS
+          : UNARY_REQUEST_TIMEOUT_MS,
+        () => {
+          const error = new Error(
+            `UNAVAILABLE: request timed out after ${
+              method.responseStream
+                ? STREAM_CONNECT_TIMEOUT_MS
+                : UNARY_REQUEST_TIMEOUT_MS
+            }ms`,
+          );
+          debug(
+            `wall-clock timeout fired${
+              response != null
+                ? " after response start"
+                : " before response start"
+            }: ${error.message}`,
+          );
+          clearRequestTimeout();
+          if (response != null) {
+            try {
+              response.destroy(error);
+            } catch {
+              void 0;
+            }
+          } else {
+            failRequestSetup(error);
+          }
+          try {
+            req.destroy(error);
+          } catch {
+            void 0;
+          }
+        },
+      );
+
+      const failRequestSetup = (err: Error) => {
+        if (requestSetupSettled) {
+          return;
+        }
+        requestSetupSettled = true;
+        wallClockTimeout.clear();
+        clearRequestTimeout();
+        signal.removeEventListener("abort", abortListener);
+        try {
+          pipeAbortController?.abort();
+        } catch {
+          void 0;
+        }
+        reject(toTransportClientError(method.path, err));
+      };
+
+      abortListener = () => {
+        log("abort signal received, destroying request");
+        wallClockTimeout.clear();
+        clearRequestTimeout();
+        const abortError = new Error("request aborted");
+        if (response != null) {
+          try {
+            response.destroy(abortError);
+          } catch {
+            void 0;
+          }
+        } else {
+          failRequestSetup(abortError);
+        }
+        try {
+          pipeAbortController?.abort();
+        } catch {
+          void 0;
+        }
+        try {
+          req.destroy();
+        } catch {
+          void 0;
+        }
+      };
 
       if (!method.responseStream) {
         const onRequestTimeout = () => {
@@ -357,10 +373,14 @@ export function BareHttpTransport({
         clearRequestTimeout = () => {
           try {
             req.off("timeout", onRequestTimeout);
-          } catch {}
+          } catch {
+            void 0;
+          }
           try {
             req.setTimeout(0);
-          } catch {}
+          } catch {
+            void 0;
+          }
         };
         req.once("timeout", onRequestTimeout);
         req.setTimeout(UNARY_REQUEST_TIMEOUT_MS);
@@ -447,7 +467,9 @@ export function BareHttpTransport({
       } finally {
         try {
           pipeAbortController?.abort();
-        } catch {}
+        } catch {
+          void 0;
+        }
         removeAbortListener();
       }
     }
@@ -462,11 +484,14 @@ export function BareHttpTransport({
     let chunkCount = 0;
     try {
       for await (const data of res) {
+        const chunk = data as Uint8Array;
         chunkCount++;
-        log(`response chunk received bytes=${data.length} chunk=${chunkCount}`);
+        log(
+          `response chunk received bytes=${chunk.length} chunk=${chunkCount}`,
+        );
         yield {
           type: "data" as const,
-          data,
+          data: chunk,
         };
       }
       log(`response iterator completed after ${chunkCount} chunks`);
@@ -482,7 +507,9 @@ export function BareHttpTransport({
       prematureCloseGuard.cleanup();
       try {
         pipeAbortController?.abort();
-      } catch {}
+      } catch {
+        void 0;
+      }
       removeAbortListener();
       throwIfAborted(signal);
     }
@@ -568,7 +595,7 @@ async function pipeBody(
     throwIfAborted(signal);
     const shouldContinue = request.write(item);
     if (!shouldContinue) {
-      await waitForEvent(signal, request as any, "drain");
+      await waitForEvent<unknown>(signal, request, "drain");
     }
   }
 }

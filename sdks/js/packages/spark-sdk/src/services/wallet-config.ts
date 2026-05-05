@@ -1,13 +1,13 @@
 import type { LoggingLevelArg } from "@lightsparkdev/core";
 import {
-  MayHaveSspClientOptions,
-  SspClientOptions,
+  type MayHaveSspClientOptions,
+  type SspClientOptions,
 } from "../graphql/client.js";
 import { isReactNative } from "../constants.js";
 import type { SparkWalletEvents } from "../spark-wallet/types.js";
 import { isBare } from "@lightsparkdev/core";
 import { isHermeticTest } from "../tests/isHermeticTest.js";
-import { NetworkType } from "../utils/network.js";
+import { type NetworkType } from "../utils/network.js";
 
 const SSP_IDENTITY_PUBLIC_KEYS = {
   LOCAL: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",

@@ -30,7 +30,7 @@ export const SwapLeafFromJson = (obj: any): SwapLeaf => {
       obj["swap_leaf_direct_from_cpfp_raw_unsigned_refund_transaction"],
     directFromCpfpAdaptorSignedSignature:
       obj["swap_leaf_direct_from_cpfp_adaptor_signed_signature"], 
-  } as SwapLeaf;
+  };
 };
 export const SwapLeafToJson = (obj: SwapLeaf): any => {
   return {

@@ -13,7 +13,7 @@ import {
   createOwnerReadonlyClient,
   type FundedWallet,
 } from "../../spark-readonly-client/helpers.js";
-import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
+import { type SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 import { retryUntilSuccess } from "../../utils/utils.js";

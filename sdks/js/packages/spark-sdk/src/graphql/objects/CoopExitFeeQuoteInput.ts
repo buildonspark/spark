@@ -22,7 +22,7 @@ export const CoopExitFeeQuoteInputFromJson = (obj: any): CoopExitFeeQuoteInput =
         leafExternalIds: obj["coop_exit_fee_quote_input_leaf_external_ids"],
         withdrawalAddress: obj["coop_exit_fee_quote_input_withdrawal_address"],
 
-        } as CoopExitFeeQuoteInput;
+        };
 
 }
 export const CoopExitFeeQuoteInputToJson = (obj: CoopExitFeeQuoteInput): any => {

@@ -25,7 +25,7 @@ class SkipFieldError extends Error {
 function isGoogleProtobufValueNull(value: any): boolean {
   if (value == null) return true;
   if (typeof value === "object" && "$case" in value) {
-    const c = (value as any).$case as string | undefined;
+    const c = value.$case as string | undefined;
     return !c || c === "nullValue";
   }
   return false;
@@ -135,9 +135,7 @@ export class ProtoHasher {
 
       // Resolve value: support oneof extraction carrying a concrete value
       const resolvedValue =
-        (fieldInfo as any).value !== undefined
-          ? (fieldInfo as any).value
-          : message[fieldName];
+        fieldInfo.value !== undefined ? fieldInfo.value : message[fieldName];
 
       // Check if field is present (has a value)
       if (this.isDefault(resolvedValue, fieldType)) {
@@ -282,7 +280,7 @@ export class ProtoHasher {
     // If element type is google.protobuf.Value, disallow null elements
     const isValueList =
       typeof elementType === "object" &&
-      (elementType as any)?.typeName === "google.protobuf.Value";
+      elementType?.typeName === "google.protobuf.Value";
 
     for (const item of list) {
       if (isValueList && isGoogleProtobufValueNull(item)) {
@@ -447,7 +445,7 @@ export class ProtoHasher {
         const oneofInfo = this.extractOneofField(
           fieldName,
           value,
-          reflectionNumbers as any,
+          reflectionNumbers,
         );
         if (oneofInfo) {
           const { actualFieldNumber, actualFieldName, actualValue } = oneofInfo;
@@ -592,7 +590,7 @@ export class ProtoHasher {
       value &&
       typeof value === "object" &&
       "$case" in value &&
-      typeof (value as any).$case === "string"
+      typeof value.$case === "string"
     );
   }
 
@@ -607,8 +605,8 @@ export class ProtoHasher {
   } | null {
     if (!value || !("$case" in value)) return null;
 
-    const actualFieldName = (value as any).$case as string;
-    const actualValue = (value as any)[actualFieldName];
+    const actualFieldName = value.$case as string;
+    const actualValue = value[actualFieldName];
     const snake = actualFieldName
       .replace(/([A-Z])/g, "_$1")
       .replace(/^_/, "")
@@ -652,7 +650,7 @@ export class ProtoHasher {
 
     if (
       this.getTypeName(fieldType) === "message" &&
-      (fieldType as any).typeName === "google.protobuf.Value"
+      fieldType.typeName === "google.protobuf.Value"
     ) {
       if (isGoogleProtobufValueNull(value)) return true;
     }
@@ -701,7 +699,7 @@ export class ProtoHasher {
     if (fieldType.type) {
       return fieldType.type;
     }
-    if ((fieldType as any).resolvedType) {
+    if (fieldType.resolvedType) {
       return "message";
     }
     return "unknown";

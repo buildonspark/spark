@@ -1,5 +1,8 @@
 import { Transaction } from "@scure/btc-signer";
-import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
+import {
+  type TransactionInput,
+  type TransactionOutput,
+} from "@scure/btc-signer/psbt";
 import { hexToBytes } from "@noble/curves/utils";
 import { SparkValidationError } from "../errors/types.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";

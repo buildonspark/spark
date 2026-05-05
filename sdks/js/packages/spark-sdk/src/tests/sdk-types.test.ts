@@ -2,12 +2,12 @@ import { describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/utils";
 import {
   Network,
-  Transfer,
-  TransferLeaf,
+  type Transfer,
+  type TransferLeaf,
   TransferStatus,
   TransferType,
-  TreeNode,
-  WalletSetting,
+  type TreeNode,
+  type WalletSetting,
 } from "../proto/spark.js";
 import {
   mapSettingsProtoToWalletSettings,

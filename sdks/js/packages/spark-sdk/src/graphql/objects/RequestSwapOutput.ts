@@ -7,7 +7,7 @@ interface RequestSwapOutput {
 export const RequestSwapOutputFromJson = (obj: any): RequestSwapOutput => {
   return {
     requestId: obj["request_swap_output_request"].id,
-  } as RequestSwapOutput;
+  };
 };
 export const RequestSwapOutputToJson = (obj: RequestSwapOutput): any => {
   return {

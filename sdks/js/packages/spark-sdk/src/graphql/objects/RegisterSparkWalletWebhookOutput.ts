@@ -9,7 +9,7 @@ export const RegisterSparkWalletWebhookOutputFromJson = (
 ): RegisterSparkWalletWebhookOutput => {
   return {
     webhook_id: obj["webhook_id"],
-  } as RegisterSparkWalletWebhookOutput;
+  };
 };
 
 export default RegisterSparkWalletWebhookOutput;

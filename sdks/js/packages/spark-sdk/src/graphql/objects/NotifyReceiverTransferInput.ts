@@ -22,7 +22,7 @@ export const NotifyReceiverTransferInputFromJson = (obj: any): NotifyReceiverTra
         phoneNumber: obj["notify_receiver_transfer_input_phone_number"],
         amountSats: obj["notify_receiver_transfer_input_amount_sats"],
 
-        } as NotifyReceiverTransferInput;
+        };
 
 }
 export const NotifyReceiverTransferInputToJson = (obj: NotifyReceiverTransferInput): any => {

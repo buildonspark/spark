@@ -1,5 +1,5 @@
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-import { Transaction } from "@scure/btc-signer";
+import { type Transaction } from "@scure/btc-signer";
 import { SparkWalletTestingWithStream } from "../utils/spark-testing-wallet.js";
 
 const DEPOSIT_AMOUNT = 10000n;

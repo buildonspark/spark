@@ -1,11 +1,14 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { SparkError } from "../errors/index.js";
-import { FinalizeNodeSignaturesResponse, TreeNode } from "../proto/spark.js";
+import {
+  type FinalizeNodeSignaturesResponse,
+  type TreeNode,
+} from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { DepositService } from "../services/deposit.js";
-import { ConfigOptions, WalletConfig } from "../services/wallet-config.js";
+import { type ConfigOptions, WalletConfig } from "../services/wallet-config.js";
 import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
@@ -67,7 +70,7 @@ async function createDeposit(
   }
 
   const depositTx = new Transaction();
-  depositTx.addInput(faucetCoin!.outpoint);
+  depositTx.addInput(faucetCoin.outpoint);
 
   // Add the main output
   const addr = Address(getNetwork(Network.LOCAL)).decode(
@@ -89,8 +92,8 @@ async function createDeposit(
 
   const signedDepositTx = await faucet.signFaucetCoin(
     depositTx,
-    faucetCoin!.txout,
-    faucetCoin!.key,
+    faucetCoin.txout,
+    faucetCoin.key,
   );
 
   await faucet.broadcastTx(signedDepositTx.hex);

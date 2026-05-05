@@ -8,8 +8,11 @@ import {
 } from "@scure/btc-signer";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { hexToBytes, equalBytes } from "@noble/curves/utils";
-import { BTC_NETWORK } from "@scure/btc-signer/utils";
-import { TaprootControlBlock, TransactionInput } from "@scure/btc-signer/psbt";
+import { type BTC_NETWORK } from "@scure/btc-signer/utils";
+import {
+  TaprootControlBlock,
+  type TransactionInput,
+} from "@scure/btc-signer/psbt";
 
 import { maybeApplyFee, getEphemeralAnchorOutput } from "./transaction.js";
 import { getTxId } from "../utils/bitcoin.js";

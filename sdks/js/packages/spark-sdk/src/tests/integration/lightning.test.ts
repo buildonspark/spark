@@ -8,7 +8,7 @@ import { KeyDerivationType } from "../../signer/types.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
-  LightningReceiveRequest,
+  type LightningReceiveRequest,
   LightningReceiveRequestStatus,
   SparkProto,
 } from "../../types/index.js";

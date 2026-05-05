@@ -5,7 +5,7 @@
  */
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { SparkValidationError } from "../../../../errors/types.js";
-import { SparkReadonlyClient } from "../../../../spark-readonly-client/spark-readonly-client.node.js";
+import { type SparkReadonlyClient } from "../../../../spark-readonly-client/spark-readonly-client.node.js";
 import {
   createEmptyWallet,
   createPublicReadonlyClient,

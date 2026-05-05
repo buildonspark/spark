@@ -3,11 +3,11 @@ import { SparkValidationError } from "../errors/types.js";
 import { bech32m } from "@scure/base";
 import { SparkAddress } from "../proto/spark.js";
 import {
-  TokenTransaction,
+  type TokenTransaction,
   TokenTransactionType,
-  InvoiceAttachment,
-  PartialTokenTransaction,
-  FinalTokenTransaction,
+  type InvoiceAttachment,
+  type PartialTokenTransaction,
+  type FinalTokenTransaction,
 } from "../proto/spark_token.js";
 import { createProtoHasher } from "../spark-wallet/proto-hash.js";
 
@@ -43,7 +43,7 @@ export function hashTokenTransactionV1(
     });
   }
 
-  let allHashes: Uint8Array[] = [];
+  const allHashes: Uint8Array[] = [];
 
   // Hash version
   const versionHashObj = sha256.create();
@@ -111,7 +111,7 @@ export function hashTokenTransactionV1(
     for (const [
       i,
       output,
-    ] of tokenTransaction.tokenInputs!.transferInput!.outputsToSpend.entries()) {
+    ] of tokenTransaction.tokenInputs.transferInput.outputsToSpend.entries()) {
       if (!output) {
         throw new SparkValidationError(`output cannot be null at index ${i}`, {
           field: `tokenInputs.transferInput.outputsToSpend[${i}]`,
@@ -151,7 +151,7 @@ export function hashTokenTransactionV1(
   } else if (tokenTransaction.tokenInputs?.$case === "mintInput") {
     const hashObj = sha256.create();
 
-    if (tokenTransaction.tokenInputs.mintInput!.issuerPublicKey) {
+    if (tokenTransaction.tokenInputs.mintInput.issuerPublicKey) {
       const issuerPubKey: Uint8Array =
         tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
       if (issuerPubKey.length === 0) {
@@ -176,7 +176,7 @@ export function hashTokenTransactionV1(
       allHashes.push(tokenIdentifierHashObj.digest());
     }
   } else if (tokenTransaction.tokenInputs?.$case === "createInput") {
-    const createInput = tokenTransaction.tokenInputs.createInput!;
+    const createInput = tokenTransaction.tokenInputs.createInput;
 
     // Hash issuer public key
     const issuerPubKeyHashObj = sha256.create();
@@ -339,7 +339,7 @@ export function hashTokenTransactionV1(
     }
 
     if (!partialHash) {
-      const revPubKey = output.revocationCommitment!!;
+      const revPubKey = output.revocationCommitment!;
       if (revPubKey) {
         if (revPubKey.length === 0) {
           throw new SparkValidationError(
@@ -468,7 +468,7 @@ export function hashTokenTransactionV1(
 
   // Hash the network field
   const hashObj = sha256.create();
-  let networkBytes = new Uint8Array(4);
+  const networkBytes = new Uint8Array(4);
   new DataView(networkBytes.buffer).setUint32(
     0,
     tokenTransaction.network.valueOf(),
@@ -539,7 +539,7 @@ export function hashTokenTransactionV2(
     });
   }
 
-  let allHashes: Uint8Array[] = [];
+  const allHashes: Uint8Array[] = [];
 
   // Hash version
   const versionHashObj = sha256.create();
@@ -607,7 +607,7 @@ export function hashTokenTransactionV2(
     for (const [
       i,
       output,
-    ] of tokenTransaction.tokenInputs!.transferInput!.outputsToSpend.entries()) {
+    ] of tokenTransaction.tokenInputs.transferInput.outputsToSpend.entries()) {
       if (!output) {
         throw new SparkValidationError(`output cannot be null at index ${i}`, {
           field: `tokenInputs.transferInput.outputsToSpend[${i}]`,
@@ -647,7 +647,7 @@ export function hashTokenTransactionV2(
   } else if (tokenTransaction.tokenInputs?.$case === "mintInput") {
     const hashObj = sha256.create();
 
-    if (tokenTransaction.tokenInputs.mintInput!.issuerPublicKey) {
+    if (tokenTransaction.tokenInputs.mintInput.issuerPublicKey) {
       const issuerPubKey: Uint8Array =
         tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
       if (issuerPubKey.length === 0) {
@@ -672,7 +672,7 @@ export function hashTokenTransactionV2(
       allHashes.push(tokenIdentifierHashObj.digest());
     }
   } else if (tokenTransaction.tokenInputs?.$case === "createInput") {
-    const createInput = tokenTransaction.tokenInputs.createInput!;
+    const createInput = tokenTransaction.tokenInputs.createInput;
 
     // Hash issuer public key
     const issuerPubKeyHashObj = sha256.create();
@@ -835,7 +835,7 @@ export function hashTokenTransactionV2(
     }
 
     if (!partialHash) {
-      const revPubKey = output.revocationCommitment!!;
+      const revPubKey = output.revocationCommitment!;
       if (revPubKey) {
         if (revPubKey.length === 0) {
           throw new SparkValidationError(
@@ -964,7 +964,7 @@ export function hashTokenTransactionV2(
 
   // Hash the network field
   const hashObj = sha256.create();
-  let networkBytes = new Uint8Array(4);
+  const networkBytes = new Uint8Array(4);
   new DataView(networkBytes.buffer).setUint32(
     0,
     tokenTransaction.network.valueOf(),
@@ -1248,7 +1248,7 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
     );
   }
 
-  let allHashes: Uint8Array[] = [];
+  const allHashes: Uint8Array[] = [];
 
   // Hash final token transaction hash if present
   if (payload.finalTokenTransactionHash) {

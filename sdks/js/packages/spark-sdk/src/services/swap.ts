@@ -1,14 +1,17 @@
 import { bytesToHex, hexToBytes, type Logger } from "@lightsparkdev/core";
 import { uuidv7 } from "uuidv7";
 import { SparkValidationError } from "../errors/index.js";
-import SspClient from "../graphql/client.js";
-import { TreeNode } from "../proto/spark.js";
+import type SspClient from "../graphql/client.js";
+import { type TreeNode } from "../proto/spark.js";
 import { KeyDerivationType } from "../signer/types.js";
-import { SparkLeavesSwapRequestStatus, UserLeafInput } from "../types/index.js";
+import {
+  SparkLeavesSwapRequestStatus,
+  type UserLeafInput,
+} from "../types/index.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { LoggingService } from "../utils/logging-service.js";
-import { WalletConfigService } from "./config.js";
-import { LeafKeyTweak, TransferService } from "./transfer.js";
+import { type WalletConfigService } from "./config.js";
+import { type LeafKeyTweak, type TransferService } from "./transfer.js";
 
 const MAX_BATCH_SIZE = 64;
 

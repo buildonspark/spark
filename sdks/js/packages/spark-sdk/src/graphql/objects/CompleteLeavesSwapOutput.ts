@@ -19,7 +19,7 @@ export const CompleteLeavesSwapOutputFromJson = (obj: any): CompleteLeavesSwapOu
     return {
         requestId: obj["complete_leaves_swap_output_request"].id,
 
-        } as CompleteLeavesSwapOutput;
+        };
 
 }
 export const CompleteLeavesSwapOutputToJson = (obj: CompleteLeavesSwapOutput): any => {

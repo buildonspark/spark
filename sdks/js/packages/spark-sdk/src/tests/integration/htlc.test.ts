@@ -79,7 +79,7 @@ describe("HTLC create and claim tests", () => {
 
     aliceBalance = await aliceWallet.getBalance();
     expect(aliceBalance.balance).toBe(0n);
-    let bobBalance = await bobWallet.getBalance();
+    const bobBalance = await bobWallet.getBalance();
     expect(bobBalance.balance).toBe(0n);
     await expect(bobWallet.claimHTLC("test2")).rejects.toThrow();
   }, 60000);

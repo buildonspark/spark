@@ -1,5 +1,5 @@
 import { Metadata } from "nice-grpc-common";
-import { SparkCallOptions } from "../types/grpc.js";
+import { type SparkCallOptions } from "../types/grpc.js";
 
 const IDEMPOTENCY_KEY_HEADER = "x-idempotency-key";
 

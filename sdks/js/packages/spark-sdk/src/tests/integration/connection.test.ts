@@ -80,9 +80,7 @@ describe("ConnectionManager auth retry refcount", () => {
     const { wallet } = await SparkWalletTestingIntegration.initialize({
       options: { network: "LOCAL" },
     });
-    const connMgr = (
-      wallet as SparkWalletTestingIntegration
-    ).getConnectionManager();
+    const connMgr = wallet.getConnectionManager();
 
     // Prove the channel works
     const balance1 = await wallet.getBalance();

@@ -2,7 +2,7 @@ import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.j
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 import { waitForBalance } from "../../utils/utils.js";
 import { CurrencyUnit } from "@lightsparkdev/core";
-import { Transaction } from "@scure/btc-signer";
+import { type Transaction } from "@scure/btc-signer";
 
 // SSP regtest screening: even-sat UTXOs => 0-conf, odd-sat UTXOs => 1-conf.
 const DEPOSIT_AMOUNT = 10000n;
@@ -46,7 +46,7 @@ describe("SSP instant static deposit integration", () => {
       const quoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           transactionId,
-          vout!,
+          vout,
         );
 
       expect(quoteResult).toBeDefined();
@@ -96,7 +96,7 @@ describe("SSP instant static deposit integration", () => {
       const quoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           transactionId,
-          vout!,
+          vout,
           "test-partner",
         );
 
@@ -140,7 +140,7 @@ describe("SSP instant static deposit integration", () => {
       const quoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           transactionId,
-          vout!,
+          vout,
           "test-partner",
         );
 
@@ -188,7 +188,7 @@ describe("SSP instant static deposit integration", () => {
         const quoteResult =
           await userWallet.experimental_GetInstantStaticDepositQuote(
             tx1.id,
-            vout1!,
+            vout1,
             "test-partner",
           );
 
@@ -267,7 +267,7 @@ describe("SSP instant static deposit integration", () => {
       const quoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           transactionId,
-          vout!,
+          vout,
         );
 
       await faucet.mineBlocks(1);
@@ -275,7 +275,7 @@ describe("SSP instant static deposit integration", () => {
       const confirmedQuoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           transactionId,
-          vout!,
+          vout,
         );
 
       const oneConfPlan = confirmedQuoteResult.fulfillmentPlans.find(
@@ -292,7 +292,7 @@ describe("SSP instant static deposit integration", () => {
       const claimResult =
         await userWallet.experimental_ClaimInstantStaticDeposit({
           quote: confirmedQuoteResult.quote,
-          plan: oneConfPlan!,
+          plan: oneConfPlan,
           transactionId,
           outputIndex: vout!,
         });
@@ -327,7 +327,7 @@ describe("SSP instant static deposit integration", () => {
       const quoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           tx1.id,
-          vout1!,
+          vout1,
         );
 
       const oneConfPlan = quoteResult.fulfillmentPlans.find(
@@ -374,7 +374,7 @@ describe("SSP instant static deposit integration", () => {
       const claimResult =
         await userWallet.experimental_ClaimInstantStaticDeposit({
           quote: quoteResult.quote,
-          plan: oneConfPlan!,
+          plan: oneConfPlan,
           transactionId: tx2.id,
           outputIndex: vout2!,
         });
@@ -409,7 +409,7 @@ describe("SSP instant static deposit integration", () => {
       const quoteResult =
         await userWallet.experimental_GetInstantStaticDepositQuote(
           tx1.id,
-          vout1!,
+          vout1,
         );
 
       const oneConfPlan = quoteResult.fulfillmentPlans.find(
@@ -456,7 +456,7 @@ describe("SSP instant static deposit integration", () => {
       await expect(
         userWallet.experimental_ClaimInstantStaticDeposit({
           quote: quoteResult.quote,
-          plan: oneConfPlan!,
+          plan: oneConfPlan,
           transactionId: tx2.id,
           outputIndex: vout2!,
         }),
@@ -469,7 +469,8 @@ describe("SSP instant static deposit integration", () => {
   describe("0-conf RBF", () => {
     const MAX_RBF_ATTEMPTS = 3;
 
-    // TODO: Fix 0-conf RBF claim — SSP returns "UTXO is spent or not found" for unconfirmed replacement txs
+    // TODO: Fix 0-conf RBF claim — SSP returns "UTXO is spent or not found" for unconfirmed
+    // replacement txs
     it.skip("should claim 0-conf plan after RBF with same amount", async () => {
       const faucet = BitcoinFaucet.getInstance();
 
@@ -491,7 +492,7 @@ describe("SSP instant static deposit integration", () => {
         const quoteResult =
           await userWallet.experimental_GetInstantStaticDepositQuote(
             tx1.id,
-            vout1!,
+            vout1,
             "test-partner",
           );
 
@@ -545,7 +546,7 @@ describe("SSP instant static deposit integration", () => {
         const claimResult =
           await userWallet.experimental_ClaimInstantStaticDeposit({
             quote: quoteResult.quote,
-            plan: zeroConfPlan!,
+            plan: zeroConfPlan,
             transactionId: tx2.id,
             outputIndex: vout2!,
           });
@@ -584,7 +585,7 @@ describe("SSP instant static deposit integration", () => {
         const quoteResult =
           await userWallet.experimental_GetInstantStaticDepositQuote(
             tx1.id,
-            vout1!,
+            vout1,
             "test-partner",
           );
 
@@ -639,7 +640,7 @@ describe("SSP instant static deposit integration", () => {
         await expect(
           userWallet.experimental_ClaimInstantStaticDeposit({
             quote: quoteResult.quote,
-            plan: zeroConfPlan!,
+            plan: zeroConfPlan,
             transactionId: tx2.id,
             outputIndex: vout2!,
           }),

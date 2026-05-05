@@ -128,7 +128,7 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
     const depositTx = new Transaction();
     const sendAmount = 50_000n;
 
-    depositTx.addInput(coin!.outpoint);
+    depositTx.addInput(coin.outpoint);
 
     const depositAddress = await sdk.getSingleUseDepositAddress();
     if (!depositAddress) {
@@ -151,8 +151,8 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.signFaucetCoin(
       depositTx,
-      coin!.txout,
-      coin!.key,
+      coin.txout,
+      coin.key,
     );
 
     const broadcastResult = await faucet.broadcastTx(signedTx.hex);
@@ -189,7 +189,7 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
     const depositTx = new Transaction();
     const sendAmount = 50_000n;
 
-    depositTx.addInput(coin!.outpoint);
+    depositTx.addInput(coin.outpoint);
 
     const depositAddress = await sdk.getSingleUseDepositAddress();
     if (!depositAddress) {
@@ -226,8 +226,8 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
 
     const signedTx = await faucet.signFaucetCoin(
       depositTx,
-      coin!.txout,
-      coin!.key,
+      coin.txout,
+      coin.key,
     );
 
     const broadcastResult = await faucet.broadcastTx(signedTx.hex);

@@ -1,5 +1,5 @@
 import { hexToBytes } from "@noble/curves/utils";
-import { TransferPackage } from "../proto/spark.js";
+import { type TransferPackage } from "../proto/spark.js";
 import { newHasher } from "./hashstructure.js";
 
 // GetTransferPackageSigningPayload returns the signing payload for a transfer package.

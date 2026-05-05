@@ -2,8 +2,8 @@ import type { Logger } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { equalBytes, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
-import { Transaction } from "@scure/btc-signer";
-import { TransactionOutput } from "@scure/btc-signer/psbt";
+import { type Transaction } from "@scure/btc-signer";
+import { type TransactionOutput } from "@scure/btc-signer/psbt";
 import { ClientError, Status } from "nice-grpc-common";
 import { uuidv7 } from "uuidv7";
 import {
@@ -12,39 +12,39 @@ import {
   SparkValidationError,
 } from "../errors/index.js";
 import { SignatureIntent } from "../proto/common.js";
-import { Timestamp } from "../proto/google/protobuf/timestamp.js";
+import { type Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
-  ClaimLeafKeyTweak,
+  type ClaimLeafKeyTweak,
   ClaimLeafKeyTweaks,
   type ClaimTransferResponse,
-  ClaimTransferSignRefundsResponse,
-  CounterLeafSwapResponse,
+  type ClaimTransferSignRefundsResponse,
+  type CounterLeafSwapResponse,
   HashVariant,
-  InitiateSwapPrimaryTransferResponse,
-  LeafRefundTxSigningJob,
-  LeafRefundTxSigningResult,
-  NodeSignatures,
-  QueryTransfersResponse,
-  RenewNodeZeroTimelockSigningJob,
-  RenewRefundTimelockSigningJob,
-  SendLeafKeyTweak,
+  type InitiateSwapPrimaryTransferResponse,
+  type LeafRefundTxSigningJob,
+  type LeafRefundTxSigningResult,
+  type NodeSignatures,
+  type QueryTransfersResponse,
+  type RenewNodeZeroTimelockSigningJob,
+  type RenewRefundTimelockSigningJob,
+  type SendLeafKeyTweak,
   SendLeafKeyTweaks,
-  SigningJob,
-  StartTransferRequest,
-  StartTransferResponse,
-  Transfer,
+  type SigningJob,
+  type StartTransferRequest,
+  type StartTransferResponse,
+  type Transfer,
   TransferPackage,
   TransferStatus,
   TransferType,
-  TreeNode,
+  type TreeNode,
 } from "../proto/spark.js";
 import {
-  KeyDerivation,
+  type KeyDerivation,
   KeyDerivationType,
-  SigningCommitmentWithOptionalNonce,
+  type SigningCommitmentWithOptionalNonce,
 } from "../signer/types.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
-import { SparkAddressFormat } from "../utils/address.js";
+import { type SparkAddressFormat } from "../utils/address.js";
 import {
   getSigHashFromMultiInputTx,
   getSigHashFromTx,
@@ -56,8 +56,8 @@ import {
   type LogServiceDisplayName,
 } from "../utils/logging-service.js";
 import { NetworkToProto } from "../utils/network.js";
-import { RetryContext, withRetry } from "../utils/retry.js";
-import { VerifiableSecretShare } from "../utils/secret-sharing.js";
+import { type RetryContext, withRetry } from "../utils/retry.js";
+import { type VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
   createCurrentTimelockRefundTxs,
   createDecrementedTimelockNodeTx,
@@ -71,11 +71,11 @@ import {
   getClaimPackageSigningPayload,
   getTransferPackageSigningPayload,
 } from "../utils/transfer_package.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection/connection.js";
+import { type WalletConfigService } from "./config.js";
+import { type ConnectionManager } from "./connection/connection.js";
 import {
-  SigningService,
-  UserSignedTxSigningJobWithSelfCommitment,
+  type SigningService,
+  type UserSignedTxSigningJobWithSelfCommitment,
 } from "./signing.js";
 
 // Transfer statuses before the sender key tweak is applied — the sender
@@ -999,7 +999,7 @@ export class TransferService extends BaseTransferService {
     const leafPubKeyMap = await this.verifyPendingTransfer(transfer);
     const selfIdentityPubkey = await this.config.signer.getIdentityPublicKey();
 
-    let leaves: LeafKeyTweak[] = [];
+    const leaves: LeafKeyTweak[] = [];
 
     for (const leaf of transfer.leaves) {
       if (leaf.leaf) {
@@ -1168,13 +1168,13 @@ export class TransferService extends BaseTransferService {
       const seconds = Math.floor(createdAfter.getTime() / 1000);
       filter.timeFilter = {
         $case: "createdAfter",
-        createdAfter: { seconds, nanos: 0 } as Timestamp,
+        createdAfter: { seconds, nanos: 0 },
       };
     } else if (createdBefore) {
       const seconds = Math.floor(createdBefore.getTime() / 1000);
       filter.timeFilter = {
         $case: "createdBefore",
-        createdBefore: { seconds, nanos: 0 } as Timestamp,
+        createdBefore: { seconds, nanos: 0 },
       };
     }
 

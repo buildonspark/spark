@@ -1,7 +1,7 @@
 import { SparkError } from "../errors/index.js";
 import {
-  TokenTransaction as TokenTransaction,
-  TokenOutputToSpend as TokenOutputToSpend,
+  type TokenTransaction as TokenTransaction,
+  type TokenOutputToSpend as TokenOutputToSpend,
 } from "../proto/spark_token.js";
 
 function areByteArraysEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -235,14 +235,14 @@ export function validateTokenTransaction(
       finalOutput.tokenPublicKey !== undefined &&
       partialOutput.tokenPublicKey !== undefined &&
       !areByteArraysEqual(
-        finalOutput.tokenPublicKey!,
-        partialOutput.tokenPublicKey!,
+        finalOutput.tokenPublicKey,
+        partialOutput.tokenPublicKey,
       )
     ) {
       throw new SparkError("Token public key mismatch in token output", {
         outputIndex: i,
-        value: finalOutput.tokenPublicKey!.toString(),
-        expected: partialOutput.tokenPublicKey!.toString(),
+        value: finalOutput.tokenPublicKey.toString(),
+        expected: partialOutput.tokenPublicKey.toString(),
       });
     }
 

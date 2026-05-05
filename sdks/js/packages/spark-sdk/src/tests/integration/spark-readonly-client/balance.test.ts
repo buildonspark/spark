@@ -8,7 +8,7 @@
  * readonly client and an unauthenticated public readonly client.
  */
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
-import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
+import { type SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
 import {
   createEmptyWallet,
   createFundedWallet,

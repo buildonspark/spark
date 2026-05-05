@@ -1,6 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import UserLeafInput, {
+import type UserLeafInput from "./UserLeafInput.js";
+import {
   UserLeafInputFromJson,
   UserLeafInputToJson,
 } from "./UserLeafInput.js";
@@ -30,7 +31,7 @@ export const RequestSwapInputFromJson = (obj: any): RequestSwapInput => {
     ),
     userOutboundTransferExternalId:
       obj["request_swap_input_user_outbound_transfer_external_id"],
-  } as RequestSwapInput;
+  };
 };
 export const RequestSwapInputToJson = (obj: RequestSwapInput): any => {
   return {

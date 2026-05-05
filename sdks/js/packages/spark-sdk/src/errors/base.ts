@@ -94,7 +94,10 @@ function getMessage(
 
 function safeStringify(value: unknown): string {
   const replacer = (_: string, v: unknown) => {
-    /* Handle BigInt explicitly because JSON.stringify throws a TypeError when encountering it at any depth. */
+    /**
+     * Handle BigInt explicitly because JSON.stringify throws a TypeError when encountering it at
+     * any depth.
+     */
     if (typeof v === "bigint") {
       return v.toString();
     }
@@ -104,7 +107,10 @@ function safeStringify(value: unknown): string {
     return v;
   };
 
-  /* If the value itself is a BigInt (top-level), stringify will still throw, so convert beforehand. */
+  /**
+   * If the value itself is a BigInt (top-level), stringify will still throw, so convert
+   * beforehand.
+   */
   if (typeof value === "bigint") {
     return `${value.toString()}`;
   }

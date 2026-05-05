@@ -19,7 +19,7 @@ export const CompleteSeedReleaseOutputFromJson = (obj: any): CompleteSeedRelease
     return {
         seed: obj["complete_seed_release_output_seed"],
 
-        } as CompleteSeedReleaseOutput;
+        };
 
 }
 export const CompleteSeedReleaseOutputToJson = (obj: CompleteSeedReleaseOutput): any => {

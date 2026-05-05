@@ -31,10 +31,10 @@ async function fundWalletWithStaticDeposit(
     }
   }
 
-  const quote = await wallet.getClaimStaticDepositQuote(transactionId, vout!);
+  const quote = await wallet.getClaimStaticDepositQuote(transactionId, vout);
 
-  const quoteAmount = quote!.creditAmountSats;
-  const sspSignature = quote!.signature;
+  const quoteAmount = quote.creditAmountSats;
+  const sspSignature = quote.signature;
 
   await wallet.claimStaticDeposit({
     transactionId,

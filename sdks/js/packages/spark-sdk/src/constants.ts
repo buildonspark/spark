@@ -7,7 +7,9 @@ export const isReactNative =
 export const isBun = "Bun" in globalThis;
 
 export const isWebExtension =
-  /* globalThis.chrome actually exists in extension contexts for all browsers for legacy reasons: */
+  /**
+   * globalThis.chrome actually exists in extension contexts for all browsers for legacy reasons:
+   */
   "chrome" in globalThis && globalThis.chrome.runtime?.id;
 export const isWebExtensionContentScript =
   isWebExtension && "window" in globalThis;

@@ -1,6 +1,7 @@
 // Copyright ©, 2025-present, Lightspark Group, Inc. - All Rights Reserved
 
-import CurrencyAmount, { CurrencyAmountFromJson } from "./CurrencyAmount.js";
+import type CurrencyAmount from "./CurrencyAmount.js";
+import { CurrencyAmountFromJson } from "./CurrencyAmount.js";
 
 interface InstantStaticDepositPlan {
   id: string;
@@ -19,7 +20,7 @@ export const InstantStaticDepositPlanFromJson = (
     confirmations: obj["static_deposit_plan_confirmations"],
     status: obj["static_deposit_plan_status"],
     transferSparkId: obj["static_deposit_plan_transfer_spark_id"] ?? null,
-  } as InstantStaticDepositPlan;
+  };
 };
 
 export const FRAGMENT = `

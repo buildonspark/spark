@@ -1,18 +1,18 @@
 import { bytesToHex } from "@noble/curves/utils";
-import ClaimStaticDeposit from "../graphql/objects/ClaimStaticDeposit.js";
-import CoopExitRequest from "../graphql/objects/CoopExitRequest.js";
-import LeavesSwapRequest from "../graphql/objects/LeavesSwapRequest.js";
-import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
-import LightningSendRequest from "../graphql/objects/LightningSendRequest.js";
+import type ClaimStaticDeposit from "../graphql/objects/ClaimStaticDeposit.js";
+import type CoopExitRequest from "../graphql/objects/CoopExitRequest.js";
+import type LeavesSwapRequest from "../graphql/objects/LeavesSwapRequest.js";
+import type LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
+import type LightningSendRequest from "../graphql/objects/LightningSendRequest.js";
 import {
   Network,
-  SigningKeyshare,
-  Transfer,
-  TransferLeaf,
+  type SigningKeyshare,
+  type Transfer,
+  type TransferLeaf,
   TransferStatus,
   TransferType,
-  TreeNode,
-  WalletSetting,
+  type TreeNode,
+  type WalletSetting,
 } from "../proto/spark.js";
 
 export interface WalletSettings {

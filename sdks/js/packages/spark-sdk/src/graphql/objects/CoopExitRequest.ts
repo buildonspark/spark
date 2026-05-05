@@ -1,19 +1,21 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
 import ExitSpeed from "./ExitSpeed.js";
 import SparkCoopExitRequestStatus from "./SparkCoopExitRequestStatus.js";
-import Transfer, { TransferFromJson } from "./Transfer.js";
+import type Transfer from "./Transfer.js";
+import { TransferFromJson } from "./Transfer.js";
 
 interface CoopExitRequest {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 
@@ -88,7 +90,7 @@ export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
     transfer: !!obj["coop_exit_request_transfer"]
       ? TransferFromJson(obj["coop_exit_request_transfer"])
       : undefined,
-  } as CoopExitRequest;
+  };
 };
 export const CoopExitRequestToJson = (obj: CoopExitRequest): any => {
   return {

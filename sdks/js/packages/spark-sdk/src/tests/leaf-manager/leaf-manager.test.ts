@@ -2,16 +2,16 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   Network,
-  QueryNodesRequest,
-  QueryNodesResponse,
-  Transfer,
-  TransferLeaf,
+  type QueryNodesRequest,
+  type QueryNodesResponse,
+  type Transfer,
+  type TransferLeaf,
   TransferStatus,
   TransferType,
-  TreeNode,
+  type TreeNode,
 } from "../../proto/spark.js";
 import LeafManager from "../../services/leaf-manager.js";
-import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
+import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { addPublicKeys } from "../../utils/keys.js";
 
 // ---------------------------------------------------------------------------
@@ -1697,7 +1697,7 @@ describe("LeafManager", () => {
         config: {
           getCoordinatorAddress: () => "mock-addr",
           getNetworkProto: () => 0,
-        } as any,
+        },
         connectionManager: { createSparkClient: createSparkClientMock },
         transferService: {
           renewNodeTxn: renewNodeTxnMock,
@@ -1771,7 +1771,7 @@ describe("LeafManager", () => {
         config: {
           getCoordinatorAddress: () => "mock-addr",
           getNetworkProto: () => 0,
-        } as any,
+        },
         connectionManager: {
           createSparkClient: jest.fn(async () => ({
             query_nodes: queryNodesStub,
@@ -3546,12 +3546,12 @@ describe("LeafManager", () => {
         incomingTransfers: [
           {
             id: "t-counter",
-            type: TransferType.COUNTER_SWAP as number,
+            type: TransferType.COUNTER_SWAP,
             leaves: [{ leaf: counterSwapLeaf }],
           },
           {
             id: "t-counter-v3",
-            type: TransferType.COUNTER_SWAP_V3 as number,
+            type: TransferType.COUNTER_SWAP_V3,
             leaves: [{ leaf: counterSwapV3Leaf }],
           },
           {
@@ -4168,7 +4168,7 @@ describe("LeafManager", () => {
         [500],
         async (selected) => {
           expect(selected[0]).toHaveLength(1);
-          expect(selected[0]![0]!.id).toBe("c");
+          expect(selected[0][0]!.id).toBe("c");
           return "executed";
         },
       );
@@ -4259,7 +4259,7 @@ describe("LeafManager", () => {
         [500],
         async (selected) => {
           expect(selected[0]).toHaveLength(1);
-          expect(selected[0]![0]!.value).toBe(500);
+          expect(selected[0][0]!.value).toBe(500);
           return "swapped-ok";
         },
       );
@@ -4317,8 +4317,8 @@ describe("LeafManager", () => {
       const result = await lm.selectLeavesAndExecute(
         [500, 300],
         async (selected) => {
-          const batch0Values = selected[0]!.map((l: TreeNode) => l.value);
-          const batch1Values = selected[1]!.map((l: TreeNode) => l.value);
+          const batch0Values = selected[0].map((l: TreeNode) => l.value);
+          const batch1Values = selected[1].map((l: TreeNode) => l.value);
           expect(batch0Values.reduce((a: number, b: number) => a + b, 0)).toBe(
             500,
           );
@@ -4659,7 +4659,7 @@ describe("LeafManager", () => {
           getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
           getCoordinatorAddress: () => "mock-addr",
           getNetworkProto: () => 0,
-        } as any,
+        },
         onAutoOptimize: onAutoOptimizeMock,
       });
 

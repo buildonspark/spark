@@ -1,25 +1,28 @@
 import { LoggingLevel, type LoggingLevelArg } from "@lightsparkdev/core";
-import { HasSspClientOptions, SspClientOptions } from "../graphql/client.js";
-import { BitcoinNetwork } from "../graphql/objects/BitcoinNetwork.js";
-import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
-import { Network, NetworkToProto, NetworkType } from "../utils/network.js";
 import {
-  ConfigOptions,
+  type HasSspClientOptions,
+  type SspClientOptions,
+} from "../graphql/client.js";
+import { BitcoinNetwork } from "../graphql/objects/BitcoinNetwork.js";
+import { DefaultSparkSigner, type SparkSigner } from "../signer/signer.js";
+import { Network, NetworkToProto, type NetworkType } from "../utils/network.js";
+import {
+  type ConfigOptions,
   LOG_SERVICE_NAMES,
-  LogConfig,
-  LogOptionsObject,
-  LogServiceName,
-  MethodLoggingConfig,
-  MethodLoggingOptions,
-  OptimizationOptions,
-  ServiceLogOptions,
-  ServiceLoggingConfig,
-  SigningOperator,
-  TokenOptimizationOptions,
+  type LogConfig,
+  type LogOptionsObject,
+  type LogServiceName,
+  type MethodLoggingConfig,
+  type MethodLoggingOptions,
+  type OptimizationOptions,
+  type ServiceLogOptions,
+  type ServiceLoggingConfig,
+  type SigningOperator,
+  type TokenOptimizationOptions,
   WalletConfig,
 } from "./wallet-config.js";
 import { SparkError } from "../errors/index.js";
-import { SparkWalletEvents } from "../spark-wallet/types.js";
+import { type SparkWalletEvents } from "../spark-wallet/types.js";
 
 function isTraceLevel(level: LoggingLevelArg | undefined): boolean {
   if (typeof level === "number") {
@@ -302,7 +305,7 @@ export class WalletConfigService implements HasSspClientOptions {
     const logOptions = this.config.log;
     const objectOptions =
       typeof logOptions === "object" && logOptions !== null
-        ? (logOptions as LogOptionsObject)
+        ? logOptions
         : undefined;
     const requestedLevel =
       typeof logOptions === "string" || typeof logOptions === "number"
@@ -368,7 +371,7 @@ export class WalletConfigService implements HasSspClientOptions {
 
       baseConfig.services[serviceName as LogServiceName] =
         normalizeServiceLogOptions(
-          serviceOptions as ServiceLogOptions,
+          serviceOptions,
           baseConfig.services[serviceName as LogServiceName],
         );
     }

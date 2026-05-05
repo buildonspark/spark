@@ -2,15 +2,16 @@
 
 import { LightsparkException } from "@lightsparkdev/core";
 import { LeafFromJson, LeafToJson } from "./Leaf.js";
-import PageInfo, { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
-import SparkTransferToLeavesConnection from "./SparkTransferToLeavesConnection.js";
-import SparkWalletUserToUserRequestsConnection from "./SparkWalletUserToUserRequestsConnection.js";
+import type PageInfo from "./PageInfo.js";
+import { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
+import type SparkTransferToLeavesConnection from "./SparkTransferToLeavesConnection.js";
+import type SparkWalletUserToUserRequestsConnection from "./SparkWalletUserToUserRequestsConnection.js";
 import { UserRequestFromJson, UserRequestToJson } from "./UserRequest.js";
 
 interface Connection {
   /**
-   * The total count of objects in this connection, using the current filters. It is different from the
-   * number of objects returned in the current page (in the `entities` field).
+   * The total count of objects in this connection, using the current filters. It is different from
+   * the number of objects returned in the current page (in the `entities` field).
    **/
   count: number;
 

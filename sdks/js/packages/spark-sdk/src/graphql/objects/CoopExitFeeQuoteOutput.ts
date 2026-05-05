@@ -19,7 +19,7 @@ export const CoopExitFeeQuoteOutputFromJson = (obj: any): CoopExitFeeQuoteOutput
     return {
         quoteId: obj["coop_exit_fee_quote_output_quote"].id,
 
-        } as CoopExitFeeQuoteOutput;
+        };
 
 }
 export const CoopExitFeeQuoteOutputToJson = (obj: CoopExitFeeQuoteOutput): any => {

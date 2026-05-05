@@ -19,7 +19,7 @@ export const ClaimStaticDepositOutputFromJson = (obj: any): ClaimStaticDepositOu
     return {
         transferId: obj["claim_static_deposit_output_transfer_id"],
 
-        } as ClaimStaticDepositOutput;
+        };
 
 }
 export const ClaimStaticDepositOutputToJson = (obj: ClaimStaticDepositOutput): any => {

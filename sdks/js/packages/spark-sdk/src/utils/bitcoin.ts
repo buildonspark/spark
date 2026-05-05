@@ -3,9 +3,9 @@ import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 
 import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
-import { TransactionOutput } from "@scure/btc-signer/psbt";
+import { type TransactionOutput } from "@scure/btc-signer/psbt";
 import { SparkValidationError } from "../errors/index.js";
-import { getNetwork, Network } from "./network.js";
+import { getNetwork, type Network } from "./network.js";
 
 // const t = tapTweak(pubKey, h); // t = int_from_bytes(tagged_hash("TapTweak", pubkey + h)
 // const P = u.lift_x(u.bytesToNumberBE(pubKey)); // P = lift_x(int_from_bytes(pubkey))

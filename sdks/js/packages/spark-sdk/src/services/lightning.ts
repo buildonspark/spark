@@ -8,17 +8,17 @@ import {
 import { sha256 } from "@noble/hashes/sha2";
 import { uuidv7 } from "uuidv7";
 import { SparkRequestError, SparkValidationError } from "../errors/types.js";
-import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
+import type LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import {
-  GetSigningCommitmentsResponse,
+  type GetSigningCommitmentsResponse,
   InitiatePreimageSwapRequest_Reason,
-  InitiatePreimageSwapResponse,
-  ProvidePreimageResponse,
-  QueryUserSignedRefundsResponse,
+  type InitiatePreimageSwapResponse,
+  type ProvidePreimageResponse,
+  type QueryUserSignedRefundsResponse,
   SecretShare as SecretShareProto,
-  Transfer,
-  StartTransferRequest,
-  UserSignedRefund,
+  type Transfer,
+  type StartTransferRequest,
+  type UserSignedRefund,
 } from "../proto/spark.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
@@ -29,9 +29,9 @@ import {
 } from "../utils/idempotency.js";
 import { LoggingService } from "../utils/logging-service.js";
 import { decodeInvoice } from "./bolt11-spark.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection/connection.js";
-import { SigningService } from "./signing.js";
+import { type WalletConfigService } from "./config.js";
+import { type ConnectionManager } from "./connection/connection.js";
+import { type SigningService } from "./signing.js";
 import type { LeafKeyTweak } from "./transfer.js";
 
 export type CreateLightningInvoiceParams = {

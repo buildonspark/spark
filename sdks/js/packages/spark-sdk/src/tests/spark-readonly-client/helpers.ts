@@ -13,7 +13,7 @@ import {
 } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 import { retryUntilSuccess } from "../utils/utils.js";
-import { DefaultSparkSigner } from "../../signer/signer.js";
+import { type DefaultSparkSigner } from "../../signer/signer.js";
 import type { ConfigOptions } from "../../services/wallet-config.js";
 import { encodeSparkAddress } from "../../utils/address.js";
 

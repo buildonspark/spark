@@ -6,7 +6,7 @@ import {
   construct_refund_tx_trio,
   create_dummy_tx,
   decrypt_ecies,
-  DummyTx,
+  type DummyTx,
   encrypt_ecies,
   generate_adaptor_from_signature,
   generate_signature_from_existing_adaptor,

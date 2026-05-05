@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { Network, NetworkType } from "../utils/network.js";
+import { Network, type NetworkType } from "../utils/network.js";
 import {
   decodeBech32mTokenIdentifier,
   encodeBech32mTokenIdentifier,
@@ -48,7 +48,7 @@ describe("token identifier", () => {
         network as NetworkType,
       );
       expect(decoded.tokenIdentifier).toEqual(TEST_TOKEN_IDENTIFIER);
-      expect(decoded.network).toEqual(network as NetworkType);
+      expect(decoded.network).toEqual(network);
     }
   });
 });

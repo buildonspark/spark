@@ -1,18 +1,20 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
 import LightningSendRequestStatus from "./LightningSendRequestStatus.js";
-import Transfer, { TransferFromJson } from "./Transfer.js";
+import type Transfer from "./Transfer.js";
+import { TransferFromJson } from "./Transfer.js";
 
 interface LightningSendRequest {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 
@@ -68,7 +70,7 @@ export const LightningSendRequestFromJson = (
       ? TransferFromJson(obj["lightning_send_request_transfer"])
       : undefined,
     paymentPreimage: obj["lightning_send_request_payment_preimage"],
-  } as LightningSendRequest;
+  };
 };
 export const LightningSendRequestToJson = (obj: LightningSendRequest): any => {
   return {

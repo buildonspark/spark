@@ -22,7 +22,7 @@ export const CompleteSeedReleaseInputFromJson = (obj: any): CompleteSeedReleaseI
         phoneNumber: obj["complete_seed_release_input_phone_number"],
         code: obj["complete_seed_release_input_code"],
 
-        } as CompleteSeedReleaseInput;
+        };
 
 }
 export const CompleteSeedReleaseInputToJson = (obj: CompleteSeedReleaseInput): any => {

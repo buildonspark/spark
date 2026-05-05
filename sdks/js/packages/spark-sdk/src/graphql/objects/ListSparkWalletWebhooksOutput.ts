@@ -1,6 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import SparkWalletWebhookEntry, {
+import type SparkWalletWebhookEntry from "./SparkWalletWebhookEntry.js";
+import {
   SparkWalletWebhookEntryFromJson,
 } from "./SparkWalletWebhookEntry.js";
 
@@ -13,7 +14,7 @@ export const ListSparkWalletWebhooksOutputFromJson = (
 ): ListSparkWalletWebhooksOutput => {
   return {
     webhooks: obj["webhooks"].map(SparkWalletWebhookEntryFromJson),
-  } as ListSparkWalletWebhooksOutput;
+  };
 };
 
 export default ListSparkWalletWebhooksOutput;

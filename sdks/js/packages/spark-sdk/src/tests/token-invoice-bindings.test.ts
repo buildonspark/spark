@@ -1,7 +1,7 @@
 import { numberToVarBytesBE } from "@noble/curves/utils";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { Network as NetworkProto } from "../proto/spark.js";
-import { WalletConfigService } from "../services/config.js";
+import { type WalletConfigService } from "../services/config.js";
 import type { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.node.js";
 import {

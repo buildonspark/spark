@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "@jest/globals";
-import { SparkInvoiceFields, SatsPayment } from "../proto/spark.js";
+import { type SparkInvoiceFields, type SatsPayment } from "../proto/spark.js";
 import {
   getFieldNumbers,
   listMessageTypes,

@@ -17,7 +17,7 @@ export const CurrencyAmountFromJson = (obj: any): CurrencyAmount => {
     originalUnit:
       CurrencyUnit[obj["currency_amount_original_unit"]] ??
       CurrencyUnit.FUTURE_VALUE,
-  } as CurrencyAmount;
+  };
 };
 export const CurrencyAmountToJson = (obj: CurrencyAmount): any => {
   return {

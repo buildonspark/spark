@@ -12,7 +12,7 @@ interface SparkFetchHeaders extends Iterable<[name: string, value: string]> {
 }
 
 export type SparkHeadersConstructor = new (
-  init?: Record<string, string> | undefined,
+  init?: Record<string, string>,
 ) => SparkFetchHeaders;
 
 export type SparkFetchRetryOptions = {
@@ -143,7 +143,7 @@ function createSparkFetch(
   baseFetch: SparkFetch,
   defaults?: SparkFetchOptions,
 ): SparkFetch {
-  return (async (input: RequestInfo | URL, init?: SparkFetchRequestInit) => {
+  return async (input: RequestInfo | URL, init?: SparkFetchRequestInit) => {
     const { sparkOptions, ...restInit } = init ?? {};
     const fetchInit =
       init && sparkOptions !== undefined
@@ -231,7 +231,7 @@ function createSparkFetch(
     }
 
     throw new Error("Retry loop exited unexpectedly");
-  }) as SparkFetch;
+  };
 }
 
 function shouldRethrowFetchError(

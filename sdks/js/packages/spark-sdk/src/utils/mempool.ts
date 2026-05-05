@@ -5,7 +5,7 @@ import {
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import { BitcoinNetwork } from "../types/index.js";
 import { getFetch } from "./fetch.js";
-import { Network, NetworkType, getNetworkFromAddress } from "./network.js";
+import { Network, type NetworkType, getNetworkFromAddress } from "./network.js";
 
 /**
  * @deprecated Use `SparkWallet.getUtxosForDepositAddress()` instead.

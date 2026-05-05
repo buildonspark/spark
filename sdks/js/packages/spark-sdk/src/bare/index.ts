@@ -1,8 +1,8 @@
 import { setCrypto } from "../utils/crypto.js";
 import {
   setFetch,
-  SparkFetch,
-  SparkHeadersConstructor,
+  type SparkFetch,
+  type SparkHeadersConstructor,
 } from "../utils/fetch.js";
 import {
   AbortController,

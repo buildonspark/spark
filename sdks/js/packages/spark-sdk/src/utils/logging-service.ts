@@ -349,10 +349,7 @@ export class LoggingService {
       config,
       logger,
       loggerName,
-      methodCallLogger: new MethodCallLogger(
-        logger,
-        config.methods as MethodLoggingOptions,
-      ),
+      methodCallLogger: new MethodCallLogger(logger, config.methods),
     };
     this.states.set(serviceName, state);
     this.configure(serviceName);

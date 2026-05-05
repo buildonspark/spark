@@ -4,7 +4,7 @@ import {
   default as initWasm,
   finalize_token_invoice,
   hash_partial_token_transaction,
-  InitOutput,
+  type InitOutput,
   prepare_token_invoice,
 } from "./wasm/wasm-browser.js";
 import type {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex } from "@noble/curves/utils";
 import type { Transaction } from "@scure/btc-signer";
-import { ConfigOptions } from "../../services/wallet-config.js";
+import { type ConfigOptions } from "../../services/wallet-config.js";
 import type { SparkSigner } from "../../signer/signer.js";
 import type {
   AggregateFrostParams,
@@ -12,7 +12,7 @@ import type {
   SigningNonce,
   SplitSecretWithProofsParams,
 } from "../../signer/types.js";
-import { NetworkType } from "../../utils/network.js";
+import { type NetworkType } from "../../utils/network.js";
 import type { VerifiableSecretShare } from "../../utils/secret-sharing.js";
 import { walletTypes } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";

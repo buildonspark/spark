@@ -13,7 +13,7 @@ import {
   createPublicReadonlyClient,
   type FundedWallet,
 } from "../../spark-readonly-client/helpers.js";
-import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
+import { type SparkReadonlyClient } from "../../../spark-readonly-client/spark-readonly-client.node.js";
 import { SparkValidationError } from "../../../errors/types.js";
 
 describe("getTokenTransactions", () => {

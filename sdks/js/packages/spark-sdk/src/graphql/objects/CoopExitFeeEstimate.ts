@@ -1,6 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
@@ -17,7 +18,7 @@ export const CoopExitFeeEstimateFromJson = (obj: any): CoopExitFeeEstimate => {
     l1BroadcastFee: CurrencyAmountFromJson(
       obj["coop_exit_fee_estimate_l1_broadcast_fee"],
     ),
-  } as CoopExitFeeEstimate;
+  };
 };
 export const CoopExitFeeEstimateToJson = (obj: CoopExitFeeEstimate): any => {
   return {

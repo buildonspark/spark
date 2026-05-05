@@ -1986,7 +1986,7 @@ function __wbg_get_imports() {
         return ret;
     };
     imports.wbg.__wbg_new_e17d9f43105b08be = function() {
-        const ret = new Array();
+        const ret = [];
         return ret;
     };
     imports.wbg.__wbg_new_no_args_ee98eee5275000a4 = function(arg0, arg1) {

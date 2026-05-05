@@ -20,7 +20,7 @@ import {
   SparkAddressFormat,
 } from "../utils/address.js";
 import {
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
 } from "../utils/token-identifier.js";
 
@@ -78,11 +78,11 @@ describe("Spark Invoice Encode/Decode", () => {
       let senderPublicKey: string | undefined = identityPublicKey;
 
       const testUUID: Uint8Array = uuidv7obj().bytes;
-      let tokenIdentifier: Bech32mTokenIdentifier =
+      const tokenIdentifier: Bech32mTokenIdentifier =
         "btknrt1kcsyuqlkqz48f7pg442xefz3u355ccnn8v55keaz6hav42m032gs5nly6r";
       let satsAmount: number | undefined = 1000;
       let tokenAmount: Uint8Array | undefined = numberToVarBytesBE(1000n);
-      let expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
       let memo = "myMemo";
 
       const rawTokenIdentifier = decodeBech32mTokenIdentifier(

@@ -10,7 +10,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { TransactionInput } from "@scure/btc-signer/psbt";
+import { type TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { EventEmitter } from "eventemitter3";
 import { uuidv7, uuidv7obj } from "uuidv7";
@@ -21,25 +21,25 @@ import {
   SparkValidationError,
 } from "../errors/index.js";
 import SspClient, {
-  GetUserRequestsParams,
-  TransferWithUserRequest,
+  type GetUserRequestsParams,
+  type TransferWithUserRequest,
 } from "../graphql/client.js";
 import {
   BitcoinNetwork,
-  ClaimStaticDepositOutput,
-  CoopExitFeeQuote,
-  CoopExitRequest,
+  type ClaimStaticDepositOutput,
+  type CoopExitFeeQuote,
+  type CoopExitRequest,
   ExitSpeed,
-  InstantStaticDepositPlan,
-  InstantStaticDepositQuoteOutput,
-  LeavesSwapFeeEstimateOutput,
-  LightningReceiveRequest,
-  LightningSendFeeEstimateInput,
-  LightningSendRequest,
-  RequestCoopExitInput,
-  SparkWalletUserToUserRequestsConnection,
-  StaticDepositQuote,
-  StaticDepositQuoteOutput,
+  type InstantStaticDepositPlan,
+  type InstantStaticDepositQuoteOutput,
+  type LeavesSwapFeeEstimateOutput,
+  type LightningReceiveRequest,
+  type LightningSendFeeEstimateInput,
+  type LightningSendRequest,
+  type RequestCoopExitInput,
+  type SparkWalletUserToUserRequestsConnection,
+  type StaticDepositQuote,
+  type StaticDepositQuoteOutput,
   type DeleteSparkWalletWebhookInput,
   type DeleteSparkWalletWebhookOutput,
   type ListSparkWalletWebhooksOutput,
@@ -47,28 +47,28 @@ import {
   type RegisterSparkWalletWebhookOutput,
 } from "../graphql/objects/index.js";
 import {
-  ConnectedEvent,
-  DepositAddressQueryResult,
+  type ConnectedEvent,
+  type DepositAddressQueryResult,
   Direction,
-  HeartbeatEvent,
-  Network as NetworkProto,
+  type HeartbeatEvent,
+  type Network as NetworkProto,
   networkToJSON,
   PreimageRequestRole,
-  PreimageRequestStatus,
-  QueryHtlcResponse,
-  QuerySparkInvoicesResponse,
-  SigningJob,
-  SubscribeToEventsResponse,
-  TokenTransactionEvent,
-  Transfer,
+  type PreimageRequestStatus,
+  type QueryHtlcResponse,
+  type QuerySparkInvoicesResponse,
+  type SigningJob,
+  type SubscribeToEventsResponse,
+  type TokenTransactionEvent,
+  type Transfer,
   TransferStatus,
   TransferType,
-  TreeNode,
+  type TreeNode,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import {
-  OutputWithPreviousTransactionData,
-  QueryTokenTransactionsResponse,
+  type OutputWithPreviousTransactionData,
+  type QueryTokenTransactionsResponse,
 } from "../proto/spark_token.js";
 import type { DecodedInvoice } from "../services/bolt11-spark.js";
 import {
@@ -77,7 +77,7 @@ import {
   isValidSparkAddressFallback,
 } from "../services/bolt11-spark.js";
 import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection/connection.js";
+import { type ConnectionManager } from "../services/connection/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
 import { DepositService } from "../services/deposit.js";
 import LeafManager from "../services/leaf-manager.js";
@@ -92,23 +92,23 @@ import {
 import type { LeafKeyTweak } from "../services/transfer.js";
 import { TransferService } from "../services/transfer.js";
 import {
-  ConfigOptions,
+  type ConfigOptions,
   ELECTRS_CREDENTIALS,
 } from "../services/wallet-config.js";
-import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
-import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
+import { DefaultSparkSigner, type SparkSigner } from "../signer/signer.js";
+import { type KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import type { WalletGetUtxosForIdentityParams } from "../spark-readonly-client/types.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import { getSparkTokenPrimitives } from "../token-primitives-bindings/token-primitives-bindings.js";
-import { Interval } from "../types/index.js";
+import { type Interval } from "../types/index.js";
 import {
   mapSettingsProtoToWalletSettings,
   mapTransferToWalletTransfer,
   mapTreeNodeToWalletLeaf,
-  UserRequestType,
-  WalletLeaf,
-  WalletSettings,
-  WalletTransfer,
+  type UserRequestType,
+  type WalletLeaf,
+  type WalletSettings,
+  type WalletTransfer,
 } from "../types/sdk-types.js";
 import {
   decodeSparkAddress,
@@ -118,7 +118,7 @@ import {
   isLegacySparkAddress,
   isSafeForNumber,
   normalizeSparkAddressToNetwork,
-  SparkAddressFormat,
+  type SparkAddressFormat,
   validateSparkInvoiceFields,
 } from "../utils/address.js";
 import {
@@ -147,10 +147,10 @@ import {
   getNetwork,
   Network,
   NetworkToProto,
-  NetworkType,
+  type NetworkType,
 } from "../utils/network.js";
 import {
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
   encodeBech32mTokenIdentifier,
 } from "../utils/token-identifier.js";
@@ -438,7 +438,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           );
           wallet.singletonKey = identityHex;
           SparkWallet.instances.set(identityHex, wallet);
-          return { ...result, mnemonic } as InitWalletResponse<T>;
+          return { ...result, mnemonic };
         });
       },
       wallet,
@@ -730,10 +730,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           if (timer != null) {
             clearTimeout(timer);
           }
-          timer = setTimeout(
-            onTimeout,
-            STREAM_HEARTBEAT_TIMEOUT_MS,
-          ) as StreamActivityTimeoutHandle;
+          timer = setTimeout(onTimeout, STREAM_HEARTBEAT_TIMEOUT_MS);
           timer.unref?.();
         },
         clear() {
@@ -918,9 +915,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
-   * Optimizes token outputs by consolidating them when there are more than the configured threshold.
-   * Processes as many token outputs as possible in one transaction, up to MAX_TOKEN_OUTPUTS_TX.
-   * Consolidates each eligible token identifier into a single output for this wallet address.
+   * Optimizes token outputs by consolidating them when there are more than the configured
+   * threshold. Processes as many token outputs as possible in one transaction, up to
+   * MAX_TOKEN_OUTPUTS_TX. Consolidates each eligible token identifier into a single output for
+   * this wallet address.
    */
   public async optimizeTokenOutputs(): Promise<void> {
     if (this.tokenOptimizationInProgress) {
@@ -1480,7 +1478,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   > {
     const tokenIdentifierKeys =
       await this.tokenOutputManager.getTokenIdentifiers();
-    let metadataToFetch = new Array<Bech32mTokenIdentifier>();
+    const metadataToFetch = new Array<Bech32mTokenIdentifier>();
     for (const tokenIdentifier of tokenIdentifierKeys) {
       if (!this.tokenMetadata.has(tokenIdentifier)) {
         metadataToFetch.push(tokenIdentifier);
@@ -1519,7 +1517,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     }
 
-    let tokenMetadataMap = new Map<Bech32mTokenIdentifier, UserTokenMetadata>();
+    const tokenMetadataMap = new Map<
+      Bech32mTokenIdentifier,
+      UserTokenMetadata
+    >();
 
     for (const [tokenIdentifier, metadata] of this.tokenMetadata) {
       tokenMetadataMap.set(tokenIdentifier, {
@@ -1576,8 +1577,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   /**
    * Generates a new deposit address for receiving bitcoin funds.
-   * Note that this function returns a bitcoin address, not a spark address, and this address is single use.
-   * Once you deposit funds to this address, it cannot be used again.
+   * Note that this function returns a bitcoin address, not a spark address, and this address is
+   * single use. Once you deposit funds to this address, it cannot be used again.
    * For Layer 1 Bitcoin deposits, Spark generates Pay to Taproot (P2TR) addresses.
    * These addresses start with "bc1p" and can be used to receive Bitcoin from any wallet.
    *
@@ -1905,7 +1906,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
-   * Get a quote on how much credit you can claim for a deposit from the SSP. If the quote charges less fees than the max fee, claim the deposit.
+   * Get a quote on how much credit you can claim for a deposit from the SSP. If the quote charges
+   * less fees than the max fee, claim the deposit.
    *
    * @param {Object} params - The parameters object
    * @param {string} params.transactionId - The ID of the transaction
@@ -2025,9 +2027,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
-   * Claims an instant static deposit using a quote from {@link experimental_GetInstantStaticDepositQuote}.
-   * Supports both 0-conf (instant tagged hash signature) and 1-conf (regular static deposit
-   * signature) paths based on the fulfillment plan's confirmation requirement.
+   * Claims an instant static deposit using a quote from {@link
+   * experimental_GetInstantStaticDepositQuote}. Supports both 0-conf (instant tagged hash
+   * signature) and 1-conf (regular static deposit signature) paths based on the fulfillment plan's
+   * confirmation requirement.
    *
    * @experimental This API is experimental and may change or be removed without notice.
    *
@@ -2167,7 +2170,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       throw new SparkValidationError("Fee or satsPerVbyteFee must be provided");
     }
 
-    // Users can set this to 300 or higher due to our old flow so they may be trained to type in 300 or higher which would make the fee way too high.
+    // Users can set this to 300 or higher due to our old flow so they may be trained to type in
+    // 300 or higher which would make the fee way too high.
     if (satsPerVbyteFee && satsPerVbyteFee > 150) {
       throw new SparkValidationError("satsPerVbyteFee must be less than 150");
     }
@@ -2183,8 +2187,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    let network = this.config.getNetwork();
-    let networkType = this.config.getNetworkProto();
+    const network = this.config.getNetwork();
+    const networkType = this.config.getNetworkProto();
     const networkJSON = networkToJSON(networkType);
 
     const depositTx = await this.getDepositTransaction(depositTransactionId);
@@ -2561,7 +2565,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    const res = await this.depositService!.createTreeRoot({
+    const res = await this.depositService.createTreeRoot({
       keyDerivation,
       verifyingKey,
       depositTx,
@@ -2600,7 +2604,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.config.getCoordinatorAddress(),
     );
 
-    let limit = 100;
+    const limit = 100;
     let offset = 0;
     const pastOffsets = new Set<number>();
     const depositAddresses: DepositAddressQueryResult[] = [];
@@ -2871,7 +2875,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         };
       }
 
-      const res = await this.depositService!.createTreeRootMultiUtxo({
+      const res = await this.depositService.createTreeRootMultiUtxo({
         keyDerivation,
         verifyingKey: depositAddress.verifyingPublicKey,
         depositTxs: matchedTxs,
@@ -2946,7 +2950,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           };
         }
 
-        const response = await this.depositService!.createTreeRoot({
+        const response = await this.depositService.createTreeRoot({
           keyDerivation,
           verifyingKey: unusedDepositAddress.verifyingPublicKey,
           depositTx,
@@ -3747,7 +3751,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     if (decoded) {
       return this.transfer({
         amountSats,
-        receiverSparkAddress: fallbackAddress as SparkAddressFormat,
+        receiverSparkAddress: fallbackAddress,
       });
     }
 
@@ -4348,8 +4352,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    *   Must use spark1... prefixed invoices.
    *   Deprecated sp1... prefixed invoices are not supported.
    * @param sparkInvoices[].amount - Used to define an amount for invoices without an amount encoded.
-   *   For sats invoices, this is the amount in sats. For token invoices, this is the amount in tokens.
-   *   Amount encoded in the invoice takes precedence if both are provided.
+   *   For sats invoices, this is the amount in sats. For token invoices, this is the amount in
+   *   tokens. Amount encoded in the invoice takes precedence if both are provided.
    *
    * @returns Promise<string> A payment or transaction identifier (implementation‑specific).
    *
@@ -4424,15 +4428,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const tokenIdB32 = encodeBech32mTokenIdentifier({
           tokenIdentifier,
           network: this.config.getNetworkType(),
-        }) as Bech32mTokenIdentifier;
+        });
         const receiverOutputs = decodedInvoices.map((d) => ({
           tokenIdentifier: tokenIdB32,
-          tokenAmount: d.amount!,
+          tokenAmount: d.amount,
           receiverSparkAddress: d.invoice,
         }));
-        const invoices = decodedInvoices.map(
-          (d) => d.invoice as SparkAddressFormat,
-        );
+        const invoices = decodedInvoices.map((d) => d.invoice);
         const totalTokenAmount = receiverOutputs.reduce(
           (sum, o) => sum + o.tokenAmount,
           0n,
@@ -4623,7 +4625,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         satsInvoices.push({
           amountSats: encodedAmount ?? Number(amount!),
           receiverIdentityPubkey: hexToBytes(addressData.identityPublicKey),
-          sparkInvoice: invoice as SparkAddressFormat,
+          sparkInvoice: invoice,
         });
       } else if (fields.paymentType?.type === "tokens") {
         const tokenIdentifierHex = fields.paymentType.tokenIdentifier;
@@ -5701,7 +5703,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           const script = input.witnessUtxo.script;
 
           // Check if this script corresponds to one of our keys
-          // This is a simplified check - in practice, you might need more sophisticated script analysis
+          // This is a simplified check - in practice, you might need more sophisticated script
+          // analysis
           const identityScript = getP2TRScriptFromPublicKey(
             identityPubKey,
             this.config.getNetwork(),
@@ -6107,7 +6110,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private getPublicMethodDecorator(): ServiceMethodDecorator {
     return (_methodName, originalFn, receiver) =>
-      (async (...args: unknown[]) => {
+      async (...args: unknown[]) => {
         try {
           return await originalFn.apply(receiver, args);
         } catch (error) {
@@ -6117,7 +6120,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             serverTraceId,
           });
         }
-      }) as (...args: unknown[]) => Promise<unknown>;
+      };
   }
 
   protected wrapPublicMethod<M extends keyof SparkWallet>(methodName: M) {

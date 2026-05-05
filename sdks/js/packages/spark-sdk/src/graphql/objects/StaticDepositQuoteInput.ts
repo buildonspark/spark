@@ -29,7 +29,7 @@ export const StaticDepositQuoteInputFromJson = (obj: any): StaticDepositQuoteInp
         outputIndex: obj["static_deposit_quote_input_output_index"],
         network: BitcoinNetwork[obj["static_deposit_quote_input_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
 
-        } as StaticDepositQuoteInput;
+        };
 
 }
 export const StaticDepositQuoteInputToJson = (obj: StaticDepositQuoteInput): any => {

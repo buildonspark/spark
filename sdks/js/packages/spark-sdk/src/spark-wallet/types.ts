@@ -1,15 +1,19 @@
 import type { Transaction } from "@scure/btc-signer";
 import {
-  OutputWithPreviousTransactionData,
-  TokenMetadata,
+  type OutputWithPreviousTransactionData,
+  type TokenMetadata,
 } from "../proto/spark_token.js";
-import { ConfigOptions } from "../services/wallet-config.js";
+import { type ConfigOptions } from "../services/wallet-config.js";
 import type { SparkSigner } from "../signer/signer.js";
-import { KeyDerivation } from "../signer/types.js";
-import { CoopExitFeeQuote, ExitSpeed, WalletTransfer } from "../types/index.js";
-import { SparkAddressFormat } from "../utils/address.js";
+import { type KeyDerivation } from "../signer/types.js";
+import {
+  type CoopExitFeeQuote,
+  type ExitSpeed,
+  type WalletTransfer,
+} from "../types/index.js";
+import { type SparkAddressFormat } from "../utils/address.js";
 import { type IdempotencyOptions } from "../utils/idempotency.js";
-import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
+import { type Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 import type { SparkWallet } from "./spark-wallet.js";
 
 export type WithdrawParams = {
@@ -118,7 +122,8 @@ export type DepositParams = {
  * Token metadata containing essential information about a token.
  * This is the wallet's internal representation with JavaScript-friendly types.
  *
- * rawTokenIdentifier: This is the raw binary token identifier - This is used to encode the bech32m encoded token identifier.
+ * rawTokenIdentifier: This is the raw binary token identifier - This is used to encode the bech32m
+ * encoded token identifier.
  *
  * tokenPublicKey: This is the hex-encoded public key of the token issuer - Same as issuerPublicKey.
  *
@@ -211,7 +216,10 @@ export interface SparkWalletEvents {
     owned: bigint;
     incoming: bigint;
   }) => void;
-  /** Emitted when a token transaction is finalized (both sender and receiver). Includes the updated balances for affected tokens. */
+  /**
+   * Emitted when a token transaction is finalized (both sender and receiver). Includes the updated
+   * balances for affected tokens.
+   */
   [SparkWalletEvent.TokenBalanceUpdate]: (event: {
     finalizedTokenTransactions: Array<{
       tokenTransactionHash: Uint8Array;
@@ -220,12 +228,17 @@ export interface SparkWalletEvents {
     }>;
     tokenBalances: TokenBalanceMap;
   }) => void;
-  /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */
+  /**
+   * Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new
+   * total balance.
+   */
   [SparkWalletEvent.TransferClaimed]: (
     transferId: string,
     updatedBalance: bigint,
   ) => void;
-  /** Emitted when a deposit is marked as available. Includes the deposit ID and new total balance. */
+  /**
+   * Emitted when a deposit is marked as available. Includes the deposit ID and new total balance.
+   */
   [SparkWalletEvent.DepositConfirmed]: (
     depositId: string,
     updatedBalance: bigint,
@@ -234,7 +247,10 @@ export interface SparkWalletEvents {
   [SparkWalletEvent.StreamConnected]: () => void;
   /** Emitted when the stream stops and will not retry again on this wallet instance. */
   [SparkWalletEvent.StreamDisconnected]: (reason: string) => void;
-  /** Emitted when attempting to reconnect the stream. maxAttempts is Infinity when retries are unbounded. */
+  /**
+   * Emitted when attempting to reconnect the stream. maxAttempts is Infinity when retries are
+   * unbounded.
+   */
   [SparkWalletEvent.StreamReconnecting]: (
     attempt: number,
     maxAttempts: number,

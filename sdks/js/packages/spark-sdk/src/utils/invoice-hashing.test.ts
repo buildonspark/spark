@@ -1,8 +1,8 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { HashSparkInvoice } from "./invoice-hashing.js";
-import { SparkInvoiceFields } from "../proto/spark.js";
+import { type SparkInvoiceFields } from "../proto/spark.js";
 import { UUID } from "uuidv7";
-import { NetworkType } from "./network.js";
+import { type NetworkType } from "./network.js";
 
 it("produces a stable hash from known inputs", () => {
   const identityPKHex =
@@ -228,7 +228,7 @@ it("throws on invalid lengths and missing fields", () => {
     version: 1,
     id: UUID.parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").bytes,
     paymentType: undefined,
-  } as any;
+  };
   expect(() => HashSparkInvoice(missingPt, RECV_PK, "REGTEST")).toThrow(
     /unsupported or missing/i,
   );

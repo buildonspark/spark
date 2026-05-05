@@ -19,7 +19,7 @@ export const WalletUserIdentityPublicKeyInputFromJson = (obj: any): WalletUserId
     return {
         phoneNumber: obj["wallet_user_identity_public_key_input_phone_number"],
 
-        } as WalletUserIdentityPublicKeyInput;
+        };
 
 }
 export const WalletUserIdentityPublicKeyInputToJson = (obj: WalletUserIdentityPublicKeyInput): any => {

@@ -9,7 +9,7 @@ export const DeleteSparkWalletWebhookOutputFromJson = (
 ): DeleteSparkWalletWebhookOutput => {
   return {
     success: obj["success"],
-  } as DeleteSparkWalletWebhookOutput;
+  };
 };
 
 export default DeleteSparkWalletWebhookOutput;

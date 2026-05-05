@@ -159,7 +159,7 @@ export function parseSparkFallbackAddress(value: unknown): string | undefined {
     typeof value === "object" &&
     value !== null &&
     "words" in value &&
-    typeof (value as { words: unknown }).words === "string"
+    typeof value.words === "string"
   ) {
     try {
       // The 'words' field is bech32-encoded with prefix 'unknown'

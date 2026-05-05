@@ -26,7 +26,7 @@ describe("LeafManager", () => {
     const depositLeaf = await userWallet.claimDeposit(depositTx.id);
 
     expect(depositLeaf).toBeDefined();
-    expect(depositLeaf!.length).toBe(1);
+    expect(depositLeaf.length).toBe(1);
 
     const leafManager = new LeafManager(
       userWallet.getConfigService(),
@@ -37,6 +37,6 @@ describe("LeafManager", () => {
 
     const leaves = await leafManager.getLeaves();
     expect(leaves.length).toBe(1);
-    expect(leaves[0]!.id).toEqual(depositLeaf![0]?.id);
+    expect(leaves[0]!.id).toEqual(depositLeaf[0]?.id);
   });
 });

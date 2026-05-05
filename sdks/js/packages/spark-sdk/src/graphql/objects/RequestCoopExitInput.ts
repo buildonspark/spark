@@ -36,7 +36,7 @@ export const RequestCoopExitInputFromJson = (
     userOutboundTransferExternalId:
       obj["request_coop_exit_input_user_outbound_transfer_external_id"] ??
       undefined,
-  } as RequestCoopExitInput;
+  };
 };
 export const RequestCoopExitInputToJson = (obj: RequestCoopExitInput): any => {
   return {

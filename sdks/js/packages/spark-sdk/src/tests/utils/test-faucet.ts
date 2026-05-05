@@ -4,7 +4,10 @@ import { sha256 } from "@noble/hashes/sha2";
 import { concatBytes, utf8ToBytes } from "@noble/hashes/utils";
 import * as btc from "@scure/btc-signer";
 import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
-import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
+import {
+  type TransactionInput,
+  type TransactionOutput,
+} from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import { SparkRequestError } from "../../errors/index.js";
 import {
@@ -257,7 +260,7 @@ export class BitcoinFaucet {
           txid: hexToBytes(splitTxId),
           index: i,
         },
-        txout: signedSplitTx.getOutput(i)!,
+        txout: signedSplitTx.getOutput(i),
       });
     }
   }
@@ -467,12 +470,12 @@ export class BitcoinFaucet {
   }
 
   async broadcastTx(txHex: string) {
-    let response = await this.call("sendrawtransaction", [txHex, 0]);
+    const response = await this.call("sendrawtransaction", [txHex, 0]);
     return response;
   }
 
   async submitPackage(txHexs: string[]) {
-    let response = await this.call("submitpackage", [txHexs]);
+    const response = await this.call("submitpackage", [txHexs]);
     return response;
   }
 

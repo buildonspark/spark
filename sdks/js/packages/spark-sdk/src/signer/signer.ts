@@ -5,13 +5,13 @@ import { sha256 } from "@noble/hashes/sha2";
 import { HDKey } from "@scure/bip32";
 import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { Transaction } from "@scure/btc-signer";
+import { type Transaction } from "@scure/btc-signer";
 import { SparkError, SparkValidationError } from "../errors/index.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import {
-  AggregateFrostBindingParams,
-  IKeyPackage,
-  SignFrostBindingParams,
+  type AggregateFrostBindingParams,
+  type IKeyPackage,
+  type SignFrostBindingParams,
 } from "../spark-bindings/types.js";
 import { subtractPrivateKeys } from "../utils/keys.js";
 import { type VerifiableSecretShare } from "../utils/secret-sharing.js";
@@ -21,7 +21,7 @@ import {
 } from "../utils/signing.js";
 import {
   KeyDerivationType,
-  SigningCommitmentWithOptionalNonce,
+  type SigningCommitmentWithOptionalNonce,
   type AggregateFrostParams,
   type DerivedHDKey,
   type KeyDerivation,

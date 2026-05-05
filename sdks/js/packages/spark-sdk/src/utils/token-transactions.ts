@@ -1,8 +1,8 @@
 import { bytesToNumberBE, equalBytes } from "@noble/curves/utils";
-import { OutputWithPreviousTransactionData } from "../proto/spark_token.js";
-import { TokenBalanceMap } from "../spark-wallet/types.js";
+import { type OutputWithPreviousTransactionData } from "../proto/spark_token.js";
+import { type TokenBalanceMap } from "../spark-wallet/types.js";
 import {
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
 } from "./token-identifier.js";
 
@@ -12,7 +12,7 @@ export function sumTokenOutputs(
   try {
     return outputs.reduce(
       (sum, output) =>
-        sum + BigInt(bytesToNumberBE(output.output!.tokenAmount!)),
+        sum + BigInt(bytesToNumberBE(output.output!.tokenAmount)),
       BigInt(0),
     );
   } catch (error) {

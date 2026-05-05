@@ -1,6 +1,6 @@
-import { WalletConfigService } from "../services/config.js";
+import { type WalletConfigService } from "../services/config.js";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
-import { AuthMode } from "../services/index.js";
+import { type AuthMode } from "../services/index.js";
 import type { LoggingService } from "../utils/logging-service.js";
 import { SparkReadonlyClient } from "./spark-readonly-client.js";
 

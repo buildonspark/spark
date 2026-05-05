@@ -19,7 +19,7 @@ export const GetChallengeInputFromJson = (obj: any): GetChallengeInput => {
     return {
         publicKey: obj["get_challenge_input_public_key"],
 
-        } as GetChallengeInput;
+        };
 
 }
 export const GetChallengeInputToJson = (obj: GetChallengeInput): any => {

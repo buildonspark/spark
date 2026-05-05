@@ -1,5 +1,5 @@
 import { SparkError } from "../../errors/index.js";
-import { ConfigOptions } from "../../services/wallet-config.js";
+import { type ConfigOptions } from "../../services/wallet-config.js";
 import { getCurrentTimelock, getTxFromRawTxBytes } from "../../utils/index.js";
 import { SparkWalletTestingIntegrationWithStream } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";

@@ -1,18 +1,18 @@
 import type { Logger } from "@lightsparkdev/core";
-import { Transaction } from "@scure/btc-signer";
+import { type Transaction } from "@scure/btc-signer";
 import { SparkValidationError } from "../errors/types.js";
-import { SigningCommitment } from "../proto/common.js";
+import { type SigningCommitment } from "../proto/common.js";
 import {
-  RequestedSigningCommitments,
-  UserSignedTxSigningJob,
+  type RequestedSigningCommitments,
+  type UserSignedTxSigningJob,
 } from "../proto/spark.js";
-import { SigningCommitmentWithOptionalNonce } from "../signer/types.js";
+import { type SigningCommitmentWithOptionalNonce } from "../signer/types.js";
 import {
   getSigHashFromMultiInputTx,
   getSigHashFromTx,
   getTxFromRawTxBytes,
 } from "../utils/bitcoin.js";
-import { TransactionInput } from "@scure/btc-signer/psbt";
+import { type TransactionInput } from "@scure/btc-signer/psbt";
 import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
 import { getNetwork } from "../utils/network.js";
 import { LoggingService } from "../utils/logging-service.js";
@@ -23,7 +23,7 @@ import {
   getCurrentTimelock,
   getNextHTLCTransactionSequence,
 } from "../utils/transaction.js";
-import { WalletConfigService } from "./config.js";
+import { type WalletConfigService } from "./config.js";
 import type {
   LeafKeyTweak,
   SigningJobType,

@@ -1,4 +1,4 @@
-import { TransferType } from "../proto/spark.js";
+import { type TransferType } from "../proto/spark.js";
 
 export type QueryTransfersParams = {
   sparkAddress: string;

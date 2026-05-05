@@ -19,7 +19,7 @@ export const StartSeedReleaseInputFromJson = (obj: any): StartSeedReleaseInput =
     return {
         phoneNumber: obj["start_seed_release_input_phone_number"],
 
-        } as StartSeedReleaseInput;
+        };
 
 }
 export const StartSeedReleaseInputToJson = (obj: StartSeedReleaseInput): any => {

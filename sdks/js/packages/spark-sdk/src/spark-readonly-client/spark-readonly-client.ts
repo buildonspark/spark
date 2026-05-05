@@ -3,39 +3,39 @@ import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import {
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
   decodeSparkAddress,
   DefaultSparkSigner,
   encodeBech32mTokenIdentifier,
   SparkRequestError,
-  SparkSigner,
+  type SparkSigner,
   SparkValidationError,
-  TokenBalanceMap,
+  type TokenBalanceMap,
 } from "../index-shared.js";
 import {
   type DeepPartial,
-  DepositAddressQueryResult,
+  type DepositAddressQueryResult,
   Direction,
   HashVariant,
-  InvoiceResponse,
+  type InvoiceResponse,
   Order,
   type SparkServiceClient,
-  Transfer,
-  TransferFilter,
+  type Transfer,
+  type TransferFilter,
   TransferType,
   TreeNodeStatus,
 } from "../proto/spark.js";
 import {
-  OutputWithPreviousTransactionData,
-  QueryTokenTransactionsResponse,
+  type OutputWithPreviousTransactionData,
+  type QueryTokenTransactionsResponse,
   TokenOutputStatus,
-  TokenTransactionWithStatus,
+  type TokenTransactionWithStatus,
 } from "../proto/spark_token.js";
 import {
-  AuthMode,
-  ConfigOptions,
-  ConnectionManager,
+  type AuthMode,
+  type ConfigOptions,
+  type ConnectionManager,
   WalletConfigService,
 } from "../services/index.js";
 import {

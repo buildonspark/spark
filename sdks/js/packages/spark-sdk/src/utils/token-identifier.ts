@@ -1,6 +1,6 @@
 import { bech32m } from "@scure/base";
 
-import { NetworkType } from "../utils/network.js";
+import { type NetworkType } from "../utils/network.js";
 import { SparkValidationError } from "../errors/index.js";
 
 const Bech32mTokenIdentifierTokenIdentifierNetworkPrefix: Record<
@@ -43,7 +43,7 @@ export function encodeBech32mTokenIdentifier(
     }
 
     return bech32m.encode(
-      Bech32mTokenIdentifierTokenIdentifierNetworkPrefix[payload.network!],
+      Bech32mTokenIdentifierTokenIdentifierNetworkPrefix[payload.network],
       words,
       500,
     ) as Bech32mTokenIdentifier;
@@ -64,10 +64,7 @@ export function decodeBech32mTokenIdentifier(
   network?: NetworkType,
 ): Bech32mTokenIdentifierData {
   try {
-    const decoded = bech32m.decode(
-      bech32mTokenIdentifier as Bech32mTokenIdentifier,
-      500,
-    );
+    const decoded = bech32m.decode(bech32mTokenIdentifier, 500);
 
     if (
       network &&

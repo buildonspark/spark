@@ -19,7 +19,7 @@ export const CompleteCoopExitOutputFromJson = (obj: any): CompleteCoopExitOutput
     return {
         requestId: obj["complete_coop_exit_output_request"].id,
 
-        } as CompleteCoopExitOutput;
+        };
 
 }
 export const CompleteCoopExitOutputToJson = (obj: CompleteCoopExitOutput): any => {

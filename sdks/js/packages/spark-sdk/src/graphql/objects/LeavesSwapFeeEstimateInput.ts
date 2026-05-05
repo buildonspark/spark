@@ -19,7 +19,7 @@ export const LeavesSwapFeeEstimateInputFromJson = (obj: any): LeavesSwapFeeEstim
     return {
         totalAmountSats: obj["leaves_swap_fee_estimate_input_total_amount_sats"],
 
-        } as LeavesSwapFeeEstimateInput;
+        };
 
 }
 export const LeavesSwapFeeEstimateInputToJson = (obj: LeavesSwapFeeEstimateInput): any => {

@@ -111,8 +111,8 @@ export class Swap {
 }
 
 /**
- * Generates swaps that will result in the unilateral exit maximizing set of leaves. Multiple iterations
- * may be required to reach the optimal set.
+ * Generates swaps that will result in the unilateral exit maximizing set of leaves. Multiple
+ * iterations may be required to reach the optimal set.
  *
  * @param inputLeaves - the leaves to optimize.
  * @param maxLeavesPerSwap - soft limit on the number of leaves per swap.
@@ -125,7 +125,7 @@ export function maximizeUnilateralExit(
   const swaps: Swap[] = [];
 
   let batch: number[] = [];
-  let leaves: number[] = sorted(inputLeaves);
+  const leaves: number[] = sorted(inputLeaves);
 
   // Process leaves in batches of up to approximately maxLeavesPerSwap.
   while (leaves.length > 0) {
@@ -151,8 +151,8 @@ export function maximizeUnilateralExit(
 }
 
 /**
- * Generates swaps that will minimize the probability of needing to swap during a transfer. Multiple iterations
- * may be required to reach the optimal set.
+ * Generates swaps that will minimize the probability of needing to swap during a transfer.
+ * Multiple iterations may be required to reach the optimal set.
  *
  * @param inputLeaves - the leaves to optimize.
  * @param multiplicity - roughly speaking, the higher the multiplicity, the more transfers can be sent
@@ -179,8 +179,8 @@ export function minimizeTransferSwap(
   const swaps: Swap[] = [];
   let toGiveBatch: number[] = [];
   let toReceiveBatch: number[] = [];
-  let give = [...leavesToGiveFlat];
-  let receive = [...leavesToReceiveFlat];
+  const give = [...leavesToGiveFlat];
+  const receive = [...leavesToReceiveFlat];
 
   while (give.length > 0 || receive.length > 0) {
     if (sum(toGiveBatch) > sum(toReceiveBatch)) {

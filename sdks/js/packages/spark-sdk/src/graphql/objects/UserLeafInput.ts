@@ -30,7 +30,7 @@ export const UserLeafInputFromJson = (obj: any): UserLeafInput => {
       obj["user_leaf_input_direct_adaptor_added_signature"],
     direct_from_cpfp_adaptor_added_signature:
       obj["user_leaf_input_direct_from_cpfp_adaptor_added_signature"],
-  } as UserLeafInput;
+  };
 };
 export const UserLeafInputToJson = (obj: UserLeafInput): any => {
   return {

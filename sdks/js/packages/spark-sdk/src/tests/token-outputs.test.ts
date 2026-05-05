@@ -1,18 +1,18 @@
 import { numberToBytesBE, bytesToNumberBE } from "@noble/curves/utils";
 import { SparkValidationError } from "../errors/types.js";
 import {
-  OutputWithPreviousTransactionData,
+  type OutputWithPreviousTransactionData,
   TokenOutputStatus,
 } from "../proto/spark_token.js";
-import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection/connection.js";
+import { type WalletConfigService } from "../services/config.js";
+import { type ConnectionManager } from "../services/connection/connection.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
   TokenTransactionService,
 } from "../services/tokens/token-transactions.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
-import { TokenOutputsMap } from "../spark-wallet/types.js";
-import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
+import { type TokenOutputsMap } from "../spark-wallet/types.js";
+import { type Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 
 describe("select token outputs", () => {
   let tokenTransactionService: TokenTransactionService;
@@ -297,7 +297,7 @@ describe("select token outputs", () => {
       sortTokenOutputsByStrategy(smallFirstSorted, "SMALL_FIRST");
 
       const smallFirstAmounts = smallFirstSorted.map((o) =>
-        bytesToNumberBE(o.output!.tokenAmount!),
+        bytesToNumberBE(o.output!.tokenAmount),
       );
       expect(smallFirstAmounts).toEqual([
         base + 1n,
@@ -311,7 +311,7 @@ describe("select token outputs", () => {
       sortTokenOutputsByStrategy(largeFirstSorted, "LARGE_FIRST");
 
       const largeFirstAmounts = largeFirstSorted.map((o) =>
-        bytesToNumberBE(o.output!.tokenAmount!),
+        bytesToNumberBE(o.output!.tokenAmount),
       );
       expect(largeFirstAmounts).toEqual([
         base + 10000n,
@@ -347,7 +347,7 @@ describe("select token outputs", () => {
       });
 
       const total = result.reduce(
-        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount),
         0n,
       );
       expect(total).toBe(400n);
@@ -379,7 +379,7 @@ describe("select token outputs", () => {
       expect(largeCount).toBeGreaterThan(0);
 
       const total = result.reduce(
-        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount),
         0n,
       );
       expect(total).toBeGreaterThanOrEqual(1200n);
@@ -415,7 +415,7 @@ describe("select token outputs", () => {
       expect(smallCount).toBe(499);
 
       const total = result.reduce(
-        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount),
         0n,
       );
       expect(total).toBe(5990n);
@@ -447,7 +447,7 @@ describe("select token outputs", () => {
       expect(largeCount).toBeGreaterThanOrEqual(45);
 
       const total = result.reduce(
-        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount),
         0n,
       );
       expect(total).toBeGreaterThanOrEqual(5000n);

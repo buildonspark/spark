@@ -1,6 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
@@ -16,7 +17,7 @@ export const LightningSendFeeEstimateOutputFromJson = (
     feeEstimate: CurrencyAmountFromJson(
       obj["lightning_send_fee_estimate_output_fee_estimate"],
     ),
-  } as LightningSendFeeEstimateOutput;
+  };
 };
 export const LightningSendFeeEstimateOutputToJson = (
   obj: LightningSendFeeEstimateOutput,

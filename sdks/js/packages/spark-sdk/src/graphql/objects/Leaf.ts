@@ -1,6 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
@@ -17,7 +18,7 @@ export const LeafFromJson = (obj: any): Leaf => {
   return {
     amount: CurrencyAmountFromJson(obj["leaf_amount"]),
     sparkNodeId: obj["leaf_spark_node_id"],
-  } as Leaf;
+  };
 };
 export const LeafToJson = (obj: Leaf): any => {
   return {

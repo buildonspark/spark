@@ -24,10 +24,7 @@ describe("SparkFetch", () => {
       .fn<FetchFn>()
       .mockResolvedValue(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -44,10 +41,7 @@ describe("SparkFetch", () => {
       .fn<FetchFn>()
       .mockRejectedValue(new Error("ECONNRESET"));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch } = getFetch();
 
     await expect(fetch("https://example.com")).rejects.toThrow("ECONNRESET");
@@ -62,10 +56,7 @@ describe("SparkFetch", () => {
       .fn<FetchFn>()
       .mockResolvedValue(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch } = getFetch({
       logger: logger as unknown as Logger,
     });
@@ -92,10 +83,7 @@ describe("SparkFetch", () => {
       )
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -118,10 +106,7 @@ describe("SparkFetch", () => {
       )
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -147,10 +132,7 @@ describe("SparkFetch", () => {
       );
     });
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch } = getFetch({
       retry: { maxRetries: 1, baseDelayMs: 100 },
     });
@@ -177,10 +159,7 @@ describe("SparkFetch", () => {
       )
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -202,10 +181,7 @@ describe("SparkFetch", () => {
         withBytes(new Response("bad gateway", { status: 502 })),
       );
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -227,10 +203,7 @@ describe("SparkFetch", () => {
         withBytes(new Response("bad request", { status: 400 })),
       );
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -249,10 +222,7 @@ describe("SparkFetch", () => {
         withBytes(new Response("internal error", { status: 500 })),
       );
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -272,10 +242,7 @@ describe("SparkFetch", () => {
       .mockResolvedValueOnce(withBytes(new Response("", { status: 502 })))
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -296,10 +263,7 @@ describe("SparkFetch", () => {
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -319,10 +283,7 @@ describe("SparkFetch", () => {
     const networkError = new Error("ECONNREFUSED");
     const mockFetch = jest.fn<FetchFn>().mockRejectedValue(networkError);
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 2, baseDelayMs: 1 },
     });
@@ -344,10 +305,7 @@ describe("SparkFetch", () => {
       )
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -368,10 +326,7 @@ describe("SparkFetch", () => {
     });
     const mockFetch = jest.fn<FetchFn>().mockRejectedValue(abortError);
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -396,10 +351,7 @@ describe("SparkFetch", () => {
       )
       .mockRejectedValueOnce(abortError);
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 1 },
     });
@@ -418,10 +370,7 @@ describe("SparkFetch", () => {
     });
     const mockFetch = jest.fn<FetchFn>().mockRejectedValue(timeoutError);
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch, Headers } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -444,10 +393,7 @@ describe("SparkFetch", () => {
       .fn<FetchFn>()
       .mockRejectedValue(new Error("request was canceled"));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });
@@ -468,10 +414,7 @@ describe("SparkFetch", () => {
       )
       .mockResolvedValueOnce(withBytes(new Response("ok", { status: 200 })));
 
-    setFetch(
-      mockFetch as unknown as SparkFetch,
-      globalThis.Headers as unknown as any,
-    );
+    setFetch(mockFetch, globalThis.Headers);
     const { fetch: retryFetch } = getFetch({
       retry: { maxRetries: 3, baseDelayMs: 100 },
     });

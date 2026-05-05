@@ -3,11 +3,31 @@
  * This replaces manual field number mapping with runtime descriptor introspection
  */
 
-import { FileDescriptorSet } from "../proto/google/protobuf/descriptor.js";
+import {
+  type DescriptorProto,
+  type FieldDescriptorProto,
+  FieldDescriptorProto_Label,
+  FieldDescriptorProto_Type,
+  FileDescriptorSet,
+  type FileDescriptorProto,
+} from "../proto/google/protobuf/descriptor.js";
 import { getSparkDescriptorBytes } from "./proto-descriptors.js";
 
-// Cache for the registry to avoid reloading descriptors
-let _registry: any = null;
+type ProtoRegistry = {
+  descriptorSet: ReturnType<typeof FileDescriptorSet.decode>;
+  fileMap: Map<string, FileDescriptorProto>;
+  messageMap: Map<string, DescriptorProto>;
+};
+
+type FieldMeta = {
+  number: number;
+  oneofIndex?: number;
+  typeName?: string;
+  repeated?: boolean;
+  type?: number;
+};
+
+let registryCache: ProtoRegistry | null = null;
 
 function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -17,16 +37,18 @@ function formatErrorMessage(error: unknown): string {
  * Helper function to process nested messages recursively
  */
 function processNestedMessages(
-  messageDescriptor: any,
+  messageDescriptor: DescriptorProto,
   parentFullName: string,
-  messageMap: Map<string, any>,
+  messageMap: Map<string, DescriptorProto>,
 ) {
-  if (messageDescriptor.nestedType) {
+  if (messageDescriptor.nestedType.length > 0) {
     for (const nestedMessage of messageDescriptor.nestedType) {
+      if (!nestedMessage.name) {
+        continue;
+      }
       const nestedFullName = `${parentFullName}.${nestedMessage.name}`;
       messageMap.set(nestedFullName, nestedMessage);
 
-      // Recursively process nested messages
       processNestedMessages(nestedMessage, nestedFullName, messageMap);
     }
   }
@@ -35,9 +57,9 @@ function processNestedMessages(
 /**
  * Get or create the protobuf registry with our descriptors loaded
  */
-function getRegistry() {
-  if (_registry) {
-    return _registry;
+function getRegistry(): ProtoRegistry {
+  if (registryCache) {
+    return registryCache;
   }
 
   try {
@@ -49,7 +71,7 @@ function getRegistry() {
 
     // Instead of using the problematic registry.addFile(), we'll work directly
     // with the decoded FileDescriptorSet data
-    _registry = {
+    const registry: ProtoRegistry = {
       descriptorSet,
       fileMap: new Map(),
       messageMap: new Map(),
@@ -57,29 +79,34 @@ function getRegistry() {
 
     // Build lookup maps from the descriptor set
     for (const fileDescriptor of descriptorSet.file) {
-      _registry.fileMap.set(fileDescriptor.name, fileDescriptor);
+      if (fileDescriptor.name) {
+        registry.fileMap.set(fileDescriptor.name, fileDescriptor);
+      }
 
       // Process messages in this file
-      if (fileDescriptor.messageType) {
+      if (fileDescriptor.messageType.length > 0) {
         for (const messageDescriptor of fileDescriptor.messageType) {
+          if (!messageDescriptor.name) {
+            continue;
+          }
           const pkg = fileDescriptor.package ?? "";
           const fullName =
             pkg.length > 0
               ? `${pkg}.${messageDescriptor.name}`
               : String(messageDescriptor.name);
-          _registry.messageMap.set(fullName, messageDescriptor);
+          registry.messageMap.set(fullName, messageDescriptor);
 
-          // Process nested messages
           processNestedMessages(
             messageDescriptor,
             fullName,
-            _registry.messageMap,
+            registry.messageMap,
           );
         }
       }
     }
 
-    return _registry;
+    registryCache = registry;
+    return registry;
   } catch (error) {
     throw new Error(
       `Failed to load protobuf descriptors: ${formatErrorMessage(error)}`,
@@ -109,9 +136,11 @@ export function getFieldNumbers(
     const fieldNumbers: Record<string, number> = {};
 
     // Extract field numbers from the descriptor
-    if (messageDescriptor.field) {
+    if (messageDescriptor.field.length > 0) {
       for (const field of messageDescriptor.field) {
-        fieldNumbers[field.name] = field.number;
+        if (field.name && field.number != null) {
+          fieldNumbers[field.name] = field.number;
+        }
       }
     }
 
@@ -129,7 +158,7 @@ export function listMessageTypes(): string[] {
     const registry = getRegistry();
 
     // Get all message type names from our custom registry
-    const types = Array.from(registry.messageMap.keys()) as string[];
+    const types = Array.from(registry.messageMap.keys());
 
     return types.sort();
   } catch {
@@ -143,67 +172,22 @@ export function listMessageTypes(): string[] {
  * - Values include field number, oneof index if applicable, nested type name for message fields,
  *   whether the field is repeated, and the element type
  */
-export function getFieldMeta(messageTypeName: string): Record<
-  string,
-  {
-    number: number;
-    oneofIndex?: number;
-    typeName?: string;
-    repeated?: boolean;
-    type?: number;
-  }
-> {
+export function getFieldMeta(
+  messageTypeName: string,
+): Record<string, FieldMeta> {
   try {
     const registry = getRegistry();
     const descriptor = registry.messageMap.get(messageTypeName);
     if (!descriptor) {
       return {};
     }
-    const meta: Record<
-      string,
-      {
-        number: number;
-        oneofIndex?: number;
-        typeName?: string;
-        repeated?: boolean;
-        type?: number;
-      }
-    > = {};
+    const meta: Record<string, FieldMeta> = {};
     const fields = descriptor.field || [];
-    const LABEL_REPEATED = 3; // google.protobuf.FieldDescriptorProto.Label.LABEL_REPEATED
-    const TYPE_MESSAGE = 11; // google.protobuf.FieldDescriptorProto.Type.TYPE_MESSAGE
 
     for (const f of fields) {
-      const entry: {
-        number: number;
-        oneofIndex?: number;
-        typeName?: string;
-        repeated?: boolean;
-        type?: number;
-      } = {
-        number: f.number,
-      };
-      if (typeof f.oneofIndex === "number") {
-        entry.oneofIndex = f.oneofIndex;
-      }
-      // Record if this is a repeated field
-      if (f.label === LABEL_REPEATED) {
-        entry.repeated = true;
-      }
-      // Record the field type
-      if (typeof f.type === "number") {
-        entry.type = f.type;
-      }
-      // If this is a message-typed field, record fully qualified nested type name
-      // f.typeName may be like ".spark.TokensPayment"; normalize by trimming leading dot
-      if (
-        f.type === TYPE_MESSAGE &&
-        typeof f.typeName === "string" &&
-        f.typeName.length > 0
-      ) {
-        entry.typeName = f.typeName.startsWith(".")
-          ? f.typeName.slice(1)
-          : f.typeName;
+      const entry = makeFieldMeta(f);
+      if (!entry || !f.name) {
+        continue;
       }
       meta[f.name] = entry;
     }
@@ -211,4 +195,32 @@ export function getFieldMeta(messageTypeName: string): Record<
   } catch {
     return {};
   }
+}
+
+function makeFieldMeta(f: FieldDescriptorProto): FieldMeta | null {
+  if (f.number == null) {
+    return null;
+  }
+  const entry: FieldMeta = {
+    number: f.number,
+  };
+  if (typeof f.oneofIndex === "number") {
+    entry.oneofIndex = f.oneofIndex;
+  }
+  if (f.label === FieldDescriptorProto_Label.LABEL_REPEATED) {
+    entry.repeated = true;
+  }
+  if (typeof f.type === "number") {
+    entry.type = f.type;
+  }
+  if (
+    f.type === FieldDescriptorProto_Type.TYPE_MESSAGE &&
+    typeof f.typeName === "string" &&
+    f.typeName.length > 0
+  ) {
+    entry.typeName = f.typeName.startsWith(".")
+      ? f.typeName.slice(1)
+      : f.typeName;
+  }
+  return entry;
 }

@@ -1,8 +1,11 @@
-import { Transaction } from "@scure/btc-signer";
-import { NetworkType, SparkWallet } from "../../index.node.js";
-import { QueryTransfersResponse, Transfer } from "../../proto/spark.js";
+import { type Transaction } from "@scure/btc-signer";
+import { type NetworkType, SparkWallet } from "../../index.node.js";
+import {
+  type QueryTransfersResponse,
+  type Transfer,
+} from "../../proto/spark.js";
 import type { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
-import { SparkSigner } from "../../signer/signer.js";
+import { type SparkSigner } from "../../signer/signer.js";
 import { BitcoinFaucet } from "./test-faucet.js";
 
 export class SparkWalletTesting extends SparkWallet {

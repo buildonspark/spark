@@ -1,7 +1,8 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
@@ -33,7 +34,7 @@ export const InvoiceFromJson = (obj: any): Invoice => {
     createdAt: obj["invoice_created_at"],
     expiresAt: obj["invoice_expires_at"],
     memo: obj["invoice_memo"],
-  } as Invoice;
+  };
 };
 export const InvoiceToJson = (obj: Invoice): any => {
   return {

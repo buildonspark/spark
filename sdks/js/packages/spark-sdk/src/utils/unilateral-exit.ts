@@ -5,7 +5,7 @@ import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { ripemd160 } from "@noble/hashes/legacy";
 import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
-import * as psbt from "@scure/btc-signer/psbt";
+import type * as psbt from "@scure/btc-signer/psbt";
 import type { SparkServiceClient } from "../proto/spark.js";
 import {
   TreeNode,
@@ -216,7 +216,8 @@ export async function constructUnilateralExitFeeBumpPackages(
       }
 
       // Check if this might be a raw transaction hex instead of TreeNode hex
-      // Raw transaction hex typically starts with version (03000000 for version 3, required for TRUC/ephemeral anchors)
+      // Raw transaction hex typically starts with version (03000000 for version 3, required for
+      // TRUC/ephemeral anchors)
       if (
         hex.startsWith("03000000") ||
         hex.startsWith("02000000") ||
@@ -278,7 +279,7 @@ export async function constructUnilateralExitFeeBumpPackages(
     // Now walk down the chain from root to leaf to build fee bump packages
     for (const chainNode of chain) {
       // Add node tx and its fee bump
-      let nodeTxHex = bytesToHex(chainNode.nodeTx);
+      const nodeTxHex = bytesToHex(chainNode.nodeTx);
 
       // We skip tx's which have already been broadcasted, or we've seen in the past
       try {
@@ -344,7 +345,7 @@ export async function constructUnilateralExitFeeBumpPackages(
 
       // If this is the original node we started with, also add its refund tx
       if (chainNode.id === node.id) {
-        let refundTxHex = bytesToHex(chainNode.refundTx);
+        const refundTxHex = bytesToHex(chainNode.refundTx);
 
         const refundFeeBump = constructFeeBumpTx(
           refundTxHex,
@@ -376,8 +377,9 @@ export async function constructUnilateralExitFeeBumpPackages(
         }
 
         if (feeBumpOut)
-          // Add to end instead of the beginning in case there are other available UTXOs we can use first
-          // We don't want to wait on leaf 1 to be broadcasted to broadcast leaf 2 if we can use a different available UTXO
+          // Add to end instead of the beginning in case there are other available UTXOs we can use
+          // first We don't want to wait on leaf 1 to be broadcasted to broadcast leaf 2 if we can
+          // use a different available UTXO
           availableUtxos.push({
             txid: getTxId(feeBumpTx),
             vout: 0,

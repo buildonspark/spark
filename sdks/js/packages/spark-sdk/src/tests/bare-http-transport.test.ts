@@ -128,9 +128,7 @@ describe("BareHttpTransport", () => {
     jest.useFakeTimers();
 
     const req = createMockClientRequest();
-    jest
-      .spyOn(http, "request")
-      .mockImplementation((() => req) as unknown as typeof http.request);
+    jest.spyOn(http, "request").mockImplementation(() => req);
 
     const transport = BareHttpTransport();
     const iterator = transport({
@@ -165,12 +163,12 @@ describe("BareHttpTransport", () => {
   it("clears the unary wall-clock timeout after a non-2xx response", async () => {
     const req = createMockClientRequest();
     let onResponse: ((res: IncomingMessage) => void) | undefined;
-    jest.spyOn(http, "request").mockImplementation(((
-      ...args: Parameters<typeof http.request>
-    ) => {
-      onResponse = args[2];
-      return req;
-    }) as typeof http.request);
+    jest
+      .spyOn(http, "request")
+      .mockImplementation((...args: Parameters<typeof http.request>) => {
+        onResponse = args[2];
+        return req;
+      });
 
     const { res } = createMockIncomingMessage();
     Object.assign(res, {
@@ -218,7 +216,7 @@ describe("BareHttpTransport", () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
     expect(onResponse).toBeDefined();
-    onResponse?.(res as unknown as IncomingMessage);
+    onResponse?.(res);
     await headerPromise;
 
     const errorPromise = iterator.next().then(
@@ -247,20 +245,20 @@ describe("BareHttpTransport", () => {
     const requests = [streamReq, unaryReq];
     const responseCallbacks: Array<(res: IncomingMessage) => void> = [];
 
-    jest.spyOn(http, "request").mockImplementation(((
-      ...args: Parameters<typeof http.request>
-    ) => {
-      const onResponse = args[2];
-      if (onResponse == null) {
-        throw new Error("missing response callback");
-      }
-      responseCallbacks.push(onResponse);
-      const req = requests.shift();
-      if (req == null) {
-        throw new Error("unexpected extra request");
-      }
-      return req;
-    }) as typeof http.request);
+    jest
+      .spyOn(http, "request")
+      .mockImplementation((...args: Parameters<typeof http.request>) => {
+        const onResponse = args[2];
+        if (onResponse == null) {
+          throw new Error("missing response callback");
+        }
+        responseCallbacks.push(onResponse);
+        const req = requests.shift();
+        if (req == null) {
+          throw new Error("unexpected extra request");
+        }
+        return req;
+      });
     unaryReq.destroy.mockImplementation(((error?: Error) => {
       if (error != null) {
         setImmediate(() => unaryReq.emit("error", error));

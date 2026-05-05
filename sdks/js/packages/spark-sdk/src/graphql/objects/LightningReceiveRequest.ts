@@ -1,15 +1,17 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import Invoice, { InvoiceFromJson, InvoiceToJson } from "./Invoice.js";
+import type Invoice from "./Invoice.js";
+import { InvoiceFromJson, InvoiceToJson } from "./Invoice.js";
 import LightningReceiveRequestStatus from "./LightningReceiveRequestStatus.js";
-import Transfer, { TransferFromJson } from "./Transfer.js";
+import type Transfer from "./Transfer.js";
+import { TransferFromJson } from "./Transfer.js";
 
 interface LightningReceiveRequest {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 
@@ -66,7 +68,7 @@ export const LightningReceiveRequestFromJson = (
     receiverIdentityPublicKey:
       obj["lightning_receive_request_receiver_identity_public_key"],
     sparkInvoice: obj["lightning_receive_request_spark_invoice"],
-  } as LightningReceiveRequest;
+  };
 };
 export const LightningReceiveRequestToJson = (
   obj: LightningReceiveRequest,

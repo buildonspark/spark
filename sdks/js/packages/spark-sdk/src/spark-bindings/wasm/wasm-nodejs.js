@@ -2004,7 +2004,7 @@ export const __wbg_new_5a79be3ab53b8aa5 = imports.__wbg_new_5a79be3ab53b8aa5 = f
 };
 
 export const __wbg_new_e17d9f43105b08be = imports.__wbg_new_e17d9f43105b08be = function() {
-    const ret = new Array();
+    const ret = [];
     return ret;
 };
 

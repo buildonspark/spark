@@ -4,7 +4,7 @@ import { ExitSpeed } from "../../../types/index.js";
 import { getNewAddress } from "../../utils/regtest-test-faucet.js";
 import {
   initTestingWallet,
-  SparkWalletTesting,
+  type SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
 import { retryUntilSuccess } from "../../utils/utils.js";
 
@@ -32,7 +32,7 @@ describe("SSP coop exit basic validation", () => {
     const quote = await retryUntilSuccess(async () => {
       const q = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
       if (!q) throw new Error("Quote not available yet");
       return q;
@@ -122,7 +122,7 @@ describe("SSP coop exit basic validation", () => {
     await expect(
       userWallet.getWithdrawalFeeQuote({
         amountSats: 1000,
-        withdrawalAddress: "" as unknown as string,
+        withdrawalAddress: "",
       }),
     ).rejects.toThrow("Invalid address provided");
   }, 600000);
@@ -181,7 +181,7 @@ describe("SSP coop exit basic validation", () => {
       message: expect.stringContaining("Invalid exit speed"),
       context: expect.objectContaining({
         field: "exitSpeed",
-        value: "INVALID" as ExitSpeed,
+        value: "INVALID",
         expected: "FAST, MEDIUM, or SLOW",
       }),
     });

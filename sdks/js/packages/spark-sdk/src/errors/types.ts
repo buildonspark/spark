@@ -28,8 +28,8 @@ export class SparkRequestError extends SparkError {
 }
 
 /**
- * SparkValidationError should be used for any errors related to data validation in regards to the user's input,
- * This includes:
+ * SparkValidationError should be used for any errors related to data validation in regards to the
+ * user's input, This includes:
  * - Invalid signatures
  * - Malformed addresses
  * - Invalid proof of possession
@@ -43,8 +43,8 @@ export class SparkValidationError extends SparkError {
 }
 
 /**
- * SparkAuthenticationError should be used specifically for authentication and authorization failures,
- * such as invalid credentials or insufficient permissions.
+ * SparkAuthenticationError should be used specifically for authentication and authorization
+ * failures, such as invalid credentials or insufficient permissions.
  * This includes:
  * - Invalid API keys
  * - Expired tokens

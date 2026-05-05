@@ -6,8 +6,8 @@ interface RequestLightningSendInput {
   idempotencyKey?: string | undefined;
 
   /**
-   * The amount you will pay for this invoice in sats. It should ONLY be set when the invoice amount is
-   * zero.
+   * The amount you will pay for this invoice in sats. It should ONLY be set when the invoice
+   * amount is zero.
    **/
   amountSats?: number | undefined;
 
@@ -24,7 +24,7 @@ export const RequestLightningSendInputFromJson = (
     userOutboundTransferExternalId:
       obj["request_lightning_send_input_user_outbound_transfer_external_id"] ??
       undefined,
-  } as RequestLightningSendInput;
+  };
 };
 export const RequestLightningSendInputToJson = (
   obj: RequestLightningSendInput,

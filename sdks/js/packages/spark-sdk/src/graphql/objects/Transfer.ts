@@ -2,11 +2,13 @@
 
 import autoBind from "../../auto-bind.js";
 import type LightsparkClient from "../client.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
-import SparkTransferToLeavesConnection, {
+import type SparkTransferToLeavesConnection from "./SparkTransferToLeavesConnection.js";
+import {
   SparkTransferToLeavesConnectionFromJson,
 } from "./SparkTransferToLeavesConnection.js";
 

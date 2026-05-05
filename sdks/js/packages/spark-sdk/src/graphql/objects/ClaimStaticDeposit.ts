@@ -1,17 +1,18 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
 import ClaimStaticDepositStatus from "./ClaimStaticDepositStatus.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
 
 interface ClaimStaticDeposit {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 
@@ -71,7 +72,7 @@ export const ClaimStaticDepositFromJson = (obj: any): ClaimStaticDeposit => {
       BitcoinNetwork.FUTURE_VALUE,
     typename: "ClaimStaticDeposit",
     transferSparkId: obj["claim_static_deposit_transfer_spark_id"],
-  } as ClaimStaticDeposit;
+  };
 };
 export const ClaimStaticDepositToJson = (obj: ClaimStaticDeposit): any => {
   return {

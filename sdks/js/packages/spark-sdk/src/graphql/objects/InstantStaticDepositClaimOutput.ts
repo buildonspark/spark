@@ -9,7 +9,7 @@ export const InstantStaticDepositClaimOutputFromJson = (
 ): InstantStaticDepositClaimOutput => {
   return {
     claimId: obj["instant_claim_output_claim_id"],
-  } as InstantStaticDepositClaimOutput;
+  };
 };
 
 export const FRAGMENT = `

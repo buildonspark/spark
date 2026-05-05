@@ -19,7 +19,7 @@ export const RequestLightningSendOutputFromJson = (obj: any): RequestLightningSe
     return {
         requestId: obj["request_lightning_send_output_request"].id,
 
-        } as RequestLightningSendOutput;
+        };
 
 }
 export const RequestLightningSendOutputToJson = (obj: RequestLightningSendOutput): any => {

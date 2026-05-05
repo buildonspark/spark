@@ -43,11 +43,11 @@ describe("SSP static deposit address integration", () => {
 
       const quote = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
 
-      const quoteAmount = quote!.creditAmountSats;
-      const sspSignature = quote!.signature;
+      const quoteAmount = quote.creditAmountSats;
+      const sspSignature = quote.signature;
 
       await retryUntilSuccess(
         async () =>
@@ -72,8 +72,8 @@ describe("SSP static deposit address integration", () => {
       // Test claiming and getting the quote without passing in the output index.
       const quote2 =
         await userWallet.getClaimStaticDepositQuote(transactionId2);
-      const quoteAmount2 = quote2!.creditAmountSats;
-      const sspSignature2 = quote2!.signature;
+      const quoteAmount2 = quote2.creditAmountSats;
+      const sspSignature2 = quote2.signature;
       await userWallet.claimStaticDeposit({
         transactionId: transactionId2,
         creditAmountSats: quoteAmount2,
@@ -92,7 +92,7 @@ describe("SSP static deposit address integration", () => {
       // Get quote so we can calculate the expected balance. Not needed for actual flow.
       const quote3 =
         await userWallet.getClaimStaticDepositQuote(transactionId3);
-      const quoteAmount3 = quote3!.creditAmountSats;
+      const quoteAmount3 = quote3.creditAmountSats;
       await userWallet.claimStaticDepositWithMaxFee({
         transactionId: transactionId3,
         maxFee: 1000,
@@ -136,10 +136,10 @@ describe("SSP static deposit address integration", () => {
 
       const quote = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
-      const quoteAmount = quote!.creditAmountSats;
-      const sspSignature = quote!.signature;
+      const quoteAmount = quote.creditAmountSats;
+      const sspSignature = quote.signature;
 
       // Claim the deposit and capture the returned transfer ID
       const claimResult = await retryUntilSuccess(
@@ -267,11 +267,11 @@ describe("SSP static deposit address integration", () => {
 
       const quote = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
 
-      const quoteAmount = quote!.creditAmountSats;
-      const sspSignature = quote!.signature;
+      const quoteAmount = quote.creditAmountSats;
+      const sspSignature = quote.signature;
 
       await retryUntilSuccess(
         async () =>
@@ -296,8 +296,8 @@ describe("SSP static deposit address integration", () => {
       // Test claiming and getting the quote without passing in the output index.
       const quote2 =
         await userWallet.getClaimStaticDepositQuote(transactionId2);
-      const quoteAmount2 = quote2!.creditAmountSats;
-      const sspSignature2 = quote2!.signature;
+      const quoteAmount2 = quote2.creditAmountSats;
+      const sspSignature2 = quote2.signature;
       await retryUntilSuccess(
         async () =>
           await userWallet.claimStaticDeposit({
@@ -319,7 +319,7 @@ describe("SSP static deposit address integration", () => {
       // Get quote so we can calculate the expected balance. Not needed for actual flow.
       const quote3 =
         await userWallet.getClaimStaticDepositQuote(transactionId3);
-      const quoteAmount3 = quote3!.creditAmountSats;
+      const quoteAmount3 = quote3.creditAmountSats;
       await retryUntilSuccess(
         async () =>
           await userWallet.claimStaticDepositWithMaxFee({
@@ -620,10 +620,10 @@ describe("SSP static deposit address integration", () => {
       console.log("Fetching claim quote for static deposit...");
       const quote = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
 
-      const quoteAmount = quote!.creditAmountSats;
+      const quoteAmount = quote.creditAmountSats;
 
       // Generate a fake signature (64 bytes of random data to simulate a signature)
       const fakeSignature = new Uint8Array(64);
@@ -658,11 +658,11 @@ describe("SSP static deposit address integration", () => {
       console.log("Fetching claim quote for static deposit...");
       const quote = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
 
-      const quoteAmount = quote!.creditAmountSats;
-      const sspSignature = quote!.signature;
+      const quoteAmount = quote.creditAmountSats;
+      const sspSignature = quote.signature;
 
       console.log("Attempting to claim static deposit for the first time...");
       const outputs = await userWallet.claimStaticDeposit({
@@ -706,11 +706,11 @@ describe("SSP static deposit address integration", () => {
 
       const quote = await userWallet.getClaimStaticDepositQuote(
         transactionId,
-        vout!,
+        vout,
       );
 
-      const quoteAmount = quote!.creditAmountSats;
-      const sspSignature = quote!.signature;
+      const quoteAmount = quote.creditAmountSats;
+      const sspSignature = quote.signature;
 
       console.log("Attempting to claim static deposit...");
       await userWallet.claimStaticDeposit({

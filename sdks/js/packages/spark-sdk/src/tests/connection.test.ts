@@ -48,7 +48,7 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
     const close =
       channelKey != null
         ? () => TestConnectionManager.releaseChannel(channelKey)
-        : (channel.close.bind(channel) as () => void);
+        : channel.close.bind(channel);
     return { close } as T & { close?: () => void };
   }
 
@@ -279,7 +279,7 @@ describe("ConnectionManager middleware", () => {
       const close =
         channelKey != null
           ? () => MiddlewareTestConnectionManager.releaseChannel(channelKey)
-          : (channel.close.bind(channel) as () => void);
+          : channel.close.bind(channel);
       return { close } as T & { close?: () => void };
     }
 
@@ -316,7 +316,7 @@ describe("ConnectionManager middleware", () => {
     const call: ClientMiddlewareCall<Req, Res> = {
       method,
       requestStream: false,
-      request: { id: 1 } as Req,
+      request: { id: 1 },
       responseStream: false,
       next: async function* (_request: Req, options: CallOptions) {
         const auth = options.metadata?.get("Authorization");
@@ -326,11 +326,11 @@ describe("ConnectionManager middleware", () => {
           throw new Error("token has expired");
         }
         expect(auth).toBe("Bearer t2");
-        return "ok" as Res;
+        return "ok";
       },
     };
 
-    const gen = middleware(call, {} as unknown as SparkCallOptions);
+    const gen = middleware(call, {});
     const result = await gen.next();
     expect(result.done).toBe(true);
     expect(result.value).toBe("ok");
@@ -363,7 +363,7 @@ describe("ConnectionManager middleware", () => {
       const close =
         channelKey != null
           ? () => AuthCachingTestConnectionManager.releaseChannel(channelKey)
-          : (channel.close.bind(channel) as () => void);
+          : channel.close.bind(channel);
 
       const self = this;
       const fakeAuthClient = {
@@ -424,15 +424,15 @@ describe("ConnectionManager middleware", () => {
       ({
         method,
         requestStream: false,
-        request: { id: 1 } as Req,
+        request: { id: 1 },
         responseStream: false,
         next: async function* () {
-          return "ok" as Res;
+          return "ok";
         },
       }) as ClientMiddlewareCall<Req, Res>;
 
-    const g1 = middleware(buildCall(), {} as unknown as SparkCallOptions);
-    const g2 = middleware(buildCall(), {} as unknown as SparkCallOptions);
+    const g1 = middleware(buildCall(), {});
+    const g2 = middleware(buildCall(), {});
 
     const [r1, r2] = await Promise.all([g1.next(), g2.next()]);
     expect(r1.value).toBe("ok");
@@ -462,23 +462,19 @@ describe("ConnectionManager middleware", () => {
     const call: ClientMiddlewareCall<Req, Res> = {
       method,
       requestStream: false,
-      request: { id: 1 } as Req,
+      request: { id: 1 },
       responseStream: false,
       next: async function* () {
-        return "ok" as Res;
+        return "ok";
       },
     };
 
-    const r1 = await (
-      await middleware(call, {} as unknown as SparkCallOptions)
-    ).next();
+    const r1 = await (await middleware(call, {})).next();
     expect(r1.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(1);
     expect(mgr.verifyChallengeCalls).toBe(1);
 
-    const r2 = await (
-      await middleware(call, {} as unknown as SparkCallOptions)
-    ).next();
+    const r2 = await (await middleware(call, {})).next();
     expect(r2.value).toBe("ok");
     // Still one call due to token cache
     expect(mgr.getChallengeCalls).toBe(1);
@@ -526,7 +522,7 @@ describe("ConnectionManager middleware", () => {
         const close =
           channelKey != null
             ? () => AuthRetryTestConnectionManager.releaseChannel(channelKey)
-            : (channel.close.bind(channel) as () => void);
+            : channel.close.bind(channel);
 
         const self = this;
         const fakeClient = {
@@ -632,30 +628,24 @@ describe("ConnectionManager middleware", () => {
     const call: ClientMiddlewareCall<Req, Res> = {
       method,
       requestStream: false,
-      request: { id: 1 } as Req,
+      request: { id: 1 },
       responseStream: false,
       next: async function* () {
-        return "ok" as Res;
+        return "ok";
       },
     };
 
-    const r1 = await (
-      await middleware1(call, {} as unknown as SparkCallOptions)
-    ).next();
+    const r1 = await (await middleware1(call, {})).next();
     expect(r1.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(1);
     expect(mgr.verifyChallengeCalls).toBe(1);
 
-    const r2 = await (
-      await middleware2(call, {} as unknown as SparkCallOptions)
-    ).next();
+    const r2 = await (await middleware2(call, {})).next();
     expect(r2.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(2);
     expect(mgr.verifyChallengeCalls).toBe(2);
 
-    const r3 = await (
-      await middleware1(call, {} as unknown as SparkCallOptions)
-    ).next();
+    const r3 = await (await middleware1(call, {})).next();
     expect(r3.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(2);
     expect(mgr.verifyChallengeCalls).toBe(2);

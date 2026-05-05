@@ -97,7 +97,7 @@ function HashSparkInvoiceV1(
 
   switch (paymentType?.$case) {
     case "tokensPayment": {
-      const tp = paymentType!.tokensPayment;
+      const tp = paymentType.tokensPayment;
       // discriminator {1}
       const discrHash = sha256.create();
       discrHash.update(new Uint8Array([1]));
@@ -129,7 +129,7 @@ function HashSparkInvoiceV1(
       break;
     }
     case "satsPayment": {
-      const sp = paymentType!.satsPayment;
+      const sp = paymentType.satsPayment;
       // discriminator {2}
       const discrHash = sha256.create();
       discrHash.update(new Uint8Array([2]));

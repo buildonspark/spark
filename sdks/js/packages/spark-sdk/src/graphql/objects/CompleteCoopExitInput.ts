@@ -14,7 +14,7 @@ export const CompleteCoopExitInputFromJson = (
       obj["complete_coop_exit_input_user_outbound_transfer_external_id"],
     coopExitRequestId:
       obj["complete_coop_exit_input_coop_exit_request_id"] ?? undefined,
-  } as CompleteCoopExitInput;
+  };
 };
 export const CompleteCoopExitInputToJson = (
   obj: CompleteCoopExitInput,

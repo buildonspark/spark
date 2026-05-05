@@ -1,19 +1,22 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
 import SparkLeavesSwapRequestStatus from "./SparkLeavesSwapRequestStatus.js";
-import SwapLeaf, { SwapLeafFromJson, SwapLeafToJson } from "./SwapLeaf.js";
-import Transfer, { TransferFromJson } from "./Transfer.js";
+import type SwapLeaf from "./SwapLeaf.js";
+import { SwapLeafFromJson, SwapLeafToJson } from "./SwapLeaf.js";
+import type Transfer from "./Transfer.js";
+import { TransferFromJson } from "./Transfer.js";
 
 interface LeavesSwapRequest {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 
@@ -83,7 +86,7 @@ export const LeavesSwapRequestFromJson = (obj: any): LeavesSwapRequest => {
       ? TransferFromJson(obj["leaves_swap_request_outbound_transfer"])
       : undefined,
     expiresAt: obj["leaves_swap_request_expires_at"],
-  } as LeavesSwapRequest;
+  };
 };
 export const LeavesSwapRequestToJson = (obj: LeavesSwapRequest): any => {
   return {

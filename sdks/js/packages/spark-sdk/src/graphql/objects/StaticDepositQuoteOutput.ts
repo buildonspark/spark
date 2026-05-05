@@ -36,7 +36,7 @@ export const StaticDepositQuoteOutputFromJson = (obj: any): StaticDepositQuoteOu
         creditAmountSats: obj["static_deposit_quote_output_credit_amount_sats"],
         signature: obj["static_deposit_quote_output_signature"],
 
-        } as StaticDepositQuoteOutput;
+        };
 
 }
 export const StaticDepositQuoteOutputToJson = (obj: StaticDepositQuoteOutput): any => {

@@ -1,6 +1,6 @@
 import { SparkWallet as BaseSparkWallet } from "./spark-wallet.js";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
-import { WalletConfigService } from "../services/config.js";
+import { type WalletConfigService } from "../services/config.js";
 import type { LoggingService } from "../utils/logging-service.js";
 
 export class SparkWalletNodeJS extends BaseSparkWallet {

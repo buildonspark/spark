@@ -1,16 +1,17 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { Query, isObject } from "@lightsparkdev/core";
+import { type Query, isObject } from "@lightsparkdev/core";
 import BitcoinNetwork from "./BitcoinNetwork.js";
-import CurrencyAmount, {
+import type CurrencyAmount from "./CurrencyAmount.js";
+import {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
 } from "./CurrencyAmount.js";
 
 interface CoopExitFeeQuote {
   /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an
+   * opaque string.
    **/
   id: string;
 
@@ -26,13 +27,22 @@ interface CoopExitFeeQuote {
   /** The total currency amount of all the nodes user swapped for the coop exit quote. **/
   totalAmount: CurrencyAmount;
 
-  /** The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is fast. **/
+  /**
+   * The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is
+   * fast. *
+   */
   userFeeFast: CurrencyAmount;
 
-  /** The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is medium. **/
+  /**
+   * The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is
+   * medium. *
+   */
   userFeeMedium: CurrencyAmount;
 
-  /** The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is slow. **/
+  /**
+   * The fee user pays for the coop exit not including the L1 broadcast fee when exit speed is
+   * slow. *
+   */
   userFeeSlow: CurrencyAmount;
 
   /** The L1 broadcast fee user pays for the coop exit when exit speed is fast. **/
@@ -82,7 +92,7 @@ export const CoopExitFeeQuoteFromJson = (obj: any): CoopExitFeeQuote => {
     ),
     expiresAt: obj["coop_exit_fee_quote_expires_at"],
     typename: "CoopExitFeeQuote",
-  } as CoopExitFeeQuote;
+  };
 };
 export const CoopExitFeeQuoteToJson = (obj: CoopExitFeeQuote): any => {
   return {

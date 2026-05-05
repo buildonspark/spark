@@ -32,7 +32,7 @@ describe("address", () => {
           ]);
 
           // Verify each address is unique and valid
-          let addressMap = new Map<string, string>();
+          const addressMap = new Map<string, string>();
           for (const depositAddress of depositAddresses) {
             expect(depositAddress).toMatch(
               new RegExp(`^${blockchainAddressPrefix}1[a-zA-Z0-9]{59}$`),

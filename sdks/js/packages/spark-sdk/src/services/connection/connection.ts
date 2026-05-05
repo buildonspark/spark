@@ -5,7 +5,7 @@ import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
 import {
   ClientError,
-  ClientMiddlewareCall,
+  type ClientMiddlewareCall,
   Metadata,
   Status,
 } from "nice-grpc-common";
@@ -14,22 +14,22 @@ import { uuidv7 } from "uuidv7";
 import { SparkError } from "../../errors/base.js";
 import { SparkAuthenticationError } from "../../errors/types.js";
 import {
-  SparkServiceClient,
+  type SparkServiceClient,
   SparkServiceDefinition,
 } from "../../proto/spark.js";
 import {
   Challenge,
-  SparkAuthnServiceClient,
+  type SparkAuthnServiceClient,
   SparkAuthnServiceDefinition,
 } from "../../proto/spark_authn.js";
 import {
-  SparkTokenServiceClient,
+  type SparkTokenServiceClient,
   SparkTokenServiceDefinition,
 } from "../../proto/spark_token.js";
-import { SparkCallOptions } from "../../types/grpc.js";
+import { type SparkCallOptions } from "../../types/grpc.js";
 import { formatUrlForLogs } from "../../utils/logging.js";
 import { LoggingService } from "../../utils/logging-service.js";
-import { WalletConfigService } from "../config.js";
+import { type WalletConfigService } from "../config.js";
 import { ServerTimeSync, getMonotonicTime } from "../time-sync.js";
 
 // Module-level types used by shared caches
@@ -120,7 +120,7 @@ export abstract class ConnectionManager {
       channelPromise = (async () => {
         const ch = (await create()) as BrowserOrNodeJSChannel;
         ConnectionManager.channelCache.set(key, { channel: ch, refCount: 1 });
-        return ch as BrowserOrNodeJSChannel;
+        return ch;
       })();
       ConnectionManager.channelInflight.set(key, channelPromise);
     }
@@ -263,7 +263,8 @@ export abstract class ConnectionManager {
   protected readonly logger: Logger;
   private readonly logging: LoggingService;
 
-  // Note clientsByType is a per instance cache whereas channelCache is static and shared by all instances
+  // Note clientsByType is a per instance cache whereas channelCache is static and shared by all
+  // instances
   private clientsByType: Map<
     SparkClientType,
     Map<Address, { client: ClientWithClose<unknown>; channelKey: ChannelKey }>
@@ -623,8 +624,9 @@ export abstract class ConnectionManager {
 
               // Since the server time isn't known at the time,
               // the first auth call computes TTL from the client clock (monotonic + wall clock)
-              // If the client clock is skewed these tokens may expire before the eviction check can catch them
-              // Invalidate any tokens that were cached before the server time was known.
+              // If the client clock is skewed these tokens may expire before the eviction check
+              // can catch them Invalidate any tokens that were cached before the server time was
+              // known.
               if (!wasSynced && this.timeSync.isSynced()) {
                 ConnectionManager.authTokenCache.clear();
               }

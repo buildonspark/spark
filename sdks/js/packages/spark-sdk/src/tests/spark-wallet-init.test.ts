@@ -7,7 +7,7 @@ import {
   it,
   jest,
 } from "@jest/globals";
-import { WalletConfigService } from "../services/config.js";
+import { type WalletConfigService } from "../services/config.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.js";
 
 class InitServiceRefreshTestWallet extends SparkWallet {
@@ -78,10 +78,8 @@ describe("SparkWallet initialization", () => {
     expect(internalWallet.sspClient.logger).toBe(originalSspLogger);
     expect(originalSspLogger.context).not.toBe(originalSspLoggerContext);
     expect(originalSspLogger.context).toMatch(/^SspClient:[0-9a-f]{8}$/);
-    expect((internalWallet.swapService as any).sspClient).toBe(
-      internalWallet.sspClient,
-    );
-    expect((internalWallet.leafManager as any).swapService).toBe(
+    expect(internalWallet.swapService.sspClient).toBe(internalWallet.sspClient);
+    expect(internalWallet.leafManager.swapService).toBe(
       internalWallet.swapService,
     );
   });
