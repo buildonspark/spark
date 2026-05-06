@@ -30,6 +30,8 @@ const (
 	FieldStatus = "status"
 	// FieldCompletionTime holds the string denoting the completion_time field in the database.
 	FieldCompletionTime = "completion_time"
+	// FieldTransferType holds the string denoting the transfer_type field in the database.
+	FieldTransferType = "transfer_type"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// Table holds the table name of the transferreceiver in the database.
@@ -52,6 +54,7 @@ var Columns = []string{
 	FieldIdentityPubkey,
 	FieldStatus,
 	FieldCompletionTime,
+	FieldTransferType,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -91,6 +94,16 @@ func StatusValidator(s schematype.TransferReceiverStatus) error {
 	}
 }
 
+// TransferTypeValidator is a validator for the "transfer_type" field enum values. It is called by the builders before save.
+func TransferTypeValidator(tt schematype.TransferType) error {
+	switch tt {
+	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3":
+		return nil
+	default:
+		return fmt.Errorf("transferreceiver: invalid enum value for transfer_type field: %q", tt)
+	}
+}
+
 // OrderOption defines the ordering options for the TransferReceiver queries.
 type OrderOption func(*sql.Selector)
 
@@ -122,6 +135,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByCompletionTime orders the results by the completion_time field.
 func ByCompletionTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCompletionTime, opts...).ToFunc()
+}
+
+// ByTransferType orders the results by the transfer_type field.
+func ByTransferType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTransferType, opts...).ToFunc()
 }
 
 // ByTransferField orders the results by transfer field.

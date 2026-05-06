@@ -70,6 +70,26 @@ func (tru *TransferReceiverUpdate) ClearCompletionTime() *TransferReceiverUpdate
 	return tru
 }
 
+// SetTransferType sets the "transfer_type" field.
+func (tru *TransferReceiverUpdate) SetTransferType(st schematype.TransferType) *TransferReceiverUpdate {
+	tru.mutation.SetTransferType(st)
+	return tru
+}
+
+// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
+func (tru *TransferReceiverUpdate) SetNillableTransferType(st *schematype.TransferType) *TransferReceiverUpdate {
+	if st != nil {
+		tru.SetTransferType(*st)
+	}
+	return tru
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (tru *TransferReceiverUpdate) ClearTransferType() *TransferReceiverUpdate {
+	tru.mutation.ClearTransferType()
+	return tru
+}
+
 // Mutation returns the TransferReceiverMutation object of the builder.
 func (tru *TransferReceiverUpdate) Mutation() *TransferReceiverMutation {
 	return tru.mutation
@@ -124,6 +144,11 @@ func (tru *TransferReceiverUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.status": %w`, err)}
 		}
 	}
+	if v, ok := tru.mutation.TransferType(); ok {
+		if err := transferreceiver.TransferTypeValidator(v); err != nil {
+			return &ValidationError{Name: "transfer_type", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.transfer_type": %w`, err)}
+		}
+	}
 	if tru.mutation.TransferCleared() && len(tru.mutation.TransferIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TransferReceiver.transfer"`)
 	}
@@ -159,6 +184,12 @@ func (tru *TransferReceiverUpdate) sqlSave(ctx context.Context) (n int, err erro
 	}
 	if tru.mutation.CompletionTimeCleared() {
 		_spec.ClearField(transferreceiver.FieldCompletionTime, field.TypeTime)
+	}
+	if value, ok := tru.mutation.TransferType(); ok {
+		_spec.SetField(transferreceiver.FieldTransferType, field.TypeEnum, value)
+	}
+	if tru.mutation.TransferTypeCleared() {
+		_spec.ClearField(transferreceiver.FieldTransferType, field.TypeEnum)
 	}
 	_spec.AddModifiers(tru.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tru.driver, _spec); err != nil {
@@ -219,6 +250,26 @@ func (truo *TransferReceiverUpdateOne) SetNillableCompletionTime(t *time.Time) *
 // ClearCompletionTime clears the value of the "completion_time" field.
 func (truo *TransferReceiverUpdateOne) ClearCompletionTime() *TransferReceiverUpdateOne {
 	truo.mutation.ClearCompletionTime()
+	return truo
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (truo *TransferReceiverUpdateOne) SetTransferType(st schematype.TransferType) *TransferReceiverUpdateOne {
+	truo.mutation.SetTransferType(st)
+	return truo
+}
+
+// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
+func (truo *TransferReceiverUpdateOne) SetNillableTransferType(st *schematype.TransferType) *TransferReceiverUpdateOne {
+	if st != nil {
+		truo.SetTransferType(*st)
+	}
+	return truo
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (truo *TransferReceiverUpdateOne) ClearTransferType() *TransferReceiverUpdateOne {
+	truo.mutation.ClearTransferType()
 	return truo
 }
 
@@ -289,6 +340,11 @@ func (truo *TransferReceiverUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.status": %w`, err)}
 		}
 	}
+	if v, ok := truo.mutation.TransferType(); ok {
+		if err := transferreceiver.TransferTypeValidator(v); err != nil {
+			return &ValidationError{Name: "transfer_type", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.transfer_type": %w`, err)}
+		}
+	}
 	if truo.mutation.TransferCleared() && len(truo.mutation.TransferIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TransferReceiver.transfer"`)
 	}
@@ -341,6 +397,12 @@ func (truo *TransferReceiverUpdateOne) sqlSave(ctx context.Context) (_node *Tran
 	}
 	if truo.mutation.CompletionTimeCleared() {
 		_spec.ClearField(transferreceiver.FieldCompletionTime, field.TypeTime)
+	}
+	if value, ok := truo.mutation.TransferType(); ok {
+		_spec.SetField(transferreceiver.FieldTransferType, field.TypeEnum, value)
+	}
+	if truo.mutation.TransferTypeCleared() {
+		_spec.ClearField(transferreceiver.FieldTransferType, field.TypeEnum)
 	}
 	_spec.AddModifiers(truo.modifiers...)
 	_node = &TransferReceiver{config: truo.config}

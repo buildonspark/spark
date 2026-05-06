@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 )
@@ -63,6 +64,20 @@ func (tsc *TransferSenderCreate) SetTransferID(u uuid.UUID) *TransferSenderCreat
 // SetIdentityPubkey sets the "identity_pubkey" field.
 func (tsc *TransferSenderCreate) SetIdentityPubkey(k keys.Public) *TransferSenderCreate {
 	tsc.mutation.SetIdentityPubkey(k)
+	return tsc
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (tsc *TransferSenderCreate) SetTransferType(st schematype.TransferType) *TransferSenderCreate {
+	tsc.mutation.SetTransferType(st)
+	return tsc
+}
+
+// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
+func (tsc *TransferSenderCreate) SetNillableTransferType(st *schematype.TransferType) *TransferSenderCreate {
+	if st != nil {
+		tsc.SetTransferType(*st)
+	}
 	return tsc
 }
 
@@ -148,6 +163,11 @@ func (tsc *TransferSenderCreate) check() error {
 	if _, ok := tsc.mutation.IdentityPubkey(); !ok {
 		return &ValidationError{Name: "identity_pubkey", err: errors.New(`ent: missing required field "TransferSender.identity_pubkey"`)}
 	}
+	if v, ok := tsc.mutation.TransferType(); ok {
+		if err := transfersender.TransferTypeValidator(v); err != nil {
+			return &ValidationError{Name: "transfer_type", err: fmt.Errorf(`ent: validator failed for field "TransferSender.transfer_type": %w`, err)}
+		}
+	}
 	if len(tsc.mutation.TransferIDs()) == 0 {
 		return &ValidationError{Name: "transfer", err: errors.New(`ent: missing required edge "TransferSender.transfer"`)}
 	}
@@ -198,6 +218,10 @@ func (tsc *TransferSenderCreate) createSpec() (*TransferSender, *sqlgraph.Create
 	if value, ok := tsc.mutation.IdentityPubkey(); ok {
 		_spec.SetField(transfersender.FieldIdentityPubkey, field.TypeBytes, value)
 		_node.IdentityPubkey = value
+	}
+	if value, ok := tsc.mutation.TransferType(); ok {
+		_spec.SetField(transfersender.FieldTransferType, field.TypeEnum, value)
+		_node.TransferType = value
 	}
 	if nodes := tsc.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -280,6 +304,24 @@ func (u *TransferSenderUpsert) UpdateUpdateTime() *TransferSenderUpsert {
 	return u
 }
 
+// SetTransferType sets the "transfer_type" field.
+func (u *TransferSenderUpsert) SetTransferType(v schematype.TransferType) *TransferSenderUpsert {
+	u.Set(transfersender.FieldTransferType, v)
+	return u
+}
+
+// UpdateTransferType sets the "transfer_type" field to the value that was provided on create.
+func (u *TransferSenderUpsert) UpdateTransferType() *TransferSenderUpsert {
+	u.SetExcluded(transfersender.FieldTransferType)
+	return u
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (u *TransferSenderUpsert) ClearTransferType() *TransferSenderUpsert {
+	u.SetNull(transfersender.FieldTransferType)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -348,6 +390,27 @@ func (u *TransferSenderUpsertOne) SetUpdateTime(v time.Time) *TransferSenderUpse
 func (u *TransferSenderUpsertOne) UpdateUpdateTime() *TransferSenderUpsertOne {
 	return u.Update(func(s *TransferSenderUpsert) {
 		s.UpdateUpdateTime()
+	})
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (u *TransferSenderUpsertOne) SetTransferType(v schematype.TransferType) *TransferSenderUpsertOne {
+	return u.Update(func(s *TransferSenderUpsert) {
+		s.SetTransferType(v)
+	})
+}
+
+// UpdateTransferType sets the "transfer_type" field to the value that was provided on create.
+func (u *TransferSenderUpsertOne) UpdateTransferType() *TransferSenderUpsertOne {
+	return u.Update(func(s *TransferSenderUpsert) {
+		s.UpdateTransferType()
+	})
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (u *TransferSenderUpsertOne) ClearTransferType() *TransferSenderUpsertOne {
+	return u.Update(func(s *TransferSenderUpsert) {
+		s.ClearTransferType()
 	})
 }
 
@@ -586,6 +649,27 @@ func (u *TransferSenderUpsertBulk) SetUpdateTime(v time.Time) *TransferSenderUps
 func (u *TransferSenderUpsertBulk) UpdateUpdateTime() *TransferSenderUpsertBulk {
 	return u.Update(func(s *TransferSenderUpsert) {
 		s.UpdateUpdateTime()
+	})
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (u *TransferSenderUpsertBulk) SetTransferType(v schematype.TransferType) *TransferSenderUpsertBulk {
+	return u.Update(func(s *TransferSenderUpsert) {
+		s.SetTransferType(v)
+	})
+}
+
+// UpdateTransferType sets the "transfer_type" field to the value that was provided on create.
+func (u *TransferSenderUpsertBulk) UpdateTransferType() *TransferSenderUpsertBulk {
+	return u.Update(func(s *TransferSenderUpsert) {
+		s.UpdateTransferType()
+	})
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (u *TransferSenderUpsertBulk) ClearTransferType() *TransferSenderUpsertBulk {
+	return u.Update(func(s *TransferSenderUpsert) {
+		s.ClearTransferType()
 	})
 }
 

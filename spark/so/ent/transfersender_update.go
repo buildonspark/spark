@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 )
 
@@ -32,6 +33,26 @@ func (tsu *TransferSenderUpdate) Where(ps ...predicate.TransferSender) *Transfer
 // SetUpdateTime sets the "update_time" field.
 func (tsu *TransferSenderUpdate) SetUpdateTime(t time.Time) *TransferSenderUpdate {
 	tsu.mutation.SetUpdateTime(t)
+	return tsu
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (tsu *TransferSenderUpdate) SetTransferType(st schematype.TransferType) *TransferSenderUpdate {
+	tsu.mutation.SetTransferType(st)
+	return tsu
+}
+
+// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
+func (tsu *TransferSenderUpdate) SetNillableTransferType(st *schematype.TransferType) *TransferSenderUpdate {
+	if st != nil {
+		tsu.SetTransferType(*st)
+	}
+	return tsu
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (tsu *TransferSenderUpdate) ClearTransferType() *TransferSenderUpdate {
+	tsu.mutation.ClearTransferType()
 	return tsu
 }
 
@@ -78,6 +99,11 @@ func (tsu *TransferSenderUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (tsu *TransferSenderUpdate) check() error {
+	if v, ok := tsu.mutation.TransferType(); ok {
+		if err := transfersender.TransferTypeValidator(v); err != nil {
+			return &ValidationError{Name: "transfer_type", err: fmt.Errorf(`ent: validator failed for field "TransferSender.transfer_type": %w`, err)}
+		}
+	}
 	if tsu.mutation.TransferCleared() && len(tsu.mutation.TransferIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TransferSender.transfer"`)
 	}
@@ -105,6 +131,12 @@ func (tsu *TransferSenderUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if value, ok := tsu.mutation.UpdateTime(); ok {
 		_spec.SetField(transfersender.FieldUpdateTime, field.TypeTime, value)
 	}
+	if value, ok := tsu.mutation.TransferType(); ok {
+		_spec.SetField(transfersender.FieldTransferType, field.TypeEnum, value)
+	}
+	if tsu.mutation.TransferTypeCleared() {
+		_spec.ClearField(transfersender.FieldTransferType, field.TypeEnum)
+	}
 	_spec.AddModifiers(tsu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tsu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -130,6 +162,26 @@ type TransferSenderUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (tsuo *TransferSenderUpdateOne) SetUpdateTime(t time.Time) *TransferSenderUpdateOne {
 	tsuo.mutation.SetUpdateTime(t)
+	return tsuo
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (tsuo *TransferSenderUpdateOne) SetTransferType(st schematype.TransferType) *TransferSenderUpdateOne {
+	tsuo.mutation.SetTransferType(st)
+	return tsuo
+}
+
+// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
+func (tsuo *TransferSenderUpdateOne) SetNillableTransferType(st *schematype.TransferType) *TransferSenderUpdateOne {
+	if st != nil {
+		tsuo.SetTransferType(*st)
+	}
+	return tsuo
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (tsuo *TransferSenderUpdateOne) ClearTransferType() *TransferSenderUpdateOne {
+	tsuo.mutation.ClearTransferType()
 	return tsuo
 }
 
@@ -189,6 +241,11 @@ func (tsuo *TransferSenderUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (tsuo *TransferSenderUpdateOne) check() error {
+	if v, ok := tsuo.mutation.TransferType(); ok {
+		if err := transfersender.TransferTypeValidator(v); err != nil {
+			return &ValidationError{Name: "transfer_type", err: fmt.Errorf(`ent: validator failed for field "TransferSender.transfer_type": %w`, err)}
+		}
+	}
 	if tsuo.mutation.TransferCleared() && len(tsuo.mutation.TransferIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TransferSender.transfer"`)
 	}
@@ -232,6 +289,12 @@ func (tsuo *TransferSenderUpdateOne) sqlSave(ctx context.Context) (_node *Transf
 	}
 	if value, ok := tsuo.mutation.UpdateTime(); ok {
 		_spec.SetField(transfersender.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := tsuo.mutation.TransferType(); ok {
+		_spec.SetField(transfersender.FieldTransferType, field.TypeEnum, value)
+	}
+	if tsuo.mutation.TransferTypeCleared() {
+		_spec.ClearField(transfersender.FieldTransferType, field.TypeEnum)
 	}
 	_spec.AddModifiers(tsuo.modifiers...)
 	_node = &TransferSender{config: tsuo.config}

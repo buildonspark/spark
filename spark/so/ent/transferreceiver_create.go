@@ -87,6 +87,20 @@ func (trc *TransferReceiverCreate) SetNillableCompletionTime(t *time.Time) *Tran
 	return trc
 }
 
+// SetTransferType sets the "transfer_type" field.
+func (trc *TransferReceiverCreate) SetTransferType(st schematype.TransferType) *TransferReceiverCreate {
+	trc.mutation.SetTransferType(st)
+	return trc
+}
+
+// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
+func (trc *TransferReceiverCreate) SetNillableTransferType(st *schematype.TransferType) *TransferReceiverCreate {
+	if st != nil {
+		trc.SetTransferType(*st)
+	}
+	return trc
+}
+
 // SetID sets the "id" field.
 func (trc *TransferReceiverCreate) SetID(u uuid.UUID) *TransferReceiverCreate {
 	trc.mutation.SetID(u)
@@ -189,6 +203,11 @@ func (trc *TransferReceiverCreate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.status": %w`, err)}
 		}
 	}
+	if v, ok := trc.mutation.TransferType(); ok {
+		if err := transferreceiver.TransferTypeValidator(v); err != nil {
+			return &ValidationError{Name: "transfer_type", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.transfer_type": %w`, err)}
+		}
+	}
 	if len(trc.mutation.TransferIDs()) == 0 {
 		return &ValidationError{Name: "transfer", err: errors.New(`ent: missing required edge "TransferReceiver.transfer"`)}
 	}
@@ -247,6 +266,10 @@ func (trc *TransferReceiverCreate) createSpec() (*TransferReceiver, *sqlgraph.Cr
 	if value, ok := trc.mutation.CompletionTime(); ok {
 		_spec.SetField(transferreceiver.FieldCompletionTime, field.TypeTime, value)
 		_node.CompletionTime = value
+	}
+	if value, ok := trc.mutation.TransferType(); ok {
+		_spec.SetField(transferreceiver.FieldTransferType, field.TypeEnum, value)
+		_node.TransferType = value
 	}
 	if nodes := trc.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -359,6 +382,24 @@ func (u *TransferReceiverUpsert) ClearCompletionTime() *TransferReceiverUpsert {
 	return u
 }
 
+// SetTransferType sets the "transfer_type" field.
+func (u *TransferReceiverUpsert) SetTransferType(v schematype.TransferType) *TransferReceiverUpsert {
+	u.Set(transferreceiver.FieldTransferType, v)
+	return u
+}
+
+// UpdateTransferType sets the "transfer_type" field to the value that was provided on create.
+func (u *TransferReceiverUpsert) UpdateTransferType() *TransferReceiverUpsert {
+	u.SetExcluded(transferreceiver.FieldTransferType)
+	return u
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (u *TransferReceiverUpsert) ClearTransferType() *TransferReceiverUpsert {
+	u.SetNull(transferreceiver.FieldTransferType)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -462,6 +503,27 @@ func (u *TransferReceiverUpsertOne) UpdateCompletionTime() *TransferReceiverUpse
 func (u *TransferReceiverUpsertOne) ClearCompletionTime() *TransferReceiverUpsertOne {
 	return u.Update(func(s *TransferReceiverUpsert) {
 		s.ClearCompletionTime()
+	})
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (u *TransferReceiverUpsertOne) SetTransferType(v schematype.TransferType) *TransferReceiverUpsertOne {
+	return u.Update(func(s *TransferReceiverUpsert) {
+		s.SetTransferType(v)
+	})
+}
+
+// UpdateTransferType sets the "transfer_type" field to the value that was provided on create.
+func (u *TransferReceiverUpsertOne) UpdateTransferType() *TransferReceiverUpsertOne {
+	return u.Update(func(s *TransferReceiverUpsert) {
+		s.UpdateTransferType()
+	})
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (u *TransferReceiverUpsertOne) ClearTransferType() *TransferReceiverUpsertOne {
+	return u.Update(func(s *TransferReceiverUpsert) {
+		s.ClearTransferType()
 	})
 }
 
@@ -735,6 +797,27 @@ func (u *TransferReceiverUpsertBulk) UpdateCompletionTime() *TransferReceiverUps
 func (u *TransferReceiverUpsertBulk) ClearCompletionTime() *TransferReceiverUpsertBulk {
 	return u.Update(func(s *TransferReceiverUpsert) {
 		s.ClearCompletionTime()
+	})
+}
+
+// SetTransferType sets the "transfer_type" field.
+func (u *TransferReceiverUpsertBulk) SetTransferType(v schematype.TransferType) *TransferReceiverUpsertBulk {
+	return u.Update(func(s *TransferReceiverUpsert) {
+		s.SetTransferType(v)
+	})
+}
+
+// UpdateTransferType sets the "transfer_type" field to the value that was provided on create.
+func (u *TransferReceiverUpsertBulk) UpdateTransferType() *TransferReceiverUpsertBulk {
+	return u.Update(func(s *TransferReceiverUpsert) {
+		s.UpdateTransferType()
+	})
+}
+
+// ClearTransferType clears the value of the "transfer_type" field.
+func (u *TransferReceiverUpsertBulk) ClearTransferType() *TransferReceiverUpsertBulk {
+	return u.Update(func(s *TransferReceiverUpsert) {
+		s.ClearTransferType()
 	})
 }
 

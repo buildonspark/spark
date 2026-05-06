@@ -6350,6 +6350,7 @@ type TransferReceiverExample struct {
 	IdentityPubkey *keys.Public
 	Status         *schematype.TransferReceiverStatus
 	CompletionTime *time.Time
+	TransferType   *schematype.TransferType
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	Transfer *ent.Transfer
@@ -6387,6 +6388,12 @@ func (tr *TransferReceiverExample) SetCompletionTime(v time.Time) *TransferRecei
 	return tr
 }
 
+// SetTransferType sets the transfer_type field.
+func (tr *TransferReceiverExample) SetTransferType(v schematype.TransferType) *TransferReceiverExample {
+	tr.TransferType = &v
+	return tr
+}
+
 // SetTransfer sets the transfer edge.
 func (tr *TransferReceiverExample) SetTransfer(v *ent.Transfer) *TransferReceiverExample {
 	tr.Transfer = v
@@ -6420,6 +6427,12 @@ func (tr *TransferReceiverExample) MustExec(ctx context.Context) *ent.TransferRe
 	if tr.CompletionTime != nil {
 		create.SetCompletionTime(*tr.CompletionTime)
 	} else {
+	}
+	if tr.TransferType != nil {
+		create.SetTransferType(*tr.TransferType)
+	} else {
+		// Use default from annotation
+		create.SetTransferType("TRANSFER")
 	}
 
 	// Handle edges
@@ -6469,6 +6482,12 @@ func (tr *TransferReceiverExample) Exec(ctx context.Context) (*ent.TransferRecei
 		create.SetCompletionTime(*tr.CompletionTime)
 	} else {
 	}
+	if tr.TransferType != nil {
+		create.SetTransferType(*tr.TransferType)
+	} else {
+		// Use default from annotation
+		create.SetTransferType("TRANSFER")
+	}
 
 	// Handle edges
 	if tr.Transfer != nil {
@@ -6494,6 +6513,7 @@ type TransferSenderExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	TransferID     *uuid.UUID
 	IdentityPubkey *keys.Public
+	TransferType   *schematype.TransferType
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	Transfer *ent.Transfer
@@ -6516,6 +6536,12 @@ func (ts *TransferSenderExample) SetTransferID(v uuid.UUID) *TransferSenderExamp
 // SetIdentityPubkey sets the identity_pubkey field.
 func (ts *TransferSenderExample) SetIdentityPubkey(v keys.Public) *TransferSenderExample {
 	ts.IdentityPubkey = &v
+	return ts
+}
+
+// SetTransferType sets the transfer_type field.
+func (ts *TransferSenderExample) SetTransferType(v schematype.TransferType) *TransferSenderExample {
+	ts.TransferType = &v
 	return ts
 }
 
@@ -6542,6 +6568,12 @@ func (ts *TransferSenderExample) MustExec(ctx context.Context) *ent.TransferSend
 	} else {
 		// Use default from annotation
 		create.SetIdentityPubkey(keys.MustParsePublicKeyHex("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+	if ts.TransferType != nil {
+		create.SetTransferType(*ts.TransferType)
+	} else {
+		// Use default from annotation
+		create.SetTransferType("TRANSFER")
 	}
 
 	// Handle edges
@@ -6580,6 +6612,12 @@ func (ts *TransferSenderExample) Exec(ctx context.Context) (*ent.TransferSender,
 	} else {
 		// Use default from annotation
 		create.SetIdentityPubkey(keys.MustParsePublicKeyHex("02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+	if ts.TransferType != nil {
+		create.SetTransferType(*ts.TransferType)
+	} else {
+		// Use default from annotation
+		create.SetTransferType("TRANSFER")
 	}
 
 	// Handle edges

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // ID filters vertices based on their ID field.
@@ -215,6 +216,46 @@ func IdentityPubkeyLT(v keys.Public) predicate.TransferSender {
 // IdentityPubkeyLTE applies the LTE predicate on the "identity_pubkey" field.
 func IdentityPubkeyLTE(v keys.Public) predicate.TransferSender {
 	return predicate.TransferSender(sql.FieldLTE(FieldIdentityPubkey, v))
+}
+
+// TransferTypeEQ applies the EQ predicate on the "transfer_type" field.
+func TransferTypeEQ(v schematype.TransferType) predicate.TransferSender {
+	vc := v
+	return predicate.TransferSender(sql.FieldEQ(FieldTransferType, vc))
+}
+
+// TransferTypeNEQ applies the NEQ predicate on the "transfer_type" field.
+func TransferTypeNEQ(v schematype.TransferType) predicate.TransferSender {
+	vc := v
+	return predicate.TransferSender(sql.FieldNEQ(FieldTransferType, vc))
+}
+
+// TransferTypeIn applies the In predicate on the "transfer_type" field.
+func TransferTypeIn(vs ...schematype.TransferType) predicate.TransferSender {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TransferSender(sql.FieldIn(FieldTransferType, v...))
+}
+
+// TransferTypeNotIn applies the NotIn predicate on the "transfer_type" field.
+func TransferTypeNotIn(vs ...schematype.TransferType) predicate.TransferSender {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TransferSender(sql.FieldNotIn(FieldTransferType, v...))
+}
+
+// TransferTypeIsNil applies the IsNil predicate on the "transfer_type" field.
+func TransferTypeIsNil() predicate.TransferSender {
+	return predicate.TransferSender(sql.FieldIsNull(FieldTransferType))
+}
+
+// TransferTypeNotNil applies the NotNil predicate on the "transfer_type" field.
+func TransferTypeNotNil() predicate.TransferSender {
+	return predicate.TransferSender(sql.FieldNotNull(FieldTransferType))
 }
 
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.

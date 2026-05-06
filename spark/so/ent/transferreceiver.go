@@ -33,6 +33,8 @@ type TransferReceiver struct {
 	Status schematype.TransferReceiverStatus `json:"status,omitempty"`
 	// The time when the transfer claim was completed.
 	CompletionTime time.Time `json:"completion_time,omitempty"`
+	// Denormalized from transfers.type. Optional during the backfill window; required after.
+	TransferType schematype.TransferType `json:"transfer_type,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferReceiverQuery when eager-loading is set.
 	Edges        TransferReceiverEdges `json:"edges"`
@@ -66,7 +68,7 @@ func (*TransferReceiver) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case transferreceiver.FieldIdentityPubkey:
 			values[i] = new(keys.Public)
-		case transferreceiver.FieldStatus:
+		case transferreceiver.FieldStatus, transferreceiver.FieldTransferType:
 			values[i] = new(sql.NullString)
 		case transferreceiver.FieldCreateTime, transferreceiver.FieldUpdateTime, transferreceiver.FieldCompletionTime:
 			values[i] = new(sql.NullTime)
@@ -129,6 +131,12 @@ func (tr *TransferReceiver) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				tr.CompletionTime = value.Time
 			}
+		case transferreceiver.FieldTransferType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_type", values[i])
+			} else if value.Valid {
+				tr.TransferType = schematype.TransferType(value.String)
+			}
 		default:
 			tr.selectValues.Set(columns[i], values[i])
 		}
@@ -187,6 +195,9 @@ func (tr *TransferReceiver) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("completion_time=")
 	builder.WriteString(tr.CompletionTime.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("transfer_type=")
+	builder.WriteString(fmt.Sprintf("%v", tr.TransferType))
 	builder.WriteByte(')')
 	return builder.String()
 }

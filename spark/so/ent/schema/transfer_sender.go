@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -36,6 +37,11 @@ func (TransferSender) Fields() []ent.Field {
 			Annotations(entexample.Default(
 				"02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3",
 			)),
+		field.Enum("transfer_type").
+			Optional().
+			GoType(schematype.TransferType("")).
+			Comment("Denormalized from transfers.type. Optional during the backfill window; required after.").
+			Annotations(entexample.Default(schematype.TransferTypeTransfer)),
 	}
 }
 

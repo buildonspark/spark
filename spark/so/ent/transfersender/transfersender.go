@@ -3,11 +3,13 @@
 package transfersender
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 const (
@@ -23,6 +25,8 @@ const (
 	FieldTransferID = "transfer_id"
 	// FieldIdentityPubkey holds the string denoting the identity_pubkey field in the database.
 	FieldIdentityPubkey = "identity_pubkey"
+	// FieldTransferType holds the string denoting the transfer_type field in the database.
+	FieldTransferType = "transfer_type"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// Table holds the table name of the transfersender in the database.
@@ -43,6 +47,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldTransferID,
 	FieldIdentityPubkey,
+	FieldTransferType,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -66,6 +71,16 @@ var (
 	DefaultID func() uuid.UUID
 )
 
+// TransferTypeValidator is a validator for the "transfer_type" field enum values. It is called by the builders before save.
+func TransferTypeValidator(tt schematype.TransferType) error {
+	switch tt {
+	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3":
+		return nil
+	default:
+		return fmt.Errorf("transfersender: invalid enum value for transfer_type field: %q", tt)
+	}
+}
+
 // OrderOption defines the ordering options for the TransferSender queries.
 type OrderOption func(*sql.Selector)
 
@@ -87,6 +102,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByTransferID orders the results by the transfer_id field.
 func ByTransferID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTransferID, opts...).ToFunc()
+}
+
+// ByTransferType orders the results by the transfer_type field.
+func ByTransferType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTransferType, opts...).ToFunc()
 }
 
 // ByTransferField orders the results by transfer field.

@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transfersender"
 )
@@ -28,6 +29,8 @@ type TransferSender struct {
 	TransferID uuid.UUID `json:"transfer_id,omitempty"`
 	// The identity public key of this sender of the transfer.
 	IdentityPubkey keys.Public `json:"identity_pubkey,omitempty"`
+	// Denormalized from transfers.type. Optional during the backfill window; required after.
+	TransferType schematype.TransferType `json:"transfer_type,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferSenderQuery when eager-loading is set.
 	Edges        TransferSenderEdges `json:"edges"`
@@ -61,6 +64,8 @@ func (*TransferSender) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case transfersender.FieldIdentityPubkey:
 			values[i] = new(keys.Public)
+		case transfersender.FieldTransferType:
+			values[i] = new(sql.NullString)
 		case transfersender.FieldCreateTime, transfersender.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case transfersender.FieldID, transfersender.FieldTransferID:
@@ -109,6 +114,12 @@ func (ts *TransferSender) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field identity_pubkey", values[i])
 			} else if value != nil {
 				ts.IdentityPubkey = *value
+			}
+		case transfersender.FieldTransferType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_type", values[i])
+			} else if value.Valid {
+				ts.TransferType = schematype.TransferType(value.String)
 			}
 		default:
 			ts.selectValues.Set(columns[i], values[i])
@@ -162,6 +173,9 @@ func (ts *TransferSender) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", ts.IdentityPubkey))
+	builder.WriteString(", ")
+	builder.WriteString("transfer_type=")
+	builder.WriteString(fmt.Sprintf("%v", ts.TransferType))
 	builder.WriteByte(')')
 	return builder.String()
 }

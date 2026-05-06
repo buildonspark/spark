@@ -303,6 +303,46 @@ func CompletionTimeNotNil() predicate.TransferReceiver {
 	return predicate.TransferReceiver(sql.FieldNotNull(FieldCompletionTime))
 }
 
+// TransferTypeEQ applies the EQ predicate on the "transfer_type" field.
+func TransferTypeEQ(v schematype.TransferType) predicate.TransferReceiver {
+	vc := v
+	return predicate.TransferReceiver(sql.FieldEQ(FieldTransferType, vc))
+}
+
+// TransferTypeNEQ applies the NEQ predicate on the "transfer_type" field.
+func TransferTypeNEQ(v schematype.TransferType) predicate.TransferReceiver {
+	vc := v
+	return predicate.TransferReceiver(sql.FieldNEQ(FieldTransferType, vc))
+}
+
+// TransferTypeIn applies the In predicate on the "transfer_type" field.
+func TransferTypeIn(vs ...schematype.TransferType) predicate.TransferReceiver {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TransferReceiver(sql.FieldIn(FieldTransferType, v...))
+}
+
+// TransferTypeNotIn applies the NotIn predicate on the "transfer_type" field.
+func TransferTypeNotIn(vs ...schematype.TransferType) predicate.TransferReceiver {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TransferReceiver(sql.FieldNotIn(FieldTransferType, v...))
+}
+
+// TransferTypeIsNil applies the IsNil predicate on the "transfer_type" field.
+func TransferTypeIsNil() predicate.TransferReceiver {
+	return predicate.TransferReceiver(sql.FieldIsNull(FieldTransferType))
+}
+
+// TransferTypeNotNil applies the NotNil predicate on the "transfer_type" field.
+func TransferTypeNotNil() predicate.TransferReceiver {
+	return predicate.TransferReceiver(sql.FieldNotNull(FieldTransferType))
+}
+
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.
 func HasTransfer() predicate.TransferReceiver {
 	return predicate.TransferReceiver(func(s *sql.Selector) {

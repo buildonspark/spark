@@ -1483,6 +1483,7 @@ var (
 		{Name: "identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "RECEIVER_CLAIM_PENDING", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
+		{Name: "transfer_type", Type: field.TypeEnum, Nullable: true, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
 		{Name: "transfer_id", Type: field.TypeUUID},
 	}
 	// TransferReceiversTable holds the schema information for the "transfer_receivers" table.
@@ -1493,7 +1494,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_receivers_transfers_transfer",
-				Columns:    []*schema.Column{TransferReceiversColumns[6]},
+				Columns:    []*schema.Column{TransferReceiversColumns[7]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1507,12 +1508,12 @@ var (
 			{
 				Name:    "transferreceiver_transfer_id_identity_pubkey",
 				Unique:  true,
-				Columns: []*schema.Column{TransferReceiversColumns[6], TransferReceiversColumns[3]},
+				Columns: []*schema.Column{TransferReceiversColumns[7], TransferReceiversColumns[3]},
 			},
 			{
 				Name:    "transferreceiver_transfer_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{TransferReceiversColumns[6], TransferReceiversColumns[4]},
+				Columns: []*schema.Column{TransferReceiversColumns[7], TransferReceiversColumns[4]},
 			},
 			{
 				Name:    "transferreceiver_identity_pubkey_create_time",
@@ -1527,12 +1528,12 @@ var (
 			{
 				Name:    "idx_transferreceiver_claim_pending_pubkey_time",
 				Unique:  false,
-				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[6]},
+				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[7]},
 				Annotation: &entsql.IndexAnnotation{
 					DescColumns: map[string]bool{
 						TransferReceiversColumns[1].Name: true,
 
-						TransferReceiversColumns[6].Name: true,
+						TransferReceiversColumns[7].Name: true,
 					},
 					Where: "status IN ('RECEIVER_CLAIM_PENDING', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
 				},
@@ -1540,12 +1541,12 @@ var (
 			{
 				Name:    "idx_transferreceiver_stuck_create_time",
 				Unique:  false,
-				Columns: []*schema.Column{TransferReceiversColumns[1], TransferReceiversColumns[6]},
+				Columns: []*schema.Column{TransferReceiversColumns[1], TransferReceiversColumns[7]},
 				Annotation: &entsql.IndexAnnotation{
 					DescColumns: map[string]bool{
 						TransferReceiversColumns[1].Name: true,
 
-						TransferReceiversColumns[6].Name: true,
+						TransferReceiversColumns[7].Name: true,
 					},
 					Where: "status IN ('RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
 				},
@@ -1558,6 +1559,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "identity_pubkey", Type: field.TypeBytes},
+		{Name: "transfer_type", Type: field.TypeEnum, Nullable: true, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
 		{Name: "transfer_id", Type: field.TypeUUID},
 	}
 	// TransferSendersTable holds the schema information for the "transfer_senders" table.
@@ -1568,7 +1570,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_senders_transfers_transfer",
-				Columns:    []*schema.Column{TransferSendersColumns[4]},
+				Columns:    []*schema.Column{TransferSendersColumns[5]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1582,7 +1584,7 @@ var (
 			{
 				Name:    "transfersender_transfer_id_identity_pubkey",
 				Unique:  true,
-				Columns: []*schema.Column{TransferSendersColumns[4], TransferSendersColumns[3]},
+				Columns: []*schema.Column{TransferSendersColumns[5], TransferSendersColumns[3]},
 			},
 			{
 				Name:    "transfersender_identity_pubkey_create_time",
