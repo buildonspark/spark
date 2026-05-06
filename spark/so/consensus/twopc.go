@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -17,6 +19,15 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+// engineCleanupTimeout caps how long any single engine bookkeeping phase
+// (createCoordinatorRow, markCommitted/markRolledBack, commit/rollback
+// gossip dispatch) is allowed to run. Each call to inEngineSession derives
+// a fresh WithTimeout from this value, so a long Prepare or BuildCommitPayload
+// doesn't burn the cleanup-phase budget — the post-decision path always
+// gets the full window to drive participants to a terminal outcome,
+// regardless of how long the request-cancellable phases took.
+const engineCleanupTimeout = 60 * time.Second
 
 // ErrCoordinatorRowPreempted is returned by markCommitted (and is the cause
 // surfaced by Execute when applicable) if the coordinator's FlowExecution
@@ -50,14 +61,32 @@ var ErrCoordinatorRowPreempted = errors.New("coordinator FlowExecution row was p
 type TwoPCEngine struct {
 	config *so.Config
 	gossip GossipSender
+	// sessionFactory mints a db.Session per engine bookkeeping phase
+	// (createCoordinatorRow, markCommitted, markRolledBack, gossip
+	// dispatch). The engine session is bound to a detached cleanup
+	// context so the session — and its transaction — survive a
+	// user-cancelled request. Sharing the SessionFactory abstraction
+	// with the gRPC database middleware means engine writes go through
+	// exactly the same Begin/Save/Commit machinery as request-tx writes
+	// (notification flush hooks, panic-recovery rollback, metric
+	// attribution, lazy tx-begin), with only the lifecycle differing.
+	sessionFactory db.SessionFactory
 }
 
 // NewTwoPCEngine creates a TwoPCEngine backed by synchronous operator
 // fan-out for prepare and gossip for commit/rollback.
-func NewTwoPCEngine(config *so.Config, gossip GossipSender) *TwoPCEngine {
+//
+// sessionFactory provides per-engine-call db sessions used for
+// transactional bookkeeping writes that must outlive a user-cancelled
+// request. The production engine is constructed once at server init
+// (where the dbClient already lives) and shared across requests via the
+// ConsensusEngineInterceptor; handlers fetch it through
+// consensus.GetEngine(ctx). Tests construct an engine directly per test.
+func NewTwoPCEngine(config *so.Config, gossip GossipSender, sessionFactory db.SessionFactory) *TwoPCEngine {
 	return &TwoPCEngine{
-		config: config,
-		gossip: gossip,
+		config:         config,
+		gossip:         gossip,
+		sessionFactory: sessionFactory,
 	}
 }
 
@@ -80,12 +109,20 @@ func (e *TwoPCEngine) Execute(
 ) (proto.Message, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
+	// detachedCtx carries the same values as ctx (logger, request_id,
+	// etc., for log correlation) but is not propagated cancellation.
+	// Each engine bookkeeping phase derives its own WithTimeout from
+	// this base inside inEngineSession — so a long Prepare doesn't
+	// burn the cleanup-phase budget. Without WithoutCancel here, a
+	// user-cancelled request would strand participants in IN_FLIGHT.
+	detachedCtx := context.WithoutCancel(ctx)
+
 	participants, err := selection.OperatorIdentifierList(e.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve participants: %w", err)
 	}
 
-	row, err := e.createCoordinatorRow(ctx, opType, flow)
+	row, err := e.createCoordinatorRow(detachedCtx, opType, flow)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create FlowExecution row: %w", err)
 	}
@@ -94,6 +131,12 @@ func (e *TwoPCEngine) Execute(
 	// Wrap prepareTask: remote operators use DefaultPrepareTask (gRPC),
 	// self uses flow.Prepare locally to avoid deadlock.
 	// Both return proto.Message which is marshaled into *anypb.Any for the results map.
+	//
+	// NOTE: the prepare task uses the user-cancellable ctx (not detachedCtx)
+	// — coordinator's own flow.Prepare must run in the request transaction
+	// so its domain work (e.g. locking a TreeNode) is tied to request
+	// success, and remote peers must observe a fresh client cancel as
+	// quickly as possible to avoid wasted work.
 	prepareTask := func(ctx context.Context, operator *so.SigningOperator) (*anypb.Any, error) {
 		var result proto.Message
 		var err error
@@ -115,7 +158,7 @@ func (e *TwoPCEngine) Execute(
 	results, err := helper.ExecuteTaskWithAllOperators(ctx, e.config, selection, prepareTask)
 	if err != nil {
 		logger.Sugar().Infof("2PC prepare: failed for op type %d, sending rollback", opType)
-		e.attemptRollback(ctx, row, opType, flow, executionID, participants)
+		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("prepare failed: %w", err)
 	}
 	logger.Sugar().Infof("2PC prepare: all %d participants ready for op type %d", len(participants), opType)
@@ -123,15 +166,45 @@ func (e *TwoPCEngine) Execute(
 	commitOp, err := flow.BuildCommitPayload(ctx, results)
 	if err != nil {
 		logger.Sugar().Infof("2PC build-commit: failed for op type %d, sending rollback", opType)
-		e.attemptRollback(ctx, row, opType, flow, executionID, participants)
+		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("build-commit failed: %w", err)
 	}
 
-	if err := e.markCommitted(ctx, row, commitOp); err != nil {
+	// Commit the coordinator's request transaction BEFORE telling
+	// participants to commit. FlowHandler.Prepare (and BuildCommitPayload
+	// for some flows) writes coordinator-side domain state through the
+	// request session — preimage_shares for StorePreimageShareV2,
+	// new tree nodes for FinalizeDepositTreeCreation, etc. If we
+	// dispatched commit gossip while that work was still uncommitted
+	// and the request tx subsequently failed to commit at handler
+	// return, participants would commit on the strength of the
+	// already-durable engine FlowExecution row (markCommitted fires
+	// next) while the coordinator's local domain state is rolled back.
+	// Mirrors the pre-refactor pattern in CreateCommitAndSendGossipMessage,
+	// which committed the request tx mid-function before gossip dispatch.
+	//
+	// On failure here we treat it as a build-commit failure: roll back
+	// the engine row and dispatch rollback gossip, so participants
+	// don't end up committed against a coordinator that lost its
+	// domain writes.
+	if commitErr := ent.DbCommit(ctx); commitErr != nil {
+		logger.With(zap.Error(commitErr)).Sugar().Infof(
+			"2PC commit: request tx commit failed for op type %d, sending rollback", opType)
+		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
+		return nil, fmt.Errorf("request tx commit failed: %w", commitErr)
+	}
+
+	if err := e.markCommitted(detachedCtx, row, commitOp); err != nil {
 		// CAS conflict: the row was already transitioned out of
 		// IN_FLIGHT by some other path (most likely the self-sweep).
 		// Don't send commit gossip; the participants will resolve to
 		// the actually-recorded outcome via ConsensusQueryOutcome.
+		// NOTE: the request tx committed above, so coordinator's
+		// domain work persists. With the engine row eventually
+		// transitioned to ROLLED_BACK by the sweep, participants
+		// reconcile to ROLLED_BACK — a divergence (coordinator did
+		// the work, participants think rolled-back), but recoverable
+		// only at the application level.
 		if errors.Is(err, ErrCoordinatorRowPreempted) {
 			logger.With(zap.Error(err)).Sugar().Warnf(
 				"2PC commit: coordinator row preempted for op type %d, skipping commit gossip", opType)
@@ -141,7 +214,7 @@ func (e *TwoPCEngine) Execute(
 	}
 
 	logger.Sugar().Infof("2PC commit: sending gossip for op type %d to %d participants", opType, len(participants))
-	if err := e.commit(ctx, opType, commitOp, executionID, participants); err != nil {
+	if err := e.commit(detachedCtx, opType, commitOp, executionID, participants); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf(
 			"failed to send consensus commit gossip for op type %d", opType)
 		return nil, fmt.Errorf("commit gossip failed: %w", err)
@@ -175,12 +248,70 @@ func (e *TwoPCEngine) attemptRollback(
 	}
 }
 
+// inEngineSession runs fn inside a fresh db.Session bound to ctx. The
+// session is injected into a child context (so callees that fetch via
+// ent.GetDbFromContext find it), fn runs against that context, and any
+// transaction the session opened is committed if fn succeeds or rolled
+// back if fn errors or panics.
+//
+// This is the engine's analogue of DatabaseSessionMiddleware: same
+// session machinery (notification flush, panic-recovery rollback,
+// metric attribution, lazy tx-begin), just with a per-engine-call
+// lifecycle rooted at the engine's cleanup ctx instead of the request
+// ctx. Letting downstream calls — including the unmodified
+// CreateCommitAndSendGossipMessage handler — operate against a
+// session-style ctx is what keeps the engine's writes transactional in
+// the same shape the rest of the codebase uses.
+func (e *TwoPCEngine) inEngineSession(parentCtx context.Context, fn func(sessionCtx context.Context) error) (err error) {
+	// Each engine bookkeeping phase gets a fresh engineCleanupTimeout
+	// window. Applying the timeout here (rather than once at Execute
+	// start) means a long Prepare or BuildCommitPayload doesn't burn
+	// the cleanup-phase budget — markCommitted/markRolledBack and
+	// commit/rollback gossip always run with the full window even if
+	// the user-cancellable phases ate up most of the request's
+	// surrounding deadline.
+	ctx, cancel := context.WithTimeout(parentCtx, engineCleanupTimeout)
+	defer cancel()
+
+	session := e.sessionFactory.NewSession(ctx)
+	sessionCtx := ent.Inject(ctx, session)
+
+	var committed bool
+	defer func() {
+		r := recover()
+		if !committed {
+			if tx := session.GetTxIfExists(); tx != nil {
+				_ = tx.Rollback()
+			}
+		}
+		if r != nil {
+			panic(r)
+		}
+	}()
+
+	if fnErr := fn(sessionCtx); fnErr != nil {
+		return fnErr
+	}
+	if tx := session.GetTxIfExists(); tx != nil {
+		if commitErr := tx.Commit(); commitErr != nil {
+			return fmt.Errorf("commit engine session tx: %w", commitErr)
+		}
+	}
+	committed = true
+	return nil
+}
+
 // createCoordinatorRow inserts the coordinator's FlowExecution row with the
 // rollback payload pre-populated in decision_payload. If the coordinator later
 // commits, that field is overwritten with the commit bytes; if the coordinator
 // crashes before deciding, the self-sweep task transitions the row to
 // ROLLED_BACK and the rollback bytes already in decision_payload become the
 // answer served to reconciling participants.
+//
+// Runs in its own engine session (not the request session) so the row is
+// durable regardless of whether the originating request transaction
+// commits — the load-bearing property that lets participants always
+// reconcile to a real outcome via ConsensusQueryOutcome.
 func (e *TwoPCEngine) createCoordinatorRow(
 	ctx context.Context,
 	opType pbgossip.ConsensusOperationType,
@@ -190,20 +321,28 @@ func (e *TwoPCEngine) createCoordinatorRow(
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal rollback payload: %w", err)
 	}
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
 	self, ok := e.config.SigningOperatorMap[e.config.Identifier]
 	if !ok || self == nil {
 		return nil, fmt.Errorf("self operator %q not found in SigningOperatorMap", e.config.Identifier)
 	}
-	return db.FlowExecution.Create().
-		SetRole(st.FlowExecutionRoleCoordinator).
-		SetOpType(int32(opType)).
-		SetCoordinatorIndex(uint(self.ID)).
-		SetDecisionPayload(rollbackBytes).
-		Save(ctx)
+	var row *ent.FlowExecution
+	if err := e.inEngineSession(ctx, func(sessionCtx context.Context) error {
+		client, err := ent.GetDbFromContext(sessionCtx)
+		if err != nil {
+			return err
+		}
+		var saveErr error
+		row, saveErr = client.FlowExecution.Create().
+			SetRole(st.FlowExecutionRoleCoordinator).
+			SetOpType(int32(opType)).
+			SetCoordinatorIndex(uint(self.ID)).
+			SetDecisionPayload(rollbackBytes).
+			Save(sessionCtx)
+		return saveErr
+	}); err != nil {
+		return nil, err
+	}
+	return row, nil
 }
 
 // markCommitted updates the coordinator row with the commit payload bytes and
@@ -222,22 +361,26 @@ func (e *TwoPCEngine) markCommitted(ctx context.Context, row *ent.FlowExecution,
 	if err != nil {
 		return fmt.Errorf("failed to marshal commit payload: %w", err)
 	}
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
+	var rowsAffected int
+	if err := e.inEngineSession(ctx, func(sessionCtx context.Context) error {
+		client, err := ent.GetDbFromContext(sessionCtx)
+		if err != nil {
+			return err
+		}
+		var updErr error
+		rowsAffected, updErr = client.FlowExecution.Update().
+			Where(
+				flowexecution.ID(row.ID),
+				flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+			).
+			SetStatus(st.FlowExecutionStatusCommitted).
+			SetDecisionPayload(commitBytes).
+			Save(sessionCtx)
+		return updErr
+	}); err != nil {
 		return err
 	}
-	n, err := db.FlowExecution.Update().
-		Where(
-			flowexecution.ID(row.ID),
-			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
-		).
-		SetStatus(st.FlowExecutionStatusCommitted).
-		SetDecisionPayload(commitBytes).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
+	if rowsAffected == 0 {
 		return ErrCoordinatorRowPreempted
 	}
 	return nil
@@ -253,18 +396,20 @@ func (e *TwoPCEngine) markCommitted(ctx context.Context, row *ent.FlowExecution,
 // the row is already in the rolled-back state we wanted, so the
 // zero-rows-affected case is silently treated as success.
 func (e *TwoPCEngine) markRolledBack(ctx context.Context, row *ent.FlowExecution) error {
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
+	return e.inEngineSession(ctx, func(sessionCtx context.Context) error {
+		client, err := ent.GetDbFromContext(sessionCtx)
+		if err != nil {
+			return err
+		}
+		_, err = client.FlowExecution.Update().
+			Where(
+				flowexecution.ID(row.ID),
+				flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+			).
+			SetStatus(st.FlowExecutionStatusRolledBack).
+			Save(sessionCtx)
 		return err
-	}
-	_, err = db.FlowExecution.Update().
-		Where(
-			flowexecution.ID(row.ID),
-			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
-		).
-		SetStatus(st.FlowExecutionStatusRolledBack).
-		Save(ctx)
-	return err
+	})
 }
 
 // marshalAny marshals a proto message into the wire-format bytes of an
@@ -279,7 +424,11 @@ func marshalAny(msg proto.Message) ([]byte, error) {
 }
 
 // commit builds a ConsensusCommit gossip message and sends it to all
-// participants for durable async delivery.
+// participants for durable async delivery. Runs in an engine session so
+// the underlying CreateCommitAndSendGossipMessage call (which uses
+// ent.GetDbFromContext + ent.DbCommit internally) is transactional in
+// the same shape it is on the request-tx path, just bound to the
+// engine's cleanup ctx instead of the user-cancellable request ctx.
 func (e *TwoPCEngine) commit(ctx context.Context, opType pbgossip.ConsensusOperationType, op proto.Message, executionID string, participants []string) error {
 	anyOp, err := anypb.New(op)
 	if err != nil {
@@ -294,12 +443,15 @@ func (e *TwoPCEngine) commit(ctx context.Context, opType pbgossip.ConsensusOpera
 			},
 		},
 	}
-	_, err = e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
-	return err
+	return e.inEngineSession(ctx, func(sessionCtx context.Context) error {
+		_, sendErr := e.gossip.CreateCommitAndSendGossipMessage(sessionCtx, msg, participants)
+		return sendErr
+	})
 }
 
 // rollback builds a ConsensusRollback gossip message and sends it to all
-// participants for durable async delivery.
+// participants for durable async delivery. Same engine-session shape as
+// commit().
 func (e *TwoPCEngine) rollback(ctx context.Context, opType pbgossip.ConsensusOperationType, op proto.Message, executionID string, participants []string) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("2PC rollback: sending gossip for op type %d to %d participants", opType, len(participants))
@@ -316,8 +468,10 @@ func (e *TwoPCEngine) rollback(ctx context.Context, opType pbgossip.ConsensusOpe
 			},
 		},
 	}
-	_, err = e.gossip.CreateCommitAndSendGossipMessage(ctx, msg, participants)
-	return err
+	return e.inEngineSession(ctx, func(sessionCtx context.Context) error {
+		_, sendErr := e.gossip.CreateCommitAndSendGossipMessage(sessionCtx, msg, participants)
+		return sendErr
+	})
 }
 
 // DefaultPrepareTask sends a ConsensusPrepare RPC to a remote operator.

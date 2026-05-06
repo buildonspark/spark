@@ -155,9 +155,13 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		PreimageShareFlowHandler: NewPreimageShareFlowHandler(h.config),
 		prepareReq:               prepareReq,
 	}
+	engine, err := consensus.GetEngine(consensusCtx)
+	if err != nil {
+		endSpanWithError(consensusSpan, err)
+		return err
+	}
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	engine := consensus.NewTwoPCEngine(h.config, NewSendGossipHandler(h.config))
-	_, err := engine.Execute(consensusCtx,
+	_, err = engine.Execute(consensusCtx,
 		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
 		&selection, flow)
 	endSpanWithError(consensusSpan, err)

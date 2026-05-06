@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -17,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
@@ -388,4 +390,380 @@ func triggerTask(t *testing.T, op *so.SigningOperator, taskName string) error {
 // operator's ID (matching testing/wallet/testing.go's `fmt.Sprintf("%064d", id+1)`).
 func operatorIdentifier(id int) string {
 	return fmt.Sprintf("%064d", id+1)
+}
+
+// TestFlowExecution_RenewLeafConsensus_RequestCancellation_RowsTerminal exercises
+// the layer-1 engine fix: when a coordinator's gRPC client cancels mid-flow,
+// the engine's bookkeeping (coordinator FlowExecution row + commit/rollback
+// gossip dispatch) must complete on a detached cleanup context. Pre-fix, the
+// coordinator's row was tied to the request transaction and the cleanup paths
+// ran on the cancelled ctx, so participants that had already prepared were
+// stranded IN_FLIGHT with locked resources.
+//
+// The test fires a real renew with a tight client-side timeout designed to
+// land inside Execute, then asserts that every operator's FlowExecution row
+// for that execution reaches a terminal state (COMMITTED or ROLLED_BACK)
+// within a few seconds — not minutes via the reconciler. Either terminal
+// outcome is acceptable: a fast renew that races past the cancel ends in
+// COMMITTED; a cancel that lands mid-fan-out ends in ROLLED_BACK. The
+// failure mode this test guards against is "stuck IN_FLIGHT", which is the
+// pre-fix behavior.
+func TestFlowExecution_RenewLeafConsensus_RequestCancellation_RowsTerminal(t *testing.T) {
+	// Knob propagation requires the K8s ConfigMap path; bare local
+	// (run-everything.sh) has no K8s and the multi-operator DB workload
+	// of this test is hostile to bare-local Postgres' default
+	// max_connections anyway. Same skip convention as the happy-path
+	// consensus test.
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	}
+	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusRenew, 100))
+	t.Cleanup(func() {
+		if err := kc.SetKnob(t, knobs.KnobUseConsensusRenew, 0); err != nil {
+			t.Logf("best-effort KnobUseConsensusRenew reset failed: %v", err)
+		}
+	})
+
+	config := wallet.NewTestWalletConfig(t)
+	operatorIndices := operatorIndicesFromConfig(config)
+
+	// One long-lived ent client per operator. The test runs ~50 DB
+	// queries (snapshot + assertion + Eventually polling) and re-opening a
+	// client every time saturates Postgres' connection pool when the 5
+	// running SOs already hold a large slice of max_connections.
+	clients := make(map[int]*ent.Client, len(operatorIndices))
+	for _, i := range operatorIndices {
+		clients[i] = db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
+		t.Cleanup(func() { _ = clients[i].Close() })
+	}
+
+	preExistingIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
+	for _, i := range operatorIndices {
+		ids, err := clients[i].FlowExecution.Query().IDs(t.Context())
+		require.NoError(t, err)
+		set := make(map[uuid.UUID]struct{}, len(ids))
+		for _, id := range ids {
+			set[id] = struct{}{}
+		}
+		preExistingIDs[i] = set
+	}
+
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
+	require.NoError(t, err)
+	require.Equal(t, "AVAILABLE", rootNode.Status)
+
+	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+	parentCtx := wallet.ContextWithToken(t.Context(), authToken)
+	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+
+	// 75ms is shorter than the typical end-to-end renew latency (p50
+	// ~110ms in production) but long enough that createCoordinatorRow
+	// has fired. Whether cancel lands during prepare fan-out, between
+	// Prepare and BuildCommitPayload, or after commit gossip starts
+	// dispatching, the post-fix engine drives the row to a terminal
+	// state on cleanupCtx.
+	ctx, cancel := context.WithTimeout(parentCtx, 75*time.Millisecond)
+	defer cancel()
+
+	// Don't fail the test on the renew error — the cancellation may or
+	// may not propagate to the client depending on which phase it landed
+	// in. What matters is the post-state of the FlowExecution rows.
+	_, _ = wallet.RenewNodeZeroTimelock(ctx, config, leaf, leafPrivKey)
+
+	// newRows fetches all FlowExecution rows on operator i that didn't
+	// exist at test start. Closure over the per-operator client so the
+	// pool stays bounded.
+	//
+	// Uses assert.NoError + return nil rather than require.NoError so a
+	// DB error inside require.Eventually's goroutine doesn't get
+	// swallowed by t.Fatal → runtime.Goexit (which would surface only
+	// as "condition never satisfied in time" without the actual cause).
+	// assert.NoError marks the test failed via t.Errorf; the empty
+	// return lets the caller continue and Eventually's wall-clock
+	// timeout will end the loop normally.
+	newRows := func(i int) []*ent.FlowExecution {
+		rows, err := clients[i].FlowExecution.Query().
+			Order(ent.Asc(flowexecution.FieldCreateTime)).
+			All(t.Context())
+		if !assert.NoError(t, err) {
+			return nil
+		}
+		var newOnes []*ent.FlowExecution
+		for _, r := range rows {
+			if _, seen := preExistingIDs[i][r.ID]; !seen {
+				newOnes = append(newOnes, r)
+			}
+		}
+		return newOnes
+	}
+
+	// If no operator wrote a row, we're on an env without live knob
+	// propagation (run-everything.sh doesn't read the K8s ConfigMap the
+	// KnobController writes to, and the static_values fallback may not
+	// be configured). Same skip pattern as the happy-path test.
+	totalNew := 0
+	for _, i := range operatorIndices {
+		totalNew += len(newRows(i))
+	}
+	if totalNew == 0 {
+		t.Skip("no FlowExecution rows written — 2PC path did not run (likely no live knob propagation; run under minikube or set spark.so.use_consensus_renew in static config)")
+	}
+
+	// All NEW rows must reach a terminal state within a few seconds —
+	// well under any reconciler threshold, so this assertion specifically
+	// tests that the engine's cleanupCtx drove the gossip dispatch
+	// directly, rather than relying on the participant reconcile sweep.
+	// (If the cleanupCtx wiring is broken, participants stay IN_FLIGHT
+	// and only the reconciler picks them up — which we explicitly *don't*
+	// enable here.)
+	require.Eventually(t, func() bool {
+		for _, i := range operatorIndices {
+			// If a participant's own request ctx was cancelled before
+			// it finished writing its row, no row will ever appear on
+			// that operator — that's correct (nothing to undo). We
+			// only assert on rows that DID land.
+			for _, r := range newRows(i) {
+				if r.Status == st.FlowExecutionStatusInFlight {
+					return false
+				}
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond,
+		"every FlowExecution row left behind by the cancelled renew must reach a terminal state via the engine's cleanup ctx, not via the reconciler")
+
+	// All present rows must agree on outcome — coordinator and any
+	// participants that wrote rows must record the same terminal state,
+	// or gossip dispatch was incomplete and we're in a divergence.
+	observed := make(map[st.FlowExecutionStatus]int)
+	for _, i := range operatorIndices {
+		for _, r := range newRows(i) {
+			observed[r.Status]++
+		}
+	}
+	assert.Len(t, observed, 1,
+		"all FlowExecution rows from a single execution must record the same terminal status; got %v", observed)
+}
+
+// TestFlowExecution_RenewLeafConsensus_RequestCancellation_LeafStateConsistent
+// is the domain-level companion to the row-state cancellation test above:
+// it cancels mid-renew and asserts the renew flow ended *correctly* from
+// the application's point of view — not just that engine bookkeeping
+// settled.
+//
+// "Correctly" means: every operator must agree on what happened to the
+// leaf, and the leaf must not be left in the transient RenewLocked
+// status. Two valid outcomes:
+//
+//   - All operators COMMITTED: leaf is back to AVAILABLE, leaf's parent
+//     points at a freshly-created split node (renew applied cleanly,
+//     the cancel raced past commit gossip dispatch).
+//   - All operators ROLLED_BACK: leaf is back to AVAILABLE with its
+//     original parent unchanged (rollback released the lock and undid
+//     the prepare-time mutation).
+//
+// The pre-fix bug would manifest as: some operators ROLLED_BACK while
+// others were stuck IN_FLIGHT (leaf in RenewLocked, requiring manual
+// recovery), or as divergence — coordinator COMMITTED but participants
+// ROLLED_BACK because the engine's commit gossip never dispatched.
+func TestFlowExecution_RenewLeafConsensus_RequestCancellation_LeafStateConsistent(t *testing.T) {
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	}
+	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusRenew, 100))
+	t.Cleanup(func() {
+		if err := kc.SetKnob(t, knobs.KnobUseConsensusRenew, 0); err != nil {
+			t.Logf("best-effort KnobUseConsensusRenew reset failed: %v", err)
+		}
+	})
+
+	config := wallet.NewTestWalletConfig(t)
+	operatorIndices := operatorIndicesFromConfig(config)
+
+	// Single ent client per operator, reused across all DB inspections —
+	// re-opening per query saturates Postgres' default connection limit
+	// when 5 SOs are already each holding a pool slice.
+	clients := make(map[int]*ent.Client, len(operatorIndices))
+	for _, i := range operatorIndices {
+		clients[i] = db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
+		t.Cleanup(func() { _ = clients[i].Close() })
+	}
+
+	preExistingFlowIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
+	for _, i := range operatorIndices {
+		ids, err := clients[i].FlowExecution.Query().IDs(t.Context())
+		require.NoError(t, err)
+		set := make(map[uuid.UUID]struct{}, len(ids))
+		for _, id := range ids {
+			set[id] = struct{}{}
+		}
+		preExistingFlowIDs[i] = set
+	}
+
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
+	require.NoError(t, err)
+	require.Equal(t, "AVAILABLE", rootNode.Status)
+	leafUUID, err := uuid.Parse(rootNode.Id)
+	require.NoError(t, err)
+
+	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+
+	// Snapshot the leaf's parent id on every operator BEFORE the renew —
+	// this is the signal we use to distinguish committed-renew (parent
+	// changed to the new split node) from rolled-back-renew (parent
+	// unchanged). uuid.Nil = "no parent" (root node), which is a valid
+	// pre-state for a freshly-created single-node tree.
+	leafParentBefore := make(map[int]uuid.UUID, len(operatorIndices))
+	for _, i := range operatorIndices {
+		row, err := clients[i].TreeNode.Query().
+			Where(treenode.ID(leafUUID)).
+			WithParent().
+			Only(t.Context())
+		require.NoError(t, err, "operator %d must hold the leaf at test start", i)
+		if row.Edges.Parent != nil {
+			leafParentBefore[i] = row.Edges.Parent.ID
+		}
+	}
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+	parentCtx := wallet.ContextWithToken(t.Context(), authToken)
+	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+
+	// Tight timeout designed to land cancellation inside Execute. Either
+	// outcome (commit-races-past-cancel or cancel-lands-mid-flight) is a
+	// valid path through the engine; we just want both to converge to a
+	// consistent application-level state.
+	ctx, cancel := context.WithTimeout(parentCtx, 75*time.Millisecond)
+	defer cancel()
+	_, _ = wallet.RenewNodeZeroTimelock(ctx, config, leaf, leafPrivKey)
+
+	// Helper to read the new FlowExecution rows (post-renew) on a
+	// per-operator basis. Closure over the long-lived clients so the
+	// pool stays bounded.
+	//
+	// Uses assert.NoError + return nil so a DB error inside
+	// require.Eventually's goroutine surfaces as a real failure rather
+	// than getting swallowed by t.Fatal → runtime.Goexit (which would
+	// otherwise read as "condition never satisfied in time").
+	newFlowRows := func(i int) []*ent.FlowExecution {
+		rows, err := clients[i].FlowExecution.Query().
+			Order(ent.Asc(flowexecution.FieldCreateTime)).
+			All(t.Context())
+		if !assert.NoError(t, err) {
+			return nil
+		}
+		var out []*ent.FlowExecution
+		for _, r := range rows {
+			if _, seen := preExistingFlowIDs[i][r.ID]; !seen {
+				out = append(out, r)
+			}
+		}
+		return out
+	}
+
+	// Skip if static knob propagation wasn't in play — same convention
+	// as the row-state companion test.
+	totalNew := 0
+	for _, i := range operatorIndices {
+		totalNew += len(newFlowRows(i))
+	}
+	if totalNew == 0 {
+		t.Skip("no FlowExecution rows written — 2PC path did not run (likely no live knob propagation; run under minikube or set spark.so.use_consensus_renew in static config)")
+	}
+
+	// Wait for the engine's cleanup ctx to drive every persisted row to
+	// a terminal state. Without layer 1 this would never converge.
+	require.Eventually(t, func() bool {
+		for _, i := range operatorIndices {
+			for _, r := range newFlowRows(i) {
+				if r.Status == st.FlowExecutionStatusInFlight {
+					return false
+				}
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond,
+		"every FlowExecution row must reach a terminal state on the engine cleanup ctx")
+
+	// Domain-level invariants on the leaf itself:
+	//
+	// 1. No operator may have the leaf stuck in RenewLocked. RenewLocked
+	//    is the prepare-time transient status; if any operator is still
+	//    in it, prepare's lock was never released — the user-facing bug.
+	// 2. Every operator must agree on the leaf's terminal status (no
+	//    divergence between coordinator and participants).
+	// 3. Every operator must agree on whether the leaf's parent changed
+	//    (committed) or stayed the same (rolled back) — divergence here
+	//    would mean some operators committed and others rolled back,
+	//    which is the worst kind of split-brain.
+	leafStatusByOp := make(map[int]st.TreeNodeStatus, len(operatorIndices))
+	leafParentChangedByOp := make(map[int]bool, len(operatorIndices))
+	for _, i := range operatorIndices {
+		row, err := clients[i].TreeNode.Query().
+			Where(treenode.ID(leafUUID)).
+			WithParent().
+			Only(t.Context())
+		require.NoError(t, err, "operator %d must still hold the leaf after the renew settles", i)
+
+		assert.NotEqual(t, st.TreeNodeStatusRenewLocked, row.Status,
+			"operator %d still has the leaf in RenewLocked — prepare's lock was never released, the bug layer 1 fixes", i)
+		leafStatusByOp[i] = row.Status
+
+		// uuid.Nil → no parent, matching the snapshot convention above.
+		var parentAfter uuid.UUID
+		if row.Edges.Parent != nil {
+			parentAfter = row.Edges.Parent.ID
+		}
+		leafParentChangedByOp[i] = parentAfter != leafParentBefore[i]
+	}
+
+	// Status agreement.
+	statusSet := make(map[st.TreeNodeStatus]struct{})
+	for _, s := range leafStatusByOp {
+		statusSet[s] = struct{}{}
+	}
+	assert.Len(t, statusSet, 1,
+		"every operator must agree on the leaf's terminal status; got per-operator: %v", leafStatusByOp)
+
+	// Parent-changed agreement.
+	parentChangedSet := make(map[bool]struct{})
+	for _, c := range leafParentChangedByOp {
+		parentChangedSet[c] = struct{}{}
+	}
+	require.Len(t, parentChangedSet, 1,
+		"every operator must agree on whether the renew committed (parent changed) or rolled back (parent unchanged); got per-operator: %v", leafParentChangedByOp)
+
+	// Cross-check: parent-changed flag must match the FlowExecution
+	// terminal status on every operator that DID write a row. If parent
+	// changed → row should be COMMITTED; if parent unchanged → row
+	// should be ROLLED_BACK.
+	//
+	// An operator with zero new rows is a valid outcome of the cancel
+	// race (its participant gRPC ctx was cancelled before the row
+	// persisted) — same outcome the row-terminal companion test
+	// permits. We skip those operators here rather than assert exactly
+	// one row, otherwise the test flakes on the same race.
+	for _, i := range operatorIndices {
+		rows := newFlowRows(i)
+		if len(rows) == 0 {
+			continue
+		}
+		require.Len(t, rows, 1, "operator %d should have at most one new FlowExecution row", i)
+		row := rows[0]
+		if leafParentChangedByOp[i] {
+			assert.Equal(t, st.FlowExecutionStatusCommitted, row.Status,
+				"operator %d: leaf parent changed (renew applied) but FlowExecution row is %s", i, row.Status)
+		} else {
+			assert.Equal(t, st.FlowExecutionStatusRolledBack, row.Status,
+				"operator %d: leaf parent unchanged (renew not applied) but FlowExecution row is %s", i, row.Status)
+		}
+	}
 }

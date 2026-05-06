@@ -146,8 +146,11 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		if err != nil {
 			return nil, err
 		}
+		engine, err := consensus.GetEngine(ctx)
+		if err != nil {
+			return nil, err
+		}
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-		engine := consensus.NewTwoPCEngine(h.config, NewSendGossipHandler(h.config))
 		_, err = engine.Execute(ctx,
 			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RENEW_LEAF,
 			&selection,

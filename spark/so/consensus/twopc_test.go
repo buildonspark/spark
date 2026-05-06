@@ -39,6 +39,11 @@ func (m *mockGossipSender) CreateCommitAndSendGossipMessage(_ context.Context, m
 	return nil, m.err
 }
 
+func (m *mockGossipSender) CreateCommitAndSendGossipMessageWithClient(_ context.Context, _ *ent.Client, msg *pbgossip.GossipMessage, participants []string) (*ent.Gossip, error) {
+	m.calls = append(m.calls, gossipCall{msg: msg, participants: participants})
+	return nil, m.err
+}
+
 var _ GossipSender = (*mockGossipSender)(nil)
 
 func testConfig() *so.Config {
@@ -55,12 +60,13 @@ func testConfig() *so.Config {
 // a ctx scoped to the test DB and a handle to the Ent client for assertions.
 func newTestEngine(t *testing.T) (context.Context, *TwoPCEngine, *mockGossipSender, *ent.Client, *so.Config) {
 	t.Helper()
-	ctx, _ := db.NewTestSQLiteContext(t)
-	entTx, err := ent.GetTxFromContext(ctx)
-	require.NoError(t, err)
+	ctx, tc := db.NewTestSQLiteContext(t)
 	gs := &mockGossipSender{}
 	config := testConfig()
-	return ctx, NewTwoPCEngine(config, gs), gs, entTx.Client(), config
+	// Engine takes a SessionFactory (mirroring production) so its
+	// bookkeeping writes flow through the same Begin/Save/Commit
+	// machinery the rest of the codebase uses.
+	return ctx, NewTwoPCEngine(config, gs, db.NewDefaultSessionFactory(tc.Client)), gs, tc.Client, config
 }
 
 // simpleFlow is a CoordinatorFlow where commit and rollback use the same static payload.
@@ -329,7 +335,7 @@ func TestExecute_MarkCommitted_PreemptedByExternalRollback(t *testing.T) {
 		rollbackOp:   rollbackOp,
 	}
 
-	_, err := NewTwoPCEngine(config, gs).Execute(ctx, testOpType, selfSelection(t, config), preempt)
+	_, err := NewTwoPCEngine(config, gs, db.NewDefaultSessionFactory(client)).Execute(ctx, testOpType, selfSelection(t, config), preempt)
 	require.ErrorIs(t, err, ErrCoordinatorRowPreempted, "Execute must propagate the preemption")
 
 	// Row stays ROLLED_BACK — markCommitted's conditional UPDATE matched
@@ -403,3 +409,144 @@ func (f *preemptingFlow) BuildCommitPayload(_ context.Context, _ map[string]*any
 func (f *preemptingFlow) RollbackPayload() proto.Message { return f.rollbackOp }
 
 var _ CoordinatorFlow = (*preemptingFlow)(nil)
+
+// --- Cancellation resilience tests ---
+
+// cancelDuringPrepareFlow models the bug case: the user (or anything else
+// holding a cancellable parent of the request ctx) cancels in the middle of
+// Prepare. The engine's pre-fix behavior was to lose the coordinator row
+// entirely because its bookkeeping ran in the request session's tx; the
+// post-fix behavior is to drive the row to ROLLED_BACK and dispatch
+// rollback gossip on a detached cleanup ctx.
+type cancelDuringPrepareFlow struct {
+	cancel  context.CancelFunc
+	payload proto.Message
+}
+
+func (f *cancelDuringPrepareFlow) Prepare(_ context.Context, _ proto.Message) (proto.Message, error) {
+	f.cancel()
+	return nil, context.Canceled
+}
+
+func (f *cancelDuringPrepareFlow) Commit(_ context.Context, _ proto.Message) error   { return nil }
+func (f *cancelDuringPrepareFlow) Rollback(_ context.Context, _ proto.Message) error { return nil }
+func (f *cancelDuringPrepareFlow) PrepareOp() proto.Message                          { return f.payload }
+func (f *cancelDuringPrepareFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) (proto.Message, error) {
+	return nil, context.Canceled
+}
+func (f *cancelDuringPrepareFlow) BuildCommitPayload(_ context.Context, _ map[string]*anypb.Any) (proto.Message, error) {
+	return f.payload, nil
+}
+func (f *cancelDuringPrepareFlow) RollbackPayload() proto.Message { return f.payload }
+
+var _ CoordinatorFlow = (*cancelDuringPrepareFlow)(nil)
+
+func TestExecute_UserCancelDuringPrepare_RowReachesRolledBackDurably(t *testing.T) {
+	parentCtx, engine, gs, client, config := newTestEngine(t)
+	// The cancellable ctx is what we'd pass into a gRPC handler.
+	ctx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+	flow := &cancelDuringPrepareFlow{cancel: cancel, payload: rollbackOp}
+
+	_, err := engine.Execute(ctx, testOpType, selfSelection(t, config), flow)
+	require.Error(t, err, "Execute should report the prepare failure to the caller")
+	assert.Contains(t, err.Error(), "prepare failed")
+
+	// Read via the unwrapped client (NOT the request ctx) — proves the
+	// row hit disk through the engine's own dbClient and isn't tied to
+	// the cancelled request.
+	rows, err := client.FlowExecution.Query().All(parentCtx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1, "coordinator row must exist even though the request was cancelled")
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, rows[0].Status,
+		"engine must drive the row to ROLLED_BACK on the cleanup ctx")
+	require.NotNil(t, rows[0].DecisionPayload)
+	assert.True(t, proto.Equal(rollbackOp, payloadFromAnyBytes(t, *rows[0].DecisionPayload)),
+		"row must carry the rollback payload that participants will see via reconcile")
+
+	// Rollback gossip was dispatched even though the originating ctx was cancelled.
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusRollback())
+}
+
+// cancelDuringBuildCommitFlow cancels the user ctx after Prepare succeeds —
+// modelling a cancel that arrives between fan-out and BuildCommitPayload.
+type cancelDuringBuildCommitFlow struct {
+	cancel     context.CancelFunc
+	rollbackOp proto.Message
+}
+
+func (f *cancelDuringBuildCommitFlow) Prepare(_ context.Context, _ proto.Message) (proto.Message, error) {
+	return nil, nil
+}
+func (f *cancelDuringBuildCommitFlow) Commit(_ context.Context, _ proto.Message) error   { return nil }
+func (f *cancelDuringBuildCommitFlow) Rollback(_ context.Context, _ proto.Message) error { return nil }
+func (f *cancelDuringBuildCommitFlow) PrepareOp() proto.Message                          { return f.rollbackOp }
+func (f *cancelDuringBuildCommitFlow) PrepareTask(_ context.Context, _ *so.SigningOperator) (proto.Message, error) {
+	return nil, nil
+}
+func (f *cancelDuringBuildCommitFlow) BuildCommitPayload(_ context.Context, _ map[string]*anypb.Any) (proto.Message, error) {
+	f.cancel()
+	return nil, context.Canceled
+}
+func (f *cancelDuringBuildCommitFlow) RollbackPayload() proto.Message { return f.rollbackOp }
+
+var _ CoordinatorFlow = (*cancelDuringBuildCommitFlow)(nil)
+
+func TestExecute_UserCancelDuringBuildCommit_RowReachesRolledBackDurably(t *testing.T) {
+	parentCtx, engine, gs, client, config := newTestEngine(t)
+	ctx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+	flow := &cancelDuringBuildCommitFlow{cancel: cancel, rollbackOp: rollbackOp}
+
+	_, err := engine.Execute(ctx, testOpType, selfSelection(t, config), flow)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "build-commit failed")
+
+	rows, err := client.FlowExecution.Query().All(parentCtx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, rows[0].Status)
+
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusRollback(),
+		"rollback gossip must dispatch even though the request ctx was cancelled mid-flow")
+}
+
+func TestExecute_CoordinatorRowSurvivesRequestSessionRollback(t *testing.T) {
+	// This is the load-bearing assertion for the layer-1 fix: even if the
+	// caller's request transaction is rolled back after Execute returns
+	// (for any reason — handler-level error, panic recovery, etc.), the
+	// engine's coordinator row remains durable so participants reconciling
+	// against this SO get a real outcome via ConsensusQueryOutcome.
+	ctx, engine, gs, client, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+
+	_, err := engine.Execute(ctx, testOpType, selfSelection(t, config),
+		&aggregatingFlow{rollbackOp: &pbgossip.GossipMessage{MessageId: "rb"}, commitResult: commitOp})
+	require.NoError(t, err)
+	require.Len(t, gs.calls, 1)
+
+	// Force the request session's tx to roll back, then re-read via the
+	// bare client to prove the row landed on disk independent of the
+	// session.
+	tx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Rollback())
+
+	rows, err := client.FlowExecution.Query().All(parentlessCtx())
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, rows[0].Status)
+	require.NotNil(t, rows[0].DecisionPayload)
+	assert.True(t, proto.Equal(commitOp, payloadFromAnyBytes(t, *rows[0].DecisionPayload)))
+}
+
+// parentlessCtx returns a fresh context with no DB session attached —
+// emphasizes that the post-rollback read goes through the bare client
+// alone, with no session in scope.
+func parentlessCtx() context.Context { return context.Background() }

@@ -38,6 +38,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authninternal"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/chain"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
@@ -47,6 +48,7 @@ import (
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	"github.com/lightsparkdev/spark/so/grpc/grpcutil"
+	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/middleware"
 	events "github.com/lightsparkdev/spark/so/stream"
@@ -695,6 +697,14 @@ func main() {
 		config.Database.NewTxTimeout,
 	)
 
+	// The 2PC engine is stateless across requests (it just carries config,
+	// the gossip sender, and the unwrapped *ent.Client used for engine
+	// bookkeeping writes that must outlive the request transaction), so a
+	// single instance is constructed here and injected into every request
+	// ctx by ConsensusEngineInterceptor below. Handlers fetch it via
+	// consensus.GetEngine(ctx) instead of constructing one per call.
+	consensusEngine := consensus.NewTwoPCEngine(config, handler.NewSendGossipHandler(config), db.NewDefaultSessionFactory(dbClient))
+
 	serverOpts = append(serverOpts,
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			sparkgrpc.TimestampHeaderInterceptor(),
@@ -726,6 +736,9 @@ func main() {
 				}
 			}(),
 			dbSessionMiddleware,
+			// Inject the 2PC engine after the DB session so handlers that
+			// need consensus can pull it from ctx without constructing one.
+			sparkgrpc.ConsensusEngineInterceptor(consensusEngine),
 			// Idempotency must be after the DB session so we can store idempotency keys
 			sparkgrpc.IdempotencyInterceptor(),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(

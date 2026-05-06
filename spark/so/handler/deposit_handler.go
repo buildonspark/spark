@@ -1968,8 +1968,11 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 		if err != nil {
 			return nil, err
 		}
+		engine, err := consensus.GetEngine(ctx)
+		if err != nil {
+			return nil, err
+		}
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-		engine := consensus.NewTwoPCEngine(config, NewSendGossipHandler(config))
 		_, err = engine.Execute(ctx,
 			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE,
 			&selection,
