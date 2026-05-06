@@ -9,6 +9,12 @@ import {
   listMessageTypes,
 } from "../spark-wallet/proto-reflection.js";
 
+type ReflectionProperties = {
+  $type?: unknown;
+  $typeName?: unknown;
+  descriptor?: unknown;
+};
+
 // Try importing @bufbuild/protobuf reflection
 // This is just a test to see what's available
 describe("@bufbuild/protobuf Reflection Test", () => {
@@ -47,14 +53,16 @@ describe("@bufbuild/protobuf Reflection Test", () => {
     console.log("SparkInvoiceFields own properties:", sparkFieldsProps);
 
     // Check for any potential descriptor or reflection properties
+    const satsPaymentReflection = satsPayment as ReflectionProperties;
+    const sparkFieldsReflection = sparkFields as ReflectionProperties;
     const satsPaymentDescriptor =
-      (satsPayment as any).$typeName ||
-      (satsPayment as any).descriptor ||
-      (satsPayment as any).$type;
+      satsPaymentReflection.$typeName ??
+      satsPaymentReflection.descriptor ??
+      satsPaymentReflection.$type;
     const sparkFieldsDescriptor =
-      (sparkFields as any).$typeName ||
-      (sparkFields as any).descriptor ||
-      (sparkFields as any).$type;
+      sparkFieldsReflection.$typeName ??
+      sparkFieldsReflection.descriptor ??
+      sparkFieldsReflection.$type;
 
     console.log("SatsPayment descriptor:", satsPaymentDescriptor);
     console.log("SparkInvoiceFields descriptor:", sparkFieldsDescriptor);
@@ -131,9 +139,6 @@ describe("@bufbuild/protobuf Reflection Test", () => {
       // Test for SatsPayment
       const satsPaymentNumbers = getFieldNumbers("spark.SatsPayment");
       console.log("SatsPayment field numbers:", satsPaymentNumbers);
-
-      // No structural inference. Use explicit message name.
-      const satsPayment: SatsPayment = { amount: 1000 };
       console.log(
         "Explicit SatsPayment field numbers:",
         getFieldNumbers("spark.SatsPayment"),

@@ -346,9 +346,9 @@ export class BitcoinFaucet {
 
     const sighash = unsignedTx.preimageWitnessV1(
       0,
-      new Array(unsignedTx.inputsLength).fill(script),
+      Array<Uint8Array>(unsignedTx.inputsLength).fill(script),
       SigHash.DEFAULT,
-      new Array(unsignedTx.inputsLength).fill(fundingTxOut.amount!),
+      Array<bigint>(unsignedTx.inputsLength).fill(fundingTxOut.amount!),
     );
 
     const merkleRoot = new Uint8Array();
@@ -651,7 +651,7 @@ export class BitcoinFaucet {
         if (mempoolEntry) {
           return mempoolEntry;
         }
-      } catch (error) {
+      } catch {
         await new Promise((r) => setTimeout(r, intervalMs));
       }
     }

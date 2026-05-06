@@ -157,7 +157,7 @@ describe.each(walletTypes)(
       const connectionManager = userWallet.getConnectionManager();
       const threshold = userWallet.getConfigService().getThreshold();
 
-      for (const [_, operator] of Object.entries(signingOperators)) {
+      for (const operator of Object.values(signingOperators)) {
         const mockClient = await connectionManager.createMockClient(
           operator.address,
         );
@@ -270,26 +270,10 @@ describe.each(walletTypes)(
         throw new Error("test: Receiver leaf not found");
       }
 
-      const claimingNodes = receiverTransfer.leaves.map((leaf) => {
+      receiverTransfer.leaves.forEach((leaf) => {
         if (!leaf.leaf) {
           throw new Error("test: Leaf not found");
         }
-        return {
-          leaf: {
-            ...leaf.leaf,
-            refundTx: leaf.intermediateRefundTx,
-            directRefundTx: leaf.intermediateDirectRefundTx,
-            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
-          },
-          keyDerivation: {
-            type: KeyDerivationType.ECIES,
-            path: leaf.secretCipher,
-          } as const,
-          newKeyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.leaf.id,
-          } as const,
-        };
       });
 
       await transferService.claimTransfer(receiverTransfer);

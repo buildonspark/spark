@@ -8,7 +8,7 @@ function withBytes(response: Response): Response {
   return response;
 }
 
-type FetchFn = (input: RequestInfo | URL, init?: any) => Promise<any>;
+type FetchFn = SparkFetch;
 
 describe("SparkFetch", () => {
   beforeEach(() => {

@@ -8,7 +8,21 @@ import {
   jest,
 } from "@jest/globals";
 import { type WalletConfigService } from "../services/config.js";
+import { type ConnectionManager } from "../services/connection/connection.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.js";
+
+type InitWalletInternals = {
+  createClientsAndSyncWallet: () => Promise<void>;
+  leafManager: { swapService: unknown };
+  logger: { context: string };
+  sspClient: { logger: { context: string } };
+  swapService: { sspClient: unknown };
+  syncWallet: () => Promise<void>;
+};
+
+function initWalletInternals(wallet: SparkWallet): InitWalletInternals {
+  return wallet as unknown as InitWalletInternals;
+}
 
 class InitServiceRefreshTestWallet extends SparkWallet {
   constructor(
@@ -19,8 +33,9 @@ class InitServiceRefreshTestWallet extends SparkWallet {
     super({
       network: "LOCAL",
     });
-    this.connectionManager = connectionManagerStub as any;
-    (this as any).syncWallet = jest.fn(async () => {
+    this.connectionManager =
+      connectionManagerStub as unknown as ConnectionManager;
+    initWalletInternals(this).syncWallet = jest.fn(async () => {
       await Promise.resolve();
     });
   }
@@ -35,7 +50,7 @@ class InitServiceRefreshTestWallet extends SparkWallet {
       },
       subscribeToEvents: async function* () {},
       getSessionId: () => "test-session",
-    } as any;
+    } as unknown as ConnectionManager;
   }
 
   protected override async setupBackgroundStream() {
@@ -54,7 +69,10 @@ class InitServiceRefreshTestWallet extends SparkWallet {
 describe("SparkWallet initialization", () => {
   beforeEach(() => {
     jest
-      .spyOn(Requester.prototype as any, "initWsClient")
+      .spyOn(
+        Requester.prototype as unknown as { initWsClient: () => Promise<null> },
+        "initWsClient",
+      )
       .mockResolvedValue(null);
   });
 
@@ -71,7 +89,7 @@ describe("SparkWallet initialization", () => {
     const wallet = new InitServiceRefreshTestWallet(connectionManagerStub);
     await wallet.initializeSignerForTest();
 
-    const internalWallet = wallet as any;
+    const internalWallet = initWalletInternals(wallet);
     const originalSspClient = internalWallet.sspClient;
     const originalSwapService = internalWallet.swapService;
     const originalLeafManager = internalWallet.leafManager;

@@ -4,22 +4,68 @@ import http from "http";
 import type { ClientRequest, IncomingMessage } from "http";
 import { PassThrough } from "stream";
 import { ClientError, Metadata } from "nice-grpc-common";
+import type { TransportParams } from "nice-grpc-web/lib/client/Transport.js";
 import {
   attachPrematureSocketCloseGuard,
   BareHttpTransport,
 } from "../services/connection/bare-http-transport.js";
 
 type MockIncomingMessage = IncomingMessage & {
-  destroy: ReturnType<typeof jest.fn>;
+  destroy: jest.Mock<(error?: Error) => MockIncomingMessage>;
 };
 
 type MockClientRequest = ClientRequest & {
-  destroy: ReturnType<typeof jest.fn>;
-  end: ReturnType<typeof jest.fn>;
-  setHeader: ReturnType<typeof jest.fn>;
-  setTimeout: ReturnType<typeof jest.fn>;
-  write: ReturnType<typeof jest.fn>;
+  destroy: jest.Mock<(error?: Error) => MockClientRequest>;
+  end: jest.Mock<() => MockClientRequest>;
+  setHeader: jest.Mock<
+    (name: string, value: number | string | string[]) => MockClientRequest
+  >;
+  setTimeout: jest.Mock<
+    (timeout: number, callback?: () => void) => MockClientRequest
+  >;
+  write: jest.Mock<(chunk: Uint8Array) => boolean>;
 };
+
+type TransportMethod = TransportParams["method"];
+
+const queryPendingTransfersMethod = {
+  path: "/spark.SparkService/query_pending_transfers",
+  requestStream: false,
+  responseStream: false,
+  requestSerialize: (value: unknown) =>
+    value instanceof Uint8Array ? value : new Uint8Array(),
+  requestDeserialize: (bytes: Uint8Array): unknown => bytes,
+  responseSerialize: (value: unknown) =>
+    value instanceof Uint8Array ? value : new Uint8Array(),
+  responseDeserialize: (bytes: Uint8Array): unknown => bytes,
+  options: {},
+} satisfies TransportMethod;
+
+const subscribeToEventsMethod = {
+  path: "/spark.SparkService/subscribe_to_events",
+  requestStream: false,
+  responseStream: true,
+  requestSerialize: (value: unknown) =>
+    value instanceof Uint8Array ? value : new Uint8Array(),
+  requestDeserialize: (bytes: Uint8Array): unknown => bytes,
+  responseSerialize: (value: unknown) =>
+    value instanceof Uint8Array ? value : new Uint8Array(),
+  responseDeserialize: (bytes: Uint8Array): unknown => bytes,
+  options: {},
+} satisfies TransportMethod;
+
+const queryNodesMethod = {
+  path: "/spark.SparkService/query_nodes",
+  requestStream: false,
+  responseStream: false,
+  requestSerialize: (value: unknown) =>
+    value instanceof Uint8Array ? value : new Uint8Array(),
+  requestDeserialize: (bytes: Uint8Array): unknown => bytes,
+  responseSerialize: (value: unknown) =>
+    value instanceof Uint8Array ? value : new Uint8Array(),
+  responseDeserialize: (bytes: Uint8Array): unknown => bytes,
+  options: {},
+} satisfies TransportMethod;
 
 function createMockIncomingMessage() {
   const socket = new EventEmitter();
@@ -27,7 +73,7 @@ function createMockIncomingMessage() {
 
   Object.assign(res, {
     socket,
-    destroy: jest.fn(),
+    destroy: jest.fn<(error?: Error) => MockIncomingMessage>(() => res),
   });
 
   return { socket, res };
@@ -52,18 +98,35 @@ function createMockClientRequest() {
   const req = new EventEmitter() as MockClientRequest;
 
   Object.assign(req, {
-    destroy: jest.fn(),
-    end: jest.fn(),
-    setHeader: jest.fn(),
-    setTimeout: jest.fn(),
-    write: jest.fn(),
+    destroy: jest.fn<(error?: Error) => MockClientRequest>(() => req),
+    end: jest.fn<() => MockClientRequest>(() => req),
+    setHeader: jest.fn<
+      (name: string, value: number | string | string[]) => MockClientRequest
+    >(() => req),
+    setTimeout: jest.fn<
+      (timeout: number, callback?: () => void) => MockClientRequest
+    >(() => req),
+    write: jest.fn<(chunk: Uint8Array) => boolean>(() => true),
   });
 
   return req;
 }
 
 async function* createUnaryBody() {
+  await Promise.resolve();
   yield new Uint8Array([1, 2, 3]);
+}
+
+async function getRejection(promise: Promise<unknown>) {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof Error) {
+      return error;
+    }
+    throw new Error(`Expected Error rejection, received ${String(error)}`);
+  }
+  throw new Error("Expected promise to reject");
 }
 
 afterEach(() => {
@@ -83,8 +146,9 @@ describe("attachPrematureSocketCloseGuard", () => {
     socket.emit("close");
 
     expect(res.destroy).toHaveBeenCalledTimes(1);
-    expect(res.destroy.mock.calls[0]?.[0]).toBeInstanceOf(Error);
-    expect(String(res.destroy.mock.calls[0]?.[0]?.message)).toContain(
+    const destroyError = res.destroy.mock.calls[0]?.[0];
+    expect(destroyError).toBeInstanceOf(Error);
+    expect(destroyError?.message).toContain(
       "response stream closed before completion",
     );
 
@@ -134,27 +198,18 @@ describe("BareHttpTransport", () => {
     const iterator = transport({
       body: createUnaryBody(),
       metadata: new Metadata(),
-      method: {
-        path: "/spark.SparkService/query_pending_transfers",
-        requestStream: false,
-        responseStream: false,
-      } as any,
+      method: queryPendingTransfersMethod,
       signal: new AbortController().signal,
       url: "http://example.com/test",
     });
 
     const nextResultPromise = iterator[Symbol.asyncIterator]().next();
-    const errorPromise = nextResultPromise.then(
-      () => null,
-      (error) => error,
-    );
+    const errorPromise = getRejection(nextResultPromise);
     await jest.advanceTimersByTimeAsync(15_000);
 
     const error = await errorPromise;
     expect(error).toBeInstanceOf(Error);
-    expect(String((error as Error).message)).toContain(
-      "request timed out after 15000ms",
-    );
+    expect(String(error.message)).toContain("request timed out after 15000ms");
     expect(req.setTimeout).toHaveBeenNthCalledWith(1, 15_000);
     expect(req.setTimeout).toHaveBeenNthCalledWith(2, 0);
     expect(req.destroy).toHaveBeenCalledWith(expect.any(Error));
@@ -178,35 +233,28 @@ describe("BareHttpTransport", () => {
     const realSetTimeout = global.setTimeout;
     const realClearTimeout = global.clearTimeout;
     const trackedTimeoutHandles: ReturnType<typeof setTimeout>[] = [];
-    const clearedTimeoutHandles = new Set<ReturnType<typeof setTimeout>>();
+    const clearedTimeoutHandles = new Set<unknown>();
 
-    jest.spyOn(global, "setTimeout").mockImplementation(((
-      callback: (...args: any[]) => void,
-      delay?: number,
-      ...args: any[]
-    ) => {
-      const handle = realSetTimeout(callback, delay, ...args);
+    jest.spyOn(global, "setTimeout").mockImplementation((callback, delay) => {
+      const handle = realSetTimeout(callback, delay);
       if (delay === 15_000) {
         trackedTimeoutHandles.push(handle);
       }
       return handle;
-    }) as typeof setTimeout);
-    jest.spyOn(global, "clearTimeout").mockImplementation(((timeout) => {
+    });
+    const clearTimeoutMock: typeof clearTimeout = (timeout) => {
       if (timeout != null) {
-        clearedTimeoutHandles.add(timeout as ReturnType<typeof setTimeout>);
+        clearedTimeoutHandles.add(timeout);
       }
-      return realClearTimeout(timeout);
-    }) as typeof clearTimeout);
+      return realClearTimeout(timeout as ReturnType<typeof setTimeout>);
+    };
+    jest.spyOn(global, "clearTimeout").mockImplementation(clearTimeoutMock);
 
     const transport = BareHttpTransport();
     const iterator = transport({
       body: createUnaryBody(),
       metadata: new Metadata(),
-      method: {
-        path: "/spark.SparkService/query_pending_transfers",
-        requestStream: false,
-        responseStream: false,
-      } as any,
+      method: queryPendingTransfersMethod,
       signal: new AbortController().signal,
       url: "http://example.com/test",
     })[Symbol.asyncIterator]();
@@ -219,10 +267,7 @@ describe("BareHttpTransport", () => {
     onResponse?.(res);
     await headerPromise;
 
-    const errorPromise = iterator.next().then(
-      () => null,
-      (error) => error,
-    );
+    const errorPromise = getRejection(iterator.next());
     await Promise.resolve();
     res.emit("data", "server exploded");
     res.emit("end");
@@ -259,12 +304,12 @@ describe("BareHttpTransport", () => {
         }
         return req;
       });
-    unaryReq.destroy.mockImplementation(((error?: Error) => {
+    unaryReq.destroy.mockImplementation((error?: Error) => {
       if (error != null) {
         setImmediate(() => unaryReq.emit("error", error));
       }
       return unaryReq;
-    }) as typeof unaryReq.destroy);
+    });
 
     const { res: streamRes } = createMockStreamingIncomingMessage();
     const streamDestroySpy = jest.spyOn(streamRes, "destroy");
@@ -273,11 +318,7 @@ describe("BareHttpTransport", () => {
     const streamIterator = transport({
       body: createUnaryBody(),
       metadata: new Metadata(),
-      method: {
-        path: "/spark.SparkService/subscribe_to_events",
-        requestStream: false,
-        responseStream: true,
-      } as any,
+      method: subscribeToEventsMethod,
       signal: new AbortController().signal,
       url: "http://example.com/stream",
     })[Symbol.asyncIterator]();
@@ -299,19 +340,12 @@ describe("BareHttpTransport", () => {
     const unaryIterator = transport({
       body: createUnaryBody(),
       metadata: new Metadata(),
-      method: {
-        path: "/spark.SparkService/query_nodes",
-        requestStream: false,
-        responseStream: false,
-      } as any,
+      method: queryNodesMethod,
       signal: new AbortController().signal,
       url: "http://example.com/query",
     })[Symbol.asyncIterator]();
 
-    const unaryErrorPromise = unaryIterator.next().then(
-      () => null,
-      (error) => error,
-    );
+    const unaryErrorPromise = getRejection(unaryIterator.next());
     for (
       let attempt = 0;
       attempt < 10 && unaryReq.setTimeout.mock.calls.length === 0;
@@ -327,7 +361,7 @@ describe("BareHttpTransport", () => {
 
     expect(streamDestroySpy).not.toHaveBeenCalled();
     expect(unaryError).toBeInstanceOf(ClientError);
-    expect(String((unaryError as Error).message)).toContain(
+    expect(String(unaryError.message)).toContain(
       "request timed out after 15000ms",
     );
 

@@ -24,7 +24,10 @@ describe("SSP Auth Test", () => {
 
   it("Should throw an error if the user is not authenticated", async () => {
     // Mock the authenticate function so we don't set the auth token
-    const originalAuthenticate = SspClient.prototype.authenticate;
+    const originalAuthenticate = Object.getOwnPropertyDescriptor(
+      SspClient.prototype,
+      "authenticate",
+    )?.value as SspClient["authenticate"];
     SspClient.prototype.authenticate = jest.fn(async () => {
       await Promise.resolve();
     });
@@ -51,7 +54,10 @@ describe("SSP Auth Test", () => {
 
   it("Should reauthenticate successfully", async () => {
     // Mock the authenticate function so we don't set the auth token
-    const originalAuthenticate = SspClient.prototype.authenticate;
+    const originalAuthenticate = Object.getOwnPropertyDescriptor(
+      SspClient.prototype,
+      "authenticate",
+    )?.value as SspClient["authenticate"];
     SspClient.prototype.authenticate = jest.fn(async () => {
       await Promise.resolve();
     });

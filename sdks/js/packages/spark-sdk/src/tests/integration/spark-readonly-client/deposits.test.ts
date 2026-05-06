@@ -118,7 +118,7 @@ describe("getStaticDepositAddresses", () => {
   });
 
   it("returns the static deposit address after one is generated", async () => {
-    const { wallet, mnemonic } = await SparkWalletTestingWithStream.initialize({
+    const { wallet } = await SparkWalletTestingWithStream.initialize({
       options: { network: "LOCAL" },
     });
 

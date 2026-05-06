@@ -8,7 +8,6 @@ export default [
       "src/graphql/objects/**",
       "src/proto/**",
       "src/spark-bindings/wasm/**",
-      "src/tests/**",
       "src/token-primitives-bindings/wasm/**",
       "src/wasm/**",
       "wasm/**",

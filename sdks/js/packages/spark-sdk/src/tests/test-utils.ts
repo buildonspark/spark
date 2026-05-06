@@ -79,16 +79,16 @@ async function createDeposit(
   const script = OutScript.encode(addr);
   depositTx.addOutput({ script, amount: amountSats });
 
-  let treeResp: FinalizeNodeSignaturesResponse;
-  treeResp = await depositService.createTreeRoot({
-    keyDerivation: {
-      type: KeyDerivationType.LEAF,
-      path: leafId,
-    },
-    verifyingKey: depositResp.depositAddress.verifyingKey,
-    depositTx,
-    vout: 0,
-  });
+  const treeResp: FinalizeNodeSignaturesResponse =
+    await depositService.createTreeRoot({
+      keyDerivation: {
+        type: KeyDerivationType.LEAF,
+        path: leafId,
+      },
+      verifyingKey: depositResp.depositAddress.verifyingKey,
+      depositTx,
+      vout: 0,
+    });
 
   const signedDepositTx = await faucet.signFaucetCoin(
     depositTx,

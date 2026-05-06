@@ -14,6 +14,16 @@ import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import { type TokenOutputsMap } from "../spark-wallet/types.js";
 import { type Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 
+type TokenTransactionServiceInternals = {
+  sortTokenOutputsByStrategy(
+    tokenOutputs: OutputWithPreviousTransactionData[],
+    strategy: "SMALL_FIRST" | "LARGE_FIRST",
+  ): void;
+  validateOutputCountPerToken(
+    outputsToUse: OutputWithPreviousTransactionData[],
+  ): void;
+};
+
 describe("select token outputs", () => {
   let tokenTransactionService: TokenTransactionService;
 
@@ -31,11 +41,9 @@ describe("select token outputs", () => {
     tokenOutputs: OutputWithPreviousTransactionData[],
     strategy: "SMALL_FIRST" | "LARGE_FIRST",
   ) => {
-    // TypeScript bracket notation to access private method
-    (tokenTransactionService as any)["sortTokenOutputsByStrategy"](
-      tokenOutputs,
-      strategy,
-    );
+    (
+      tokenTransactionService as unknown as TokenTransactionServiceInternals
+    ).sortTokenOutputsByStrategy(tokenOutputs, strategy);
   };
 
   const createMockTokenOutput = (
@@ -239,9 +247,9 @@ describe("select token outputs", () => {
     const validateOutputCountPerToken = (
       outputsToUse: OutputWithPreviousTransactionData[],
     ) =>
-      (tokenTransactionService as any)["validateOutputCountPerToken"](
-        outputsToUse,
-      );
+      (
+        tokenTransactionService as unknown as TokenTransactionServiceInternals
+      ).validateOutputCountPerToken(outputsToUse);
 
     it("allows multi-token transfers when each token is within the limit", () => {
       const tokenA = new Uint8Array(32).fill(10);

@@ -22,7 +22,7 @@ const INVOICE_AMOUNT = 1000;
 const options: ConfigOptions = {
   network: "LOCAL",
 };
-const { wallet: walletStatic, ...rest } = await SparkWallet.initialize({
+const { wallet: walletStatic } = await SparkWallet.initialize({
   mnemonicOrSeed:
     "logic ripple layer execute smart disease marine hero monster talent crucial unfair horror shadow maze abuse avoid story loop jaguar sphere trap decrease turn",
   options,

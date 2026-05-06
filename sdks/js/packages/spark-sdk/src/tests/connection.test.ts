@@ -13,7 +13,6 @@ import type { SparkAuthnServiceDefinition } from "../proto/spark_authn.js";
 import type { SparkServiceDefinition } from "../proto/spark.js";
 import type { SparkTokenServiceDefinition } from "../proto/spark_token.js";
 import { DefaultSparkSigner } from "../signer/signer.js";
-import type { SparkCallOptions } from "../types/grpc.js";
 
 class FakeChannel {
   public close = jest.fn<() => void>();
@@ -43,7 +42,7 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
     _definition: AnyServiceDef,
     channel: Channel,
     _withRetries: boolean,
-    _middleware?: ClientMiddleware<RetryOptions, {}>,
+    _middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: string,
   ): Promise<T & { close?: () => void }> {
     await Promise.resolve();
@@ -69,8 +68,8 @@ describe("ConnectionManager channel cache", () => {
     const mgr = new TestConnectionManager(config);
     const address = "https://0.spark.minikube.local";
 
-    const client1 = await mgr.createSparkClient(address);
-    const client2 = await mgr.createSparkClient(address);
+    await mgr.createSparkClient(address);
+    await mgr.createSparkClient(address);
 
     expect(mgr.createdChannels).toHaveLength(1);
     const ch1 = mgr.createdChannels[0]!;
@@ -79,7 +78,7 @@ describe("ConnectionManager channel cache", () => {
     await mgr.closeConnections();
     expect(ch1.close).toHaveBeenCalledTimes(1);
 
-    const client3 = await mgr.createSparkClient(address);
+    await mgr.createSparkClient(address);
     expect(mgr.createdChannels).toHaveLength(2);
     const ch2 = mgr.createdChannels[1]!;
     await mgr.closeConnections();
@@ -95,8 +94,8 @@ describe("ConnectionManager channel cache", () => {
     const mgr = new TestConnectionManager(config);
     const address = "https://0.spark.minikube.local";
 
-    const unaryClient = await mgr.createSparkClient(address);
-    const streamClient = await mgr.createSparkStreamClient(address);
+    await mgr.createSparkClient(address);
+    await mgr.createSparkStreamClient(address);
 
     // Two channels created: one unary, one stream
     expect(mgr.createdChannels).toHaveLength(2);
@@ -132,7 +131,7 @@ describe("ConnectionManager channel cache", () => {
     const ch = mgr.createdChannels[0]!;
 
     // The channel returned by getChannelForClient should be the same object
-    const cachedCh = await mgr.getChannelForClient("spark", address);
+    const cachedCh = mgr.getChannelForClient("spark", address);
     expect(cachedCh).toBe(ch as unknown as Channel);
 
     await mgr.closeConnections();
@@ -249,7 +248,7 @@ describe("ConnectionManager channel cache", () => {
     await mgr2.createSparkClient(address);
     // Should reuse static cached channel; no new channel created by mgr2
     expect(mgr2.createdChannels).toHaveLength(0);
-    const cachedCh2 = await mgr2.getChannelForClient("spark", address);
+    const cachedCh2 = mgr2.getChannelForClient("spark", address);
     expect(cachedCh2).toBe(ch as unknown as Channel);
 
     await mgr1.closeConnections();
@@ -277,7 +276,7 @@ describe("ConnectionManager middleware", () => {
       _definition: AnyServiceDef,
       channel: Channel,
       _withRetries: boolean,
-      _middleware?: ClientMiddleware<RetryOptions, {}>,
+      _middleware?: ClientMiddleware<RetryOptions, object>,
       channelKey?: string,
     ): Promise<T & { close?: () => void }> {
       await Promise.resolve();
@@ -325,6 +324,8 @@ describe("ConnectionManager middleware", () => {
       request: { id: 1 },
       responseStream: false,
       next: async function* (_request: Req, options: CallOptions) {
+        await Promise.resolve();
+        yield* [] as never[];
         const auth = options.metadata?.get("Authorization");
         if (invocation === 0) {
           expect(auth).toBe("Bearer t1");
@@ -364,18 +365,18 @@ describe("ConnectionManager middleware", () => {
       _definition: AnyServiceDef,
       channel: Channel,
       _withRetries: boolean,
-      _middleware?: ClientMiddleware<RetryOptions, {}>,
+      _middleware?: ClientMiddleware<RetryOptions, object>,
       channelKey?: string,
     ): Promise<T & { close?: () => void }> {
+      await Promise.resolve();
       const close =
         channelKey != null
           ? () => AuthCachingTestConnectionManager.releaseChannel(channelKey)
           : channel.close.bind(channel);
 
-      const self = this;
       const fakeAuthClient = {
-        async get_challenge({ publicKey }: { publicKey: Uint8Array }) {
-          self.getChallengeCalls += 1;
+        get_challenge: async ({ publicKey }: { publicKey: Uint8Array }) => {
+          this.getChallengeCalls += 1;
           await new Promise((r) => setTimeout(r, 5));
           return {
             protectedChallenge: {
@@ -390,14 +391,14 @@ describe("ConnectionManager middleware", () => {
             },
           };
         },
-        async verify_challenge() {
+        verify_challenge: async () => {
           await Promise.resolve();
-          self.verifyChallengeCalls += 1;
+          this.verifyChallengeCalls += 1;
           // Derive expiration from the stubbed server time so the TTL check is deterministic
           return {
             sessionToken: "cached-token",
             expirationTimestamp:
-              Math.floor(self.fixedNow.getTime() / 1000) + 3600,
+              Math.floor(this.fixedNow.getTime() / 1000) + 3600,
           };
         },
         close,
@@ -435,6 +436,8 @@ describe("ConnectionManager middleware", () => {
         request: { id: 1 },
         responseStream: false,
         next: async function* () {
+          await Promise.resolve();
+          yield* [] as never[];
           return "ok";
         },
       }) as ClientMiddlewareCall<Req, Res>;
@@ -473,16 +476,18 @@ describe("ConnectionManager middleware", () => {
       request: { id: 1 },
       responseStream: false,
       next: async function* () {
+        await Promise.resolve();
+        yield* [] as never[];
         return "ok";
       },
     };
 
-    const r1 = await (await middleware(call, {})).next();
+    const r1 = await middleware(call, {}).next();
     expect(r1.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(1);
     expect(mgr.verifyChallengeCalls).toBe(1);
 
-    const r2 = await (await middleware(call, {})).next();
+    const r2 = await middleware(call, {}).next();
     expect(r2.value).toBe("ok");
     // Still one call due to token cache
     expect(mgr.getChallengeCalls).toBe(1);
@@ -525,7 +530,7 @@ describe("ConnectionManager middleware", () => {
         _definition: AnyServiceDef,
         channel: Channel,
         _withRetries: boolean,
-        _middleware?: ClientMiddleware<RetryOptions, {}>,
+        _middleware?: ClientMiddleware<RetryOptions, object>,
         channelKey?: string,
       ): Promise<T & { close?: () => void }> {
         await Promise.resolve();
@@ -534,9 +539,8 @@ describe("ConnectionManager middleware", () => {
             ? () => AuthRetryTestConnectionManager.releaseChannel(channelKey)
             : channel.close.bind(channel);
 
-        const self = this;
         const fakeClient = {
-          async get_challenge({ publicKey }: { publicKey: Uint8Array }) {
+          get_challenge: async ({ publicKey }: { publicKey: Uint8Array }) => {
             await Promise.resolve();
             getChallengeAttempts += 1;
             // Fail with a connection error on the first 3 attempts,
@@ -557,12 +561,12 @@ describe("ConnectionManager middleware", () => {
               },
             };
           },
-          async verify_challenge() {
+          verify_challenge: async () => {
             await Promise.resolve();
             return {
               sessionToken: "recovered-token",
               expirationTimestamp:
-                Math.floor(self.fixedNow.getTime() / 1000) + 3600,
+                Math.floor(this.fixedNow.getTime() / 1000) + 3600,
             };
           },
           close,
@@ -587,7 +591,11 @@ describe("ConnectionManager middleware", () => {
 
     // Invalidate the cached auth token so the next authenticate() call
     // goes through the full get_challenge / verify_challenge flow.
-    (AuthRetryTestConnectionManager as any).authTokenCache.clear();
+    (
+      AuthRetryTestConnectionManager as unknown as {
+        authTokenCache: { clear: () => void };
+      }
+    ).authTokenCache.clear();
 
     // Trigger re-authentication. This acquires the EXISTING unary channel
     // (refCount goes to 2), then get_challenge fails 3 times with
@@ -599,7 +607,9 @@ describe("ConnectionManager middleware", () => {
     // The first authenticate() (inside createSparkClient) already consumed
     // attempts 1-4 of the mock. Reset so the re-auth exercises the retry path fresh.
     getChallengeAttempts = 0;
-    const token = await (mgr as any).authenticate(address);
+    const token = await (
+      mgr as unknown as { authenticate: (address: string) => Promise<string> }
+    ).authenticate(address);
 
     expect(token).toBeDefined();
     expect(getChallengeAttempts).toBe(4); // 3 failures + 1 success
@@ -643,21 +653,23 @@ describe("ConnectionManager middleware", () => {
       request: { id: 1 },
       responseStream: false,
       next: async function* () {
+        await Promise.resolve();
+        yield* [] as never[];
         return "ok";
       },
     };
 
-    const r1 = await (await middleware1(call, {})).next();
+    const r1 = await middleware1(call, {}).next();
     expect(r1.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(1);
     expect(mgr.verifyChallengeCalls).toBe(1);
 
-    const r2 = await (await middleware2(call, {})).next();
+    const r2 = await middleware2(call, {}).next();
     expect(r2.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(2);
     expect(mgr.verifyChallengeCalls).toBe(2);
 
-    const r3 = await (await middleware1(call, {})).next();
+    const r3 = await middleware1(call, {}).next();
     expect(r3.value).toBe("ok");
     expect(mgr.getChallengeCalls).toBe(2);
     expect(mgr.verifyChallengeCalls).toBe(2);

@@ -195,7 +195,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     let hasError = false;
     try {
       await sspTransferService.claimTransfer(receiverTransfer!);
-    } catch (e) {
+    } catch {
       hasError = true;
     }
     expect(hasError).toBe(true);

@@ -12,7 +12,6 @@ import { SparkReadonlyClient } from "../../../spark-readonly-client/spark-readon
 import { DefaultSparkSigner } from "../../../signer/signer.js";
 import {
   createEmptyWallet,
-  createPublicReadonlyClient,
   LOCAL_OPTIONS,
 } from "../../spark-readonly-client/helpers.js";
 

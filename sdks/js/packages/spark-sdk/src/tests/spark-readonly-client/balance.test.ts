@@ -35,7 +35,6 @@ const TEST_SPARK_ADDRESS = encodeSparkAddress({
 
 type QueryNodes = SparkServiceClient["query_nodes"];
 type QueryAllTransfers = SparkServiceClient["query_all_transfers"];
-type QueryNodesRequest = Parameters<QueryNodes>[0];
 type QueryTransfersRequest = Parameters<QueryAllTransfers>[0];
 type QueryNodesResponse = Awaited<ReturnType<QueryNodes>>;
 type QueryTransfersResponse = Awaited<ReturnType<QueryAllTransfers>>;
@@ -69,7 +68,7 @@ function createTestClient(
   client: TestSparkReadonlyClient;
   createSparkClient: jest.Mock;
 } {
-  const createSparkClient = jest.fn(async () => sparkClient);
+  const createSparkClient = jest.fn(() => Promise.resolve(sparkClient));
   nextConnectionManager = {
     createSparkClient,
   } as unknown as ConnectionManagerNodeJS;

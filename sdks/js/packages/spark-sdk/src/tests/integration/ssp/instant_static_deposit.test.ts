@@ -205,13 +205,8 @@ describe("SSP instant static deposit integration", () => {
         expect(claimResult.claimId).toBeDefined();
 
         // RBF tx1 with same amount before mining
-        let tx2: Transaction;
         try {
-          tx2 = await faucet.replaceTransaction(
-            coin,
-            depositAddress,
-            DEPOSIT_AMOUNT,
-          );
+          await faucet.replaceTransaction(coin, depositAddress, DEPOSIT_AMOUNT);
         } catch (err) {
           const isMissingInput =
             err instanceof Error &&
@@ -264,11 +259,10 @@ describe("SSP instant static deposit integration", () => {
       const vout = findOutputVout(tx, DEPOSIT_AMOUNT);
       expect(vout).toBeDefined();
 
-      const quoteResult =
-        await userWallet.experimental_GetInstantStaticDepositQuote(
-          transactionId,
-          vout,
-        );
+      await userWallet.experimental_GetInstantStaticDepositQuote(
+        transactionId,
+        vout,
+      );
 
       await faucet.mineBlocks(1);
 

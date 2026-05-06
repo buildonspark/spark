@@ -2,11 +2,9 @@ import { expect } from "@jest/globals";
 
 import { SparkError } from "../../../../errors/index.js";
 import { SparkWalletEvent } from "../../../../spark-wallet/types.js";
-import {
-  SparkWalletTestingIntegration,
-  SparkWalletTestingIntegrationWithStream,
-} from "../../../utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "../../../utils/test-faucet.js";
+import { SparkWalletTestingIntegrationWithStream } from "../../../utils/spark-testing-wallet.js";
+import type { SparkWalletTestingIntegration } from "../../../utils/spark-testing-wallet.js";
+import type { BitcoinFaucet } from "../../../utils/test-faucet.js";
 import { broadcastUnilateralExit } from "../../../utils/unilateral-exit-helpers.js";
 import { retryUntilSuccess } from "../../../utils/utils.js";
 

@@ -78,6 +78,7 @@ class WrappedTarget extends WrappedTargetBase {
   }
 
   public async *streamValues() {
+    await Promise.resolve();
     yield "one";
     yield "two";
   }
@@ -160,11 +161,17 @@ describe("LoggingService", () => {
   it("does not install prototype wrappers when method logging is disabled", () => {
     const logging = createLoggingService();
     const target = new WrappedTarget();
-    const originalOwnMethod = target.ownMethod;
+    const originalOwnMethod = Object.getOwnPropertyDescriptor(
+      WrappedTarget.prototype,
+      "ownMethod",
+    )?.value as WrappedTarget["ownMethod"] | undefined;
 
     logging.wrapPrototypeMethods("SparkWallet", target);
 
-    expect(target.ownMethod).toBe(originalOwnMethod);
+    expect(
+      Object.getOwnPropertyDescriptor(WrappedTarget.prototype, "ownMethod")
+        ?.value,
+    ).toBe(originalOwnMethod);
     expect(Object.prototype.hasOwnProperty.call(target, "ownMethod")).toBe(
       false,
     );

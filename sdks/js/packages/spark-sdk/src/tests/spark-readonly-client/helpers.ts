@@ -5,7 +5,6 @@
  * can then be observed through both the owner's authenticated readonly client
  * and an unauthenticated public readonly client.
  */
-import { bytesToHex } from "@noble/curves/utils";
 import { SparkReadonlyClient } from "../../spark-readonly-client/spark-readonly-client.node.js";
 import {
   SparkWalletTesting,

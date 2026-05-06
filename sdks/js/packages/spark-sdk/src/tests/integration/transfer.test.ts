@@ -13,15 +13,12 @@ import {
 } from "../../services/wallet-config.js";
 import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { SparkWalletEvent } from "../../spark-wallet/types.js";
-import { type NetworkType } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
 import {
   SparkWalletTestingIntegration,
   SparkWalletTestingIntegrationWithStream,
 } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-
-const testLocalOnly = process.env.GITHUB_ACTIONS ? it.skip : it;
 
 describe.each(walletTypes)(
   "Transfer with name",
@@ -399,30 +396,7 @@ describe.each(walletTypes)(
       expect(receiverBalance.balance).toBe(1000n);
     });
 
-    function generateNetworkPairs(
-      networks: NetworkType[],
-    ): [NetworkType, NetworkType][] {
-      const pairs: [NetworkType, NetworkType][] = [];
-      for (const source of networks) {
-        for (const target of networks) {
-          if (source !== target) {
-            pairs.push([source, target]);
-          }
-        }
-      }
-      return pairs;
-    }
-
     describe.skip("address validation", () => {
-      const networkTypes: NetworkType[] = [
-        "MAINNET",
-        "TESTNET",
-        "REGTEST",
-        "SIGNET",
-        "LOCAL",
-      ];
-      const networkCombinations = generateNetworkPairs(networkTypes);
-
       // it.concurrent.each(networkCombinations)(
       //   "should not allow transfer from %s to %s network due to address validation",
       //   async (sourceNetwork, targetNetwork) => {
@@ -432,17 +406,13 @@ describe.each(walletTypes)(
       //     const targetOptions: ConfigOptions = {
       //       network: targetNetwork,
       //     };
-
       //     const { wallet: sourceWallet } = await SparkWalletTestingIntegration.initialize({
       //       options: sourceOptions,
       //     });
-
       //     const { wallet: targetWallet } = await SparkWalletTestingIntegration.initialize({
       //       options: targetOptions,
       //     });
-
       //     const targetAddress = await targetWallet.getSparkAddress();
-
       //     await expect(
       //       sourceWallet.transfer({
       //         amountSats: 1000,
@@ -460,24 +430,19 @@ describe.each(walletTypes)(
       //     );
       //   },
       // );
-
       // it.concurrent.each(networkTypes)(
       //   "should fail transfer on same %s network due to no available leaves",
       //   async (network) => {
       //     const options: ConfigOptions = {
       //       network,
       //     };
-
       //     const { wallet: wallet1 } = await SparkWalletTestingIntegration.initialize({
       //       options,
       //     });
-
       //     const { wallet: wallet2 } = await SparkWalletTestingIntegration.initialize({
       //       options,
       //     });
-
       //     const address2 = await wallet2.getSparkAddress();
-
       //     await expect(
       //       wallet1.transfer({
       //         amountSats: 1000,
@@ -1070,18 +1035,20 @@ describe.each(walletTypes)(
         );
       }
 
-      const res = await (sdk2 as any).querySparkInvoices([
+      const res = await sdk2.querySparkInvoices([
         invoice1000,
         invoice2000,
         invoiceNilAmount,
       ]);
       expect(res.invoiceStatuses.length).toBe(3);
-      expect(res.invoiceStatuses[0].invoice).toBe(invoice1000);
-      expect(res.invoiceStatuses[1].invoice).toBe(invoice2000);
-      expect(res.invoiceStatuses[2].invoice).toBe(invoiceNilAmount);
-      expect(res.invoiceStatuses[0].status).toBe(InvoiceStatus.FINALIZED);
-      expect(res.invoiceStatuses[1].status).toBe(InvoiceStatus.FINALIZED);
-      expect(res.invoiceStatuses[2].status).toBe(InvoiceStatus.FINALIZED);
+      const [invoice1000Status, invoice2000Status, invoiceNilAmountStatus] =
+        res.invoiceStatuses;
+      expect(invoice1000Status?.invoice).toBe(invoice1000);
+      expect(invoice2000Status?.invoice).toBe(invoice2000);
+      expect(invoiceNilAmountStatus?.invoice).toBe(invoiceNilAmount);
+      expect(invoice1000Status?.status).toBe(InvoiceStatus.FINALIZED);
+      expect(invoice2000Status?.status).toBe(InvoiceStatus.FINALIZED);
+      expect(invoiceNilAmountStatus?.status).toBe(InvoiceStatus.FINALIZED);
     });
 
     it(`${name} - should reject invalid invoice: mismatched sender`, async () => {
@@ -1116,7 +1083,6 @@ describe.each(walletTypes)(
         signer: new Signer(),
       });
 
-      const receiverTransferService = sdk2.getTransferService();
       const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
       const invoice1000 = await sdk2.createSatsInvoice({
         amount: 1_000,
@@ -1157,14 +1123,6 @@ describe.each(walletTypes)(
       const balance = await sdk.getBalance();
       expect(balance.balance).toBe(1_000n);
 
-      const { wallet: sdk2 } = await SparkWalletTestingIntegration.initialize({
-        options: {
-          network: "LOCAL",
-        },
-        signer: new Signer(),
-      });
-
-      const receiverTransferService = sdk2.getTransferService();
       const yesterday = new Date(Date.now() - 1000 * 60 * 60 * 24);
       const invoice1000 = await sdk.createSatsInvoice({
         // invalid receiver public key - sdk as receiver

@@ -10,7 +10,7 @@ import {
 } from "../../utils/unilateral-exit.js";
 import type { FeeBumpTxChain, Utxo } from "../../utils/unilateral-exit.js";
 import { signPsbtWithExternalKey } from "./signing.js";
-import { SparkWalletTestingIntegration } from "./spark-testing-wallet.js";
+import type { SparkWalletTestingIntegration } from "./spark-testing-wallet.js";
 import { BitcoinFaucet } from "./test-faucet.js";
 
 export interface ExternalFundingWallet {
@@ -20,7 +20,10 @@ export interface ExternalFundingWallet {
 }
 
 export const didTxSucceed = (response: unknown): boolean =>
-  (response as { package_msg?: string })?.package_msg === "success";
+  typeof response === "object" &&
+  response !== null &&
+  "package_msg" in response &&
+  response.package_msg === "success";
 
 /**
  * Faucet a fresh P2WPKH wallet, fund it with `amount` sats, and return the

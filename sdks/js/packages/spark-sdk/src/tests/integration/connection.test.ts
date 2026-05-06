@@ -5,10 +5,36 @@ import {
   SparkWalletTestingIntegration,
 } from "../utils/spark-testing-wallet.js";
 
+type AuthnClient = {
+  get_challenge: (request: unknown) => Promise<unknown>;
+};
+
+type ConnectionManagerInternals = {
+  createChannelWithTLS: (
+    address: string,
+    isStreamClientType?: boolean,
+  ) => Promise<unknown>;
+  createSparkAuthnGrpcConnection: (address: string) => Promise<AuthnClient>;
+};
+
+function connectionManagerInternals(
+  connectionManager: unknown,
+): ConnectionManagerInternals {
+  return connectionManager as ConnectionManagerInternals;
+}
+
+function clearAuthTokenCache(): void {
+  (
+    ConnectionManagerNodeJS as unknown as {
+      authTokenCache: { clear: () => void };
+    }
+  ).authTokenCache.clear();
+}
+
 describe("ConnectionManager", () => {
   it("reuses channels across many wallets for the same operator address", async () => {
     const createSpy = jest.spyOn(
-      ConnectionManagerNodeJS.prototype as any,
+      connectionManagerInternals(ConnectionManagerNodeJS.prototype),
       "createChannelWithTLS",
     );
 
@@ -31,7 +57,7 @@ describe("ConnectionManager", () => {
       const key = String(addr);
       callsByAddress.set(key, (callsByAddress.get(key) ?? 0) + 1);
     }
-    for (const [addr, count] of callsByAddress) {
+    for (const [, count] of callsByAddress) {
       expect(count).toBeLessThanOrEqual(1);
     }
 
@@ -54,7 +80,7 @@ describe("ConnectionManager auth retry refcount", () => {
     // Clear the auth token cache to force a full re-auth on the next call.
     // This is the happy path — the connection is healthy, re-auth succeeds
     // on the first try, close() is called once, channel survives
-    (ConnectionManagerNodeJS as any).authTokenCache.clear();
+    clearAuthTokenCache();
 
     const balance2 = await wallet.getBalance();
     expect(balance2).toBeDefined();
@@ -90,20 +116,20 @@ describe("ConnectionManager auth retry refcount", () => {
     // get_challenge while keeping the real auth flow otherwise intact.
     let getChallengeAttempts = 0;
     const authnSpy = jest.spyOn(
-      connMgr as any,
+      connectionManagerInternals(connMgr),
       "createSparkAuthnGrpcConnection",
     );
-    authnSpy.mockImplementation(async (...args: unknown[]) => {
-      const address = args[0] as string;
+    authnSpy.mockImplementation(async (address: string) => {
       // Call the real implementation to get a real authn client
       authnSpy.mockRestore();
-      const realClient = await (connMgr as any).createSparkAuthnGrpcConnection(
-        address,
-      );
+      const realClient =
+        await connectionManagerInternals(
+          connMgr,
+        ).createSparkAuthnGrpcConnection(address);
 
       // Wrap get_challenge to fail the first 3 times
       const originalGetChallenge = realClient.get_challenge.bind(realClient);
-      realClient.get_challenge = async (req: any) => {
+      realClient.get_challenge = async (req: unknown) => {
         await Promise.resolve();
         getChallengeAttempts++;
         if (getChallengeAttempts <= 3) {
@@ -115,7 +141,7 @@ describe("ConnectionManager auth retry refcount", () => {
     });
 
     // Clear the auth token cache to force re-auth
-    (ConnectionManagerNodeJS as any).authTokenCache.clear();
+    clearAuthTokenCache();
 
     // This triggers re-auth. get_challenge fails 3 times, then succeeds.
     // On buggy code: each failure calls close(), refcount drains, channel dies.

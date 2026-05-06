@@ -4,10 +4,7 @@ import { bytesToHex } from "@noble/curves/utils";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 import { waitForClaim } from "../utils/utils.js";
-import {
-  PreimageRequestRole,
-  PreimageRequestStatus,
-} from "../../proto/spark.js";
+import { PreimageRequestRole } from "../../proto/spark.js";
 
 describe("HTLC create and claim tests", () => {
   it("should create and claim a HTLC", async () => {

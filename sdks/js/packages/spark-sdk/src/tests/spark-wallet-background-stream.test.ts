@@ -1,24 +1,47 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import type { SubscribeToEventsResponse } from "../proto/spark.js";
+import { type ConnectionManager } from "../services/connection/connection.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.js";
 import { SparkWalletEvent } from "../spark-wallet/types.js";
 
+type SubscribeToEvents = (
+  address: string,
+  signal: AbortSignal,
+) => Promise<AsyncIterable<SubscribeToEventsResponse>>;
+
+type ConnectionManagerStub = {
+  closeConnections: jest.Mock<() => Promise<void>>;
+  subscribeToEvents: jest.Mock<SubscribeToEvents>;
+};
+
+type BackgroundStreamWalletInternals = {
+  claimTransfers: () => Promise<string[]>;
+  connectionManager: ConnectionManagerStub;
+  handleStreamEvent: (data: SubscribeToEventsResponse) => Promise<void>;
+  syncTokenOutputs: () => Promise<void>;
+};
+
+function backgroundStreamWalletInternals(
+  wallet: SparkWallet,
+): BackgroundStreamWalletInternals {
+  return wallet as unknown as BackgroundStreamWalletInternals;
+}
+
 class BackgroundStreamRetryTestWallet extends SparkWallet {
   constructor(
-    private readonly connectionManagerStub: {
-      closeConnections: ReturnType<typeof jest.fn>;
-      subscribeToEvents: ReturnType<typeof jest.fn>;
-    },
-    private readonly claimTransfersStub: ReturnType<typeof jest.fn> = jest.fn(
-      async () => [],
-    ),
+    private readonly connectionManagerStub: ConnectionManagerStub,
+    private readonly claimTransfersStub: jest.Mock<
+      () => Promise<string[]>
+    > = jest.fn(() => Promise.resolve([])),
   ) {
     super({
       network: "LOCAL",
     });
-    this.connectionManager = connectionManagerStub as any;
-    (this as any).claimTransfers = claimTransfersStub;
-    (this as any).syncTokenOutputs = jest.fn(async () => {
+    this.connectionManager =
+      connectionManagerStub as unknown as ConnectionManager;
+    const internals = backgroundStreamWalletInternals(this);
+    internals.claimTransfers = claimTransfersStub;
+    internals.syncTokenOutputs = jest.fn(async () => {
       await Promise.resolve();
     });
   }
@@ -32,7 +55,7 @@ class BackgroundStreamRetryTestWallet extends SparkWallet {
         await Promise.resolve();
         throw new Error("placeholder connection manager should be replaced");
       },
-    } as any;
+    } as unknown as ConnectionManager;
   }
 
   public async runBackgroundStreamForTesting() {
@@ -206,7 +229,7 @@ describe("SparkWallet background stream reconnects", () => {
       closeConnections: jest.fn(async () => {
         await Promise.resolve();
       }),
-      subscribeToEvents: jest.fn(async () => {
+      subscribeToEvents: jest.fn<SubscribeToEvents>(async () => {
         await Promise.resolve();
         throw new Error("offline");
       }),
@@ -258,7 +281,7 @@ describe("SparkWallet background stream reconnects", () => {
     expect(disconnected).not.toHaveBeenCalled();
 
     let settled = false;
-    backgroundStreamPromise.then(() => {
+    void backgroundStreamPromise.then(() => {
       settled = true;
     });
     await Promise.resolve();
@@ -280,15 +303,14 @@ describe("SparkWallet background stream reconnects", () => {
         await Promise.resolve();
       }),
       subscribeToEvents: jest
-        .fn()
-        .mockImplementationOnce(async (...args: any[]) =>
-          createConnectedThenHeartbeatThenIdleStream(
-            args[1] as AbortSignal,
-            5_000,
+        .fn<SubscribeToEvents>()
+        .mockImplementationOnce((_address, signal) =>
+          Promise.resolve(
+            createConnectedThenHeartbeatThenIdleStream(signal, 5_000),
           ),
         )
-        .mockImplementationOnce(async (...args: any[]) =>
-          createConnectedThenHeartbeatStream(args[1] as AbortSignal, 3, 5_000),
+        .mockImplementationOnce((_address, signal) =>
+          Promise.resolve(createConnectedThenHeartbeatStream(signal, 3, 5_000)),
         ),
     };
     const wallet = new BackgroundStreamRetryTestWallet(connectionManagerStub);
@@ -344,8 +366,8 @@ describe("SparkWallet background stream reconnects", () => {
       closeConnections: jest.fn(async () => {
         await Promise.resolve();
       }),
-      subscribeToEvents: jest.fn(async (...args: any[]) =>
-        createConnectedThenIdleStream(args[1] as AbortSignal),
+      subscribeToEvents: jest.fn<SubscribeToEvents>((_address, signal) =>
+        Promise.resolve(createConnectedThenIdleStream(signal)),
       ),
     };
     const wallet = new BackgroundStreamRetryTestWallet(connectionManagerStub);
@@ -368,8 +390,8 @@ describe("SparkWallet background stream reconnects", () => {
       closeConnections: jest.fn(async () => {
         await Promise.resolve();
       }),
-      subscribeToEvents: jest.fn(async (...args: any[]) =>
-        createConnectedThenReceiverTransferStream(args[1] as AbortSignal),
+      subscribeToEvents: jest.fn<SubscribeToEvents>((_address, signal) =>
+        Promise.resolve(createConnectedThenReceiverTransferStream(signal)),
       ),
     };
     const wallet = new BackgroundStreamRetryTestWallet(connectionManagerStub);
@@ -386,18 +408,17 @@ describe("SparkWallet background stream reconnects", () => {
       },
     );
 
-    jest.spyOn(wallet as any, "handleStreamEvent").mockImplementation((async (
-      ...args: any[]
-    ) => {
-      const [data] = args as [SubscribeToEventsResponse];
-      if (data.event?.$case !== "receiverTransfer") {
-        return;
-      }
+    jest
+      .spyOn(backgroundStreamWalletInternals(wallet), "handleStreamEvent")
+      .mockImplementation(async (data: SubscribeToEventsResponse) => {
+        if (data.event?.$case !== "receiverTransfer") {
+          return;
+        }
 
-      await new Promise((resolve) => {
-        setTimeout(resolve, 20_000);
+        await new Promise((resolve) => {
+          setTimeout(resolve, 20_000);
+        });
       });
-    }) as any);
 
     const backgroundStreamPromise = wallet.runBackgroundStreamForTesting();
     await flushMicrotasks();
@@ -429,8 +450,8 @@ describe("SparkWallet background stream reconnects", () => {
       closeConnections: jest.fn(async () => {
         await Promise.resolve();
       }),
-      subscribeToEvents: jest.fn(async (...args: any[]) =>
-        createConnectedThenImmediateHeartbeatStream(args[1] as AbortSignal),
+      subscribeToEvents: jest.fn<SubscribeToEvents>((_address, signal) =>
+        Promise.resolve(createConnectedThenImmediateHeartbeatStream(signal)),
       ),
     };
     const wallet = new BackgroundStreamRetryTestWallet(connectionManagerStub);

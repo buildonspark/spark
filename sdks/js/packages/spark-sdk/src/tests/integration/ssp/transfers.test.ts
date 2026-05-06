@@ -22,7 +22,7 @@ async function fundWalletWithStaticDeposit(
 
   const transactionId = signedTx.id;
 
-  let vout;
+  let vout: number | undefined;
   for (let i = 0; i < signedTx.outputsLength; i++) {
     const output = signedTx.getOutput(i);
     if (output.amount === amount) {

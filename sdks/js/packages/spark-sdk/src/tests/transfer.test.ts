@@ -90,15 +90,14 @@ describe("transfer", () => {
 
     let aggregateCalls = 0;
     const signer = {
-      getPublicKeyFromDerivation: jest.fn(
-        async (_keyDerivation?: KeyDerivation) => receivingPubkey,
+      getPublicKeyFromDerivation: jest.fn((_keyDerivation?: KeyDerivation) =>
+        Promise.resolve(receivingPubkey),
       ),
-      signFrost: jest.fn(
-        async (_params: SignFrostParams) => new Uint8Array([9]),
+      signFrost: jest.fn((_params: SignFrostParams) =>
+        Promise.resolve(new Uint8Array([9])),
       ),
-      aggregateFrost: jest.fn(
-        async (_params: AggregateFrostParams) =>
-          new Uint8Array([++aggregateCalls]),
+      aggregateFrost: jest.fn((_params: AggregateFrostParams) =>
+        Promise.resolve(new Uint8Array([++aggregateCalls])),
       ),
     };
 
@@ -203,15 +202,14 @@ describe("transfer", () => {
 
     let aggregateCalls = 0;
     const signer = {
-      getPublicKeyFromDerivation: jest.fn(
-        async (_keyDerivation?: KeyDerivation) => receivingPubkey,
+      getPublicKeyFromDerivation: jest.fn((_keyDerivation?: KeyDerivation) =>
+        Promise.resolve(receivingPubkey),
       ),
-      signFrost: jest.fn(
-        async (_params: SignFrostParams) => new Uint8Array([9]),
+      signFrost: jest.fn((_params: SignFrostParams) =>
+        Promise.resolve(new Uint8Array([9])),
       ),
-      aggregateFrost: jest.fn(
-        async (_params: AggregateFrostParams) =>
-          new Uint8Array([++aggregateCalls]),
+      aggregateFrost: jest.fn((_params: AggregateFrostParams) =>
+        Promise.resolve(new Uint8Array([++aggregateCalls])),
       ),
     };
 
@@ -360,14 +358,14 @@ describe("transfer", () => {
     ];
 
     const signer = {
-      getPublicKeyFromDerivation: jest.fn(
-        async (_keyDerivation?: KeyDerivation) => receivingPubkey,
+      getPublicKeyFromDerivation: jest.fn((_keyDerivation?: KeyDerivation) =>
+        Promise.resolve(receivingPubkey),
       ),
-      signFrost: jest.fn(
-        async (_params: SignFrostParams) => new Uint8Array([9]),
+      signFrost: jest.fn((_params: SignFrostParams) =>
+        Promise.resolve(new Uint8Array([9])),
       ),
-      aggregateFrost: jest.fn(
-        async (_params: AggregateFrostParams) => new Uint8Array([1]),
+      aggregateFrost: jest.fn((_params: AggregateFrostParams) =>
+        Promise.resolve(new Uint8Array([1])),
       ),
     };
 

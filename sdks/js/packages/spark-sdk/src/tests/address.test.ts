@@ -6,18 +6,12 @@ import {
   hexToBytes,
   numberToVarBytesBE,
 } from "@noble/curves/utils";
-import { bech32m } from "@scure/base";
-import { SparkAddress } from "../proto/spark.js";
 import {
-  bech32mDecode,
   decodeSparkAddress,
   encodeSparkAddress,
-  encodeSparkAddressWithSignature,
   getNetworkFromSparkAddress,
   isLegacySparkAddress,
   normalizeSparkAddressToNetwork,
-  SparkAddressData,
-  SparkAddressFormat,
 } from "../utils/address.js";
 import {
   type Bech32mTokenIdentifier,
@@ -72,7 +66,7 @@ describe("Spark Invoice Encode/Decode", () => {
   ];
 
   testCases.forEach((tc) => {
-    test(tc.name, async () => {
+    test(tc.name, () => {
       let identityPublicKey: string | undefined =
         "02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132";
       let senderPublicKey: string | undefined = identityPublicKey;
@@ -171,13 +165,13 @@ describe("Spark Invoice Encode/Decode", () => {
       }
 
       // Encode addresses
-      const tokensAddress = await encodeSparkAddress({
+      const tokensAddress = encodeSparkAddress({
         identityPublicKey: identityKey as string,
         network: "REGTEST",
         sparkInvoiceFields: tokenInvoiceFields,
       });
 
-      const satsAddress = await encodeSparkAddress({
+      const satsAddress = encodeSparkAddress({
         identityPublicKey: identityKey as string,
         network: "REGTEST",
         sparkInvoiceFields: satsInvoiceFields,

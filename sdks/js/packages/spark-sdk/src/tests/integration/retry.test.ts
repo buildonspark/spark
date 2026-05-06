@@ -51,7 +51,7 @@ describe("Retry Test", () => {
       },
     });
 
-    jest.runAllTimersAsync();
+    await jest.runAllTimersAsync();
 
     const result = await promise;
 
@@ -69,10 +69,11 @@ describe("Retry Test", () => {
     }
 
     const promise = withRetry<string>(operation);
+    const rejection = expect(promise).rejects.toThrow("Network error");
 
-    jest.runAllTimersAsync();
+    await jest.runAllTimersAsync();
 
-    await expect(promise).rejects.toThrow("Network error");
+    await rejection;
     expect(operation).toHaveBeenCalledTimes(DEFAULT_RETRY_CONFIG.maxAttempts);
   });
 });

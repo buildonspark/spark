@@ -149,8 +149,7 @@ describe("ServerTimeSync", () => {
     expect(time1!.getTime()).toBeGreaterThanOrEqual(expectedServerTime);
     expect(time1!.getTime()).toBeLessThan(expectedServerTime + 100);
 
-    const realDateNow = Date.now;
-    (Date.now as any) = () => 0;
+    const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(0);
 
     const time2 = timeSync.getCurrentServerTime();
     expect(time2).not.toBeNull();
@@ -159,6 +158,6 @@ describe("ServerTimeSync", () => {
     const timeDiff = time2!.getTime() - time1!.getTime();
     expect(timeDiff).toBeLessThan(100);
 
-    Date.now = realDateNow;
+    dateNowSpy.mockRestore();
   });
 });

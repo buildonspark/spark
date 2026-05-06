@@ -53,10 +53,8 @@ describe("SSP static deposit validation tests", () => {
   it("should validate static deposit request parameters", async () => {
     const {
       wallet: userWallet,
-      depositAddress,
       signedTx,
       vout,
-      faucet,
     } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
     const transactionId = await retryUntilSuccess(async () => {

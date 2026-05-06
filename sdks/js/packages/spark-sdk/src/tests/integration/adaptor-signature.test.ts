@@ -12,7 +12,7 @@ describe("adaptor signature", () => {
   it("should validate outbound adaptor signature", async () => {
     let failures = 0;
 
-    const { wallet } = await SparkWalletTesting.initialize({
+    await SparkWalletTesting.initialize({
       options: {
         network: "LOCAL",
       },
@@ -47,7 +47,7 @@ describe("adaptor signature", () => {
         );
 
         expect(schnorr.verify(adapterSig, hash, schnorrPublicKey)).toBe(true);
-      } catch (e) {
+      } catch {
         failures++;
       }
     }

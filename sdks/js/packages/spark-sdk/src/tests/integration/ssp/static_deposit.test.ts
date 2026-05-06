@@ -32,7 +32,7 @@ describe("SSP static deposit address integration", () => {
       await faucet.mineBlocks(6);
       expect(signedTx).toBeDefined();
       const transactionId = signedTx.id;
-      let vout;
+      let vout: number | undefined;
       for (let i = 0; i < signedTx.outputsLength; i++) {
         const output = signedTx.getOutput(i);
         if (output.amount === DEPOSIT_AMOUNT) {
@@ -169,9 +169,7 @@ describe("SSP static deposit address integration", () => {
       );
       expect(transfer).toBeDefined();
       expect(transfer!.userRequest).toBeDefined();
-      expect((transfer!.userRequest as any).typename).toBe(
-        "ClaimStaticDeposit",
-      );
+      expect(transfer!.userRequest?.typename).toBe("ClaimStaticDeposit");
     }, 60000);
 
     it("should create a refund transaction", async () => {
@@ -256,7 +254,7 @@ describe("SSP static deposit address integration", () => {
       await faucet.mineBlocks(6);
       expect(signedTx).toBeDefined();
       const transactionId = signedTx.id;
-      let vout;
+      let vout: number | undefined;
       for (let i = 0; i < signedTx.outputsLength; i++) {
         const output = signedTx.getOutput(i);
         if (output.amount === DEPOSIT_AMOUNT) {
@@ -341,7 +339,7 @@ describe("SSP static deposit address integration", () => {
 
       await faucet.mineBlocks(6);
 
-      let utxosExcludeClaimed: any[] = [];
+      let utxosExcludeClaimed: { txid: string; vout: number }[] = [];
       const utxosExcludeClaimedExpected = 98;
       const maxAttempts = 10;
       for (let attempt = 1; attempt <= 10; attempt++) {

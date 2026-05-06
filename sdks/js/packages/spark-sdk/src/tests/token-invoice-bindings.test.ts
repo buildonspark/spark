@@ -132,7 +132,7 @@ describe("token invoice bindings", () => {
     const signer = wallet.getSigner();
     const identityPublicKey = await signer.getIdentityPublicKey();
     const signature = new Uint8Array(64).fill(9);
-    jest
+    const signSchnorrWithIdentityKeyMock = jest
       .spyOn(signer, "signSchnorrWithIdentityKey")
       .mockResolvedValue(signature);
 
@@ -166,7 +166,7 @@ describe("token invoice bindings", () => {
       senderSparkAddress,
       expiryTimeUnixMillis: expiryTime.getTime(),
     });
-    expect(signer.signSchnorrWithIdentityKey).toHaveBeenCalledWith(
+    expect(signSchnorrWithIdentityKeyMock).toHaveBeenCalledWith(
       preparedInvoice.sparkInvoiceHash,
     );
     expect(finalizeTokenInvoiceMock).toHaveBeenCalledWith({

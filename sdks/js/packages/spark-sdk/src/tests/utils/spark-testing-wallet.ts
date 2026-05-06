@@ -8,6 +8,10 @@ import type { ConnectionManagerNodeJS } from "../../services/connection/connecti
 import { type SparkSigner } from "../../signer/signer.js";
 import { BitcoinFaucet } from "./test-faucet.js";
 
+type SparkWalletInternals = {
+  syncWallet(): Promise<void>;
+};
+
 export class SparkWalletTesting extends SparkWallet {
   protected override async setupBackgroundStream() {
     await Promise.resolve();
@@ -27,6 +31,8 @@ export class SparkWalletTesting extends SparkWallet {
     void
   > {
     // Optimize is disabled by default.
+    await Promise.resolve();
+    yield* [];
     return;
   }
 
@@ -107,7 +113,7 @@ export class SparkWalletTestingIntegrationWithStream extends SparkWalletTestingI
 
   // Expose SparkWallet's private sync for tests
   public async syncWalletForTesting(): Promise<void> {
-    await (this as any).syncWallet();
+    await (this as unknown as SparkWalletInternals).syncWallet();
   }
 }
 
