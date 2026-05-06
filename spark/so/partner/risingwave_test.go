@@ -55,7 +55,7 @@ func TestRisingWaveClient_QueryTransactionVolumes_Postgres(t *testing.T) {
 	defer pgDB.Close()
 
 	_, err = pgDB.ExecContext(t.Context(), `
-		CREATE TABLE IF NOT EXISTS spark_transaction_volume (
+		CREATE TABLE IF NOT EXISTS spark_transaction_volume_mv (
 			partner_id TEXT NOT NULL,
 			label TEXT NOT NULL,
 			date TEXT NOT NULL,
@@ -69,7 +69,7 @@ func TestRisingWaveClient_QueryTransactionVolumes_Postgres(t *testing.T) {
 
 	// Insert test data across MAINNET and REGTEST.
 	_, err = pgDB.ExecContext(t.Context(), `
-		INSERT INTO spark_transaction_volume (partner_id, label, date, transaction_type, network, volume_sats, transaction_count) VALUES
+		INSERT INTO spark_transaction_volume_mv (partner_id, label, date, transaction_type, network, volume_sats, transaction_count) VALUES
 			('partner-a', 'label-1', '2025-03-01', 'TRANSFER',       'MAINNET', 50000, 10),
 			('partner-a', 'label-1', '2025-03-02', 'TRANSFER',       'MAINNET', 30000, 5),
 			('partner-a', 'label-1', '2025-03-01', 'LIGHTNING_SEND', 'MAINNET', 20000, 3),

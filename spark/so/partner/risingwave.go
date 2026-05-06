@@ -59,7 +59,7 @@ func (c *RisingWaveClient) Close() error {
 	return nil
 }
 
-// QueryTransactionVolumes queries the spark_transaction_volume materialized view
+// QueryTransactionVolumes queries the spark_transaction_volume_mv materialized view
 // for the given partner, date range, and optional filters.
 // label is empty string to aggregate across all labels.
 // txTypes is empty to include all transaction types; otherwise rows match any listed type.
@@ -115,7 +115,7 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 
 	query := fmt.Sprintf(
 		`SELECT transaction_type, SUM(volume_sats), SUM(transaction_count)
-		FROM spark_transaction_volume
+		FROM spark_transaction_volume_mv
 		WHERE %s
 		GROUP BY transaction_type`,
 		strings.Join(conditions, " AND "),
