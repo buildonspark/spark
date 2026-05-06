@@ -591,14 +591,14 @@ func TestGetSigningCommitments(t *testing.T) {
 			nodeIds:        manyNodeIDs,
 			count:          3,
 			expectError:    true,
-			expectedErrMsg: "too many node ids: 1001",
+			expectedErrMsg: "there were 1001 node ids provided, but the max is 1000",
 		},
 		{
 			name:           "too high count",
 			nodeIds:        []string{"12345678-1234-1234-1234-123456789012"},
 			count:          100,
 			expectError:    true,
-			expectedErrMsg: "count too large: 100",
+			expectedErrMsg: "number of signing commitments provided was 100, but the maximum is 10",
 		},
 	}
 

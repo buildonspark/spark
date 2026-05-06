@@ -82,7 +82,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 	}
 
 	if len(req.NodeIds) > 0 && req.NodeIdCount != 0 {
-		return nil, errs.New("can provide node_ids or node_id_count, but not both")
+		return nil, errs.New("both node_ids and node_id_count were set, but they are mutually exclusive. Provide one or the other")
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -97,22 +97,22 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 	knobsService := knobs.GetKnobsService(ctx)
 	maxNodeIDs := int(knobsService.GetValue(knobs.KnobSoSigningCommitmentNodeLimit, DefaultMaxSigningCommitmentNodes))
 
-	if len(nodeIDs) > maxNodeIDs {
-		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many node ids: %d", len(nodeIDs)))
+	maxSigningCommitmentCount := uint32(knobsService.GetValue(knobs.KnobSoSigningCommitmentCountLimit, DefaultMaxSigningCommitmentCount))
+	signingCommitmentCount := req.Count
+	if signingCommitmentCount == 0 {
+		signingCommitmentCount = 1
 	}
 
-	maxCount := uint32(knobsService.GetValue(knobs.KnobSoSigningCommitmentCountLimit, DefaultMaxSigningCommitmentCount))
-	count := req.Count
-	if count == 0 {
-		count = 1
-	}
-
-	if count > maxCount {
-		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("count too large: %d", count))
+	if signingCommitmentCount > maxSigningCommitmentCount {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("number of signing commitments provided was %d, but the maximum is %d", signingCommitmentCount, maxSigningCommitmentCount))
 	}
 
 	var keyshareIDcount uint32
 	if len(nodeIDs) > 0 {
+		if len(nodeIDs) > maxNodeIDs {
+			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("there were %d node ids provided, but the max is %d", len(nodeIDs), maxNodeIDs))
+		}
+
 		nodes, err := tx.TreeNode.Query().WithSigningKeyshare().Where(treenode.IDIn(nodeIDs...)).All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get nodes: %w", err)
@@ -125,7 +125,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		keyshareIDcount = uint32(len(nodes))
 	} else {
 		if req.NodeIdCount > uint32(maxNodeIDs) {
-			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("node_id_count too large: %d", req.NodeIdCount))
+			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("node ID count provided was %d, but the max is %d", req.NodeIdCount, maxNodeIDs))
 		}
 		keyshareIDcount = req.NodeIdCount
 	}
@@ -134,7 +134,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		return &pb.GetSigningCommitmentsResponse{}, nil
 	}
 
-	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDcount, count)
+	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDcount, signingCommitmentCount)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get signing commitments: %w", err)
 	}
