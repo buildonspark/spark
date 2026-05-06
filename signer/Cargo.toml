@@ -31,7 +31,7 @@ tonic-build = "0.12.3"
 thiserror = "1.0.69"
 uniffi = "0.28.3"
 uuid = { version = "1.1.2", features = ["v4", "js"] }
-ecies = { "version" = "0.2.7", default-features = false, features = ["pure"]}
+ecies = { "version" = "0.2.11", default-features = false, features = ["aes-rust"] }
 rayon = "1.10.0"
 
 [profile.release-smaller]
