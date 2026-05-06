@@ -242,7 +242,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
 
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	internalSignatures, fanoutErr := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
+	fanoutResults, fanoutErr := helper.ExecuteTaskWithAllOperatorsWithAllResponses(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionResponse, error) {
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
@@ -268,12 +268,33 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		return nil, fmt.Errorf("failed to commit token transaction broadcast: %w", err)
 	}
 
+	// helper-level error (e.g., operator selection / context). Not a peer response.
 	if fanoutErr != nil {
 		return nil, sparkerrors.WrapErrorWithReasonPrefix(fanoutErr, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
-	for opID, resp := range internalSignatures {
+	// Surface non-transient peer errors (validation, conflicts, etc.) immediately.
+	// Transient peer errors become a partial commit — the retry cron task will fan
+	// out to those peers later.
+	for _, peerErr := range fanoutResults.Errors {
+		if !sparkerrors.IsTransientPeerError(peerErr) {
+			return nil, sparkerrors.WrapErrorWithReasonPrefix(peerErr, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
+		}
+	}
+
+	for opID, resp := range fanoutResults.Successes {
 		signatures[opID] = resp.SparkOperatorSignature
+	}
+
+	// If any peer errored transiently, the coordinator is signed and committed locally;
+	// the retry cron will reach those peers later. Return COMMIT_PROCESSING with
+	// progress instead of failing the wallet's broadcast call.
+	if fanoutResults.HasErrors() {
+		return &tokenpb.BroadcastTransactionResponse{
+			FinalTokenTransaction: finalTx,
+			CommitStatus:          tokenpb.CommitStatus_COMMIT_PROCESSING,
+			CommitProgress:        BuildSignedCommitProgressFromSignatures(signatures, h.config),
+		}, nil
 	}
 
 	finalTxHash, err := utils.HashTokenTransaction(legacyTokenTx, false)

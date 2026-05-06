@@ -106,6 +106,15 @@ func toGRPCError(err error) error {
 	return &grpcError{Code: codes.Internal, Cause: err, Reason: ""}
 }
 
+// IsTransientPeerError returns true if an error from a peer/external SO indicates an
+// availability or capacity failure that may resolve on retry, as opposed to a definitive
+// validation or business-rule failure. Callers can use this to decide whether to surface
+// the error or fall back to a partial-success path that defers to a retry mechanism.
+func IsTransientPeerError(err error) bool {
+	code := status.Code(err)
+	return code == codes.Unavailable || code == codes.DeadlineExceeded || code == codes.ResourceExhausted
+}
+
 // WrapErrorWithCode should be used to convert a standard Go error into a gRPC error with a specific code.
 // The original error will be used as the message.
 func WrapErrorWithCode(err error, grpcCode codes.Code) error {

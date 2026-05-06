@@ -61,7 +61,6 @@ func skipIfNotPhase2(t *testing.T) {
 // TestTokenMintOperatorOfflineAutoRetry tests that a mint transaction can be retried
 // via the retry task when an operator comes back online before the transaction expires.
 func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
-	t.Skip("muted: consistently failing in hermetic CI with `failed to broadcast token transaction: rpc error: code = Unavailable desc = the method is currently unavailable, please try again later` followed by 2m timeout")
 	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
@@ -102,7 +101,6 @@ func TestTokenMintOperatorOfflineAutoRetry(t *testing.T) {
 // execute_before and an old CCT partially commits (operator offline), the retry task
 // forwards execute_before so non-coordinator SOs accept the relaxed CCT.
 func TestTokenMintWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
-	t.Skip("muted: consistently failing in hermetic CI with `failed to broadcast token transaction: rpc error: code = Unavailable desc = the method is currently unavailable, please try again later` followed by 2m timeout")
 	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
@@ -149,7 +147,6 @@ func TestTokenMintWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
 // TestTokenTransferOperatorOfflineAutoRetry tests that a transfer transaction can be retried
 // via the retry task when an operator comes back online before the transaction expires.
 func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
-	t.Skip("muted: consistently failing in hermetic CI with `failed to broadcast token transaction: rpc error: code = Unavailable desc = the method is currently unavailable, please try again later` followed by 2m timeout")
 	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
@@ -205,7 +202,6 @@ func TestTokenTransferOperatorOfflineAutoRetry(t *testing.T) {
 // TestTokenTransferWithExecuteBeforeRetryForwardsDeadline tests that a transfer with
 // execute_before and old CCT partially commits then retries successfully.
 func TestTokenTransferWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
-	t.Skip("muted: consistently failing in hermetic CI with `failed to broadcast token transaction: rpc error: code = Unavailable desc = the method is currently unavailable, please try again later` followed by 2m timeout")
 	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {
@@ -269,7 +265,6 @@ func TestTokenTransferWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
 // TestTokenTransferOperatorOfflineRetryAfterExpiry tests that a fresh transfer transaction
 // succeeds after the original transaction expires and the operator comes back online.
 func TestTokenTransferOperatorOfflineRetryAfterExpiry(t *testing.T) {
-	t.Skip("muted: consistently failing in hermetic CI with `failed to broadcast token transaction: rpc error: code = Unavailable desc = the method is currently unavailable, please try again later` followed by 2m timeout")
 	skipIfNotPhase2(t)
 
 	sparktesting.WithTimeout(t, 2*time.Minute, func(t *testing.T) {

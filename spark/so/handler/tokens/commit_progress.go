@@ -48,6 +48,25 @@ func BuildSignedCommitProgress(tt *ent.TokenTransaction, config *so.Config) (*to
 	}, nil
 }
 
+// BuildSignedCommitProgressFromSignatures is the in-memory analogue of BuildSignedCommitProgress.
+// Use it on paths where the token transaction entity isn't loaded yet — for example, the
+// partial-commit response on the initial broadcast, before peer signatures are persisted.
+func BuildSignedCommitProgressFromSignatures(signatures map[string][]byte, config *so.Config) *tokenpb.CommitProgress {
+	var committed, uncommitted [][]byte
+	for opID, operator := range config.SigningOperatorMap {
+		keyBytes := operator.IdentityPublicKey.Serialize()
+		if _, signed := signatures[opID]; signed {
+			committed = append(committed, keyBytes)
+		} else {
+			uncommitted = append(uncommitted, keyBytes)
+		}
+	}
+	return &tokenpb.CommitProgress{
+		CommittedOperatorPublicKeys:   committed,
+		UncommittedOperatorPublicKeys: uncommitted,
+	}
+}
+
 // BuildRevealCommitProgress determines which operators have provided their secret shares
 // for ALL spent outputs in a transfer transaction.
 //

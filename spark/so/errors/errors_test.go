@@ -457,6 +457,32 @@ func TestWrapGRPCErrorWithReasonPrefix(t *testing.T) {
 	})
 }
 
+func TestIsTransientPeerError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{name: "Unavailable is transient", err: status.Error(codes.Unavailable, "connection refused"), expected: true},
+		{name: "DeadlineExceeded is transient", err: status.Error(codes.DeadlineExceeded, "deadline exceeded"), expected: true},
+		{name: "ResourceExhausted is transient", err: status.Error(codes.ResourceExhausted, "rate limited"), expected: true},
+		{name: "FailedPrecondition is not transient", err: status.Error(codes.FailedPrecondition, "validation failed"), expected: false},
+		{name: "InvalidArgument is not transient", err: status.Error(codes.InvalidArgument, "malformed"), expected: false},
+		{name: "NotFound is not transient", err: status.Error(codes.NotFound, "missing"), expected: false},
+		{name: "Internal is not transient", err: status.Error(codes.Internal, "server bug"), expected: false},
+		{name: "AlreadyExists is not transient", err: status.Error(codes.AlreadyExists, "duplicate"), expected: false},
+		{name: "wrapped Unavailable preserves code", err: fmt.Errorf("outer: %w", status.Error(codes.Unavailable, "down")), expected: true},
+		{name: "plain error is not transient", err: fmt.Errorf("some random error"), expected: false},
+		{name: "nil is not transient", err: nil, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsTransientPeerError(tt.err))
+		})
+	}
+}
+
 // fakeError is an Error interface implementation for testing.
 type fakeError struct {
 	message string

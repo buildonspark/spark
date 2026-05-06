@@ -18,8 +18,6 @@ import (
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type retryBroadcastTestSetup struct {
@@ -278,62 +276,6 @@ func TestRetryIncompleteSignatureBroadcasts_PeerSignatureCountLogic(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, ids, 1, "transaction with insufficient signatures should need retry")
 	assert.Equal(t, tx.ID, ids[0])
-}
-
-func TestIsNonRetryableBroadcastError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{
-			name:     "FailedPrecondition is non-retryable",
-			err:      status.Error(codes.FailedPrecondition, "error validating transfer using previous output data"),
-			expected: true,
-		},
-		{
-			name:     "InvalidArgument is non-retryable",
-			err:      status.Error(codes.InvalidArgument, "malformed transaction"),
-			expected: true,
-		},
-		{
-			name:     "NotFound is non-retryable",
-			err:      status.Error(codes.NotFound, "output no longer exists"),
-			expected: true,
-		},
-		{
-			name:     "Unavailable is retryable",
-			err:      status.Error(codes.Unavailable, "connection refused"),
-			expected: false,
-		},
-		{
-			name:     "Internal is retryable",
-			err:      status.Error(codes.Internal, "internal error"),
-			expected: false,
-		},
-		{
-			name:     "DeadlineExceeded is retryable",
-			err:      status.Error(codes.DeadlineExceeded, "deadline exceeded"),
-			expected: false,
-		},
-		{
-			name:     "wrapped gRPC error preserves code",
-			err:      fmt.Errorf("fanout failed: %w", status.Error(codes.FailedPrecondition, "hash mismatch")),
-			expected: true,
-		},
-		{
-			name:     "plain error is retryable",
-			err:      fmt.Errorf("some random error"),
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isNonRetryableBroadcastError(tt.err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
 }
 
 func TestErrNonRetryableBroadcast_IsSentinel(t *testing.T) {
