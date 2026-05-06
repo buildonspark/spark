@@ -111,6 +111,18 @@ func stubQuery(resp *pbinternal.ConsensusQueryOutcomeResponse) outcomeQueryFunc 
 	}
 }
 
+// requireStuckRowsErr asserts that the reconcile/sweep task returned a
+// stuck-rows alert error for the given role. Both tasks now intentionally
+// surface this as a task-level error (so the scheduler routes it to the
+// alerting pipeline) whenever the threshold-based query found any rows —
+// independent of whether recovery succeeded for those rows. Every test
+// that seeds a stuck row must therefore expect the error.
+func requireStuckRowsErr(t *testing.T, err error, role string) {
+	t.Helper()
+	require.Error(t, err, "task must surface stuck rows as an error so on-call gets a Slack alert")
+	require.ErrorContains(t, err, "stuck "+role+" flow_execution rows")
+}
+
 // anyOperation wraps a minimal gossip message as an Any — the preimage
 // share flow's Commit/Rollback ignore payload content, so any well-formed
 // Any works.
@@ -159,7 +171,7 @@ func TestReconcile_CoordinatorCommitted_TransitionsRowToCommitted(t *testing.T) 
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -184,7 +196,7 @@ func TestReconcile_CoordinatorRolledBack_TransitionsRowToRolledBack(t *testing.T
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -207,7 +219,7 @@ func TestReconcile_CoordinatorInFlight_LeavesRowInFlight(t *testing.T) {
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -233,7 +245,7 @@ func TestReconcile_CoordinatorUnspecified_LeavesRowInFlight(t *testing.T) {
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -262,7 +274,7 @@ func TestReconcile_CoordinatorUnspecified_OldRowWithPayload_PresumedAbortsToRoll
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -289,7 +301,7 @@ func TestReconcile_CoordinatorUnspecified_YoungRowWithPayload_LeavesRowInFlight(
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -322,7 +334,7 @@ func TestReconcile_CoordinatorUnspecified_EmptyPayload_LeavesRowInFlight(t *test
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -358,7 +370,7 @@ func TestReconcile_RpcError_LeavesRowInFlightAndContinues(t *testing.T) {
 		query:         failingThenSucceedingQuery,
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx), "per-row RPC failure must not abort the whole sweep")
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 	assert.Equal(t, 2, calls, "both stuck rows should be attempted")
 }
 
@@ -372,7 +384,7 @@ func TestSweepStaleCoordinatorFlows_TransitionsOldInFlightToRolledBack(t *testin
 	fresh := insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusInFlight, 10*time.Second)
 	terminal := insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusCommitted, 1*time.Hour)
 
-	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), recoveryEnabledKnobs()))
+	requireStuckRowsErr(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), recoveryEnabledKnobs()), "COORDINATOR")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -429,7 +441,7 @@ func TestReconcile_RespectsBatchLimitAndOldestFirstOrdering(t *testing.T) {
 		}),
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -466,11 +478,11 @@ func TestSweepStaleCoordinatorFlows_RespectsBatchLimitAndOldestFirstOrdering(t *
 		ids[i] = insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusInFlight, age)
 	}
 
-	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t),
+	requireStuckRowsErr(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t),
 		knobs.NewFixedKnobs(map[string]float64{
 			knobs.KnobFlowExecutionSweepBatchLimit:  batchLimit,
 			knobs.KnobFlowExecutionReconcileEnabled: 1,
-		})))
+		})), "COORDINATOR")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -513,7 +525,7 @@ func TestReconcile_MonitorOnly_LeavesRowsUntouched(t *testing.T) {
 		},
 		gossipHandler: handler.NewGossipHandler(cfg),
 	}
-	require.NoError(t, r.reconcile(ctx))
+	requireStuckRowsErr(t, r.reconcile(ctx), "PARTICIPANT")
 
 	assert.Equal(t, 0, queryCalls, "monitor-only mode must not issue ConsensusQueryOutcome RPCs")
 
@@ -533,7 +545,7 @@ func TestSweepStaleCoordinatorFlows_MonitorOnly_LeavesRowsUntouched(t *testing.T
 	ctx, _ := db.ConnectToTestPostgres(t)
 	id := insertStaleCoordinatorRow(t, ctx, st.FlowExecutionStatusInFlight, 1*time.Hour)
 
-	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), knobs.NewEmptyFixedKnobs()))
+	requireStuckRowsErr(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), knobs.NewEmptyFixedKnobs()), "COORDINATOR")
 
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -541,4 +553,137 @@ func TestSweepStaleCoordinatorFlows_MonitorOnly_LeavesRowsUntouched(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, st.FlowExecutionStatusInFlight, row.Status,
 		"monitor-only mode must leave the stale coordinator row IN_FLIGHT")
+}
+
+// ---------- Stuck-row alert: steady-state (no rows) and error-format ----------
+
+// TestReconcile_NoStuckRows_ReturnsNil is the steady-state assertion: when
+// the threshold-based query finds no participant rows, the task must NOT
+// return an error — otherwise every healthy operator would page on every
+// 30s tick.
+func TestReconcile_NoStuckRows_ReturnsNil(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+
+	r := &participantReconciler{
+		config:        cfg,
+		knobs:         recoveryEnabledKnobs(),
+		query:         stubQuery(nil),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	require.NoError(t, r.reconcile(ctx),
+		"healthy steady-state (no stuck rows) must return nil so the alert pipeline stays quiet")
+}
+
+// TestSweepStaleCoordinatorFlows_NoStaleRows_ReturnsNil is the
+// steady-state companion for the coordinator sweep.
+func TestSweepStaleCoordinatorFlows_NoStaleRows_ReturnsNil(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	require.NoError(t, SweepStaleCoordinatorFlows(ctx, sparktesting.TestConfig(t), recoveryEnabledKnobs()),
+		"healthy steady-state (no stale rows) must return nil so the alert pipeline stays quiet")
+}
+
+// TestStuckFlowExecutionError_IncludesActionableContext checks the error
+// message format the Slack alert will surface — count + role + a sample of
+// (id, op_type, age) so on-call has enough to start an investigation
+// without paging logs first.
+func TestStuckFlowExecutionError_IncludesActionableContext(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	// Five stuck rows so the "+more in batch" suffix is exercised (sample limit is 3).
+	ids := make([]uuid.UUID, 5)
+	for i := range ids {
+		ids[i] = uuid.New()
+		insertStaleParticipantRow(t, ctx, ids[i], 0, time.Hour+time.Duration(i)*time.Second)
+	}
+
+	r := &participantReconciler{
+		config:        cfg,
+		knobs:         recoveryEnabledKnobs(),
+		query:         stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_IN_FLIGHT}),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	err := r.reconcile(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "found 5 stuck PARTICIPANT flow_execution rows",
+		"error must lead with the role-qualified count for Slack alert legibility")
+	assert.Contains(t, err.Error(), "op_type=CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE",
+		"op_type must be the human-readable proto enum name, not the numeric value, so on-call doesn't have to cross-reference the proto file")
+	assert.Contains(t, err.Error(), "+2 more in batch",
+		"sample suffix must indicate how many rows beyond the sample exist within this batch")
+}
+
+// TestReconcile_RecoveryPersistsAcrossAlertError is the codex-P1 regression:
+// the alert error must NOT cause the task middleware to roll back recovery
+// work the reconciler just persisted via the session tx. If the commit-
+// before-error path inside reconcile() ever regresses, this test fails
+// because (a) the session's tx is still open after reconcile returns, and
+// (b) production rollback would have undone the COMMITTED transition.
+func TestReconcile_RecoveryPersistsAcrossAlertError(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	id := uuid.New()
+	stuckParticipantRow(t, ctx, id, 0)
+
+	r := &participantReconciler{
+		config: cfg,
+		knobs:  recoveryEnabledKnobs(),
+		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
+			Outcome:         pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED,
+			OpType:          int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE),
+			DecisionPayload: anyOperation(t),
+		}),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+
+	// reconcile must return the alert error (rows were found) but
+	// also persist the recovery transition.
+	err := r.reconcile(ctx)
+	requireStuckRowsErr(t, err, "PARTICIPANT")
+
+	// Session has no live tx — proves DbCommit ran inside reconcile
+	// before the error return. In production this is what makes
+	// DatabaseMiddleware's deferred rollback a no-op; without it,
+	// the COMMITTED transition would be rolled back and the same
+	// row would alert (and re-fail to recover) every tick forever.
+	assert.Nil(t, dbCtx.Session.GetTxIfExists(),
+		"reconcile must DbCommit recovery work before returning the alert error")
+
+	// Recovery actually persisted: re-read via the bare client (no
+	// session tx in scope) and assert the row is COMMITTED. This
+	// would fail if the deferred rollback semantics weren't honored.
+	row, getErr := dbCtx.Client.FlowExecution.Get(t.Context(), id)
+	require.NoError(t, getErr)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, row.Status,
+		"recovery transition must remain on disk across the alert-error return")
+}
+
+// TestReconcile_BacklogScaleShownInAlertWhenLargerThanBatch — the greptile
+// P2 regression. When the stuck backlog exceeds the sweep batchLimit,
+// the alert message must surface "<batch>/<total>" so on-call sees actual
+// scale and isn't misled by a steady "found 50" forever.
+func TestReconcile_BacklogScaleShownInAlertWhenLargerThanBatch(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := testConfigWithOperator(t, 0)
+	const totalRows = 5
+	const batchLimit = 2
+	for i := range totalRows {
+		insertStaleParticipantRow(t, ctx, uuid.New(), 0, time.Hour+time.Duration(i)*time.Second)
+	}
+
+	r := &participantReconciler{
+		config: cfg,
+		knobs: knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobFlowExecutionReconcileEnabled: 1,
+			knobs.KnobFlowExecutionSweepBatchLimit:  batchLimit,
+		}),
+		query: stubQuery(&pbinternal.ConsensusQueryOutcomeResponse{
+			Outcome: pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_IN_FLIGHT,
+		}),
+		gossipHandler: handler.NewGossipHandler(cfg),
+	}
+	err := r.reconcile(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "found 2/5 (batch limit reached) stuck PARTICIPANT",
+		"alert must show <batch>/<total> when the backlog exceeds batchLimit so on-call sees true scale")
 }

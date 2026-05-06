@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -111,14 +112,14 @@ func (r *participantReconciler) reconcile(ctx context.Context) error {
 	for _, row := range rows {
 		if !recoveryEnabled {
 			logger.Sugar().Infof(
-				"flow_execution reconcile (monitor-only): stuck PARTICIPANT row %s coordinator=%d op_type=%d age=%s — recovery disabled by knob",
-				row.ID, row.CoordinatorIndex, row.OpType, time.Since(row.UpdateTime))
+				"flow_execution reconcile (monitor-only): stuck PARTICIPANT row %s coordinator=%d op_type=%s age=%s — recovery disabled by knob",
+				row.ID, row.CoordinatorIndex, pbgossip.ConsensusOperationType(row.OpType), time.Since(row.UpdateTime))
 			continue
 		}
 		if err := r.reconcileOne(ctx, row); err != nil {
 			logger.With(zap.Error(err)).Sugar().Warnf(
-				"flow_execution reconcile: failed to resolve %s (coordinator=%d, op_type=%d)",
-				row.ID, row.CoordinatorIndex, row.OpType)
+				"flow_execution reconcile: failed to resolve %s (coordinator=%d, op_type=%s)",
+				row.ID, row.CoordinatorIndex, pbgossip.ConsensusOperationType(row.OpType))
 		}
 	}
 
@@ -130,7 +131,110 @@ func (r *participantReconciler) reconcile(ctx context.Context) error {
 			logger.With(zap.Error(err)).Warn("flow_execution reconcile: failed to emit in-flight gauges")
 		}
 	}
+
+	// Surface the existence of stuck rows as a task-level error so the
+	// scheduler's failure-logging pipeline picks it up and routes it to
+	// Slack. The error fires whether or not we successfully reconciled
+	// the rows this tick — the goal is to alert that participant-side
+	// flows reached the stuck threshold at all (which they shouldn't,
+	// once the engine cleanup-ctx fix is in place), so on-call can
+	// investigate the underlying cause rather than wait for follow-on
+	// effects.
+	//
+	// CRITICAL: commit the reconcile loop's recovery work BEFORE
+	// returning the alert error. DatabaseMiddleware only commits the
+	// task's session tx when the task returns nil — a non-nil return
+	// triggers the deferred rollback, which would undo every
+	// markParticipantFlowExecutionTerminal write the gossip dispatch
+	// path just persisted. Without this commit the alert would fire
+	// every tick on the same rows forever and never actually drain.
+	if len(rows) > 0 {
+		// Count must run BEFORE DbCommit — once the session's tx is
+		// committed, queries through the same tx-bound client fail.
+		// Counts the unrecovered backlog (rows still IN_FLIGHT after
+		// the reconcile loop) so the alert reflects what's left to
+		// drain, not the pre-recovery snapshot.
+		totalCount, countErr := countStuckParticipantRows(ctx, db, cutoff)
+		if countErr != nil {
+			// Fall back to batch length — degraded alert is better
+			// than no alert. Log so operators know the count is
+			// approximate.
+			logger.With(zap.Error(countErr)).Warn("flow_execution reconcile: failed to count total stuck rows; alert message uses batch size")
+			totalCount = int64(len(rows))
+		}
+		if commitErr := ent.DbCommit(ctx); commitErr != nil {
+			return fmt.Errorf("commit recovery work before alert: %w", commitErr)
+		}
+		return stuckFlowExecutionError("PARTICIPANT", rows, totalCount)
+	}
 	return nil
+}
+
+// countStuckParticipantRows / countStuckCoordinatorRows return the true
+// total of rows past the stuck threshold so the alert message can reflect
+// actual scale even when the batch-limited recovery query returns only the
+// first N. Without this an unrelenting backlog would always look like
+// exactly batchLimit (default 50), masking 5×/10×-larger problems.
+func countStuckParticipantRows(ctx context.Context, db *ent.Client, cutoff time.Time) (int64, error) {
+	c, err := db.FlowExecution.Query().
+		Where(
+			flowexecution.RoleEQ(st.FlowExecutionRoleParticipant),
+			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+			flowexecution.UpdateTimeLT(cutoff),
+		).
+		Count(ctx)
+	return int64(c), err
+}
+
+func countStuckCoordinatorRows(ctx context.Context, db *ent.Client, cutoff time.Time) (int64, error) {
+	c, err := db.FlowExecution.Query().
+		Where(
+			flowexecution.RoleEQ(st.FlowExecutionRoleCoordinator),
+			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+			flowexecution.UpdateTimeLT(cutoff),
+		).
+		Count(ctx)
+	return int64(c), err
+}
+
+// stuckFlowExecutionError formats the task-level error returned by
+// reconcile() and SweepStaleCoordinatorFlows() when stuck rows are
+// found. Recovery work has already been committed before this fires
+// (see the explicit DbCommit in each task body), but the existence of
+// stuck rows is itself alert-worthy — the error propagates up through
+// the task middleware so the scheduler's LogMiddleware logs it at
+// ERROR and Slack fans the notification out. Manual TriggerTask
+// callers see the same error as codes.Internal carrying the alert
+// message.
+//
+// Format: "found <N>[/<total> (batch limit reached)] stuck <ROLE>
+// flow_execution rows: {id=… op_type=… age=…}, … [+M more in batch]".
+// Sample size capped at 3; rows beyond that show as "(+M more in
+// batch)". When the batch-limited query returned fewer rows than the
+// uncapped count, the message includes "<batch>/<total>" so on-call
+// sees true backlog scale.
+func stuckFlowExecutionError(role string, rows []*ent.FlowExecution, totalCount int64) error {
+	const sampleLimit = 3
+	sample := rows
+	if len(sample) > sampleLimit {
+		sample = sample[:sampleLimit]
+	}
+	parts := make([]string, 0, len(sample))
+	for _, r := range sample {
+		parts = append(parts, fmt.Sprintf("{id=%s op_type=%s age=%s}",
+			r.ID,
+			pbgossip.ConsensusOperationType(r.OpType),
+			time.Since(r.UpdateTime).Truncate(time.Second)))
+	}
+	more := ""
+	if len(rows) > sampleLimit {
+		more = fmt.Sprintf(" (+%d more in batch)", len(rows)-sampleLimit)
+	}
+	scale := fmt.Sprintf("%d", len(rows))
+	if totalCount > int64(len(rows)) {
+		scale = fmt.Sprintf("%d/%d (batch limit reached)", len(rows), totalCount)
+	}
+	return fmt.Errorf("found %s stuck %s flow_execution rows: %s%s", scale, role, strings.Join(parts, ", "), more)
 }
 
 // recoveryEnabled reports whether the active recovery path (gossip dispatch
@@ -409,10 +513,19 @@ func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService 
 	if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) <= 0 {
 		for _, row := range rows {
 			logger.Sugar().Infof(
-				"flow_execution sweep (monitor-only): stale COORDINATOR row %s op_type=%d age=%s — recovery disabled by knob",
-				row.ID, row.OpType, time.Since(row.UpdateTime))
+				"flow_execution sweep (monitor-only): stale COORDINATOR row %s op_type=%s age=%s — recovery disabled by knob",
+				row.ID, pbgossip.ConsensusOperationType(row.OpType), time.Since(row.UpdateTime))
 		}
-		return nil
+		// Even in monitor-only mode, surface the existence of stale
+		// rows so the alerting pipeline picks it up. No tx work was
+		// done so no commit is needed; the count can run on the
+		// session client (still alive) before we return.
+		totalCount, countErr := countStuckCoordinatorRows(ctx, db, cutoff)
+		if countErr != nil {
+			logger.With(zap.Error(countErr)).Warn("flow_execution sweep: failed to count total stale rows; alert message uses batch size")
+			totalCount = int64(len(rows))
+		}
+		return stuckFlowExecutionError("COORDINATOR", rows, totalCount)
 	}
 
 	ids := make([]uuid.UUID, len(rows))
@@ -433,5 +546,23 @@ func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService 
 	if err != nil {
 		return fmt.Errorf("failed to sweep stale coordinator rows: %w", err)
 	}
-	return nil
+	// Count the post-recovery backlog BEFORE committing — after the
+	// commit the session's tx-bound client is dead and queries through
+	// it fail. After this UPDATE the count reflects whatever's still
+	// IN_FLIGHT after this tick's batch was transitioned.
+	totalCount, countErr := countStuckCoordinatorRows(ctx, db, cutoff)
+	if countErr != nil {
+		logger.With(zap.Error(countErr)).Warn("flow_execution sweep: failed to count total stale rows; alert message uses batch size")
+		totalCount = int64(len(rows))
+	}
+	// CRITICAL: commit the bulk transition before surfacing the alert
+	// error. DatabaseMiddleware's deferred rollback fires whenever the
+	// task returns non-nil, which would undo the SetStatus work above
+	// and leave the rows IN_FLIGHT for the next tick to re-alert on.
+	if commitErr := ent.DbCommit(ctx); commitErr != nil {
+		return fmt.Errorf("commit recovery work before alert: %w", commitErr)
+	}
+	// Surface the existence of stale rows as a task-level error so the
+	// scheduler's failure-logging pipeline routes it to Slack.
+	return stuckFlowExecutionError("COORDINATOR", rows, totalCount)
 }

@@ -284,15 +284,26 @@ func TestFlowExecution_ReconcileRecoversStuckParticipantRow(t *testing.T) {
 	})
 
 	// Trigger the reconcile task on the participant via the mock RPC.
-	triggerTask(t, config.SigningOperators[operatorIdentifier(participantIdx)], "reconcile_stuck_flow_executions")
+	// The task surfaces a stuck-rows alert as a task-level error (so the
+	// scheduler's LogMiddleware logs at ERROR and Slack fans the
+	// notification out); manual triggers see the same error propagated
+	// as codes.Internal carrying the alert message. Recovery has
+	// already committed by the time the alert fires, which the polling
+	// loop below verifies.
+	triggerErr := triggerTask(t, config.SigningOperators[operatorIdentifier(participantIdx)], "reconcile_stuck_flow_executions")
+	require.Error(t, triggerErr, "reconcile must surface stuck rows as a task-level error so Slack alerts fire")
+	assert.Contains(t, triggerErr.Error(), "stuck PARTICIPANT flow_execution rows",
+		"alert error must carry the role-qualified message used by the Slack notification")
 
 	// Open one client for the polling loop rather than creating a new
 	// connection per tick.
 	participantClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, participantIdx))
 	defer participantClient.Close()
 
-	// TriggerTask returns when the task body returns, but allow a short poll
-	// window in case any internal step is async.
+	// Recovery committed before the alert error returned (DbCommit ran
+	// inside reconcile() before stuckFlowExecutionError), so the row
+	// should already be COMMITTED on disk. Poll briefly in case any
+	// internal step is async.
 	require.Eventually(t, func() bool {
 		row, err := participantClient.FlowExecution.Get(t.Context(), executionID)
 		require.NoError(t, err)
@@ -355,18 +366,22 @@ func deleteSeedRow(t *testing.T, dbURI string, id uuid.UUID) {
 	}
 }
 
-// triggerTask calls the mock TriggerTask RPC on the given operator. The
-// reconcile task swallows per-row errors internally and returns nil under
-// normal operation, so any error here represents a real problem (bad task
-// name, RPC failure, DB query failure inside the task) and should fail the
-// test fast rather than letting the polling loop time out.
-func triggerTask(t *testing.T, op *so.SigningOperator, taskName string) {
+// triggerTask calls the mock TriggerTask RPC on the given operator and
+// returns whatever the RPC returns. Callers decide whether the error is
+// expected — the flow_execution sweep tasks deliberately surface
+// stuck-rows alerts as task-level errors (which propagate through
+// MockServer.TriggerTask as codes.Internal) so that the same error
+// triggers Slack notifications via the scheduler's LogMiddleware. RPC-
+// transport problems (bad task name, connection failure) are reported
+// via require.NoError on the connection setup so callers don't have to
+// disambiguate them from alert errors.
+func triggerTask(t *testing.T, op *so.SigningOperator, taskName string) error {
 	t.Helper()
 	conn, err := op.NewOperatorGRPCConnection()
 	require.NoError(t, err)
 	defer conn.Close()
 	_, err = pbmock.NewMockServiceClient(conn).TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: taskName})
-	require.NoErrorf(t, err, "TriggerTask(%s) failed", taskName)
+	return err
 }
 
 // operatorIdentifier derives the 32-byte-hex operator identifier from the
