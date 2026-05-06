@@ -317,6 +317,16 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, fmt.Errorf("transfer %s is not owned by the authenticated identity public key %x", transfer.ID.String(), session.IdentityPublicKey())
 	}
 
+	// Mirror the coop-exit confirmation guard that receiver SOs apply in
+	// InternalTransferHandler.FinalizeTransfer. Without this, the coordinator
+	// completes the transfer and marks leaves AVAILABLE before the on-chain
+	// coop-exit tx has reached the required confirmations, while receivers
+	// reject the FinalizeTransfer gossip with FailedPrecondition and stay at
+	// TRANSFER_LOCKED — producing permanent state divergence (SP-2961).
+	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
+		return nil, err
+	}
+
 	// Verify that every submitted leaf belongs to this transfer (set equality, not just count).
 	transferLeafIDs, err := transfer.QueryTransferLeaves().QueryLeaf().IDs(ctx)
 	if err != nil {
