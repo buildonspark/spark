@@ -2423,7 +2423,7 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 //   - receiver-side filters on transfer_receivers.status (per-receiver claim
 //     state) for the 5 pending statuses (RECEIVER_CLAIM_PENDING + 4
 //     RECEIVER_*). Drives idx_transferreceiver_claim_pending_pubkey_time.
-//   - sender-side filters on transfers.status + expiry_time < NOW().
+//   - sender-side filters on transfers.status + expiry_time < args.now.
 //
 // Marshaling: when the participant is a receiver of the transfer,
 // MarshalProtoForReceiver filters leaves to just that receiver's leaves
@@ -2528,6 +2528,7 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		order:             filter.Order,
 		limit:             limit,
 		offset:            offset,
+		now:               time.Now(),
 	})
 	if err != nil {
 		metrics.record(ctx, 0, err)
@@ -2673,6 +2674,7 @@ type queryMIMOPendingArgs struct {
 	order             pb.Order
 	limit             int
 	offset            int
+	now               time.Time // sampled at handler entry; bound into the sender-pending expiry predicate
 }
 
 // queryMIMOPendingTransferIDs returns paginated pending-transfer IDs ordered
@@ -2686,6 +2688,10 @@ type queryMIMOPendingArgs struct {
 // to t.create_time, keeping the union's merge key uniform across
 // both arms.
 func queryMIMOPendingTransferIDs(ctx context.Context, db *ent.Client, args queryMIMOPendingArgs) ([]uuid.UUID, error) {
+	if args.now.IsZero() {
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("queryMIMOPendingArgs.now is required"))
+	}
+
 	var query string
 	var sqlArgs []any
 	var err error
@@ -2769,7 +2775,7 @@ func buildPendingIDsQueryReceiver(args queryMIMOPendingArgs) (string, []any, err
 
 // buildPendingIDsQuerySender builds the sender-only pending-IDs query.
 // Joins transfer_senders for pubkey scope via UNIQUE(transfer_id,
-// identity_pubkey). Sender-pending requires expiry_time < NOW() — the
+// identity_pubkey). Sender-pending requires expiry_time < args.now — the
 // sender has missed its handoff window.
 //
 // **Known planner-flip footgun (MIMO MVP only).** With the new
@@ -2799,6 +2805,9 @@ func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error
 		args.offset,                            // $4 - OFFSET
 	}
 
+	sqlArgs = append(sqlArgs, args.now)
+	nowPos := len(sqlArgs)
+
 	sqlArgs, commonFilters, err := mimo.AppendPendingCommonFilters(sqlArgs, args.network, args.types, args.transferIDsFilter)
 	if err != nil {
 		return "", nil, err
@@ -2820,10 +2829,10 @@ func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error
 		FROM transfers t
 		INNER JOIN transfer_senders s ON s.transfer_id = t.id AND s.identity_pubkey = $1
 		WHERE t.status = ANY($2::text[])
-		  AND t.expiry_time < NOW()%s%s
+		  AND t.expiry_time < $%d%s%s
 		ORDER BY t.create_time %s, t.id %s
 		LIMIT $3 OFFSET $4
-	`, commonFilters, timeFilter, direction, direction)
+	`, nowPos, commonFilters, timeFilter, direction, direction)
 
 	return query, sqlArgs, nil
 }
@@ -2881,6 +2890,9 @@ func buildPendingIDsQuerySenderOrReceiver(args queryMIMOPendingArgs) (string, []
 		args.offset,                              // $6 - outer OFFSET
 	}
 
+	sqlArgs = append(sqlArgs, args.now)
+	nowPos := len(sqlArgs)
+
 	sqlArgs, commonFilters, err := mimo.AppendPendingCommonFilters(sqlArgs, args.network, args.types, args.transferIDsFilter)
 	if err != nil {
 		return "", nil, err
@@ -2913,7 +2925,7 @@ func buildPendingIDsQuerySenderOrReceiver(args queryMIMOPendingArgs) (string, []
 			 FROM transfers t
 			 WHERE t.sender_identity_pubkey = $1
 			   AND t.status = ANY($2::text[])
-			   AND t.expiry_time < NOW()%s%s
+			   AND t.expiry_time < $%d%s%s
 			 ORDER BY t.create_time %s, t.id %s
 			 LIMIT $4)
 			UNION ALL
@@ -2928,7 +2940,7 @@ func buildPendingIDsQuerySenderOrReceiver(args queryMIMOPendingArgs) (string, []
 		ORDER BY ct %s, id %s
 		LIMIT $5 OFFSET $6
 	`,
-		commonFilters, senderTimeFilter.String(), direction, direction,
+		nowPos, commonFilters, senderTimeFilter.String(), direction, direction,
 		commonFilters, receiverTimeFilter.String(), direction, direction,
 		direction, direction)
 
