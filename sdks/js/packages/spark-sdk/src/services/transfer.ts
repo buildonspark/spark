@@ -12,13 +12,13 @@ import {
   SparkValidationError,
 } from "../errors/index.js";
 import { SignatureIntent } from "../proto/common.js";
-import { type Timestamp } from "../proto/google/protobuf/timestamp.js";
 import {
   type ClaimLeafKeyTweak,
   ClaimLeafKeyTweaks,
   type ClaimTransferResponse,
   type ClaimTransferSignRefundsResponse,
   type CounterLeafSwapResponse,
+  type DeepPartial,
   HashVariant,
   type InitiateSwapPrimaryTransferResponse,
   type LeafRefundTxSigningJob,
@@ -29,10 +29,10 @@ import {
   type RenewRefundTimelockSigningJob,
   type SendLeafKeyTweak,
   SendLeafKeyTweaks,
-  type SigningJob,
   type StartTransferRequest,
   type StartTransferResponse,
   type Transfer,
+  type TransferFilter,
   TransferPackage,
   TransferStatus,
   TransferType,
@@ -183,16 +183,6 @@ export type SigningJobWithOptionalNonce = {
   verifyingKey: Uint8Array;
 };
 
-function getSigningJobProto(
-  signingJob: SigningJobWithOptionalNonce,
-): SigningJob {
-  return {
-    signingPublicKey: signingJob.signingPublicKey,
-    rawTx: signingJob.rawTx,
-    signingNonceCommitment: signingJob.signingNonceCommitment.commitment,
-  };
-}
-
 export class BaseTransferService {
   protected readonly config: WalletConfigService;
   protected readonly connectionManager: ConnectionManager;
@@ -227,9 +217,7 @@ export class BaseTransferService {
       directFromCpfpRefundSignatureMap,
     );
 
-    for (const [key, operator] of Object.entries(
-      this.config.getSigningOperators(),
-    )) {
+    for (const key of Object.keys(this.config.getSigningOperators())) {
       const tweaks = keyTweakInputMap.get(key);
       if (!tweaks) {
         throw new SparkValidationError("No tweaks for operator", {
@@ -1037,7 +1025,7 @@ export class TransferService extends BaseTransferService {
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         claimPackage,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new SparkRequestError("Failed to claim transfer", {
         method: "POST",
         error,
@@ -1073,7 +1061,10 @@ export class TransferService extends BaseTransferService {
         network: this.config.getNetworkProto(),
       });
     } catch (error) {
-      throw new Error(`Error querying pending transfers: ${error}`);
+      throw new Error(
+        `Error querying pending transfers: ${formatUnknownError(error)}`,
+        { cause: error },
+      );
     }
     return pendingTransfersResp;
   }
@@ -1146,7 +1137,7 @@ export class TransferService extends BaseTransferService {
     const identityPublicKey = await this.config.signer.getIdentityPublicKey();
 
     // Build filter object
-    const filter: any = {
+    const filter: DeepPartial<TransferFilter> = {
       participant: senderOnly
         ? {
             $case: "senderIdentityPublicKey",
@@ -1165,16 +1156,14 @@ export class TransferService extends BaseTransferService {
 
     // Add optional time filter (mutually exclusive - only one can be set)
     if (createdAfter) {
-      const seconds = Math.floor(createdAfter.getTime() / 1000);
       filter.timeFilter = {
         $case: "createdAfter",
-        createdAfter: { seconds, nanos: 0 },
+        createdAfter,
       };
     } else if (createdBefore) {
-      const seconds = Math.floor(createdBefore.getTime() / 1000);
       filter.timeFilter = {
         $case: "createdBefore",
-        createdBefore: { seconds, nanos: 0 },
+        createdBefore,
       };
     }
 
@@ -1182,7 +1171,12 @@ export class TransferService extends BaseTransferService {
     try {
       allTransfersResp = await sparkClient.query_all_transfers(filter);
     } catch (error) {
-      throw new Error(`Error querying all transfers: ${error}`);
+      throw new Error(
+        `Error querying all transfers: ${formatUnknownError(error)}`,
+        {
+          cause: error,
+        },
+      );
     }
     return allTransfersResp;
   }
@@ -1350,7 +1344,10 @@ export class TransferService extends BaseTransferService {
         expiryTime: expiryTime,
       });
     } catch (error) {
-      throw new Error(`Error starting send transfer: ${error}`);
+      throw new Error(
+        `Error starting send transfer: ${formatUnknownError(error)}`,
+        { cause: error },
+      );
     }
 
     if (!response.transfer) {
@@ -1516,7 +1513,7 @@ export class TransferService extends BaseTransferService {
               await this.config.signer.getIdentityPublicKey(),
             leavesToReceive,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           errors.push(
             new SparkRequestError("Failed to claim transfer tweak keys", {
               method: "POST",
@@ -1531,7 +1528,7 @@ export class TransferService extends BaseTransferService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw errors[0];
+      throw errors[0] ?? new Error("Failed to claim transfer tweak keys");
     }
   }
 
@@ -1758,7 +1755,7 @@ export class TransferService extends BaseTransferService {
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         signingJobs,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new SparkRequestError("Failed to claim transfer sign refunds", {
         method: "POST",
         error,
@@ -1777,7 +1774,10 @@ export class TransferService extends BaseTransferService {
         nodeSignatures,
       });
     } catch (error) {
-      throw new Error(`Error finalizing node signatures in transfer: ${error}`);
+      throw new Error(
+        `Error finalizing node signatures in transfer: ${formatUnknownError(error)}`,
+        { cause: error },
+      );
     }
   }
 
@@ -1795,7 +1795,10 @@ export class TransferService extends BaseTransferService {
         },
       });
     } catch (error) {
-      throw new Error(`Error querying pending transfers by sender: ${error}`);
+      throw new Error(
+        `Error querying pending transfers by sender: ${formatUnknownError(error)}`,
+        { cause: error },
+      );
     }
   }
 
@@ -2121,16 +2124,6 @@ export class TransferService extends BaseTransferService {
     }
 
     const splitNodeOutput = splitNodeTx.getOutput(0);
-    const splitNodeDirectOutput = splitNodeDirectTx.getOutput(0);
-
-    if (!splitNodeDirectOutput.amount || !splitNodeDirectOutput.script) {
-      throw new Error("Could not get split node output");
-    }
-
-    const unsignedSplitNodeOutput: TransactionOutput = {
-      script: splitNodeDirectOutput.script,
-      amount: splitNodeDirectOutput.amount,
-    };
 
     const { nodeTx: newNodeTx, directNodeTx: newDirectNodeTx } =
       await createInitialTimelockNodeTx(splitNodeTx, this.config.getNetwork());
@@ -2436,4 +2429,17 @@ export class TransferService extends BaseTransferService {
       throw new SparkError("Failed to claim transfer", { error });
     }
   }
+}
+
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error === "number" || typeof error === "boolean") {
+    return String(error);
+  }
+  return "unknown error";
 }

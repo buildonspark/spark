@@ -1,4 +1,4 @@
-import { CurrencyUnit, type Logger } from "@lightsparkdev/core";
+import { type Logger } from "@lightsparkdev/core";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -29,6 +29,7 @@ import {
   type ClaimStaticDepositOutput,
   type CoopExitFeeQuote,
   type CoopExitRequest,
+  CurrencyUnit,
   ExitSpeed,
   type InstantStaticDepositPlan,
   type InstantStaticDepositQuoteOutput,
@@ -306,7 +307,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         });
       },
       async () => {
-        for await (const _ of this.optimizeLeaves()) {
+        for await (const step of this.optimizeLeaves()) {
+          void step;
           // run all steps
         }
       },
@@ -464,9 +466,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     await this.leafManager.initialize();
 
     if (isReactNative) {
-      this.startPeriodicClaimTransfers();
+      void this.startPeriodicClaimTransfers();
     } else {
-      this.setupBackgroundStream();
+      void this.setupBackgroundStream();
     }
 
     await this.syncWallet();
@@ -746,8 +748,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const streamController = new AbortController();
     this.streamController = streamController;
     while (!streamController.signal.aborted) {
-      const { controller: streamAttemptController, cleanup: cleanupAttempt } =
-        createStreamAttemptController(streamController.signal);
+      const streamAttempt = createStreamAttemptController(
+        streamController.signal,
+      );
+      const streamAttemptController = streamAttempt.controller;
       let heartbeatTimeoutError: Error | undefined;
       const streamActivityTimeout = createStreamActivityTimeout(() => {
         if (
@@ -881,14 +885,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           if (!completed) {
             break;
           }
-        } catch (error) {
+        } catch {
           if (streamController.signal.aborted) {
             break;
           }
         }
       } finally {
         streamActivityTimeout.clear();
-        cleanupAttempt();
+        streamAttempt.cleanup();
         this.logStream(
           `stream loop iteration finished retryCount=${retryCount} aborted=${streamController.signal.aborted}`,
         );
@@ -1018,17 +1022,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const tokenOptConfig = this.config.getTokenOptimizationOptions();
     const intervalMs = tokenOptConfig?.intervalMs ?? 300000; // Default 5 minutes
 
-    // @ts-ignore
-    this.tokenOptimizationInterval = setInterval(async () => {
-      try {
-        await this.optimizeTokenOutputs();
-      } catch (error) {
+    this.tokenOptimizationInterval = setInterval(() => {
+      void this.optimizeTokenOutputs().catch((error: unknown) => {
         this.logger.error(
           `Error in periodic token output optimization: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
-      }
+      });
     }, intervalMs);
   }
 
@@ -2386,7 +2387,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
   }
 
-  private async getStaticDepositSigningPayload(
+  private getStaticDepositSigningPayload(
     transactionID: string,
     outputIndex: number,
     network: string,
@@ -2455,7 +2456,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       payload.set(part, offset);
       offset += part.length;
     }
-    return payload;
+    return Promise.resolve(payload);
   }
 
   private async getDepositTransactionVout({
@@ -3161,21 +3162,19 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return await this.leafManager.selectLeavesAndExecute(
       amountSatsArray,
       async (selected) => {
-        const jobs = await Promise.all(
-          params.map(async (param, i) => {
-            const { receiverIdentityPubkey, sparkInvoice } = param;
-            const leaves = selected[i] as TreeNode[];
-            const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) =>
-              this.toSendTweak(leaf, receiverIdentityPubkey),
-            );
-            return {
-              leafKeyTweaks,
-              receiverIdentityPubkey,
-              sparkInvoice,
-              param,
-            };
-          }),
-        );
+        const jobs = params.map((param, i) => {
+          const { receiverIdentityPubkey, sparkInvoice } = param;
+          const leaves = selected[i] as TreeNode[];
+          const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) =>
+            this.toSendTweak(leaf, receiverIdentityPubkey),
+          );
+          return {
+            leafKeyTweaks,
+            receiverIdentityPubkey,
+            sparkInvoice,
+            param,
+          };
+        });
 
         const signerIdentityPublicKey =
           await this.config.signer.getIdentityPublicKey();
@@ -4470,7 +4469,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 invoices,
                 txid,
               };
-            } catch (e: any) {
+            } catch (e: unknown) {
               return {
                 ok: false as const,
                 tokenIdentifier: tokenIdB32,
@@ -4719,9 +4718,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     switch (feeEstimate.feeEstimate.originalUnit) {
-      case CurrencyUnit.Satoshi:
+      case CurrencyUnit.SATOSHI:
         return feeEstimate.feeEstimate.originalValue;
-      case CurrencyUnit.Millisatoshi:
+      case CurrencyUnit.MILLISATOSHI:
         return Math.ceil(feeEstimate.feeEstimate.originalValue / 1000);
       default:
         throw new Error(
@@ -5612,7 +5611,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           publicKey = await this.config.signer.getDepositSigningKey();
           break;
         case "auto-detect":
-        default:
+        default: {
           // Try to auto-detect which key to use by examining the transaction inputs
           const detectedKey = await this.detectKeyForTransaction(tx);
           if (detectedKey) {
@@ -5622,6 +5621,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             publicKey = await this.config.signer.getIdentityPublicKey();
           }
           break;
+        }
       }
 
       // Check each input to determine which ones need signing
@@ -5653,7 +5653,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             inputsSigned++;
           } catch (error) {
             throw new SparkValidationError(
-              `Failed to sign input ${i}: ${error}`,
+              `Failed to sign input ${i}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
               {
                 field: "input",
                 value: i,
@@ -5836,7 +5838,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       }
 
-      let nodeTx, refundTx;
+      let nodeTx: Transaction;
+      let refundTx: Transaction;
 
       try {
         // Get the node transaction to check its timelock
@@ -5886,7 +5889,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       }
 
-      if (!refundInput.sequence) {
+      if (nodeInput.sequence == null) {
+        throw new SparkValidationError(
+          `Node transaction has no sequence for ${isRootNode ? "root" : "non-root"} node`,
+          {
+            field: "sequence",
+            value: nodeInput.sequence,
+          },
+        );
+      }
+
+      if (refundInput.sequence == null) {
         throw new SparkValidationError(
           `Refund transaction has no sequence for ${isRootNode ? "root" : "non-root"} node`,
           {
@@ -5973,25 +5986,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     await this.claimTransfers();
 
     // Set up new interval to claim transfers every 5 seconds
-    // @ts-ignore
-    this.claimTransfersInterval = setInterval(async () => {
-      try {
-        await this.claimTransfers(
-          [
-            TransferType.TRANSFER,
-            TransferType.COOPERATIVE_EXIT,
-            TransferType.PREIMAGE_SWAP,
-            TransferType.UTXO_SWAP,
-          ],
-          true,
-        );
-      } catch (error) {
+    this.claimTransfersInterval = setInterval(() => {
+      void this.claimTransfers(
+        [
+          TransferType.TRANSFER,
+          TransferType.COOPERATIVE_EXIT,
+          TransferType.PREIMAGE_SWAP,
+          TransferType.UTXO_SWAP,
+        ],
+        true,
+      ).catch((error: unknown) => {
         this.logger.error(
           `Error in periodic transfer claiming: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
-      }
+      });
     }, 10000);
   }
 
@@ -6051,12 +6061,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return await sspClient.listSparkWalletWebhooks();
   }
 
-  public async isOptimizationInProgress() {
-    return this.leafManager.isOptimizing();
+  public isOptimizationInProgress() {
+    return Promise.resolve(this.leafManager.isOptimizing());
   }
 
-  public async isTokenOptimizationInProgress() {
-    return this.tokenOptimizationInProgress;
+  public isTokenOptimizationInProgress() {
+    return Promise.resolve(this.tokenOptimizationInProgress);
   }
 
   protected static async handlePublicMethodError(
@@ -6073,7 +6083,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       try {
         const keyBytes = await wallet.config.signer.getIdentityPublicKey();
         context.idPubKey = bytesToHex(keyBytes);
-      } catch (keyError) {
+      } catch {
         /* Signer not initialized yet, ignore */
       }
     }
@@ -6165,7 +6175,7 @@ type AssertNever<T extends never> = T;
 type SparkWalletFunctionKeys = Extract<
   {
     [K in keyof SparkWallet]: SparkWallet[K] extends (
-      ...args: any[]
+      ...args: never[]
     ) => PromiseLike<unknown>
       ? K
       : never;
@@ -6255,6 +6265,12 @@ type _AllWrappableMethodsCovered = AssertNever<
     (typeof PUBLIC_SPARK_WALLET_METHODS)[number]
   >
 >;
+
+// Compile-time assertion: every wrappable SparkWallet method must be listed in
+// PUBLIC_SPARK_WALLET_METHODS. The value exists only to keep the type check live.
+const allWrappableMethodsCovered: _AllWrappableMethodsCovered =
+  undefined as never;
+void allWrappableMethodsCovered;
 
 function isConnectedStreamEvent(
   event: SubscribeToEventsResponse["event"],

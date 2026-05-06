@@ -363,6 +363,7 @@ describe.each(walletTypes)(
         transferId: string,
         timeoutMs: number,
       ): Promise<{ transferId: string; balance: bigint }> {
+        await Promise.resolve();
         return new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             receiverWallet.removeListener(

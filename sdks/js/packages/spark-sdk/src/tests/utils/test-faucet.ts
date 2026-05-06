@@ -63,6 +63,28 @@ export type FaucetCoin = {
   txout: TransactionOutput;
 };
 
+type FaucetUtxo = {
+  txid: string;
+  vout: number;
+  amount: bigint;
+};
+
+type ScanTxOutSetResult = {
+  success: boolean;
+  height: number;
+  unspents: Array<{
+    txid: string;
+    vout: number;
+    amount: number;
+    height: number;
+  }>;
+};
+
+type RawTransactionInfo = {
+  hex: string;
+  confirmations?: number;
+};
+
 // The amount of satoshis to put in each faucet coin to be used in tests
 const REFILL_AMOUNT = 10_000_000n;
 const COIN_AMOUNT = 1_000_000n;
@@ -140,16 +162,14 @@ export class BitcoinFaucet {
 
     // Use scantxoutset to find UTXOs. Retry on "Scan already in progress" (-8)
     // which happens when concurrent test processes hit the same bitcoind.
-    const scanResult = await this.callWithRetry("scantxoutset", [
-      "start",
-      [`addr(${address})`],
-    ]);
+    const scanResult = await this.callWithRetry<ScanTxOutSetResult>(
+      "scantxoutset",
+      ["start", [`addr(${address})`]],
+    );
 
-    let selectedUtxo;
-    let selectedUtxoAmountSats;
-
+    let selectedUtxo: FaucetUtxo | undefined;
     if (scanResult.success && scanResult.unspents.length > 0) {
-      selectedUtxo = scanResult.unspents.find((utxo) => {
+      const scannedUtxo = scanResult.unspents.find((utxo) => {
         const isValueEnough =
           BigInt(Math.floor(utxo.amount * SATS_PER_BTC)) >=
           COIN_AMOUNT + FEE_AMOUNT;
@@ -157,10 +177,12 @@ export class BitcoinFaucet {
         return isValueEnough && isMature;
       });
 
-      if (selectedUtxo) {
-        selectedUtxoAmountSats = BigInt(
-          Math.floor(selectedUtxo.amount * SATS_PER_BTC),
-        );
+      if (scannedUtxo) {
+        selectedUtxo = {
+          txid: scannedUtxo.txid,
+          vout: scannedUtxo.vout,
+          amount: BigInt(Math.floor(scannedUtxo.amount * SATS_PER_BTC)),
+        };
       }
     }
 
@@ -192,7 +214,6 @@ export class BitcoinFaucet {
             vout: i,
             amount: REFILL_AMOUNT,
           };
-          selectedUtxoAmountSats = REFILL_AMOUNT;
           break;
         }
       }
@@ -203,6 +224,7 @@ export class BitcoinFaucet {
       throw new Error("No UTXO large enough to create even one faucet coin");
     }
 
+    const selectedUtxoAmountSats = selectedUtxo.amount;
     const maxPossibleCoins = Number(
       (selectedUtxoAmountSats - FEE_AMOUNT) / COIN_AMOUNT,
     );
@@ -308,6 +330,7 @@ export class BitcoinFaucet {
     fundingTxOut: TransactionOutput,
     key: Uint8Array,
   ): Promise<Transaction> {
+    await Promise.resolve();
     const pubKey = secp256k1.getPublicKey(key);
     const internalKey = pubKey.slice(1); // Remove the 0x02/0x03 prefix
 
@@ -361,14 +384,14 @@ export class BitcoinFaucet {
     });
   }
 
-  private async callWithRetry(
+  private async callWithRetry<T>(
     method: string,
-    params: any[],
+    params: unknown[],
     { maxAttempts = 5, baseDelayMs = 200, maxDelayMs = 3000 } = {},
-  ) {
+  ): Promise<T> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await this.call(method, params);
+        return await this.call<T>(method, params);
       } catch (err) {
         const isRetryable =
           err instanceof SparkRequestError &&
@@ -380,9 +403,10 @@ export class BitcoinFaucet {
         await new Promise((r) => setTimeout(r, delay));
       }
     }
+    throw new Error("Unexpected retry loop exit");
   }
 
-  private async call(method: string, params: any[]) {
+  private async call<T>(method: string, params: unknown[]): Promise<T> {
     try {
       const { fetch, Headers } = getFetch();
       const response = await fetch(this.url, {
@@ -399,7 +423,10 @@ export class BitcoinFaucet {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json<{
+        error?: { code?: unknown };
+        result: T;
+      }>();
       if (data.error) {
         console.error(`RPC Error for method ${method}:`, data.error);
         throw new SparkRequestError(`Bitcoin RPC error`, {
@@ -424,22 +451,22 @@ export class BitcoinFaucet {
   }
 
   async generateToAddress(numBlocks: number, address: string) {
-    return await this.call("generatetoaddress", [numBlocks, address]);
+    return await this.call<string[]>("generatetoaddress", [numBlocks, address]);
   }
 
   async sendToAddressInternal(address: string, amountSats: number) {
-    return await this.call("sendtoaddress", [
+    return await this.call<string>("sendtoaddress", [
       address,
       amountSats / SATS_PER_BTC,
     ]);
   }
 
   async getBlock(blockHash: string) {
-    return await this.call("getblock", [blockHash, 2]);
+    return await this.call<unknown>("getblock", [blockHash, 2]);
   }
 
   async getBlockCount(): Promise<number> {
-    return await this.call("getblockcount", []);
+    return await this.call<number>("getblockcount", []);
   }
 
   async waitForBlocksMined({
@@ -470,16 +497,17 @@ export class BitcoinFaucet {
   }
 
   async broadcastTx(txHex: string) {
-    const response = await this.call("sendrawtransaction", [txHex, 0]);
+    const response = await this.call<string>("sendrawtransaction", [txHex, 0]);
     return response;
   }
 
   async submitPackage(txHexs: string[]) {
-    const response = await this.call("submitpackage", [txHexs]);
+    const response = await this.call<unknown>("submitpackage", [txHexs]);
     return response;
   }
 
   async getNewAddress(): Promise<string> {
+    await Promise.resolve();
     const key = secp256k1.utils.randomPrivateKey();
     const pubKey = secp256k1.getPublicKey(key);
     return getP2TRAddressFromPublicKey(pubKey, Network.LOCAL);
@@ -490,6 +518,7 @@ export class BitcoinFaucet {
     key: Uint8Array;
     pubKey: Uint8Array;
   }> {
+    await Promise.resolve();
     const key = secp256k1.utils.randomPrivateKey();
     const pubKey = secp256k1.getPublicKey(key);
     return {
@@ -593,19 +622,20 @@ export class BitcoinFaucet {
     address: string,
     amount: bigint,
   ): Promise<Transaction> {
+    await Promise.resolve();
     return this.buildAndBroadcastTx(coin, address, amount, FEE_AMOUNT * 2n);
   }
 
   async getRawTransaction(txid: string) {
-    return await this.call("getrawtransaction", [txid, 2]);
+    return await this.call<RawTransactionInfo>("getrawtransaction", [txid, 2]);
   }
 
   async getRawMempool() {
-    return await this.call("getrawmempool", []);
+    return await this.call<string[]>("getrawmempool", []);
   }
 
   async getMempoolEntry(txid: string) {
-    return await this.call("getmempoolentry", [txid]);
+    return await this.call<unknown>("getmempoolentry", [txid]);
   }
 
   async waitForMempoolEntry(

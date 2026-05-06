@@ -22,6 +22,7 @@ describe("SSP coop exit basic validation", () => {
     );
 
     const transactionId = await retryUntilSuccess(async () => {
+      await Promise.resolve();
       if (!signedTx) throw new Error("Tx not mined yet");
       return signedTx.id;
     });

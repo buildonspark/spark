@@ -1,4 +1,3 @@
-import { bytesToHex } from "@noble/curves/utils";
 import {
   apply_adaptor_to_signature,
   compute_multi_input_sighash,
@@ -31,6 +30,13 @@ import {
 } from "./types.js";
 import { SparkFrostBase } from "./spark-bindings.js";
 import wasmBytes from "./wasm/wasm-browser-bg.wasm";
+
+type WasmVerifiableSecretShareWire = {
+  threshold: number;
+  index: number;
+  share: number[];
+  proofs: number[][];
+};
 
 function createKeyPackage(params: IKeyPackage): KeyPackage {
   return new KeyPackage(
@@ -160,27 +166,17 @@ class SparkFrostBrowser extends SparkFrostBase {
     numShares: number,
   ) {
     await this.init();
-    const result = split_secret_with_proofs(secret, threshold, numShares);
-    return (
-      result as {
-        threshold: number;
-        index: number;
-        share: number[];
-        proofs: number[][];
-      }[]
-    ).map(
-      (s: {
-        threshold: number;
-        index: number;
-        share: number[];
-        proofs: number[][];
-      }) => ({
-        threshold: s.threshold,
-        index: s.index,
-        share: new Uint8Array(s.share),
-        proofs: s.proofs.map((p: number[]) => new Uint8Array(p)),
-      }),
-    );
+    const result = split_secret_with_proofs(
+      secret,
+      threshold,
+      numShares,
+    ) as WasmVerifiableSecretShareWire[];
+    return result.map((s) => ({
+      threshold: s.threshold,
+      index: s.index,
+      share: new Uint8Array(s.share),
+      proofs: s.proofs.map((p: number[]) => new Uint8Array(p)),
+    }));
   }
 
   async recoverSecret(

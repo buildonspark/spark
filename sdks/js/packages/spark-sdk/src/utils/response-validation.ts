@@ -15,13 +15,16 @@ export function collectResponses<T>(responses: PromiseSettledResult<T>[]): T[] {
   );
 
   if (failedResponses.length > 0) {
-    const errors = failedResponses.map((result) => result.reason).join("\n");
+    const reasons = failedResponses.map(
+      (result): unknown => result.reason as unknown,
+    );
+    const errors = reasons.map(String).join("\n");
     throw new SparkRequestError(
       `${failedResponses.length} out of ${responses.length} requests failed, please try again`,
       {
         errorCount: failedResponses.length,
         errors,
-        error: failedResponses.map((result) => result.reason),
+        error: reasons,
       },
     );
   }

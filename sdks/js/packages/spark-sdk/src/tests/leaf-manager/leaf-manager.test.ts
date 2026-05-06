@@ -14,6 +14,78 @@ import LeafManager from "../../services/leaf-manager.js";
 import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { addPublicKeys } from "../../utils/keys.js";
 
+type TestLeafStatus =
+  | "AVAILABLE"
+  | "LOCAL_LOCKED"
+  | "OUTGOING"
+  | "SWAP_PENDING"
+  | "INCOMING"
+  | "SPENT";
+
+type TestLeafRecord = {
+  treeNode: TreeNode;
+  status: TestLeafStatus;
+  source: unknown;
+};
+
+type RequestLeavesSwapParams = {
+  leaves: TreeNode[];
+  targetAmounts: number[];
+  onSwapInitiated?: (leafIds?: string[]) => void | Promise<void>;
+  registerSwapTransferId?: (transferId: string) => void;
+};
+
+type RequestLeavesSwapMock = jest.Mock<
+  (args: RequestLeavesSwapParams) => Promise<TreeNode[]>
+>;
+
+type LeafManagerInternals = {
+  checkRenewLeaves: (nodes: TreeNode[]) => Promise<TreeNode[]>;
+  config: MockConfig;
+  determineLeavesToSwap: (targetAmount: number) => TreeNode[];
+  getAllPendingOutgoingTransfers: () => Promise<unknown[]>;
+  getAllPendingSwaps: () => Promise<unknown[]>;
+  getAvailableLeaves: () => TreeNode[];
+  getLeaves: (isBalanceCheck?: boolean) => Promise<TreeNode[]>;
+  identityPublicKey: Uint8Array | undefined;
+  isLeafConsistent: (leaf: TreeNode, opLeaf: TreeNode | undefined) => boolean;
+  isStaleLeafError: (error: unknown) => boolean;
+  leaves: Map<string, TestLeafRecord>;
+  queryNodes: (
+    baseRequest: Omit<QueryNodesRequest, "limit" | "offset">,
+    sparkClientAddress?: string,
+    pageSize?: number,
+  ) => Promise<QueryNodesResponse>;
+  recoverLeaves: (
+    leaves: TreeNode[],
+    keyDerivation: KeyDerivation,
+  ) => Promise<TreeNode[]>;
+  restoreLocalLockedToAvailable: (leafIds: string[]) => void;
+  selectLeaves: (targetAmounts: number[]) => [
+    {
+      [key: number]: TreeNode[];
+    },
+    boolean,
+  ];
+  transferService: MockTransferService;
+  transition: (
+    leafIds: string[],
+    toStatus: string,
+    meta?: { source: unknown },
+  ) => void;
+  verifyKey: (
+    pubkey1: Uint8Array,
+    pubkey2: Uint8Array,
+    verifyingKey: Uint8Array,
+  ) => boolean;
+};
+
+function leafManagerInternals(lm: LeafManager): LeafManagerInternals {
+  return lm as unknown as LeafManagerInternals;
+}
+
+type LeafManagerConstructorArgs = ConstructorParameters<typeof LeafManager>;
+
 // ---------------------------------------------------------------------------
 // Testable subclass — exposes private internals for white-box testing
 // ---------------------------------------------------------------------------
@@ -25,9 +97,11 @@ class TestableLeafManager extends LeafManager {
     this.bypassCheckRenewLeaves();
   }
   bypassCheckRenewLeaves() {
-    (this as any).checkRenewLeaves = async (nodes: TreeNode[]) => nodes;
+    leafManagerInternals(this).checkRenewLeaves = (nodes: TreeNode[]) =>
+      Promise.resolve(nodes);
   }
   override async getLeaves(_isBalanceCheck?: boolean): Promise<TreeNode[]> {
+    await Promise.resolve();
     if (this.getLeavesOverride) return this.getLeavesOverride();
     return super.getLeaves(_isBalanceCheck);
   }
@@ -37,7 +111,12 @@ class TestableLeafManager extends LeafManager {
     sparkClientAddress?: string,
     pageSize?: number,
   ): Promise<QueryNodesResponse> {
-    return (this as any).queryNodes(baseRequest, sparkClientAddress, pageSize);
+    await Promise.resolve();
+    return leafManagerInternals(this).queryNodes(
+      baseRequest,
+      sparkClientAddress,
+      pageSize,
+    );
   }
 
   verifyKeyPublic(
@@ -45,25 +124,27 @@ class TestableLeafManager extends LeafManager {
     pubkey2: Uint8Array,
     verifyingKey: Uint8Array,
   ): boolean {
-    return (this as any).verifyKey(pubkey1, pubkey2, verifyingKey);
+    return leafManagerInternals(this).verifyKey(pubkey1, pubkey2, verifyingKey);
   }
 
   isLeafConsistentPublic(
     leaf: TreeNode,
     opLeaf: TreeNode | undefined,
   ): boolean {
-    return (this as any).isLeafConsistent(leaf, opLeaf);
+    return leafManagerInternals(this).isLeafConsistent(leaf, opLeaf);
   }
 
   async recoverLeavesPublic(
     leaves: TreeNode[],
     keyDerivation: KeyDerivation,
   ): Promise<TreeNode[]> {
-    return (this as any).recoverLeaves(leaves, keyDerivation);
+    await Promise.resolve();
+    return leafManagerInternals(this).recoverLeaves(leaves, keyDerivation);
   }
 
   async checkRenewLeavesPublic(nodes: TreeNode[]): Promise<TreeNode[]> {
-    return (this as any).checkRenewLeaves(nodes);
+    await Promise.resolve();
+    return leafManagerInternals(this).checkRenewLeaves(nodes);
   }
 
   transitionPublic(
@@ -71,51 +152,51 @@ class TestableLeafManager extends LeafManager {
     toStatus: string,
     meta?: { source: unknown },
   ): void {
-    (this as any).transition(leafIds, toStatus, meta);
+    leafManagerInternals(this).transition(leafIds, toStatus, meta);
   }
 
   getLeafRecordPublic(
     id: string,
   ): { treeNode: TreeNode; status: string; source: unknown } | undefined {
-    return (this as any).leaves.get(id);
+    return leafManagerInternals(this).leaves.get(id);
   }
 
-  getInternalLeaves(): Map<string, any> {
-    return (this as any).leaves;
+  getInternalLeaves(): Map<string, TestLeafRecord> {
+    return leafManagerInternals(this).leaves;
   }
 
-  getLeafRecord(id: string): any {
-    return (this as any).leaves.get(id);
+  getLeafRecord(id: string): TestLeafRecord {
+    return leafManagerInternals(this).leaves.get(id) as TestLeafRecord;
   }
 
   getLeafStatus(id: string): string | undefined {
-    return (this as any).leaves.get(id)?.status;
+    return leafManagerInternals(this).leaves.get(id)?.status;
   }
 
-  getLeafSource(id: string): any {
-    return (this as any).leaves.get(id)?.source;
+  getLeafSource(id: string): unknown {
+    return leafManagerInternals(this).leaves.get(id)?.source;
   }
 
   getInternalLeafCount(): number {
-    return (this as any).leaves.size;
+    return leafManagerInternals(this).leaves.size;
   }
 
   selectLeavesPublic(
     targetAmounts: number[],
   ): [{ [key: number]: TreeNode[] }, boolean] {
-    return (this as any).selectLeaves(targetAmounts);
+    return leafManagerInternals(this).selectLeaves(targetAmounts);
   }
 
   determineLeavesToSwapPublic(targetAmount: number): TreeNode[] {
-    return (this as any).determineLeavesToSwap(targetAmount);
+    return leafManagerInternals(this).determineLeavesToSwap(targetAmount);
   }
 
   restoreLocalLockedToAvailablePublic(leafIds: string[]): void {
-    (this as any).restoreLocalLockedToAvailable(leafIds);
+    leafManagerInternals(this).restoreLocalLockedToAvailable(leafIds);
   }
 
   isStaleLeafErrorPublic(error: unknown): boolean {
-    return (this as any).isStaleLeafError(error);
+    return leafManagerInternals(this).isStaleLeafError(error);
   }
 }
 
@@ -148,16 +229,12 @@ interface MockTransferService {
   queryPendingOutgoingTransfers?: jest.Mock;
 }
 
-interface MockSwapService {
-  requestLeavesSwap?: jest.Mock;
-}
-
 interface MockConnectionManager {
   createSparkClient?: jest.Mock;
 }
 
 interface MockSwapService {
-  requestLeavesSwap?: jest.Mock;
+  requestLeavesSwap?: RequestLeavesSwapMock;
 }
 
 function createTestableLeafManager(overrides?: {
@@ -176,10 +253,15 @@ function createTestableLeafManager(overrides?: {
     getLog: () => false,
   };
   return new TestableLeafManager(
-    { ...defaultConfig, ...overrides?.config } as any,
-    (overrides?.swapService ?? {}) as any,
-    (overrides?.transferService ?? {}) as any,
-    (overrides?.connectionManager ?? {}) as any,
+    {
+      ...defaultConfig,
+      ...overrides?.config,
+    } as unknown as LeafManagerConstructorArgs[0],
+    (overrides?.swapService ?? {}) as unknown as LeafManagerConstructorArgs[1],
+    (overrides?.transferService ??
+      {}) as unknown as LeafManagerConstructorArgs[2],
+    (overrides?.connectionManager ??
+      {}) as unknown as LeafManagerConstructorArgs[3],
     overrides?.onBalanceUpdate,
     overrides?.onAutoOptimize,
   );
@@ -413,7 +495,7 @@ describe("LeafManager", () => {
     it("getOwnedBalance includes available + outgoing + locked + swap pending", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([
         createMockTreeNode({ id: "avail", value: 100 }),
@@ -439,7 +521,7 @@ describe("LeafManager", () => {
     it("getOwnedBalance excludes SPENT leaves", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf", value: 500 })]);
 
@@ -458,7 +540,7 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager();
 
       await lm.addLeaves([createMockTreeNode({ id: "swap-leaf", value: 500 })]);
-      (lm as any).leaves.get("swap-leaf")!.status = "SWAP_PENDING";
+      leafManagerInternals(lm).leaves.get("swap-leaf")!.status = "SWAP_PENDING";
 
       expect(lm.getAvailableBalance()).toBe(0);
       expect(lm.getOwnedBalance()).toBe(500);
@@ -589,7 +671,7 @@ describe("LeafManager", () => {
 
     function createLeafManagerWithIdentity() {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
       return lm;
     }
 
@@ -849,7 +931,9 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([0], async () => {}),
+        lm.selectLeavesAndExecute([0], async () => {
+          await Promise.resolve();
+        }),
       ).rejects.toThrow("Target amount must be positive");
     });
 
@@ -858,7 +942,9 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([-100], async () => {}),
+        lm.selectLeavesAndExecute([-100], async () => {
+          await Promise.resolve();
+        }),
       ).rejects.toThrow("Target amount must be positive");
     });
 
@@ -867,7 +953,9 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 100 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([500], async () => {}),
+        lm.selectLeavesAndExecute([500], async () => {
+          await Promise.resolve();
+        }),
       ).rejects.toThrow("Total target amount exceeds available balance");
     });
 
@@ -882,6 +970,7 @@ describe("LeafManager", () => {
       const result = await lm.selectLeavesAndExecute(
         [500],
         async (selected) => {
+          await Promise.resolve();
           const total = selected[0].reduce((sum, l) => sum + l.value, 0);
           expect(total).toBe(500);
           return "done";
@@ -896,6 +985,7 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 100 })]);
 
       const result = await lm.selectLeavesAndExecute([100], async () => {
+        await Promise.resolve();
         return { txId: "abc123" };
       });
 
@@ -912,7 +1002,7 @@ describe("LeafManager", () => {
 
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             // Simulate what the real swap service does: call onSwapInitiated after sendSwapTransfer
             await args.onSwapInitiated?.();
 
@@ -930,6 +1020,7 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "big-leaf", value: 500 })]);
 
       await lm.selectLeavesAndExecute([300], async (selected) => {
+        await Promise.resolve();
         return selected;
       });
 
@@ -941,7 +1032,7 @@ describe("LeafManager", () => {
 
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             await args.onSwapInitiated?.();
             balanceDuringSwap = {
               available: lm.getAvailableBalance(),
@@ -956,7 +1047,10 @@ describe("LeafManager", () => {
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
-      await lm.selectLeavesAndExecute([300], async () => "ok");
+      await lm.selectLeavesAndExecute([300], async () => {
+        await Promise.resolve();
+        return "ok";
+      });
 
       // After onSwapInitiated, leaves are SWAP_PENDING: available=0 but owned=500
       expect(balanceDuringSwap).toBeDefined();
@@ -967,7 +1061,7 @@ describe("LeafManager", () => {
     it("old leaves become SPENT after swap (deleted from cache), new leaves are AVAILABLE", async () => {
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             await args.onSwapInitiated?.();
             return args.targetAmounts.map((amount: number, i: number) =>
               createMockTreeNode({ id: `swapped-${i}`, value: amount }),
@@ -978,7 +1072,10 @@ describe("LeafManager", () => {
 
       await lm.addLeaves([createMockTreeNode({ id: "original", value: 500 })]);
 
-      await lm.selectLeavesAndExecute([300], async () => "ok");
+      await lm.selectLeavesAndExecute([300], async () => {
+        await Promise.resolve();
+        return "ok";
+      });
 
       // SPENT deletes the leaf from cache
       expect(lm.getLeafRecord("original")).toBeUndefined();
@@ -1010,7 +1107,7 @@ describe("LeafManager", () => {
 
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             await args.onSwapInitiated?.();
             snapshot(lm, "during-swap");
             return args.targetAmounts.map((amount: number, i: number) =>
@@ -1019,7 +1116,7 @@ describe("LeafManager", () => {
           }),
         },
       });
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       // 1. Deposit: user receives 10000 sats
       await lm.handleDepositEvent(
@@ -1073,7 +1170,7 @@ describe("LeafManager", () => {
 
     it("AVAILABLE → OUTGOING → SPENT full transfer lifecycle", async () => {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       const leaf = createMockTreeNode({ id: "leaf-1", value: 100 });
       await lm.addLeaves([leaf]);
@@ -1105,7 +1202,7 @@ describe("LeafManager", () => {
 
     it("AVAILABLE → OUTGOING → AVAILABLE (returned)", async () => {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       const leaf = createMockTreeNode({ id: "leaf-1", value: 100 });
       await lm.addLeaves([leaf]);
@@ -1131,7 +1228,7 @@ describe("LeafManager", () => {
 
     it("LOCAL_LOCKED → OUTGOING → SPENT: pending outgoing flow (lightning send)", async () => {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
@@ -1179,7 +1276,7 @@ describe("LeafManager", () => {
 
     it("LOCAL_LOCKED → OUTGOING → AVAILABLE: pending outgoing returned (lightning send failed)", async () => {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
@@ -1221,7 +1318,7 @@ describe("LeafManager", () => {
 
     it("pending outgoing: local state is correct, sync produces same result", async () => {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 300 })]);
 
@@ -1251,33 +1348,52 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () => identityKey),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return identityKey;
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [
-              createMockTransfer({
-                id: "lightning-transfer",
-                type: TransferType.PREIMAGE_SWAP,
-                status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
-                leaves: [createMockTransferLeaf(pendingLeaf)],
-              }),
-            ],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [
+                createMockTransfer({
+                  id: "lightning-transfer",
+                  type: TransferType.PREIMAGE_SWAP,
+                  status:
+                    TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
+                  leaves: [createMockTransferLeaf(pendingLeaf)],
+                }),
+              ],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
-      lm2.setGetLeavesOverride(async () => []);
+      lm2.setGetLeavesOverride(async () => {
+        await Promise.resolve();
+        return [];
+      });
 
       await lm2.sync();
 
@@ -1289,7 +1405,7 @@ describe("LeafManager", () => {
 
     it("deposit → send partial → receive change: balances stay consistent", async () => {
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       // 1. User gets a 1000 sat deposit
       await lm.handleDepositEvent(
@@ -1357,12 +1473,16 @@ describe("LeafManager", () => {
       };
 
       const queryNodesStub = jest.fn(async ({ offset }: { offset: number }) => {
+        await Promise.resolve();
         return paginatedResponses[offset] ?? { nodes: {}, offset };
       });
 
-      createSparkClientMock = jest.fn(async () => ({
-        query_nodes: queryNodesStub,
-      }));
+      createSparkClientMock = jest.fn(async () => {
+        await Promise.resolve();
+        return {
+          query_nodes: queryNodesStub,
+        };
+      });
 
       leafManager = createTestableLeafManager({
         config: { getCoordinatorAddress: () => "mock-address" },
@@ -1553,14 +1673,26 @@ describe("LeafManager", () => {
       const mockTransfer = { id: "transfer-1" };
       const mockPendingTransfer = { id: "transfer-1", status: "PENDING" };
 
-      const sendMock = jest.fn(async () => mockTransfer);
-      const queryMock = jest.fn(async () => mockPendingTransfer);
-      const claimMock = jest.fn(async () => [recoveredNode]);
+      const sendMock = jest.fn(async () => {
+        await Promise.resolve();
+        return mockTransfer;
+      });
+      const queryMock = jest.fn(async () => {
+        await Promise.resolve();
+        return mockPendingTransfer;
+      });
+      const claimMock = jest.fn(async () => {
+        await Promise.resolve();
+        return [recoveredNode];
+      });
 
       const lm = createTestableLeafManager({
         config: {
           signer: {
-            getIdentityPublicKey: jest.fn(async () => fakeIdentityPubkey),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return fakeIdentityPubkey;
+            }),
           },
         },
         transferService: {
@@ -1596,12 +1728,21 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: {
           signer: {
-            getIdentityPublicKey: jest.fn(async () => fakeIdentityPubkey),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return fakeIdentityPubkey;
+            }),
           },
         },
         transferService: {
-          sendTransferWithKeyTweaks: jest.fn(async () => ({ id: "t-1" })),
-          queryTransfer: jest.fn(async () => null),
+          sendTransferWithKeyTweaks: jest.fn(async () => {
+            await Promise.resolve();
+            return { id: "t-1" };
+          }),
+          queryTransfer: jest.fn(async () => {
+            await Promise.resolve();
+            return null;
+          }),
           claimTransfer: jest.fn(),
         },
       });
@@ -1675,23 +1816,38 @@ describe("LeafManager", () => {
       const parentNode1 = createMockTreeNode({ id: "parent-1" });
       const parentNode2 = createMockTreeNode({ id: "parent-2" });
 
-      const queryNodesStub = jest.fn(async () => ({
-        nodes: {
-          n1: nodeRenewNode,
-          n2: nodeRenewRefund,
-          n3: nodeRenewZero,
-          "parent-1": parentNode1,
-          "parent-2": parentNode2,
-        },
-        offset: 0,
-      }));
-      const createSparkClientMock = jest.fn(async () => ({
-        query_nodes: queryNodesStub,
-      }));
+      const queryNodesStub = jest.fn(async () => {
+        await Promise.resolve();
+        return {
+          nodes: {
+            n1: nodeRenewNode,
+            n2: nodeRenewRefund,
+            n3: nodeRenewZero,
+            "parent-1": parentNode1,
+            "parent-2": parentNode2,
+          },
+          offset: 0,
+        };
+      });
+      const createSparkClientMock = jest.fn(async () => {
+        await Promise.resolve();
+        return {
+          query_nodes: queryNodesStub,
+        };
+      });
 
-      const renewNodeTxnMock = jest.fn(async () => renewedNode);
-      const renewRefundTxnMock = jest.fn(async () => renewedRefund);
-      const renewZeroTimelockNodeTxnMock = jest.fn(async () => renewedZero);
+      const renewNodeTxnMock = jest.fn(async () => {
+        await Promise.resolve();
+        return renewedNode;
+      });
+      const renewRefundTxnMock = jest.fn(async () => {
+        await Promise.resolve();
+        return renewedRefund;
+      });
+      const renewZeroTimelockNodeTxnMock = jest.fn(async () => {
+        await Promise.resolve();
+        return renewedZero;
+      });
 
       const leafManager = createTestableLeafManager({
         config: {
@@ -1757,15 +1913,18 @@ describe("LeafManager", () => {
       const parentFail = createMockTreeNode({ id: "parent-fail" });
       const parentOk = createMockTreeNode({ id: "parent-ok" });
 
-      const queryNodesStub = jest.fn(async () => ({
-        nodes: {
-          fail: failNode,
-          ok: okNode,
-          "parent-fail": parentFail,
-          "parent-ok": parentOk,
-        },
-        offset: 0,
-      }));
+      const queryNodesStub = jest.fn(async () => {
+        await Promise.resolve();
+        return {
+          nodes: {
+            fail: failNode,
+            ok: okNode,
+            "parent-fail": parentFail,
+            "parent-ok": parentOk,
+          },
+          offset: 0,
+        };
+      });
 
       const leafManager = createTestableLeafManager({
         config: {
@@ -1773,15 +1932,22 @@ describe("LeafManager", () => {
           getNetworkProto: () => 0,
         },
         connectionManager: {
-          createSparkClient: jest.fn(async () => ({
-            query_nodes: queryNodesStub,
-          })),
+          createSparkClient: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              query_nodes: queryNodesStub,
+            };
+          }),
         },
         transferService: {
           renewNodeTxn: jest.fn(async () => {
+            await Promise.resolve();
             throw new Error("network failure");
           }),
-          renewRefundTxn: jest.fn(async () => renewedRefund),
+          renewRefundTxn: jest.fn(async () => {
+            await Promise.resolve();
+            return renewedRefund;
+          }),
           renewZeroTimelockNodeTxn: jest.fn(),
         },
       });
@@ -1818,7 +1984,7 @@ describe("LeafManager", () => {
     it("handleTransferEvent with empty leaves array is a no-op", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 100 })]);
 
@@ -1838,7 +2004,7 @@ describe("LeafManager", () => {
 
       // handleTransferEvent on a leaf not in the cache
       const identityKey = new Uint8Array(33).fill(0x02);
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.handleTransferEvent(
         createMockTransfer({
@@ -1857,7 +2023,7 @@ describe("LeafManager", () => {
     it("getAvailableLeaves returns only AVAILABLE leaves", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([
         createMockTreeNode({ id: "avail-1", value: 100 }),
@@ -1875,7 +2041,7 @@ describe("LeafManager", () => {
         }),
       );
 
-      const available = (lm as any).getAvailableLeaves() as any[];
+      const available = leafManagerInternals(lm).getAvailableLeaves();
       expect(available).toHaveLength(2);
       expect(available.map((l) => l.id).sort()).toEqual(["avail-1", "avail-2"]);
     });
@@ -1909,8 +2075,8 @@ describe("LeafManager", () => {
 
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
-            const ids = args.leaves.map((l: any) => l.id);
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
+            const ids = args.leaves.map((l: TreeNode) => l.id);
             swapCallLeafIds.push(ids);
             await args.onSwapInitiated?.();
             // Return new leaves matching target amounts
@@ -1936,9 +2102,11 @@ describe("LeafManager", () => {
       // Call 2 wants 150 (no single leaf is exactly 150)
       const [result1, result2] = await Promise.all([
         lm.selectLeavesAndExecute([400], async (selected) => {
+          await Promise.resolve();
           return selected[0].map((l) => l.id);
         }),
         lm.selectLeavesAndExecute([150], async (selected) => {
+          await Promise.resolve();
           return selected[0].map((l) => l.id);
         }),
       ]);
@@ -1965,6 +2133,7 @@ describe("LeafManager", () => {
 
       await expect(
         lm.executeWithAllLeaves(async () => {
+          await Promise.resolve();
           throw new Error("executor failed");
         }),
       ).rejects.toThrow("executor failed");
@@ -1978,7 +2147,7 @@ describe("LeafManager", () => {
     it("executor advances leaf state to SPENT via handleTransferEvent", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
@@ -2009,7 +2178,7 @@ describe("LeafManager", () => {
       // but a deposit event comes in saying it's AVAILABLE on the SO.
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
       // Manually lock it
-      (lm as any).leaves.get("leaf-1")!.status = "LOCAL_LOCKED";
+      leafManagerInternals(lm).leaves.get("leaf-1")!.status = "LOCAL_LOCKED";
       expect(lm.getLeafStatus("leaf-1")).toBe("LOCAL_LOCKED");
 
       // Deposit event says it's available — should NOT overwrite LOCAL_LOCKED
@@ -2028,6 +2197,7 @@ describe("LeafManager", () => {
       // Exact match: 500 = 500, no swap needed
       await expect(
         lm.selectLeavesAndExecute([500], async () => {
+          await Promise.resolve();
           throw new Error("transfer failed");
         }),
       ).rejects.toThrow("transfer failed");
@@ -2040,7 +2210,7 @@ describe("LeafManager", () => {
     it("selectLeavesAndExecute does NOT restore leaves that changed status during executor", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
@@ -2071,34 +2241,50 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
       // getLeaves override: SO reports this leaf as AVAILABLE
-      lm.setGetLeavesOverride(async () => [leaf]);
+      lm.setGetLeavesOverride(async () => {
+        await Promise.resolve();
+        return [leaf];
+      });
 
       // Add the leaf and manually set it to LOCAL_LOCKED (simulating in-progress optimization)
       await lm.addLeaves([leaf]);
-      (lm as any).leaves.get(leaf.id)!.status = "LOCAL_LOCKED";
+      leafManagerInternals(lm).leaves.get(leaf.id)!.status = "LOCAL_LOCKED";
 
       // sync queries the SO which still reports the leaf as AVAILABLE,
       // but the preserved LOCAL_LOCKED state should win
@@ -2121,32 +2307,48 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
-      lm.setGetLeavesOverride(async () => []);
+      lm.setGetLeavesOverride(async () => {
+        await Promise.resolve();
+        return [];
+      });
 
       await lm.addLeaves([swapLeaf]);
-      (lm as any).leaves.get(swapLeaf.id)!.status = "SWAP_PENDING";
+      leafManagerInternals(lm).leaves.get(swapLeaf.id)!.status = "SWAP_PENDING";
 
       await lm.sync();
 
@@ -2174,50 +2376,70 @@ describe("LeafManager", () => {
           getSigningOperators: () => ({ "coord-1": { address: "mock" } }),
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
-            getPublicKeyFromDerivation: jest.fn(async () =>
-              new Uint8Array(33).fill(0),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
+            getPublicKeyFromDerivation: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0);
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({
-            transfers: [
-              // Counter-swap: should NOT count as incoming
-              createMockTransfer({
-                id: "counter-swap-transfer",
-                type: TransferType.COUNTER_SWAP_V3,
-                status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-                leaves: [createMockTransferLeaf(counterSwapLeaf)],
-              }),
-              // Real incoming transfer: should count as incoming
-              createMockTransfer({
-                id: "real-transfer",
-                type: TransferType.TRANSFER,
-                status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-                leaves: [createMockTransferLeaf(realIncomingLeaf)],
-              }),
-            ],
-          })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [
+                // Counter-swap: should NOT count as incoming
+                createMockTransfer({
+                  id: "counter-swap-transfer",
+                  type: TransferType.COUNTER_SWAP_V3,
+                  status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+                  leaves: [createMockTransferLeaf(counterSwapLeaf)],
+                }),
+                // Real incoming transfer: should count as incoming
+                createMockTransfer({
+                  id: "real-transfer",
+                  type: TransferType.TRANSFER,
+                  status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+                  leaves: [createMockTransferLeaf(realIncomingLeaf)],
+                }),
+              ],
+            };
+          }),
         },
         connectionManager: {
-          createSparkClient: jest.fn(async () => ({
-            query_nodes: jest.fn(async () => ({ nodes: {}, offset: 0 })),
-          })),
+          createSparkClient: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              query_nodes: jest.fn(async () => {
+                await Promise.resolve();
+                return { nodes: {}, offset: 0 };
+              }),
+            };
+          }),
         },
       });
 
@@ -2246,51 +2468,71 @@ describe("LeafManager", () => {
           getSigningOperators: () => ({ "coord-1": { address: "mock" } }),
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
-            getPublicKeyFromDerivation: jest.fn(async () =>
-              new Uint8Array(33).fill(0),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
+            getPublicKeyFromDerivation: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0);
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [
-              // Our outbound swap — leaf is in SWAP_PENDING
-              createMockTransfer({
-                id: "swap-out",
-                type: TransferType.PRIMARY_SWAP_V3,
-                status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
-                leaves: [createMockTransferLeaf(originalLeaf)],
-              }),
-            ],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({
-            transfers: [
-              // Counter-swap from SSP — should be excluded from incoming
-              createMockTransfer({
-                id: "swap-in",
-                type: TransferType.COUNTER_SWAP_V3,
-                status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-                leaves: [createMockTransferLeaf(counterSwapLeaf)],
-              }),
-            ],
-          })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [
+                // Our outbound swap — leaf is in SWAP_PENDING
+                createMockTransfer({
+                  id: "swap-out",
+                  type: TransferType.PRIMARY_SWAP_V3,
+                  status: TransferStatus.TRANSFER_STATUS_SENDER_INITIATED,
+                  leaves: [createMockTransferLeaf(originalLeaf)],
+                }),
+              ],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [
+                // Counter-swap from SSP — should be excluded from incoming
+                createMockTransfer({
+                  id: "swap-in",
+                  type: TransferType.COUNTER_SWAP_V3,
+                  status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+                  leaves: [createMockTransferLeaf(counterSwapLeaf)],
+                }),
+              ],
+            };
+          }),
         },
         connectionManager: {
-          createSparkClient: jest.fn(async () => ({
-            query_nodes: jest.fn(async () => ({ nodes: {}, offset: 0 })),
-          })),
+          createSparkClient: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              query_nodes: jest.fn(async () => {
+                await Promise.resolve();
+                return { nodes: {}, offset: 0 };
+              }),
+            };
+          }),
         },
       });
 
@@ -2314,28 +2556,41 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             swapCallCount++;
             if (swapCallCount === 1) {
               // First attempt: SO rejects — leaf was swapped by another instance
@@ -2355,6 +2610,7 @@ describe("LeafManager", () => {
       // getLeaves override: sync discovers fresh leaves from the other instance's swap
       let syncGetLeavesCallCount = 0;
       lm.setGetLeavesOverride(async () => {
+        await Promise.resolve();
         syncGetLeavesCallCount++;
         // Sync always returns fresh leaves (the stale leaf is gone on the SO)
         return [freshLeaf];
@@ -2366,6 +2622,7 @@ describe("LeafManager", () => {
       ]);
 
       await lm.selectLeavesAndExecute([300], async (selected) => {
+        await Promise.resolve();
         executorCallCount++;
         return selected[0].map((l) => l.id);
       });
@@ -2387,6 +2644,7 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         swapService: {
           requestLeavesSwap: jest.fn(async () => {
+            await Promise.resolve();
             throw new Error("SSP unavailable");
           }),
         },
@@ -2396,7 +2654,10 @@ describe("LeafManager", () => {
 
       // Requesting 300 from a 500 leaf triggers a swap (no exact match)
       await expect(
-        lm.selectLeavesAndExecute([300], async () => "nope"),
+        lm.selectLeavesAndExecute([300], async () => {
+          await Promise.resolve();
+          return "nope";
+        }),
       ).rejects.toThrow("SSP unavailable");
 
       // The leaf should be restored to AVAILABLE, not stuck as LOCAL_LOCKED
@@ -2407,7 +2668,7 @@ describe("LeafManager", () => {
     it("selectLeavesWithSwap does NOT restore SWAP_PENDING leaves when swap fails after onSwapInitiated", async () => {
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             // onSwapInitiated fires (leaf transitions to SWAP_PENDING — SO has it locked)
             await args.onSwapInitiated?.();
             // Then something fails later in the swap
@@ -2419,7 +2680,10 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([300], async () => "nope"),
+        lm.selectLeavesAndExecute([300], async () => {
+          await Promise.resolve();
+          return "nope";
+        }),
       ).rejects.toThrow("SSP swap processing failed");
 
       // Leaf is SWAP_PENDING — the SO has it locked, so we must NOT restore to
@@ -2436,7 +2700,7 @@ describe("LeafManager", () => {
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
         },
         swapService: {
-          requestLeavesSwap: jest.fn(async (args: any) => {
+          requestLeavesSwap: jest.fn(async (args: RequestLeavesSwapParams) => {
             swapCallCount++;
             await args.onSwapInitiated?.();
             if (swapCallCount === 1) {
@@ -2460,7 +2724,8 @@ describe("LeafManager", () => {
 
       // Run optimizeLeaves — even if it throws, remaining leaves should be restored
       try {
-        for await (const _ of lm.optimizeLeaves()) {
+        for await (const step of lm.optimizeLeaves()) {
+          void step;
           // consume all steps
         }
       } catch {
@@ -2468,7 +2733,7 @@ describe("LeafManager", () => {
       }
 
       // No leaves should be stuck as LOCAL_LOCKED or SWAP_PENDING
-      for (const [, record] of (lm as any).leaves as Map<string, any>) {
+      for (const [, record] of leafManagerInternals(lm).leaves) {
         expect(record.status).not.toBe("LOCAL_LOCKED");
         expect(record.status).not.toBe("SWAP_PENDING");
       }
@@ -2487,6 +2752,7 @@ describe("LeafManager", () => {
         },
         swapService: {
           requestLeavesSwap: jest.fn(async () => {
+            await Promise.resolve();
             // Simulates: another instance already locked this leaf for a swap
             throw new Error(
               "leaf is not available to transfer, status: TRANSFER_LOCKED",
@@ -2509,7 +2775,7 @@ describe("LeafManager", () => {
     it("wallet A balance updates when wallet B sends a transfer (via senderTransfer stream event)", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       // Wallet A has two leaves
       await lm.addLeaves([
@@ -2561,7 +2827,7 @@ describe("LeafManager", () => {
     it("wallet A balance updates when wallet B sends a transfer that gets returned", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 500 })]);
 
@@ -2602,7 +2868,7 @@ describe("LeafManager", () => {
     it("handleTransferEvent marks leaf SPENT when another instance completes a swap", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       // Leaf is AVAILABLE in our cache (we claimed it)
       await lm.addLeaves([createMockTreeNode({ id: "leaf-X", value: 128 })]);
@@ -2636,29 +2902,47 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () => identityKey),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return identityKey;
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       // getLeaves returns the replacement leaf from another instance's swap
-      lm.setGetLeavesOverride(async () => [freshLeaf]);
+      lm.setGetLeavesOverride(async () => {
+        await Promise.resolve();
+        return [freshLeaf];
+      });
 
       // Start with stale leaf
       await lm.addLeaves([createMockTreeNode({ id: "leaf-X", value: 128 })]);
@@ -2697,28 +2981,44 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () => identityKey),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return identityKey;
+            }),
           },
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
       // After sync, getLeaves returns fresh leaf
       lm.setGetLeavesOverride(async () => {
+        await Promise.resolve();
         getLeavesCallCount++;
         return [freshLeaf];
       });
@@ -2731,6 +3031,7 @@ describe("LeafManager", () => {
       const result = await lm.selectLeavesAndExecute(
         [500],
         async (selected) => {
+          await Promise.resolve();
           executorCallCount++;
           if (executorCallCount === 1) {
             // First attempt: SO rejects the stale leaf
@@ -2764,34 +3065,53 @@ describe("LeafManager", () => {
           getCoordinatorAddress: () => "mock",
           getOptimizationOptions: () => ({ auto: true, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () => identityKey),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return identityKey;
+            }),
           },
         },
         swapService: {
           requestLeavesSwap: jest.fn(async () => {
+            await Promise.resolve();
             swapCallCount++;
             return [];
           }),
         },
         transferService: {
-          queryPrimarySwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryCounterSwapTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: -1,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: -1,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
       // getLeaves returns already-optimized leaves from another instance's swap
-      lm.setGetLeavesOverride(async () => optimizedLeaves);
+      lm.setGetLeavesOverride(async () => {
+        await Promise.resolve();
+        return optimizedLeaves;
+      });
 
       // Sync discovers optimized leaves → autoOptimizeIfNeeded runs
       await lm.sync();
@@ -2845,7 +3165,7 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         onBalanceUpdate: (b) => updates.push(b),
       });
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([createMockTreeNode({ id: "leaf-1", value: 200 })]);
       const countAfterAdd = updates.length;
@@ -2884,8 +3204,9 @@ describe("LeafManager", () => {
     });
 
     it("isStaleLeafError detects 'not available to transfer' from SO", async () => {
+      await Promise.resolve();
       const lm = createTestableLeafManager();
-      const check = (lm as any).isStaleLeafError.bind(lm);
+      const check = leafManagerInternals(lm).isStaleLeafError.bind(lm);
 
       expect(
         check(
@@ -2904,8 +3225,9 @@ describe("LeafManager", () => {
     });
 
     it("isStaleLeafError detects 'not owned by' from SO", async () => {
+      await Promise.resolve();
       const lm = createTestableLeafManager();
-      const check = (lm as any).isStaleLeafError.bind(lm);
+      const check = leafManagerInternals(lm).isStaleLeafError.bind(lm);
 
       expect(
         check(
@@ -2917,8 +3239,9 @@ describe("LeafManager", () => {
     });
 
     it("isStaleLeafError does NOT match unrelated errors", async () => {
+      await Promise.resolve();
       const lm = createTestableLeafManager();
-      const check = (lm as any).isStaleLeafError.bind(lm);
+      const check = leafManagerInternals(lm).isStaleLeafError.bind(lm);
 
       // Generic service errors should NOT trigger stale-leaf retry
       expect(check(new Error("SSP service is unavailable"))).toBe(false);
@@ -2935,7 +3258,7 @@ describe("LeafManager", () => {
     it("two concurrent selectLeavesAndExecute calls select different leaves", async () => {
       const identityKey = new Uint8Array(33).fill(0x02);
       const lm = createTestableLeafManager();
-      (lm as any).identityPublicKey = identityKey;
+      leafManagerInternals(lm).identityPublicKey = identityKey;
 
       await lm.addLeaves([
         createMockTreeNode({ id: "leaf-100", value: 100 }),
@@ -2992,31 +3315,46 @@ describe("LeafManager", () => {
           getSigningOperators: () => ({ "coord-1": { address: "mock" } }),
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
           },
         },
         transferService: {
           queryPrimarySwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
             swapQueryCount++;
             // Return empty results with non-negative offset (would cause infinite loop without fix)
             return { transfers: [], offset: 0 };
           }),
           queryCounterSwapTransfers: jest.fn(async () => {
+            await Promise.resolve();
             swapQueryCount++;
             return { transfers: [], offset: 0 };
           }),
-          queryPendingOutgoingTransfers: jest.fn(async () => ({
-            transfers: [],
-            offset: 0,
-          })),
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingOutgoingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [],
+              offset: 0,
+            };
+          }),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
         connectionManager: {
-          createSparkClient: jest.fn(async () => ({
-            query_nodes: jest.fn(async () => ({ nodes: {} })),
-          })),
+          createSparkClient: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              query_nodes: jest.fn(async () => {
+                await Promise.resolve();
+                return { nodes: {} };
+              }),
+            };
+          }),
         },
       });
 
@@ -3370,7 +3708,10 @@ describe("LeafManager", () => {
 
   describe("sync", () => {
     const SYNC_SIGNER = {
-      getIdentityPublicKey: jest.fn(async () => new Uint8Array(33).fill(0x02)),
+      getIdentityPublicKey: jest.fn(async () => {
+        await Promise.resolve();
+        return new Uint8Array(33).fill(0x02);
+      }),
     };
 
     function mockSyncDeps(
@@ -3387,21 +3728,38 @@ describe("LeafManager", () => {
       },
     ) {
       // sync() calls autoOptimizeIfNeeded which needs getOptimizationOptions
-      (lm as any).config.getOptimizationOptions ??= () => ({
+      leafManagerInternals(lm).config.getOptimizationOptions ??= () => ({
         auto: false,
         multiplicity: 0,
       });
-      (lm as any).getLeaves = jest.fn(async () => opts.leaves ?? []);
-      (lm as any).getAllPendingSwaps = jest.fn(async () => opts.swaps ?? []);
-      (lm as any).getAllPendingOutgoingTransfers = jest.fn(
-        async () => opts.outgoing ?? [],
+      leafManagerInternals(lm).getLeaves = jest.fn(async () => {
+        await Promise.resolve();
+        return opts.leaves ?? [];
+      });
+      leafManagerInternals(lm).getAllPendingSwaps = jest.fn(async () => {
+        await Promise.resolve();
+        return opts.swaps ?? [];
+      });
+      leafManagerInternals(lm).getAllPendingOutgoingTransfers = jest.fn(
+        async () => {
+          await Promise.resolve();
+          return opts.outgoing ?? [];
+        },
       );
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
-      (lm as any).transferService.queryPendingTransfers = jest.fn(async () => ({
-        transfers: opts.incomingTransfers ?? [],
-      }));
+      leafManagerInternals(lm).transferService.queryPendingTransfers = jest.fn(
+        async () => {
+          await Promise.resolve();
+          return {
+            transfers: opts.incomingTransfers ?? [],
+          };
+        },
+      );
     }
 
     it("populates cache from server data", async () => {
@@ -3422,15 +3780,18 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: { signer: SYNC_SIGNER },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({
-            transfers: [
-              {
-                id: "incoming-t1",
-                type: 0, // not a counter-swap
-                leaves: [{ leaf: incomingLeaf }],
-              },
-            ],
-          })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [
+                {
+                  id: "incoming-t1",
+                  type: 0, // not a counter-swap
+                  leaves: [{ leaf: incomingLeaf }],
+                },
+              ],
+            };
+          }),
         },
       });
 
@@ -3461,7 +3822,10 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: { signer: SYNC_SIGNER },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
@@ -3488,7 +3852,10 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: { signer: SYNC_SIGNER },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
@@ -3519,25 +3886,28 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: { signer: SYNC_SIGNER },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({
-            transfers: [
-              {
-                id: "t-counter",
-                type: TransferType.COUNTER_SWAP,
-                leaves: [{ leaf: counterSwapLeaf }],
-              },
-              {
-                id: "t-counter-v3",
-                type: TransferType.COUNTER_SWAP_V3,
-                leaves: [{ leaf: counterSwapV3Leaf }],
-              },
-              {
-                id: "t-regular",
-                type: 0, // not a counter-swap
-                leaves: [{ leaf: regularLeaf }],
-              },
-            ],
-          })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return {
+              transfers: [
+                {
+                  id: "t-counter",
+                  type: TransferType.COUNTER_SWAP,
+                  leaves: [{ leaf: counterSwapLeaf }],
+                },
+                {
+                  id: "t-counter-v3",
+                  type: TransferType.COUNTER_SWAP_V3,
+                  leaves: [{ leaf: counterSwapV3Leaf }],
+                },
+                {
+                  id: "t-regular",
+                  type: 0, // not a counter-swap
+                  leaves: [{ leaf: regularLeaf }],
+                },
+              ],
+            };
+          }),
         },
       });
 
@@ -3573,7 +3943,10 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: { signer: SYNC_SIGNER },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
@@ -3602,7 +3975,10 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         config: { signer: SYNC_SIGNER },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
         onBalanceUpdate: callback,
       });
@@ -3689,8 +4065,11 @@ describe("LeafManager", () => {
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
         },
       });
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
@@ -3711,8 +4090,11 @@ describe("LeafManager", () => {
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
         },
       });
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       await lm.addIncomingLeaves(
@@ -3739,8 +4121,11 @@ describe("LeafManager", () => {
         },
         onBalanceUpdate: callback,
       });
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       await lm.registerClaimedLeaves([
@@ -3915,6 +4300,7 @@ describe("LeafManager", () => {
     });
 
     it("returns empty cache selection", async () => {
+      await Promise.resolve();
       const lm = createTestableLeafManager();
 
       const [results, found] = lm.selectLeavesPublic([100]);
@@ -4088,6 +4474,7 @@ describe("LeafManager", () => {
       ]);
 
       const result = await lm.executeWithAllLeaves(async (leaves) => {
+        await Promise.resolve();
         expect(leaves).toHaveLength(2);
         expect(lm.getLeafRecordPublic("a")?.status).toBe("LOCAL_LOCKED");
         expect(lm.getLeafRecordPublic("b")?.status).toBe("LOCAL_LOCKED");
@@ -4106,6 +4493,7 @@ describe("LeafManager", () => {
 
       await expect(
         lm.executeWithAllLeaves(async () => {
+          await Promise.resolve();
           throw new Error("executor failed");
         }),
       ).rejects.toThrow("executor failed");
@@ -4123,6 +4511,7 @@ describe("LeafManager", () => {
 
       await expect(
         lm.executeWithAllLeaves(async () => {
+          await Promise.resolve();
           lm.transitionPublic(["a"], "OUTGOING");
           throw new Error("partial failure");
         }),
@@ -4139,11 +4528,17 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([0], async () => "ok"),
+        lm.selectLeavesAndExecute([0], async () => {
+          await Promise.resolve();
+          return "ok";
+        }),
       ).rejects.toThrow("Target amount must be positive");
 
       await expect(
-        lm.selectLeavesAndExecute([-1], async () => "ok"),
+        lm.selectLeavesAndExecute([-1], async () => {
+          await Promise.resolve();
+          return "ok";
+        }),
       ).rejects.toThrow("Target amount must be positive");
     });
 
@@ -4152,7 +4547,10 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([600], async () => "ok"),
+        lm.selectLeavesAndExecute([600], async () => {
+          await Promise.resolve();
+          return "ok";
+        }),
       ).rejects.toThrow("Total target amount exceeds available balance");
     });
 
@@ -4167,6 +4565,7 @@ describe("LeafManager", () => {
       const result = await lm.selectLeavesAndExecute(
         [500],
         async (selected) => {
+          await Promise.resolve();
           expect(selected[0]).toHaveLength(1);
           expect(selected[0][0]!.id).toBe("c");
           return "executed";
@@ -4182,6 +4581,7 @@ describe("LeafManager", () => {
 
       await expect(
         lm.selectLeavesAndExecute([500], async () => {
+          await Promise.resolve();
           throw new Error("executor failed");
         }),
       ).rejects.toThrow("executor failed");
@@ -4196,28 +4596,47 @@ describe("LeafManager", () => {
         config: {
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () =>
-              new Uint8Array(33).fill(0x02),
-            ),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return new Uint8Array(33).fill(0x02);
+            }),
           },
         },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
         },
       });
 
-      (lm as any).getLeaves = jest.fn(async () => [
-        createMockTreeNode({ id: "fresh", value: 500, status: "AVAILABLE" }),
-      ]);
-      (lm as any).getAllPendingSwaps = jest.fn(async () => []);
-      (lm as any).getAllPendingOutgoingTransfers = jest.fn(async () => []);
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).getLeaves = jest.fn(async () => {
+        await Promise.resolve();
+        return [
+          createMockTreeNode({ id: "fresh", value: 500, status: "AVAILABLE" }),
+        ];
+      });
+      leafManagerInternals(lm).getAllPendingSwaps = jest.fn(async () => {
+        await Promise.resolve();
+        return [];
+      });
+      leafManagerInternals(lm).getAllPendingOutgoingTransfers = jest.fn(
+        async () => {
+          await Promise.resolve();
+          return [];
+        },
+      );
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 500 })]);
 
       const result = await lm.selectLeavesAndExecute([500], async () => {
+        await Promise.resolve();
         attempt++;
         if (attempt === 1) {
           throw new Error("leaf is not available to transfer");
@@ -4235,6 +4654,7 @@ describe("LeafManager", () => {
 
       await expect(
         lm.selectLeavesAndExecute([500], async () => {
+          await Promise.resolve();
           throw new Error("network timeout");
         }),
       ).rejects.toThrow("network timeout");
@@ -4243,13 +4663,15 @@ describe("LeafManager", () => {
     it("triggers swap when exact fit is impossible", async () => {
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (params: any) => {
-            await params.onSwapInitiated?.();
-            return [
-              createMockTreeNode({ id: "new-500", value: 500 }),
-              createMockTreeNode({ id: "new-200", value: 200 }),
-            ];
-          }),
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              return [
+                createMockTreeNode({ id: "new-500", value: 500 }),
+                createMockTreeNode({ id: "new-200", value: 200 }),
+              ];
+            },
+          ),
         },
       });
 
@@ -4258,6 +4680,7 @@ describe("LeafManager", () => {
       const result = await lm.selectLeavesAndExecute(
         [500],
         async (selected) => {
+          await Promise.resolve();
           expect(selected[0]).toHaveLength(1);
           expect(selected[0][0]!.value).toBe(500);
           return "swapped-ok";
@@ -4271,6 +4694,7 @@ describe("LeafManager", () => {
       const lm = createTestableLeafManager({
         swapService: {
           requestLeavesSwap: jest.fn(async () => {
+            await Promise.resolve();
             throw new Error("swap service down");
           }),
         },
@@ -4279,7 +4703,10 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "big", value: 700 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([500], async () => "ok"),
+        lm.selectLeavesAndExecute([500], async () => {
+          await Promise.resolve();
+          return "ok";
+        }),
       ).rejects.toThrow("swap service down");
 
       expect(lm.getLeafRecordPublic("big")?.status).toBe("AVAILABLE");
@@ -4288,17 +4715,22 @@ describe("LeafManager", () => {
     it("does not restore SWAP_PENDING leaves when swap fails after onSwapInitiated", async () => {
       const lm = createTestableLeafManager({
         swapService: {
-          requestLeavesSwap: jest.fn(async (params: any) => {
-            await params.onSwapInitiated?.();
-            throw new Error("swap failed mid-flight");
-          }),
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              throw new Error("swap failed mid-flight");
+            },
+          ),
         },
       });
 
       await lm.addLeaves([createMockTreeNode({ id: "big", value: 700 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([500], async () => "ok"),
+        lm.selectLeavesAndExecute([500], async () => {
+          await Promise.resolve();
+          return "ok";
+        }),
       ).rejects.toThrow("swap failed mid-flight");
 
       expect(lm.getLeafRecordPublic("big")?.status).toBe("SWAP_PENDING");
@@ -4317,6 +4749,7 @@ describe("LeafManager", () => {
       const result = await lm.selectLeavesAndExecute(
         [500, 300],
         async (selected) => {
+          await Promise.resolve();
           const batch0Values = selected[0].map((l: TreeNode) => l.value);
           const batch1Values = selected[1].map((l: TreeNode) => l.value);
           expect(batch0Values.reduce((a: number, b: number) => a + b, 0)).toBe(
@@ -4337,7 +4770,10 @@ describe("LeafManager", () => {
       await lm.addLeaves([createMockTreeNode({ id: "a", value: 1000 })]);
 
       await expect(
-        lm.selectLeavesAndExecute([500, 0], async () => "ok"),
+        lm.selectLeavesAndExecute([500, 0], async () => {
+          await Promise.resolve();
+          return "ok";
+        }),
       ).rejects.toThrow("Target amount must be positive");
     });
   });
@@ -4353,6 +4789,7 @@ describe("LeafManager", () => {
         void
       >,
     ) {
+      await Promise.resolve();
       const steps: { step: number; total: number }[] = [];
       for await (const { step, total } of gen) {
         steps.push({ step, total });
@@ -4406,12 +4843,14 @@ describe("LeafManager", () => {
         createMockTreeNode({ id: `l${i}`, value: 16 }),
       );
 
-      const requestLeavesSwapMock = jest.fn(async (params: any) => {
-        await params.onSwapInitiated?.();
-        return params.targetAmounts.map((v: number, i: number) =>
-          createMockTreeNode({ id: `new-${i}`, value: v }),
-        );
-      });
+      const requestLeavesSwapMock = jest.fn(
+        async (params: RequestLeavesSwapParams) => {
+          await params.onSwapInitiated?.();
+          return params.targetAmounts.map((v: number, i: number) =>
+            createMockTreeNode({ id: `new-${i}`, value: v }),
+          );
+        },
+      );
 
       const lm = createTestableLeafManager({
         config: {
@@ -4445,10 +4884,12 @@ describe("LeafManager", () => {
         createMockTreeNode({ id: `l${i}`, value: 16 }),
       );
 
-      const requestLeavesSwapMock = jest.fn(async (params: any) => {
-        await params.onSwapInitiated?.();
-        return [createMockTreeNode({ id: "new-0", value: 128 })];
-      });
+      const requestLeavesSwapMock = jest.fn(
+        async (params: RequestLeavesSwapParams) => {
+          await params.onSwapInitiated?.();
+          return [createMockTreeNode({ id: "new-0", value: 128 })];
+        },
+      );
 
       const lm = createTestableLeafManager({
         config: {
@@ -4459,15 +4900,17 @@ describe("LeafManager", () => {
       await lm.addLeaves(leaves);
 
       // When requestLeavesSwap is called, all leaves should already be locked
-      requestLeavesSwapMock.mockImplementation(async (params: any) => {
-        // All original leaves should be LOCAL_LOCKED or SWAP_PENDING at this point
-        for (const leaf of leaves) {
-          const record = lm.getLeafRecordPublic(leaf.id);
-          expect(["LOCAL_LOCKED", "SWAP_PENDING"]).toContain(record?.status);
-        }
-        await params.onSwapInitiated?.();
-        return [createMockTreeNode({ id: "new-0", value: 128 })];
-      });
+      requestLeavesSwapMock.mockImplementation(
+        async (params: RequestLeavesSwapParams) => {
+          // All original leaves should be LOCAL_LOCKED or SWAP_PENDING at this point
+          for (const leaf of leaves) {
+            const record = lm.getLeafRecordPublic(leaf.id);
+            expect(["LOCAL_LOCKED", "SWAP_PENDING"]).toContain(record?.status);
+          }
+          await params.onSwapInitiated?.();
+          return [createMockTreeNode({ id: "new-0", value: 128 })];
+        },
+      );
 
       await drainOptimize(lm.optimizeLeaves(0));
     });
@@ -4484,6 +4927,7 @@ describe("LeafManager", () => {
         },
         swapService: {
           requestLeavesSwap: jest.fn(async () => {
+            await Promise.resolve();
             // Fail before onSwapInitiated
             throw new Error("swap down");
           }),
@@ -4511,10 +4955,12 @@ describe("LeafManager", () => {
           getOptimizationOptions: () => ({ multiplicity: 0 }),
         },
         swapService: {
-          requestLeavesSwap: jest.fn(async (params: any) => {
-            await params.onSwapInitiated?.();
-            throw new Error("swap failed after initiation");
-          }),
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              throw new Error("swap failed after initiation");
+            },
+          ),
         },
       });
       await lm.addLeaves(leaves);
@@ -4544,13 +4990,18 @@ describe("LeafManager", () => {
           getOptimizationOptions: () => ({ multiplicity: 0 }),
         },
         swapService: {
-          requestLeavesSwap: jest.fn(async (params: any) => {
-            swapCallCount++;
-            await params.onSwapInitiated?.();
-            return [
-              createMockTreeNode({ id: `result-${swapCallCount}`, value: 128 }),
-            ];
-          }),
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              swapCallCount++;
+              await params.onSwapInitiated?.();
+              return [
+                createMockTreeNode({
+                  id: `result-${swapCallCount}`,
+                  value: 128,
+                }),
+              ];
+            },
+          ),
         },
       });
 
@@ -4588,10 +5039,11 @@ describe("LeafManager", () => {
 
       let resolveSwap: ((v: TreeNode[]) => void) | undefined;
       const requestLeavesSwapMock = jest.fn(
-        (params: any) =>
-          new Promise<TreeNode[]>(async (resolve) => {
-            await params.onSwapInitiated?.();
-            resolveSwap = resolve;
+        (params: RequestLeavesSwapParams) =>
+          new Promise<TreeNode[]>((resolve, reject) => {
+            void Promise.resolve(params.onSwapInitiated?.()).then(() => {
+              resolveSwap = resolve;
+            }, reject);
           }),
       );
 
@@ -4619,7 +5071,8 @@ describe("LeafManager", () => {
     });
 
     it("clears optimizationInProgress flag even on error", async () => {
-      const swapMock: jest.Mock = jest.fn(async () => {
+      const swapMock: RequestLeavesSwapMock = jest.fn(async () => {
+        await Promise.resolve();
         throw new Error("fail");
       });
 
@@ -4637,7 +5090,7 @@ describe("LeafManager", () => {
       await expect(drainOptimize(lm.optimizeLeaves(0))).rejects.toThrow("fail");
 
       // Replace mock with one that succeeds — verify reentrancy guard is cleared
-      swapMock.mockImplementation(async (params: any) => {
+      swapMock.mockImplementation(async (params: RequestLeavesSwapParams) => {
         await params.onSwapInitiated?.();
         return params.targetAmounts.map((v: number, i: number) =>
           createMockTreeNode({ id: `retry-${i}`, value: v }),
@@ -4652,7 +5105,9 @@ describe("LeafManager", () => {
 
   describe("autoOptimizeIfNeeded", () => {
     it("triggers optimization when auto=true and shouldOptimize returns true", async () => {
-      const onAutoOptimizeMock = jest.fn(async () => {});
+      const onAutoOptimizeMock = jest.fn(async () => {
+        await Promise.resolve();
+      });
 
       const lm = createTestableLeafManager({
         config: {
@@ -4664,8 +5119,11 @@ describe("LeafManager", () => {
       });
 
       // checkRenewLeaves is called by registerClaimedLeaves — mock it
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       // 8 x 16 triggers shouldOptimize for multiplicity=0
@@ -4681,7 +5139,9 @@ describe("LeafManager", () => {
     });
 
     it("does not trigger when auto=false", async () => {
-      const onAutoOptimizeMock = jest.fn(async () => {});
+      const onAutoOptimizeMock = jest.fn(async () => {
+        await Promise.resolve();
+      });
 
       const lm = createTestableLeafManager({
         config: {
@@ -4689,8 +5149,11 @@ describe("LeafManager", () => {
         },
         onAutoOptimize: onAutoOptimizeMock,
       });
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       const leaves = Array.from({ length: 8 }, (_, i) =>
@@ -4702,7 +5165,9 @@ describe("LeafManager", () => {
     });
 
     it("does not trigger when leaves are already optimal", async () => {
-      const onAutoOptimizeMock = jest.fn(async () => {});
+      const onAutoOptimizeMock = jest.fn(async () => {
+        await Promise.resolve();
+      });
 
       const lm = createTestableLeafManager({
         config: {
@@ -4710,8 +5175,11 @@ describe("LeafManager", () => {
         },
         onAutoOptimize: onAutoOptimizeMock,
       });
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       // Single power-of-two leaf — shouldOptimize returns false
@@ -4724,6 +5192,7 @@ describe("LeafManager", () => {
 
     it("swallows optimization errors silently", async () => {
       const onAutoOptimizeMock = jest.fn(async () => {
+        await Promise.resolve();
         throw new Error("optimization unavailable");
       });
 
@@ -4733,8 +5202,11 @@ describe("LeafManager", () => {
         },
         onAutoOptimize: onAutoOptimizeMock,
       });
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
 
       const leaves = Array.from({ length: 8 }, (_, i) =>
@@ -4800,22 +5272,42 @@ describe("LeafManager", () => {
         config: {
           getOptimizationOptions: () => ({ auto: false, multiplicity: 0 }),
           signer: {
-            getIdentityPublicKey: jest.fn(async () => IDENTITY_PUBKEY),
+            getIdentityPublicKey: jest.fn(async () => {
+              await Promise.resolve();
+              return IDENTITY_PUBKEY;
+            }),
           },
           ...overrides?.config,
         },
         transferService: {
-          queryPendingTransfers: jest.fn(async () => ({ transfers: [] })),
+          queryPendingTransfers: jest.fn(async () => {
+            await Promise.resolve();
+            return { transfers: [] };
+          }),
           ...overrides?.transferService,
         },
       });
 
       // Call sync to set identityPublicKey
-      (lm as any).getLeaves = jest.fn(async () => []);
-      (lm as any).getAllPendingSwaps = jest.fn(async () => []);
-      (lm as any).getAllPendingOutgoingTransfers = jest.fn(async () => []);
-      (lm as any).checkRenewLeaves = jest.fn(
-        async (nodes: TreeNode[]) => nodes,
+      leafManagerInternals(lm).getLeaves = jest.fn(async () => {
+        await Promise.resolve();
+        return [];
+      });
+      leafManagerInternals(lm).getAllPendingSwaps = jest.fn(async () => {
+        await Promise.resolve();
+        return [];
+      });
+      leafManagerInternals(lm).getAllPendingOutgoingTransfers = jest.fn(
+        async () => {
+          await Promise.resolve();
+          return [];
+        },
+      );
+      leafManagerInternals(lm).checkRenewLeaves = jest.fn(
+        async (nodes: TreeNode[]) => {
+          await Promise.resolve();
+          return nodes;
+        },
       );
       await lm.sync();
 

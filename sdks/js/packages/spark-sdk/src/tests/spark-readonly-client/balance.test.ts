@@ -135,6 +135,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
     ];
 
     const query_nodes = jest.fn<QueryNodes>().mockImplementation(async () => {
+      await Promise.resolve();
       const nextPage = nodePages.shift();
       if (!nextPage) {
         throw new Error("No scripted node page remaining");
@@ -145,6 +146,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
     const query_all_transfers = jest
       .fn<QueryAllTransfers>()
       .mockImplementation(async (filter) => {
+        await Promise.resolve();
         const pages =
           filter.participant?.$case === "senderIdentityPublicKey"
             ? senderPages
@@ -306,6 +308,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
     const query_all_transfers = jest
       .fn<QueryAllTransfers>()
       .mockImplementation(async (filter) => {
+        await Promise.resolve();
         if (filter.participant?.$case === "senderIdentityPublicKey") {
           throw expectedError;
         }
@@ -343,6 +346,7 @@ describe("SparkReadonlyClient.getOwnedBalance", () => {
     const query_all_transfers = jest
       .fn<QueryAllTransfers>()
       .mockImplementation(async (filter) => {
+        await Promise.resolve();
         if (filter.participant?.$case === "senderIdentityPublicKey") {
           return {
             transfers: Array.from({ length: 100 }, () => createTransfer([1])),

@@ -1,4 +1,3 @@
-import { bytesToHex } from "@noble/curves/utils";
 import {
   apply_adaptor_to_signature,
   compute_multi_input_sighash,
@@ -28,6 +27,13 @@ import {
   type ISigningNonce,
 } from "./types.js";
 import { SparkFrostBase } from "./spark-bindings.js";
+
+type WasmVerifiableSecretShareWire = {
+  threshold: number;
+  index: number;
+  share: number[];
+  proofs: number[][];
+};
 
 function createKeyPackage(params: IKeyPackage): KeyPackage {
   return new KeyPackage(
@@ -112,28 +118,18 @@ class SparkFrostNodeJS extends SparkFrostBase {
     threshold: number,
     numShares: number,
   ) {
-    const result = split_secret_with_proofs(secret, threshold, numShares);
+    const result = split_secret_with_proofs(
+      secret,
+      threshold,
+      numShares,
+    ) as WasmVerifiableSecretShareWire[];
     return Promise.resolve(
-      (
-        result as {
-          threshold: number;
-          index: number;
-          share: number[];
-          proofs: number[][];
-        }[]
-      ).map(
-        (s: {
-          threshold: number;
-          index: number;
-          share: number[];
-          proofs: number[][];
-        }) => ({
-          threshold: s.threshold,
-          index: s.index,
-          share: new Uint8Array(s.share),
-          proofs: s.proofs.map((p: number[]) => new Uint8Array(p)),
-        }),
-      ),
+      result.map((s) => ({
+        threshold: s.threshold,
+        index: s.index,
+        share: new Uint8Array(s.share),
+        proofs: s.proofs.map((p: number[]) => new Uint8Array(p)),
+      })),
     );
   }
 

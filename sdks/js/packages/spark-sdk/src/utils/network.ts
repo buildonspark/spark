@@ -63,7 +63,7 @@ export function getNetworkFromAddress(address: string) {
     const decoded = (() => {
       try {
         return bech32.decode(bechAddress);
-      } catch (_) {
+      } catch {
         return bech32m.decode(bechAddress);
       }
     })();

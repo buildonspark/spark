@@ -127,6 +127,22 @@ export interface GetUserRequestsParams {
   networks?: BitcoinNetwork[];
 }
 
+type TransferGraphqlResponse = Record<string, unknown> & {
+  transfer_user_request?:
+    | (Record<string, unknown> & { __typename?: string })
+    | null;
+};
+
+function asTransferResponse(value: unknown): TransferGraphqlResponse {
+  if (typeof value !== "object" || value === null) {
+    throw new SparkRequestError("Invalid transfer response", {
+      field: "transfers",
+      value,
+    });
+  }
+  return value as TransferGraphqlResponse;
+}
+
 export default class SspClient {
   private readonly requester: Requester;
 
@@ -155,11 +171,12 @@ export default class SspClient {
     const schemaEndpoint =
       sspOptions.schemaEndpoint || `graphql/spark/2025-03-19`;
 
-    const authAwareFetch: typeof globalThis.fetch = async (input, init) => {
-      const response = await (fetch as unknown as typeof globalThis.fetch)(
-        input,
-        init,
-      );
+    const authAwareFetch: typeof globalThis.fetch = async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const sparkFetch = fetch as unknown as typeof globalThis.fetch;
+      const response = await sparkFetch(input, init);
       if (response.status === 401) {
         throw new Error("Request unauthorized");
       }
@@ -224,7 +241,7 @@ export default class SspClient {
       variables: {
         total_amount_sats: amountSats,
       },
-      constructObject: (response: { leaves_swap_fee_estimate: any }) => {
+      constructObject: (response: { leaves_swap_fee_estimate: unknown }) => {
         return LeavesSwapFeeEstimateOutputFromJson(
           response.leaves_swap_fee_estimate,
         );
@@ -242,7 +259,7 @@ export default class SspClient {
         encoded_invoice: encodedInvoice,
         amount_sats: amountSats,
       },
-      constructObject: (response: { lightning_send_fee_estimate: any }) => {
+      constructObject: (response: { lightning_send_fee_estimate: unknown }) => {
         return LightningSendFeeEstimateOutputFromJson(
           response.lightning_send_fee_estimate,
         );
@@ -260,7 +277,7 @@ export default class SspClient {
         leaf_external_ids: leafExternalIds,
         withdrawal_address: withdrawalAddress,
       },
-      constructObject: (response: { coop_exit_fee_estimates: any }) => {
+      constructObject: (response: { coop_exit_fee_estimates: unknown }) => {
         return CoopExitFeeEstimatesOutputFromJson(
           response.coop_exit_fee_estimates,
         );
@@ -269,7 +286,7 @@ export default class SspClient {
   }
 
   // TODO: Might not need
-  async getCurrentUser() {
+  getCurrentUser() {
     throw new Error("Not implemented");
   }
 
@@ -281,7 +298,9 @@ export default class SspClient {
       variables: {
         user_outbound_transfer_external_id: userOutboundTransferExternalId,
       },
-      constructObject: (response: { complete_coop_exit: any }) => {
+      constructObject: (response: {
+        complete_coop_exit: { request: unknown };
+      }) => {
         return CoopExitRequestFromJson(response.complete_coop_exit.request);
       },
     });
@@ -307,7 +326,9 @@ export default class SspClient {
         withdraw_all: withdrawAll,
         user_outbound_transfer_external_id: userOutboundTransferExternalId,
       },
-      constructObject: (response: { request_coop_exit: any }) => {
+      constructObject: (response: {
+        request_coop_exit: { request: unknown };
+      }) => {
         return CoopExitRequestFromJson(response.request_coop_exit.request);
       },
     });
@@ -337,7 +358,9 @@ export default class SspClient {
         description_hash: descriptionHash,
         spark_invoice: sparkInvoice,
       },
-      constructObject: (response: { request_lightning_receive: any }) => {
+      constructObject: (response: {
+        request_lightning_receive: { request: unknown };
+      }) => {
         return LightningReceiveRequestFromJson(
           response.request_lightning_receive.request,
         );
@@ -357,7 +380,9 @@ export default class SspClient {
         amount_sats: amountSats,
         user_outbound_transfer_external_id: userOutboundTransferExternalId,
       },
-      constructObject: (response: { request_lightning_send: any }) => {
+      constructObject: (response: {
+        request_lightning_send: { request: unknown };
+      }) => {
         return LightningSendRequestFromJson(
           response.request_lightning_send.request,
         );
@@ -383,7 +408,9 @@ export default class SspClient {
         user_leaves: userLeaves,
         user_outbound_transfer_external_id: userOutboundTransferExternalId,
       },
-      constructObject: (response: { request_swap: any }) => {
+      constructObject: (response: {
+        request_swap: { request: unknown } | null;
+      }) => {
         if (!response.request_swap) {
           return null;
         }
@@ -402,7 +429,7 @@ export default class SspClient {
       variables: {
         request_id: id,
       },
-      constructObject: (response: { user_request: any }) => {
+      constructObject: (response: { user_request: unknown }) => {
         if (!response.user_request) {
           return null;
         }
@@ -420,7 +447,7 @@ export default class SspClient {
       variables: {
         request_id: id,
       },
-      constructObject: (response: { user_request: any }) => {
+      constructObject: (response: { user_request: unknown }) => {
         if (!response.user_request) {
           return null;
         }
@@ -436,7 +463,7 @@ export default class SspClient {
       variables: {
         request_id: id,
       },
-      constructObject: (response: { user_request: any }) => {
+      constructObject: (response: { user_request: unknown }) => {
         if (!response.user_request) {
           return null;
         }
@@ -452,7 +479,7 @@ export default class SspClient {
       variables: {
         request_id: id,
       },
-      constructObject: (response: { user_request: any }) => {
+      constructObject: (response: { user_request: unknown }) => {
         if (!response.user_request) {
           return null;
         }
@@ -474,7 +501,7 @@ export default class SspClient {
         output_index: outputIndex,
         network: network,
       },
-      constructObject: (response: { static_deposit_quote: any }) => {
+      constructObject: (response: { static_deposit_quote: unknown }) => {
         return StaticDepositQuoteOutputFromJson(response.static_deposit_quote);
       },
     });
@@ -509,7 +536,7 @@ export default class SspClient {
         signature: signature,
         quote_signature: sspSignature,
       },
-      constructObject: (response: { claim_static_deposit: any }) => {
+      constructObject: (response: { claim_static_deposit: unknown }) => {
         return ClaimStaticDepositOutputFromJson(response.claim_static_deposit);
       },
     });
@@ -530,7 +557,7 @@ export default class SspClient {
         partner_id: partnerId,
       },
       constructObject: (response: {
-        create_instant_static_deposit_quote: any;
+        create_instant_static_deposit_quote: unknown;
       }) => {
         return InstantStaticDepositQuoteOutputFromJson(
           response.create_instant_static_deposit_quote,
@@ -556,7 +583,7 @@ export default class SspClient {
         signature: signature,
       },
       constructObject: (response: {
-        create_claim_instant_static_deposit: any;
+        create_claim_instant_static_deposit: unknown;
       }) => {
         return InstantStaticDepositClaimOutputFromJson(
           response.create_claim_instant_static_deposit,
@@ -566,49 +593,54 @@ export default class SspClient {
   }
 
   async getTransfers(ids: string[]): Promise<TransferWithUserRequest[]> {
-    return await this.executeRawQuery({
-      queryPayload: GetTransfers,
-      variables: {
-        transfer_spark_ids: ids,
-      },
-      constructObject: (response: { transfers: any }) => {
-        return response.transfers.map((transfer: any) => {
-          const transferObj: TransferWithUserRequest =
-            TransferFromJson(transfer);
+    return (
+      (await this.executeRawQuery({
+        queryPayload: GetTransfers,
+        variables: {
+          transfer_spark_ids: ids,
+        },
+        constructObject: (response: { transfers: unknown[] }) => {
+          return response.transfers.map((transfer) => {
+            const transferRecord = asTransferResponse(transfer);
+            const transferObj: TransferWithUserRequest =
+              TransferFromJson(transferRecord);
+            const userRequest = transferRecord.transfer_user_request;
 
-          switch (transfer.transfer_user_request.__typename) {
-            case "ClaimStaticDeposit":
-              transferObj.userRequest = ClaimStaticDepositFromJson(
-                transfer.transfer_user_request,
-              );
-              break;
-            case "CoopExitRequest":
-              transferObj.userRequest = CoopExitRequestFromJson(
-                transfer.transfer_user_request,
-              );
-              break;
-            case "LeavesSwapRequest":
-              transferObj.userRequest = LeavesSwapRequestFromJson(
-                transfer.transfer_user_request,
-              );
-              break;
-            case "LightningReceiveRequest":
-              transferObj.userRequest = LightningReceiveRequestFromJson(
-                transfer.transfer_user_request,
-              );
-              break;
-            case "LightningSendRequest":
-              transferObj.userRequest = LightningSendRequestFromJson(
-                transfer.transfer_user_request,
-              );
-              break;
-          }
+            switch (userRequest?.__typename) {
+              case "ClaimStaticDeposit":
+                transferObj.userRequest =
+                  ClaimStaticDepositFromJson(userRequest);
+                break;
+              case "CoopExitRequest":
+                transferObj.userRequest = CoopExitRequestFromJson(userRequest);
+                break;
+              case "LeavesSwapRequest":
+                transferObj.userRequest =
+                  LeavesSwapRequestFromJson(userRequest);
+                break;
+              case "LightningReceiveRequest":
+                transferObj.userRequest =
+                  LightningReceiveRequestFromJson(userRequest);
+                break;
+              case "LightningSendRequest":
+                transferObj.userRequest =
+                  LightningSendRequestFromJson(userRequest);
+                break;
+            }
 
-          const { userRequestId, ...rest } = transferObj;
-          return rest;
-        });
-      },
-    });
+            const { userRequestId: _ignored, ...transferResult } =
+              transferObj as TransferWithUserRequest & {
+                userRequestId?: unknown;
+              };
+            void _ignored;
+            return transferResult as Omit<
+              TransferWithUserRequest,
+              "userRequestId"
+            >;
+          });
+        },
+      })) ?? []
+    );
   }
 
   async getChallenge(): Promise<GetChallengeOutput | null> {
@@ -618,7 +650,7 @@ export default class SspClient {
         variables: {
           public_key: bytesToHex(await this.signer.getIdentityPublicKey()),
         },
-        constructObject: (response: { get_challenge: any }) => {
+        constructObject: (response: { get_challenge: unknown }) => {
           return GetChallengeOutputFromJson(response.get_challenge);
         },
       },
@@ -640,7 +672,7 @@ export default class SspClient {
             await this.signer.getIdentityPublicKey(),
           ),
         },
-        constructObject: (response: any) => {
+        constructObject: (response: { verify_challenge: unknown }) => {
           return VerifyChallengeOutputFromJson(response.verify_challenge);
         },
       },
@@ -722,7 +754,9 @@ export default class SspClient {
         leaf_external_ids: leafExternalIds,
         withdrawal_address: withdrawalAddress,
       },
-      constructObject: (response: { coop_exit_fee_quote: any }) => {
+      constructObject: (response: {
+        coop_exit_fee_quote: { quote: unknown };
+      }) => {
         return CoopExitFeeQuoteFromJson(response.coop_exit_fee_quote.quote);
       },
     });
@@ -744,7 +778,9 @@ export default class SspClient {
         statuses: statuses,
         networks: networks,
       },
-      constructObject: (response: { current_user: any }) => {
+      constructObject: (response: {
+        current_user?: { user_requests?: unknown };
+      }) => {
         if (!response.current_user?.user_requests) {
           return null;
         }
@@ -766,7 +802,7 @@ export default class SspClient {
           event_types: input.event_types,
         },
       },
-      constructObject: (response: { register_wallet_webhook: any }) => {
+      constructObject: (response: { register_wallet_webhook: unknown }) => {
         return RegisterSparkWalletWebhookOutputFromJson(
           response.register_wallet_webhook,
         );
@@ -784,7 +820,7 @@ export default class SspClient {
           webhook_id: input.webhook_id,
         },
       },
-      constructObject: (response: { delete_wallet_webhook: any }) => {
+      constructObject: (response: { delete_wallet_webhook: unknown }) => {
         return DeleteSparkWalletWebhookOutputFromJson(
           response.delete_wallet_webhook,
         );
@@ -796,7 +832,7 @@ export default class SspClient {
     return await this.executeRawQuery({
       queryPayload: ListSparkWalletWebhooks,
       variables: {},
-      constructObject: (response: { wallet_webhooks: any }) => {
+      constructObject: (response: { wallet_webhooks: unknown }) => {
         return ListSparkWalletWebhooksOutputFromJson(response.wallet_webhooks);
       },
     });
@@ -828,9 +864,9 @@ class SparkAuthProvider implements AuthProvider {
     return Promise.resolve(_headers);
   }
 
-  async isAuthorized(): Promise<boolean> {
-    return (
-      !!this.sessionToken && !!this.validUntil && this.validUntil > new Date()
+  isAuthorized(): Promise<boolean> {
+    return Promise.resolve(
+      !!this.sessionToken && !!this.validUntil && this.validUntil > new Date(),
     );
   }
 

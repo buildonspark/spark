@@ -49,9 +49,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
       .set("Content-Type", "application/grpc-web+proto");
   }
 
-  protected async createChannelWithTLS(address: string) {
+  protected createChannelWithTLS(address: string): Promise<ChannelWeb> {
     try {
-      return createChannel(address, this.transport);
+      return Promise.resolve(createChannel(address, this.transport));
     } catch (error) {
       throw new SparkRequestError("Failed to create channel", {
         url: address,
@@ -67,9 +67,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
       | SparkTokenServiceDefinition,
     channel: ChannelWeb,
     withRetries: boolean,
-    middleware?: ClientMiddleware<RetryOptions, {}>,
+    middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: string,
-  ) {
+  ): Promise<T & { close?: () => void }> {
     let clientFactory: ClientFactoryWeb;
 
     const retryOptions = {
@@ -92,11 +92,11 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     const client = clientFactory.create(definition, channel, {
       "*": options,
     }) as T;
-    return {
+    return Promise.resolve({
       ...client,
       close: channelKey
         ? () => ConnectionManager.releaseChannel(channelKey)
         : undefined,
-    };
+    });
   }
 }

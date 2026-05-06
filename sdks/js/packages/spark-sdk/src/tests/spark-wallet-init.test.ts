@@ -20,19 +20,26 @@ class InitServiceRefreshTestWallet extends SparkWallet {
       network: "LOCAL",
     });
     this.connectionManager = connectionManagerStub as any;
-    (this as any).syncWallet = jest.fn(async () => {});
+    (this as any).syncWallet = jest.fn(async () => {
+      await Promise.resolve();
+    });
   }
 
   protected override buildConnectionManager(_config: WalletConfigService) {
     return {
-      createClients: async () => {},
-      closeConnections: async () => {},
+      createClients: async () => {
+        await Promise.resolve();
+      },
+      closeConnections: async () => {
+        await Promise.resolve();
+      },
       subscribeToEvents: async function* () {},
       getSessionId: () => "test-session",
     } as any;
   }
 
   protected override async setupBackgroundStream() {
+    await Promise.resolve();
     return;
   }
 
@@ -57,7 +64,9 @@ describe("SparkWallet initialization", () => {
 
   it("keeps SSP-backed services stable while updating logger context", async () => {
     const connectionManagerStub = {
-      createClients: jest.fn(async () => {}),
+      createClients: jest.fn(async () => {
+        await Promise.resolve();
+      }),
     };
     const wallet = new InitServiceRefreshTestWallet(connectionManagerStub);
     await wallet.initializeSignerForTest();

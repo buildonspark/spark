@@ -7,6 +7,15 @@ import { BitcoinNetwork } from "../types/index.js";
 import { getFetch } from "./fetch.js";
 import { Network, type NetworkType, getNetworkFromAddress } from "./network.js";
 
+type AddressTx = {
+  txid: string;
+  vout: Array<{ scriptpubkey_address?: string }>;
+};
+
+type TxLookupResponse = {
+  error?: unknown;
+};
+
 /**
  * @deprecated Use `SparkWallet.getUtxosForDepositAddress()` instead.
  * Retrieves the most recent transaction that pays to the given deposit address
@@ -35,13 +44,12 @@ export async function getLatestDepositTxId(
     headers,
   });
 
-  const addressTxs = await response.json();
+  const addressTxs = await response.json<AddressTx[]>();
 
-  if (addressTxs && addressTxs.length > 0) {
-    const latestTx = addressTxs[0];
-
+  const latestTx = addressTxs[0];
+  if (latestTx) {
     const outputIndex: number = latestTx.vout.findIndex(
-      (output: any) => output.scriptpubkey_address === address,
+      (output) => output.scriptpubkey_address === address,
     );
 
     if (outputIndex === -1) {
@@ -82,7 +90,7 @@ export async function isTxBroadcast(
     headers,
   });
 
-  const tx = await response.json();
+  const tx = await response.json<TxLookupResponse>();
   if (tx.error) {
     return false;
   }

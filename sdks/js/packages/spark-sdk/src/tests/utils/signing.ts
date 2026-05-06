@@ -7,6 +7,7 @@ export async function signPsbtWithExternalKey(
   psbtHex: string,
   privateKeyInput: string,
 ): Promise<string> {
+  await Promise.resolve();
   const tx = btc.Transaction.fromPSBT(hexToBytes(psbtHex), {
     allowUnknown: true,
     allowLegacyWitnessUtxo: true,

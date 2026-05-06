@@ -259,8 +259,7 @@ export class TokenTransactionService {
         })),
         operatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
         network: this.config.getNetworkProto(),
-        validityDurationSeconds:
-          await this.config.getTokenValidityDurationSeconds(),
+        validityDurationSeconds: this.config.getTokenValidityDurationSeconds(),
         clientCreatedTimestampUnixMicros:
           this.connectionManager.getCurrentServerTime().getTime() * 1000,
         withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
@@ -426,9 +425,16 @@ export class TokenTransactionService {
 
   private findBech32TokenIdentifier(
     hexTokenId: string,
-    receiversByToken: Map<Bech32mTokenIdentifier, any[]>,
+    receiversByToken: Map<
+      Bech32mTokenIdentifier,
+      {
+        tokenIdentifier: Bech32mTokenIdentifier;
+        tokenAmount: bigint;
+        receiverSparkAddress: string;
+      }[]
+    >,
   ): Bech32mTokenIdentifier | undefined {
-    for (const [bech32TokenId, _] of receiversByToken) {
+    for (const bech32TokenId of receiversByToken.keys()) {
       const { tokenIdentifier } = decodeBech32mTokenIdentifier(
         bech32TokenId,
         this.config.getNetworkType(),
@@ -612,8 +618,7 @@ export class TokenTransactionService {
         network: this.config.getNetworkProto(),
         sparkOperatorIdentityPublicKeys:
           this.collectOperatorIdentityPublicKeys(),
-        validityDurationSeconds:
-          await this.config.getTokenValidityDurationSeconds(),
+        validityDurationSeconds: this.config.getTokenValidityDurationSeconds(),
         clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
         invoiceAttachments: sortedInvoiceAttachments!,
       },
@@ -632,9 +637,7 @@ export class TokenTransactionService {
 
   public collectOperatorIdentityPublicKeys(): Uint8Array[] {
     const operatorKeys: Uint8Array[] = [];
-    for (const [_, operator] of Object.entries(
-      this.config.getSigningOperators(),
-    )) {
+    for (const operator of Object.values(this.config.getSigningOperators())) {
       operatorKeys.push(hexToBytes(operator.identityPublicKey));
     }
 
@@ -679,7 +682,7 @@ export class TokenTransactionService {
   }> {
     const signingOperators = this.config.getSigningOperators();
 
-    const { finalTokenTransaction, finalTokenTransactionHash, threshold } =
+    const { finalTokenTransaction, finalTokenTransactionHash } =
       await this.startTokenTransaction(
         tokenTransaction,
         signingOperators,
@@ -1032,8 +1035,7 @@ export class TokenTransactionService {
       {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         partialTokenTransaction: tokenTransaction,
-        validityDurationSeconds:
-          await this.config.getTokenValidityDurationSeconds(),
+        validityDurationSeconds: this.config.getTokenValidityDurationSeconds(),
         partialTokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
       },
       {
@@ -1225,23 +1227,22 @@ export class TokenTransactionService {
 
     const queryParams: QueryTokenTransactionsRequest = {
       queryType: undefined,
-      issuerPublicKeys: issuerPublicKeys?.map(hexToBytes)!,
+      issuerPublicKeys: issuerPublicKeys?.map(hexToBytes) ?? [],
       ownerPublicKeys:
-        allOwnerPublicKeys.length > 0
-          ? allOwnerPublicKeys.map(hexToBytes)
-          : undefined!,
-      tokenIdentifiers: tokenIdentifiers?.map((identifier) => {
-        const { tokenIdentifier } = decodeBech32mTokenIdentifier(
-          identifier as Bech32mTokenIdentifier,
-          this.config.getNetworkType(),
-        );
-        return tokenIdentifier;
-      })!,
-      tokenTransactionHashes: tokenTransactionHashes?.map(hexToBytes)!,
+        allOwnerPublicKeys.length > 0 ? allOwnerPublicKeys.map(hexToBytes) : [],
+      tokenIdentifiers:
+        tokenIdentifiers?.map((identifier) => {
+          const { tokenIdentifier } = decodeBech32mTokenIdentifier(
+            identifier as Bech32mTokenIdentifier,
+            this.config.getNetworkType(),
+          );
+          return tokenIdentifier;
+        }) ?? [],
+      tokenTransactionHashes: tokenTransactionHashes?.map(hexToBytes) ?? [],
       outputIds: outputIds || [],
       order: order === "asc" ? Order.ASCENDING : Order.DESCENDING,
-      limit: pageSize!,
-      offset: offset!,
+      limit: pageSize ?? 0,
+      offset: offset ?? 0,
     };
 
     try {
@@ -1320,15 +1321,16 @@ export class TokenTransactionService {
         $case: "byFilters",
         byFilters: {
           outputIds: outputIds || [],
-          ownerPublicKeys: decodedOwnerPublicKeys?.map(hexToBytes)!,
-          issuerPublicKeys: issuerPublicKeys?.map(hexToBytes)!,
-          tokenIdentifiers: tokenIdentifiers?.map((identifier) => {
-            const { tokenIdentifier } = decodeBech32mTokenIdentifier(
-              identifier as Bech32mTokenIdentifier,
-              this.config.getNetworkType(),
-            );
-            return tokenIdentifier;
-          })!,
+          ownerPublicKeys: decodedOwnerPublicKeys?.map(hexToBytes) ?? [],
+          issuerPublicKeys: issuerPublicKeys?.map(hexToBytes) ?? [],
+          tokenIdentifiers:
+            tokenIdentifiers?.map((identifier) => {
+              const { tokenIdentifier } = decodeBech32mTokenIdentifier(
+                identifier as Bech32mTokenIdentifier,
+                this.config.getNetworkType(),
+              );
+              return tokenIdentifier;
+            }) ?? [],
           pageRequest: {
             unsafePageSize: 0,
             pageSize: pageSize ?? 50,
@@ -1528,7 +1530,7 @@ export class TokenTransactionService {
   ) {
     const inputTtxoSignaturesPerOperator: InputTtxoSignaturesPerOperator[] = [];
 
-    for (const [_, operator] of Object.entries(signingOperators)) {
+    for (const operator of Object.values(signingOperators)) {
       const ttxoSignatures: SignatureWithIndex[] = [];
 
       if (finalTokenTransaction.tokenInputs!.$case === "mintInput") {
@@ -1548,7 +1550,7 @@ export class TokenTransactionService {
         };
 
         const payloadHash =
-          await hashOperatorSpecificTokenTransactionSignablePayload(payload);
+          hashOperatorSpecificTokenTransactionSignablePayload(payload);
 
         const ownerSignature = await this.signMessageWithKey(
           payloadHash,
@@ -1576,7 +1578,7 @@ export class TokenTransactionService {
         };
 
         const payloadHash =
-          await hashOperatorSpecificTokenTransactionSignablePayload(payload);
+          hashOperatorSpecificTokenTransactionSignablePayload(payload);
 
         const ownerSignature = await this.signMessageWithKey(
           payloadHash,
@@ -1598,7 +1600,7 @@ export class TokenTransactionService {
           };
 
           const payloadHash =
-            await hashOperatorSpecificTokenTransactionSignablePayload(payload);
+            hashOperatorSpecificTokenTransactionSignablePayload(payload);
 
           let ownerSignature: Uint8Array;
           if (this.config.getTokenSignatures() === "SCHNORR") {

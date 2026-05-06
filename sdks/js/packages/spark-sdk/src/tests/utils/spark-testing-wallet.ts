@@ -10,6 +10,7 @@ import { BitcoinFaucet } from "./test-faucet.js";
 
 export class SparkWalletTesting extends SparkWallet {
   protected override async setupBackgroundStream() {
+    await Promise.resolve();
     // Background stream is disabled by default, use SparkWalletTestingWithStream to enable it
     return;
   }
@@ -30,6 +31,7 @@ export class SparkWalletTesting extends SparkWallet {
   }
 
   protected async proxyParentSetupBackgroundStream() {
+    await Promise.resolve();
     return super.setupBackgroundStream();
   }
 
@@ -50,6 +52,7 @@ export class SparkWalletTesting extends SparkWallet {
 
 export class SparkWalletTestingWithStream extends SparkWalletTesting {
   protected override async setupBackgroundStream() {
+    await Promise.resolve();
     return this.proxyParentSetupBackgroundStream();
   }
 }
@@ -98,6 +101,7 @@ export class SparkWalletTestingIntegration extends SparkWalletTesting {
 
 export class SparkWalletTestingIntegrationWithStream extends SparkWalletTestingIntegration {
   protected override async setupBackgroundStream() {
+    await Promise.resolve();
     return this.proxyParentSetupBackgroundStream();
   }
 

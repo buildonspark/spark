@@ -81,7 +81,7 @@ export abstract class SparkFrostBase {
       if (schnorr.verify(newSig, hash, pubkey)) {
         return newSig;
       }
-    } catch (_e) {
+    } catch {
       // Addition didn't work, try subtraction
     }
 
@@ -91,7 +91,7 @@ export abstract class SparkFrostBase {
       if (schnorr.verify(altSig, hash, pubkey)) {
         return altSig;
       }
-    } catch (_e) {
+    } catch {
       // Subtraction also didn't work
     }
 

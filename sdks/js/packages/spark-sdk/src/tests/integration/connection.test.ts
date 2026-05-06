@@ -104,6 +104,7 @@ describe("ConnectionManager auth retry refcount", () => {
       // Wrap get_challenge to fail the first 3 times
       const originalGetChallenge = realClient.get_challenge.bind(realClient);
       realClient.get_challenge = async (req: any) => {
+        await Promise.resolve();
         getChallengeAttempts++;
         if (getChallengeAttempts <= 3) {
           throw new Error("UNAVAILABLE: read ETIMEDOUT");

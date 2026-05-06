@@ -365,7 +365,16 @@ export class MethodCallLogger {
       })`;
     }
 
-    return String(value);
+    if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint" ||
+      typeof value === "symbol"
+    ) {
+      return value.toString();
+    }
+
+    return "[Unknown]";
   }
 
   private static isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -389,7 +398,9 @@ export class MethodCallLogger {
       let caughtError: unknown;
 
       try {
-        return yield* result;
+        for await (const item of result) {
+          yield item;
+        }
       } catch (error) {
         status = "error";
         caughtError = error;

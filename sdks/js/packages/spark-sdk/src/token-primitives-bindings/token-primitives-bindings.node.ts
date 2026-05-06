@@ -8,36 +8,56 @@ import {
 import type {
   BroadcastBuildRequestBindingParams,
   FinalizeTokenInvoiceRequestBindingParams,
+  PartialTransferBuildResultBinding,
+  PreparedTokenInvoiceBinding,
   PrepareTokenInvoiceRequestBindingParams,
   TransferBuildRequestBindingParams,
 } from "./types.js";
 import { SparkTokenPrimitivesBase } from "./token-primitives-bindings.js";
 
 class SparkTokenPrimitivesNodeJS extends SparkTokenPrimitivesBase {
-  async constructPartialTransferTransaction(
+  constructPartialTransferTransaction(
     request: TransferBuildRequestBindingParams,
-  ) {
-    return construct_partial_transfer_transaction(request);
+  ): Promise<PartialTransferBuildResultBinding> {
+    return new Promise((resolve) => {
+      resolve(
+        construct_partial_transfer_transaction(
+          request,
+        ) as PartialTransferBuildResultBinding,
+      );
+    });
   }
 
-  async hashPartialTokenTransaction(partialTokenTransactionBytes: Uint8Array) {
-    return hash_partial_token_transaction(partialTokenTransactionBytes);
+  hashPartialTokenTransaction(
+    partialTokenTransactionBytes: Uint8Array,
+  ): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      resolve(hash_partial_token_transaction(partialTokenTransactionBytes));
+    });
   }
 
-  async buildBroadcastTransactionRequest(
+  buildBroadcastTransactionRequest(
     request: BroadcastBuildRequestBindingParams,
-  ) {
-    return build_broadcast_transaction_request(request);
+  ): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      resolve(build_broadcast_transaction_request(request));
+    });
   }
 
-  async prepareTokenInvoice(request: PrepareTokenInvoiceRequestBindingParams) {
-    return prepare_token_invoice(request);
+  prepareTokenInvoice(
+    request: PrepareTokenInvoiceRequestBindingParams,
+  ): Promise<PreparedTokenInvoiceBinding> {
+    return new Promise((resolve) => {
+      resolve(prepare_token_invoice(request) as PreparedTokenInvoiceBinding);
+    });
   }
 
-  async finalizeTokenInvoice(
+  finalizeTokenInvoice(
     request: FinalizeTokenInvoiceRequestBindingParams,
-  ) {
-    return finalize_token_invoice(request);
+  ): Promise<string> {
+    return new Promise((resolve) => {
+      resolve(finalize_token_invoice(request));
+    });
   }
 }
 

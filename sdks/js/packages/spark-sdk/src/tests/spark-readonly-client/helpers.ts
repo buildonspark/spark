@@ -113,6 +113,7 @@ export function createPublicReadonlyClient(): SparkReadonlyClient {
 export async function createOwnerReadonlyClient(
   mnemonic: string,
 ): Promise<SparkReadonlyClient> {
+  await Promise.resolve();
   return SparkReadonlyClient.createWithMasterKey(LOCAL_OPTIONS, mnemonic);
 }
 

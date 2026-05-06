@@ -116,6 +116,7 @@ describe("@bufbuild/protobuf Reflection Test", () => {
   });
 
   it("should automatically extract field numbers using reflection", async () => {
+    await Promise.resolve();
     console.log("=== Automatic Field Number Extraction ===");
 
     try {

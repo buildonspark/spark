@@ -12,11 +12,7 @@ import {
   TreeNodeStatus,
   treeNodeStatusToJSON,
 } from "../proto/spark.js";
-import {
-  getTxFromRawTxHex,
-  getTxId,
-  getTxEstimatedVbytesSizeByNumberOfInputsOutputs,
-} from "../utils/bitcoin.js";
+import { getTxFromRawTxHex, getTxId } from "../utils/bitcoin.js";
 import { isTxBroadcast } from "../utils/mempool.js";
 import { Network, NetworkToProto } from "../utils/network.js";
 
@@ -87,7 +83,16 @@ const EXIT_CHAIN_STATUSES = new Set([
 ]);
 
 function formatErrorForLog(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error === "number" || typeof error === "boolean") {
+    return String(error);
+  }
+  return "unknown error";
 }
 
 function warnUnilateralExit(logger: Logger | undefined, message: string) {
@@ -143,7 +148,8 @@ export async function buildUnilateralExitChain(
         }
       } catch (error) {
         throw new Error(
-          `Failed to query parent node ${currentNode.parentNodeId}: ${error}`,
+          `Failed to query parent node ${currentNode.parentNodeId}: ${formatErrorForLog(error)}`,
+          { cause: error },
         );
       }
     }
@@ -246,7 +252,8 @@ export async function constructUnilateralExitFeeBumpPackages(
       nodes.push(node);
     } catch (decodeError) {
       throw new Error(
-        `Failed to decode TreeNode hex string at index ${i}: ${decodeError}. Make sure you're providing TreeNode protobuf hex strings, not raw transaction hex. Use 'leafidtohex' command to get proper hex strings.`,
+        `Failed to decode TreeNode hex string at index ${i}: ${formatErrorForLog(decodeError)}. Make sure you're providing TreeNode protobuf hex strings, not raw transaction hex. Use 'leafidtohex' command to get proper hex strings.`,
+        { cause: decodeError },
       );
     }
   }
@@ -313,9 +320,9 @@ export async function constructUnilateralExitFeeBumpPackages(
       const feeBumpTx = btc.Transaction.fromPSBT(hexToBytes(nodeFeeBumpPsbt));
 
       // Get the fee bump transaction's output, if any
-      var feeBumpOut: psbt.TransactionOutput | null =
+      const feeBumpOut: psbt.TransactionOutput | null =
         feeBumpTx.outputsLength === 1 ? feeBumpTx.getOutput(0) : null;
-      var feeBumpOutPubKey: string | null = null;
+      let feeBumpOutPubKey: string | null = null;
 
       // Remove used UTXOs from the available list
       for (const usedUtxo of usedUtxos) {
@@ -359,9 +366,9 @@ export async function constructUnilateralExitFeeBumpPackages(
           hexToBytes(refundFeeBump.feeBumpPsbt),
         );
 
-        var feeBumpOut: psbt.TransactionOutput | null =
+        const feeBumpOut: psbt.TransactionOutput | null =
           feeBumpTx.outputsLength === 1 ? feeBumpTx.getOutput(0) : null;
-        var feeBumpOutPubKey: string | null = null;
+        let feeBumpOutPubKey: string | null = null;
 
         // Remove used UTXOs from the available list
         for (const usedUtxo of refundFeeBump.usedUtxos) {
@@ -533,7 +540,7 @@ export function constructFeeBumpTx(
   }
 
   // Decode the parent tx using the utility function with error handling
-  let parentTx: any;
+  let parentTx: btc.Transaction;
   try {
     parentTx = getTxFromRawTxHex(txHex);
     if (!parentTx) {
@@ -541,7 +548,8 @@ export function constructFeeBumpTx(
     }
   } catch (parseError) {
     throw new Error(
-      `Failed to parse parent transaction hex: ${parseError}. Transaction hex: ${txHex}`,
+      `Failed to parse parent transaction hex: ${formatErrorForLog(parseError)}. Transaction hex: ${txHex}`,
+      { cause: parseError },
     );
   }
 
@@ -561,7 +569,8 @@ export function constructFeeBumpTx(
     }
   } catch (validationError) {
     throw new Error(
-      `Transaction validation failed: ${validationError}. This may indicate a corrupted or malformed transaction.`,
+      `Transaction validation failed: ${formatErrorForLog(validationError)}. This may indicate a corrupted or malformed transaction.`,
+      { cause: validationError },
     );
   }
 
@@ -721,18 +730,25 @@ export function constructFeeBumpTx(
       builder.updateInput(i, {
         witnessScript: processed.p2wpkhScript,
       });
-      builder.signIdx;
     } catch (error) {
-      throw new Error(`Failed to handle funding UTXO input ${i + 1}: ${error}`);
+      throw new Error(
+        `Failed to handle funding UTXO input ${i + 1}: ${formatErrorForLog(error)}`,
+        { cause: error },
+      );
     }
   }
 
   // Extract transaction bytes (funding inputs are finalized, ephemeral anchor has empty witness)
-  let psbtHex;
+  let psbtHex: string;
   try {
     psbtHex = bytesToHex(builder.toPSBT());
   } catch (error) {
-    throw new Error(`Failed to extract transaction: ${error}`);
+    throw new Error(
+      `Failed to extract transaction: ${formatErrorForLog(error)}`,
+      {
+        cause: error,
+      },
+    );
   }
 
   return {

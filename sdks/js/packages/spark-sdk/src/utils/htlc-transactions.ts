@@ -45,6 +45,14 @@ export function numsPoint(): Buffer {
 
 const lightningHTLCSequence = 2160;
 
+function getFirstOutputAmount(tx: Transaction): bigint {
+  const amount = tx.getOutput(0)?.amount;
+  if (amount == null) {
+    throw new SparkValidationError("Missing HTLC output amount");
+  }
+  return amount;
+}
+
 export function createRefundTxsForLightning({
   nodeTx,
   directNodeTx,
@@ -274,7 +282,8 @@ export function createSenderSpendTx({
   ).script;
 
   // check if fee is greater than the amount
-  const amount = htlcTx.getOutput(0)?.amount! - BigInt(fee);
+  const htlcAmount = getFirstOutputAmount(htlcTx);
+  const amount = htlcAmount - BigInt(fee);
 
   if (amount <= 0n) {
     throw new SparkValidationError("Fee is greater than the amount", {
@@ -316,13 +325,13 @@ export function createSenderSpendTx({
     0,
     [sequenceLockScript],
     SigHash.DEFAULT,
-    [htlcTx.getOutput(0)?.amount!],
+    [htlcAmount],
   );
 
   senderSpendTx.updateInput(0, {
     witnessUtxo: {
       script: p2.script,
-      amount: htlcTx.getOutput(0)?.amount!,
+      amount: htlcAmount,
     },
     tapLeafScript: [seqLeafEntry!],
   });
@@ -370,7 +379,8 @@ export function createReceiverSpendTx({
     true,
   ).script;
 
-  const amount = htlcTx.getOutput(0)?.amount! - BigInt(fee);
+  const htlcAmount = getFirstOutputAmount(htlcTx);
+  const amount = htlcAmount - BigInt(fee);
   if (amount <= 0n) {
     throw new SparkValidationError("Fee is greater than the amount", {
       field: "fee",
@@ -404,7 +414,7 @@ export function createReceiverSpendTx({
   spendTx.updateInput(0, {
     witnessUtxo: {
       script: p2.script,
-      amount: htlcTx.getOutput(0)?.amount!,
+      amount: htlcAmount,
     },
     tapLeafScript: [hashLeafEntry!],
   });

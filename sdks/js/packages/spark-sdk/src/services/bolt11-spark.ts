@@ -9,7 +9,7 @@ import { hexToBytes } from "@noble/hashes/utils";
 interface Section {
   name: string;
   letters?: string;
-  value?: any;
+  value?: unknown;
   tag?: string;
 }
 
@@ -74,8 +74,13 @@ export function decodeInvoice(invoice: string): DecodedInvoice {
 
   routeHints = decodedInvoice.route_hints;
 
-  const amountMSats = amountSection?.value ? BigInt(amountSection.value) : null;
-  const paymentHash = paymentSection?.value as string;
+  const amountMSats = isBigIntInput(amountSection?.value)
+    ? BigInt(amountSection.value)
+    : null;
+  const paymentHash =
+    typeof paymentSection?.value === "string"
+      ? paymentSection.value
+      : undefined;
 
   // Check BOLT-11 fallback address field for embedded spark invoice
   if (fallbackAddressSection?.value) {
@@ -191,6 +196,17 @@ export function getNetworkFromInvoice(invoice: string): Network | null {
   if (invoice.startsWith("lnsb")) return Network.SIGNET;
 
   return null;
+}
+
+function isBigIntInput(
+  value: unknown,
+): value is string | number | bigint | boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    typeof value === "boolean"
+  );
 }
 
 export function isValidSparkAddressFallback(address: string): boolean {

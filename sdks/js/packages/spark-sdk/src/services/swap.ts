@@ -247,7 +247,10 @@ export default class SwapService {
           e instanceof Error ? e.message : String(e)
         } stack=${e instanceof Error ? e.stack : undefined}`,
       );
-      throw new Error(`Failed to request leaves swap: ${e}`, { cause: e });
+      const message = e instanceof Error ? e.message : "unknown error";
+      throw new Error(`Failed to request leaves swap: ${message}`, {
+        cause: e,
+      });
     }
   }
 

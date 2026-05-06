@@ -174,7 +174,7 @@ it("expiry uses seconds only and treats undefined == epoch zero", () => {
 it("deterministic and stable across identical objects and clones", () => {
   const f = makeTokensFields({ amount: bigintToMinimalBE(42n), memo: "m" });
   const h1 = HashSparkInvoice(f, RECV_PK, "REGTEST");
-  const fClone: SparkInvoiceFields = JSON.parse(JSON.stringify(f));
+  const fClone = JSON.parse(JSON.stringify(f)) as unknown as SparkInvoiceFields;
   // Re-hydrate types lost by JSON (id/tokenIdentifier/amount) where needed
   fClone.id = new Uint8Array(f.id);
   if (fClone.paymentType?.$case === "tokensPayment") {
@@ -196,8 +196,7 @@ it("deterministic and stable across identical objects and clones", () => {
 it("hash changes if receiver public key changes by 1 bit", () => {
   const f = makeTokensFields({ amount: bigintToMinimalBE(7n) });
   const pk2 = new Uint8Array(RECV_PK);
-  // @ts-ignore
-  pk2[1] ^= 0x01;
+  pk2[1] = (pk2[1] ?? 0) ^ 0x01;
   const h1 = HashSparkInvoice(f, RECV_PK, "REGTEST");
   const h2 = HashSparkInvoice(f, pk2, "REGTEST");
   expect(bytesToHex(h1)).not.toBe(bytesToHex(h2));

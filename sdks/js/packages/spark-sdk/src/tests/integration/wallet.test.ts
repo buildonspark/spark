@@ -114,39 +114,48 @@ class PreinitializedTestSigner implements SparkSigner {
   }
 
   async getIdentityPublicKey(): Promise<Uint8Array> {
+    await Promise.resolve();
     return secp256k1.getPublicKey(this.identityPrivateKey);
   }
   async getDepositSigningKey(): Promise<Uint8Array> {
+    await Promise.resolve();
     return secp256k1.getPublicKey(this.depositPrivateKey);
   }
   async getStaticDepositSigningKey(_idx: number): Promise<Uint8Array> {
+    await Promise.resolve();
     // Not used in this test; return a valid pubkey
     return secp256k1.getPublicKey(secp256k1.utils.randomPrivateKey());
   }
   async getStaticDepositSecretKey(_idx: number): Promise<Uint8Array> {
+    await Promise.resolve();
     // Not used in this test
     return secp256k1.utils.randomPrivateKey();
   }
 
   async generateMnemonic(): Promise<string> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async mnemonicToSeed(_mnemonic: string): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async createSparkWalletFromSeed(
     _seed: Uint8Array | string,
     _accountNumber?: number,
   ): Promise<string> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async getPublicKeyFromDerivation(
     _keyDerivation?: KeyDerivation,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
 
   async signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
+    await Promise.resolve();
     return schnorr.sign(message, this.identityPrivateKey);
   }
 
@@ -154,6 +163,7 @@ class PreinitializedTestSigner implements SparkSigner {
     _first: string,
     _second: string,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async subtractAndSplitSecretWithProofsGivenDerivations(
@@ -162,6 +172,7 @@ class PreinitializedTestSigner implements SparkSigner {
       second?: KeyDerivation | undefined;
     },
   ): Promise<VerifiableSecretShare[]> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async subtractSplitAndEncrypt(
@@ -171,17 +182,21 @@ class PreinitializedTestSigner implements SparkSigner {
       receiverPublicKey: Uint8Array;
     },
   ): Promise<{ shares: VerifiableSecretShare[]; secretCipher: Uint8Array }> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async splitSecretWithProofs(
     _params: SplitSecretWithProofsParams,
   ): Promise<VerifiableSecretShare[]> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async signFrost(_params: SignFrostParams): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async aggregateFrost(_params: AggregateFrostParams): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   getNonceForSelfCommitment(
@@ -194,6 +209,7 @@ class PreinitializedTestSigner implements SparkSigner {
     message: Uint8Array,
     compact?: boolean,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     const signature = secp256k1.sign(message, this.identityPrivateKey);
     return compact ? signature.toCompactRawBytes() : signature.toDERRawBytes();
   }
@@ -201,6 +217,7 @@ class PreinitializedTestSigner implements SparkSigner {
     message: Uint8Array,
     signature: Uint8Array,
   ): Promise<boolean> {
+    await Promise.resolve();
     return secp256k1.verify(
       signature,
       message,
@@ -218,14 +235,17 @@ class PreinitializedTestSigner implements SparkSigner {
   }
 
   async htlcHMAC(_transferID: string): Promise<Uint8Array> {
+    await Promise.resolve();
     return hmac(sha256, this.htlcPreimagePrivateKey, _transferID);
   }
 
   async decryptEcies(_ciphertext: Uint8Array): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
 
   async getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce> {
+    await Promise.resolve();
     // Provide a structurally valid fake commitment
     const binding = secp256k1.utils.randomPrivateKey();
     const hiding = secp256k1.utils.randomPrivateKey();

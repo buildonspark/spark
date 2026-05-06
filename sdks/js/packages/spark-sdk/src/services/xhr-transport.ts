@@ -2,7 +2,11 @@ import type { Logger } from "@lightsparkdev/core";
 import { throwIfAborted } from "abort-controller-x";
 import { Base64 } from "js-base64";
 import { ClientError, Metadata, Status } from "nice-grpc-common";
-import type { Transport } from "nice-grpc-web/lib/client/Transport.js";
+import type {
+  Frame,
+  Transport,
+  TransportParams,
+} from "nice-grpc-web/lib/client/Transport.js";
 import { NoopLogger } from "../utils/logging.js";
 import type { LoggingService } from "../utils/logging-service.js";
 
@@ -64,8 +68,6 @@ async function xhrPost(
       callData.grpcStatus = getStatusFromHttpCode(xhr.status);
     };
 
-    // Tested, this works.
-    // @ts-ignore
     xhr.send(requestBody);
   });
 }
@@ -98,7 +100,7 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
     metadata,
     signal,
     method,
-  }) {
+  }: TransportParams): AsyncGenerator<Frame, void, undefined> {
     let requestBody: BodyInit;
 
     if (!method.requestStream) {
@@ -112,17 +114,19 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
 
       requestBody = bodyBuffer!.slice();
     } else {
-      let iterator: AsyncIterator<Uint8Array> | undefined;
+      let iterator: AsyncIterator<Uint8Array, void, undefined> | undefined;
 
-      requestBody = new ReadableStream({
-        // @ts-ignore
+      requestBody = new ReadableStream<Uint8Array>({
         type: "bytes",
         start() {
           iterator = body[Symbol.asyncIterator]();
         },
 
         async pull(controller) {
-          const { done, value } = await iterator!.next();
+          if (!iterator) {
+            throw new Error("Request body iterator was not initialized");
+          }
+          const { done, value } = await iterator.next();
 
           if (done) {
             controller.close();
@@ -131,7 +135,7 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
           }
         },
         async cancel() {
-          await iterator!.return?.();
+          await iterator?.return?.();
         },
       });
     }

@@ -18,19 +18,25 @@ class BackgroundStreamRetryTestWallet extends SparkWallet {
     });
     this.connectionManager = connectionManagerStub as any;
     (this as any).claimTransfers = claimTransfersStub;
-    (this as any).syncTokenOutputs = jest.fn(async () => {});
+    (this as any).syncTokenOutputs = jest.fn(async () => {
+      await Promise.resolve();
+    });
   }
 
   protected override buildConnectionManager() {
     return {
-      closeConnections: async () => {},
+      closeConnections: async () => {
+        await Promise.resolve();
+      },
       subscribeToEvents: async () => {
+        await Promise.resolve();
         throw new Error("placeholder connection manager should be replaced");
       },
     } as any;
   }
 
   public async runBackgroundStreamForTesting() {
+    await Promise.resolve();
     return this.setupBackgroundStream();
   }
 }
@@ -197,8 +203,11 @@ describe("SparkWallet background stream reconnects", () => {
     jest.useFakeTimers();
 
     const connectionManagerStub = {
-      closeConnections: jest.fn(async () => {}),
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
       subscribeToEvents: jest.fn(async () => {
+        await Promise.resolve();
         throw new Error("offline");
       }),
     };
@@ -267,7 +276,9 @@ describe("SparkWallet background stream reconnects", () => {
     jest.useFakeTimers();
 
     const connectionManagerStub = {
-      closeConnections: jest.fn(async () => {}),
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
       subscribeToEvents: jest
         .fn()
         .mockImplementationOnce(async (...args: any[]) =>
@@ -330,7 +341,9 @@ describe("SparkWallet background stream reconnects", () => {
     const setTimeoutSpy = jest.spyOn(global, "setTimeout");
 
     const connectionManagerStub = {
-      closeConnections: jest.fn(async () => {}),
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
       subscribeToEvents: jest.fn(async (...args: any[]) =>
         createConnectedThenIdleStream(args[1] as AbortSignal),
       ),
@@ -352,7 +365,9 @@ describe("SparkWallet background stream reconnects", () => {
     jest.useFakeTimers();
 
     const connectionManagerStub = {
-      closeConnections: jest.fn(async () => {}),
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
       subscribeToEvents: jest.fn(async (...args: any[]) =>
         createConnectedThenReceiverTransferStream(args[1] as AbortSignal),
       ),
@@ -411,7 +426,9 @@ describe("SparkWallet background stream reconnects", () => {
     jest.spyOn(global, "clearTimeout").mockImplementation(() => {});
 
     const connectionManagerStub = {
-      closeConnections: jest.fn(async () => {}),
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
       subscribeToEvents: jest.fn(async (...args: any[]) =>
         createConnectedThenImmediateHeartbeatStream(args[1] as AbortSignal),
       ),

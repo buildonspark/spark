@@ -282,7 +282,7 @@ export default class LeafManager {
       "sync",
       `Complete. Post-sync: ${this.formatBalanceSummary()} statusCounts=${this.formatLeafStatusCounts()}`,
     );
-    this.autoOptimizeIfNeeded();
+    void this.autoOptimizeIfNeeded();
     this.emitBalanceUpdate();
   }
 
@@ -398,7 +398,7 @@ export default class LeafManager {
           path,
         });
         finalLeaves.push(...recovered);
-      } catch (err) {
+      } catch {
         // Recovery failed — skip these leaves rather than losing all valid leaves.
       }
     }
@@ -685,7 +685,7 @@ export default class LeafManager {
       `post-claim ${this.formatBalanceSummary()} statusCounts=${this.formatLeafStatusCounts()}`,
     );
     this.emitBalanceUpdate();
-    this.autoOptimizeIfNeeded();
+    void this.autoOptimizeIfNeeded();
     return renewed;
   }
 
@@ -1163,7 +1163,9 @@ export default class LeafManager {
     indexed.sort((a, b) => a.amount - b.amount);
 
     const usedIds = new Set<string>();
-    const batches: TreeNode[][] = new Array(targetAmounts.length);
+    const batches: TreeNode[][] = Array.from<TreeNode[]>({
+      length: targetAmounts.length,
+    });
     let totalAmount = 0;
 
     for (const { amount: targetAmount, i: originalIndex } of indexed) {
@@ -1402,8 +1404,9 @@ export default class LeafManager {
             );
           });
         } catch (error) {
+          const message = error instanceof Error ? error.message : "unknown";
           this.logOptimizeLeaves(
-            `Error requesting swap ${i + 1} of ${swapBatches.length}: ${error}. Restoring ids=[${swapLeafIds.join(",")}]`,
+            `Error requesting swap ${i + 1} of ${swapBatches.length}: ${message}. Restoring ids=[${swapLeafIds.join(",")}]`,
           );
           // Only restore LOCAL_LOCKED leaves — SWAP_PENDING means the SO was
           // contacted and has them locked; sync() will reconcile those.

@@ -175,9 +175,9 @@ export function getSigHashFromTx(
 
   return tx.preimageWitnessV1(
     inputIndex,
-    new Array(tx.inputsLength).fill(prevScript),
+    Array<Uint8Array>(tx.inputsLength).fill(prevScript),
     btc.SigHash.DEFAULT,
-    new Array(tx.inputsLength).fill(amount),
+    Array<bigint>(tx.inputsLength).fill(amount),
   );
 }
 

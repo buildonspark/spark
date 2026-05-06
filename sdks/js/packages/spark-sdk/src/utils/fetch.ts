@@ -44,7 +44,7 @@ type SparkFetchResponse = {
   readonly url: string | null;
 
   headers: SparkFetchHeaders;
-  json: () => Promise<any>;
+  json: <T = unknown>() => Promise<T>;
   text: () => Promise<string>;
   arrayBuffer: () => Promise<ArrayBuffer>;
   bytes: () => Promise<Uint8Array>;
@@ -204,8 +204,7 @@ function createSparkFetch(
         return response;
       } catch (error) {
         const durationMs = Date.now() - startTime;
-        const message =
-          error instanceof Error ? error.message : String(error ?? "unknown");
+        const message = formatUnknown(error);
         logger?.debug?.(
           `HTTP ${method} ${safeUrl} -> error (+${durationMs}ms, attempt ${
             attempt + 1
@@ -315,12 +314,31 @@ function resolveUrl(input: RequestInfo | URL): string {
   }
   if (typeof input === "object" && input && "url" in input) {
     try {
-      return String((input as { url?: unknown }).url ?? "");
+      const url = (input as { url?: unknown }).url;
+      return typeof url === "string" ? url : "";
     } catch {
       return "";
     }
   }
   return "";
+}
+
+function formatUnknown(value: unknown): string {
+  if (value instanceof Error) {
+    return value.message;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint" ||
+    typeof value === "symbol"
+  ) {
+    return value.toString();
+  }
+  return "unknown";
 }
 
 export const setFetch = (

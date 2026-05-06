@@ -4,13 +4,12 @@ import {
   type SspClientOptions,
 } from "../graphql/client.js";
 import { BitcoinNetwork } from "../graphql/objects/BitcoinNetwork.js";
-import { DefaultSparkSigner, type SparkSigner } from "../signer/signer.js";
+import { type SparkSigner } from "../signer/signer.js";
 import { Network, NetworkToProto, type NetworkType } from "../utils/network.js";
 import {
   type ConfigOptions,
   LOG_SERVICE_NAMES,
   type LogConfig,
-  type LogOptionsObject,
   type LogServiceName,
   type MethodLoggingConfig,
   type MethodLoggingOptions,

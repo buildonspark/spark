@@ -12,15 +12,18 @@ import { webcrypto } from "bare-crypto";
 import bareFetch from "bare-fetch";
 import { default as BareHeaders } from "bare-fetch/headers";
 
-declare const Bare: {
-  on: (event: string, listener: (...args: unknown[]) => void) => void;
-};
+const BareAbortController =
+  AbortController as unknown as typeof globalThis.AbortController;
+const createAbortableFetch = abortableFetch as unknown as (
+  fetch: SparkFetch,
+) => { fetch: SparkFetch };
+const bareFetchImpl = bareFetch as unknown as SparkFetch;
 
-globalThis.AbortController = AbortController;
+globalThis.AbortController = BareAbortController;
 
-const Headers = BareHeaders as SparkHeadersConstructor;
+const Headers = BareHeaders as unknown as SparkHeadersConstructor;
 
-const { fetch: abortableBareFetch } = abortableFetch(bareFetch);
+const { fetch: abortableBareFetch } = createAbortableFetch(bareFetchImpl);
 const sparkBareFetch: SparkFetch = async (input, init = {}) => {
   if (!init.headers) {
     init.headers = new Headers();

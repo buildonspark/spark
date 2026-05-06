@@ -246,7 +246,7 @@ export function isLegacySparkAddress(
   try {
     const { prefix } = bech32mDecode(address);
     return prefix in LegacyPrefixToNetwork;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

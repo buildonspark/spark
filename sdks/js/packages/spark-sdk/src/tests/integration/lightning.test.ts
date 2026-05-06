@@ -19,6 +19,7 @@ import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js"
 const { TransferStatus } = SparkProto;
 
 const fakeInvoiceCreator = async (): Promise<LightningReceiveRequest> => {
+  await Promise.resolve();
   return {
     id: "123",
     createdAt: new Date().toISOString(),

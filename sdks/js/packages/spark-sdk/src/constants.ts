@@ -1,6 +1,20 @@
 import { isNode, isBare } from "@lightsparkdev/core";
 import { UAParser } from "ua-parser-js";
 
+type BunGlobal = {
+  version?: unknown;
+};
+type ChromeGlobal = {
+  runtime?: {
+    id?: unknown;
+  };
+};
+type BareGlobal = {
+  version?: unknown;
+};
+
+const globalRecord = globalThis as Record<string, unknown>;
+
 export const isReactNative =
   "navigator" in globalThis && navigator.product === "ReactNative";
 
@@ -10,7 +24,8 @@ export const isWebExtension =
   /**
    * globalThis.chrome actually exists in extension contexts for all browsers for legacy reasons:
    */
-  "chrome" in globalThis && globalThis.chrome.runtime?.id;
+  "chrome" in globalThis &&
+  typeof (globalRecord.chrome as ChromeGlobal).runtime?.id === "string";
 export const isWebExtensionContentScript =
   isWebExtension && "window" in globalThis;
 export const isWebExtensionBackgroundScript =
@@ -29,18 +44,18 @@ export const packageVersion =
 
 let baseEnvStr = "unknown";
 if (isBun) {
+  const bun = globalRecord.Bun as BunGlobal;
   const bunVersion =
-    "version" in globalThis.Bun ? globalThis.Bun.version : "unknown-version";
+    typeof bun.version === "string" ? bun.version : "unknown-version";
   baseEnvStr = `bun/${bunVersion}`;
 } else if (isNode) {
   baseEnvStr = `node/${globalThis.process.version}`;
 } else if (isReactNative) {
   baseEnvStr = "react-native";
 } else if (isBare) {
-  type BareType = {
-    version: string;
-  };
-  const bareVersion = (Bare as BareType).version;
+  const bare = Bare as BareGlobal;
+  const bareVersion =
+    typeof bare.version === "string" ? bare.version : "unknown-version";
   baseEnvStr = `bare/${bareVersion}`;
 } else if (isWebExtension) {
   /* Protocol may contain additional information about where the

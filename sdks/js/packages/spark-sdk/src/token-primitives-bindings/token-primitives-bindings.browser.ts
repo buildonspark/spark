@@ -10,6 +10,8 @@ import {
 import type {
   BroadcastBuildRequestBindingParams,
   FinalizeTokenInvoiceRequestBindingParams,
+  PartialTransferBuildResultBinding,
+  PreparedTokenInvoiceBinding,
   PrepareTokenInvoiceRequestBindingParams,
   TransferBuildRequestBindingParams,
 } from "./types.js";
@@ -58,7 +60,9 @@ class SparkTokenPrimitivesBrowser extends SparkTokenPrimitivesBase {
     request: TransferBuildRequestBindingParams,
   ) {
     await this.init();
-    return construct_partial_transfer_transaction(request);
+    return construct_partial_transfer_transaction(
+      request,
+    ) as PartialTransferBuildResultBinding;
   }
 
   async hashPartialTokenTransaction(partialTokenTransactionBytes: Uint8Array) {
@@ -75,7 +79,7 @@ class SparkTokenPrimitivesBrowser extends SparkTokenPrimitivesBase {
 
   async prepareTokenInvoice(request: PrepareTokenInvoiceRequestBindingParams) {
     await this.init();
-    return prepare_token_invoice(request);
+    return prepare_token_invoice(request) as PreparedTokenInvoiceBinding;
   }
 
   async finalizeTokenInvoice(

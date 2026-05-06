@@ -1,10 +1,5 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import {
-  SparkInvoiceFields,
-  SatsPayment,
-  TokensPayment,
-} from "../dist/proto/spark.js";
 import { createProtoHasher } from "../dist/spark-wallet/proto-hash.js";
 
 // Load shared test data

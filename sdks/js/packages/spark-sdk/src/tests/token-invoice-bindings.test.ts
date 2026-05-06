@@ -40,18 +40,21 @@ class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
   async constructPartialTransferTransaction(
     _request: TransferBuildRequestBindingParams,
   ): Promise<PartialTransferBuildResultBinding> {
+    await Promise.resolve();
     throw new Error("not used in this test");
   }
 
   async hashPartialTokenTransaction(
     _partialTokenTransactionBytes: Uint8Array,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("not used in this test");
   }
 
   async buildBroadcastTransactionRequest(
     _request: BroadcastBuildRequestBindingParams,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     throw new Error("not used in this test");
   }
 

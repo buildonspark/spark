@@ -60,6 +60,7 @@ describe("SSP static deposit validation tests", () => {
     } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
     const transactionId = await retryUntilSuccess(async () => {
+      await Promise.resolve();
       if (!signedTx) throw new Error("Tx not mined yet");
       return signedTx.id;
     });

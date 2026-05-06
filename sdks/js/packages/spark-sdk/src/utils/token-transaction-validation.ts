@@ -18,7 +18,7 @@ function hasDuplicates<T>(array: T[]): boolean {
 export function validateTokenTransaction(
   finalTokenTransaction: TokenTransaction,
   partialTokenTransaction: TokenTransaction,
-  signingOperators: Record<string, any>,
+  signingOperators: Record<string, unknown>,
   keyshareInfo: { ownerIdentifiers: string[]; threshold: number },
   expectedWithdrawBondSats: number,
   expectedWithdrawRelativeBlockLocktime: number,

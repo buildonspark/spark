@@ -15,7 +15,7 @@ export function sumTokenOutputs(
         sum + BigInt(bytesToNumberBE(output.output!.tokenAmount)),
       BigInt(0),
     );
-  } catch (error) {
+  } catch {
     return 0n;
   }
 }

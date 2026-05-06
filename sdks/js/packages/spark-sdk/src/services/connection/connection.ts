@@ -140,7 +140,9 @@ export abstract class ConnectionManager {
       if ("close" in ch && typeof ch.close === "function") {
         try {
           ch.close();
-        } catch {}
+        } catch {
+          // Ignore close failures while releasing a cached channel.
+        }
       }
       ConnectionManager.channelCache.delete(key);
     }
@@ -252,7 +254,7 @@ export abstract class ConnectionManager {
       | SparkTokenServiceDefinition,
     channel: Channel | ChannelWeb,
     withRetries: boolean,
-    middleware?: ClientMiddleware<RetryOptions, {}>,
+    middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: ChannelKey,
   ): Promise<T & { close?: () => void }>;
 
@@ -268,7 +270,10 @@ export abstract class ConnectionManager {
   private clientsByType: Map<
     SparkClientType,
     Map<Address, { client: ClientWithClose<unknown>; channelKey: ChannelKey }>
-  > = new Map([
+  > = new Map<
+    SparkClientType,
+    Map<Address, { client: ClientWithClose<unknown>; channelKey: ChannelKey }>
+  >([
     ["spark", new Map()],
     ["stream", new Map()],
     ["tokens", new Map()],
@@ -314,9 +319,9 @@ export abstract class ConnectionManager {
   // When initializing wallet, go ahead and instantiate all clients
   public async createClients() {
     await Promise.all(
-      Object.values(this.config.getSigningOperators()).map((operator) => {
-        this.createSparkClient(operator.address);
-      }),
+      Object.values(this.config.getSigningOperators()).map((operator) =>
+        this.createSparkClient(operator.address),
+      ),
     );
   }
 
@@ -407,7 +412,7 @@ export abstract class ConnectionManager {
     );
   }
 
-  async getChannelForClient(clientType: SparkClientType, address: Address) {
+  getChannelForClient(clientType: SparkClientType, address: Address) {
     const key = this.getAddressToClientMap(clientType).get(address)?.channelKey;
     if (!key) return undefined;
     return ConnectionManager.channelCache.get(key)?.channel;
@@ -649,7 +654,7 @@ export abstract class ConnectionManager {
       } catch (error: unknown) {
         const durationMs = this.getMonotonicTime() - startTime;
         const message =
-          error instanceof Error ? error.message : String(error ?? "unknown");
+          error instanceof Error ? error.message : formatUnknownError(error);
         this.logger.debug(
           `gRPC ${methodPath} ${safeAddress} session=${this.sessionId} -> error (+${durationMs}ms): ${message}`,
         );
@@ -722,4 +727,17 @@ function isConnectionError(error: Error) {
     error.message.includes("UNKNOWN") ||
     error.message.includes("Received HTTP status code")
   );
+}
+
+function formatUnknownError(error: unknown) {
+  if (error == null) {
+    return "unknown";
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error === "number" || typeof error === "boolean") {
+    return String(error);
+  }
+  return "non-error thrown value";
 }

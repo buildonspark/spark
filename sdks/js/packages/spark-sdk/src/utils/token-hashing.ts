@@ -424,8 +424,7 @@ export function hashTokenTransactionV1(
     ...(tokenTransaction.sparkOperatorIdentityPublicKeys || []),
   ].sort((a, b) => {
     for (let i = 0; i < a.length && i < b.length; i++) {
-      // @ts-ignore - i < a and b length
-      if (a[i] !== b[i]) return a[i] - b[i];
+      if (a[i] !== b[i]) return (a[i] ?? 0) - (b[i] ?? 0);
     }
     return a.length - b.length;
   });
@@ -479,8 +478,7 @@ export function hashTokenTransactionV1(
 
   // Hash client created timestamp
   const clientTimestampHashObj = sha256.create();
-  const clientCreatedTs: Date | undefined = (tokenTransaction as any)
-    .clientCreatedTimestamp;
+  const clientCreatedTs = tokenTransaction.clientCreatedTimestamp;
   if (!clientCreatedTs) {
     throw new SparkValidationError(
       "client created timestamp cannot be null for V1 token transactions",
@@ -920,8 +918,7 @@ export function hashTokenTransactionV2(
     ...(tokenTransaction.sparkOperatorIdentityPublicKeys || []),
   ].sort((a, b) => {
     for (let i = 0; i < a.length && i < b.length; i++) {
-      // @ts-ignore - i < a and b length
-      if (a[i] !== b[i]) return a[i] - b[i];
+      if (a[i] !== b[i]) return (a[i] ?? 0) - (b[i] ?? 0);
     }
     return a.length - b.length;
   });
@@ -975,8 +972,7 @@ export function hashTokenTransactionV2(
 
   // Hash client created timestamp
   const clientTimestampHashObj = sha256.create();
-  const clientCreatedTs: Date | undefined = (tokenTransaction as any)
-    .clientCreatedTimestamp;
+  const clientCreatedTs = tokenTransaction.clientCreatedTimestamp;
   if (!clientCreatedTs) {
     throw new SparkValidationError(
       "client created timestamp cannot be null for V1 token transactions",
@@ -1044,7 +1040,7 @@ export function hashTokenTransactionV2(
 
       let idBytes: Uint8Array | undefined;
       try {
-        const decoded = bech32m.decode(invoice as any, 500);
+        const decoded = bech32m.decode(invoice as `${string}1${string}`, 500);
         const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
         if (!payload.sparkInvoiceFields || !payload.sparkInvoiceFields.id) {
           throw new Error("missing spark invoice fields or id");

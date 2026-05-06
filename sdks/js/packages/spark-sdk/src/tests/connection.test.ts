@@ -32,6 +32,7 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
     _address: string,
     _isStreamClientType: boolean = false,
   ): Promise<Channel> {
+    await Promise.resolve();
     const ch = new FakeChannel();
     this.createdChannels.push(ch);
     this.createdIsStream.push(_isStreamClientType);
@@ -45,6 +46,7 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
     _middleware?: ClientMiddleware<RetryOptions, {}>,
     channelKey?: string,
   ): Promise<T & { close?: () => void }> {
+    await Promise.resolve();
     const close =
       channelKey != null
         ? () => TestConnectionManager.releaseChannel(channelKey)
@@ -53,6 +55,7 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
   }
 
   protected async authenticate(_address: string): Promise<string> {
+    await Promise.resolve();
     return "test-session-token";
   }
 }
@@ -266,6 +269,7 @@ describe("ConnectionManager middleware", () => {
       _address: string,
       _isStreamClientType: boolean = false,
     ): Promise<Channel> {
+      await Promise.resolve();
       return new FakeChannel() as unknown as Channel;
     }
 
@@ -276,6 +280,7 @@ describe("ConnectionManager middleware", () => {
       _middleware?: ClientMiddleware<RetryOptions, {}>,
       channelKey?: string,
     ): Promise<T & { close?: () => void }> {
+      await Promise.resolve();
       const close =
         channelKey != null
           ? () => MiddlewareTestConnectionManager.releaseChannel(channelKey)
@@ -284,6 +289,7 @@ describe("ConnectionManager middleware", () => {
     }
 
     protected async authenticate(_address: string): Promise<string> {
+      await Promise.resolve();
       this.authCalls += 1;
       return this.authCalls === 1 ? "t1" : "t2";
     }
@@ -350,6 +356,7 @@ describe("ConnectionManager middleware", () => {
       _address: string,
       _isStreamClientType: boolean = false,
     ): Promise<Channel> {
+      await Promise.resolve();
       return new FakeChannel() as unknown as Channel;
     }
 
@@ -384,6 +391,7 @@ describe("ConnectionManager middleware", () => {
           };
         },
         async verify_challenge() {
+          await Promise.resolve();
           self.verifyChallengeCalls += 1;
           // Derive expiration from the stubbed server time so the TTL check is deterministic
           return {
@@ -507,6 +515,7 @@ describe("ConnectionManager middleware", () => {
         _address: string,
         _isStreamClientType: boolean = false,
       ): Promise<Channel> {
+        await Promise.resolve();
         const ch = new FakeChannel();
         this.createdChannels.push(ch);
         return ch as unknown as Channel;
@@ -519,6 +528,7 @@ describe("ConnectionManager middleware", () => {
         _middleware?: ClientMiddleware<RetryOptions, {}>,
         channelKey?: string,
       ): Promise<T & { close?: () => void }> {
+        await Promise.resolve();
         const close =
           channelKey != null
             ? () => AuthRetryTestConnectionManager.releaseChannel(channelKey)
@@ -527,6 +537,7 @@ describe("ConnectionManager middleware", () => {
         const self = this;
         const fakeClient = {
           async get_challenge({ publicKey }: { publicKey: Uint8Array }) {
+            await Promise.resolve();
             getChallengeAttempts += 1;
             // Fail with a connection error on the first 3 attempts,
             // then succeed on attempt 4.
@@ -547,6 +558,7 @@ describe("ConnectionManager middleware", () => {
             };
           },
           async verify_challenge() {
+            await Promise.resolve();
             return {
               sessionToken: "recovered-token",
               expirationTimestamp:

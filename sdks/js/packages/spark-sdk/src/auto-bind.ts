@@ -42,7 +42,10 @@ export default function autoBind<T extends object>(
   };
 
   // Iterate over all properties from the prototype chain.
-  for (const [proto, key] of getAllProperties(self.constructor.prototype)) {
+  const constructor = self.constructor as { prototype: object };
+  const target = self as Record<PropertyKey, unknown>;
+
+  for (const [proto, key] of getAllProperties(constructor.prototype)) {
     // Skip the constructor and any keys that don't pass the filter.
     if (key === "constructor" || !filter(key)) {
       continue;
@@ -50,9 +53,10 @@ export default function autoBind<T extends object>(
 
     const descriptor = Reflect.getOwnPropertyDescriptor(proto, key);
     if (descriptor && typeof descriptor.value === "function") {
-      // Bind the method to 'self'. We use a type assertion because
-      // we're dynamically accessing properties.
-      (self as any)[key] = (self as any)[key].bind(self);
+      const value = target[key];
+      if (typeof value === "function") {
+        target[key] = value.bind(self);
+      }
     }
   }
 

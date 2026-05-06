@@ -184,6 +184,7 @@ describe("LoggingService", () => {
   });
 
   it("wraps async iterable methods without consuming their output", async () => {
+    await Promise.resolve();
     const logging = createLoggingService();
     const target = new WrappedTarget();
 
@@ -198,6 +199,7 @@ describe("LoggingService", () => {
   });
 
   it("ends async iterable method logging when iteration stops early", async () => {
+    await Promise.resolve();
     const messages: string[] = [];
     const logger = {
       trace(message: string) {
@@ -372,7 +374,9 @@ describe("LoggingService", () => {
   });
 
   it("closes configured file sinks once", async () => {
-    const close = jest.fn(async () => {});
+    const close = jest.fn(async () => {
+      await Promise.resolve();
+    });
     setLogFileWriterFactory(
       jest.fn(() => ({
         write() {},
@@ -421,6 +425,7 @@ describe("LoggingService", () => {
     setLogFileWriterFactory(() => ({
       write() {},
       close: async () => {
+        await Promise.resolve();
         throw new Error("close failed");
       },
     }));

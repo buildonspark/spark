@@ -31,6 +31,7 @@ class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
   async constructPartialTransferTransaction(
     request: TransferBuildRequestBindingParams,
   ): Promise<PartialTransferBuildResultBinding> {
+    await Promise.resolve();
     const partialTokenTransaction = PartialTokenTransaction.create({
       version: 3,
       tokenTransactionMetadata: {
@@ -64,18 +65,21 @@ class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
   async hashPartialTokenTransaction(
     _partialTokenTransactionBytes: Uint8Array,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     return new Uint8Array(32);
   }
 
   async buildBroadcastTransactionRequest(
     _request: BroadcastBuildRequestBindingParams,
   ): Promise<Uint8Array> {
+    await Promise.resolve();
     return new Uint8Array();
   }
 
   async prepareTokenInvoice(
     _request: PrepareTokenInvoiceRequestBindingParams,
   ): Promise<PreparedTokenInvoiceBinding> {
+    await Promise.resolve();
     return {
       sparkInvoiceFieldsBytes: new Uint8Array(),
       sparkInvoiceHash: new Uint8Array(32),
@@ -86,6 +90,7 @@ class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
   async finalizeTokenInvoice(
     _request: FinalizeTokenInvoiceRequestBindingParams,
   ): Promise<string> {
+    await Promise.resolve();
     return "sprt1test";
   }
 }
@@ -169,6 +174,7 @@ async function createWalletWithScript({
   const scriptedSnapshots = [...outputSnapshots];
   const tokenClient = {
     query_token_outputs: jest.fn(async () => {
+      await Promise.resolve();
       const snapshot = scriptedSnapshots.shift();
       if (!snapshot) {
         throw new Error("No scripted output snapshot remaining");
@@ -197,6 +203,7 @@ async function createWalletWithScript({
       "broadcastTokenTransactionV3",
     )
     .mockImplementation(async () => {
+      await Promise.resolve();
       const nextResult = scriptedTransferResults.shift();
       if (nextResult === undefined) {
         throw new Error("No scripted transfer result remaining");

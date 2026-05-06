@@ -25,7 +25,9 @@ describe("SSP Auth Test", () => {
   it("Should throw an error if the user is not authenticated", async () => {
     // Mock the authenticate function so we don't set the auth token
     const originalAuthenticate = SspClient.prototype.authenticate;
-    SspClient.prototype.authenticate = jest.fn(async () => {});
+    SspClient.prototype.authenticate = jest.fn(async () => {
+      await Promise.resolve();
+    });
 
     try {
       const { wallet } = await SparkWalletTesting.initialize({
@@ -50,7 +52,9 @@ describe("SSP Auth Test", () => {
   it("Should reauthenticate successfully", async () => {
     // Mock the authenticate function so we don't set the auth token
     const originalAuthenticate = SspClient.prototype.authenticate;
-    SspClient.prototype.authenticate = jest.fn(async () => {});
+    SspClient.prototype.authenticate = jest.fn(async () => {
+      await Promise.resolve();
+    });
 
     const { wallet } = await SparkWalletTesting.initialize({
       options,

@@ -5,7 +5,7 @@ export interface RetryConfig {
   backoffFactor: number;
 }
 
-export interface RetryContext<T, TData = any> {
+export interface RetryContext<T, TData = unknown> {
   attempt: number;
   maxAttempts: number;
   error: Error;
@@ -14,7 +14,7 @@ export interface RetryContext<T, TData = any> {
   data?: TData;
 }
 
-export interface RetryCallbacks<T, TData = any> {
+export interface RetryCallbacks<T, TData = unknown> {
   fetchData?: (context: RetryContext<T, TData>) => Promise<TData | undefined>;
   onRetry?: (context: RetryContext<T, TData>) => Promise<void> | void;
   onError?: (
@@ -39,12 +39,12 @@ function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
   return Math.min(delay, config.maxDelayMs);
 }
 
-export interface WithRetryOptions<T, TData = any> {
+export interface WithRetryOptions<T, TData = unknown> {
   config?: RetryConfig;
   callbacks?: RetryCallbacks<T, TData>;
 }
 
-export async function withRetry<T, TData = any>(
+export async function withRetry<T, TData = unknown>(
   operation: (data?: TData) => Promise<T>,
   options: WithRetryOptions<T, TData> = {},
 ): Promise<T> {

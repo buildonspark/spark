@@ -50,7 +50,7 @@ interface SparkKeysGenerator {
 const HARDENED_OFFSET = 0x80000000; // 2^31
 
 class DefaultSparkKeysGenerator implements SparkKeysGenerator {
-  async deriveKeysFromSeed(
+  deriveKeysFromSeed(
     seed: Uint8Array,
     accountNumber: number,
   ): Promise<{
@@ -60,145 +60,67 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
     staticDepositHDKey: DerivedHDKey;
     HTLCPreimageHDKey: DerivedHDKey;
   }> {
-    const hdkey = HDKey.fromMasterSeed(seed);
+    return new Promise((resolve) => {
+      const hdkey = HDKey.fromMasterSeed(seed);
 
-    if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new SparkValidationError("Failed to derive keys from seed", {
-        field: "hdkey",
-        value: seed,
-      });
-    }
+      if (!hdkey.privateKey || !hdkey.publicKey) {
+        throw new SparkValidationError("Failed to derive keys from seed", {
+          field: "hdkey",
+          value: seed,
+        });
+      }
 
-    const identityKey = hdkey.derive(`m/8797555'/${accountNumber}'/0'`);
-    const signingKey = hdkey.derive(`m/8797555'/${accountNumber}'/1'`);
-    const depositKey = hdkey.derive(`m/8797555'/${accountNumber}'/2'`);
-    const staticDepositKey = hdkey.derive(`m/8797555'/${accountNumber}'/3'`);
-    const htlcPreimageKey = hdkey.derive(`m/8797555'/${accountNumber}'/4'`);
-    if (
-      !identityKey.privateKey ||
-      !depositKey.privateKey ||
-      !signingKey.privateKey ||
-      !identityKey.publicKey ||
-      !depositKey.publicKey ||
-      !signingKey.publicKey ||
-      !staticDepositKey.privateKey ||
-      !staticDepositKey.publicKey ||
-      !htlcPreimageKey.privateKey ||
-      !htlcPreimageKey.publicKey
-    ) {
-      throw new SparkValidationError(
-        "Failed to derive all required keys from seed",
-        {
-          field: "derivedKeys",
+      const identityKey = hdkey.derive(`m/8797555'/${accountNumber}'/0'`);
+      const signingKey = hdkey.derive(`m/8797555'/${accountNumber}'/1'`);
+      const depositKey = hdkey.derive(`m/8797555'/${accountNumber}'/2'`);
+      const staticDepositKey = hdkey.derive(`m/8797555'/${accountNumber}'/3'`);
+      const htlcPreimageKey = hdkey.derive(`m/8797555'/${accountNumber}'/4'`);
+      if (
+        !identityKey.privateKey ||
+        !depositKey.privateKey ||
+        !signingKey.privateKey ||
+        !identityKey.publicKey ||
+        !depositKey.publicKey ||
+        !signingKey.publicKey ||
+        !staticDepositKey.privateKey ||
+        !staticDepositKey.publicKey ||
+        !htlcPreimageKey.privateKey ||
+        !htlcPreimageKey.publicKey
+      ) {
+        throw new SparkValidationError(
+          "Failed to derive all required keys from seed",
+          {
+            field: "derivedKeys",
+          },
+        );
+      }
+
+      resolve({
+        identityKey: {
+          privateKey: identityKey.privateKey,
+          publicKey: identityKey.publicKey,
         },
-      );
-    }
-
-    return {
-      identityKey: {
-        privateKey: identityKey.privateKey,
-        publicKey: identityKey.publicKey,
-      },
-      signingHDKey: {
-        hdKey: signingKey,
-        privateKey: signingKey.privateKey,
-        publicKey: signingKey.publicKey,
-      },
-      depositKey: {
-        privateKey: depositKey.privateKey,
-        publicKey: depositKey.publicKey,
-      },
-      staticDepositHDKey: {
-        hdKey: staticDepositKey,
-        privateKey: staticDepositKey.privateKey,
-        publicKey: staticDepositKey.publicKey,
-      },
-      HTLCPreimageHDKey: {
-        hdKey: htlcPreimageKey,
-        privateKey: htlcPreimageKey.privateKey,
-        publicKey: htlcPreimageKey.publicKey,
-      },
-    };
-  }
-}
-
-class DerivationPathKeysGenerator implements SparkKeysGenerator {
-  constructor(private readonly derivationPathTemplate: string) {}
-
-  async deriveKeysFromSeed(
-    seed: Uint8Array,
-    accountNumber: number,
-  ): Promise<{
-    identityKey: KeyPair;
-    signingHDKey: DerivedHDKey;
-    depositKey: KeyPair;
-    staticDepositHDKey: DerivedHDKey;
-    HTLCPreimageHDKey: DerivedHDKey;
-  }> {
-    const hdkey = HDKey.fromMasterSeed(seed);
-
-    if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new SparkValidationError("Failed to derive keys from seed", {
-        field: "hdkey",
-        value: seed,
-      });
-    }
-
-    const derivationPath = this.derivationPathTemplate.replaceAll(
-      "?",
-      accountNumber.toString(),
-    );
-
-    const identityKey = hdkey.derive(derivationPath);
-    const signingKey = hdkey.derive(`${derivationPath}/1'`);
-    const depositKey = hdkey.derive(`${derivationPath}/2'`);
-    const staticDepositKey = hdkey.derive(`${derivationPath}/3'`);
-    const htlcPreimageKey = hdkey.derive(`${derivationPath}/4'`);
-    if (
-      !identityKey.privateKey ||
-      !identityKey.publicKey ||
-      !signingKey.privateKey ||
-      !signingKey.publicKey ||
-      !depositKey.privateKey ||
-      !depositKey.publicKey ||
-      !staticDepositKey.privateKey ||
-      !staticDepositKey.publicKey ||
-      !htlcPreimageKey.privateKey ||
-      !htlcPreimageKey.publicKey
-    ) {
-      throw new SparkValidationError(
-        "Failed to derive all required keys from seed",
-        {
-          field: "derivedKeys",
+        signingHDKey: {
+          hdKey: signingKey,
+          privateKey: signingKey.privateKey,
+          publicKey: signingKey.publicKey,
         },
-      );
-    }
-
-    return {
-      identityKey: {
-        privateKey: identityKey.privateKey,
-        publicKey: identityKey.publicKey,
-      },
-      signingHDKey: {
-        hdKey: signingKey,
-        privateKey: signingKey.privateKey,
-        publicKey: signingKey.publicKey,
-      },
-      depositKey: {
-        privateKey: depositKey.privateKey,
-        publicKey: depositKey.publicKey,
-      },
-      staticDepositHDKey: {
-        hdKey: staticDepositKey,
-        privateKey: staticDepositKey.privateKey,
-        publicKey: staticDepositKey.publicKey,
-      },
-      HTLCPreimageHDKey: {
-        hdKey: htlcPreimageKey,
-        privateKey: htlcPreimageKey.privateKey,
-        publicKey: htlcPreimageKey.publicKey,
-      },
-    };
+        depositKey: {
+          privateKey: depositKey.privateKey,
+          publicKey: depositKey.publicKey,
+        },
+        staticDepositHDKey: {
+          hdKey: staticDepositKey,
+          privateKey: staticDepositKey.privateKey,
+          publicKey: staticDepositKey.publicKey,
+        },
+        HTLCPreimageHDKey: {
+          hdKey: htlcPreimageKey,
+          privateKey: htlcPreimageKey.privateKey,
+          publicKey: htlcPreimageKey.publicKey,
+        },
+      });
+    });
   }
 }
 
@@ -344,36 +266,40 @@ class DefaultSparkSigner implements SparkSigner {
     }
   }
 
-  async signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
-    if (!this.identityKey?.privateKey) {
-      throw new SparkValidationError("Private key not set", {
-        field: "identityKey",
-      });
-    }
+  signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.identityKey?.privateKey) {
+        throw new SparkValidationError("Private key not set", {
+          field: "identityKey",
+        });
+      }
 
-    const signature = schnorr.sign(message, this.identityKey.privateKey);
-
-    return signature;
+      resolve(schnorr.sign(message, this.identityKey.privateKey));
+    });
   }
 
-  async getIdentityPublicKey(): Promise<Uint8Array> {
-    if (!this.identityKey?.publicKey) {
-      throw new SparkValidationError("Private key is not set", {
-        field: "identityKey",
-      });
-    }
+  getIdentityPublicKey(): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.identityKey?.publicKey) {
+        throw new SparkValidationError("Private key is not set", {
+          field: "identityKey",
+        });
+      }
 
-    return this.identityKey.publicKey;
+      resolve(this.identityKey.publicKey);
+    });
   }
 
-  async getDepositSigningKey(): Promise<Uint8Array> {
-    if (!this.depositKey?.publicKey) {
-      throw new SparkValidationError("Deposit key is not set", {
-        field: "depositKey",
-      });
-    }
+  getDepositSigningKey(): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.depositKey?.publicKey) {
+        throw new SparkValidationError("Deposit key is not set", {
+          field: "depositKey",
+        });
+      }
 
-    return this.depositKey.publicKey;
+      resolve(this.depositKey.publicKey);
+    });
   }
 
   async getStaticDepositSigningKey(idx: number): Promise<Uint8Array> {
@@ -381,28 +307,32 @@ class DefaultSparkSigner implements SparkSigner {
     return secp256k1.getPublicKey(staticDepositKey);
   }
 
-  async getStaticDepositSecretKey(idx: number): Promise<Uint8Array> {
-    if (!this.staticDepositKey) {
-      throw new SparkValidationError("Static deposit key is not set", {
-        field: "staticDepositKey",
-      });
-    }
+  getStaticDepositSecretKey(idx: number): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.staticDepositKey) {
+        throw new SparkValidationError("Static deposit key is not set", {
+          field: "staticDepositKey",
+        });
+      }
 
-    const staticDepositKey = this.staticDepositKey.deriveChild(
-      HARDENED_OFFSET + idx,
-    );
+      const staticDepositKey = this.staticDepositKey.deriveChild(
+        HARDENED_OFFSET + idx,
+      );
 
-    if (!staticDepositKey?.privateKey) {
-      throw new SparkValidationError("Static deposit key is not set", {
-        field: "staticDepositKey",
-      });
-    }
+      if (!staticDepositKey?.privateKey) {
+        throw new SparkValidationError("Static deposit key is not set", {
+          field: "staticDepositKey",
+        });
+      }
 
-    return staticDepositKey.privateKey;
+      resolve(staticDepositKey.privateKey);
+    });
   }
 
-  async generateMnemonic(): Promise<string> {
-    return generateMnemonic(wordlist);
+  generateMnemonic(): Promise<string> {
+    return new Promise((resolve) => {
+      resolve(generateMnemonic(wordlist));
+    });
   }
 
   async mnemonicToSeed(mnemonic: string): Promise<Uint8Array> {
@@ -417,20 +347,21 @@ class DefaultSparkSigner implements SparkSigner {
     return secp256k1.getPublicKey(privateKey);
   }
 
-  async subtractPrivateKeysGivenDerivationPaths(
+  subtractPrivateKeysGivenDerivationPaths(
     first: string,
     second: string,
   ): Promise<Uint8Array> {
-    const firstPrivateKey = this.deriveSigningKey(sha256(first));
-    const secondPrivateKey = this.deriveSigningKey(sha256(second));
+    return new Promise((resolve) => {
+      const firstPrivateKey = this.deriveSigningKey(sha256(first));
+      const secondPrivateKey = this.deriveSigningKey(sha256(second));
 
-    const resultPrivKey = subtractPrivateKeys(
-      firstPrivateKey,
-      secondPrivateKey,
-    );
-    const resultPubKey = secp256k1.getPublicKey(resultPrivKey);
+      const resultPrivKey = subtractPrivateKeys(
+        firstPrivateKey,
+        secondPrivateKey,
+      );
 
-    return resultPubKey;
+      resolve(secp256k1.getPublicKey(resultPrivKey));
+    });
   }
 
   async subtractAndSplitSecretWithProofsGivenDerivations({
@@ -556,28 +487,34 @@ class DefaultSparkSigner implements SparkSigner {
     };
   }
 
-  async buildAggregateFrostParams({
-    message,
-    publicKey,
-    verifyingKey,
-    selfCommitment,
-    statechainCommitments,
-    adaptorPubKey,
-    selfSignature,
-    statechainSignatures,
-    statechainPublicKeys,
-  }: AggregateFrostParams): Promise<AggregateFrostBindingParams> {
-    return {
-      message,
-      statechainSignatures,
-      statechainPublicKeys,
-      verifyingKey,
-      statechainCommitments,
-      selfCommitment: selfCommitment.commitment,
-      selfPublicKey: publicKey,
-      selfSignature,
-      adaptorPubKey,
-    };
+  buildAggregateFrostParams(
+    params: AggregateFrostParams,
+  ): Promise<AggregateFrostBindingParams> {
+    return new Promise((resolve) => {
+      const {
+        message,
+        publicKey,
+        verifyingKey,
+        selfCommitment,
+        statechainCommitments,
+        adaptorPubKey,
+        selfSignature,
+        statechainSignatures,
+        statechainPublicKeys,
+      } = params;
+
+      resolve({
+        message,
+        statechainSignatures,
+        statechainPublicKeys,
+        verifyingKey,
+        statechainCommitments,
+        selfCommitment: selfCommitment.commitment,
+        selfPublicKey: publicKey,
+        selfSignature,
+        adaptorPubKey,
+      });
+    });
   }
 
   async signFrost({
@@ -653,23 +590,26 @@ class DefaultSparkSigner implements SparkSigner {
     return bytesToHex(identityKey.publicKey);
   }
 
-  async signMessageWithIdentityKey(
+  signMessageWithIdentityKey(
     message: Uint8Array,
     compact?: boolean,
   ): Promise<Uint8Array> {
-    if (!this.identityKey?.privateKey) {
-      throw new SparkError("Identity key not initialized", {
-        configKey: "identityKey",
-      });
-    }
+    return new Promise((resolve) => {
+      if (!this.identityKey?.privateKey) {
+        throw new SparkError("Identity key not initialized", {
+          configKey: "identityKey",
+        });
+      }
 
-    const signature = secp256k1.sign(message, this.identityKey.privateKey);
+      const signature = secp256k1.sign(message, this.identityKey.privateKey);
 
-    if (compact) {
-      return signature.toCompactRawBytes();
-    }
+      if (compact) {
+        resolve(signature.toCompactRawBytes());
+        return;
+      }
 
-    return signature.toDERRawBytes();
+      resolve(signature.toDERRawBytes());
+    });
   }
 
   async decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array> {
@@ -686,24 +626,28 @@ class DefaultSparkSigner implements SparkSigner {
     return publicKey;
   }
 
-  async getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce> {
-    const nonce = getRandomSigningNonce();
-    const commitment = getSigningCommitmentFromNonce(nonce);
-    this.commitmentToNonceMap.set(commitment, nonce);
-    return {
-      commitment,
-    };
+  getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce> {
+    return new Promise((resolve) => {
+      const nonce = getRandomSigningNonce();
+      const commitment = getSigningCommitmentFromNonce(nonce);
+      this.commitmentToNonceMap.set(commitment, nonce);
+      resolve({
+        commitment,
+      });
+    });
   }
 
-  async validateMessageWithIdentityKey(
+  validateMessageWithIdentityKey(
     message: Uint8Array,
     signature: Uint8Array,
   ): Promise<boolean> {
-    if (!this.identityKey?.publicKey) {
-      throw new SparkError("identityKey not initialized");
-    }
+    return new Promise((resolve) => {
+      if (!this.identityKey?.publicKey) {
+        throw new SparkError("identityKey not initialized");
+      }
 
-    return secp256k1.verify(signature, message, this.identityKey.publicKey);
+      resolve(secp256k1.verify(signature, message, this.identityKey.publicKey));
+    });
   }
 
   signTransactionIndex(
@@ -733,13 +677,16 @@ class DefaultSparkSigner implements SparkSigner {
     tx.signIdx(privateKey, index);
   }
 
-  async htlcHMAC(transferID: string): Promise<Uint8Array> {
-    if (!this.htlcPreimageKey?.privateKey) {
-      throw new SparkError("HTLC preimage key not initialized", {
-        configKey: "htlcPreimageKey",
-      });
-    }
-    return hmac(sha256, this.htlcPreimageKey.privateKey, transferID);
+  htlcHMAC(transferID: string): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.htlcPreimageKey?.privateKey) {
+        throw new SparkError("HTLC preimage key not initialized", {
+          configKey: "htlcPreimageKey",
+        });
+      }
+
+      resolve(hmac(sha256, this.htlcPreimageKey.privateKey, transferID));
+    });
   }
 }
 
@@ -756,13 +703,15 @@ class UnsafeStatelessSparkSigner extends DefaultSparkSigner {
     return selfCommitment.nonce;
   }
 
-  async getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce> {
-    const nonce = getRandomSigningNonce();
-    const commitment = getSigningCommitmentFromNonce(nonce);
-    return {
-      commitment,
-      nonce,
-    };
+  getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce> {
+    return new Promise((resolve) => {
+      const nonce = getRandomSigningNonce();
+      const commitment = getSigningCommitmentFromNonce(nonce);
+      resolve({
+        commitment,
+        nonce,
+      });
+    });
   }
 }
 

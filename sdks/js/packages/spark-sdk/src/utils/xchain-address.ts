@@ -29,7 +29,9 @@ export function getSparkAddressFromTaproot(
           network: networkType,
         });
       }
-    } catch (_) {}
+    } catch {
+      continue;
+    }
   }
 
   throw new SparkValidationError("Invalid taproot address");

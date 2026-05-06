@@ -2,7 +2,6 @@ import { LoggingLevel, type Logger } from "@lightsparkdev/core";
 import type {
   LogConfig,
   LogServiceName,
-  MethodLoggingOptions,
   ServiceLoggingConfig,
 } from "../services/wallet-config.js";
 import { LOG_SERVICE_NAMES } from "../services/wallet-config.js";
@@ -297,7 +296,7 @@ export class LoggingService {
     const excludedMethods = new Set(options?.excludeMethods ?? []);
     const stopAtPrototype = options?.stopAtPrototype ?? Object.prototype;
     let proto: object | null =
-      options?.startAtPrototype ?? Object.getPrototypeOf(target);
+      options?.startAtPrototype ?? Reflect.getPrototypeOf(target);
 
     while (proto && proto !== stopAtPrototype) {
       for (const methodName of Object.getOwnPropertyNames(proto)) {
@@ -321,7 +320,7 @@ export class LoggingService {
         });
       }
 
-      proto = Object.getPrototypeOf(proto);
+      proto = Reflect.getPrototypeOf(proto);
     }
   }
 

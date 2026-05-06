@@ -18,13 +18,14 @@ export function HashSparkInvoice(
   }
 
   switch (sparkInvoiceFields.version) {
-    case 1:
+    case 1: {
       const hash = HashSparkInvoiceV1(
         sparkInvoiceFields,
         receiverPublicKey,
         network,
       );
       return hash;
+    }
     default:
       throw new Error(
         `Unsupported invoice version: ${sparkInvoiceFields.version}`,

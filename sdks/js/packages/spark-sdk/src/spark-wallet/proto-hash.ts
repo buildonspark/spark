@@ -3,6 +3,7 @@
  * This implements the same objecthash algorithm used by github.com/stackb/protoreflecthash
  * to ensure identical hashes for the same proto messages across Go and JavaScript.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return -- This file implements dynamic protobuf reflection over generated message shapes. */
 
 import { getFieldNumbers, getFieldMeta } from "./proto-reflection.js";
 import { sha256 } from "@noble/hashes/sha2";
@@ -143,7 +144,7 @@ export class ProtoHasher {
       }
 
       const fieldValue = resolvedValue;
-      const khash = await this.hashFieldKey(parseInt(fieldNumber), fieldName);
+      const khash = this.hashFieldKey(parseInt(fieldNumber), fieldName);
 
       let vhash: Uint8Array | null = null;
       try {
@@ -187,10 +188,7 @@ export class ProtoHasher {
     return this.hash(identifier, buffer);
   }
 
-  private async hashFieldKey(
-    fieldNumber: number,
-    fieldName: string,
-  ): Promise<Uint8Array> {
+  private hashFieldKey(fieldNumber: number, fieldName: string): Uint8Array {
     return this.hashInt64(fieldNumber);
   }
 

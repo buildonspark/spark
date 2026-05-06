@@ -6,6 +6,7 @@ import { SparkWallet } from "../spark-wallet/spark-wallet.js";
 
 class TestableWallet extends SparkWalletTesting {
   public async testThrowError(): Promise<void> {
+    await Promise.resolve();
     throw new Error("Something went wrong");
   }
 }

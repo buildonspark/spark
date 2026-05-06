@@ -50,6 +50,24 @@ const CHANNEL_OPTIONS = {
   "grpc-node.flow_control_window": HTTP2_FLOW_CONTROL_WINDOW,
 };
 
+type GrpcChannelWithInternalSocket = {
+  internalChannel?: {
+    currentPicker?: {
+      subchannel?: {
+        child?: {
+          transport?: {
+            session?: {
+              socket?: {
+                unref: () => void;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+};
+
 export class ConnectionManagerNodeJS extends ConnectionManager {
   private certPath: string | null = null;
 
@@ -85,18 +103,20 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     };
   }
 
-  protected async createChannelWithTLS(
+  protected createChannelWithTLS(
     address: string,
     isStreamClientType: boolean = false,
-  ) {
+  ): Promise<Channel> {
     try {
       if (this.certPath) {
         try {
           const cert = fs.readFileSync(this.certPath);
-          return createChannel(
-            address,
-            ChannelCredentials.createSsl(cert),
-            CHANNEL_OPTIONS,
+          return Promise.resolve(
+            createChannel(
+              address,
+              ChannelCredentials.createSsl(cert),
+              CHANNEL_OPTIONS,
+            ),
           );
         } catch (error) {
           this.logger.warn(
@@ -104,12 +124,14 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
               error instanceof Error ? error.message : String(error)
             }`,
           );
-          return createChannel(
-            address,
-            ChannelCredentials.createSsl(null, null, null, {
-              rejectUnauthorized: false,
-            }),
-            CHANNEL_OPTIONS,
+          return Promise.resolve(
+            createChannel(
+              address,
+              ChannelCredentials.createSsl(null, null, null, {
+                rejectUnauthorized: false,
+              }),
+              CHANNEL_OPTIONS,
+            ),
           );
         }
       } else {
@@ -120,7 +142,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
           }),
           CHANNEL_OPTIONS,
         );
-        return ch;
+        return Promise.resolve(ch);
       }
     } catch (error) {
       throw new SparkRequestError("Failed to create channel", {
@@ -137,9 +159,9 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
       | SparkTokenServiceDefinition,
     channel: Channel,
     withRetries: boolean,
-    middleware?: ClientMiddleware<RetryOptions, {}>,
+    middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: string,
-  ) {
+  ): Promise<T & { close?: () => void }> {
     const retryOptions: RetryOptions = {
       retry: true,
       retryMaxAttempts: 3,
@@ -160,17 +182,17 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     const client = clientFactory.create(definition, channel, {
       "*": options,
     }) as T;
-    return {
+    return Promise.resolve({
       ...client,
       close: channelKey
         ? () => ConnectionManager.releaseChannel(channelKey)
         : channel.close.bind(channel),
-    };
+    });
   }
 
   override async subscribeToEvents(address: string, signal: AbortSignal) {
     const stream = await super.subscribeToEvents(address, signal);
-    const channel = await this.getChannelForClient("stream", address);
+    const channel = this.getChannelForClient("stream", address);
 
     if (!channel) {
       throw new Error("Failed to get channel for client");
@@ -186,13 +208,14 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     //
     // Since the socket isn't always immediately available, we retry with setTimeout
     // until it shows up.
-    const maybeUnref = () => {
-      const internalChannel = (channel as any).internalChannel;
-      if (
+    const maybeUnref = (): void => {
+      const internalChannel = (channel as GrpcChannelWithInternalSocket)
+        .internalChannel;
+      const socket =
         internalChannel?.currentPicker?.subchannel?.child?.transport?.session
-          ?.socket
-      ) {
-        internalChannel.currentPicker.subchannel.child.transport.session.socket.unref();
+          ?.socket;
+      if (socket) {
+        socket.unref();
       } else {
         const retryTimer = setTimeout(maybeUnref, 100);
         (retryTimer as unknown as NodeJS.Timeout).unref?.();
