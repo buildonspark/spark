@@ -132,6 +132,11 @@ func (Transfer) Indexes() []ent.Index {
 		// status. Serves QueryTransfers pending (sender + receiver) and
 		// GetStuckTransfers sender arm. WHERE clause is the complement of the
 		// terminal set (COMPLETED / CANCELLED / EXPIRED / RETURNED).
+		//
+		// Deprecated for outgoing-in-flight sender queries: WHERE excludes
+		// APPLYING_SENDER_KEY_TWEAK. Use
+		// idx_transfers_outgoing_in_flight_sender_pubkey_time for that shape.
+		// Likely obsolete with full MIMO / SP-2914.
 		index.Fields("network", "create_time", "id").
 			Annotations(
 				entsql.DescColumns("create_time", "id"),
@@ -149,6 +154,17 @@ func (Transfer) Indexes() []ent.Index {
 				entsql.IndexWhere("status IN ('SENDER_KEY_TWEAK_PENDING', 'SENDER_INITIATED')"),
 			).
 			StorageKey("idx_transfers_pending_sender_pubkey_time"),
+
+		// Drives queryOutgoingInFlightMIMO. Matches the SDK's 4-state filter
+		// sent by wallets polling for outbound transfers in flight; includes
+		// APPLYING_SENDER_KEY_TWEAK for predicate-subset matching (0 rows
+		// today, but the SDK sends it). Obsolete with SP-2914.
+		index.Fields("sender_identity_pubkey", "create_time", "id").
+			Annotations(
+				entsql.DescColumns("create_time", "id"),
+				entsql.IndexWhere("status IN ('SENDER_INITIATED', 'SENDER_INITIATED_COORDINATOR', 'APPLYING_SENDER_KEY_TWEAK', 'SENDER_KEY_TWEAK_PENDING')"),
+			).
+			StorageKey("idx_transfers_outgoing_in_flight_sender_pubkey_time"),
 
 		index.Fields("spark_invoice_id").
 			Unique().

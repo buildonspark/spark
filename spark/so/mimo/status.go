@@ -64,3 +64,15 @@ func StuckReceiverStatuses() []string {
 		string(st.TransferReceiverStatusRefundSigned),
 	}
 }
+
+// OutgoingInFlightSenderStatuses mirrors the JS SDK's SENDER_PENDING_STATUSES.
+// Includes APPLYING_SENDER_KEY_TWEAK for predicate-subset matching against the
+// partial index.
+func OutgoingInFlightSenderStatuses() []string {
+	return []string{
+		string(st.TransferStatusSenderInitiated),
+		string(st.TransferStatusSenderInitiatedCoordinator),
+		string(st.TransferStatusApplyingSenderKeyTweak),
+		string(st.TransferStatusSenderKeyTweakPending),
+	}
+}

@@ -1264,6 +1264,19 @@ var (
 				},
 			},
 			{
+				Name:    "idx_transfers_outgoing_in_flight_sender_pubkey_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[3], TransfersColumns[1], TransfersColumns[0]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransfersColumns[1].Name: true,
+
+						TransfersColumns[0].Name: true,
+					},
+					Where: "status IN ('SENDER_INITIATED', 'SENDER_INITIATED_COORDINATOR', 'APPLYING_SENDER_KEY_TWEAK', 'SENDER_KEY_TWEAK_PENDING')",
+				},
+			},
+			{
 				Name:    "idx_transfers_spark_invoice_pending",
 				Unique:  true,
 				Columns: []*schema.Column{TransfersColumns[12]},

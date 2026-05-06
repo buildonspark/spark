@@ -33,3 +33,26 @@ func TestPendingStatusesDisjoint(t *testing.T) {
 		"PendingSenderStatuses and PendingReceiverStatuses must be disjoint — "+
 			"buildPendingIDsQuerySenderOrReceiver relies on this for correctness without DISTINCT")
 }
+
+// Locks the exact 4-state set. Drift without a matching index migration
+// silently disables partial-index drive for the SDK's filter shape.
+func TestOutgoingInFlightSenderStatuses(t *testing.T) {
+	assert.ElementsMatch(t, []string{
+		"SENDER_INITIATED",
+		"SENDER_INITIATED_COORDINATOR",
+		"APPLYING_SENDER_KEY_TWEAK",
+		"SENDER_KEY_TWEAK_PENDING",
+	}, mimo.OutgoingInFlightSenderStatuses())
+}
+
+// Locks the documented superset relationship between the two sender status sets.
+func TestOutgoingInFlightIsSupersetOfPendingSender(t *testing.T) {
+	outgoingSet := make(map[string]bool, len(mimo.OutgoingInFlightSenderStatuses()))
+	for _, s := range mimo.OutgoingInFlightSenderStatuses() {
+		outgoingSet[s] = true
+	}
+	for _, s := range mimo.PendingSenderStatuses() {
+		assert.True(t, outgoingSet[s],
+			"PendingSenderStatuses element %q must also be in OutgoingInFlightSenderStatuses", s)
+	}
+}
