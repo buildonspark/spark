@@ -120,18 +120,5 @@ func MarkExitingNodes(ctx context.Context, dbClient *ent.Client, confirmedTxHash
 
 // Checks whether a tree node status can transition to TreeNodeStatusAvailable.
 func TreeNodeCanBecomeAvailable(node *ent.TreeNode) bool {
-	switch node.Status {
-	case st.TreeNodeStatusSplitted:
-		return false
-	case st.TreeNodeStatusOnChain:
-		return false
-	case st.TreeNodeStatusExited:
-		return false
-	case st.TreeNodeStatusParentExited:
-		return false
-	case st.TreeNodeStatusReimbursed:
-		return false
-	default:
-		return true
-	}
+	return node.Status.CanBecomeAvailable()
 }

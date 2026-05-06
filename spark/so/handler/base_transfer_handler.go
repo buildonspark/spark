@@ -1366,6 +1366,7 @@ func (h *BaseTransferHandler) RollbackTransfer(ctx context.Context, transferID u
 }
 
 func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, transfer *ent.Transfer) error {
+	logger := logging.GetLoggerFromContext(ctx)
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
@@ -1375,6 +1376,14 @@ func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, tr
 		treeNode, err := leaf.QueryLeaf().ForUpdate().Only(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get tree node: %w", err)
+		}
+		// Skip leaves that have already advanced to a terminal state (e.g. their
+		// refund tx confirmed on-chain, marking the leaf EXITED). Reviving such
+		// a leaf to AVAILABLE would let the sender create a second transfer
+		// from an already-spent outpoint. See SP-3049.
+		if !treeNode.Status.CanBecomeAvailable() {
+			logger.Sugar().Infof("Skipping unlock of tree node %s in terminal status %s during cancel of transfer %s", treeNode.ID, treeNode.Status, transfer.ID)
+			continue
 		}
 		_, err = treeNode.Update().SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
 		if err != nil {

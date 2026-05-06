@@ -15,6 +15,7 @@ import (
 	gen "github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/hook"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/entexample"
 )
 
@@ -200,6 +201,43 @@ func (TreeNode) Indexes() []ent.Index {
 
 func (TreeNode) Hooks() []ent.Hook {
 	return []ent.Hook{
+		// Reject AVAILABLE transitions for nodes in a terminal status. Once a node
+		// is SPLITTED / ON_CHAIN / EXITED / PARENT_EXITED / REIMBURSED, its
+		// backing UTXO has been consumed (or retired) and the node must never be
+		// revived off-chain. Guards against bugs like SP-3049, where a cancel
+		// path unconditionally reset leaves to AVAILABLE and let a user create
+		// a second transfer from an already-spent outpoint.
+		hook.On(
+			func(next ent.Mutator) ent.Mutator {
+				return hook.TreeNodeFunc(func(ctx context.Context, m *gen.TreeNodeMutation) (ent.Value, error) {
+					newStatus, ok := m.Status()
+					if !ok || newStatus != st.TreeNodeStatusAvailable {
+						return next.Mutate(ctx, m)
+					}
+					ids, err := m.IDs(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get tree node IDs for AVAILABLE-transition guard: %w", err)
+					}
+					if len(ids) == 0 {
+						return next.Mutate(ctx, m)
+					}
+					existing, err := m.Client().TreeNode.Query().
+						Where(treenode.IDIn(ids...)).
+						Select(treenode.FieldID, treenode.FieldStatus).
+						All(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("failed to load tree nodes for AVAILABLE-transition guard: %w", err)
+					}
+					for _, n := range existing {
+						if !n.Status.CanBecomeAvailable() {
+							return nil, fmt.Errorf("tree node %s in terminal status %s cannot transition to AVAILABLE", n.ID, n.Status)
+						}
+					}
+					return next.Mutate(ctx, m)
+				})
+			},
+			ent.OpUpdate|ent.OpUpdateOne,
+		),
 		// Validate that the tree_node's network matches the network of its parent tree
 		hook.On(
 			func(next ent.Mutator) ent.Mutator {

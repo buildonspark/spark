@@ -36,6 +36,38 @@ const (
 	TreeNodeStatusRenewLocked TreeNodeStatus = "RENEW_LOCKED"
 )
 
+// CanBecomeAvailable reports whether a tree node currently in this status is
+// allowed to transition to AVAILABLE. Terminal states whose backing UTXO has
+// been consumed on-chain (or has otherwise been retired) must never be revived
+// off-chain — see SP-3049 for the cancel-transfer revival exploit this guards
+// against.
+func (s TreeNodeStatus) CanBecomeAvailable() bool {
+	switch s {
+	case TreeNodeStatusSplitted,
+		TreeNodeStatusOnChain,
+		TreeNodeStatusExited,
+		TreeNodeStatusParentExited,
+		TreeNodeStatusReimbursed:
+		return false
+	case TreeNodeStatusCreating,
+		TreeNodeStatusAvailable,
+		TreeNodeStatusFrozenByIssuer,
+		TreeNodeStatusTransferLocked,
+		TreeNodeStatusSplitLocked,
+		TreeNodeStatusAggregated,
+		TreeNodeStatusAggregateLock,
+		TreeNodeStatusInvestigation,
+		TreeNodeStatusLost,
+		TreeNodeStatusRenewLocked:
+		return true
+	}
+	// Fail-safe: a TreeNodeStatus that didn't match either arm above is treated
+	// as non-revivable. The `exhaustive` linter makes this branch unreachable
+	// today, but defaulting to false ensures any newly-added status is opted
+	// into AVAILABLE transitions explicitly rather than by accident.
+	return false
+}
+
 // Values returns the values of the tree node status.
 func (TreeNodeStatus) Values() []string {
 	return []string{

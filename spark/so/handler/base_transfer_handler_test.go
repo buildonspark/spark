@@ -801,6 +801,97 @@ func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 	})
 }
 
+// TestCancelTransfer_DoesNotReviveExitedLeaf is a regression test for SP-3049.
+// Before the fix, cancelTransferUnlockLeaves unconditionally reset every leaf
+// of the cancelled transfer to AVAILABLE — including leaves that had already
+// transitioned to a terminal status (e.g. EXITED after the refund tx confirmed
+// on-chain). That allowed a sender to create a second transfer from an
+// outpoint whose UTXO had already been spent.
+func TestCancelTransfer_DoesNotReviveExitedLeaf(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+
+	tree, err := client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(senderPub).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	secret := keys.GeneratePrivateKey()
+	keyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"key": secret.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusTransferLocked).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetSigningKeyshare(keyshare).
+		SetValue(1000).
+		SetVerifyingPubkey(keys.GeneratePrivateKey().Public()).
+		SetOwnerIdentityPubkey(senderPub).
+		SetOwnerSigningPubkey(senderPub).
+		SetRawTx(createTestTxBytes(t, 3000)).
+		SetRawRefundTx(createTestTxBytes(t, 3100)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer, err := client.Transfer.Create().
+		SetSenderIdentityPubkey(senderPub).
+		SetReceiverIdentityPubkey(receiverPub).
+		SetStatus(st.TransferStatusSenderInitiated).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetType(st.TransferTypeTransfer).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = client.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(leaf).
+		SetPreviousRefundTx(createTestTxBytes(t, 4000)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 4001)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Simulate the refund tx confirming on-chain: MarkExitingNodes promotes
+	// the leaf to EXITED while the transfer is still SENDER_INITIATED.
+	_, err = leaf.Update().SetStatus(st.TreeNodeStatusExited).Save(ctx)
+	require.NoError(t, err)
+
+	h := NewBaseTransferHandler(config)
+	err = h.CancelTransferInternal(ctx, transfer.ID)
+	require.NoError(t, err)
+
+	// Cancel must complete cleanly — transfer marked RETURNED.
+	updatedTransfer, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, st.TransferStatusReturned, updatedTransfer.Status)
+
+	// Critically: the on-chain leaf must NOT be revived. Reviving it would let
+	// the sender start a second transfer from an already-spent outpoint.
+	updatedLeaf, err := client.TreeNode.Get(ctx, leaf.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TreeNodeStatusExited, updatedLeaf.Status,
+		"cancel must not revive a leaf whose refund tx already confirmed on-chain (SP-3049)")
+}
+
 func TestValidateTransferPackage_DuplicateLeafID(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	h := NewBaseTransferHandler(config)
