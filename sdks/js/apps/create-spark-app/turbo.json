@@ -7,12 +7,6 @@
        https://github.com/vercel/turborepo/issues/937 */
     "package:checks": {
       "dependsOn": ["build", "^build"]
-    },
-    "test:integration": {
-      "dependsOn": ["build", "^build"]
-    },
-    "test:integration:ssp": {
-      "dependsOn": ["build", "^build"]
     }
   }
 }

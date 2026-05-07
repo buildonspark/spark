@@ -4,18 +4,9 @@ import { Fragment, useState } from 'react';
 import { CONFIG } from '../config';
 import { HERMETIC_CONFIG } from '../config/hermeticConfig';
 import { SPARK_ENV } from '../config/sparkEnv';
-import {
-  Button,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
   const [wallet, setWallet] = useState<IssuerSparkWallet | null>(null);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [dummyTx, setDummyTx] = useState<string | null>(null);
@@ -37,14 +28,14 @@ function App() {
       setInvoice(null);
       setDummyTx(null);
       setTestTokenTxId(null);
-      const { wallet } = await IssuerSparkWallet.initialize({
+      const { wallet: initializedWallet } = await IssuerSparkWallet.initialize({
         options: SPARK_ENV.isHermeticTest
           ? { network: 'LOCAL', ...HERMETIC_CONFIG }
           : CONFIG,
       });
-      setWallet(wallet);
-      const addr = await wallet.getSparkAddress();
-      const { balance: bal } = await wallet.getBalance();
+      setWallet(initializedWallet);
+      const addr = await initializedWallet.getSparkAddress();
+      const { balance: bal } = await initializedWallet.getBalance();
       setSparkAddress(addr);
       setBalance(bal.toString());
     } catch (err) {
@@ -65,12 +56,12 @@ function App() {
         return;
       }
       console.log('Wallet found');
-      const invoice = await wallet.createLightningInvoice({
+      const lightningInvoice = await wallet.createLightningInvoice({
         amountSats: 1000,
       });
-      setInvoice(invoice.invoice.encodedInvoice);
-    } catch (error) {
-      console.error('Invoice creation error:', error);
+      setInvoice(lightningInvoice.invoice.encodedInvoice);
+    } catch (err) {
+      console.error('Invoice creation error:', err);
     } finally {
       setIsCreatingInvoice(false);
     }
@@ -80,14 +71,14 @@ function App() {
     try {
       setIsTestingBindings(true);
       const sparkFrost = getSparkFrost();
-      const dummyTx = await sparkFrost.createDummyTx(
+      const generatedDummyTx = await sparkFrost.createDummyTx(
         'bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te',
         65536n,
       );
-      console.log('Tx:', dummyTx.txid);
-      setDummyTx(dummyTx.txid);
-    } catch (error) {
-      console.error('Test bindings error:', error);
+      console.log('Tx:', generatedDummyTx.txid);
+      setDummyTx(generatedDummyTx.txid);
+    } catch (err) {
+      console.error('Test bindings error:', err);
     } finally {
       setIsTestingBindings(false);
     }
@@ -96,10 +87,10 @@ function App() {
   const getBalance = async () => {
     try {
       setIsLoadingBalance(true);
-      const balance = await wallet?.getBalance();
-      setBalance(balance?.balance.toString() ?? null);
-    } catch (error) {
-      console.error('Get balance error:', error);
+      const walletBalance = await wallet?.getBalance();
+      setBalance(walletBalance?.balance.toString() ?? null);
+    } catch (err) {
+      console.error('Get balance error:', err);
     } finally {
       setIsLoadingBalance(false);
     }
@@ -108,16 +99,16 @@ function App() {
   const createTestToken = async () => {
     try {
       setIsCreatingTestToken(true);
-      const testTokenTxId = await wallet?.createToken({
+      const createdTokenTxId = await wallet?.createToken({
         tokenName: 'Test Token',
         tokenTicker: 'TEST',
         decimals: 0,
         isFreezable: false,
         maxSupply: 0n,
       });
-      setTestTokenTxId(testTokenTxId ?? null);
-    } catch (error) {
-      console.error('Create test token error:', error);
+      setTestTokenTxId(createdTokenTxId ?? null);
+    } catch (err) {
+      console.error('Create test token error:', err);
     } finally {
       setIsCreatingTestToken(false);
     }

@@ -6,13 +6,13 @@ async function waitForEither(successId, errorId, timeout) {
     try {
       await expect(element(by.id(successId))).toBeVisible();
       return 'success';
-    } catch (_) {
+    } catch {
       // not visible yet
     }
     try {
       await expect(element(by.id(errorId))).toBeVisible();
       return 'error';
-    } catch (_) {
+    } catch {
       // not visible yet
     }
     await new Promise(r => setTimeout(r, 1000));

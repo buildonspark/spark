@@ -1,0 +1,48 @@
+name: "JS SDK checks"
+description: "Runs generated proto checks, build, lint, format, package checks, and tests for the Spark JS SDK"
+inputs:
+  node-version:
+    description: "Node.js version spec passed to actions/setup-node"
+    required: true
+  workspace:
+    description: "Working directory for the JS SDK workspace"
+    required: false
+    default: "sdks/js"
+  repo-token:
+    description: "Token passed to third-party setup actions requiring authentication"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: "Install Protoc"
+      uses: arduino/setup-protoc@v3
+      with:
+        version: "33.2"
+        repo-token: ${{ inputs.repo-token }}
+
+    - name: "Setup Node.js and Yarn"
+      uses: ./public/actions/setup-node-yarn-install
+      with:
+        node-version: ${{ inputs.node-version }}
+        cwd: ${{ inputs.workspace }}
+
+    - name: "Run JS SDK checks"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: yarn checks
+
+    - name: "Check generated JS proto files"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: yarn run generate:proto:check
+
+    - name: "Verify Android 16kb page size alignment"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: |
+        if ! command -v llvm-objdump &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y llvm
+        fi
+
+        bash ../../public/scripts/verify-android-page-size.sh

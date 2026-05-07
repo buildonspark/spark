@@ -77,8 +77,8 @@ jobs:
         with:
           ref: ${{ needs.update-lock-file.outputs.VERIFIED_LOCK_COMMIT }}
 
-      - name: "Run JS SDK unit tests"
-        uses: ./public/actions/js-sdk-unit-test
+      - name: "Run JS SDK checks"
+        uses: ./public/actions/js-sdk-checks
         with:
           node-version: ${{ matrix.node-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}

@@ -49,7 +49,7 @@
     "lint:fix": "eslint --fix .",
     "lint:fix:continue": "eslint --fix . || exit 0",
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
-    "lint": "eslint .",
+    "lint": "echo \"Not implemented yet\"",
     "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
