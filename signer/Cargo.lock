@@ -2462,7 +2462,7 @@ dependencies = [
 
 [[package]]
 name = "spark-token-primitives"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64",
  "bech32",
@@ -2479,7 +2479,7 @@ dependencies = [
 
 [[package]]
 name = "spark-token-primitives-uniffi"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "js-sys",
  "serde",
