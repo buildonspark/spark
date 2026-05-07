@@ -149,6 +149,7 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		endSpanWithError(span, retErr)
 	}()
 
+	phaseStart := time.Now()
 	consensusCtx, consensusSpan := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2.consensusExecute", spanOpt)
 	prepareReq := &pbinternal.StorePreimageSharePrepareRequest{OriginalRequest: req}
 	flow := &preimageShareCoordinatorFlow{
@@ -165,6 +166,7 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE,
 		&selection, flow)
 	endSpanWithError(consensusSpan, err)
+	observeLightningPhase(ctx, lightningFlowStorePreimageShare, lightningPhaseConsensusExecute, phaseStart, err)
 	if err != nil {
 		return fmt.Errorf("consensus store preimage share failed: %w", err)
 	}
@@ -2352,9 +2354,11 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	}
 	endSpanWithError(validateSpan, nil)
 
+	phaseStart := time.Now()
 	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.storePreimage", spanOpt)
 	_, err = h.StorePreimage(storeCtx, preimageRequest, req.Preimage)
 	endSpanWithError(storeSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, phaseStart, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store preimage: %w", err)
 	}
@@ -2391,13 +2395,13 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	internalReq.KeyTweakProofs = keyTweakProofMap
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	phaseStart = time.Now()
 	fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout", spanOpt)
 	_, err = helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (_ any, retErr error) {
 		operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout.operator", spanOpt)
 		defer func() {
 			endSpanWithError(operatorSpan, retErr)
 		}()
-
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			return nil, err
@@ -2412,6 +2416,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, nil
 	})
 	endSpanWithError(fanoutSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseFanout, phaseStart, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
@@ -2421,6 +2426,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, fmt.Errorf("unable to get operator list: %w", err)
 	}
 	sendGossipHandler := NewSendGossipHandler(h.config)
+	phaseStart = time.Now()
 	gossipCtx, gossipSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.sendGossip", spanOpt)
 	_, err = sendGossipHandler.CreateAndSendGossipMessage(gossipCtx, &pbgossip.GossipMessage{
 		Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
@@ -2431,26 +2437,33 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		},
 	}, participants)
 	endSpanWithError(gossipSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseSendGossip, phaseStart, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create and send gossip message to settle sender key tweak: %w", err)
 	}
 
 	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningReceive)
 
+	// The span includes DB context lookup; reload_transfer measures only Transfer.Get.
 	reloadCtx, reloadSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.reloadTransfer", spanOpt)
 	tx, err := ent.GetDbFromContext(reloadCtx)
 	if err != nil {
 		endSpanWithError(reloadSpan, err)
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	phaseStart = time.Now()
 	transfer, err = tx.Transfer.Get(reloadCtx, transfer.ID)
+	endSpanWithError(reloadSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseReloadTransfer, phaseStart, err)
 	if err != nil {
-		endSpanWithError(reloadSpan, err)
 		return nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 
-	transferProto, err := transfer.MarshalProto(reloadCtx)
-	endSpanWithError(reloadSpan, err)
+	marshalStart := time.Now()
+	marshalCtx, marshalSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.marshalTransfer", spanOpt)
+	transferProto, err := transfer.MarshalProto(marshalCtx)
+	endSpanWithError(marshalSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseMarshalTransfer, marshalStart, err)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
