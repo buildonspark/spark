@@ -1032,3 +1032,47 @@ func TestVerifySenderKeyTweakProofsMatch_Mismatch(t *testing.T) {
 	err := verifySenderKeyTweakProofsMatch(keyTweakMap, senderProofs)
 	require.ErrorContains(t, err, "sender key tweak proof mismatch for leaf")
 }
+
+func TestCreateTransferEdgeRows_DenormalizeTransferTypeFromParent(t *testing.T) {
+	cases := []st.TransferType{
+		st.TransferTypeTransfer,
+		st.TransferTypeCounterSwap,
+		st.TransferTypeSwap,
+		st.TransferTypePreimageSwap,
+		st.TransferTypeCooperativeExit,
+		st.TransferTypeUtxoSwap,
+		st.TransferTypePrimarySwapV3,
+		st.TransferTypeCounterSwapV3,
+	}
+	for _, parentType := range cases {
+		t.Run(string(parentType), func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			client, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			senderPub := keys.GeneratePrivateKey().Public()
+			receiverPub := keys.GeneratePrivateKey().Public()
+
+			tr, err := client.Transfer.Create().
+				SetSenderIdentityPubkey(senderPub).
+				SetReceiverIdentityPubkey(receiverPub).
+				SetStatus(st.TransferStatusCompleted).
+				SetType(parentType).
+				SetNetwork(btcnetwork.Regtest).
+				SetTotalValue(1000).
+				SetExpiryTime(time.Now().Add(10 * time.Minute)).
+				Save(ctx)
+			require.NoError(t, err)
+
+			sender, err := createTransferSender(ctx, client, tr, senderPub)
+			require.NoError(t, err)
+			require.Equal(t, parentType, sender.TransferType, "sender transfer_type should match parent")
+			require.True(t, sender.CreateTime.Equal(tr.CreateTime), "sender create_time should match parent")
+
+			receiver, err := createTransferReceiver(ctx, client, tr, receiverPub, st.TransferReceiverStatusCompleted)
+			require.NoError(t, err)
+			require.Equal(t, parentType, receiver.TransferType, "receiver transfer_type should match parent")
+			require.True(t, receiver.CreateTime.Equal(tr.CreateTime), "receiver create_time should match parent")
+		})
+	}
+}

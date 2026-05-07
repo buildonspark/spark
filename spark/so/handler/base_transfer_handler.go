@@ -966,9 +966,9 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 	return nil
 }
 
-// createTransferSender creates a TransferSender row whose create_time matches
-// the parent transfer's create_time, so (transfer, sender, receiver) share a
-// single timestamp within the same SO.
+// createTransferSender creates a TransferSender row whose create_time and
+// transfer_type are denormalized from the parent transfer, so (transfer,
+// sender, receiver) share a single timestamp and type within the same SO.
 func createTransferSender(
 	ctx context.Context,
 	db *ent.Client,
@@ -979,11 +979,13 @@ func createTransferSender(
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(identityPubKey).
 		SetCreateTime(transfer.CreateTime).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 }
 
-// createTransferReceiver creates a TransferReceiver row whose create_time
-// matches the parent transfer's create_time. See createTransferSender.
+// createTransferReceiver creates a TransferReceiver row whose create_time and
+// transfer_type are denormalized from the parent transfer. See
+// createTransferSender.
 func createTransferReceiver(
 	ctx context.Context,
 	db *ent.Client,
@@ -996,6 +998,7 @@ func createTransferReceiver(
 		SetIdentityPubkey(identityPubKey).
 		SetStatus(status).
 		SetCreateTime(transfer.CreateTime).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 }
 
