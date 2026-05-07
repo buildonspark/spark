@@ -1,19 +1,19 @@
 import {
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
   decodeBech32mTokenIdentifier,
   decodeSparkAddress,
   encodeBech32mTokenIdentifier,
   encodeSparkAddress,
   SparkError,
-  SparkSigner,
+  type SparkSigner,
   SparkWallet,
   SparkRequestError,
   SparkValidationError,
   type ConfigOptions,
 } from "@buildonspark/spark-sdk";
 import {
-  OutputWithPreviousTransactionData,
-  TokenOutputRef,
+  type OutputWithPreviousTransactionData,
+  type TokenOutputRef,
 } from "@buildonspark/spark-sdk/proto/spark_token";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { TokenFreezeService } from "../services/freeze.js";
@@ -21,9 +21,9 @@ import { IssuerTokenTransactionService } from "../services/token-transactions.js
 import { hashFinalTokenTransaction } from "@buildonspark/spark-sdk";
 import { validateTokenParameters } from "../utils/create-validation.js";
 import {
-  IssuerTokenMetadata,
-  TokenCreationDetails,
-  TokenDistribution,
+  type IssuerTokenMetadata,
+  type TokenCreationDetails,
+  type TokenDistribution,
 } from "./types.js";
 
 const BURN_ADDRESS = "02".repeat(33);
@@ -204,8 +204,8 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           network: this.config.getNetworkType(),
         });
 
-        // query_token_metadata will return metadata for all token identifiers and issuer public keys provided.
-        // It does not filter by issuer public key if both params are provided.
+        // query_token_metadata will return metadata for all token identifiers and issuer public
+        // keys provided. It does not filter by issuer public key if both params are provided.
         // Filter the response by issuer public key to return only the issuer tokens.
         if (bytesToHex(metadata.issuerPublicKey) !== issuerPublicKey) {
           continue;
@@ -421,7 +421,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
           );
         }
         const tokenIdentifier = encodeBech32mTokenIdentifier({
-          tokenIdentifier: broadcastResponse.tokenIdentifier!,
+          tokenIdentifier: broadcastResponse.tokenIdentifier,
           network: this.config.getNetworkType(),
         });
         return {
@@ -711,7 +711,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
       this.config.getNetworkType(),
     ).tokenIdentifier;
 
-    const response = await this.tokenFreezeService!.freezeTokens({
+    const response = await this.tokenFreezeService.freezeTokens({
       ownerPublicKey: hexToBytes(decodedOwnerPubkey.identityPublicKey),
       tokenIdentifier: rawTokenIdentifier,
     });
@@ -811,7 +811,7 @@ export abstract class IssuerSparkWallet extends SparkWallet {
       this.config.getNetworkType(),
     ).tokenIdentifier;
 
-    const response = await this.tokenFreezeService!.unfreezeTokens({
+    const response = await this.tokenFreezeService.unfreezeTokens({
       ownerPublicKey: hexToBytes(decodedOwnerPubkey.identityPublicKey),
       tokenIdentifier: rawTokenIdentifier,
     });

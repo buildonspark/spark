@@ -1,5 +1,5 @@
 import { sha256 } from "@scure/btc-signer/utils";
-import { FreezeTokensPayload } from "@buildonspark/spark-sdk/proto/spark_token";
+import { type FreezeTokensPayload } from "@buildonspark/spark-sdk/proto/spark_token";
 import { SparkValidationError } from "@buildonspark/spark-sdk";
 
 export function hashFreezeTokensPayload(
@@ -13,7 +13,7 @@ export function hashFreezeTokensPayload(
     });
   }
 
-  let allHashes: Uint8Array[] = [];
+  const allHashes: Uint8Array[] = [];
 
   // Hash version
   const versionHashObj = sha256.create();

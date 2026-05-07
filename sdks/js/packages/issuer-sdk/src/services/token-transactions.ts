@@ -1,11 +1,11 @@
 import {
   TokenTransactionService,
-  WalletConfigService,
+  type WalletConfigService,
   type BaseConnectionManager,
 } from "@buildonspark/spark-sdk";
 import {
-  PartialTokenTransaction,
-  TokenTransaction,
+  type PartialTokenTransaction,
+  type TokenTransaction,
 } from "@buildonspark/spark-sdk/proto/spark_token";
 import { numberToBytesBE } from "@noble/curves/utils";
 

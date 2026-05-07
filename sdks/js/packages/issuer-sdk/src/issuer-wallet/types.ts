@@ -4,7 +4,8 @@ import type { Bech32mTokenIdentifier } from "@buildonspark/spark-sdk";
  * Token metadata containing essential information about issuer's token.
  * This is the wallet's internal representation with JavaScript-friendly types.
  *
- * rawTokenIdentifier: This is the raw binary token identifier - This is used to encode the human readable token identifier.
+ * rawTokenIdentifier: This is the raw binary token identifier - This is used to encode the human
+ * readable token identifier.
  *
  * tokenPublicKey: This is the hex-encoded public key of the token issuer - Same as issuerPublicKey.
  *

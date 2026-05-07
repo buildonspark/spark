@@ -1,12 +1,12 @@
 import {
   type BaseConnectionManager,
   SparkRequestError,
-  WalletConfigService,
+  type WalletConfigService,
   collectResponses,
 } from "@buildonspark/spark-sdk";
 import {
-  FreezeTokensPayload,
-  FreezeTokensResponse,
+  type FreezeTokensPayload,
+  type FreezeTokensResponse,
 } from "@buildonspark/spark-sdk/proto/spark_token";
 import { hexToBytes } from "@noble/curves/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
