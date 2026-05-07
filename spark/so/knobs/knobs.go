@@ -160,6 +160,11 @@ const (
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
 
+	// Rows of transfers fetched per backfill_transfer_type batch. Each
+	// invocation drains rows in a loop until empty; this just bounds the
+	// per-UPDATE row count.
+	KnobBackfillTransferTypeBatchSize = "spark.so.backfill_transfer_type_batch_size"
+
 	// Enable consensus engine for renew leaf operations.
 	KnobUseConsensusRenew = "spark.so.use_consensus_renew"
 
