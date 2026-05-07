@@ -2231,7 +2231,13 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.CreateTimeLT(createdBefore))
 	}
 
-	baseQuery := db.Transfer.Query().WithSparkInvoice()
+	baseQuery := db.Transfer.Query().
+		WithSparkInvoice().
+		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
+			q.WithLeaf(func(q *ent.TreeNodeQuery) {
+				q.WithTree().WithSigningKeyshare().WithParent()
+			})
+		})
 	if useMIMO {
 		baseQuery = baseQuery.WithTransferSenders().WithTransferReceivers()
 	}
@@ -2558,6 +2564,11 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		WithSparkInvoice().
 		WithTransferSenders().
 		WithTransferReceivers().
+		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
+			q.WithLeaf(func(q *ent.TreeNodeQuery) {
+				q.WithTree().WithSigningKeyshare().WithParent()
+			})
+		}).
 		Order(orderFn, idOrderFn).
 		All(ctx)
 	metrics.record(ctx, len(transfers), err)

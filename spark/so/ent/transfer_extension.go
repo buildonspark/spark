@@ -15,12 +15,18 @@ import (
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
 // To marshal the spark invoice, the edge must be pre-loaded via Transfer.WithSparkInvoice().
 // To populate the Receivers field, the edge must also be pre-loaded via Transfer.WithTransferReceivers().
+// If TransferLeaves (with nested Leaf→Tree/SigningKeyshare/Parent) is pre-loaded, that
+// slice is reused; otherwise leaves are lazy-loaded.
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
-	leaves, err := t.QueryTransferLeaves().WithLeaf(func(q *TreeNodeQuery) {
-		q.WithTree().WithSigningKeyshare().WithParent()
-	}).All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
+	leaves := t.Edges.TransferLeaves
+	if leaves == nil {
+		var err error
+		leaves, err = t.QueryTransferLeaves().WithLeaf(func(q *TreeNodeQuery) {
+			q.WithTree().WithSigningKeyshare().WithParent()
+		}).All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
+		}
 	}
 	return t.marshalWithLeaves(ctx, leaves)
 }
@@ -29,6 +35,8 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 // filtering leaves to only those assigned to the given receiver.
 // The Transfer's TransferReceivers edge must be pre-loaded (WithTransferReceivers).
 // Returns an error if the receiver is not found in this transfer.
+// If TransferLeaves is pre-loaded, the receiver filter is applied in-memory;
+// otherwise leaves are lazy-loaded with a SQL-side filter.
 func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey keys.Public) (*pb.Transfer, error) {
 	if t.Edges.TransferReceivers == nil {
 		return nil, fmt.Errorf("TransferReceivers edge not pre-loaded for transfer %s", t.ID)
@@ -37,14 +45,26 @@ func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey k
 	if !found {
 		return nil, fmt.Errorf("receiver %s not found in transfer %s", receiverPubkey, t.ID)
 	}
-	leaves, err := t.QueryTransferLeaves().
-		WithLeaf(func(q *TreeNodeQuery) {
-			q.WithTree().WithSigningKeyshare().WithParent()
-		}).
-		Where(transferleaf.TransferReceiverIDEQ(receiverID)).
-		All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
+	leaves := t.Edges.TransferLeaves
+	if leaves != nil {
+		var filtered []*TransferLeaf
+		for _, leaf := range leaves {
+			if leaf.TransferReceiverID != nil && *leaf.TransferReceiverID == receiverID {
+				filtered = append(filtered, leaf)
+			}
+		}
+		leaves = filtered
+	} else {
+		var err error
+		leaves, err = t.QueryTransferLeaves().
+			WithLeaf(func(q *TreeNodeQuery) {
+				q.WithTree().WithSigningKeyshare().WithParent()
+			}).
+			Where(transferleaf.TransferReceiverIDEQ(receiverID)).
+			All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
+		}
 	}
 	return t.marshalWithLeaves(ctx, leaves)
 }
