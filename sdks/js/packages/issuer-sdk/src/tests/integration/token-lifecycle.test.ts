@@ -38,7 +38,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       expect(issuerBalanceObjAfterMint.tokenIdentifier).toBeDefined();
 
       const issuerBalanceAfterMint = issuerBalanceObjAfterMint.balance;
-      const tokenIdentifier = issuerBalanceObjAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceObjAfterMint.tokenIdentifier;
 
       expect(issuerBalanceAfterMint).toEqual(tokenAmount);
 
@@ -60,7 +60,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const userBalanceObj = await userWallet.getBalance();
       const userBalanceAfterTransfer = filterTokenBalanceForTokenIdentifier(
         userBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(userBalanceAfterTransfer.ownedBalance).toEqual(tokenAmount);
 
@@ -139,7 +139,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const issuerBalanceAfterMint = issuerBalanceObjAfterMint.balance;
       expect(issuerBalanceAfterMint).toEqual(initialBalance + tokenAmount);
       expect(issuerBalanceObjAfterMint.tokenIdentifier).toBeDefined();
-      const tokenIdentifier = issuerBalanceObjAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceObjAfterMint.tokenIdentifier;
       const userSparkAddress = await userWallet.getSparkAddress();
 
       await issuerWallet.transferTokens({
@@ -156,7 +156,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const userBalanceObj = await userWallet.getBalance();
       const userBalanceAfterTransfer = filterTokenBalanceForTokenIdentifier(
         userBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(userBalanceAfterTransfer.ownedBalance).toEqual(tokenAmount);
 
@@ -169,7 +169,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const userBalanceObjAfterTransferBack = await userWallet.getBalance();
       const userBalanceAfterTransferBack = filterTokenBalanceForTokenIdentifier(
         userBalanceObjAfterTransferBack?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
 
       expect(userBalanceAfterTransferBack.ownedBalance).toEqual(0n);

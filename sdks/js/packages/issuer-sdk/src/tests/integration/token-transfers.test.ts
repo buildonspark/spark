@@ -2,7 +2,7 @@ import {
   decodeBech32mTokenIdentifier,
   filterTokenBalanceForTokenIdentifier,
 } from "@buildonspark/spark-sdk";
-import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark_token";
+import { type OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark_token";
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "@buildonspark/spark-sdk/test-utils";
@@ -42,14 +42,14 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await getSingleIssuerTokenIdentifier(issuerWallet);
       await issuerWallet.transferTokens({
         tokenAmount,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         receiverSparkAddress: await userWallet.getSparkAddress(),
       });
 
       const balanceObj = await userWallet.getBalance();
       const userBalance = filterTokenBalanceForTokenIdentifier(
         balanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(userBalance.ownedBalance).toBeGreaterThanOrEqual(tokenAmount);
     });
@@ -90,7 +90,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       expect(sharedIssuerBalance).toBeDefined();
       expect(sharedIssuerBalance.tokenIdentifier).toBeDefined();
 
-      const tokenIdentifier = sharedIssuerBalance.tokenIdentifier!;
+      const tokenIdentifier = sharedIssuerBalance.tokenIdentifier;
       const sourceBalanceBefore = sharedIssuerBalance.balance;
 
       await issuerWallet.batchTransferTokens([
@@ -119,19 +119,19 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const balanceObj = await destinationWallet1.getBalance();
       const destinationBalance = filterTokenBalanceForTokenIdentifier(
         balanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(destinationBalance.ownedBalance).toEqual(tokenAmount / 3n);
       const balanceObj2 = await destinationWallet2.getBalance();
       const destinationBalance2 = filterTokenBalanceForTokenIdentifier(
         balanceObj2?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(destinationBalance2.ownedBalance).toEqual(tokenAmount / 3n);
       const balanceObj3 = await destinationWallet3.getBalance();
       const destinationBalance3 = filterTokenBalanceForTokenIdentifier(
         balanceObj3?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(destinationBalance3.ownedBalance).toEqual(tokenAmount / 3n);
     });
@@ -182,7 +182,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         issuerWallets.map(async (wallet) => {
           const balance = await getSingleIssuerTokenBalance(wallet);
           expect(balance.tokenIdentifier).toBeDefined();
-          return balance.tokenIdentifier!;
+          return balance.tokenIdentifier;
         }),
       );
 
@@ -261,7 +261,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       await expect(
         issuerWallet.transferTokens({
           tokenAmount: transferAmount,
-          tokenIdentifier: tokenIdentifier!,
+          tokenIdentifier: tokenIdentifier,
           receiverSparkAddress: await destinationWallet1.getSparkAddress(),
         }),
       ).rejects.toThrow(/Insufficient token amount/);
@@ -301,12 +301,12 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         issuerWallet.batchTransferTokens([
           {
             tokenAmount: transferAmount,
-            tokenIdentifier: tokenIdentifier!,
+            tokenIdentifier: tokenIdentifier,
             receiverSparkAddress: await destinationWallet1.getSparkAddress(),
           },
           {
             tokenAmount: transferAmount,
-            tokenIdentifier: tokenIdentifier!,
+            tokenIdentifier: tokenIdentifier,
             receiverSparkAddress: await destinationWallet2.getSparkAddress(),
           },
         ]),
@@ -362,8 +362,8 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const issuerBalance1 = await getSingleIssuerTokenBalance(issuerWallet1);
       const issuerBalance2 = await getSingleIssuerTokenBalance(issuerWallet2);
 
-      const tokenIdentifier1 = issuerBalance1.tokenIdentifier!;
-      const tokenIdentifier2 = issuerBalance2.tokenIdentifier!;
+      const tokenIdentifier1 = issuerBalance1.tokenIdentifier;
+      const tokenIdentifier2 = issuerBalance2.tokenIdentifier;
 
       await issuerWallet1.transferTokens({
         tokenAmount: tokenAmount1,
@@ -437,8 +437,8 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const issuerBalance1 = await getSingleIssuerTokenBalance(issuerWallet1);
       const issuerBalance2 = await getSingleIssuerTokenBalance(issuerWallet2);
 
-      const tokenIdentifier1 = issuerBalance1.tokenIdentifier!;
-      const tokenIdentifier2 = issuerBalance2.tokenIdentifier!;
+      const tokenIdentifier1 = issuerBalance1.tokenIdentifier;
+      const tokenIdentifier2 = issuerBalance2.tokenIdentifier;
 
       await issuerWallet1.transferTokens({
         tokenAmount: tokenAmount,
@@ -495,12 +495,12 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         issuerWallet.batchTransferTokens([
           {
             tokenAmount: 600n,
-            tokenIdentifier: tokenIdentifier!,
+            tokenIdentifier: tokenIdentifier,
             receiverSparkAddress: await destinationWallet1.getSparkAddress(),
           },
           {
             tokenAmount: 600n,
-            tokenIdentifier: tokenIdentifier!,
+            tokenIdentifier: tokenIdentifier,
             receiverSparkAddress: await destinationWallet2.getSparkAddress(),
           },
         ]),
@@ -532,7 +532,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const tokenIdentifier =
         await getSingleIssuerTokenIdentifier(issuerWallet);
       const { tokenIdentifier: rawTokenIdentifier } =
-        decodeBech32mTokenIdentifier(tokenIdentifier!);
+        decodeBech32mTokenIdentifier(tokenIdentifier);
 
       const fakeOutput: OutputWithPreviousTransactionData = {
         output: {
@@ -550,7 +550,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       await expect(
         issuerWallet.transferTokens({
           tokenAmount: mintAmount,
-          tokenIdentifier: tokenIdentifier!,
+          tokenIdentifier: tokenIdentifier,
           receiverSparkAddress: await destinationWallet.getSparkAddress(),
           selectedOutputs: [fakeOutput],
         }),
@@ -598,7 +598,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const tokenIdentifier2 =
         await getSingleIssuerTokenIdentifier(issuerWallet2);
       const { tokenIdentifier: rawTokenIdentifier2 } =
-        decodeBech32mTokenIdentifier(tokenIdentifier2!);
+        decodeBech32mTokenIdentifier(tokenIdentifier2);
 
       const fakeOutputWithWrongToken: OutputWithPreviousTransactionData = {
         output: {
@@ -616,7 +616,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       await expect(
         issuerWallet1.transferTokens({
           tokenAmount: mintAmount,
-          tokenIdentifier: tokenIdentifier1!,
+          tokenIdentifier: tokenIdentifier1,
           receiverSparkAddress: await destinationWallet.getSparkAddress(),
           selectedOutputs: [fakeOutputWithWrongToken],
         }),
@@ -666,8 +666,8 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       const issuerBalance1 = await getSingleIssuerTokenBalance(issuerWallet1);
       const issuerBalance2 = await getSingleIssuerTokenBalance(issuerWallet2);
-      const tokenIdentifier1 = issuerBalance1.tokenIdentifier!;
-      const tokenIdentifier2 = issuerBalance2.tokenIdentifier!;
+      const tokenIdentifier1 = issuerBalance1.tokenIdentifier;
+      const tokenIdentifier2 = issuerBalance2.tokenIdentifier;
 
       const intermediateAddress = await intermediateWallet.getSparkAddress();
       await issuerWallet1.transferTokens({

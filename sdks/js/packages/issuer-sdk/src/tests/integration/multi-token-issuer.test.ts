@@ -1,15 +1,7 @@
 import { jest } from "@jest/globals";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { TEST_CONFIGS_WITH_BINDINGS } from "./test-configs.js";
-import { IssuerSparkWallet } from "../../issuer-wallet/issuer-spark-wallet.js";
-import {
-  burnSingleIssuerToken,
-  freezeSingleIssuerToken,
-  getSingleIssuerTokenBalance,
-  getSingleIssuerTokenIdentifier,
-  mintSingleIssuerToken,
-  unfreezeSingleIssuerToken,
-} from "../utils/multi-token-utils.js";
+import { type IssuerSparkWallet } from "../../issuer-wallet/issuer-spark-wallet.js";
 
 const TX_HASH_REGEX = /^[a-f0-9]{64}$/i; // valid tx hash: hex string of 64 characters
 
@@ -284,7 +276,8 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         issuerWallet.unfreezeTokens(receiverAddress),
       ).rejects.toThrow();
 
-      // Multi token issuer method - should succeed when using unfreezeTokens with a token identifier
+      // Multi token issuer method - should succeed when using unfreezeTokens with a token
+      // identifier
       const unfreezeResponse = await issuerWallet.unfreezeTokens({
         tokenIdentifier: firstTokenIdentifier,
         sparkAddress: receiverAddress,

@@ -1,4 +1,4 @@
-import { ConfigOptions, WalletConfig } from "@buildonspark/spark-sdk";
+import { type ConfigOptions, WalletConfig } from "@buildonspark/spark-sdk";
 
 const SHORTER_TOKEN_OUTPUT_LOCK_EXPIRY_MS = 5000;
 

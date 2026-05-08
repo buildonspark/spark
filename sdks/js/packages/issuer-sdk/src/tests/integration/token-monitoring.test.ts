@@ -1,7 +1,4 @@
-import {
-  filterTokenBalanceForTokenIdentifier,
-  NetworkType,
-} from "@buildonspark/spark-sdk";
+import { filterTokenBalanceForTokenIdentifier } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
 import { bytesToHex, bytesToNumberBE } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
@@ -40,23 +37,21 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       await mintSingleIssuerToken(issuerWallet, tokenAmount);
       const tokenIdentifier =
         await getSingleIssuerTokenIdentifier(issuerWallet);
-      const issuerPublicKey = await issuerWallet.getIdentityPublicKey();
-
       await issuerWallet.transferTokens({
         tokenAmount,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         receiverSparkAddress: await userWallet.getSparkAddress(),
       });
 
       const userBalanceObj = await userWallet.getBalance();
       const userBalance = filterTokenBalanceForTokenIdentifier(
         userBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(userBalance.ownedBalance).toBeGreaterThanOrEqual(tokenAmount);
 
       const response = await issuerWallet.queryTokenTransactionsWithFilters({
-        tokenIdentifiers: [tokenIdentifier!],
+        tokenIdentifiers: [tokenIdentifier],
         sparkAddresses: [await issuerWallet.getSparkAddress()],
       });
       const transactions = response.tokenTransactionsWithStatus;
@@ -101,17 +96,15 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       const tokenIdentifier =
         await getSingleIssuerTokenIdentifier(issuerWallet);
-      const issuerPublicKey = await issuerWallet.getIdentityPublicKey();
-
       await issuerWallet.transferTokens({
         tokenAmount: 500n,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         receiverSparkAddress: await userWallet.getSparkAddress(),
       });
 
       await userWallet.transferTokens({
         tokenAmount: 250n,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         receiverSparkAddress: await issuerWallet.getSparkAddress(),
       });
 
@@ -120,7 +113,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       await burnSingleIssuerToken(issuerWallet, 250n);
 
       const res = await issuerWallet.queryTokenTransactionsWithFilters({
-        tokenIdentifiers: [tokenIdentifier!],
+        tokenIdentifiers: [tokenIdentifier],
         sparkAddresses: [await issuerWallet.getSparkAddress()],
       });
       const transactions = res.tokenTransactionsWithStatus;
@@ -175,7 +168,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
@@ -184,7 +177,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
@@ -193,13 +186,13 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       await issuerWallet.transferTokens({
         tokenAmount,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         receiverSparkAddress: userSparkAddress,
       });
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
@@ -208,7 +201,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
         });
         const transactions = res.tokenTransactionsWithStatus;
         const amount_of_transactions = transactions.length;
@@ -220,14 +213,14 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await mintSingleIssuerToken(issuerWallet, dynamicAmount);
         await issuerWallet.transferTokens({
           tokenAmount: dynamicAmount,
-          tokenIdentifier: tokenIdentifier!,
+          tokenIdentifier: tokenIdentifier,
           receiverSparkAddress: userSparkAddress,
         });
       }
 
       {
         const res = await issuerWallet.queryTokenTransactionsByTxHashes([
-          mintTxHash!,
+          mintTxHash,
         ]);
         const transactions = res.tokenTransactionsWithStatus;
         expect(transactions.length).toEqual(1);
@@ -237,24 +230,19 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         expect(transactions[0].tokenTransaction?.tokenInputs?.$case).toEqual(
           "mintInput",
         );
-        expect(
-          bytesToHex(
-            transactions[0].tokenTransaction?.tokenOutputs?.[0]
-              ?.ownerPublicKey!,
-          ),
-        ).toEqual(issuerPublicKey);
-        expect(
-          BigInt(
-            bytesToNumberBE(
-              transactions[0].tokenTransaction?.tokenOutputs?.[0]?.tokenAmount!,
-            ),
-          ),
-        ).toEqual(tokenAmount);
+        const tokenOutput = transactions[0].tokenTransaction?.tokenOutputs?.[0];
+        if (tokenOutput === undefined) {
+          throw new Error("Mint transaction token output not found");
+        }
+        expect(bytesToHex(tokenOutput.ownerPublicKey)).toEqual(issuerPublicKey);
+        expect(BigInt(bytesToNumberBE(tokenOutput.tokenAmount))).toEqual(
+          tokenAmount,
+        );
       }
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
           pageSize: 10,
         });
         const transactions = res.tokenTransactionsWithStatus;
@@ -264,7 +252,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
           pageSize: 10,
         });
         const transactions = res.tokenTransactionsWithStatus;
@@ -274,7 +262,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
           issuerPublicKeys: [issuerPublicKey],
           pageSize: 10,
         });
@@ -285,7 +273,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       {
         const res = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
           sparkAddresses: [issuerSparkAddress],
           pageSize: 5,
         });
@@ -297,7 +285,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         const nextCursor = pageInfo?.nextCursor ?? "";
 
         const nextRes = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
           sparkAddresses: [issuerSparkAddress],
           pageSize: 5,
           cursor: nextCursor,
@@ -317,7 +305,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         });
 
         const prevRes = await issuerWallet.queryTokenTransactionsWithFilters({
-          tokenIdentifiers: [tokenIdentifier!],
+          tokenIdentifiers: [tokenIdentifier],
           sparkAddresses: [issuerSparkAddress],
           pageSize: 5,
           cursor: nextPageInfo?.previousCursor ?? "",
@@ -336,7 +324,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       }
 
       {
-        let hashset_of_all_transactions: Set<String> = new Set();
+        const hashset_of_all_transactions: Set<string> = new Set();
 
         const pageSize = 10;
         let page_num = 0;
@@ -344,7 +332,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
         while (true) {
           const res = await issuerWallet.queryTokenTransactionsWithFilters({
-            tokenIdentifiers: [tokenIdentifier!],
+            tokenIdentifiers: [tokenIdentifier],
             pageSize,
             cursor,
           });
@@ -361,7 +349,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
           for (let index = 0; index < transactions.length; ++index) {
             const element = transactions[index];
             if (element.tokenTransaction !== undefined) {
-              const hash: String = bytesToHex(element.tokenTransactionHash);
+              const hash: string = bytesToHex(element.tokenTransactionHash);
               if (hashset_of_all_transactions.has(hash)) {
                 expect(
                   `Duplicate found. Pagination is broken? Index of transaction: ${index} ; page №: ${page_num} ; page size: ${pageSize} ; hash_duplicate: ${hash}`,

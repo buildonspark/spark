@@ -65,7 +65,7 @@ describe("Stress test for token transfers", () => {
       try {
         // Transfer tokens from issuer to user
         await issuerWallet.transferTokens({
-          tokenIdentifier: tokenIdentifier!,
+          tokenIdentifier: tokenIdentifier,
           tokenAmount: TOKEN_AMOUNT,
           receiverSparkAddress: userWalletSparkAddress,
         });
@@ -74,14 +74,14 @@ describe("Stress test for token transfers", () => {
         const userBalanceObj = await userWallet.getBalance();
         const userBalance = filterTokenBalanceForTokenIdentifier(
           userBalanceObj?.tokenBalances,
-          tokenIdentifier!,
+          tokenIdentifier,
         );
         expect(issuerBalance.balance).toEqual(0n);
         expect(userBalance.ownedBalance).toEqual(TOKEN_AMOUNT);
 
         // Transfer tokens from user to issuer
         await userWallet.transferTokens({
-          tokenIdentifier: tokenIdentifier!,
+          tokenIdentifier: tokenIdentifier,
           tokenAmount: TOKEN_AMOUNT,
           receiverSparkAddress: issuerWalletSparkAddress,
         });
@@ -90,19 +90,21 @@ describe("Stress test for token transfers", () => {
         const userBalanceAfterTransferBack =
           filterTokenBalanceForTokenIdentifier(
             userBalanceObjAfterTransferBack?.tokenBalances,
-            tokenIdentifier!,
+            tokenIdentifier,
           );
         const issuerBalanceAfterTransferBack =
           await issuerWallet.getIssuerTokenBalance();
         expect(userBalanceAfterTransferBack.ownedBalance).toEqual(0n);
         expect(issuerBalanceAfterTransferBack.balance).toEqual(TOKEN_AMOUNT);
-      } catch (error: any) {
+      } catch (error: unknown) {
         const end_time = Date.now();
         const duration_ms = end_time - start_time;
         const minutes = Math.floor(duration_ms / 60000);
         const seconds = ((duration_ms % 60000) / 1000).toFixed(2);
         throw new Error(
-          `Test failed on iteration ${i}: ${error} in ${duration_ms}ms (${minutes}m ${seconds}s)`,
+          `Test failed on iteration ${i}: ${String(
+            error,
+          )} in ${duration_ms}ms (${minutes}m ${seconds}s)`,
         );
       }
     }
@@ -153,7 +155,7 @@ describe("Stress test for token transfers", () => {
           const start_time = Date.now();
           try {
             await issuer.wallet.transferTokens({
-              tokenIdentifier: tokenIdentifier!,
+              tokenIdentifier: tokenIdentifier,
               tokenAmount: TOKEN_AMOUNT,
               receiverSparkAddress: userAddress,
             });
@@ -172,7 +174,7 @@ describe("Stress test for token transfers", () => {
 
     const errors = results.filter((r: { success: boolean }) => !r.success);
     errors.forEach((e, i) => {
-      console.log(`Error ${i}: ${e.error} occurred in ${e.duration}ms`);
+      console.log(`Error ${i}: ${String(e.error)} occurred in ${e.duration}ms`);
     });
 
     const numSuccessfulTransfers = results.filter(

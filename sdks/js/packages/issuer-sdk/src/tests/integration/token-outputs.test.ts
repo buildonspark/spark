@@ -102,7 +102,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       const transfersToUser = buildTransfers({
         count: 60,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         tokenAmount: smallTransferAmount,
         receiverSparkAddress: userSparkAddress,
       });
@@ -111,7 +111,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       const transfersToIssuer = buildTransfers({
         count: 60,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         tokenAmount: smallTransferAmount,
         receiverSparkAddress: issuerSparkAddress,
       });
@@ -124,13 +124,13 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       await expectOutputCount({
         wallet: issuerWallet,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         expectedCount: 61,
       });
 
       await issuerWallet.optimizeTokenOutputs();
 
-      await (issuerWallet as any).syncTokenOutputs();
+      await issuerWallet.syncTokenOutputsForTesting();
 
       const balanceAfterOptimization =
         await getSingleIssuerTokenBalance(issuerWallet);
@@ -138,20 +138,20 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
 
       await expectOutputCount({
         wallet: issuerWallet,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         expectedCount: 1,
       });
 
       await issuerWallet.transferTokens({
         tokenAmount: 100n,
-        tokenIdentifier: tokenIdentifier!,
+        tokenIdentifier: tokenIdentifier,
         receiverSparkAddress: userSparkAddress,
       });
 
       expect(
         await getOwnedBalance({
           wallet: userWallet,
-          tokenIdentifier: tokenIdentifier!,
+          tokenIdentifier: tokenIdentifier,
         }),
       ).toBe(100n);
     });

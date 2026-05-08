@@ -47,7 +47,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier;
       const issuerBalanceBeforeTransfer = issuerBalanceAfterMint.balance;
 
       const invoice = await receiverWallet.createTokensInvoice({
@@ -88,7 +88,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const receiverBalanceObj = await receiverWallet.getBalance();
       const receiverBalance = filterTokenBalanceForTokenIdentifier(
         receiverBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(receiverBalance.ownedBalance).toEqual(tokenAmount);
     });
@@ -125,7 +125,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier;
       const issuerBalanceBeforeTransfer = issuerBalanceAfterMint.balance;
 
       const invoice1 = await receiverWallet1.createTokensInvoice({
@@ -183,14 +183,14 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const receiver1BalanceObj = await receiverWallet1.getBalance();
       const receiver1Balance = filterTokenBalanceForTokenIdentifier(
         receiver1BalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(receiver1Balance.ownedBalance).toEqual(amount1 + amount2);
 
       const receiver2BalanceObj = await receiverWallet2.getBalance();
       const receiver2Balance = filterTokenBalanceForTokenIdentifier(
         receiver2BalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(receiver2Balance.ownedBalance).toEqual(amount3);
     });
@@ -221,7 +221,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier;
       const issuerBalanceBefore = issuerBalanceAfterMint.balance;
 
       const expiredInvoice = await receiverWallet.createTokensInvoice({
@@ -245,7 +245,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const receiverBalanceObj = await receiverWallet.getBalance();
       const receiverBalance = filterTokenBalanceForTokenIdentifier(
         receiverBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(receiverBalance.ownedBalance).toEqual(0n);
     });
@@ -276,7 +276,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier;
       const issuerBalanceBefore = issuerBalanceAfterMint.balance;
 
       const nullExpiryInvoice = await receiverWallet.createTokensInvoice({
@@ -317,7 +317,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const receiverBalanceObj = await receiverWallet.getBalance();
       const receiverBalance = filterTokenBalanceForTokenIdentifier(
         receiverBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(receiverBalance.ownedBalance).toEqual(tokenAmount);
     });
@@ -348,7 +348,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         await getSingleIssuerTokenBalance(issuerWallet);
       expect(issuerBalanceAfterMint).toBeDefined();
       expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier;
       const issuerBalanceBeforeTransfer = issuerBalanceAfterMint.balance;
 
       const invoiceWithoutAmount = await receiverWallet.createTokensInvoice({
@@ -390,7 +390,7 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
       const receiverBalanceObj = await receiverWallet.getBalance();
       const receiverBalance = filterTokenBalanceForTokenIdentifier(
         receiverBalanceObj?.tokenBalances,
-        tokenIdentifier!,
+        tokenIdentifier,
       );
       expect(receiverBalance.ownedBalance).toEqual(tokenAmount);
     });
@@ -539,9 +539,8 @@ describe.each(TEST_CONFIGS_WITH_BINDINGS)(
         sdkTwoTokenInvoiceA,
         sdkTwoTokenNilAmountInvoiceB,
       ];
-      const queryInvoiceResponse = await (sdk as any).querySparkInvoices(
-        invoicesToQuery,
-      );
+      const queryInvoiceResponse =
+        await sdk.querySparkInvoices(invoicesToQuery);
       expect(queryInvoiceResponse.invoiceStatuses.length).toBe(7);
       for (let i = 0; i < queryInvoiceResponse.invoiceStatuses.length; i++) {
         const response = queryInvoiceResponse.invoiceStatuses[i];
