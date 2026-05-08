@@ -1984,17 +1984,13 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	// enabled — both the inverted lookups and the counter-swap filter (which
 	// assumes a single SSP identity per swap).
 	var filterType string
-	var hasPubkey bool
-	switch p := filter.Participant.(type) {
+	switch filter.Participant.(type) {
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
 		filterType = "receiver"
-		hasPubkey = len(p.ReceiverIdentityPublicKey) > 0
 	case *pb.TransferFilter_SenderIdentityPublicKey:
 		filterType = "sender"
-		hasPubkey = len(p.SenderIdentityPublicKey) > 0
 	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
 		filterType = "sender_or_receiver"
-		hasPubkey = len(p.SenderOrReceiverIdentityPublicKey) > 0
 	default:
 		filterType = "none"
 	}
@@ -2002,7 +1998,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		QueryPath:       "query_transfers",
 		MIMOEnabled:     useMIMO,
 		FilterType:      filterType,
-		HasPubkey:       hasPubkey,
 		HasStatusFilter: len(filter.Statuses) > 0,
 		HasTypeFilter:   len(filter.Types) > 0,
 		PendingOnly:     pendingOnly,
@@ -2320,7 +2315,6 @@ func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.C
 		QueryPath:   "get_ssp_counter_swap_filter",
 		MIMOEnabled: false,
 		FilterType:  "sender",
-		HasPubkey:   true,
 	})
 	var resultCount int
 	var internalErr error
@@ -2502,7 +2496,6 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		QueryPath:     "query_pending_transfers",
 		MIMOEnabled:   true,
 		FilterType:    filterType,
-		HasPubkey:     true,
 		HasTypeFilter: len(filter.Types) > 0,
 		PendingOnly:   true,
 	})

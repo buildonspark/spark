@@ -71,10 +71,33 @@ type transferQueryAttrs struct {
 	QueryPath       string
 	MIMOEnabled     bool
 	FilterType      string
-	HasPubkey       bool
 	HasStatusFilter bool
 	HasTypeFilter   bool
 	PendingOnly     bool
+}
+
+// resultCountBucket maps a result count to a coarse bucket label. Singleton
+// buckets are kept for 0/1/50/100 because those are the common page-size
+// boundaries we slice latency by.
+func resultCountBucket(n int) string {
+	switch {
+	case n == 0:
+		return "0"
+	case n == 1:
+		return "1"
+	case n <= 9:
+		return "2-9"
+	case n <= 49:
+		return "10-49"
+	case n == 50:
+		return "50"
+	case n <= 99:
+		return "51-99"
+	case n == 100:
+		return "100"
+	default:
+		return "100+"
+	}
 }
 
 type transferQueryRecorder struct {
@@ -96,10 +119,10 @@ func (r *transferQueryRecorder) record(ctx context.Context, resultCount int, err
 		attribute.String("query_path", r.attrs.QueryPath),
 		attribute.Bool("mimo_enabled", r.attrs.MIMOEnabled),
 		attribute.String("filter_type", r.attrs.FilterType),
-		attribute.Bool("has_pubkey", r.attrs.HasPubkey),
 		attribute.Bool("has_status_filter", r.attrs.HasStatusFilter),
 		attribute.Bool("has_type_filter", r.attrs.HasTypeFilter),
 		attribute.Bool("pending_only", r.attrs.PendingOnly),
+		attribute.String("result_count_bucket", resultCountBucket(resultCount)),
 		attribute.Bool("success", err == nil),
 	}
 	opts := metric.WithAttributes(attrs...)
