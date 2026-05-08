@@ -75,7 +75,7 @@ func NewDepositHandler(config *so.Config) *DepositHandler {
 func validateIdentity(ctx context.Context, config *so.Config, identityPublicKey []byte) (keys.Public, error) {
 	reqIDPubKey, err := keys.ParsePublicKey(identityPublicKey)
 	if err != nil {
-		return keys.Public{}, fmt.Errorf("invalid identity public key: %w", err)
+		return keys.Public{}, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, reqIDPubKey); err != nil {
 		return keys.Public{}, err
@@ -366,7 +366,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 
 	reqSigningPubKey, err := keys.ParsePublicKey(req.GetSigningPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse signing public key: %w", err))
 	}
 
 	depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey, req.GetHashVariant())
@@ -715,7 +715,7 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 
 	reqSigningPubKey, err := keys.ParsePublicKey(req.GetSigningPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse signing public key: %w", err))
 	}
 
 	// Query for the existing default static deposit address
@@ -838,7 +838,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	defer span.End()
 	reqIDPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
 		return nil, err
@@ -892,11 +892,11 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}
 	rootSigningPubKey, err := keys.ParsePublicKey(req.GetRootTxSigningJob().GetSigningPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid root tx signing public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid root tx signing public key: %w", err))
 	}
 	refundSigningPubKey, err := keys.ParsePublicKey(req.GetRefundTxSigningJob().GetSigningPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid refund tx signing public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid refund tx signing public key: %w", err))
 	}
 	if !depositAddress.OwnerSigningPubkey.Equals(rootSigningPubKey) || !depositAddress.OwnerSigningPubkey.Equals(refundSigningPubKey) {
 		return nil, fmt.Errorf("unexpected signing public key")
@@ -1695,7 +1695,7 @@ func (o *DepositHandler) GetUtxosForIdentity(ctx context.Context, req *pb.GetUtx
 
 	identityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, errors.InvalidArgumentMalformedField(
+		return nil, errors.InvalidArgumentMalformedKey(
 			fmt.Errorf("invalid identity public key: %w", err),
 		)
 	}
@@ -2032,7 +2032,7 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	// Step 4: Aggregate signatures (SE + user)
 	rootSigningPubKey, err := keys.ParsePublicKey(req.RootTxSigningJob.SigningPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse root signing key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse root signing key: %w", err))
 	}
 	signatures, err := aggregateDepositSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey, rootTxInputCount)
 	if err != nil {
