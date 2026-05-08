@@ -29,12 +29,19 @@ type transferRow struct {
 
 // senderRow / receiverRow — same field set on the DB side except receivers have
 // status and completion_time. We emit separate slices per table.
+//
+// transferType is the parent transfer's type, dual-written onto each edge
+// row to match the production denormalization (SP-3050). Both edge tables
+// have a transfer_type column; leaving it NULL in seeded data hides
+// type-filtered query plans that production hits against the denormalized
+// columns.
 type senderRow struct {
 	id             uuid.UUID
 	createTime     time.Time
 	updateTime     time.Time
 	transferID     uuid.UUID
 	identityPubkey []byte
+	transferType   st.TransferType
 }
 
 type receiverRow struct {
@@ -44,6 +51,7 @@ type receiverRow struct {
 	transferID     uuid.UUID
 	identityPubkey []byte
 	status         st.TransferReceiverStatus
+	transferType   st.TransferType
 }
 
 // generator emits rows for one wallet's contribution to the three tables.
@@ -280,6 +288,7 @@ func (g *generator) emit(
 			updateTime:     ct,
 			transferID:     tid,
 			identityPubkey: senderPk,
+			transferType:   ttype,
 		}
 		rr := receiverRow{
 			id:             g.newRowID(),
@@ -288,6 +297,7 @@ func (g *generator) emit(
 			transferID:     tid,
 			identityPubkey: receiverPk,
 			status:         receiverStatusForTransfer(status),
+			transferType:   ttype,
 		}
 		select {
 		case transferCh <- tr:
@@ -367,6 +377,7 @@ func (g *generator) emitPhase(
 			updateTime:     ct,
 			transferID:     tid,
 			identityPubkey: senderPk,
+			transferType:   ttype,
 		}
 		rr := receiverRow{
 			id:             g.newRowID(),
@@ -375,6 +386,7 @@ func (g *generator) emitPhase(
 			transferID:     tid,
 			identityPubkey: receiverPk,
 			status:         receiverStatusForTransfer(status),
+			transferType:   ttype,
 		}
 		select {
 		case transferCh <- tr:

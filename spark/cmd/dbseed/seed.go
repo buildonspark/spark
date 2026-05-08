@@ -412,6 +412,7 @@ func emitDualRole(ctx context.Context, g *generator, count int,
 		}
 		ct := g.randomCreateTime()
 		status := g.pickStatus()
+		ttype := g.pickType()
 		tr := transferRow{
 			id:                     tid,
 			createTime:             ct,
@@ -421,11 +422,11 @@ func emitDualRole(ctx context.Context, g *generator, count int,
 			network:                g.cfg.Network,
 			totalValue:             int64(1_000 + g.rng.Uint64()%1_000_000),
 			status:                 status,
-			transferType:           g.pickType(),
+			transferType:           ttype,
 			expiryTime:             g.randomExpiry(ct, status),
 		}
-		sr := senderRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk}
-		rr := receiverRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk, status: receiverStatusForTransfer(status)}
+		sr := senderRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk, transferType: ttype}
+		rr := receiverRow{id: g.newRowID(), createTime: ct, updateTime: ct, transferID: tid, identityPubkey: selfPk, status: receiverStatusForTransfer(status), transferType: ttype}
 		select {
 		case transferCh <- tr:
 		case <-ctx.Done():
@@ -481,14 +482,14 @@ func copySenders(ctx context.Context, pool *pgxpool.Pool, ch <-chan senderRow, c
 	defer conn.Release()
 	return conn.Conn().CopyFrom(ctx,
 		pgx.Identifier{"transfer_senders"},
-		[]string{"id", "create_time", "update_time", "transfer_id", "identity_pubkey"},
+		[]string{"id", "create_time", "update_time", "transfer_id", "identity_pubkey", "transfer_type"},
 		pgx.CopyFromFunc(func() ([]any, error) {
 			r, ok := <-ch
 			if !ok {
 				return nil, nil
 			}
 			counter.Add(1)
-			return []any{r.id, r.createTime, r.updateTime, r.transferID, r.identityPubkey}, nil
+			return []any{r.id, r.createTime, r.updateTime, r.transferID, r.identityPubkey, string(r.transferType)}, nil
 		}),
 	)
 }
@@ -501,14 +502,14 @@ func copyReceivers(ctx context.Context, pool *pgxpool.Pool, ch <-chan receiverRo
 	defer conn.Release()
 	return conn.Conn().CopyFrom(ctx,
 		pgx.Identifier{"transfer_receivers"},
-		[]string{"id", "create_time", "update_time", "transfer_id", "identity_pubkey", "status"},
+		[]string{"id", "create_time", "update_time", "transfer_id", "identity_pubkey", "status", "transfer_type"},
 		pgx.CopyFromFunc(func() ([]any, error) {
 			r, ok := <-ch
 			if !ok {
 				return nil, nil
 			}
 			counter.Add(1)
-			return []any{r.id, r.createTime, r.updateTime, r.transferID, r.identityPubkey, string(r.status)}, nil
+			return []any{r.id, r.createTime, r.updateTime, r.transferID, r.identityPubkey, string(r.status), string(r.transferType)}, nil
 		}),
 	)
 }
