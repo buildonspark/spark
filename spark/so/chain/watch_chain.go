@@ -210,7 +210,7 @@ func init() {
 func pollInterval(network btcnetwork.Network) time.Duration {
 	switch network {
 	case btcnetwork.Mainnet:
-		return 1 * time.Minute
+		return 15 * time.Second
 	case btcnetwork.Testnet:
 		return 1 * time.Minute
 	case btcnetwork.Regtest:
