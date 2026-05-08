@@ -104,7 +104,7 @@ describe("SparkWallet initialization", () => {
     expect(internalWallet.leafManager).toBe(originalLeafManager);
     expect(internalWallet.sspClient.logger).toBe(originalSspLogger);
     expect(originalSspLogger.context).not.toBe(originalSspLoggerContext);
-    expect(originalSspLogger.context).toMatch(/^SspClient:[0-9a-f]{8}$/);
+    expect(originalSspLogger.context).toMatch(/^SspClient:[0-9a-f]{8}#\d+$/);
     expect(internalWallet.swapService.sspClient).toBe(internalWallet.sspClient);
     expect(internalWallet.leafManager.swapService).toBe(
       internalWallet.swapService,

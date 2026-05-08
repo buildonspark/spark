@@ -105,18 +105,6 @@ describe("LoggingService", () => {
     expect(logger.options.level).toBe(LoggingLevel.Trace);
   });
 
-  it("renames an enabled logger in place", () => {
-    const logging = createLoggingService({ loggingEnabled: true });
-    const initialLogger = logging.logger("SparkWallet");
-    const loggerName = `SparkWallet:${Math.random().toString(16)}`;
-
-    logging.rename("SparkWallet", loggerName);
-
-    expect(logging.logger("SparkWallet")).toBe(initialLogger);
-    expect(initialLogger.context).toBe(loggerName);
-    expect(initialLogger.options.enabled).toBe(true);
-  });
-
   it("wraps named methods on a target", () => {
     const logging = createLoggingService();
     const target = new WrappedTarget();
@@ -326,8 +314,26 @@ describe("LoggingService", () => {
     logging.setInstanceSuffix("abcd1234");
 
     expect(logging.logger("SparkWallet")).toBe(logger);
-    expect(logger.context).toBe("SparkWallet:abcd1234");
+    expect(logger.context).toMatch(/^SparkWallet:abcd1234#\d+$/);
     expect(logger.options.enabled).toBe(true);
+  });
+
+  it("keeps same-identity logger suffixes distinct per SDK instance", () => {
+    const firstLogging = createLoggingService({ loggingEnabled: true });
+    const secondLogging = createLoggingService({ loggingEnabled: true });
+
+    firstLogging.setInstanceSuffix("abcd1234");
+    secondLogging.setInstanceSuffix("abcd1234");
+
+    expect(firstLogging.logger("SparkWallet").context).toMatch(
+      /^SparkWallet:abcd1234#\d+$/,
+    );
+    expect(secondLogging.logger("SparkWallet").context).toMatch(
+      /^SparkWallet:abcd1234#\d+$/,
+    );
+    expect(firstLogging.logger("SparkWallet").context).not.toBe(
+      secondLogging.logger("SparkWallet").context,
+    );
   });
 
   it("mirrors service logs to a configured file sink", () => {

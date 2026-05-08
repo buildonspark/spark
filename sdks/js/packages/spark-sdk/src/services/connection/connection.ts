@@ -425,10 +425,7 @@ export abstract class ConnectionManager {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
     this.identityPublicKeyHex = hex;
-    this.logging.rename(
-      "ConnectionManager",
-      `ConnectionManager:${hex.slice(0, 8)}`,
-    );
+    this.logging.setInstanceSuffix(hex.slice(0, 8));
     return hex;
   }
 

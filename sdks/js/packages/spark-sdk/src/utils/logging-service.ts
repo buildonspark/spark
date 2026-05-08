@@ -134,7 +134,7 @@ export class LoggingService {
   private readonly states = new Map<LogServiceName, ServiceLoggingState>();
   private readonly instanceId: number;
   private closePromise?: Promise<void>;
-  private instanceSuffix?: string;
+  private identitySuffix?: string;
 
   static fromConfig(config: WalletConfigService): LoggingService {
     if (typeof config.getLoggingConfig !== "function") {
@@ -173,22 +173,12 @@ export class LoggingService {
     return state.methodCallLogger.wrap(methodName, decoratedMethod, receiver);
   }
 
-  public rename(serviceName: LogServiceDisplayName, loggerName: string) {
-    const resolvedServiceName = this.resolveServiceName(serviceName);
-    const state = this.getState(resolvedServiceName);
-    if (state.loggerName === loggerName) {
-      return;
-    }
-
-    this.configure(resolvedServiceName, loggerName);
-  }
-
   public setInstanceSuffix(suffix: string) {
-    if (this.instanceSuffix === suffix) {
+    if (this.identitySuffix === suffix) {
       return;
     }
 
-    this.instanceSuffix = suffix;
+    this.identitySuffix = suffix;
     for (const serviceName of this.states.keys()) {
       this.configure(serviceName, this.getLoggerName(serviceName));
     }
@@ -375,7 +365,10 @@ export class LoggingService {
 
   private getLoggerName(serviceName: LogServiceName): string {
     const serviceDisplayName = SERVICE_LOGGER_NAMES[serviceName];
-    const suffix = this.instanceSuffix ?? String(this.instanceId);
+    const suffix =
+      this.identitySuffix === undefined
+        ? String(this.instanceId)
+        : `${this.identitySuffix}#${this.instanceId}`;
     return `${serviceDisplayName}:${suffix}`;
   }
 
