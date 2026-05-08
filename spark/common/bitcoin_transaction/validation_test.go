@@ -2,6 +2,7 @@ package bitcointransaction_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -331,15 +332,18 @@ func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing
 		common.EphemeralAnchorOutput(),
 	)
 
-	badLeaf, key := newTestLeafNode(t)
-	pkScript, _ := common.P2TRScriptFromPubKey(key)
-	nodeTxHash := badLeaf.RawTxid.Hash()
-	// Create a refund tx with a timelock smaller than the interval
-	badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
-	badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
+	for _, timelock := range []uint32{spark.TimeLockInterval - 1, spark.TimeLockInterval} {
+		t.Run(fmt.Sprintf("timelock %d", timelock), func(t *testing.T) {
+			badLeaf, key := newTestLeafNode(t)
+			pkScript, _ := common.P2TRScriptFromPubKey(key)
+			nodeTxHash := badLeaf.RawTxid.Hash()
+			badRefundTx := newTestTx(testSourceValue, pkScript, timelock, &nodeTxHash)
+			badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
 
-	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, badLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
-	require.ErrorContains(t, err, "is too small to subtract TimeLockInterval")
+			err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, badLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
+			require.ErrorContains(t, err, "is too small to subtract TimeLockInterval")
+		})
+	}
 }
 
 // Errors on unknown refund transaction type.

@@ -28,6 +28,18 @@ func mustSerializeTx(t *testing.T, tx *wire.MsgTx) []byte {
 	return bytes
 }
 
+func TestValidateLeafRefundTxInputRejectsZeroTimelock(t *testing.T) {
+	refundTx := wire.NewMsgTx(3)
+	expectedOutPoint := wire.OutPoint{}
+	refundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: expectedOutPoint,
+		Sequence:         0,
+	})
+
+	err := validateLeafRefundTxInput(refundTx, spark.TimeLockInterval, &expectedOutPoint, 1)
+	require.ErrorContains(t, err, "time lock on the new refund tx must be greater than 0")
+}
+
 func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.ConnectToTestPostgres(t)

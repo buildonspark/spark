@@ -564,10 +564,11 @@ func TestValidateRenewNodeTimelocks(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "valid timelocks - both at 0",
+			name:           "invalid refund timelock - zero",
 			nodeSequence:   0,
 			refundSequence: 0,
-			expectError:    false,
+			expectError:    true,
+			errorContains:  "refund transaction sequence must be at least 100 for renewal",
 		},
 		{
 			name:           "valid timelocks - node 150, refund 200",
@@ -671,10 +672,11 @@ func TestValidateRenewRefundTimelock(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "valid refund timelock - at 0",
+			name:           "invalid refund timelock - zero",
 			nodeSequence:   2000,
 			refundSequence: 0,
-			expectError:    false,
+			expectError:    true,
+			errorContains:  "refund transaction sequence must be at least 100 for renewal",
 		},
 		{
 			name:           "valid node timelock at 200 - should pass",
@@ -771,10 +773,11 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "valid zero timelock - node 0, refund 0",
+			name:           "invalid zero timelock - node 0, refund 0",
 			nodeSequence:   0,
 			refundSequence: 0,
-			expectError:    false,
+			expectError:    true,
+			errorContains:  "refund transaction sequence must be at least 100 for renewal",
 		},
 		{
 			name:           "valid zero timelock - node 0, refund 150",

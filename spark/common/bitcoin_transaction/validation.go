@@ -274,9 +274,10 @@ func ValidateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32)
 	if (txType == TxTypeNodeCPFP) || (txType == TxTypeNodeDirect) {
 		expectedCPFPTimelock = roundedCpfpTimelock
 	} else {
-		// For refund transaction, validate that the timelock is large enough to subtract TimeLockInterval
-		if roundedCpfpTimelock < spark.TimeLockInterval {
-			return 0, fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d",
+		// For refund transaction, validate that the timelock is large enough to
+		// subtract TimeLockInterval without producing a zero-timelock refund.
+		if roundedCpfpTimelock <= spark.TimeLockInterval {
+			return 0, fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d without reaching zero",
 				roundedCpfpTimelock, cpfpTimelock, spark.TimeLockInterval)
 		}
 		// Calculate the expected new timelock (should be TimeLockInterval shorter)

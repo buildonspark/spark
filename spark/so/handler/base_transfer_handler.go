@@ -248,6 +248,12 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expecte
 
 	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 	oldTimeLock := oldSequence & 0xFFFF
+	if newTimeLock == 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the new refund tx must be greater than 0"))
+	}
+	if oldTimeLock <= spark.TimeLockInterval {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the old refund tx %d is too small to transfer without reaching zero", oldTimeLock))
+	}
 	if newTimeLock+spark.TimeLockInterval > oldTimeLock {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock))
 	}
