@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsdown",
     "cli": "cross-env NODE_ENV=production NETWORK=regtest tsx src/cli.ts",
-    "cli:local": "cross-env NODE_ENV=development NETWORK=local ../../scripts/with-local-ingress.sh tsx src/cli.ts",
+    "cli:local": "cross-env NODE_ENV=development NETWORK=local ../../scripts/with-local-routing.sh tsx src/cli.ts",
     "cli:mainnet": "cross-env NODE_ENV=production NETWORK=mainnet tsx src/cli.ts",
     "cli:dev": "cross-env NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../private/config/dev-regtest-config.json tsx src/cli.ts",
     "cli:dev:mainnet": "cross-env NODE_ENV=development NETWORK=mainnet CONFIG_FILE=../../private/config/dev-mainnet-config.json tsx src/cli.ts",

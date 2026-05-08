@@ -58,9 +58,9 @@ yarn cli:mainnet    # mainnet
 yarn cli:local      # local network
 ```
 
-`cli:local` auto-detects the local ingress host in this order:
+`cli:local` uses `scripts/with-local-routing.sh` to choose local routing in this order:
 
 - `SPARK_LOCAL_INGRESS_HOST`
 - `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
 - `minikube ip`
-- otherwise no ingress override, which keeps the existing direct `localhost:8535+` flow
+- otherwise no ingress override, which keeps the existing direct `localhost:8535+` flow and defaults `SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION=true` unless you set it yourself

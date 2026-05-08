@@ -46,7 +46,10 @@ main() {
     SPARK_LOCAL_INGRESS_HOST="$ingress_host" exec "$@"
   fi
 
-  exec "$@"
+  # Direct run-everything.sh operators use self-signed localhost certs. Keep
+  # ingress runs verified by the minikube CA, and only default the local-only
+  # SDK bypass when no ingress was found.
+  SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION="${SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION:-true}" exec "$@"
 }
 
 main "$@"

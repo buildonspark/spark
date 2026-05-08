@@ -42,4 +42,5 @@ export {
   rewriteSigningOperatorAddresses,
   type ConfigOptions,
   type SigningOperator,
+  type TlsOptions,
 } from "./services/wallet-config.js";

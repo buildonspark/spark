@@ -22,7 +22,7 @@
     "pay-invoices": "node ./scripts/run-script.mjs pay-invoices",
     "send-transfer": "node ./scripts/run-script.mjs send-transfer",
     "run": "node ./scripts/run-script.mjs",
-    "run:local": "cross-env NODE_ENV=development NETWORK=LOCAL ../../scripts/with-local-ingress.sh node ./scripts/run-script.mjs",
+    "run:local": "cross-env NODE_ENV=development NETWORK=LOCAL ../../scripts/with-local-routing.sh node ./scripts/run-script.mjs",
     "run:mainnet": "cross-env NODE_ENV=production NETWORK=MAINNET node ./scripts/run-script.mjs",
     "run:dev": "cross-env NODE_ENV=development NETWORK=REGTEST CONFIG_FILE=../../private/config/dev-regtest-config.json node ./scripts/run-script.mjs",
     "run:dev:mainnet": "cross-env NODE_ENV=development NETWORK=MAINNET CONFIG_FILE=../../private/config/dev-mainnet-config.json node ./scripts/run-script.mjs"

@@ -8,15 +8,18 @@ import { type SparkSigner } from "../signer/signer.js";
 import { Network, NetworkToProto, type NetworkType } from "../utils/network.js";
 import {
   type ConfigOptions,
+  getTlsOptionsFromEnv,
   LOG_SERVICE_NAMES,
   type LogConfig,
   type LogServiceName,
   type MethodLoggingConfig,
   type MethodLoggingOptions,
   type OptimizationOptions,
+  type ResolvedTlsOptions,
   type ServiceLogOptions,
   type ServiceLoggingConfig,
   type SigningOperator,
+  type TlsOptions,
   type TokenOptimizationOptions,
   WalletConfig,
 } from "./wallet-config.js";
@@ -159,7 +162,9 @@ function normalizeServiceLogOptions(
 }
 
 export class WalletConfigService implements HasSspClientOptions {
-  private readonly config: Required<ConfigOptions>;
+  private readonly config: Omit<Required<ConfigOptions>, "tls"> & {
+    tls: ResolvedTlsOptions;
+  };
   private readonly logOptionProvided: boolean;
   public readonly signer: SparkSigner;
   public readonly sspClientOptions: SspClientOptions;
@@ -171,9 +176,17 @@ export class WalletConfigService implements HasSspClientOptions {
       "log",
     );
 
+    const defaultConfig = this.getDefaultConfig(Network[network]);
+    const envTls = getTlsOptionsFromEnv(network);
+
     this.config = {
-      ...this.getDefaultConfig(Network[network]),
+      ...defaultConfig,
       ...options,
+      tls: {
+        ...defaultConfig.tls,
+        ...envTls,
+        ...options.tls,
+      },
     };
 
     this.signer = signer;
@@ -202,6 +215,30 @@ export class WalletConfigService implements HasSspClientOptions {
 
   public getSigningOperators(): Readonly<Record<string, SigningOperator>> {
     return this.config.signingOperators;
+  }
+
+  public getTlsOptions(): TlsOptions {
+    const dangerouslyDisableCertificateVerification =
+      this.config.tls.dangerouslyDisableCertificateVerification;
+    if (dangerouslyDisableCertificateVerification === undefined) {
+      return {};
+    }
+
+    return {
+      dangerouslyDisableCertificateVerification,
+    };
+  }
+
+  public getTlsOptionsForAddress(address: string): ResolvedTlsOptions {
+    const tlsOptions = { ...this.config.tls };
+    if (
+      tlsOptions.rootCaPath &&
+      !this.shouldUseLocalIngressRootCaForAddress(address)
+    ) {
+      delete tlsOptions.rootCaPath;
+    }
+
+    return tlsOptions;
   }
 
   public getThreshold(): number {
@@ -298,6 +335,19 @@ export class WalletConfigService implements HasSspClientOptions {
 
   public getLoggingLevel(): LoggingLevelArg {
     return this.getLoggingConfig().level;
+  }
+
+  private shouldUseLocalIngressRootCaForAddress(address: string): boolean {
+    if (this.config.network !== "LOCAL") {
+      return false;
+    }
+
+    try {
+      const hostname = new URL(address).hostname.toLowerCase();
+      return hostname.endsWith(".minikube.local");
+    } catch {
+      return false;
+    }
   }
 
   public getLoggingConfig(): LogConfig {

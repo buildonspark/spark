@@ -178,10 +178,20 @@ export type TokenOptimizationOptions = {
   readonly minOutputsThreshold?: number;
 };
 
+export type TlsOptions = {
+  /** Only for local development with self-signed certificates. */
+  readonly dangerouslyDisableCertificateVerification?: boolean;
+};
+
+export type ResolvedTlsOptions = TlsOptions & {
+  readonly rootCaPath?: string;
+};
+
 export type ConfigOptions = MayHaveSspClientOptions & {
   readonly log?: LogOptions;
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
+  readonly tls?: TlsOptions;
   readonly coordinatorIdentifier?: string;
   readonly frostSignerAddress?: string;
   readonly threshold?: number;
@@ -222,6 +232,8 @@ const LOCAL_OPERATOR_PUBLIC_KEYS = [
   "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
 ] as const;
 
+const MINIKUBE_ROOT_CA_PATH = "/tmp/minikube-ca.pem";
+
 export function getDefaultUseTokenPrimitivesBindings(
   isReactNativeRuntime = isReactNative,
 ): boolean {
@@ -232,6 +244,31 @@ function getLocalFrostSignerAddress(): string {
   return isHermeticTest ? "localhost:9999" : "unix:///tmp/frost_0.sock";
 }
 
+export function getTlsOptionsFromEnv(
+  network?: NetworkType,
+): ResolvedTlsOptions {
+  if (typeof process === "undefined") {
+    return {};
+  }
+
+  const rootCaPath =
+    network === "LOCAL" && process.env.SPARK_LOCAL_INGRESS_HOST
+      ? MINIKUBE_ROOT_CA_PATH
+      : undefined;
+  const dangerouslyDisableCertificateVerification =
+    process.env.SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION;
+
+  return {
+    rootCaPath,
+    dangerouslyDisableCertificateVerification:
+      dangerouslyDisableCertificateVerification == null
+        ? undefined
+        : ["1", "true", "yes"].includes(
+            dangerouslyDisableCertificateVerification.toLowerCase(),
+          ),
+  };
+}
+
 const BASE_CONFIG: Required<ConfigOptions> = {
   log: false,
   network: "LOCAL",
@@ -240,6 +277,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   frostSignerAddress: getLocalFrostSignerAddress(),
   threshold: 2,
   signingOperators: getLocalSigningOperators(),
+  tls: {},
   tokenSignatures: "SCHNORR",
   tokenValidityDurationSeconds: 180,
   electrsUrl: getElectrsUrl("LOCAL"),

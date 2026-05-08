@@ -27,12 +27,12 @@ yarn run:local get-balance "<mnemonic>"
 yarn run:mainnet get-balance "<mnemonic>"
 ```
 
-`run:local` auto-detects the local ingress host in this order:
+`run:local` uses `scripts/with-local-routing.sh` to choose local routing in this order:
 
 - `SPARK_LOCAL_INGRESS_HOST`
 - `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`
 - `minikube ip`
-- otherwise no ingress override
+- otherwise no ingress override, and `SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION` defaults to `true` unless you set it yourself
 
 `LOCAL` then uses the SDK's existing local routing:
 

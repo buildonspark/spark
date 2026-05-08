@@ -1,4 +1,5 @@
 import fs from "fs";
+import { createHash } from "crypto";
 import {
   ChannelCredentials,
   createChannel,
@@ -24,6 +25,7 @@ import { type SparkTokenServiceDefinition } from "../../proto/spark_token.js";
 import { type WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
 import type { LoggingService } from "../../utils/logging-service.js";
+import type { ResolvedTlsOptions } from "../wallet-config.js";
 import { type AuthMode, ConnectionManager } from "./connection.js";
 
 // The default @grpc/grpc-js message size limit is 4 MB. Wallets with many
@@ -69,7 +71,7 @@ type GrpcChannelWithInternalSocket = {
 };
 
 export class ConnectionManagerNodeJS extends ConnectionManager {
-  private certPath: string | null = null;
+  private readonly walletConfig: WalletConfigService;
 
   constructor(
     config: WalletConfigService,
@@ -77,6 +79,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     logging?: LoggingService,
   ) {
     super(config, authMode, logging);
+    this.walletConfig = config;
   }
 
   protected getMonotonicTime(): number {
@@ -85,6 +88,14 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
 
   protected prepareMetadata(metadata: Metadata): Metadata {
     return super.prepareMetadata(metadata).set("X-Client-Env", getClientEnv());
+  }
+
+  protected override makeChannelKey(address: string, stream?: boolean): string {
+    return [
+      super.makeChannelKey(address, stream),
+      "tls",
+      this.makeTlsChannelCacheKey(address),
+    ].join("|");
   }
 
   public async createMockClient(address: string): Promise<
@@ -108,47 +119,137 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     isStreamClientType: boolean = false,
   ): Promise<Channel> {
     try {
-      if (this.certPath) {
-        try {
-          const cert = fs.readFileSync(this.certPath);
-          return Promise.resolve(
-            createChannel(
-              address,
-              ChannelCredentials.createSsl(cert),
-              CHANNEL_OPTIONS,
-            ),
-          );
-        } catch (error) {
-          this.logger.warn(
-            `Error reading certificate: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-          return Promise.resolve(
-            createChannel(
-              address,
-              ChannelCredentials.createSsl(null, null, null, {
-                rejectUnauthorized: false,
-              }),
-              CHANNEL_OPTIONS,
-            ),
-          );
-        }
-      } else {
-        const ch = createChannel(
+      return Promise.resolve(
+        createChannel(
           address,
-          ChannelCredentials.createSsl(null, null, null, {
-            rejectUnauthorized: false,
-          }),
+          this.createChannelCredentials(address),
           CHANNEL_OPTIONS,
-        );
-        return Promise.resolve(ch);
-      }
+        ),
+      );
     } catch (error) {
+      if (error instanceof SparkRequestError) {
+        throw error;
+      }
+
       throw new SparkRequestError("Failed to create channel", {
         url: address,
         error,
       });
+    }
+  }
+
+  protected createChannelCredentials(address: string): ChannelCredentials {
+    const tlsOptions = this.walletConfig.getTlsOptionsForAddress(address);
+
+    if (tlsOptions.dangerouslyDisableCertificateVerification) {
+      if (!this.isLocalCertificateVerificationBypassAllowed(address)) {
+        throw new SparkRequestError(
+          "Refusing to disable TLS certificate verification for non-local signing operator",
+          { url: address },
+        );
+      }
+
+      return ChannelCredentials.createSsl(null, null, null, {
+        rejectUnauthorized: false,
+      });
+    }
+
+    const rootCa = this.loadRootCa(tlsOptions);
+
+    if (rootCa) {
+      return ChannelCredentials.createSsl(rootCa);
+    }
+
+    return ChannelCredentials.createSsl();
+  }
+
+  private makeTlsChannelCacheKey(address: string): string {
+    const tlsOptions = this.walletConfig.getTlsOptionsForAddress(address);
+    const dangerouslyDisableCertificateVerification =
+      tlsOptions.dangerouslyDisableCertificateVerification === true;
+    const tlsIdentity = {
+      rootCa: this.getRootCaCacheIdentity(tlsOptions),
+      dangerouslyDisableCertificateVerification,
+      ...(dangerouslyDisableCertificateVerification
+        ? {
+            network: this.walletConfig.getNetworkType(),
+            bypassAllowed:
+              this.isLocalCertificateVerificationBypassAllowed(address),
+          }
+        : {}),
+    };
+
+    return createHash("sha256")
+      .update(JSON.stringify(tlsIdentity))
+      .digest("hex");
+  }
+
+  private getRootCaCacheIdentity(tlsOptions: ResolvedTlsOptions):
+    | {
+        path: string;
+        sha256: string;
+      }
+    | {
+        path: string;
+        unreadable: true;
+      }
+    | null {
+    if (!tlsOptions.rootCaPath) {
+      return null;
+    }
+
+    try {
+      const rootCa = fs.readFileSync(tlsOptions.rootCaPath);
+      return {
+        path: tlsOptions.rootCaPath,
+        sha256: createHash("sha256").update(rootCa).digest("hex"),
+      };
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return null;
+      }
+
+      return {
+        path: tlsOptions.rootCaPath,
+        unreadable: true,
+      };
+    }
+  }
+
+  private loadRootCa(tlsOptions: ResolvedTlsOptions): Buffer | undefined {
+    if (tlsOptions.rootCaPath) {
+      try {
+        return fs.readFileSync(tlsOptions.rootCaPath);
+      } catch (error) {
+        if (isMissingFileError(error)) {
+          return undefined;
+        }
+
+        throw error;
+      }
+    }
+
+    return undefined;
+  }
+
+  private isLocalCertificateVerificationBypassAllowed(
+    address: string,
+  ): boolean {
+    if (this.walletConfig.getNetworkType() !== "LOCAL") {
+      return false;
+    }
+
+    try {
+      const hostname = new URL(address).hostname.toLowerCase();
+      return (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1" ||
+        hostname === "[::1]" ||
+        hostname.endsWith(".minikube.local")
+      );
+    } catch {
+      return false;
     }
   }
 
@@ -227,4 +328,13 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     maybeUnref();
     return stream;
   }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
 }

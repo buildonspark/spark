@@ -17,7 +17,7 @@ yarn run:local get-or-create-wallet
 yarn run:mainnet get-or-create-wallet
 ```
 
-`run:local` auto-detects the local ingress host in this order:
+`run:local` uses `scripts/with-local-routing.sh` to choose local routing in this order:
 
 - `SPARK_LOCAL_INGRESS_HOST`
 - `127.0.0.1` when `kubectl config current-context` looks like `kind` / `kdev`

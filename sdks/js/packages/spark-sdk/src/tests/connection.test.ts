@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
-import type { Channel } from "nice-grpc";
+import fs from "fs";
+import { ChannelCredentials, type Channel } from "nice-grpc";
 import type {
   ClientMiddleware,
   ClientMiddlewareCall,
@@ -26,6 +27,10 @@ type AnyServiceDef =
 class TestConnectionManager extends ConnectionManagerNodeJS {
   public createdChannels: FakeChannel[] = [];
   public createdIsStream: boolean[] = [];
+
+  public channelKeyFor(address: string): string {
+    return this.makeChannelKey(address, false);
+  }
 
   protected async createChannelWithTLS(
     _address: string,
@@ -58,6 +63,260 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
     return "test-session-token";
   }
 }
+
+class CredentialTestConnectionManager extends ConnectionManagerNodeJS {
+  public createCredentialsFor(address: string): ChannelCredentials {
+    return this.createChannelCredentials(address);
+  }
+}
+
+function withEnv<T>(
+  overrides: Record<string, string | undefined>,
+  run: () => T,
+): T {
+  const previousValues = Object.fromEntries(
+    Object.keys(overrides).map((key) => [key, process.env[key]]),
+  );
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    return run();
+  } finally {
+    for (const [key, value] of Object.entries(previousValues)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
+const TLS_ENV_KEYS = [
+  "SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION",
+  "SPARK_LOCAL_INGRESS_HOST",
+] as const;
+
+describe("ConnectionManagerNodeJS TLS credentials", () => {
+  let createSslSpy: jest.SpiedFunction<typeof ChannelCredentials.createSsl>;
+  let previousEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    previousEnv = Object.fromEntries(
+      TLS_ENV_KEYS.map((key) => [key, process.env[key]]),
+    );
+    for (const key of TLS_ENV_KEYS) {
+      delete process.env[key];
+    }
+
+    createSslSpy = jest
+      .spyOn(ChannelCredentials, "createSsl")
+      .mockReturnValue({} as ChannelCredentials);
+  });
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    jest.restoreAllMocks();
+  });
+
+  test("uses default trusted roots when no custom TLS config is provided", () => {
+    const config = new WalletConfigService(
+      { network: "REGTEST" },
+      new DefaultSparkSigner(),
+    );
+    const mgr = new CredentialTestConnectionManager(config);
+
+    mgr.createCredentialsFor("https://0.spark.lightspark.com");
+
+    expect(createSslSpy).toHaveBeenCalledWith();
+  });
+
+  test("uses exported minikube root CA path for local ingress operators", () => {
+    const rootCa = Buffer.from("minikube-root-ca");
+    jest.spyOn(fs, "readFileSync").mockReturnValue(rootCa);
+
+    withEnv({ SPARK_LOCAL_INGRESS_HOST: "192.168.49.2" }, () => {
+      const config = new WalletConfigService(
+        { network: "LOCAL" },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new CredentialTestConnectionManager(config);
+
+      mgr.createCredentialsFor("https://0.spark.minikube.local");
+
+      expect(fs.readFileSync).toHaveBeenCalledWith("/tmp/minikube-ca.pem");
+      expect(createSslSpy).toHaveBeenCalledWith(rootCa);
+    });
+  });
+
+  test("falls back to default trusted roots when local ingress root CA file is missing", () => {
+    const missingFileError = new Error(
+      "missing root CA",
+    ) as NodeJS.ErrnoException;
+    missingFileError.code = "ENOENT";
+    jest.spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw missingFileError;
+    });
+
+    withEnv({ SPARK_LOCAL_INGRESS_HOST: "192.168.49.2" }, () => {
+      const config = new WalletConfigService(
+        { network: "LOCAL" },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new CredentialTestConnectionManager(config);
+
+      mgr.createCredentialsFor("https://0.spark.minikube.local");
+
+      expect(fs.readFileSync).toHaveBeenCalledWith("/tmp/minikube-ca.pem");
+      expect(createSslSpy).toHaveBeenCalledWith();
+    });
+  });
+
+  test("does not apply local ingress root CA path to hosted networks", () => {
+    withEnv({ SPARK_LOCAL_INGRESS_HOST: "192.168.49.2" }, () => {
+      const config = new WalletConfigService(
+        { network: "REGTEST" },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new CredentialTestConnectionManager(config);
+
+      mgr.createCredentialsFor("https://0.spark.lightspark.com");
+
+      expect(createSslSpy).toHaveBeenCalledWith();
+    });
+  });
+
+  test("does not apply local ingress root CA path to custom non-minikube local operators", () => {
+    const readFileSyncSpy = jest.spyOn(fs, "readFileSync");
+
+    withEnv({ SPARK_LOCAL_INGRESS_HOST: "192.168.49.2" }, () => {
+      const config = new WalletConfigService(
+        { network: "LOCAL" },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new CredentialTestConnectionManager(config);
+
+      mgr.createCredentialsFor("https://operator.example.com");
+
+      expect(readFileSyncSpy).not.toHaveBeenCalled();
+      expect(createSslSpy).toHaveBeenCalledWith();
+    });
+  });
+
+  test("allows explicitly disabled certificate verification for local operators", () => {
+    const config = new WalletConfigService(
+      {
+        network: "LOCAL",
+        tls: { dangerouslyDisableCertificateVerification: true },
+      },
+      new DefaultSparkSigner(),
+    );
+    const mgr = new CredentialTestConnectionManager(config);
+
+    mgr.createCredentialsFor("https://localhost:8535");
+
+    expect(createSslSpy).toHaveBeenCalledWith(null, null, null, {
+      rejectUnauthorized: false,
+    });
+  });
+
+  test("prefers explicit local verification bypass before reading root CA path", () => {
+    const readFileSyncSpy = jest
+      .spyOn(fs, "readFileSync")
+      .mockImplementation(() => {
+        throw new Error("root CA file should not be read");
+      });
+
+    withEnv({ SPARK_LOCAL_INGRESS_HOST: "192.168.49.2" }, () => {
+      const config = new WalletConfigService(
+        {
+          network: "LOCAL",
+          tls: { dangerouslyDisableCertificateVerification: true },
+        },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new CredentialTestConnectionManager(config);
+
+      mgr.createCredentialsFor("https://0.spark.minikube.local");
+
+      expect(readFileSyncSpy).not.toHaveBeenCalled();
+      expect(createSslSpy).toHaveBeenCalledWith(null, null, null, {
+        rejectUnauthorized: false,
+      });
+    });
+  });
+
+  test("reads local verification bypass from environment when config service is constructed", () => {
+    withEnv({ SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION: "true" }, () => {
+      const config = new WalletConfigService(
+        { network: "LOCAL" },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new CredentialTestConnectionManager(config);
+
+      mgr.createCredentialsFor("https://localhost:8535");
+
+      expect(createSslSpy).toHaveBeenCalledWith(null, null, null, {
+        rejectUnauthorized: false,
+      });
+    });
+  });
+
+  test("rejects disabled certificate verification for non-local operators", () => {
+    const config = new WalletConfigService(
+      {
+        network: "REGTEST",
+        tls: { dangerouslyDisableCertificateVerification: true },
+      },
+      new DefaultSparkSigner(),
+    );
+    const mgr = new CredentialTestConnectionManager(config);
+
+    expect(() =>
+      mgr.createCredentialsFor("https://0.spark.lightspark.com"),
+    ).toThrow("Refusing to disable TLS certificate verification");
+    expect(createSslSpy).not.toHaveBeenCalled();
+  });
+
+  test("rejects disabled certificate verification for custom non-local operators on local network", () => {
+    const config = new WalletConfigService(
+      {
+        network: "LOCAL",
+        signingOperators: {
+          "0000000000000000000000000000000000000000000000000000000000000001": {
+            id: 0,
+            identifier:
+              "0000000000000000000000000000000000000000000000000000000000000001",
+            address: "https://operator.example.com",
+            identityPublicKey:
+              "03dfbdff4b6332c220f8fa2ba8ed496c698ceada563fa01b67d9983bfc5c95e763",
+          },
+        },
+        tls: { dangerouslyDisableCertificateVerification: true },
+      },
+      new DefaultSparkSigner(),
+    );
+    const mgr = new CredentialTestConnectionManager(config);
+
+    expect(() =>
+      mgr.createCredentialsFor("https://operator.example.com"),
+    ).toThrow("Refusing to disable TLS certificate verification");
+    expect(createSslSpy).not.toHaveBeenCalled();
+  });
+});
 
 describe("ConnectionManager channel cache", () => {
   test("reuses channel for unary clients and releases once after close", async () => {
@@ -257,6 +516,67 @@ describe("ConnectionManager channel cache", () => {
 
     await mgr2.closeConnections();
     expect(ch.close).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not reuse channels across manager instances with different TLS verification modes", async () => {
+    const address = "https://localhost:8535";
+    const config1 = new WalletConfigService(
+      { network: "LOCAL" },
+      new DefaultSparkSigner(),
+    );
+    const mgr1 = new TestConnectionManager(config1);
+    const config2 = new WalletConfigService(
+      {
+        network: "LOCAL",
+        tls: { dangerouslyDisableCertificateVerification: true },
+      },
+      new DefaultSparkSigner(),
+    );
+    const mgr2 = new TestConnectionManager(config2);
+
+    await mgr1.createSparkClient(address);
+    await mgr2.createSparkClient(address);
+
+    expect(mgr1.createdChannels).toHaveLength(1);
+    expect(mgr2.createdChannels).toHaveLength(1);
+    expect(mgr2.createdChannels[0]).not.toBe(mgr1.createdChannels[0]);
+
+    await mgr1.closeConnections();
+    await mgr2.closeConnections();
+
+    expect(mgr1.createdChannels[0]!.close).toHaveBeenCalledTimes(1);
+    expect(mgr2.createdChannels[0]!.close).toHaveBeenCalledTimes(1);
+  });
+
+  test("changes channel cache key when local ingress root CA contents change", () => {
+    const readFileSyncSpy = jest.spyOn(fs, "readFileSync");
+    const address = "https://0.spark.minikube.local";
+
+    withEnv({ SPARK_LOCAL_INGRESS_HOST: "192.168.49.2" }, () => {
+      const config = new WalletConfigService(
+        { network: "LOCAL" },
+        new DefaultSparkSigner(),
+      );
+      const mgr = new TestConnectionManager(config);
+      const missingFileError = new Error(
+        "missing root CA",
+      ) as NodeJS.ErrnoException;
+      missingFileError.code = "ENOENT";
+
+      readFileSyncSpy.mockImplementation(() => {
+        throw missingFileError;
+      });
+      const missingCaKey = mgr.channelKeyFor(address);
+
+      readFileSyncSpy.mockReturnValue(Buffer.from("minikube-root-ca-1"));
+      const firstCaKey = mgr.channelKeyFor(address);
+
+      readFileSyncSpy.mockReturnValue(Buffer.from("minikube-root-ca-2"));
+      const secondCaKey = mgr.channelKeyFor(address);
+
+      expect(firstCaKey).not.toBe(missingCaKey);
+      expect(secondCaKey).not.toBe(firstCaKey);
+    });
   });
 });
 
