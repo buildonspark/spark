@@ -179,15 +179,17 @@ func TestBackfillTransferType_MultipleReceivers(t *testing.T) {
 		SetReceiverIdentityPubkey(receiver1).
 		SetStatus(st.TransferStatusCompleted).
 		SetTotalValue(1000).
-		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetExpiryTime(preCutoffCreateTime.Add(10 * time.Minute)).
 		SetType(st.TransferTypeCounterSwap).
 		SetNetwork(btcnetwork.Regtest).
+		SetCreateTime(preCutoffCreateTime).
 		Save(ctx)
 	require.NoError(t, err)
 
 	_, err = client.TransferSender.Create().
 		SetTransferID(tr.ID).
 		SetIdentityPubkey(senderPub).
+		SetCreateTime(preCutoffCreateTime).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -195,12 +197,14 @@ func TestBackfillTransferType_MultipleReceivers(t *testing.T) {
 		SetTransferID(tr.ID).
 		SetIdentityPubkey(receiver1).
 		SetStatus(st.TransferReceiverStatusCompleted).
+		SetCreateTime(preCutoffCreateTime).
 		Save(ctx)
 	require.NoError(t, err)
 	rcv2, err := client.TransferReceiver.Create().
 		SetTransferID(tr.ID).
 		SetIdentityPubkey(receiver2).
 		SetStatus(st.TransferReceiverStatusCompleted).
+		SetCreateTime(preCutoffCreateTime).
 		Save(ctx)
 	require.NoError(t, err)
 	require.NoError(t, ent.DbCommit(ctx))
