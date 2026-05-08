@@ -1,0 +1,26 @@
+$ timeout 45 env WATCHDOG_MS=20000 CLEANUP_CONNECTIONS=0 NETWORK=MAINNET bare repro-agent-suspend-balance.js
+[2026-05-08T19:22:12.690Z] starting Bare agent suspend balance repro { cleanupConnections: false, network: 'MAINNET', watchdogMs: 20000 }
+[2026-05-08T19:22:13.325Z] wallet initialized
+[2026-05-08T19:22:13.451Z] initial balance resolved after 126ms {
+  balance: 0n,
+  satsBalance: { available: 0n, owned: 0n, incoming: 0n },
+  tokenBalances: Map(0) {}
+}
+[2026-05-08T19:22:13.454Z] agents suspended
+[2026-05-08T19:22:13.463Z] balance while agents already suspended rejected after 9ms SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended [serverTraceId: 2dfbebb254e9ab81ca080fd9a1813ee5, idPubKey: 0350828c5f1c7377fe8828473bc2a3c30ebac45ebb1946e9d13c889848c43eb898, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-08T19:22:13.464Z] agents resumed
+[2026-05-08T19:22:13.464Z] same already-suspended balance promise after resume rejected after 0ms SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended [serverTraceId: 2dfbebb254e9ab81ca080fd9a1813ee5, idPubKey: 0350828c5f1c7377fe8828473bc2a3c30ebac45ebb1946e9d13c889848c43eb898, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-08T19:22:13.466Z] agents suspended
+[2026-05-08T19:22:28.470Z] balance suspended while in flight rejected after 15004ms SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: /spark.SparkService/query_nodes UNAVAILABLE: UNAVAILABLE: request timed out after 15000ms [serverTraceId: 2dfbebb254e9ab81ca080fd9a1813ee5, idPubKey: 0350828c5f1c7377fe8828473bc2a3c30ebac45ebb1946e9d13c889848c43eb898, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-08T19:22:28.470Z] agents resumed
+[2026-05-08T19:22:28.704Z] fresh balance after resume resolved after 234ms {
+  balance: 0n,
+  satsBalance: { available: 0n, owned: 0n, incoming: 0n },
+  tokenBalances: Map(0) {}
+}
+[2026-05-08T19:22:28.704Z] skipping wallet cleanup; process should exit only if no SDK handles keep it alive
+[2026-05-08T19:22:28.704Z] repro script completed
+real 45.01
+user 0.46
+sys 0.10
+exit_code=124

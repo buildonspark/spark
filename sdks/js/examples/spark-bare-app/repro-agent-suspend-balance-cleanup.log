@@ -1,0 +1,26 @@
+$ WATCHDOG_MS=20000 NETWORK=MAINNET bare repro-agent-suspend-balance.js
+[2026-05-08T19:21:37.090Z] starting Bare agent suspend balance repro { cleanupConnections: true, network: 'MAINNET', watchdogMs: 20000 }
+[2026-05-08T19:21:37.815Z] wallet initialized
+[2026-05-08T19:21:37.935Z] initial balance resolved after 120ms {
+  balance: 0n,
+  satsBalance: { available: 0n, owned: 0n, incoming: 0n },
+  tokenBalances: Map(0) {}
+}
+[2026-05-08T19:21:37.936Z] agents suspended
+[2026-05-08T19:21:37.939Z] balance while agents already suspended rejected after 3ms SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended [serverTraceId: 39961a9aa0d63b37fec142d383eca5a6, idPubKey: 03114fc8a14874bec79b734a44c8b7c36efb4d9dbce7ad51cc4e8cfe4746e6ba22, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-08T19:21:37.939Z] agents resumed
+[2026-05-08T19:21:37.939Z] same already-suspended balance promise after resume rejected after 0ms SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended [serverTraceId: 39961a9aa0d63b37fec142d383eca5a6, idPubKey: 03114fc8a14874bec79b734a44c8b7c36efb4d9dbce7ad51cc4e8cfe4746e6ba22, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-08T19:21:37.940Z] agents suspended
+[2026-05-08T19:21:52.943Z] balance suspended while in flight rejected after 15003ms SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: /spark.SparkService/query_nodes UNAVAILABLE: UNAVAILABLE: request timed out after 15000ms [serverTraceId: 39961a9aa0d63b37fec142d383eca5a6, idPubKey: 03114fc8a14874bec79b734a44c8b7c36efb4d9dbce7ad51cc4e8cfe4746e6ba22, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-08T19:21:52.943Z] agents resumed
+[2026-05-08T19:21:53.172Z] fresh balance after resume resolved after 229ms {
+  balance: 0n,
+  satsBalance: { available: 0n, owned: 0n, incoming: 0n },
+  tokenBalances: Map(0) {}
+}
+[2026-05-08T19:21:53.173Z] cleaning up wallet connections
+[2026-05-08T19:21:53.175Z] repro script completed
+real 16.38
+user 0.41
+sys 0.09
+exit_code=0
