@@ -827,8 +827,10 @@ export abstract class IssuerSparkWallet extends SparkWallet {
    * Retrieves the distribution information for the issuer's token.
    * @throws {SparkError} This feature is not yet supported
    */
-  public async getIssuerTokenDistribution(): Promise<TokenDistribution> {
-    throw new SparkError("Token distribution is not yet supported");
+  public getIssuerTokenDistribution(): Promise<TokenDistribution> {
+    return new Promise((_, reject) => {
+      reject(new SparkError("Token distribution is not yet supported"));
+    });
   }
 
   /**
@@ -909,7 +911,7 @@ type AssertNever<T extends never> = T;
 type IssuerSparkWalletFunctionKeys = Extract<
   {
     [K in keyof IssuerSparkWallet]: IssuerSparkWallet[K] extends (
-      ...args: any[]
+      ...args: never[]
     ) => PromiseLike<unknown>
       ? /* Exclude SparkWallet methods that are already wrapped by the base class: */
         K extends keyof SparkWallet
@@ -942,3 +944,6 @@ type _AllIssuerMethodsCovered = AssertNever<
     (typeof PUBLIC_ISSUER_SPARK_WALLET_METHODS)[number]
   >
 >;
+
+const allIssuerMethodsCovered: _AllIssuerMethodsCovered = undefined as never;
+void allIssuerMethodsCovered;

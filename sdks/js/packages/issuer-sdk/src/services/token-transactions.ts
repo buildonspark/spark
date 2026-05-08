@@ -17,73 +17,77 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
     super(config, connectionManager);
   }
 
-  async constructMintTokenTransaction(
+  constructMintTokenTransaction(
     rawTokenIdentifierBytes: Uint8Array,
     issuerTokenPublicKey: Uint8Array,
     tokenAmount: bigint,
   ): Promise<TokenTransaction> {
-    return {
-      version: 2,
-      network: this.config.getNetworkProto(),
-      tokenInputs: {
-        $case: "mintInput",
-        mintInput: {
-          issuerPublicKey: issuerTokenPublicKey,
-          tokenIdentifier: rawTokenIdentifierBytes,
+    return new Promise((resolve) => {
+      resolve({
+        version: 2,
+        network: this.config.getNetworkProto(),
+        tokenInputs: {
+          $case: "mintInput",
+          mintInput: {
+            issuerPublicKey: issuerTokenPublicKey,
+            tokenIdentifier: rawTokenIdentifierBytes,
+          },
         },
-      },
-      tokenOutputs: [
-        {
-          ownerPublicKey: issuerTokenPublicKey,
-          tokenIdentifier: rawTokenIdentifierBytes,
-          tokenAmount: numberToBytesBE(tokenAmount, 16),
-        },
-      ],
-      clientCreatedTimestamp: new Date(),
-      sparkOperatorIdentityPublicKeys:
-        super.collectOperatorIdentityPublicKeys(),
-      expiryTime: undefined,
-      invoiceAttachments: [],
-    };
+        tokenOutputs: [
+          {
+            ownerPublicKey: issuerTokenPublicKey,
+            tokenIdentifier: rawTokenIdentifierBytes,
+            tokenAmount: numberToBytesBE(tokenAmount, 16),
+          },
+        ],
+        clientCreatedTimestamp: new Date(),
+        sparkOperatorIdentityPublicKeys:
+          super.collectOperatorIdentityPublicKeys(),
+        expiryTime: undefined,
+        invoiceAttachments: [],
+      });
+    });
   }
 
-  async constructPartialMintTokenTransaction(
+  constructPartialMintTokenTransaction(
     rawTokenIdentifierBytes: Uint8Array,
     issuerTokenPublicKey: Uint8Array,
     tokenAmount: bigint,
   ): Promise<PartialTokenTransaction> {
-    return {
-      version: 3,
-      tokenTransactionMetadata: {
-        network: this.config.getNetworkProto(),
-        sparkOperatorIdentityPublicKeys:
-          this.collectOperatorIdentityPublicKeys(),
-        validityDurationSeconds:
-          await this.config.getTokenValidityDurationSeconds(),
-        clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
-        invoiceAttachments: [],
-      },
-      tokenInputs: {
-        $case: "mintInput",
-        mintInput: {
-          issuerPublicKey: issuerTokenPublicKey,
-          tokenIdentifier: rawTokenIdentifierBytes,
+    return new Promise((resolve) => {
+      resolve({
+        version: 3,
+        tokenTransactionMetadata: {
+          network: this.config.getNetworkProto(),
+          sparkOperatorIdentityPublicKeys:
+            this.collectOperatorIdentityPublicKeys(),
+          validityDurationSeconds:
+            this.config.getTokenValidityDurationSeconds(),
+          clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
+          invoiceAttachments: [],
         },
-      },
-      partialTokenOutputs: [
-        {
-          ownerPublicKey: issuerTokenPublicKey,
-          tokenIdentifier: rawTokenIdentifierBytes,
-          withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
-          withdrawRelativeBlockLocktime:
-            this.config.getExpectedWithdrawRelativeBlockLocktime(),
-          tokenAmount: numberToBytesBE(tokenAmount, 16),
+        tokenInputs: {
+          $case: "mintInput",
+          mintInput: {
+            issuerPublicKey: issuerTokenPublicKey,
+            tokenIdentifier: rawTokenIdentifierBytes,
+          },
         },
-      ],
-    };
+        partialTokenOutputs: [
+          {
+            ownerPublicKey: issuerTokenPublicKey,
+            tokenIdentifier: rawTokenIdentifierBytes,
+            withdrawBondSats: this.config.getExpectedWithdrawBondSats(),
+            withdrawRelativeBlockLocktime:
+              this.config.getExpectedWithdrawRelativeBlockLocktime(),
+            tokenAmount: numberToBytesBE(tokenAmount, 16),
+          },
+        ],
+      });
+    });
   }
 
-  async constructCreateTokenTransaction(
+  constructCreateTokenTransaction(
     tokenPublicKey: Uint8Array,
     tokenName: string,
     tokenTicker: string,
@@ -92,31 +96,33 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
     isFreezable: boolean,
     extraMetadata: Uint8Array | undefined,
   ): Promise<TokenTransaction> {
-    return {
-      version: 2,
-      network: this.config.getNetworkProto(),
-      tokenInputs: {
-        $case: "createInput",
-        createInput: {
-          issuerPublicKey: tokenPublicKey,
-          tokenName: tokenName,
-          tokenTicker: tokenTicker,
-          decimals: decimals,
-          maxSupply: numberToBytesBE(maxSupply, 16),
-          isFreezable: isFreezable,
-          extraMetadata: extraMetadata,
+    return new Promise((resolve) => {
+      resolve({
+        version: 2,
+        network: this.config.getNetworkProto(),
+        tokenInputs: {
+          $case: "createInput",
+          createInput: {
+            issuerPublicKey: tokenPublicKey,
+            tokenName: tokenName,
+            tokenTicker: tokenTicker,
+            decimals: decimals,
+            maxSupply: numberToBytesBE(maxSupply, 16),
+            isFreezable: isFreezable,
+            extraMetadata: extraMetadata,
+          },
         },
-      },
-      tokenOutputs: [],
-      clientCreatedTimestamp: new Date(),
-      sparkOperatorIdentityPublicKeys:
-        super.collectOperatorIdentityPublicKeys(),
-      expiryTime: undefined,
-      invoiceAttachments: [],
-    };
+        tokenOutputs: [],
+        clientCreatedTimestamp: new Date(),
+        sparkOperatorIdentityPublicKeys:
+          super.collectOperatorIdentityPublicKeys(),
+        expiryTime: undefined,
+        invoiceAttachments: [],
+      });
+    });
   }
 
-  async constructPartialCreateTokenTransaction(
+  constructPartialCreateTokenTransaction(
     tokenPublicKey: Uint8Array,
     tokenName: string,
     tokenTicker: string,
@@ -125,30 +131,32 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
     isFreezable: boolean,
     extraMetadata?: Uint8Array,
   ): Promise<PartialTokenTransaction> {
-    return {
-      version: 3,
-      tokenTransactionMetadata: {
-        network: this.config.getNetworkProto(),
-        sparkOperatorIdentityPublicKeys:
-          this.collectOperatorIdentityPublicKeys(),
-        validityDurationSeconds:
-          await this.config.getTokenValidityDurationSeconds(),
-        clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
-        invoiceAttachments: [],
-      },
-      tokenInputs: {
-        $case: "createInput",
-        createInput: {
-          issuerPublicKey: tokenPublicKey,
-          tokenName: tokenName,
-          tokenTicker: tokenTicker,
-          decimals: decimals,
-          maxSupply: numberToBytesBE(maxSupply, 16),
-          isFreezable: isFreezable,
-          extraMetadata: extraMetadata,
+    return new Promise((resolve) => {
+      resolve({
+        version: 3,
+        tokenTransactionMetadata: {
+          network: this.config.getNetworkProto(),
+          sparkOperatorIdentityPublicKeys:
+            this.collectOperatorIdentityPublicKeys(),
+          validityDurationSeconds:
+            this.config.getTokenValidityDurationSeconds(),
+          clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
+          invoiceAttachments: [],
         },
-      },
-      partialTokenOutputs: [],
-    };
+        tokenInputs: {
+          $case: "createInput",
+          createInput: {
+            issuerPublicKey: tokenPublicKey,
+            tokenName: tokenName,
+            tokenTicker: tokenTicker,
+            decimals: decimals,
+            maxSupply: numberToBytesBE(maxSupply, 16),
+            isFreezable: isFreezable,
+            extraMetadata: extraMetadata,
+          },
+        },
+        partialTokenOutputs: [],
+      });
+    });
   }
 }
