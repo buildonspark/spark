@@ -12,6 +12,7 @@ import {
   constructNodeTxPair,
   constructRefundTxTrio,
   computeMultiInputSighash,
+  type NativeDummyTx,
 } from "@buildonspark/spark-frost-bare-addon";
 import {
   SparkFrostBase,
@@ -20,7 +21,10 @@ import {
   type AggregateFrostBindingParams,
 } from "@buildonspark/spark-sdk/bare";
 
-/* Avoid a console.error that comes from an import of Node.js require-in-the-middle module, see LIG-8098 */
+/*
+ * Avoid a console.error from importing Node.js require-in-the-middle module,
+ * see LIG-8098.
+ */
 Object.defineProperty(Module, "_resolveFilename", {
   value: () => {
     throw new Error(
@@ -40,7 +44,7 @@ class SparkFrostBare extends SparkFrostBase {
     selfCommitment,
     statechainCommitments,
     adaptorPubKey,
-  }: SignFrostBindingParams) {
+  }: SignFrostBindingParams): Promise<Uint8Array> {
     const statechainCommitmentsArr = statechainCommitments
       ? Object.entries(statechainCommitments)
       : [];
@@ -52,7 +56,9 @@ class SparkFrostBare extends SparkFrostBase {
       statechainCommitmentsArr,
       adaptorPubKey || new Uint8Array(0),
     );
-    return result;
+    return new Promise((resolve) => {
+      resolve(result);
+    });
   }
 
   aggregateFrost({
@@ -65,7 +71,7 @@ class SparkFrostBare extends SparkFrostBase {
     selfPublicKey,
     verifyingKey,
     adaptorPubKey,
-  }: AggregateFrostBindingParams) {
+  }: AggregateFrostBindingParams): Promise<Uint8Array> {
     const statechainCommitmentsArr = statechainCommitments
       ? Object.entries(statechainCommitments)
       : [];
@@ -86,17 +92,33 @@ class SparkFrostBare extends SparkFrostBase {
       verifyingKey,
       adaptorPubKey || new Uint8Array(0),
     );
-    return result;
+    return new Promise((resolve) => {
+      resolve(result);
+    });
   }
 
-  createDummyTx(address, amountSats) {
-    return createDummyTx(address, amountSats);
+  createDummyTx(address: string, amountSats: bigint): Promise<NativeDummyTx> {
+    const result = createDummyTx(address, amountSats);
+    return new Promise((resolve) => {
+      resolve(result);
+    });
   }
-  encryptEcies(msg, publicKey) {
-    return encryptEcies(msg, publicKey);
+
+  encryptEcies(msg: Uint8Array, publicKey: Uint8Array): Promise<Uint8Array> {
+    const result = encryptEcies(msg, publicKey);
+    return new Promise((resolve) => {
+      resolve(result);
+    });
   }
-  decryptEcies(encryptedMsg, privateKey) {
-    return decryptEcies(encryptedMsg, privateKey);
+
+  decryptEcies(
+    encryptedMsg: Uint8Array,
+    privateKey: Uint8Array,
+  ): Promise<Uint8Array> {
+    const result = decryptEcies(encryptedMsg, privateKey);
+    return new Promise((resolve) => {
+      resolve(result);
+    });
   }
 
   splitSecretWithProofs(

@@ -1,4 +1,3 @@
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import {
   DefaultSparkSigner,
   SparkValidationError,
