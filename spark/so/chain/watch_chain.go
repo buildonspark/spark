@@ -1313,11 +1313,6 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 		return fmt.Errorf("failed to query transfer: %w", err)
 	}
 
-	if transfer.ID.String() == "01981232-ad72-7cc0-bd76-0ea293cf501f" {
-		logger.Sugar().Infof("Skipping transfer %s", transfer.ID)
-		return nil
-	}
-
 	if transfer.Status == st.TransferStatusSenderKeyTweaked {
 		logger.Sugar().Infof("Transfer %s already tweaked, skipping", transfer.ID)
 		return nil
