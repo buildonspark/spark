@@ -62,27 +62,41 @@ check_page_size() {
     fi
 }
 
-# Check all Android architectures
+# Verify alignment of every libuniffi_*.so present in each ABI directory.
+# Discovering files dynamically (rather than hardcoding a list) keeps this
+# script working for builds that ship any subset of the uniffi libraries.
 failed=0
+checked=0
 
-# ARM64
-if ! check_page_size "$ANDROID_JNI_DIR/arm64-v8a/libuniffi_spark_frost.so" "ARM64"; then
-    failed=1
-fi
+ABIS=(
+    "arm64-v8a:ARM64"
+    "armeabi-v7a:ARMv7"
+    "x86:x86"
+    "x86_64:x86_64"
+)
 
-# ARMv7
-if ! check_page_size "$ANDROID_JNI_DIR/armeabi-v7a/libuniffi_spark_frost.so" "ARMv7"; then
-    failed=1
-fi
+for abi_pair in "${ABIS[@]}"; do
+    abi="${abi_pair%%:*}"
+    label="${abi_pair##*:}"
+    abi_dir="$ANDROID_JNI_DIR/$abi"
 
-# x86
-if ! check_page_size "$ANDROID_JNI_DIR/x86/libuniffi_spark_frost.so" "x86"; then
-    failed=1
-fi
+    if [ ! -d "$abi_dir" ]; then
+        continue
+    fi
 
-# x86_64
-if ! check_page_size "$ANDROID_JNI_DIR/x86_64/libuniffi_spark_frost.so" "x86_64"; then
-    failed=1
+    shopt -s nullglob
+    for so_file in "$abi_dir"/libuniffi_*.so; do
+        checked=$((checked + 1))
+        if ! check_page_size "$so_file" "$label ($(basename "$so_file"))"; then
+            failed=1
+        fi
+    done
+    shopt -u nullglob
+done
+
+if [ "$checked" -eq 0 ]; then
+    echo "❌ No libuniffi_*.so files found under $ANDROID_JNI_DIR. Run a build script first."
+    exit 1
 fi
 
 if [ $failed -eq 0 ]; then
