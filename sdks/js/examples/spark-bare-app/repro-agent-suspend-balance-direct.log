@@ -1,0 +1,709 @@
+$ timeout 45 env WATCHDOG_MS=20000 NETWORK=MAINNET yarn workspace @buildonspark/spark-bare-app repro:agent-suspend-balance
+[2026-05-11T16:54:39.279Z] starting Bare agent suspend balance repro {
+  cleanupConnections: true,
+  enableSdkLogs: true,
+  network: 'MAINNET',
+  reproMode: 'direct-suspended',
+  sdkLogLevel: 'TRACE',
+  watchdogMs: 20000
+}
+2026-05-11T16:54:39.321Z [SparkWallet:029cdf6b] createClientsAndSyncWallet: initializing network=MAINNET coordinator=[path https://0.spark.lightspark.com/] signingOperators=3
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex x3 (+0ms total)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit createChannelWithTLS x3 (+0ms total)
+2026-05-11T16:54:39.321Z [ConnectionManager:029cdf6b] exit createAuthnMiddleware (+0ms)
+2026-05-11T16:54:39.322Z [ConnectionManager:029cdf6b] exit createAuthnMiddleware (+0ms)
+2026-05-11T16:54:39.322Z [ConnectionManager:029cdf6b] exit createAuthnMiddleware (+0ms)
+2026-05-11T16:54:39.322Z [ConnectionManager:029cdf6b] exit createGrpcClient x3 (+1ms total)
+2026-05-11T16:54:39.322Z [ConnectionManager:029cdf6b] exit createSparkAuthnGrpcConnection x3 (+3ms total)
+2026-05-11T16:54:39.322Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge starting request url=https://0.spark.lightspark.com/spark_authn.SparkAuthnService/get_challenge responseStream=false
+2026-05-11T16:54:39.323Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge starting request url=https://spark-operator.breez.technology/spark_authn.SparkAuthnService/get_challenge responseStream=false
+2026-05-11T16:54:39.323Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge starting request url=https://2.spark.flashnet.xyz/spark_authn.SparkAuthnService/get_challenge responseStream=false
+2026-05-11T16:54:39.325Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge wrote unary body bytes=40
+2026-05-11T16:54:39.326Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge wrote unary body bytes=40
+2026-05-11T16:54:39.326Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge wrote unary body bytes=40
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, X-Processing-Time-Ms, X-Trace-Id, Date, Content-Type, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"2b03f6884d9150600cfbe41626bb8a9e"}
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge request close event
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response has no socket to guard
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response end event
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response close event
+2026-05-11T16:54:39.502Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=143 chunk=1
+2026-05-11T16:54:39.503Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.503Z [BareHttpTransport:029cdf6b] bareHttpTransport: #2 /spark_authn.SparkAuthnService/get_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.505Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge starting request url=https://spark-operator.breez.technology/spark_authn.SparkAuthnService/verify_challenge responseStream=false
+2026-05-11T16:54:39.505Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge wrote unary body bytes=229
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"X-Processing-Time-Ms, Vary, Date, Content-Type, X-Trace-Id, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"87a778699d71e944374270d5dcd23f06"}
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge request close event
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response has no socket to guard
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=122 chunk=1
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response end event
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response close event
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response iterator completed after 2 chunks
+2026-05-11T16:54:39.506Z [BareHttpTransport:029cdf6b] bareHttpTransport: #1 /spark_authn.SparkAuthnService/get_challenge response iterator finally after 2 chunks
+2026-05-11T16:54:39.507Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge starting request url=https://0.spark.lightspark.com/spark_authn.SparkAuthnService/verify_challenge responseStream=false
+2026-05-11T16:54:39.507Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge wrote unary body bytes=230
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Date, Content-Type, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"05be1645a8e992d3209953ab11ed76a9"}
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge request close event
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response has no socket to guard
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response end event
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response close event
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=191 chunk=1
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.546Z [BareHttpTransport:029cdf6b] bareHttpTransport: #4 /spark_authn.SparkAuthnService/verify_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit prepareMetadata x5 (+1ms total)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit getCurrentServerTime (+0ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit authenticate (+225ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit createChannelWithTLS (+0ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit createMiddleware (+0ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit getDefinitionForClientType (+0ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit createGrpcClient (+0ms)
+2026-05-11T16:54:39.546Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+225ms)
+2026-05-11T16:54:39.547Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Date, Content-Type, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"057368c68fd8713afe189c5a2aea0da0"}
+2026-05-11T16:54:39.547Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.547Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=170 chunk=1
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response end event
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response end observed by premature-close guard
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response close event
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge request close event
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response iterator completed after 2 chunks
+2026-05-11T16:54:39.548Z [BareHttpTransport:029cdf6b] bareHttpTransport: #5 /spark_authn.SparkAuthnService/verify_challenge response iterator finally after 2 chunks
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit createSparkClient (+225ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit getCurrentServerTime (+0ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit authenticate (+227ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit createChannelWithTLS (+0ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit createMiddleware (+0ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit getDefinitionForClientType (+0ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit createGrpcClient (+0ms)
+2026-05-11T16:54:39.548Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+227ms)
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f05aad55da-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"Vary, X-Processing-Time-Ms, Date, Content-Type, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"0","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=141,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge request close event
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response has no socket to guard
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response end event
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response close event
+2026-05-11T16:54:39.556Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=143 chunk=1
+2026-05-11T16:54:39.557Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.557Z [BareHttpTransport:029cdf6b] bareHttpTransport: #3 /spark_authn.SparkAuthnService/get_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.557Z [ConnectionManager:029cdf6b] exit createSparkClient (+227ms)
+2026-05-11T16:54:39.557Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge starting request url=https://2.spark.flashnet.xyz/spark_authn.SparkAuthnService/verify_challenge responseStream=false
+2026-05-11T16:54:39.557Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge wrote unary body bytes=229
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f15f1b55da-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"Vary, X-Processing-Time-Ms, Date, Content-Type, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"0","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=94,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge request close event
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response has no socket to guard
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response end event
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response close event
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=191 chunk=1
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.672Z [BareHttpTransport:029cdf6b] bareHttpTransport: #6 /spark_authn.SparkAuthnService/verify_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit getCurrentServerTime (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit authenticate (+351ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit createChannelWithTLS (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit createMiddleware (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit getDefinitionForClientType (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit createGrpcClient (+0ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+351ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit createSparkClient (+351ms)
+2026-05-11T16:54:39.672Z [ConnectionManager:029cdf6b] exit createClients (+351ms)
+2026-05-11T16:54:39.673Z [SparkWallet:029cdf6b] setupBackgroundStream: subscribing to [path https://0.spark.lightspark.com/] retry=0
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.673Z [SparkWallet:029cdf6b] syncTokenOutputs: starting scope=all tokenCount=0
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit createChannelWithTLS (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit createMiddleware (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getDefinitionForClientType (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit createMiddleware (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getDefinitionForClientType (+0ms)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit createGrpcClient x2 (+0ms total)
+2026-05-11T16:54:39.673Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal x2 (+0ms total)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit createSparkTokenClient (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit createSparkStreamClient (+1ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:39.674Z [SparkWallet:029cdf6b] setupBackgroundStream: subscribeToEvents returned async iterator
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit subscribeToEvents (+1ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+0ms)
+2026-05-11T16:54:39.674Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs starting request url=https://0.spark.lightspark.com/spark_token.SparkTokenService/query_token_outputs responseStream=false
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit createSparkClient (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_pending_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:39.674Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.675Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers starting request url=https://0.spark.lightspark.com/spark.SparkService/query_pending_transfers responseStream=false
+2026-05-11T16:54:39.675Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs wrote unary body bytes=46
+2026-05-11T16:54:39.675Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers wrote unary body bytes=48
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"X-Trace-Id, X-Processing-Time-Ms, Date, Content-Type, Vary, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"2","x-trace-id":"54aa56cc9e7555e8d0aa890f7c2b247e"}
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response received status=200 responseStream=false
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs request close event
+2026-05-11T16:54:39.717Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response has no socket to guard
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=7 chunk=1
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response end event
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response close event
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response iterator completed after 2 chunks
+2026-05-11T16:54:39.717Z [BareHttpTransport:029cdf6b] bareHttpTransport: #7 /spark_token.SparkTokenService/query_token_outputs response iterator finally after 2 chunks
+2026-05-11T16:54:39.717Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.717Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+43.50129100680351ms)
+2026-05-11T16:54:39.717Z [TokenTransactionService:029cdf6b] exit fetchOwnedTokenOutputs (+44ms)
+2026-05-11T16:54:39.718Z [SparkWallet:029cdf6b] syncTokenOutputs: completed outputCount=0 tokenCount=0
+2026-05-11T16:54:39.718Z [LeafManager:029cdf6b] sync: Starting sync. Pre-sync: 0 leaves, available=0 owned=0 incoming=0
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal x7 (+0ms total)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit createSparkClient x7 (+0ms total)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_all_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_all_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_all_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.718Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_pending_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex x7 (+6ms total)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit makeChannelKey (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit createAuthnMiddleware (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit createAuthnMiddleware (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit createAuthnMiddleware (+0ms)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit createGrpcClient x3 (+0ms total)
+2026-05-11T16:54:39.719Z [ConnectionManager:029cdf6b] exit createSparkAuthnGrpcConnection x3 (+0ms total)
+2026-05-11T16:54:39.719Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge starting request url=https://0.spark.lightspark.com/spark_authn.SparkAuthnService/get_challenge responseStream=false
+2026-05-11T16:54:39.719Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge starting request url=https://spark-operator.breez.technology/spark_authn.SparkAuthnService/get_challenge responseStream=false
+2026-05-11T16:54:39.719Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge starting request url=https://2.spark.flashnet.xyz/spark_authn.SparkAuthnService/get_challenge responseStream=false
+2026-05-11T16:54:39.719Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge wrote unary body bytes=40
+2026-05-11T16:54:39.719Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge wrote unary body bytes=40
+2026-05-11T16:54:39.719Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge wrote unary body bytes=40
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Content-Type, X-Trace-Id, X-Processing-Time-Ms, Vary, Date, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"770cdcdd672de79947cffea3f1349fe7"}
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge request close event
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response has no socket to guard
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response end event
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response close event
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=143 chunk=1
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.761Z [BareHttpTransport:029cdf6b] bareHttpTransport: #10 /spark_authn.SparkAuthnService/get_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge starting request url=https://spark-operator.breez.technology/spark_authn.SparkAuthnService/verify_challenge responseStream=false
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge wrote unary body bytes=230
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Date, Content-Type, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"3bb66a84f8ffad223db3f45e25c4c718"}
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge request close event
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response has no socket to guard
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=122 chunk=1
+2026-05-11T16:54:39.762Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response end event
+2026-05-11T16:54:39.763Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response close event
+2026-05-11T16:54:39.763Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.763Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response iterator completed after 2 chunks
+2026-05-11T16:54:39.763Z [BareHttpTransport:029cdf6b] bareHttpTransport: #9 /spark_authn.SparkAuthnService/get_challenge response iterator finally after 2 chunks
+2026-05-11T16:54:39.763Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge starting request url=https://0.spark.lightspark.com/spark_authn.SparkAuthnService/verify_challenge responseStream=false
+2026-05-11T16:54:39.763Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge wrote unary body bytes=230
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Content-Type, X-Trace-Id, X-Processing-Time-Ms, Date, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"ba54fcb969def910a8b59176cc2f1301"}
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge request close event
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response has no socket to guard
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=170 chunk=1
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response end event
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response close event
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response iterator completed after 2 chunks
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #12 /spark_authn.SparkAuthnService/verify_challenge response iterator finally after 2 chunks
+2026-05-11T16:54:39.803Z [ConnectionManager:029cdf6b] exit prepareMetadata x5 (+0ms total)
+2026-05-11T16:54:39.803Z [ConnectionManager:029cdf6b] exit getCurrentServerTime (+0ms)
+2026-05-11T16:54:39.803Z [ConnectionManager:029cdf6b] exit authenticate (+85ms)
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes starting request url=https://spark-operator.breez.technology/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:39.803Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Date, Content-Type, Vary, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"0","x-trace-id":"e48d862ce9a3006d6c7457f60659e283"}
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge request close event
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response has no socket to guard
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response end event
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response close event
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=191 chunk=1
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #13 /spark_authn.SparkAuthnService/verify_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.805Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.805Z [ConnectionManager:029cdf6b] exit getCurrentServerTime (+0ms)
+2026-05-11T16:54:39.805Z [ConnectionManager:029cdf6b] exit authenticate x5 (+434ms total)
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes starting request url=https://0.spark.lightspark.com/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers starting request url=https://0.spark.lightspark.com/spark.SparkService/query_all_transfers responseStream=false
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers starting request url=https://0.spark.lightspark.com/spark.SparkService/query_all_transfers responseStream=false
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers starting request url=https://0.spark.lightspark.com/spark.SparkService/query_all_transfers responseStream=false
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers starting request url=https://0.spark.lightspark.com/spark.SparkService/query_pending_transfers responseStream=false
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers wrote unary body bytes=57
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers wrote unary body bytes=63
+2026-05-11T16:54:39.805Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers wrote unary body bytes=59
+2026-05-11T16:54:39.806Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers wrote unary body bytes=48
+2026-05-11T16:54:39.847Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Date, Content-Type, X-Trace-Id, X-Processing-Time-Ms, Vary, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"3","x-trace-id":"8ebcc7ccd1865c5fb9f037e7c41080e1"}
+2026-05-11T16:54:39.847Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:39.847Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:39.847Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:39.847Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:39.848Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:39.848Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:39.848Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:39.848Z [BareHttpTransport:029cdf6b] bareHttpTransport: #14 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:39.848Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+129.46454200148582ms)
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, X-Trace-Id, X-Processing-Time-Ms, Date, Content-Type, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"6","x-trace-id":"3402b321cc68f62f40de1f1fb8042e87"}
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response chunk received bytes=16 chunk=1
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response iterator completed after 2 chunks
+2026-05-11T16:54:39.852Z [BareHttpTransport:029cdf6b] bareHttpTransport: #15 /spark.SparkService/query_nodes response iterator finally after 2 chunks
+2026-05-11T16:54:39.852Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+134.08620800077915ms)
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Date, Content-Type, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"7","x-trace-id":"2505cc2efb71ebaf17cfb232fb8bece6"}
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response received status=200 responseStream=false
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers request close event
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response has no socket to guard
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response chunk received bytes=16 chunk=1
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response end event
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response close event
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response iterator completed after 2 chunks
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #8 /spark.SparkService/query_pending_transfers response iterator finally after 2 chunks
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_pending_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+180.69245900213718ms)
+2026-05-11T16:54:39.855Z [SparkWallet:029cdf6b] claimTransfers: found pendingTransfers=0
+2026-05-11T16:54:39.855Z [SparkWallet:029cdf6b] claimTransfers: found 0 pending transfers
+2026-05-11T16:54:39.855Z [SparkWallet:029cdf6b] claimTransfers: completed claimed=0 attempted=0
+2026-05-11T16:54:39.855Z [SparkWallet:029cdf6b] claimTransfers: completed. Claimed 0 of 0 attempted
+2026-05-11T16:54:39.855Z [SparkWallet:029cdf6b] setupBackgroundStream: claimTransfers completed claimedTransfers=0
+2026-05-11T16:54:39.855Z [SparkWallet:029cdf6b] syncTokenOutputs: starting scope=all tokenCount=0
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit getMonotonicTime x11 (+0ms total)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+0ms)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit createSparkTokenClient (+0ms)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:39.855Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs starting request url=https://0.spark.lightspark.com/spark_token.SparkTokenService/query_token_outputs responseStream=false
+2026-05-11T16:54:39.855Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs wrote unary body bytes=46
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f26b7255da-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"Vary, Date, Content-Type, X-Processing-Time-Ms, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"0","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=119,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge request close event
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response has no socket to guard
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response end event
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response close event
+2026-05-11T16:54:39.858Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response chunk received bytes=143 chunk=1
+2026-05-11T16:54:39.859Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.859Z [BareHttpTransport:029cdf6b] bareHttpTransport: #11 /spark_authn.SparkAuthnService/get_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.859Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.859Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge starting request url=https://2.spark.flashnet.xyz/spark_authn.SparkAuthnService/verify_challenge responseStream=false
+2026-05-11T16:54:39.860Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge wrote unary body bytes=230
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Date, Content-Type, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"6","x-trace-id":"2c62b713f198fa406e819a0e392d00e4"}
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response received status=200 responseStream=false
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs request close event
+2026-05-11T16:54:39.904Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response has no socket to guard
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=7 chunk=1
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response end event
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response close event
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response iterator completed after 2 chunks
+2026-05-11T16:54:39.904Z [BareHttpTransport:029cdf6b] bareHttpTransport: #20 /spark_token.SparkTokenService/query_token_outputs response iterator finally after 2 chunks
+2026-05-11T16:54:39.904Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+49.178791001439095ms)
+2026-05-11T16:54:39.904Z [TokenTransactionService:029cdf6b] exit fetchOwnedTokenOutputs (+49ms)
+2026-05-11T16:54:39.905Z [SparkWallet:029cdf6b] syncTokenOutputs: completed outputCount=0 tokenCount=0
+2026-05-11T16:54:39.905Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/subscribe_to_events [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:39.905Z [ConnectionManager:029cdf6b] exit getMonotonicTime x3 (+0ms total)
+2026-05-11T16:54:39.905Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:39.905Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:39.905Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:39.905Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events starting request url=https://0.spark.lightspark.com/spark.SparkService/subscribe_to_events responseStream=true
+2026-05-11T16:54:39.905Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events wrote unary body bytes=40
+2026-05-11T16:54:39.948Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Content-Type, Vary, Date, grpc-status, grpc-message","vary":"Origin"}
+2026-05-11T16:54:39.949Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response received status=200 responseStream=true
+2026-05-11T16:54:39.949Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response socket unref applied
+2026-05-11T16:54:39.949Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response chunk received bytes=7 chunk=1
+2026-05-11T16:54:39.949Z [SparkWallet:029cdf6b] setupBackgroundStream: stream event received type=connected
+2026-05-11T16:54:39.949Z [SparkWallet:029cdf6b] setupBackgroundStream: connected
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f33f1155da-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"Date, Vary, Content-Type, X-Processing-Time-Ms, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"0","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=88,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response received status=200 responseStream=false
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge request close event
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response has no socket to guard
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response end event
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response close event
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response chunk received bytes=191 chunk=1
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response iterator completed after 1 chunks
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #21 /spark_authn.SparkAuthnService/verify_challenge response iterator finally after 1 chunks
+2026-05-11T16:54:39.966Z [ConnectionManager:029cdf6b] exit getMonotonicTime x2 (+0ms total)
+2026-05-11T16:54:39.966Z [ConnectionManager:029cdf6b] exit getCurrentServerTime (+0ms)
+2026-05-11T16:54:39.966Z [ConnectionManager:029cdf6b] exit authenticate (+248ms)
+2026-05-11T16:54:39.966Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes starting request url=https://2.spark.flashnet.xyz/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:39.966Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"X-Trace-Id, X-Processing-Time-Ms, Vary, Date, Content-Type, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"8","x-trace-id":"1c0b7a7c291f0ec240959df6d7db0b1d"}
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response received status=200 responseStream=false
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers request close event
+2026-05-11T16:54:39.987Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response has no socket to guard
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response end event
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response close event
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response chunk received bytes=37 chunk=1
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response iterator completed after 1 chunks
+2026-05-11T16:54:39.987Z [BareHttpTransport:029cdf6b] bareHttpTransport: #17 /spark.SparkService/query_all_transfers response iterator finally after 1 chunks
+2026-05-11T16:54:39.988Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.988Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_all_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+269.0824999958277ms)
+2026-05-11T16:54:39.988Z [TransferService:029cdf6b] exit queryPendingTransfers (+181ms)
+2026-05-11T16:54:39.988Z [TransferService:029cdf6b] exit queryAllTransfers (+270ms)
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Date, Content-Type, X-Processing-Time-Ms, X-Trace-Id, Vary, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"7","x-trace-id":"697fa4139b91500aa5fb8286c1c320ae"}
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response received status=200 responseStream=false
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers request close event
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response has no socket to guard
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response chunk received bytes=16 chunk=1
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response end event
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response close event
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response iterator completed after 2 chunks
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #16 /spark.SparkService/query_all_transfers response iterator finally after 2 chunks
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_all_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+279.6467909961939ms)
+2026-05-11T16:54:39.998Z [TransferService:029cdf6b] exit queryCounterSwapTransfers (+270ms)
+2026-05-11T16:54:39.998Z [TransferService:029cdf6b] exit queryAllTransfers (+280ms)
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"X-Processing-Time-Ms, X-Trace-Id, Vary, Date, Content-Type, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"7","x-trace-id":"7e8de3ad583169e549df6ff434ee9bb7"}
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response received status=200 responseStream=false
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers request close event
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response has no socket to guard
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response end event
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response close event
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response chunk received bytes=37 chunk=1
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response iterator completed after 1 chunks
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #18 /spark.SparkService/query_all_transfers response iterator finally after 1 chunks
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_all_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+279.8614999949932ms)
+2026-05-11T16:54:39.998Z [TransferService:029cdf6b] exit queryPrimarySwapTransfers (+280ms)
+2026-05-11T16:54:39.998Z [TransferService:029cdf6b] exit queryAllTransfers (+280ms)
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response received status=200 headers={"date":"Mon, 11 May 2026 16:54:39 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Content-Type, X-Trace-Id, X-Processing-Time-Ms, Date, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"7","x-trace-id":"6bc0444dfaa311b77a1837ab2b30fb75"}
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response received status=200 responseStream=false
+2026-05-11T16:54:39.998Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.998Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response chunk received bytes=16 chunk=1
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response end event
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response end observed by premature-close guard
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response close event
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers request close event
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response chunk received bytes=21 chunk=2
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response iterator completed after 2 chunks
+2026-05-11T16:54:39.999Z [BareHttpTransport:029cdf6b] bareHttpTransport: #19 /spark.SparkService/query_pending_transfers response iterator finally after 2 chunks
+2026-05-11T16:54:39.999Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:39.999Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_pending_transfers [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+280.4870420098305ms)
+2026-05-11T16:54:39.999Z [TransferService:029cdf6b] exit queryPendingOutgoingTransfers (+280ms)
+2026-05-11T16:54:39.999Z [TransferService:029cdf6b] exit queryPendingTransfers (+281ms)
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f3e9c055da-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"Vary, Date, Content-Type, X-Processing-Time-Ms, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"1","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=96,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.084Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:40.084Z [BareHttpTransport:029cdf6b] bareHttpTransport: #23 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:40.084Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.084Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+365.8472080081701ms)
+2026-05-11T16:54:40.084Z [LeafManager:029cdf6b] sync: Fetched: 0 leaves, 0 pending swaps, 0 outgoing, 0 incoming
+2026-05-11T16:54:40.085Z [LeafManager:029cdf6b] sync: Complete. Post-sync: leaves=0 available=0 owned=0 incoming=0 statusCounts=AVAILABLE=0 LOCAL_LOCKED=0 OUTGOING=0 SWAP_PENDING=0 INCOMING=0 SPENT=0
+2026-05-11T16:54:40.085Z [LeafManager:029cdf6b] autoOptimizeIfNeeded: No optimization needed for 0 leaves
+2026-05-11T16:54:40.085Z [SparkWallet:029cdf6b] createClientsAndSyncWallet: initial wallet sync complete
+2026-05-11T16:54:40.086Z [SparkWallet:029cdf6b] exit initialize (+804ms)
+[2026-05-11T16:54:40.086Z] wallet initialized
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal x3 (+0ms total)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit createSparkClient x3 (+0ms total)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.086Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.087Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.087Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex x3 (+2ms total)
+2026-05-11T16:54:40.087Z [ConnectionManager:029cdf6b] exit authenticate x3 (+2ms total)
+2026-05-11T16:54:40.087Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.087Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes starting request url=https://0.spark.lightspark.com/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.087Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.087Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes starting request url=https://spark-operator.breez.technology/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.087Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.087Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes starting request url=https://2.spark.flashnet.xyz/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.087Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:40.087Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:40.087Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Content-Type, X-Processing-Time-Ms, X-Trace-Id, Date, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"3","x-trace-id":"4c249534c580d587152f3bc629dc8d86"}
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.133Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:40.133Z [BareHttpTransport:029cdf6b] bareHttpTransport: #25 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:40.133Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.133Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+46.90350000560284ms)
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Content-Type, X-Processing-Time-Ms, X-Trace-Id, Vary, Date, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"7","x-trace-id":"51c1a2311944002b8e5d106aba45f4db"}
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.137Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response chunk received bytes=16 chunk=1
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response chunk received bytes=21 chunk=2
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response iterator completed after 2 chunks
+2026-05-11T16:54:40.137Z [BareHttpTransport:029cdf6b] bareHttpTransport: #24 /spark.SparkService/query_nodes response iterator finally after 2 chunks
+2026-05-11T16:54:40.137Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.137Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+50.376749992370605ms)
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f4ad0055da-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"X-Processing-Time-Ms, Date, Content-Type, Vary, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"1","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=98,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.211Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.211Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:40.212Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:40.212Z [BareHttpTransport:029cdf6b] bareHttpTransport: #26 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+125.17433300614357ms)
+2026-05-11T16:54:40.212Z [SparkWallet:029cdf6b] syncTokenOutputs: starting scope=all tokenCount=0
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit createSparkTokenClient (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:40.212Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.212Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs starting request url=https://0.spark.lightspark.com/spark_token.SparkTokenService/query_token_outputs responseStream=false
+2026-05-11T16:54:40.212Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs wrote unary body bytes=46
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Date, Content-Type, Vary, X-Trace-Id, X-Processing-Time-Ms, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"6","x-trace-id":"5ddf771201263ac8e90c47ff78bd725d"}
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response received status=200 responseStream=false
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs request close event
+2026-05-11T16:54:40.264Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response has no socket to guard
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=7 chunk=1
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response end event
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response close event
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=21 chunk=2
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response iterator completed after 2 chunks
+2026-05-11T16:54:40.264Z [BareHttpTransport:029cdf6b] bareHttpTransport: #27 /spark_token.SparkTokenService/query_token_outputs response iterator finally after 2 chunks
+2026-05-11T16:54:40.264Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.264Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+51.945999994874ms)
+2026-05-11T16:54:40.264Z [TokenTransactionService:029cdf6b] exit fetchOwnedTokenOutputs (+52ms)
+2026-05-11T16:54:40.264Z [SparkWallet:029cdf6b] syncTokenOutputs: completed outputCount=0 tokenCount=0
+2026-05-11T16:54:40.264Z [SparkWallet:029cdf6b] exit getBalance (+178ms)
+[2026-05-11T16:54:40.265Z] initial balance resolved after 179ms {
+  balance: 0n,
+  satsBalance: { available: 0n, owned: 0n, incoming: 0n },
+  tokenBalances: Map(0) {}
+}
+[2026-05-11T16:54:40.266Z] agents suspended
+[2026-05-11T16:54:40.266Z] calling wallet.getBalance() directly while agents are suspended
+2026-05-11T16:54:40.266Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events socket close observed by premature-close guard
+2026-05-11T16:54:40.266Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events forcing response teardown after socket close
+2026-05-11T16:54:40.266Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.266Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.266Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events request close event
+2026-05-11T16:54:40.266Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response error event: UNAVAILABLE: response stream closed before completion (socket close) for /spark.SparkService/subscribe_to_events
+2026-05-11T16:54:40.266Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response close event
+2026-05-11T16:54:40.266Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.266Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response iterator error after 1 chunks: UNAVAILABLE: response stream closed before completion (socket close) for /spark.SparkService/subscribe_to_events
+2026-05-11T16:54:40.269Z [BareHttpTransport:029cdf6b] bareHttpTransport: #22 /spark.SparkService/subscribe_to_events response iterator finally after 1 chunks
+2026-05-11T16:54:40.269Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal x3 (+0ms total)
+2026-05-11T16:54:40.269Z [ConnectionManager:029cdf6b] exit createSparkClient x3 (+9ms total)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex x3 (+0ms total)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/subscribe_to_events [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> error (+365.15987499058247ms): /spark.SparkService/subscribe_to_events UNKNOWN: Transport error: /spark.SparkService/subscribe_to_events UNAVAILABLE: UNAVAILABLE: response stream closed before completion (socket close) for /spark.SparkService/subscribe_to_events
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit authenticate x3 (+0ms total)
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] error handleMiddlewareError (+0ms): /spark.SparkService/subscribe_to_events UNKNOWN: Transport error: /spark.SparkService/subscribe_to_events UNAVAILABLE: UNAVAILABLE: response stream closed before completion (socket close) for /spark.SparkService/subscribe_to_events
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [BareHttpTransport:029cdf6b] bareHttpTransport: #28 /spark.SparkService/query_nodes starting request url=https://0.spark.lightspark.com/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [BareHttpTransport:029cdf6b] bareHttpTransport: #29 /spark.SparkService/query_nodes starting request url=https://spark-operator.breez.technology/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.270Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.270Z [BareHttpTransport:029cdf6b] bareHttpTransport: #30 /spark.SparkService/query_nodes starting request url=https://2.spark.flashnet.xyz/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.270Z [SparkWallet:029cdf6b] setupBackgroundStream: stream iterator threw: /spark.SparkService/subscribe_to_events UNKNOWN: Transport error: /spark.SparkService/subscribe_to_events UNAVAILABLE: UNAVAILABLE: response stream closed before completion (socket close) for /spark.SparkService/subscribe_to_events
+2026-05-11T16:54:40.270Z [SparkWallet:029cdf6b] setupBackgroundStream: error: /spark.SparkService/subscribe_to_events UNKNOWN: Transport error: /spark.SparkService/subscribe_to_events UNAVAILABLE: UNAVAILABLE: response stream closed before completion (socket close) for /spark.SparkService/subscribe_to_events; retrying in 1000ms (attempt=1)
+2026-05-11T16:54:40.270Z [BareHttpTransport:029cdf6b] bareHttpTransport: #28 /spark.SparkService/query_nodes request setup failed: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.270Z [BareHttpTransport:029cdf6b] bareHttpTransport: #29 /spark.SparkService/query_nodes request setup failed: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.270Z [BareHttpTransport:029cdf6b] bareHttpTransport: #30 /spark.SparkService/query_nodes request setup failed: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> error (+1.0719169974327087ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> error (+1.0593329966068268ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> error (+1.0496660023927689ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] error handleMiddlewareError (+0ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] error handleMiddlewareError (+0ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] error handleMiddlewareError (+0ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended
+2026-05-11T16:54:40.271Z [SparkWallet:029cdf6b] error getBalance (+5ms): /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended [serverTraceId: 5ddf771201263ac8e90c47ff78bd725d, idPubKey: 029cdf6bfdeee4fff6ad63f21048675c6deb072086f5876633399d201fb6d51398, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-11T16:54:40.271Z] direct suspended balance rejected SparkError: /spark.SparkService/query_nodes UNKNOWN: Transport error: AGENT_SUSPENDED: Agent is suspended [serverTraceId: 5ddf771201263ac8e90c47ff78bd725d, idPubKey: 029cdf6bfdeee4fff6ad63f21048675c6deb072086f5876633399d201fb6d51398, clientEnv: js-spark-sdk/0.7.17 bare/v1.28.4]
+[2026-05-11T16:54:40.271Z] agents resumed
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal x3 (+0ms total)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit createSparkClient x3 (+0ms total)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex x3 (+0ms total)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit authenticate x3 (+0ms total)
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes starting request url=https://0.spark.lightspark.com/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes starting request url=https://spark-operator.breez.technology/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.271Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.271Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes starting request url=https://2.spark.flashnet.xyz/spark.SparkService/query_nodes responseStream=false
+2026-05-11T16:54:40.272Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:40.272Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:40.272Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes wrote unary body bytes=47
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"X-Processing-Time-Ms, Vary, Date, Content-Type, X-Trace-Id, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"3","x-trace-id":"fb8e731cf241691477a5d28bb5922b90"}
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.456Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #31 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:40.456Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.456Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+184.60729199647903ms)
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","cf-ray":"9fa2b4f62892c213-LAX","cf-cache-status":"DYNAMIC","access-control-allow-origin":"*","server":"cloudflare","vary":"Origin","access-control-allow-headers":"*","access-control-allow-methods":"POST, GET, OPTIONS","access-control-max-age":"86400","access-control-expose-headers":"Date, Vary, Content-Type, X-Processing-Time-Ms, grpc-status, grpc-message","expect-ct":"max-age=86400, enforce","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"SAMEORIGIN","x-processing-time-ms":"1","x-xss-protection":"1; mode=block","server-timing":"cfCacheStatus;desc=\"DYNAMIC\", cfEdge;dur=113,cfOrigin;dur=0","alt-svc":"h3=\":443\"; ma=86400"}
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.456Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.456Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:40.457Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:40.457Z [BareHttpTransport:029cdf6b] bareHttpTransport: #33 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:40.457Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.457Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://2.spark.flashnet.xyz/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+185.2417080104351ms)
+2026-05-11T16:54:40.459Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, Content-Type, X-Trace-Id, X-Processing-Time-Ms, Date, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"6","x-trace-id":"c39c95b78847318350610bbe62b839e9"}
+2026-05-11T16:54:40.459Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response received status=200 responseStream=false
+2026-05-11T16:54:40.459Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes request close event
+2026-05-11T16:54:40.459Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.459Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response has no socket to guard
+2026-05-11T16:54:40.459Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response end event
+2026-05-11T16:54:40.460Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response close event
+2026-05-11T16:54:40.460Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response chunk received bytes=37 chunk=1
+2026-05-11T16:54:40.460Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response iterator completed after 1 chunks
+2026-05-11T16:54:40.460Z [BareHttpTransport:029cdf6b] bareHttpTransport: #32 /spark.SparkService/query_nodes response iterator finally after 1 chunks
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] gRPC /spark.SparkService/query_nodes [path https://spark-operator.breez.technology/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+188.28191600739956ms)
+2026-05-11T16:54:40.460Z [SparkWallet:029cdf6b] syncTokenOutputs: starting scope=all tokenCount=0
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit getAddressToClientMap (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit getOrCreateClientInternal (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit createSparkTokenClient (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> start
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit prepareMetadata (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit getIdentityPublicKeyHex (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit authenticate (+0ms)
+2026-05-11T16:54:40.460Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.460Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs starting request url=https://0.spark.lightspark.com/spark_token.SparkTokenService/query_token_outputs responseStream=false
+2026-05-11T16:54:40.460Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs wrote unary body bytes=46
+2026-05-11T16:54:40.509Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response received status=200 headers={"date":"Mon, 11 May 2026 16:54:40 GMT","content-type":"application/grpc-web+proto","transfer-encoding":"chunked","connection":"keep-alive","access-control-expose-headers":"Vary, X-Processing-Time-Ms, Date, Content-Type, X-Trace-Id, grpc-status, grpc-message","vary":"Origin","x-processing-time-ms":"6","x-trace-id":"a5469b94a2393c057dbad296fb4f00a6"}
+2026-05-11T16:54:40.509Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response received status=200 responseStream=false
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs request close event
+2026-05-11T16:54:40.510Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response has no socket to guard
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response end event
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response close event
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response chunk received bytes=28 chunk=1
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response iterator completed after 1 chunks
+2026-05-11T16:54:40.510Z [BareHttpTransport:029cdf6b] bareHttpTransport: #34 /spark_token.SparkTokenService/query_token_outputs response iterator finally after 1 chunks
+2026-05-11T16:54:40.510Z [ConnectionManager:029cdf6b] exit getMonotonicTime (+0ms)
+2026-05-11T16:54:40.510Z [ConnectionManager:029cdf6b] gRPC /spark_token.SparkTokenService/query_token_outputs [path https://0.spark.lightspark.com/] session=019e17f6-51b1-76af-8e22-2dadb862b077 -> completed (+49.917166993021965ms)
+2026-05-11T16:54:40.510Z [TokenTransactionService:029cdf6b] exit fetchOwnedTokenOutputs (+50ms)
+2026-05-11T16:54:40.510Z [SparkWallet:029cdf6b] syncTokenOutputs: completed outputCount=0 tokenCount=0
+2026-05-11T16:54:40.510Z [SparkWallet:029cdf6b] exit getBalance (+239ms)
+[2026-05-11T16:54:40.510Z] fresh balance after direct suspended call resolved after 239ms {
+  balance: 0n,
+  satsBalance: { available: 0n, owned: 0n, incoming: 0n },
+  tokenBalances: Map(0) {}
+}
+[2026-05-11T16:54:40.510Z] cleaning up wallet connections
+2026-05-11T16:54:40.511Z [SparkWallet:029cdf6b] setupBackgroundStream: stream loop iteration finished retryCount=1 aborted=true
+2026-05-11T16:54:40.511Z [ConnectionManager:029cdf6b] exit closeConnections (+1ms)
+2026-05-11T16:54:40.511Z [SparkWallet:029cdf6b] exit cleanupConnections (+1ms)
+[2026-05-11T16:54:40.511Z] repro script completed
+real 2.46
+user 1.15
+sys 0.17
+exit_code=0
