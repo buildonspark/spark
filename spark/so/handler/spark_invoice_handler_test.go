@@ -68,6 +68,64 @@ func createTransferForInvoice(t *testing.T, ctx context.Context, tc *db.TestCont
 	require.NoError(t, err)
 }
 
+func createTestTokenInvoice(
+	t *testing.T,
+	ctx context.Context,
+	tc *db.TestContext,
+	status st.TokenTransactionStatus,
+	expiryTime time.Time,
+) (string, []byte) {
+	t.Helper()
+	invoiceID := uuid.New()
+	receiverKey := keys.GeneratePrivateKey().Public()
+	senderKey := keys.GeneratePrivateKey().Public()
+	network := btcnetwork.Regtest
+	tokenIdentifier := make([]byte, 32)
+	tokenIdentifier[31] = 1
+	amount := []byte{0x03, 0xe8}
+
+	invoiceFields := common.CreateTokenSparkInvoiceFields(
+		invoiceID[:],
+		tokenIdentifier,
+		amount,
+		nil,
+		senderKey,
+		&expiryTime,
+	)
+	invoiceStr, err := common.EncodeSparkAddress(receiverKey, network, invoiceFields)
+	require.NoError(t, err)
+
+	_, err = tc.Client.SparkInvoice.Create().
+		SetID(invoiceID).
+		SetSparkInvoice(invoiceStr).
+		SetExpiryTime(expiryTime).
+		SetReceiverPublicKey(receiverKey).
+		Save(ctx)
+	require.NoError(t, err)
+
+	partialHash := repeatedUUIDBytes(t)
+	finalHash := repeatedUUIDBytes(t)
+	_, err = tc.Client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(partialHash).
+		SetFinalizedTokenTransactionHash(finalHash).
+		SetStatus(status).
+		SetExpiryTime(expiryTime).
+		AddSparkInvoiceIDs(invoiceID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return invoiceStr, finalHash
+}
+
+func repeatedUUIDBytes(t *testing.T) []byte {
+	t.Helper()
+	id := uuid.New()
+	out := make([]byte, 0, 32)
+	out = append(out, id[:]...)
+	out = append(out, id[:]...)
+	return out
+}
+
 // TestQuerySparkInvoicesReturnsPendingStatus verifies that an invoice attached to
 // a transfer in SenderInitiatedCoordinator state is reported as PENDING.
 //
@@ -100,6 +158,51 @@ func TestQuerySparkInvoicesRejectsNilRequest(t *testing.T) {
 	_, err := handler.QuerySparkInvoices(t.Context(), nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "request is required")
+}
+
+func TestQuerySparkInvoicesReturnsNotFoundForStoredInvoiceWithoutPaymentEdge(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	invoiceStr, _ := createTestSatsInvoice(t, ctx, tc)
+
+	handler := NewSparkInvoiceHandler(config)
+	resp, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{invoiceStr},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.InvoiceStatuses, 1)
+	require.Equal(t, invoiceStr, resp.InvoiceStatuses[0].Invoice)
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.InvoiceStatuses[0].Status)
+	require.Nil(t, resp.InvoiceStatuses[0].GetTransferType())
+}
+
+func TestQuerySparkInvoicesReturnsTokenInvoiceStatuses(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	pendingStr, pendingFinalHash := createTestTokenInvoice(t, ctx, tc, st.TokenTransactionStatusStarted, time.Now().Add(10*time.Minute))
+	returnedStr, returnedFinalHash := createTestTokenInvoice(t, ctx, tc, st.TokenTransactionStatusSignedCancelled, time.Now().Add(10*time.Minute))
+
+	handler := NewSparkInvoiceHandler(config)
+	resp, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{returnedStr, pendingStr},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.InvoiceStatuses, 2)
+
+	byInvoice := make(map[string]*sparkpb.InvoiceResponse, 2)
+	for _, invoiceStatus := range resp.InvoiceStatuses {
+		byInvoice[invoiceStatus.Invoice] = invoiceStatus
+	}
+
+	require.Contains(t, byInvoice, returnedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, byInvoice[returnedStr].Status)
+	require.Equal(t, returnedFinalHash, byInvoice[returnedStr].GetTokenTransfer().GetFinalTokenTransactionHash())
+
+	require.Contains(t, byInvoice, pendingStr)
+	require.Equal(t, sparkpb.InvoiceStatus_PENDING, byInvoice[pendingStr].Status)
+	require.Equal(t, pendingFinalHash, byInvoice[pendingStr].GetTokenTransfer().GetFinalTokenTransactionHash())
 }
 
 // TestQuerySparkInvoicesReturnsPendingStatusForKeyTweakPending checks the second

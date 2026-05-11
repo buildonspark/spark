@@ -133,12 +133,10 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 
 		notFoundOrReturnedInvoiceMap := mapSliceToSet(notFoundOrReturnedInvoiceIDs)
 		for _, invoice := range notFoundOrReturnedInvoices {
-			delete(notFoundOrReturnedInvoiceMap, invoice.ID)
-			if invoice.Edges.Transfer != nil {
-				transferEdge := invoice.Edges.Transfer
-				if len(transferEdge) == 0 {
-					return nil, fmt.Errorf("no transfers found for invoice %s", invoice.ID)
-				}
+			transferEdge := invoice.Edges.Transfer
+			tokenTransactionEdge := invoice.Edges.TokenTransaction
+			switch {
+			case len(transferEdge) > 0:
 				if len(transferEdge) > 1 {
 					return nil, fmt.Errorf("multiple transfers found for invoice %s", invoice.ID)
 				}
@@ -149,11 +147,13 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 				if err != nil {
 					return nil, err
 				}
-			} else if invoice.Edges.TokenTransaction != nil {
+				delete(notFoundOrReturnedInvoiceMap, invoice.ID)
+			case len(tokenTransactionEdge) > 0:
 				invoiceResponseMap[invoice.ID], err = buildTokenInvoiceResponse(invoice, sparkpb.InvoiceStatus_RETURNED)
 				if err != nil {
 					return nil, err
 				}
+				delete(notFoundOrReturnedInvoiceMap, invoice.ID)
 			}
 		}
 		notFoundInvoiceIDs := setToSlice(notFoundOrReturnedInvoiceMap)
