@@ -221,6 +221,10 @@ func validateTokenNotGloballyPaused(ctx context.Context, tokenCreateID uuid.UUID
 }
 
 func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	if req.GetByTxHash() != nil {
 		if len(req.GetByTxHash().TokenTransactionHashes) > maxTokenTransactionHashValues {
 			return sparkerrors.InvalidArgumentOutOfRange(

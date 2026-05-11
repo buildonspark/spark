@@ -10,6 +10,12 @@ import (
 )
 
 func TestValidateQueryTokenTransactionsRequest_FilterLimits(t *testing.T) {
+	t.Run("nil request", func(t *testing.T) {
+		err := validateQueryTokenTransactionsRequest(nil)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "request is required")
+	})
+
 	t.Run("output ids over limit", func(t *testing.T) {
 		req := &tokenpb.QueryTokenTransactionsRequest{
 			OutputIds: make([]string, maxTokenTransactionFilterValues+1),

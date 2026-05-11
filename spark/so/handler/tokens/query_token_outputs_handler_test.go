@@ -15,6 +15,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
@@ -43,6 +45,16 @@ func setUpQueryTokenOutputsTestHandler(t *testing.T) *queryTokenOutputsTestFixtu
 		Handler: handler,
 		Ctx:     ctx,
 	}
+}
+
+func TestQueryTokenOutputsRejectsNilRequest(t *testing.T) {
+	handler := &QueryTokenOutputsHandler{}
+
+	resp, err := handler.QueryTokenOutputs(t.Context(), nil)
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "request is required")
 }
 
 // createTestTokenOutputs creates the specified number of token outputs with their required dependencies

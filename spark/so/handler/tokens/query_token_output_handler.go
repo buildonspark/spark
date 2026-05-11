@@ -24,6 +24,10 @@ const (
 )
 
 func validateQueryTokenOutputsRequest(req *tokenpb.QueryTokenOutputsRequest) error {
+	if req == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	if len(req.OwnerPublicKeys) > MaxTokenOutputFilterValues {
 		return errors.InvalidArgumentOutOfRange(
 			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), MaxTokenOutputFilterValues),
