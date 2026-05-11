@@ -144,9 +144,11 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 // The coordinator decrypts and stores its own share, then fans out to other SOs via internal RPC.
 func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) (retErr error) {
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2", spanOpt)
 	defer func() {
 		endSpanWithError(span, retErr)
+		observeLightningFlow(ctx, lightningFlowStorePreimageShare, lightningFlowPathUnknown, flowStart, retErr)
 	}()
 
 	phaseStart := time.Now()
