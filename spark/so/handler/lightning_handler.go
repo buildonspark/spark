@@ -2400,29 +2400,35 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage", spanOpt)
 	defer func() {
 		endSpanWithError(span, retErr)
+		observeLightningFlow(ctx, lightningFlowProvidePreimage, lightningFlowPathUnknown, flowStart, retErr)
 	}()
 
+	phaseStart := time.Now()
 	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.validate", spanOpt)
 	identityPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
 		endSpanWithError(validateSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, identityPubKey); err != nil {
 		endSpanWithError(validateSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
 		return nil, err
 	}
 	preimageRequest, transfer, err := h.ValidatePreimage(validateCtx, req)
-	if err != nil {
-		endSpanWithError(validateSpan, err)
-		return nil, fmt.Errorf("unable to provide preimage: %w", err)
+	endSpanWithError(validateSpan, err)
+	validateErr := err
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, validateErr)
+	if validateErr != nil {
+		return nil, fmt.Errorf("unable to provide preimage: %w", validateErr)
 	}
-	endSpanWithError(validateSpan, nil)
 
-	phaseStart := time.Now()
+	phaseStart = time.Now()
 	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.storePreimage", spanOpt)
 	_, err = h.StorePreimage(storeCtx, preimageRequest, req.Preimage)
 	endSpanWithError(storeSpan, err)
@@ -2467,8 +2473,10 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout", spanOpt)
 	_, err = helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (_ any, retErr error) {
 		operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout.operator", spanOpt)
+		rpcStart := time.Now()
 		defer func() {
 			endSpanWithError(operatorSpan, retErr)
+			observeOperatorFanoutRPC(ctx, lightningOperationProvidePreimage, operator.Identifier, rpcStart, retErr)
 		}()
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
