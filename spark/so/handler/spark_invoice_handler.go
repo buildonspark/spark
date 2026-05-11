@@ -36,6 +36,10 @@ func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *spark
 	ctx, span := tracer.Start(ctx, "SparkInvoiceHandler.QuerySparkInvoices")
 	defer span.End()
 
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	limit := maxSparkInvoiceLimit
 	if req.Limit > 0 {
 		limit = min(maxSparkInvoiceLimit, int(req.Limit))

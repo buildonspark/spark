@@ -93,6 +93,15 @@ func TestQuerySparkInvoicesReturnsPendingStatus(t *testing.T) {
 		resp.InvoiceStatuses[0].Status)
 }
 
+func TestQuerySparkInvoicesRejectsNilRequest(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	handler := NewSparkInvoiceHandler(config)
+
+	_, err := handler.QuerySparkInvoices(t.Context(), nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "request is required")
+}
+
 // TestQuerySparkInvoicesReturnsPendingStatusForKeyTweakPending checks the second
 // PENDING-eligible status: SenderKeyTweakPending.
 func TestQuerySparkInvoicesReturnsPendingStatusForKeyTweakPending(t *testing.T) {
