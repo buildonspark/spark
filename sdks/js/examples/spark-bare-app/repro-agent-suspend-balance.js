@@ -6,6 +6,9 @@ import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 const WATCHDOG_MS = Number(process.env.WATCHDOG_MS ?? 30_000);
 const CLEANUP_CONNECTIONS = process.env.CLEANUP_CONNECTIONS !== "0";
+const ENABLE_SDK_LOGS = process.env.ENABLE_SDK_LOGS !== "0";
+const SDK_LOG_LEVEL = process.env.SDK_LOG_LEVEL ?? "TRACE";
+const REPRO_MODE = process.env.REPRO_MODE ?? "direct-suspended";
 
 function log(message, details) {
   const prefix = `[${new Date().toISOString()}]`;
@@ -70,22 +73,26 @@ async function nextTick() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-async function main() {
-  log("starting Bare agent suspend balance repro", {
-    cleanupConnections: CLEANUP_CONNECTIONS,
-    network: process.env.NETWORK ?? process.env.SPARK_NETWORK ?? "MAINNET",
-    watchdogMs: WATCHDOG_MS,
-  });
+async function runDirectSuspendedBalance(wallet) {
+  suspendAgents();
+  log("calling wallet.getBalance() directly while agents are suspended");
 
-  const options = getExampleWalletOptions(process.env, "MAINNET");
-  const { wallet } = await SparkWallet.initialize({
-    mnemonicOrSeed: process.env.MNEMONIC ?? walletConfig.mnemonic,
-    options,
-  });
+  try {
+    const balance = await wallet.getBalance();
+    log("direct suspended balance resolved", balance);
+  } catch (error) {
+    log("direct suspended balance rejected", formatError(error));
+  } finally {
+    resumeAgents();
+  }
 
-  log("wallet initialized");
-  await raceWithWatchdog("initial balance", wallet.getBalance());
+  await raceWithWatchdog(
+    "fresh balance after direct suspended call",
+    wallet.getBalance(),
+  );
+}
 
+async function runWatchdogComparison(wallet) {
   suspendAgents();
   const alreadySuspendedBalance = wallet.getBalance();
   await raceWithWatchdog(
@@ -105,6 +112,39 @@ async function main() {
   resumeAgents();
 
   await raceWithWatchdog("fresh balance after resume", wallet.getBalance());
+}
+
+async function main() {
+  log("starting Bare agent suspend balance repro", {
+    cleanupConnections: CLEANUP_CONNECTIONS,
+    enableSdkLogs: ENABLE_SDK_LOGS,
+    network: process.env.NETWORK ?? process.env.SPARK_NETWORK ?? "MAINNET",
+    reproMode: REPRO_MODE,
+    sdkLogLevel: ENABLE_SDK_LOGS ? SDK_LOG_LEVEL : "off",
+    watchdogMs: WATCHDOG_MS,
+  });
+
+  const options = {
+    ...getExampleWalletOptions(process.env, "MAINNET"),
+    ...(ENABLE_SDK_LOGS ? { log: SDK_LOG_LEVEL } : {}),
+  };
+  const { wallet } = await SparkWallet.initialize({
+    mnemonicOrSeed: process.env.MNEMONIC ?? walletConfig.mnemonic,
+    options,
+  });
+
+  log("wallet initialized");
+  await raceWithWatchdog("initial balance", wallet.getBalance());
+
+  if (REPRO_MODE === "race") {
+    await runWatchdogComparison(wallet);
+  } else if (REPRO_MODE === "direct-suspended") {
+    await runDirectSuspendedBalance(wallet);
+  } else {
+    throw new Error(
+      `Unknown REPRO_MODE ${REPRO_MODE}; expected direct-suspended or race`,
+    );
+  }
 
   if (CLEANUP_CONNECTIONS) {
     log("cleaning up wallet connections");
