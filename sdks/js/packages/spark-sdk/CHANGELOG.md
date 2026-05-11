@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.8.0
+
+### Minor Changes
+
+- d4ef15a: - Require Node.js signing-operator TLS verification by default, trust the local minikube CA automatically for hermetic tests, and keep certificate verification bypass local-only.
+
+### Patch Changes
+
+- - Bound file logging shutdown during wallet cleanup so stalled file sinks cannot block cleanup indefinitely, and include unique instance suffixes in SDK log labels after wallet identity is known.
+
 ## 0.7.17
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-bare-app",
-  "version": "0.1.37",
+  "version": "0.1.38",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,8 +18,8 @@
     "run:dev:mainnet": "cross-env NODE_ENV=development NETWORK=MAINNET CONFIG_FILE=../../private/config/dev-mainnet-config.json node ./scripts/run-script.mjs"
   },
   "dependencies": {
-    "@buildonspark/bare": "0.0.67",
-    "@buildonspark/spark-sdk": "0.7.17",
+    "@buildonspark/bare": "0.0.68",
+    "@buildonspark/spark-sdk": "0.8.0",
     "bare": "^1.28.4",
     "bare-runtime": "^1.28.4"
   },

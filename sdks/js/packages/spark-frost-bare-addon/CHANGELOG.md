@@ -1,5 +1,11 @@
 # @buildonspark/spark-frost-bare-addon
 
+## 0.0.12
+
+### Patch Changes
+
+- - Rebuild Bare FROST native addon binaries with the k256-backed ECIES implementation, removing the deprecated libsecp256k1 dependency from packaged binaries.
+
 ## 0.0.11
 
 ### Patch Changes
