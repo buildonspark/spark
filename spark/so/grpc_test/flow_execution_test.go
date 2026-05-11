@@ -56,19 +56,9 @@ func operatorDatabasePath(t *testing.T, i int) string {
 // end-to-end check for the row-write logic in twopc.go (coordinator) and
 // consensus_handler.go + gossip_handler.go (participants).
 func TestFlowExecution_RenewLeafConsensus_WritesRowsOnCoordinatorAndParticipants(t *testing.T) {
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusRenew, 100))
-	t.Cleanup(func() {
-		// Best-effort: if the knob store is flaky during cleanup (e.g., the
-		// test context just canceled), we don't want the whole test to fail
-		// for a housekeeping operation. Log and move on.
-		if err := kc.SetKnob(t, knobs.KnobUseConsensusRenew, 0); err != nil {
-			t.Logf("best-effort KnobUseConsensusRenew reset failed: %v", err)
-		}
-	})
 
 	// Drive a consensus-path renew by mocking the leaf's timelock below the
 	// renewal threshold, then calling RenewNodeZeroTimelock.
@@ -102,20 +92,8 @@ func TestFlowExecution_RenewLeafConsensus_WritesRowsOnCoordinatorAndParticipants
 
 	// Collect the FlowExecution rows each operator wrote during the renew.
 	newRowsByOperator := make(map[int][]*ent.FlowExecution, len(operatorIndices))
-	totalNew := 0
 	for _, i := range operatorIndices {
 		newRowsByOperator[i] = newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])
-		totalNew += len(newRowsByOperator[i])
-	}
-
-	// If no operator wrote a FlowExecution row the renew ran through the
-	// legacy (non-consensus) path — KnobUseConsensusRenew did not actually
-	// propagate to the running operators. That happens under the bare
-	// run-everything.sh local env (knobs are defaulted in-process; the
-	// KnobController writes to a K8s ConfigMap the local operators do not
-	// read). Skip rather than fail; this test is meaningful under minikube.
-	if totalNew == 0 {
-		t.Skip("no FlowExecution rows written — 2PC path did not run (likely a bare local env without live knob propagation; run under minikube)")
 	}
 
 	// Exactly one new row per operator. (The renew consensus flow runs once
@@ -409,21 +387,12 @@ func operatorIdentifier(id int) string {
 // failure mode this test guards against is "stuck IN_FLIGHT", which is the
 // pre-fix behavior.
 func TestFlowExecution_RenewLeafConsensus_RequestCancellation_RowsTerminal(t *testing.T) {
-	// Knob propagation requires the K8s ConfigMap path; bare local
-	// (run-everything.sh) has no K8s and the multi-operator DB workload
-	// of this test is hostile to bare-local Postgres' default
-	// max_connections anyway. Same skip convention as the happy-path
-	// consensus test.
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	// The multi-operator DB workload of this test is hostile to
+	// bare-local Postgres' default max_connections; same minikube gate
+	// as the happy-path consensus test.
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusRenew, 100))
-	t.Cleanup(func() {
-		if err := kc.SetKnob(t, knobs.KnobUseConsensusRenew, 0); err != nil {
-			t.Logf("best-effort KnobUseConsensusRenew reset failed: %v", err)
-		}
-	})
 
 	config := wallet.NewTestWalletConfig(t)
 	operatorIndices := operatorIndicesFromConfig(config)
@@ -502,16 +471,15 @@ func TestFlowExecution_RenewLeafConsensus_RequestCancellation_RowsTerminal(t *te
 		return newOnes
 	}
 
-	// If no operator wrote a row, we're on an env without live knob
-	// propagation (run-everything.sh doesn't read the K8s ConfigMap the
-	// KnobController writes to, and the static_values fallback may not
-	// be configured). Same skip pattern as the happy-path test.
+	// If the 75ms timeout fires before the coordinator even reaches
+	// createCoordinatorRow, no row was ever created — nothing to assert
+	// on. Rare under minikube but possible under load.
 	totalNew := 0
 	for _, i := range operatorIndices {
 		totalNew += len(newRows(i))
 	}
 	if totalNew == 0 {
-		t.Skip("no FlowExecution rows written — 2PC path did not run (likely no live knob propagation; run under minikube or set spark.so.use_consensus_renew in static config)")
+		t.Skip("no FlowExecution rows written — cancel landed before any row was created")
 	}
 
 	// All NEW rows must reach a terminal state within a few seconds —
@@ -572,16 +540,9 @@ func TestFlowExecution_RenewLeafConsensus_RequestCancellation_RowsTerminal(t *te
 // recovery), or as divergence — coordinator COMMITTED but participants
 // ROLLED_BACK because the engine's commit gossip never dispatched.
 func TestFlowExecution_RenewLeafConsensus_RequestCancellation_LeafStateConsistent(t *testing.T) {
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusRenew, 100))
-	t.Cleanup(func() {
-		if err := kc.SetKnob(t, knobs.KnobUseConsensusRenew, 0); err != nil {
-			t.Logf("best-effort KnobUseConsensusRenew reset failed: %v", err)
-		}
-	})
 
 	config := wallet.NewTestWalletConfig(t)
 	operatorIndices := operatorIndicesFromConfig(config)
@@ -669,14 +630,15 @@ func TestFlowExecution_RenewLeafConsensus_RequestCancellation_LeafStateConsisten
 		return out
 	}
 
-	// Skip if static knob propagation wasn't in play — same convention
-	// as the row-state companion test.
+	// If the 75ms timeout fires before the coordinator even reaches
+	// createCoordinatorRow, no row was ever created — nothing to assert
+	// on. Same convention as the row-state companion test.
 	totalNew := 0
 	for _, i := range operatorIndices {
 		totalNew += len(newFlowRows(i))
 	}
 	if totalNew == 0 {
-		t.Skip("no FlowExecution rows written — 2PC path did not run (likely no live knob propagation; run under minikube or set spark.so.use_consensus_renew in static config)")
+		t.Skip("no FlowExecution rows written — cancel landed before any row was created")
 	}
 
 	// Wait for the engine's cleanup ctx to drive every persisted row to

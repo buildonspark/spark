@@ -126,7 +126,6 @@ const (
 	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
 
 	KnobEnablePartnerJWT        = "spark.so.enable_partner_jwt"
-	KnobShutdownRenewNode       = "spark.so.shutdown_renew_node"
 	KnobUseConsensusDepositTree = "spark.so.use_consensus_deposit_tree"
 	KnobShutdownHodlInvoices    = "spark.so.shutdown_hodl_invoices"
 
@@ -164,9 +163,6 @@ const (
 	// invocation drains rows in a loop until empty; this just bounds the
 	// per-UPDATE row count.
 	KnobBackfillTransferTypeBatchSize = "spark.so.backfill_transfer_type_batch_size"
-
-	// Enable consensus engine for renew leaf operations.
-	KnobUseConsensusRenew = "spark.so.use_consensus_renew"
 
 	// Seconds a PARTICIPANT FlowExecution row can stay IN_FLIGHT before the
 	// reconciliation task considers it stuck and asks the coordinator for
