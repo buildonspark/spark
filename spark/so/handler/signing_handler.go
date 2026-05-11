@@ -77,12 +77,16 @@ func (h *SigningHandler) validateNodeOwnership(ctx context.Context, nodes []*ent
 
 // GetSigningCommitments gets the signing commitments for the given node ids.
 func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	if err := h.validateHasSession(ctx); err != nil {
 		return nil, err
 	}
 
 	if len(req.NodeIds) > 0 && req.NodeIdCount != 0 {
-		return nil, errs.New("both node_ids and node_id_count were set, but they are mutually exclusive. Provide one or the other")
+		return nil, errors.InvalidArgumentMalformedField(errs.New("can provide node_ids or node_id_count, but not both"))
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -91,7 +95,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 	}
 	nodeIDs, err := uuids.ParseSlice(req.GetNodeIds())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse node id: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node id: %w", err))
 	}
 
 	knobsService := knobs.GetKnobsService(ctx)
