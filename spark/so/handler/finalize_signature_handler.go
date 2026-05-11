@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tree"
@@ -302,8 +303,14 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		).
 		ForUpdate().
 		Only(ctx)
-	if err != nil || transfer == nil {
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to find pending transfer for leaves %s: %w", leafIDs, err))
+		}
 		return nil, fmt.Errorf("failed to find pending transfer for leaves %s: %w", leafIDs, err)
+	}
+	if transfer == nil {
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to find pending transfer for leaves %s", leafIDs))
 	}
 	if transfer.Status != st.TransferStatusReceiverRefundSigned {
 		return nil, fmt.Errorf("transfer %s is not in receiver refund signed status", transfer.ID.String())

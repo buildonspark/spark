@@ -1436,8 +1436,14 @@ func (h *BaseTransferHandler) loadTransferForUpdate(ctx context.Context, transfe
 		WithTransferSenders().
 		WithTransferReceivers().
 		Only(ctx)
-	if err != nil || transfer == nil {
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("unable to find transfer %s: %w", transferID, err))
+		}
 		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
+	}
+	if transfer == nil {
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("unable to find transfer %s", transferID))
 	}
 	return transfer, nil
 }
@@ -1453,8 +1459,14 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 		WithTransferSenders().
 		WithTransferReceivers().
 		Only(ctx)
-	if err != nil || transfer == nil {
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("unable to find transfer %s: %w", transferID, err))
+		}
 		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
+	}
+	if transfer == nil {
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("unable to find transfer %s", transferID))
 	}
 	return transfer, nil
 }

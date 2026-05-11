@@ -373,7 +373,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	limit := int(req.GetLimit())
 	offset := int(req.GetOffset())
 	if limit < 0 || offset < 0 {
-		return nil, fmt.Errorf("expect non-negative offset and limit")
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("expect non-negative offset and limit"))
 	}
 	if limit > 100 || limit == 0 {
 		limit = 100
@@ -381,7 +381,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse identity public key: %w", err))
 	}
 
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
@@ -389,7 +389,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	}
 	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to common network: %w", err))
 	}
 	query := db.DepositAddress.Query().
 		Where(depositaddress.OwnerIdentityPubkey(idPubKey)).

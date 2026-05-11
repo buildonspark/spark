@@ -309,6 +309,11 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	defer span.End()
 
 	logger := logging.GetLoggerFromContext(ctx)
+
+	if req.OnChainUtxo == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+
 	logger.Sugar().Infof("Start InitiateStaticDepositUtxoRefund request for on-chain utxo %x:%d with coordinator %s", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, config.Identifier)
 
 	// Check if the swap is already completed for the caller

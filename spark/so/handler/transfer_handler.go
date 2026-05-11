@@ -251,7 +251,7 @@ func (h *TransferHandler) startTransferInternal(
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid transfer id: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
 	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, reqOwnerIdentityPubKey, !transferType.IsSwap())
 	if err != nil {
