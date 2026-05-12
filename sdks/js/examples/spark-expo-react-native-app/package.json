@@ -19,7 +19,7 @@
     "@buildonspark/issuer-sdk": "0.1.36",
     "@buildonspark/spark-sdk": "0.8.0",
     "@expo/vector-icons": "^14.1.0",
-    "@react-native-community/cli": "19.0.0",
+    "@react-native-community/cli": "19.1.2",
     "@react-navigation/bottom-tabs": "^7.4.8",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.18",
