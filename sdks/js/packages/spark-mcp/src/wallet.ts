@@ -41,7 +41,7 @@ export async function cleanupAllWallets(): Promise<void> {
   const wallets = [...walletCache.values()].map((e) => e.wallet);
   walletCache.clear();
   pendingInits.clear();
-  await Promise.allSettled(wallets.map((w) => w.cleanupConnections()));
+  await Promise.allSettled(wallets.map((w) => w.cleanup()));
 }
 
 // Best-effort cleanup on process exit.
@@ -184,7 +184,7 @@ export async function evictWallet(
 
   walletCache.delete(key);
   pendingInits.delete(key);
-  await entry.wallet.cleanupConnections();
+  await entry.wallet.cleanup();
   return true;
 }
 

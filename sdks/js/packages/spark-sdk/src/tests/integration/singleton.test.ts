@@ -24,7 +24,7 @@ describe("SparkWallet.getOrCreateWallet", () => {
 
     expect(w1).toBe(w2);
 
-    await w1.cleanupConnections();
+    await w1.cleanup();
   });
 
   it("returns different instances for different seeds", async () => {
@@ -40,17 +40,17 @@ describe("SparkWallet.getOrCreateWallet", () => {
 
     expect(w1).not.toBe(w2);
 
-    await w1.cleanupConnections();
-    await w2.cleanupConnections();
+    await w1.cleanup();
+    await w2.cleanup();
   });
 
-  it("creates a new instance after cleanupConnections", async () => {
+  it("creates a new instance after cleanup", async () => {
     const { wallet: w1 } = await SparkWalletTesting.getOrCreateWallet({
       mnemonicOrSeed: TEST_SEED_A,
       options: { network: "LOCAL" },
     });
 
-    await w1.cleanupConnections();
+    await w1.cleanup();
 
     const { wallet: w2 } = await SparkWalletTesting.getOrCreateWallet({
       mnemonicOrSeed: TEST_SEED_A,
@@ -59,7 +59,7 @@ describe("SparkWallet.getOrCreateWallet", () => {
 
     expect(w1).not.toBe(w2);
 
-    await w2.cleanupConnections();
+    await w2.cleanup();
   });
 
   it("forceReinit creates a new instance and cleans up the old one", async () => {
@@ -84,7 +84,7 @@ describe("SparkWallet.getOrCreateWallet", () => {
 
     expect(w3).toBe(w2);
 
-    await w2.cleanupConnections();
+    await w2.cleanup();
   });
 
   it("concurrent calls return the same instance", async () => {
@@ -102,7 +102,7 @@ describe("SparkWallet.getOrCreateWallet", () => {
     expect(result1.wallet).toBe(result2.wallet);
     expect(result2.wallet).toBe(result3.wallet);
 
-    await result1.wallet.cleanupConnections();
+    await result1.wallet.cleanup();
   });
 
   it("initialize always creates a new instance", async () => {
@@ -118,8 +118,8 @@ describe("SparkWallet.getOrCreateWallet", () => {
 
     expect(w1).not.toBe(w2);
 
-    await w1.cleanupConnections();
-    await w2.cleanupConnections();
+    await w1.cleanup();
+    await w2.cleanup();
   });
 
   it("resetInstances clears the registry", async () => {
@@ -137,6 +137,6 @@ describe("SparkWallet.getOrCreateWallet", () => {
 
     expect(w1).not.toBe(w2);
 
-    await w2.cleanupConnections();
+    await w2.cleanup();
   });
 });

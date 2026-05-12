@@ -41,7 +41,7 @@ async function main() {
   console.log("Balance:", balance);
   console.log("Spark Address:", sparkAddress);
 
-  await wallet.cleanupConnections();
+  await wallet.cleanup();
 }
 
 main().catch((error) => {
@@ -71,7 +71,7 @@ const { wallet } = await SparkWallet.initialize({
 const address = await wallet.getStaticDepositAddress();
 console.log("Deposit address:", address);
 
-await wallet.cleanupConnections();
+await wallet.cleanup();
 ```
 
 ### Transfer Bitcoin

@@ -15,7 +15,7 @@ async function autoclaimStaticDeposit(mnemonicInit, transactionId) {
     creditAmountSats: quote.creditAmountSats,
     sspSignature: quote.signature,
   });
-  await wallet.cleanupConnections();
+  await wallet.cleanup();
   return claimResult;
 }
 

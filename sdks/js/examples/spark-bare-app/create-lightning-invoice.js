@@ -12,7 +12,7 @@ async function createLightningInvoice(mnemonicInit, amountSats) {
   const invoice = await wallet.createLightningInvoice({
     amountSats: Number(amountSats),
   });
-  await wallet.cleanupConnections();
+  await wallet.cleanup();
   return invoice;
 }
 

@@ -900,7 +900,7 @@ async function runCLI() {
       if (execIndex >= execCommands.length) {
         rl.close();
         if (wallet) {
-          await wallet.cleanupConnections();
+          await wallet.cleanup();
         }
         break;
       }
@@ -1234,7 +1234,7 @@ async function runCLI() {
           break;
         case "initwallet":
           if (wallet) {
-            await wallet.cleanupConnections();
+            await wallet.cleanup();
           }
           let mnemonicOrSeed;
           let accountNumber;

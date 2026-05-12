@@ -16,7 +16,7 @@ export class AppService {
       },
     });
     const identityPublicKey = await wallet.getIdentityPublicKey();
-    await wallet.cleanupConnections();
+    await wallet.cleanup();
     return `Spark Wallet Identity Public Key: ${identityPublicKey}`;
   }
 

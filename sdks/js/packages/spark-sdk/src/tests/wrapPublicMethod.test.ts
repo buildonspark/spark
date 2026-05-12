@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { getTestWalletConfig } from "./test-utils.js";
 import { SparkError } from "../errors/base.js";
@@ -36,7 +36,7 @@ function wrapTestMethod(wallet: TestableWallet) {
 
 afterEach(async () => {
   for (const wallet of walletsToCleanup) {
-    await wallet.cleanupConnections();
+    await wallet.cleanup();
   }
   walletsToCleanup.clear();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -87,5 +87,15 @@ describe("wrapPublicMethod", () => {
     expect(wallet.isMethodLoggingEnabled()).toBe(true);
     expect(wallet["logger"]).toBe(logger);
     expect(logger.options.enabled).toBe(true);
+  });
+
+  it("keeps cleanupConnections as an alias for cleanup", async () => {
+    const wallet = await makeTestWallet();
+    const cleanup = jest.spyOn(wallet, "cleanup").mockResolvedValue(undefined);
+
+    await wallet.cleanupConnections();
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    cleanup.mockRestore();
   });
 });

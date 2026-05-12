@@ -12,7 +12,7 @@ async function getOrCreateWallet(mnemonicInit?: string) {
   });
   const balance = await wallet.getBalance();
   const sparkAddress = await wallet.getSparkAddress();
-  await wallet.cleanupConnections();
+  await wallet.cleanup();
   return {
     mnemonic,
     balance,

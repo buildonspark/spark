@@ -425,9 +425,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           const existing = SparkWallet.instances.get(identityHex);
           if (existing && !existing.disposed) {
             if (forceReinit) {
-              await existing.cleanupConnections();
+              await existing.cleanup();
             } else {
-              wallet.cleanup();
+              await wallet.cleanup();
               return { wallet: existing as unknown as T, mnemonic };
             }
           }
@@ -5928,7 +5928,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
   }
 
-  private cleanup() {
+  private cleanupState() {
     this.disposed = true;
     if (this.singletonKey) {
       if (SparkWallet.instances.get(this.singletonKey) === this) {
@@ -5953,8 +5953,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     this.removeAllListeners();
   }
 
-  public async cleanupConnections() {
-    this.cleanup();
+  public async cleanup() {
+    this.cleanupState();
     try {
       await this.connectionManager.closeConnections();
     } finally {
@@ -5963,13 +5963,20 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * @deprecated Use cleanup() instead.
+   */
+  public async cleanupConnections() {
+    await this.cleanup();
+  }
+
+  /**
    * Clears the singleton registry. Intended for test cleanup only — in
-   * production, use cleanupConnections() on individual wallet instances.
+   * production, use cleanup() on individual wallet instances.
    */
   public static async resetInstances() {
     const cleanups: Promise<void>[] = [];
     for (const wallet of SparkWallet.instances.values()) {
-      cleanups.push(wallet.cleanupConnections().catch(() => {}));
+      cleanups.push(wallet.cleanup().catch(() => {}));
     }
     await Promise.all(cleanups);
     SparkWallet.instances.clear();
@@ -6197,6 +6204,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
   "experimental_ClaimInstantStaticDeposit",
+  "cleanup",
   "cleanupConnections",
   "createHTLC",
   "getHTLCPreimage",

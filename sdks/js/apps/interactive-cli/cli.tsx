@@ -156,7 +156,7 @@ const App = () => {
   const cleanupAndExit = useCallback(async () => {
     if (wallet) {
       try {
-        await wallet.cleanupConnections();
+        await wallet.cleanup();
       } catch (error) {
         appendLog(`Cleanup error: ${formatError(error)}`);
       }
@@ -231,7 +231,7 @@ const App = () => {
         try {
           appendLog("Initializing wallet...");
           if (wallet) {
-            await wallet.cleanupConnections();
+            await wallet.cleanup();
           }
 
           const seedInput = mnemonicOrSeed.trim();

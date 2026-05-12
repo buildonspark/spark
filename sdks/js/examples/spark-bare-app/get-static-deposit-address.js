@@ -10,7 +10,7 @@ async function getStaticDepositAddress(mnemonicInit) {
     options,
   });
   const staticDepositAddress = await wallet.getStaticDepositAddress();
-  await wallet.cleanupConnections();
+  await wallet.cleanup();
   return staticDepositAddress;
 }
 
