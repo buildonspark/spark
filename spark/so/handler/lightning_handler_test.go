@@ -258,6 +258,59 @@ func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
 	}
 }
 
+func TestQueryHTLCRejectsFilterResourceExhaustionBeforeDB(t *testing.T) {
+	identityPubKey := keys.GeneratePrivateKey().Public().Serialize()
+	handler := NewLightningHandler(&so.Config{})
+
+	baseRequest := func() *pb.QueryHtlcRequest {
+		return &pb.QueryHtlcRequest{
+			IdentityPublicKey: identityPubKey,
+			Limit:             1,
+		}
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*pb.QueryHtlcRequest)
+		want   string
+	}{
+		{
+			name: "transfer ids over limit",
+			mutate: func(req *pb.QueryHtlcRequest) {
+				req.TransferIds = make([]string, maxQueryHTLCFilterValues+1)
+			},
+			want: "too many transfer ids in filter",
+		},
+		{
+			name: "payment hashes over limit",
+			mutate: func(req *pb.QueryHtlcRequest) {
+				req.PaymentHashes = make([][]byte, maxQueryHTLCFilterValues+1)
+			},
+			want: "too many payment hashes in filter",
+		},
+		{
+			name: "malformed payment hash",
+			mutate: func(req *pb.QueryHtlcRequest) {
+				req.PaymentHashes = [][]byte{make([]byte, 31)}
+			},
+			want: "invalid payment hash length at index 0",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := baseRequest()
+			test.mutate(req)
+
+			resp, err := handler.QueryHTLC(t.Context(), req)
+
+			require.Nil(t, resp)
+			require.Error(t, err)
+			require.ErrorContains(t, err, test.want)
+		})
+	}
+}
+
 type trackingFrostServiceClientConnection struct {
 	client pbfrost.FrostServiceClient
 }

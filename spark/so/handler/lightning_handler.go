@@ -60,6 +60,7 @@ import (
 const (
 	LightningPaymentExpiryDuration = 16 * 24 * time.Hour
 	LightningReceiveExpiryDuration = 4 * time.Hour
+	maxQueryHTLCFilterValues       = 1000
 )
 
 // LightningHandler is the handler for the lightning service.
@@ -2156,6 +2157,19 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 
 	if req.Offset < 0 {
 		return nil, fmt.Errorf("expect non-negative offset")
+	}
+
+	if len(req.TransferIds) > maxQueryHTLCFilterValues {
+		return nil, fmt.Errorf("too many transfer ids in filter: got %d, max %d", len(req.TransferIds), maxQueryHTLCFilterValues)
+	}
+
+	if len(req.PaymentHashes) > maxQueryHTLCFilterValues {
+		return nil, fmt.Errorf("too many payment hashes in filter: got %d, max %d", len(req.PaymentHashes), maxQueryHTLCFilterValues)
+	}
+	for i, paymentHash := range req.PaymentHashes {
+		if len(paymentHash) != sha256.Size {
+			return nil, fmt.Errorf("invalid payment hash length at index %d: %d bytes, expected %d bytes", i, len(paymentHash), sha256.Size)
+		}
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
