@@ -21,6 +21,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparktesting "github.com/lightsparkdev/spark/testing"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type internalSignTokenTestSetup struct {
@@ -149,6 +151,110 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 		require.Empty(t, result.ByUUID)
 		require.Len(t, result.ByHashVout, 1)
 	})
+
+	t.Run("falls back to legacy UUID when InputTtxoRef hash is malformed", func(t *testing.T) {
+		shares := []*sparktokeninternal.OperatorRevocationShares{
+			{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{
+					{
+						InputTtxoId: testUUID.String(),
+						SecretShare: testSecret,
+						InputTtxoRef: &tokenpb.TokenOutputToSpend{
+							PrevTokenTransactionHash: []byte{0x01, 0x02},
+							PrevTokenTransactionVout: 2,
+						},
+					},
+				},
+			},
+		}
+
+		result, err := buildInputOperatorShareMap(shares)
+		require.NoError(t, err)
+		require.Len(t, result.ByUUID, 1)
+		require.Empty(t, result.ByHashVout)
+	})
+
+	for _, tc := range []struct {
+		name    string
+		shares  []*sparktokeninternal.OperatorRevocationShares
+		wantErr string
+	}{
+		{
+			name:    "nil operator share",
+			shares:  []*sparktokeninternal.OperatorRevocationShares{nil},
+			wantErr: "nil operator share",
+		},
+		{
+			name: "malformed operator identity key",
+			shares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: []byte{0x02},
+			}},
+			wantErr: "failed to parse operator identity public key",
+		},
+		{
+			name: "nil revocation share",
+			shares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares:                    []*sparktokeninternal.RevocationSecretShare{nil},
+			}},
+			wantErr: "nil share found",
+		},
+		{
+			name: "malformed secret share",
+			shares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{{
+					SecretShare: []byte{0x01},
+					InputTtxoId: uuid.NewString(),
+				}},
+			}},
+			wantErr: "failed to parse secret share",
+		},
+		{
+			name: "malformed legacy uuid",
+			shares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{{
+					SecretShare: testSecret,
+					InputTtxoId: "not-a-uuid",
+				}},
+			}},
+			wantErr: "failed to parse token output id",
+		},
+		{
+			name: "short input ttxo ref hash",
+			shares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{{
+					SecretShare: testSecret,
+					InputTtxoRef: &tokenpb.TokenOutputToSpend{
+						PrevTokenTransactionHash: []byte{0x01, 0x02},
+						PrevTokenTransactionVout: 1,
+					},
+				}},
+			}},
+			wantErr: "prev token transaction hash must be 32 bytes",
+		},
+		{
+			name: "missing input ttxo reference",
+			shares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: testOperatorPubKey,
+				Shares: []*sparktokeninternal.RevocationSecretShare{{
+					SecretShare: testSecret,
+				}},
+			}},
+			wantErr: "missing input ttxo reference",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := buildInputOperatorShareMap(tc.shares)
+			require.Nil(t, result)
+			require.Error(t, err)
+			require.Equal(t, codes.Internal, status.Code(err))
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func TestRecoverFullRevocationSecretsAndFinalize_ReturnsNotReadyWhenThresholdNotMetAndEphemeralUnavailable(t *testing.T) {

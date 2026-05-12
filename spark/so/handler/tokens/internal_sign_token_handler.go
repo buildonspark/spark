@@ -1270,8 +1270,10 @@ func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocatio
 				OperatorIdentityPublicKey: opIDPubKey,
 			}
 
-			// Prefer InputTtxoRef (hash, vout) format if available
-			if ref := share.GetInputTtxoRef(); ref != nil && len(ref.GetPrevTokenTransactionHash()) == 32 {
+			// Prefer InputTtxoRef (hash, vout) format when it is complete, but
+			// preserve the legacy InputTtxoId fallback for older operators.
+			ref := share.GetInputTtxoRef()
+			if ref != nil && len(ref.GetPrevTokenTransactionHash()) == 32 {
 				var hashKey [32]byte
 				copy(hashKey[:], ref.GetPrevTokenTransactionHash())
 				result.ByHashVout[HashVoutShareKey{
@@ -1289,6 +1291,12 @@ func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocatio
 					TokenOutputID:             tokenOutputID,
 					OperatorIdentityPublicKey: opIDPubKey,
 				}] = shareValue
+			} else if ref != nil {
+				return nil, sparkerrors.InternalInvalidOperatorResponse(
+					fmt.Errorf("input ttxo ref prev token transaction hash must be 32 bytes, got %d", len(ref.GetPrevTokenTransactionHash())),
+				)
+			} else {
+				return nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("revocation secret share is missing input ttxo reference"))
 			}
 		}
 	}
