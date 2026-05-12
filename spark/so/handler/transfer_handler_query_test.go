@@ -21,6 +21,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -157,6 +159,87 @@ func TestQueryTransfers_NotSSP_RequiresAuthz_Mismatch(t *testing.T) {
 	assert.NotNil(t, resp)
 	assert.Empty(t, resp.Transfers, "Should return empty transfers when viewer doesn't have access")
 	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when no access")
+}
+
+func TestQueryTransfersRejectsMalformedFiltersWithTypedErrors(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	handler := NewTransferHandler(cfg)
+	identityKey := keys.GeneratePrivateKey().Public().Serialize()
+
+	base := func() *pb.TransferFilter {
+		return &pb.TransferFilter{
+			Network: pb.Network_REGTEST,
+			Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
+				ReceiverIdentityPublicKey: identityKey,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		filter      *pb.TransferFilter
+		pendingOnly bool
+	}{
+		{
+			name: "empty receiver identity public key",
+			filter: &pb.TransferFilter{
+				Network: pb.Network_REGTEST,
+				Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
+					ReceiverIdentityPublicKey: nil,
+				},
+			},
+		},
+		{
+			name: "malformed sender identity public key",
+			filter: &pb.TransferFilter{
+				Network: pb.Network_REGTEST,
+				Participant: &pb.TransferFilter_SenderIdentityPublicKey{
+					SenderIdentityPublicKey: []byte{0x02, 0x01},
+				},
+			},
+		},
+		{
+			name: "malformed sender or receiver identity public key",
+			filter: &pb.TransferFilter{
+				Network: pb.Network_REGTEST,
+				Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+					SenderOrReceiverIdentityPublicKey: []byte{0x02, 0x01},
+				},
+			},
+		},
+		{
+			name: "malformed transfer id",
+			filter: &pb.TransferFilter{
+				Network:     pb.Network_REGTEST,
+				TransferIds: []string{"not-a-uuid"},
+			},
+		},
+		{
+			name: "invalid transfer status",
+			filter: func() *pb.TransferFilter {
+				filter := base()
+				filter.Statuses = []pb.TransferStatus{pb.TransferStatus(999)}
+				return filter
+			}(),
+		},
+		{
+			name: "statuses on pending query",
+			filter: func() *pb.TransferFilter {
+				filter := base()
+				filter.Statuses = []pb.TransferStatus{pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED}
+				return filter
+			}(),
+			pendingOnly: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := handler.queryTransfers(ctx, tt.filter, tt.pendingOnly, true)
+			require.Nil(t, resp)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
 }
 
 func TestQueryTransfers_NotSSP_NoSession(t *testing.T) {

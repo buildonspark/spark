@@ -1966,11 +1966,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
 	if pendingOnly && len(filter.Statuses) > 0 {
-		return nil, fmt.Errorf("cannot specify both pendingOnly=true and filter.Statuses")
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cannot specify both pendingOnly=true and filter.Statuses"))
 	}
 
 	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
@@ -2029,7 +2029,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
 		receiverIDPubKey, err := keys.ParsePublicKey(filter.GetReceiverIdentityPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid receiver identity public key: %w", err))
 		}
 		if useMIMO {
 			transferIDs, err := queryReceiverTransferIDs(ctx, db, receiverIDPubKey)
@@ -2050,7 +2050,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	case *pb.TransferFilter_SenderIdentityPublicKey:
 		senderIDPubKey, err := keys.ParsePublicKey(filter.GetSenderIdentityPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender identity public key: %w", err))
 		}
 		if useMIMO {
 			transferIDs, err := querySenderTransferIDs(ctx, db, senderIDPubKey)
@@ -2074,7 +2074,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
 		identityPubKey, err := keys.ParsePublicKey(filter.GetSenderOrReceiverIdentityPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("invalid sender or receiver identity public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender or receiver identity public key: %w", err))
 		}
 		if useMIMO {
 			receiverTransferIDs, err := queryReceiverTransferIDs(ctx, db, identityPubKey)
@@ -2173,7 +2173,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 		transferUUIDs, err := uuids.ParseSlice(filter.GetTransferIds())
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", err))
 		}
 		transferPredicate = append(transferPredicate, enttransfer.IDIn(transferUUIDs...))
 	}
@@ -2216,7 +2216,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			var err error
 			statuses[i], err = ent.TransferStatusSchema(stat)
 			if err != nil {
-				return nil, fmt.Errorf("invalid transfer status: %w", err)
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer status: %w", err))
 			}
 		}
 		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
