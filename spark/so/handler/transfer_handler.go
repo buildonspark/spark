@@ -3033,8 +3033,21 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		transfer.Status == st.TransferStatusReturned {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be processed", transferID, transfer.Status))
 	}
-	if transfer.Status != st.TransferStatusSenderKeyTweaked {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s", transferID, transfer.Status))
+	// If the transfer is already past the key-tweak phase, return success
+	// for idempotency. This handles the case where a concurrent or retried
+	// ClaimTransferTweakKeys call arrives after the first one already
+	// advanced the transfer to RECEIVER_KEY_TWEAKED or beyond.
+	switch transfer.Status {
+	case st.TransferStatusSenderKeyTweaked:
+		// Expected status — proceed with key tweaking
+	case st.TransferStatusReceiverKeyTweaked,
+		st.TransferStatusReceiverKeyTweakLocked,
+		st.TransferStatusReceiverKeyTweakApplied,
+		st.TransferStatusReceiverRefundSigned:
+		// Already past the tweak-keys phase — return success for idempotency
+		return nil
+	default:
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is not in a claimable status: %s", transferID, transfer.Status))
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
