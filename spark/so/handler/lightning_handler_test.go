@@ -129,6 +129,134 @@ func (m *mockFrostServiceClient) ValidateSignatureShareV2(context.Context, *pbfr
 	return &emptypb.Empty{}, nil
 }
 
+func TestLightningHandlersRejectNilRequests(t *testing.T) {
+	ctx := t.Context()
+	handler := NewLightningHandler(&so.Config{})
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "StorePreimageShare",
+			call: func() error {
+				return handler.StorePreimageShare(ctx, nil)
+			},
+		},
+		{
+			name: "StorePreimageShareV2",
+			call: func() error {
+				return handler.StorePreimageShareV2(ctx, nil)
+			},
+		},
+		{
+			name: "StorePreimageShareInternal",
+			call: func() error {
+				return handler.StorePreimageShareInternal(ctx, nil)
+			},
+		},
+		{
+			name: "QueryUserSignedRefunds",
+			call: func() error {
+				_, err := handler.QueryUserSignedRefunds(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "QueryHTLC",
+			call: func() error {
+				_, err := handler.QueryHTLC(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "ValidatePreimage",
+			call: func() error {
+				_, _, err := handler.ValidatePreimage(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "ValidatePreimageInternal",
+			call: func() error {
+				_, err := handler.ValidatePreimageInternal(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "QueryPreimage",
+			call: func() error {
+				_, err := handler.QueryPreimage(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "ProvidePreimage",
+			call: func() error {
+				_, err := handler.ProvidePreimage(ctx, nil)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.ErrorContains(t, tt.call(), "request is required")
+		})
+	}
+}
+
+func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
+	ctx := t.Context()
+	handler := NewLightningHandler(&so.Config{})
+	identityPubKey := []byte{1}
+
+	tests := []struct {
+		name    string
+		req     *pb.QueryHtlcRequest
+		wantErr string
+	}{
+		{
+			name:    "missing identity public key",
+			req:     &pb.QueryHtlcRequest{Limit: 1},
+			wantErr: "identity public key is required",
+		},
+		{
+			name: "zero limit",
+			req: &pb.QueryHtlcRequest{
+				IdentityPublicKey: identityPubKey,
+				Limit:             0,
+			},
+			wantErr: "expect limit to be greater than 0",
+		},
+		{
+			name: "negative limit",
+			req: &pb.QueryHtlcRequest{
+				IdentityPublicKey: identityPubKey,
+				Limit:             -1,
+			},
+			wantErr: "expect limit to be greater than 0",
+		},
+		{
+			name: "negative offset",
+			req: &pb.QueryHtlcRequest{
+				IdentityPublicKey: identityPubKey,
+				Limit:             1,
+				Offset:            -1,
+			},
+			wantErr: "expect non-negative offset",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := handler.QueryHTLC(ctx, tt.req)
+			require.Nil(t, resp)
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
 type trackingFrostServiceClientConnection struct {
 	client pbfrost.FrostServiceClient
 }

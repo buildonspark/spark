@@ -78,6 +78,9 @@ func NewLightningHandler(config *so.Config) *LightningHandler {
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareRequest) error {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	if req.PreimageShare == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("preimage share is nil"))
 	}
@@ -143,6 +146,10 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 // StorePreimageShareV2 stores preimage shares for all SOs via a single coordinator call.
 // The coordinator decrypts and stores its own share, then fans out to other SOs via internal RPC.
 func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspark.StorePreimageShareV2Request) (retErr error) {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
 	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2", spanOpt)
@@ -190,6 +197,10 @@ func (h *LightningHandler) StorePreimageShareInternal(ctx context.Context, req *
 }
 
 func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req *pbspark.StorePreimageShareV2Request) error {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	ciphertext, ok := req.EncryptedPreimageShares[h.config.Identifier]
 	if !ok {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no encrypted preimage share found for SO %s", h.config.Identifier))
@@ -2037,6 +2048,10 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 
 // QueryUserSignedRefunds queries the user signed refunds for the given payment hash.
 func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbspark.QueryUserSignedRefundsRequest) (*pbspark.QueryUserSignedRefundsResponse, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -2124,6 +2139,10 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbsp
 }
 
 func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlcRequest) (*pbspark.QueryHtlcResponse, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	if len(req.IdentityPublicKey) == 0 {
 		return nil, fmt.Errorf("identity public key is required")
 	}
@@ -2244,6 +2263,10 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 }
 
 func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*ent.PreimageRequest, *ent.Transfer, error) {
+	if req == nil {
+		return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if len(req.PaymentHash) != 32 {
@@ -2310,6 +2333,10 @@ func (h *LightningHandler) StorePreimage(ctx context.Context, preimageRequest *e
 }
 
 func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pbinternal.ProvidePreimageRequest) (*ent.Transfer, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	providePreimageRequest := &pbspark.ProvidePreimageRequest{
 		PaymentHash:       req.PaymentHash,
 		Preimage:          req.Preimage,
@@ -2335,6 +2362,10 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 }
 
 func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.QueryPreimageRequest) (*pbspark.QueryPreimageResponse, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	session, err := authn.GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -2399,6 +2430,10 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 }
 
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
 	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage", spanOpt)
