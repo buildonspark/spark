@@ -883,7 +883,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 [[package]]
 name = "frost-core"
 version = "3.0.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
+source = "git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "byteorder",
  "const-crc32-nostd",
@@ -904,7 +904,7 @@ dependencies = [
 [[package]]
 name = "frost-rerandomized"
 version = "3.0.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
+source = "git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "derive-getters",
  "document-features",
@@ -916,7 +916,7 @@ dependencies = [
 [[package]]
 name = "frost-secp256k1-tr"
 version = "3.0.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
+source = "git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "document-features",
  "frost-core",
