@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -760,34 +761,40 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
 
-	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	nonexistentPreimage := bytes.Repeat([]byte{0x03}, 32)
+	nonexistentHash := sha256.Sum256(nonexistentPreimage)
 	tests := []struct {
 		name           string
 		paymentHash    []byte
 		preimage       []byte
-		identityPubKey keys.Public
+		identityPubKey []byte
 		expectedErrMsg string
+		expectedCode   codes.Code
 	}{
 		{
 			name:           "invalid preimage - hash mismatch",
 			paymentHash:    bytes.Repeat([]byte{0}, 32),
-			preimage:       []byte("wrong_preimage_that_doesnt_match_hash"),
+			preimage:       bytes.Repeat([]byte{0x01}, 32),
 			identityPubKey: identityKey,
 			expectedErrMsg: "invalid preimage",
+			expectedCode:   codes.FailedPrecondition,
 		},
 		{
 			name:           "non-existent preimage request",
-			paymentHash:    []byte("some_hash_that_matches_preimage_"),
-			preimage:       []byte("test_preimage_32_bytes_long_____"),
+			paymentHash:    nonexistentHash[:],
+			preimage:       nonexistentPreimage,
 			identityPubKey: identityKey,
-			expectedErrMsg: "invalid preimage",
+			expectedErrMsg: "preimage request not found",
+			expectedCode:   codes.NotFound,
 		},
 		{
 			name:           "empty payment hash",
 			paymentHash:    []byte{},
-			preimage:       []byte("test_preimage"),
+			preimage:       bytes.Repeat([]byte{0x01}, 32),
 			identityPubKey: identityKey,
 			expectedErrMsg: "invalid payment hash length: 0 bytes, expected 32 bytes",
+			expectedCode:   codes.InvalidArgument,
 		},
 		{
 			name:           "empty preimage",
@@ -795,13 +802,23 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 			preimage:       []byte{},
 			identityPubKey: identityKey,
 			expectedErrMsg: "invalid preimage length: 0 bytes, expected 32 bytes",
+			expectedCode:   codes.InvalidArgument,
 		},
 		{
 			name:           "nil identity public key",
 			paymentHash:    []byte("payment_hash_32_bytes_long______"),
 			preimage:       []byte("test_preimage_32_bytes_long_____"),
-			identityPubKey: keys.Public{},
+			identityPubKey: nil,
 			expectedErrMsg: "invalid identity public key length: 0 bytes, expected 33 bytes",
+			expectedCode:   codes.InvalidArgument,
+		},
+		{
+			name:           "malformed identity public key",
+			paymentHash:    []byte("payment_hash_32_bytes_long______"),
+			preimage:       []byte("test_preimage_32_bytes_long_____"),
+			identityPubKey: bytes.Repeat([]byte{0xff}, 33),
+			expectedErrMsg: "invalid identity public key",
+			expectedCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -810,16 +827,30 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 			req := &pb.ProvidePreimageRequest{
 				PaymentHash:       tt.paymentHash,
 				Preimage:          tt.preimage,
-				IdentityPublicKey: tt.identityPubKey.Serialize(),
+				IdentityPublicKey: tt.identityPubKey,
 			}
 
 			preimageRequest, transfer, err := lightningHandler.ValidatePreimage(ctx, req)
 
 			require.ErrorContains(t, err, tt.expectedErrMsg)
+			require.Equal(t, tt.expectedCode, status.Code(err))
 			assert.Nil(t, preimageRequest)
 			assert.Nil(t, transfer)
 		})
 	}
+}
+
+func TestProvidePreimageRejectsMalformedIdentityPublicKeyWithInvalidArgument(t *testing.T) {
+	handler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+	resp, err := handler.ProvidePreimage(t.Context(), &pb.ProvidePreimageRequest{
+		PaymentHash:       bytes.Repeat([]byte{0x01}, 32),
+		Preimage:          bytes.Repeat([]byte{0x02}, 32),
+		IdentityPublicKey: []byte{0x02, 0x01},
+	})
+	require.Nil(t, resp)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "invalid identity public key")
 }
 
 func TestStorePreimage(t *testing.T) {

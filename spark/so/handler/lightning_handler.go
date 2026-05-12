@@ -2273,26 +2273,34 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if len(req.PaymentHash) != 32 {
-		return nil, nil, fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.PaymentHash))
+		return nil, nil, sparkerrors.InvalidArgumentMalformedField(
+			fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.PaymentHash)),
+		)
 	}
 	if len(req.Preimage) != 32 {
-		return nil, nil, fmt.Errorf("invalid preimage length: %d bytes, expected 32 bytes", len(req.Preimage))
+		return nil, nil, sparkerrors.InvalidArgumentMalformedField(
+			fmt.Errorf("invalid preimage length: %d bytes, expected 32 bytes", len(req.Preimage)),
+		)
 	}
 	if len(req.IdentityPublicKey) != 33 {
-		return nil, nil, fmt.Errorf("invalid identity public key length: %d bytes, expected 33 bytes", len(req.IdentityPublicKey))
+		return nil, nil, sparkerrors.InvalidArgumentMalformedKey(
+			fmt.Errorf("invalid identity public key length: %d bytes, expected 33 bytes", len(req.IdentityPublicKey)),
+		)
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, nil, sparkerrors.InternalDatabaseReadError(
+			fmt.Errorf("failed to get or create current tx for request: %w", err),
+		)
 	}
 	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	calculatedPaymentHash := sha256.Sum256(req.Preimage)
 	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
-		return nil, nil, fmt.Errorf("invalid preimage")
+		return nil, nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("invalid preimage"))
 	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
@@ -2306,16 +2314,23 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 			req.IdentityPublicKey,
 			req.PaymentHash,
 		)
-		return nil, nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err)
+		if ent.IsNotFound(err) {
+			return nil, nil, sparkerrors.NotFoundMissingEntity(
+				fmt.Errorf("ProvidePreimage: preimage request not found for public key %x and payment hash %x", req.IdentityPublicKey, req.PaymentHash),
+			)
+		}
+		return nil, nil, sparkerrors.InternalDatabaseReadError(
+			fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err),
+		)
 	}
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get transfer: %w", err)
+		return nil, nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("unable to get transfer: %w", err))
 	}
 
 	if transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now()) {
-		return nil, nil, fmt.Errorf("transfer %s has expired", transfer.ID)
+		return nil, nil, sparkerrors.FailedPreconditionExpired(fmt.Errorf("transfer %s has expired", transfer.ID))
 	}
 
 	return preimageRequest, transfer, nil
@@ -2451,7 +2466,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	if err != nil {
 		endSpanWithError(validateSpan, err)
 		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, identityPubKey); err != nil {
 		endSpanWithError(validateSpan, err)
