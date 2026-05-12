@@ -200,6 +200,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		}
 		_, err := VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooLongTxid, Vout: 0}, nil)
 		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
 		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 33 bytes")
 		// Test with invalid txid (too short - less than 32 bytes)
 		tooShortTxid := make([]byte, 16)
@@ -208,16 +209,24 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		}
 		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooShortTxid, Vout: 0}, nil)
 		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
 		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 16 bytes")
 		// Test with empty txid
 		emptyTxid := []byte{}
 		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, &pb.UTXO{Txid: emptyTxid, Vout: 0}, nil)
 		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
 		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 0 bytes")
 		// Test with nil reqUtxo
 		_, err = VerifiedTargetUtxoFromRequest(ctx, config, tx, btcnetwork.Regtest, nil, nil)
 		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
 		require.ErrorContains(t, err, "requested UTXO is nil")
+
+		_, err = VerifiedTargetUtxoFromRequestWithThreshold(ctx, tx, btcnetwork.Regtest, &pb.UTXO{Txid: tooShortTxid, Vout: 0}, 1)
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.ErrorContains(t, err, "invalid txid length: expected 32 bytes, got 16 bytes")
 	})
 
 	t.Run("threshold_1_with_1_conf_succeeds", func(t *testing.T) {

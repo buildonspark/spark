@@ -1358,17 +1358,17 @@ func (u *VerifiedTargetUtxo) Vout() uint32 {
 // Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
 func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO, confirmationThreshold *uint32) (*VerifiedTargetUtxo, error) {
 	if reqUtxo == nil {
-		return nil, fmt.Errorf("requested UTXO is nil")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("requested UTXO is nil"))
 	}
 
 	if len(reqUtxo.Txid) != chainhash.HashSize {
-		return nil, fmt.Errorf("invalid txid length: expected %d bytes, got %d bytes", chainhash.HashSize, len(reqUtxo.Txid))
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid txid length: expected %d bytes, got %d bytes", chainhash.HashSize, len(reqUtxo.Txid)))
 	}
 
 	txidString := hex.EncodeToString(reqUtxo.Txid)
 	reqUtxoTxid, err := chainhash.NewHashFromStr(txidString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse on-chain txid: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse on-chain txid: %w", err))
 	}
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(network),
@@ -1422,17 +1422,17 @@ func resolveConfirmationThreshold(requested *uint32, config *so.Config, network 
 // This allows callers to handle unconfirmed UTXOs gracefully.
 func VerifiedTargetUtxoFromRequestWithThreshold(ctx context.Context, db *ent.Client, network btcnetwork.Network, reqUtxo *pb.UTXO, threshold uint32) (*VerifiedTargetUtxo, error) {
 	if reqUtxo == nil {
-		return nil, fmt.Errorf("requested UTXO is nil")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("requested UTXO is nil"))
 	}
 
 	if len(reqUtxo.Txid) != chainhash.HashSize {
-		return nil, fmt.Errorf("invalid txid length: expected %d bytes, got %d bytes", chainhash.HashSize, len(reqUtxo.Txid))
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid txid length: expected %d bytes, got %d bytes", chainhash.HashSize, len(reqUtxo.Txid)))
 	}
 
 	txidString := hex.EncodeToString(reqUtxo.Txid)
 	reqUtxoTxid, err := chainhash.NewHashFromStr(txidString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse on-chain txid: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse on-chain txid: %w", err))
 	}
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(network),
