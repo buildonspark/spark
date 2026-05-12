@@ -122,6 +122,22 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestQueryNodesRejectsTooManyNodeIDsBeforeParsing(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewTreeQueryHandler(&so.Config{})
+	nodeIDs := make([]string, DefaultMaxQueryNodesByID+1)
+
+	resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{NodeIds: nodeIDs},
+		},
+	}, false)
+
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "node ids provided")
+}
+
 func TestQueryNodes_StatusField(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)

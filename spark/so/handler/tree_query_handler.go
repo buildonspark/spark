@@ -21,6 +21,8 @@ import (
 
 var ancestorChainRootSkipCutoff = time.Date(2026, time.March, 17, 0, 0, 0, 0, time.UTC)
 
+const DefaultMaxQueryNodesByID = 1000
+
 // TreeQueryHandler handles queries related to tree nodes.
 type TreeQueryHandler struct {
 	config *so.Config
@@ -104,7 +106,11 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 
 	case *pb.QueryNodesRequest_NodeIds:
 		offset = -1
-		nodeIDs, err := uuids.ParseSlice(req.GetNodeIds().GetNodeIds())
+		rawNodeIDs := req.GetNodeIds().GetNodeIds()
+		if len(rawNodeIDs) > DefaultMaxQueryNodesByID {
+			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("there were %d node ids provided, but the max is %d", len(rawNodeIDs), DefaultMaxQueryNodesByID))
+		}
+		nodeIDs, err := uuids.ParseSlice(rawNodeIDs)
 		if err != nil {
 			return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node IDs as UUIDs: %w", err))
 		}
