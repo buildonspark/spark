@@ -70,6 +70,13 @@ func validateSigningJobFields(job *pb.UserSignedTxSigningJob, jobName string) er
 func validateFinalizeDepositTreeCreationRequest(
 	req *pb.FinalizeDepositTreeCreationRequest,
 ) error {
+	if req == nil {
+		return status.Errorf(codes.InvalidArgument, "request is required")
+	}
+	if req.OnChainUtxo == nil {
+		return status.Errorf(codes.InvalidArgument, "on_chain_utxo is required")
+	}
+
 	if err := validateSigningJobFields(req.RootTxSigningJob, "root_tx_signing_job"); err != nil {
 		return err
 	}
@@ -90,6 +97,11 @@ func validateFinalizeDepositTreeCreationRequest(
 			len(req.AdditionalOnChainUtxos), maxAdditionalUtxos)
 	}
 	if len(req.AdditionalOnChainUtxos) > 0 {
+		for i, additionalUtxo := range req.AdditionalOnChainUtxos {
+			if additionalUtxo == nil {
+				return status.Errorf(codes.InvalidArgument, "additional_on_chain_utxos[%d] is required", i)
+			}
+		}
 		if len(req.RootTxSigningJob.AdditionalInputs) != len(req.AdditionalOnChainUtxos) {
 			return status.Errorf(codes.InvalidArgument,
 				"additional_inputs count (%d) must match additional_on_chain_utxos count (%d)",
