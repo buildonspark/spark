@@ -655,7 +655,8 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	knobsService := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled: 1.0,
+		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled:      1.0,
+		knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations: 3.0,
 	})
 	ctx = knobs.InjectKnobsService(ctx, knobsService)
 
@@ -856,7 +857,8 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	knobsService := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled: 1.0,
+		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled:      1.0,
+		knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations: 3.0,
 	})
 	ctx = knobs.InjectKnobsService(ctx, knobsService)
 

@@ -13,7 +13,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -154,7 +154,7 @@ func TestCoopExitBasic(t *testing.T) {
 	// First generate 3 blocks to trigger fund availability
 	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	require.NoError(t, err)
-	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+2, randomAddress, nil)
+	_, err = client.GenerateToAddress(knobs.CoopExitConfirmationThreshold+2, randomAddress, nil)
 	require.NoError(t, err)
 
 	// Wait until tx is confirmed and picked up by SO
@@ -318,7 +318,7 @@ func TestCoopExitSingleCall(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	require.NoError(t, err)
-	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+2, randomAddress, nil)
+	_, err = client.GenerateToAddress(knobs.CoopExitConfirmationThreshold+2, randomAddress, nil)
 	require.NoError(t, err)
 
 	// Wait until tx is confirmed and picked up by SO

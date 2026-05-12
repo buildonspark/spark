@@ -82,6 +82,13 @@ const (
 	KnobWatchChainTweakKeysForCoopExitDelayEnabled      = "spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled"
 	KnobWatchChainCoopExitKeyTweakRequiredConfirmations = "spark.so.watch_chain.coop_exit_key_tweak_required_confirmations"
 
+	// CoopExitConfirmationThreshold is the default required L1 confirmation
+	// count for both the watch-chain key-tweak advance and the receiver-claim
+	// finalization guard. Both call sites read
+	// KnobWatchChainCoopExitKeyTweakRequiredConfirmations with this value as
+	// the fallback so they can never disagree when the knob is unset.
+	CoopExitConfirmationThreshold = 6
+
 	// Tokens
 	KnobTokenTransactionV3Enabled = "spark.so.tokens.token_transaction_v3_enabled"
 	// Enable Phase 2 of the token transaction v3 migration which combines the internal prepare and sign RPCs into a single RPC.

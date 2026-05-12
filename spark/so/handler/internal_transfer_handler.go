@@ -250,6 +250,10 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		return nil
 	}
 
+	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
+		return err
+	}
+
 	receiverLeaves, err := db.TransferLeaf.Query().
 		Where(enttransferleaf.TransferReceiverID(receiver.ID)).
 		QueryLeaf().

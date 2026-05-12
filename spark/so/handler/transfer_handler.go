@@ -2627,8 +2627,6 @@ func timeOrZero(ts *timestamppb.Timestamp) time.Time {
 	return ts.AsTime().UTC()
 }
 
-const CoopExitConfirmationThreshold = 6
-
 // maxTransferPageSize caps the LIMIT on QueryPendingTransfers /
 // QueryAllTransfers responses. Mirrors the maxTokenTransactionPageSize
 // pattern in so/handler/tokens.
@@ -3000,7 +2998,7 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *e
 	if coopExit.ConfirmationHeight == nil {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx hasn't been broadcasted"))
 	}
-	requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations, CoopExitConfirmationThreshold))
+	requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations, knobs.CoopExitConfirmationThreshold))
 	if blockHeight.Height-*coopExit.ConfirmationHeight+1 < requiredConfirmations {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", *coopExit.ConfirmationHeight, blockHeight.Height))
 	}
@@ -3598,6 +3596,13 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	// Read model determined by MIMO state
 	if isMimoReceiveEnabled {
 		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+			return nil, err
+		}
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get db: %w", err)
+		}
+		if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
 			return nil, err
 		}
 		switch receiver.Status {
