@@ -1019,7 +1019,14 @@ func (h *InternalTransferHandler) GetTransfers(ctx context.Context, req *pbinter
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transfer ids: %w", err)
 	}
-	transfers, err := db.Transfer.Query().Where(enttransfer.IDIn(transferIDs...)).All(ctx)
+	transfers, err := db.Transfer.Query().
+		Where(enttransfer.IDIn(transferIDs...)).
+		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
+			q.WithLeaf(func(q *ent.TreeNodeQuery) {
+				q.WithTree().WithSigningKeyshare().WithParent()
+			})
+		}).
+		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transfers: %w", err)
 	}
