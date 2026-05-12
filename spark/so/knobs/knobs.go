@@ -34,6 +34,7 @@ const (
 	KnobReadMIMODataModelTransferSend          = "spark.so.read_mimo_data_model_transfer_send"
 	KnobReadMIMODataModelQueryTransfers        = "spark.so.read_mimo_data_model_query_transfers"
 	KnobReadMIMODataModelQueryPendingTransfers = "spark.so.read_mimo_data_model_query_pending_transfers"
+	KnobReadMIMODataModelOutgoingInFlight      = "spark.so.read_mimo_data_model_outgoing_in_flight"
 	KnobReadMIMODataModelGetStuckTransfers     = "spark.so.read_mimo_data_model_get_stuck_transfers"
 
 	// Per-call sampling rate (0–100) for the "transfer query invoked" caller-attribution log.

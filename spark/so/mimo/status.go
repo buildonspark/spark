@@ -76,3 +76,17 @@ func OutgoingInFlightSenderStatuses() []string {
 		string(st.TransferStatusSenderKeyTweakPending),
 	}
 }
+
+// IsOutgoingInFlightStatus reports whether s is in the 4-state set covered by
+// idx_transfers_outgoing_in_flight_sender_pubkey_time's partial WHERE. Used
+// by the QueryAllTransfers dispatcher to detect the specialized shape.
+func IsOutgoingInFlightStatus(s st.TransferStatus) bool {
+	switch s { //nolint:exhaustive // closed set of 4; all other statuses fall through to false
+	case st.TransferStatusSenderInitiated,
+		st.TransferStatusSenderInitiatedCoordinator,
+		st.TransferStatusApplyingSenderKeyTweak,
+		st.TransferStatusSenderKeyTweakPending:
+		return true
+	}
+	return false
+}

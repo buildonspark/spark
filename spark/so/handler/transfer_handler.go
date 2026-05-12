@@ -2415,6 +2415,9 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.
 }
 
 func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (*pb.QueryTransfersResponse, error) {
+	if shouldRouteToOutgoingInFlight(ctx, filter) {
+		return h.queryOutgoingInFlight(ctx, filter, isSSP)
+	}
 	return h.queryTransfers(ctx, filter, false, isSSP)
 }
 
@@ -2593,9 +2596,10 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		transferProtos = append(transferProtos, transferProto)
 	}
 
+	// Gate and advance by SQL ID count, not ORM count — concurrent deletes shouldn't reshape pagination.
 	nextOffset := int64(-1)
-	if len(transfers) == limit {
-		nextOffset = int64(offset + len(transfers))
+	if len(transferIDs) == limit {
+		nextOffset = int64(offset + len(transferIDs))
 	}
 	return &pb.QueryTransfersResponse{
 		Transfers: transferProtos,

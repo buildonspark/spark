@@ -3,6 +3,7 @@ package mimo_test
 import (
 	"testing"
 
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/mimo"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,5 +55,30 @@ func TestOutgoingInFlightIsSupersetOfPendingSender(t *testing.T) {
 	for _, s := range mimo.PendingSenderStatuses() {
 		assert.True(t, outgoingSet[s],
 			"PendingSenderStatuses element %q must also be in OutgoingInFlightSenderStatuses", s)
+	}
+}
+
+// Locks IsOutgoingInFlightStatus to the same 4-state set as
+// OutgoingInFlightSenderStatuses — drift would silently break the
+// QueryAllTransfers dispatcher's shape detection.
+func TestIsOutgoingInFlightStatus(t *testing.T) {
+	for _, s := range mimo.OutgoingInFlightSenderStatuses() {
+		assert.Truef(t, mimo.IsOutgoingInFlightStatus(st.TransferStatus(s)),
+			"IsOutgoingInFlightStatus(%q) should be true", s)
+	}
+
+	negatives := []st.TransferStatus{
+		st.TransferStatusSenderKeyTweaked,
+		st.TransferStatusReceiverKeyTweaked,
+		st.TransferStatusReceiverKeyTweakLocked,
+		st.TransferStatusReceiverKeyTweakApplied,
+		st.TransferStatusReceiverRefundSigned,
+		st.TransferStatusCompleted,
+		st.TransferStatusExpired,
+		st.TransferStatusReturned,
+	}
+	for _, s := range negatives {
+		assert.Falsef(t, mimo.IsOutgoingInFlightStatus(s),
+			"IsOutgoingInFlightStatus(%q) should be false", s)
 	}
 }
