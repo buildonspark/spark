@@ -80,6 +80,14 @@ func (TransferReceiver) Indexes() []ent.Index {
 		index.Fields("identity_pubkey", "create_time").
 			Annotations(entsql.DescColumns("create_time")),
 
+		// Denormalized-type composite (SP-3050) — drives queryAll receiver-arm
+		// with type filter via leading-equality on (pubkey, transfer_type) +
+		// ordered top-N. Required for adversarial 0%-density type filters at
+		// high cardinality where heap-side filter on the 2-col index seq-scans.
+		index.Fields("identity_pubkey", "transfer_type", "create_time", "transfer_id").
+			Annotations(entsql.DescColumns("create_time", "transfer_id")).
+			StorageKey("idx_transferreceiver_pubkey_type_time"),
+
 		// Partial index covering RECEIVER_CLAIM_PENDING + the 4 stuck states.
 		// Drives the receiver-arm of queryPendingTransfers for multi-receiver,
 		// and serves the per-user receiver arm of stuck-transfer queries

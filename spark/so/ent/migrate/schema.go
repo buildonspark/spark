@@ -1526,6 +1526,18 @@ var (
 				},
 			},
 			{
+				Name:    "idx_transferreceiver_pubkey_type_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[6], TransferReceiversColumns[1], TransferReceiversColumns[7]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferReceiversColumns[1].Name: true,
+
+						TransferReceiversColumns[7].Name: true,
+					},
+				},
+			},
+			{
 				Name:    "idx_transferreceiver_claim_pending_pubkey_time",
 				Unique:  false,
 				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[1], TransferReceiversColumns[7]},
@@ -1593,6 +1605,18 @@ var (
 				Annotation: &entsql.IndexAnnotation{
 					DescColumns: map[string]bool{
 						TransferSendersColumns[1].Name: true,
+					},
+				},
+			},
+			{
+				Name:    "idx_transfersender_pubkey_type_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferSendersColumns[3], TransferSendersColumns[4], TransferSendersColumns[1], TransferSendersColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferSendersColumns[1].Name: true,
+
+						TransferSendersColumns[5].Name: true,
 					},
 				},
 			},

@@ -68,5 +68,12 @@ func (TransferSender) Indexes() []ent.Index {
 		// by identity_pubkey ordered by create_time without joining to transfers.
 		index.Fields("identity_pubkey", "create_time").
 			Annotations(entsql.DescColumns("create_time")),
+
+		// Denormalized-type composite (SP-3050) — drives queryAll sender-arm
+		// with type filter via leading-equality on (pubkey, transfer_type) +
+		// ordered top-N.
+		index.Fields("identity_pubkey", "transfer_type", "create_time", "transfer_id").
+			Annotations(entsql.DescColumns("create_time", "transfer_id")).
+			StorageKey("idx_transfersender_pubkey_type_time"),
 	}
 }
