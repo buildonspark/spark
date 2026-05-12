@@ -57,6 +57,40 @@ func TestQueryTokenOutputsRejectsNilRequest(t *testing.T) {
 	require.ErrorContains(t, err, "request is required")
 }
 
+func TestQueryTokenOutputsRejectsInvalidNetwork(t *testing.T) {
+	handler := &QueryTokenOutputsHandler{}
+	ownerPublicKey := keys.GeneratePrivateKey().Public().Serialize()
+
+	for _, tc := range []struct {
+		name    string
+		network sparkpb.Network
+		wantErr string
+	}{
+		{
+			name:    "unspecified",
+			network: sparkpb.Network_UNSPECIFIED,
+			wantErr: "network must be specified",
+		},
+		{
+			name:    "unknown enum",
+			network: sparkpb.Network(999),
+			wantErr: "failed to convert proto network",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := handler.QueryTokenOutputs(t.Context(), &tokenpb.QueryTokenOutputsRequest{
+				OwnerPublicKeys: [][]byte{ownerPublicKey},
+				Network:         tc.network,
+			})
+
+			require.Nil(t, resp)
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
 // createTestTokenOutputs creates the specified number of token outputs with their required dependencies
 // for testing pagination functionality. Returns the created outputs.
 func createTestTokenOutputs(t *testing.T, ctx context.Context, dbClient *ent.Client, count int, ownerKey keys.Public, tokenCreate *ent.TokenCreate, rng *rand.ChaCha8) []*ent.TokenOutput {
@@ -253,6 +287,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	t.Run("filter value limits", func(t *testing.T) {
 		t.Run("owner public keys over limit", func(t *testing.T) {
 			req := &tokenpb.QueryTokenOutputsRequest{
+				Network:         sparkpb.Network_REGTEST,
 				OwnerPublicKeys: make([][]byte, MaxTokenOutputFilterValues+1),
 			}
 
@@ -263,6 +298,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 		t.Run("issuer public keys over limit", func(t *testing.T) {
 			req := &tokenpb.QueryTokenOutputsRequest{
+				Network:          sparkpb.Network_REGTEST,
 				IssuerPublicKeys: make([][]byte, MaxTokenOutputFilterValues+1),
 			}
 
@@ -273,6 +309,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 		t.Run("token identifiers over limit", func(t *testing.T) {
 			req := &tokenpb.QueryTokenOutputsRequest{
+				Network:          sparkpb.Network_REGTEST,
 				TokenIdentifiers: make([][]byte, MaxTokenOutputFilterValues+1),
 			}
 
@@ -283,6 +320,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 		t.Run("within limits succeeds", func(t *testing.T) {
 			req := &tokenpb.QueryTokenOutputsRequest{
+				Network:          sparkpb.Network_REGTEST,
 				OwnerPublicKeys:  make([][]byte, MaxTokenOutputFilterValues),
 				IssuerPublicKeys: make([][]byte, MaxTokenOutputFilterValues),
 				TokenIdentifiers: make([][]byte, MaxTokenOutputFilterValues),

@@ -28,6 +28,10 @@ func validateQueryTokenOutputsRequest(req *tokenpb.QueryTokenOutputsRequest) err
 		return errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
+	if req.GetNetwork() == sparkpb.Network_UNSPECIFIED {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
+	}
+
 	if len(req.OwnerPublicKeys) > MaxTokenOutputFilterValues {
 		return errors.InvalidArgumentOutOfRange(
 			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), MaxTokenOutputFilterValues),
@@ -69,7 +73,7 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 	if err != nil {
-		return nil, err
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to common network: %w", err))
 	}
 
 	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
