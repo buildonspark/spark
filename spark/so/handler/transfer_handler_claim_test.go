@@ -30,6 +30,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestMain(m *testing.M) {
@@ -613,4 +615,36 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.TransferStatusReceiverKeyTweakApplied, updatedTransfer.Status)
+}
+
+func TestClaimTransferSignRefundsV2RejectsNotFoundAndInvalidStatus(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{})
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	receiverIdentity := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	t.Run("missing transfer", func(t *testing.T) {
+		_, err := handler.ClaimTransferSignRefundsV2(ctx, &pb.ClaimTransferSignRefundsRequest{
+			TransferId:             uuid.New().String(),
+			OwnerIdentityPublicKey: receiverIdentity.Serialize(),
+		})
+
+		require.Error(t, err)
+		require.Equal(t, codes.NotFound, status.Code(err))
+	})
+
+	t.Run("sender key tweaked transfer", func(t *testing.T) {
+		transfer := createTestTransfer(t, ctx, rng, sessionCtx.Client, st.TransferStatusSenderKeyTweaked)
+
+		_, err := handler.ClaimTransferSignRefundsV2(ctx, &pb.ClaimTransferSignRefundsRequest{
+			TransferId:             transfer.ID.String(),
+			OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey.Serialize(),
+		})
+
+		require.Error(t, err)
+		require.Equal(t, codes.FailedPrecondition, status.Code(err))
+		require.ErrorContains(t, err, "expected to be at status")
+	})
 }
