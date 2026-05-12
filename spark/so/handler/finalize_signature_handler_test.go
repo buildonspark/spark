@@ -26,6 +26,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestNewFinalizeSignatureHandler(t *testing.T) {
@@ -93,6 +95,41 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_EmptyRequest(t *testi
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Empty(t, resp.Nodes)
+}
+
+func TestFinalizeSignatureHandler_FinalizeNodeSignaturesRejectsTooManyNodeSignaturesBeforeDB(t *testing.T) {
+	t.Parallel()
+
+	handler := NewFinalizeSignatureHandler(&so.Config{})
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: make([]*pb.NodeSignatures, maxFinalizeNodeSignatures+1),
+		Intent:         pbcommon.SignatureIntent_CREATION,
+	}
+
+	tests := []struct {
+		name string
+		call func(context.Context, *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error)
+	}{
+		{
+			name: "v1",
+			call: handler.FinalizeNodeSignatures,
+		},
+		{
+			name: "v2",
+			call: handler.FinalizeNodeSignaturesV2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resp, err := test.call(t.Context(), req)
+
+			require.Nil(t, resp)
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.ErrorContains(t, err, "too many node signatures in request")
+		})
+	}
 }
 
 func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {

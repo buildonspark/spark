@@ -35,6 +35,8 @@ type FinalizeSignatureHandler struct {
 	config *so.Config
 }
 
+const maxFinalizeNodeSignatures = MaxLeavesToSend
+
 // NewFinalizeSignatureHandler creates a new FinalizeSignatureHandler.
 func NewFinalizeSignatureHandler(config *so.Config) *FinalizeSignatureHandler {
 	return &FinalizeSignatureHandler{config: config}
@@ -54,6 +56,12 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest, requireDirectTx bool) (*pb.FinalizeNodeSignaturesResponse, error) {
 	if req.Intent == pbcommon.SignatureIntent_REFRESH || req.Intent == pbcommon.SignatureIntent_EXTEND {
 		return nil, fmt.Errorf("operation has been deprecated: %s", req.Intent)
+	}
+
+	if len(req.NodeSignatures) > maxFinalizeNodeSignatures {
+		return nil, sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many node signatures in request: got %d, max %d", len(req.NodeSignatures), maxFinalizeNodeSignatures),
+		)
 	}
 
 	if len(req.NodeSignatures) == 0 {
