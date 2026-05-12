@@ -205,6 +205,49 @@ func TestQuerySparkInvoicesReturnsTokenInvoiceStatuses(t *testing.T) {
 	require.Equal(t, pendingFinalHash, byInvoice[pendingStr].GetTokenTransfer().GetFinalTokenTransactionHash())
 }
 
+func TestQuerySparkInvoicesLimitDoesNotMisclassifyExplicitInvoiceList(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	firstStr, firstID := createTestSatsInvoice(t, ctx, tc)
+	secondStr, secondID := createTestSatsInvoice(t, ctx, tc)
+	createTransferForInvoice(t, ctx, tc, firstID, st.TransferStatusSenderKeyTweaked)
+	createTransferForInvoice(t, ctx, tc, secondID, st.TransferStatusSenderKeyTweaked)
+
+	handler := NewSparkInvoiceHandler(config)
+	resp, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Limit:   1,
+		Invoice: []string{firstStr, secondStr},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.InvoiceStatuses, 2)
+
+	byInvoice := make(map[string]sparkpb.InvoiceStatus, 2)
+	for _, invoiceStatus := range resp.InvoiceStatuses {
+		byInvoice[invoiceStatus.Invoice] = invoiceStatus.Status
+	}
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, byInvoice[firstStr])
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, byInvoice[secondStr])
+}
+
+func TestQuerySparkInvoicesRejectsOversizedExplicitInvoiceList(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	invoiceStr, _ := createTestSatsInvoice(t, ctx, tc)
+	invoices := make([]string, maxSparkInvoiceLimit+1)
+	for i := range invoices {
+		invoices[i] = invoiceStr
+	}
+
+	handler := NewSparkInvoiceHandler(config)
+	_, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: invoices,
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "too many invoice strings provided")
+}
+
 // TestQuerySparkInvoicesReturnsPendingStatusForKeyTweakPending checks the second
 // PENDING-eligible status: SenderKeyTweakPending.
 func TestQuerySparkInvoicesReturnsPendingStatusForKeyTweakPending(t *testing.T) {

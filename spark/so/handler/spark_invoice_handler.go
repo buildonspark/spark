@@ -40,13 +40,13 @@ func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *spark
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
-	limit := maxSparkInvoiceLimit
-	if req.Limit > 0 {
-		limit = min(maxSparkInvoiceLimit, int(req.Limit))
-	}
-
 	if len(req.Invoice) > 0 {
-		return h.querySparkInvoicesByRawInvoice(ctx, req, limit)
+		if len(req.Invoice) > maxSparkInvoiceLimit {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("too many invoice strings provided"))
+		}
+		// This is an explicit lookup path: the caller-provided invoice list is the
+		// response boundary, while limit/offset only apply to paginated list APIs.
+		return h.querySparkInvoicesByRawInvoice(ctx, req, len(req.Invoice))
 	}
 
 	return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice strings provided"))
