@@ -1,14 +1,18 @@
 package signing_handler
 
 import (
+	"math"
 	"testing"
 
+	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
@@ -106,6 +110,115 @@ func TestFrostSigningHandler_GenerateRandomNonces_UniqueCommitments(t *testing.T
 
 	// Verify that we have exactly the expected number of unique commitments
 	assert.Len(t, commitmentMap, count, "Should have exactly %d unique commitments", count)
+}
+
+func TestFrostSigningHandler_FrostRound1RequestBounds(t *testing.T) {
+	t.Run("nil request", func(t *testing.T) {
+		handler := NewFrostSigningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+		resp, err := handler.FrostRound1(t.Context(), nil)
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.ErrorContains(t, err, "request is required")
+	})
+
+	t.Run("derived count uses count times keyshare ids", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		handler := NewFrostSigningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+		resp, err := handler.FrostRound1(ctx, &pb.FrostRound1Request{
+			Count:       2,
+			KeyshareIds: []string{"keyshare-a", "keyshare-b"},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.GetSigningCommitments(), 4)
+	})
+
+	t.Run("random nonce count overrides derived count", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		handler := NewFrostSigningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+		resp, err := handler.FrostRound1(ctx, &pb.FrostRound1Request{
+			RandomNonceCount: 3,
+			Count:            2,
+			KeyshareIds:      []string{"keyshare-a", "keyshare-b"},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.GetSigningCommitments(), 3)
+	})
+
+	for _, tc := range []struct {
+		name string
+		req  *pb.FrostRound1Request
+	}{
+		{
+			name: "random nonce count exceeds cap",
+			req: &pb.FrostRound1Request{
+				RandomNonceCount: 1_000_001,
+			},
+		},
+		{
+			name: "derived count overflow exceeds cap",
+			req: &pb.FrostRound1Request{
+				Count:       math.MaxUint32,
+				KeyshareIds: []string{"keyshare-a", "keyshare-b"},
+			},
+		},
+		{
+			name: "derived product exceeds cap while operands are under cap",
+			req: &pb.FrostRound1Request{
+				Count:       1000,
+				KeyshareIds: make([]string, 1001),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := NewFrostSigningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+			resp, err := handler.FrostRound1(t.Context(), tc.req)
+			require.Nil(t, resp)
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.ErrorContains(t, err, "too many nonces requested")
+		})
+	}
+}
+
+func TestFrostSigningHandler_FrostRound2RejectsMalformedRequestsBeforeDB(t *testing.T) {
+	handler := NewFrostSigningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+	for _, tc := range []struct {
+		name    string
+		req     *pb.FrostRound2Request
+		wantErr string
+	}{
+		{
+			name:    "nil request",
+			req:     nil,
+			wantErr: "request is required",
+		},
+		{
+			name:    "empty signing jobs",
+			req:     &pb.FrostRound2Request{},
+			wantErr: "signing_jobs is required",
+		},
+		{
+			name: "nil signing job",
+			req: &pb.FrostRound2Request{
+				SigningJobs: []*pb.SigningJob{nil},
+			},
+			wantErr: "signing_jobs[0] is required",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := handler.FrostRound2(t.Context(), tc.req)
+			require.Nil(t, resp)
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func TestFrostSigningHandler_NewFrostSigningHandler(t *testing.T) {

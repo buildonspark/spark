@@ -19,11 +19,15 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/frost"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type FrostSigningHandler struct {
 	config *so.Config
 }
+
+const maxFrostRound1Nonces uint64 = 1_000_000
 
 func NewFrostSigningHandler(config *so.Config) *FrostSigningHandler {
 	return &FrostSigningHandler{config: config}
@@ -55,25 +59,48 @@ func (h *FrostSigningHandler) GenerateRandomNonces(ctx context.Context, count ui
 }
 
 func (h *FrostSigningHandler) FrostRound1(ctx context.Context, req *pb.FrostRound1Request) (*pb.FrostRound1Response, error) {
-	totalCount := req.RandomNonceCount
-	if req.RandomNonceCount <= 0 {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	var totalCount uint64
+	if req.RandomNonceCount > 0 {
+		totalCount = uint64(req.RandomNonceCount)
+	} else {
 		count := req.Count
 		if count == 0 {
 			count = 1
 		}
 
-		totalCount = count * uint32(len(req.KeyshareIds))
+		keyshareCount := uint64(len(req.KeyshareIds))
+		if uint64(count) > maxFrostRound1Nonces || keyshareCount > maxFrostRound1Nonces {
+			return nil, status.Error(codes.InvalidArgument, "too many nonces requested in one request, please split into multiple requests")
+		}
+
+		totalCount = uint64(count) * keyshareCount
 	}
 
-	if totalCount > 1_000_000 {
-		return nil, fmt.Errorf("too many nonces requested in one request, please split into multiple requests")
+	if totalCount > maxFrostRound1Nonces {
+		return nil, status.Error(codes.InvalidArgument, "too many nonces requested in one request, please split into multiple requests")
 	}
 
-	return h.GenerateRandomNonces(ctx, totalCount)
+	return h.GenerateRandomNonces(ctx, uint32(totalCount))
 }
 
 // FrostRound2 handles FROST signing.
 func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if len(req.GetSigningJobs()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "signing_jobs is required")
+	}
+	for i, job := range req.GetSigningJobs() {
+		if job == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "signing_jobs[%d] is required", i)
+		}
+	}
+
 	// Fetch key packages in one call.
 	keyshareIDs, err := uuids.ParseSliceFunc(req.GetSigningJobs(), (*pb.SigningJob).GetKeyshareId)
 	if err != nil {
