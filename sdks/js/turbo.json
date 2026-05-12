@@ -3,6 +3,7 @@
   "globalEnv": [
     "CONFIG_FILE",
     "GITHUB_ACTIONS",
+    "NODE_EXTRA_CA_CERTS",
     "SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION",
     "SPARK_LOCAL_INGRESS_HOST",
     "SPARK_VITE_APP_BASE",
@@ -11,7 +12,7 @@
     "VITE_SPARK_NETWORK",
     "VITE_SPARK_TARGET"
   ],
-  "globalPassThroughEnv": ["SPARK_LOCAL_INGRESS_HOST"],
+  "globalPassThroughEnv": ["NODE_EXTRA_CA_CERTS", "SPARK_LOCAL_INGRESS_HOST"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
