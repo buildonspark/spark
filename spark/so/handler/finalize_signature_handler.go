@@ -78,7 +78,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 			if err != nil {
-				return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err))
 			}
 			nodeIDs = append(nodeIDs, nodeID)
 		}
@@ -87,7 +87,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 			return nil, fmt.Errorf("failed to get nodes for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
 		if len(treeNodes) != len(nodeIDs) {
-			return nil, fmt.Errorf("not all nodes found: expected %d, got %d", len(nodeIDs), len(treeNodes))
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("not all nodes found: expected %d, got %d", len(nodeIDs), len(treeNodes)))
 		}
 		nodeTree = treeNodes[0].Edges.Tree
 		if nodeTree == nil {
@@ -103,10 +103,13 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 			for _, nodeSignatures := range req.NodeSignatures {
 				nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 				if err != nil {
-					return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+					return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err))
 				}
 				node, err := db.TreeNode.Get(ctx, nodeID)
 				if err != nil {
+					if ent.IsNotFound(err) {
+						return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err))
+					}
 					return nil, fmt.Errorf("failed to get node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 				}
 				signingKeyshare, err := node.QuerySigningKeyshare().Only(ctx)
@@ -381,7 +384,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 
 	nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid node id in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 	}
 
 	// Read the tree node
@@ -392,10 +395,13 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		WithSigningKeyshare().
 		Only(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+		}
 		return nil, nil, fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 	if node == nil {
-		return nil, nil, fmt.Errorf("node not found in %s", logging.FormatProto("node_signatures", nodeSignatures))
+		return nil, nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("node not found in %s", logging.FormatProto("node_signatures", nodeSignatures)))
 	}
 
 	signingKeyshare := node.Edges.SigningKeyshare
@@ -424,15 +430,15 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if intent == pbcommon.SignatureIntent_CREATION {
 		cpfpNodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to update cpfp tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update cpfp tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 		}
 		if len(node.DirectTx) > 0 && len(nodeSignatures.DirectNodeTxSignature) > 0 {
 			directNodeTxBytes, err = common.UpdateTxWithSignature(node.DirectTx, 0, nodeSignatures.DirectNodeTxSignature)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to update direct tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update direct tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
 		} else if len(nodeSignatures.DirectNodeTxSignature) == 0 && requireDirectTx && len(node.DirectTx) > 0 {
-			return nil, nil, fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version")
+			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version"))
 		}
 		// Node may not have parent if it is the root node
 		nodeParent := node.Edges.Parent
@@ -456,7 +462,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			}
 			err = common.VerifySignatureSingleInput(cpfpTreeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to verify node tx signature: %w", err)
+				return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
 			}
 			if len(directNodeTxBytes) > 0 {
 				directTreeNodeTx, err := common.TxFromRawTxBytes(directNodeTxBytes)
@@ -465,7 +471,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 				}
 				err = common.VerifySignatureSingleInput(directTreeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 				if err != nil {
-					return nil, nil, fmt.Errorf("unable to verify node tx signature: %w", err)
+					return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
 				}
 			}
 
@@ -480,7 +486,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if len(nodeSignatures.RefundTxSignature) > 0 {
 		cpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.RefundTxSignature)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 		}
 
 		cpfpRefundTx, err := common.TxFromRawTxBytes(cpfpRefundTxBytes)
@@ -496,12 +502,12 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		}
 		err = common.VerifySignatureSingleInput(cpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to verify cpfprefund tx signature: %w", err)
+			return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify cpfprefund tx signature: %w", err))
 		}
 		if len(nodeSignatures.DirectRefundTxSignature) > 0 {
 			directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.DirectRefundTxSignature)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
 			directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
 			if err != nil {
@@ -516,7 +522,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			}
 			err = common.VerifySignatureSingleInput(directRefundTx, 0, directTreeNodeTx.TxOut[0])
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to verify direct refund tx signature: %w", err)
+				return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify direct refund tx signature: %w", err))
 			}
 		} else if requireDirectTx && len(node.DirectTx) > 0 {
 			isZeroNode, err := bitcointransaction.IsZeroNode(node)
@@ -525,13 +531,13 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			}
 
 			if !isZeroNode {
-				return nil, nil, fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version")
+				return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version"))
 			}
 		}
 		if len(nodeSignatures.DirectFromCpfpRefundTxSignature) > 0 {
 			directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.DirectFromCpfpRefundTxSignature)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
 			directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
 			if err != nil {
@@ -539,11 +545,11 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			}
 			err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
+				return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err))
 			}
 		} else if requireDirectTx {
 			if len(node.DirectTx) > 0 {
-				return nil, nil, fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version")
+				return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version"))
 			}
 		}
 	} else {
