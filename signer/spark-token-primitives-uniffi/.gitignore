@@ -1,0 +1,7 @@
+# Swift
+spark-token-primitives-swift/spark_token_primitivesFFI.xcframework/*/spark_token_primitivesFFI.framework/*
+spark-token-primitives-swift/spark_token_primitivesFFI.xcframework/*/spark_token_primitivesFFI.framework/Headers/*
+!spark-token-primitives-swift/spark_token_primitivesFFI.xcframework/*/spark_token_primitivesFFI.framework/Headers
+!spark-token-primitives-swift/spark_token_primitivesFFI.xcframework/*/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h
+!spark-token-primitives-swift/spark_token_primitivesFFI.xcframework/*/spark_token_primitivesFFI.framework/Modules
+!spark-token-primitives-swift/spark_token_primitivesFFI.xcframework/*/spark_token_primitivesFFI.framework/Modules/module.modulemap

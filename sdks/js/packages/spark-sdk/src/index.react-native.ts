@@ -6,6 +6,8 @@ import { Platform } from "react-native";
 import { setReactNativeEnvDetails } from "./constants.js";
 import { setSparkFrostOnce } from "./spark-bindings/spark-bindings.js";
 import { SparkFrost } from "./spark-bindings/spark-bindings.react-native.js";
+import { setSparkTokenPrimitivesOnce } from "./token-primitives-bindings/token-primitives-bindings.js";
+import { SparkTokenPrimitives } from "./token-primitives-bindings/token-primitives-bindings.react-native.js";
 import { setCrypto } from "./utils/crypto.js";
 
 const rv = Platform.constants?.reactNativeVersion;
@@ -19,6 +21,7 @@ if (rv) {
 
 setCrypto(globalThis.crypto);
 setSparkFrostOnce(new SparkFrost());
+setSparkTokenPrimitivesOnce(new SparkTokenPrimitives());
 
 export * from "./index-shared.js";
 

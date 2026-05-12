@@ -20,7 +20,7 @@ Pod::Spec.new do |s|
   s.source_files = "ios/*.{h,m,mm,swift}"
   s.dependency "React"
   s.dependency "React-Core" # Or "React-CoreModules" depending on RN version and setup
-  s.vendored_frameworks = "ios/spark_frostFFI.xcframework"
+  s.vendored_frameworks = ["ios/spark_frostFFI.xcframework", "ios/spark_token_primitivesFFI.xcframework"]
 
   s.swift_version = "5.0"
   

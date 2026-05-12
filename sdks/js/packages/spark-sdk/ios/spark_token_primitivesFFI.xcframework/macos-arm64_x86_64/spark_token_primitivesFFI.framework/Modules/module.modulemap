@@ -1,0 +1,6 @@
+framework module spark_token_primitivesFFI {
+  umbrella header "spark_token_primitivesFFI-umbrella.h"
+
+  export *
+  module * { export * }
+}

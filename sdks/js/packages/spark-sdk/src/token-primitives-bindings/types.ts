@@ -22,6 +22,7 @@ export interface TransferBuildRequestBindingParams {
   clientCreatedTimestampUnixMicros: number;
   withdrawBondSats: number;
   withdrawRelativeBlockLocktime: number;
+  executeBeforeUnixMicros?: number;
 }
 
 export interface PartialTransferBuildResultBinding {
