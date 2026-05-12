@@ -29,6 +29,37 @@ import (
 
 var testTransferID = uuid.Must(uuid.Parse("550e8400-e29b-41d4-a716-446655440000"))
 
+func TestInitiateStaticDepositUtxoRefundRejectsMalformedDirectRequests(t *testing.T) {
+	ctx := t.Context()
+	cfg := &so.Config{}
+	handler := NewStaticDepositHandler(cfg)
+
+	tests := []struct {
+		name    string
+		req     *pb.InitiateStaticDepositUtxoRefundRequest
+		wantErr string
+	}{
+		{
+			name:    "nil request",
+			req:     nil,
+			wantErr: "request is required",
+		},
+		{
+			name:    "nil on-chain UTXO",
+			req:     &pb.InitiateStaticDepositUtxoRefundRequest{},
+			wantErr: "on_chain_utxo is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, tt.req)
+			require.Nil(t, resp)
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
 func createVersion3ParentTx(t *testing.T, receiverPubKey keys.Public, amount int64, vout uint32) ([]byte, chainhash.Hash) {
 	tx := wire.NewMsgTx(3)
 

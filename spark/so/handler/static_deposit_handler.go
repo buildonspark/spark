@@ -310,6 +310,9 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 
 	logger := logging.GetLoggerFromContext(ctx)
 
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	if req.OnChainUtxo == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}

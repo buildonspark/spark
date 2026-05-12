@@ -98,6 +98,10 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 	ctx, span := tracer.Start(ctx, "DepositHandler.GenerateDepositAddress")
 	defer span.End()
 
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	if req.GetIsStatic() {
 		res, err := o.GenerateStaticDepositAddress(ctx, config, &pb.GenerateStaticDepositAddressRequest{
 			IdentityPublicKey: req.IdentityPublicKey,
@@ -296,6 +300,10 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateStaticDepositAddressRequest) (*pb.GenerateStaticDepositAddressResponse, error) {
 	ctx, span := tracer.Start(ctx, "DepositHandler.GenerateStaticDepositAddress")
 	defer span.End()
+
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 
 	network, err := btcnetwork.FromProtoNetwork(req.Network)
 	if err != nil {
@@ -836,6 +844,13 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *so.Config, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
 	ctx, span := tracer.Start(ctx, "DepositHandler.StartDepositTreeCreation")
 	defer span.End()
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.OnChainUtxo == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+
 	reqIDPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
@@ -1575,6 +1590,13 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 }
 
 func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxosForAddressRequest) (*pb.GetUtxosForAddressResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.Offset > uint64(int(^uint(0)>>1)) {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("offset too large: %d", req.Offset))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)

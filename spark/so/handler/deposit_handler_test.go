@@ -447,6 +447,83 @@ func TestResolveConfirmationThreshold(t *testing.T) {
 	})
 }
 
+func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
+	ctx := t.Context()
+	cfg := &so.Config{}
+	handler := NewDepositHandler(cfg)
+
+	tests := []struct {
+		name    string
+		call    func() error
+		wantErr string
+	}{
+		{
+			name: "GenerateDepositAddress nil request",
+			call: func() error {
+				_, err := handler.GenerateDepositAddress(ctx, cfg, nil)
+				return err
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "GenerateDepositAddressInternal nil request",
+			call: func() error {
+				_, err := handler.GenerateDepositAddressInternal(ctx, cfg, nil)
+				return err
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "GenerateStaticDepositAddress nil request",
+			call: func() error {
+				_, err := handler.GenerateStaticDepositAddress(ctx, cfg, nil)
+				return err
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "StartDepositTreeCreation nil request",
+			call: func() error {
+				_, err := handler.StartDepositTreeCreation(ctx, cfg, nil)
+				return err
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "StartDepositTreeCreation nil on-chain UTXO",
+			call: func() error {
+				_, err := handler.StartDepositTreeCreation(ctx, cfg, &pb.StartDepositTreeCreationRequest{})
+				return err
+			},
+			wantErr: "on_chain_utxo is required",
+		},
+		{
+			name: "GetUtxosForAddress nil request",
+			call: func() error {
+				_, err := handler.GetUtxosForAddress(ctx, nil)
+				return err
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "GetUtxosForAddress offset overflow",
+			call: func() error {
+				_, err := handler.GetUtxosForAddress(ctx, &pb.GetUtxosForAddressRequest{
+					Offset: uint64(int(^uint(0)>>1)) + 1,
+				})
+				return err
+			},
+			wantErr: "offset too large",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.ErrorContains(t, tt.call(), tt.wantErr)
+		})
+	}
+}
+
 func TestGenerateDepositAddress(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
