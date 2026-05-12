@@ -5,18 +5,22 @@ import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 async function autoclaimStaticDeposit(mnemonicInit, transactionId) {
   const options = getExampleWalletOptions(process.env, "REGTEST");
-  let { wallet } = await SparkWallet.initialize({
-    mnemonicOrSeed: mnemonicInit,
-    options,
-  });
-  const quote = await wallet.getClaimStaticDepositQuote(transactionId);
-  const claimResult = await wallet.claimStaticDeposit({
-    transactionId,
-    creditAmountSats: quote.creditAmountSats,
-    sspSignature: quote.signature,
-  });
-  await wallet.cleanupConnections();
-  return claimResult;
+  let wallet;
+  try {
+    const initialized = await SparkWallet.initialize({
+      mnemonicOrSeed: mnemonicInit,
+      options,
+    });
+    wallet = initialized.wallet;
+    const quote = await wallet.getClaimStaticDepositQuote(transactionId);
+    return await wallet.claimStaticDeposit({
+      transactionId,
+      creditAmountSats: quote.creditAmountSats,
+      sspSignature: quote.signature,
+    });
+  } finally {
+    await wallet?.cleanupConnections();
+  }
 }
 
 const args = process.argv.slice(2);
