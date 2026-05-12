@@ -33,6 +33,10 @@ func NewTreeQueryHandler(config *so.Config) *TreeQueryHandler {
 
 // QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
 func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest, isSSP bool) (*pb.QueryNodesResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -164,6 +168,10 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 }
 
 func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -277,6 +285,10 @@ func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*
 }
 
 func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, errors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get or create current tx for request: %w", err))
@@ -365,6 +377,10 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 }
 
 func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req *pb.QueryStaticDepositAddressesRequest) (*pb.QueryStaticDepositAddressesResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)

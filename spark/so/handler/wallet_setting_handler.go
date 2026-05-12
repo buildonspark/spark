@@ -34,6 +34,9 @@ func NewWalletSettingHandler(config *so.Config) *WalletSettingHandler {
 
 func (h *WalletSettingHandler) UpdateWalletSetting(ctx context.Context, request *pb.UpdateWalletSettingRequest) (*pb.UpdateWalletSettingResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
 
 	// Get session and identity public key
 	session, err := authn.GetSessionFromContext(ctx)

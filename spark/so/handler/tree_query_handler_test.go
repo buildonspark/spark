@@ -23,6 +23,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestTreeQueryHandlersRejectNilRequests(t *testing.T) {
+	handler := NewTreeQueryHandler(&so.Config{})
+
+	t.Run("QueryNodes", func(t *testing.T) {
+		resp, err := handler.QueryNodes(t.Context(), nil, false)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "request is required")
+	})
+
+	t.Run("QueryBalance", func(t *testing.T) {
+		resp, err := handler.QueryBalance(t.Context(), nil)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "request is required")
+	})
+
+	t.Run("QueryUnusedDepositAddresses", func(t *testing.T) {
+		resp, err := handler.QueryUnusedDepositAddresses(t.Context(), nil)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "request is required")
+	})
+
+	t.Run("QueryStaticDepositAddresses", func(t *testing.T) {
+		resp, err := handler.QueryStaticDepositAddresses(t.Context(), nil)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "request is required")
+	})
+}
+
 func TestQueryStaticDepositAddresses(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)

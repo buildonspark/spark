@@ -33,6 +33,37 @@ func createTestHandler() *TreeCreationHandler {
 	return NewTreeCreationHandler(config)
 }
 
+func TestCreateTreeRejectsNilRequests(t *testing.T) {
+	ctx := t.Context()
+	handler := createTestHandler()
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "CreateTree",
+			call: func() error {
+				_, err := handler.CreateTree(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "CreateTreeV2",
+			call: func() error {
+				_, err := handler.CreateTreeV2(ctx, nil)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.ErrorContains(t, tt.call(), "request is required")
+		})
+	}
+}
+
 func createTestTx() *wire.MsgTx {
 	tx := wire.NewMsgTx(wire.TxVersion)
 	// Add a proper input

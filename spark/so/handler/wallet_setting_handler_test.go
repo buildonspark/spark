@@ -140,6 +140,16 @@ func TestUpdateWalletSetting_NoFieldsProvided(t *testing.T) {
 	assert.Contains(t, grpcErr.Message(), "at least one field must be provided for update")
 }
 
+func TestUpdateWalletSetting_NilRequest(t *testing.T) {
+	walletSettingHandler := handler.NewWalletSettingHandler(&so.Config{})
+
+	resp, err := walletSettingHandler.UpdateWalletSetting(t.Context(), nil)
+
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "request is required")
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
 func TestUpdateWalletSetting_NoSession(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)

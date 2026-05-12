@@ -804,6 +804,10 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 
 // createTree creates a tree from user input and signs the transactions in the tree.
 func (h *TreeCreationHandler) createTree(ctx context.Context, req *pb.CreateTreeRequest, requireDirectTx bool) (*pb.CreateTreeResponse, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	reqUserIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
