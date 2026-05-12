@@ -85,6 +85,68 @@ func TestStartTokenTransaction_DuplicateV3StartedDifferentCoordinatorRejects(t *
 	require.Equal(t, codes.AlreadyExists, sts.Code())
 }
 
+// TestStartTokenTransaction_DuplicateV3StartedSameCoordinatorReturnsRegeneratedResponse
+// covers the success branch through regenerateStartResponseForDuplicateRequest. A retry
+// for an already-started transaction with the same coordinator must replay the original
+// response with valid KeyshareInfo. This pins the application-boundary contract that the
+// nil-check fix preserves: when getStartTokenTransactionKeyshareInfo succeeds, the
+// response surfaces a populated KeyshareInfo to the caller.
+func TestStartTokenTransaction_DuplicateV3StartedSameCoordinatorReturnsRegeneratedResponse(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	f := entfixtures.New(t, ctx, dbClient)
+	tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+
+	issuerPubKey := tokenCreate.IssuerPublicKey
+	clientCreated := utils.ToMicrosecondPrecision(time.Now().UTC())
+	validity := uint64(60)
+
+	partial := buildV3CreateTransactionProto(
+		t,
+		cfg,
+		tokenCreate,
+		issuerPubKey,
+		validity,
+		clientCreated,
+	)
+
+	partialHash, err := utils.HashTokenTransaction(partial, true)
+	require.NoError(t, err)
+
+	ownerSigs := []*tokenpb.SignatureWithIndex{
+		{Signature: []byte{1}, InputIndex: 0},
+	}
+
+	entexample.NewTokenTransactionExample(t, dbClient).
+		SetPartialTokenTransactionHash(partialHash).
+		SetFinalizedTokenTransactionHash(partialHash).
+		SetStatus(st.TokenTransactionStatusStarted).
+		SetCoordinatorPublicKey(cfg.IdentityPublicKey()).
+		SetClientCreatedTimestamp(clientCreated).
+		SetValidityDurationSeconds(validity).
+		SetCreate(tokenCreate).
+		MustExec(ctx)
+
+	handler := NewStartTokenTransactionHandler(cfg)
+
+	resp, err := handler.StartTokenTransaction(ctx, &tokenpb.StartTransactionRequest{
+		PartialTokenTransaction:                partial,
+		PartialTokenTransactionOwnerSignatures: ownerSigs,
+		IdentityPublicKey:                      cfg.IdentityPublicKey().Serialize(),
+		ValidityDurationSeconds:                validity,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.FinalTokenTransaction)
+	require.NotNil(t, resp.KeyshareInfo)
+	require.NotEmpty(t, resp.KeyshareInfo.OwnerIdentifiers)
+	require.Equal(t, uint32(cfg.Threshold), resp.KeyshareInfo.Threshold)
+}
+
 func TestStartTokenTransaction_DuplicateV3SignedSameCoordinatorRejects(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	ctx, _ := db.ConnectToTestPostgres(t)

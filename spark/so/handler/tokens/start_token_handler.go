@@ -159,7 +159,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	}
 
 	keyshareInfo, err := getStartTokenTransactionKeyshareInfo(h.config)
-	if keyshareInfo == nil {
+	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetKeyshareInfo, req.PartialTokenTransaction, err)
 	}
 
@@ -248,7 +248,7 @@ func (h *StartTokenTransactionHandler) regenerateStartResponseForDuplicateReques
 	}
 
 	keyshareInfo, err := getStartTokenTransactionKeyshareInfo(h.config)
-	if keyshareInfo == nil {
+	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareInfo, tokenTransaction, err)
 	}
 
