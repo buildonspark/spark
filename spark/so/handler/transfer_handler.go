@@ -1953,7 +1953,14 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		)
 	}()
 
-	if filter.GetParticipant() == nil && len(filter.TransferIds) == 0 {
+	if filter.GetLimit() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
+	}
+	if filter.GetOffset() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
+	}
+
+	if filter.GetParticipant() == nil && len(filter.GetTransferIds()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "must specify either filter.Participant or filter.TransferIds")
 	}
 

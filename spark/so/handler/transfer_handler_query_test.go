@@ -190,6 +190,55 @@ func TestQueryTransfers_NotSSP_NoSession(t *testing.T) {
 	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when no access")
 }
 
+func TestQueryTransfersRejectsMalformedPagination(t *testing.T) {
+	ctx := t.Context()
+	handler := NewTransferHandler(&so.Config{})
+
+	validFilter := func() *pb.TransferFilter {
+		return &pb.TransferFilter{
+			Participant: &pb.TransferFilter_SenderIdentityPublicKey{
+				SenderIdentityPublicKey: []byte{1},
+			},
+			Network: pb.Network_REGTEST,
+			Limit:   10,
+			Offset:  0,
+		}
+	}
+
+	t.Run("nil filter uses existing selector validation", func(t *testing.T) {
+		resp, err := handler.QueryAllTransfers(ctx, nil, false)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "must specify either filter.Participant or filter.TransferIds")
+	})
+
+	t.Run("negative limit", func(t *testing.T) {
+		filter := validFilter()
+		filter.Limit = -1
+
+		resp, err := handler.QueryAllTransfers(ctx, filter, false)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "limit must be non-negative")
+	})
+
+	t.Run("negative offset", func(t *testing.T) {
+		filter := validFilter()
+		filter.Offset = -1
+
+		resp, err := handler.QueryAllTransfers(ctx, filter, false)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "offset must be non-negative")
+	})
+
+	t.Run("pending transfers negative limit", func(t *testing.T) {
+		filter := validFilter()
+		filter.Limit = -1
+
+		resp, err := handler.QueryPendingTransfers(ctx, filter)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "limit must be non-negative")
+	})
+}
+
 // Helper function to create test context with authz enabled
 func createTestContextForTransferQuery(t *testing.T) (context.Context, *so.Config) {
 	ctx, _ := db.NewTestSQLiteContext(t)
