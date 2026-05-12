@@ -461,6 +461,9 @@ func (h *BaseTransferHandler) createTransfer(
 		if primaryTransfer.ExpiryTime.Before(time.Now().Add(PrimaryTransferExpiryTimeSafetyBuffer)) {
 			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or is about to expire (within safety buffer of %v), expiry time is %s", primaryTransferId.String(), PrimaryTransferExpiryTimeSafetyBuffer, primaryTransfer.ExpiryTime.String())
 		}
+		if primaryTransfer.Network != network {
+			return nil, nil, fmt.Errorf("primary swap transfer %s network %s does not match counter transfer network %s", primaryTransferId.String(), primaryTransfer.Network, network)
+		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 		// The counter transfer amount should be the same as the primary transfer amount until we implement fees. Then we should probably validate a statement from the user that they accepted the fees.
 		counterTransferAmount := getTotalTransferValue(leaves)
