@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
 
 	"github.com/lightsparkdev/spark/so/ent"
@@ -45,6 +46,11 @@ func decodeGetUtxosForIdentityCursor(cursor string) (*getUtxosForIdentityCursor,
 	txidBytes, err := hex.DecodeString(payload.Txid)
 	if err != nil {
 		return nil, nil, uuid.Nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor txid: %w", err))
+	}
+	if len(txidBytes) != chainhash.HashSize {
+		return nil, nil, uuid.Nil, errors.InvalidArgumentMalformedField(
+			fmt.Errorf("invalid cursor txid length: got %d, expected %d", len(txidBytes), chainhash.HashSize),
+		)
 	}
 
 	utxoID, err := uuid.Parse(payload.ID)

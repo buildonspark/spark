@@ -1724,10 +1724,18 @@ func TestGetUtxosForIdentity(t *testing.T) {
 		nonStaticDepositAddress := newAddress(nonStaticAddress, ownerIdentityPubKey, false, false)
 		otherIdentityDepositAddress := newAddress(otherIdentityAddress, otherIdentityPubKey, true, true)
 
-		createUtxo := func(addr *ent.DepositAddress, txid string, vout uint32, blockHeight int64) *ent.Utxo {
+		testTxid := func(fill byte) []byte {
+			txid := make([]byte, 32)
+			for i := range txid {
+				txid[i] = fill
+			}
+			return txid
+		}
+
+		createUtxo := func(addr *ent.DepositAddress, txid []byte, vout uint32, blockHeight int64) *ent.Utxo {
 			utxo, createErr := tx.Utxo.Create().
 				SetNetwork(btcnetwork.Regtest).
-				SetTxid([]byte(txid)).
+				SetTxid(txid).
 				SetVout(vout).
 				SetBlockHeight(blockHeight).
 				SetAmount(1000).
@@ -1749,15 +1757,15 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			require.NoError(t, createErr)
 		}
 
-		confirmedUtxo := createUtxo(depositAddress1, "confirmed_txid_1", 0, 100)
-		claimedConfirmedUtxo := createUtxo(depositAddress1, "claimed_confirmed_txid", 1, 101)
-		cancelledSwapUtxo := createUtxo(depositAddress2, "cancelled_swap_txid", 2, 102)
-		pendingUtxo := createUtxo(depositAddress2, "pending_txid", 3, 199)
-		pendingClaimedUtxo := createUtxo(depositAddress1, "pending_claimed_txid", 4, 200)
-		thresholdConfirmedUtxo := createUtxo(depositAddress3, "threshold_confirmed_txid", 5, 198)
-		oneConfUtxo := createUtxo(depositAddress2, "one_conf_txid", 6, 200)
-		_ = createUtxo(nonStaticDepositAddress, "non_static_txid", 7, 103)
-		otherIdentityUtxo := createUtxo(otherIdentityDepositAddress, "other_identity_txid", 8, 150)
+		confirmedUtxo := createUtxo(depositAddress1, testTxid(0x01), 0, 100)
+		claimedConfirmedUtxo := createUtxo(depositAddress1, testTxid(0x02), 1, 101)
+		cancelledSwapUtxo := createUtxo(depositAddress2, testTxid(0x03), 2, 102)
+		pendingUtxo := createUtxo(depositAddress2, testTxid(0x04), 3, 199)
+		pendingClaimedUtxo := createUtxo(depositAddress1, testTxid(0x07), 4, 200)
+		thresholdConfirmedUtxo := createUtxo(depositAddress3, testTxid(0x06), 5, 198)
+		oneConfUtxo := createUtxo(depositAddress2, testTxid(0x05), 6, 200)
+		_ = createUtxo(nonStaticDepositAddress, testTxid(0x08), 7, 103)
+		otherIdentityUtxo := createUtxo(otherIdentityDepositAddress, testTxid(0x09), 8, 150)
 
 		createSwap(claimedConfirmedUtxo, st.UtxoSwapStatusCreated)
 		createSwap(cancelledSwapUtxo, st.UtxoSwapStatusCancelled)
