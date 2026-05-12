@@ -72,6 +72,20 @@ func TestQueryTransfers_SSP_WithSenderFilter(t *testing.T) {
 	assert.NotNil(t, resp, "Response should not be nil")
 }
 
+func TestQueryTransfersRejectsTooManyTransferIDsBeforeParsing(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	filter := &pb.TransferFilter{
+		TransferIds: make([]string, maxTransferIDFilterValues+1),
+		Network:     pb.Network_REGTEST,
+	}
+
+	resp, err := NewTransferHandler(cfg).queryTransfers(ctx, filter, false, false)
+
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "transfer ids provided")
+}
+
 func TestQueryTransfers_NotSSP_RequiresAuthz(t *testing.T) {
 	// Test that non-SSP queries require authentication and match participant
 	ctx, cfg := createTestContextForTransferQuery(t)

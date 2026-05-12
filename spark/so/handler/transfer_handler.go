@@ -2168,6 +2168,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 
 	if len(filter.TransferIds) > 0 {
+		if len(filter.TransferIds) > maxTransferIDFilterValues {
+			return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("there were %d transfer ids provided, but the max is %d", len(filter.TransferIds), maxTransferIDFilterValues))
+		}
 		transferUUIDs, err := uuids.ParseSlice(filter.GetTransferIds())
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", err)
@@ -2630,6 +2633,10 @@ const CoopExitConfirmationThreshold = 6
 // QueryAllTransfers responses. Mirrors the maxTokenTransactionPageSize
 // pattern in so/handler/tokens.
 const maxTransferPageSize = 100
+
+// maxTransferIDFilterValues caps caller-provided transfer ID filters before
+// UUID parsing and SQL IN predicate construction.
+const maxTransferIDFilterValues = 1000
 
 // maxMIMOTransferIDs caps the number of transfer IDs fetched from
 // TransferSender/TransferReceiver to stay within PostgreSQL's bind
