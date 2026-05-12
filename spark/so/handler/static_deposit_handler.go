@@ -520,12 +520,12 @@ func validateStaticDepositRefundTx(targetUtxo *VerifiedTargetUtxo, rawTx []byte)
 	}
 
 	if len(rawTx) == 0 {
-		return fmt.Errorf("refund transaction is empty")
+		return errors.InvalidArgumentMissingField(fmt.Errorf("refund transaction is empty"))
 	}
 
 	refundTx, err := common.TxFromRawTxBytes(rawTx)
 	if err != nil {
-		return fmt.Errorf("failed to parse refund transaction: %w", err)
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse refund transaction: %w", err))
 	}
 
 	// Create refund transaction internally using user provided outputs
@@ -548,7 +548,7 @@ func validateStaticDepositRefundTx(targetUtxo *VerifiedTargetUtxo, rawTx []byte)
 	}
 	expectedTxBytes := buf.Bytes()
 	if !bytes.Equal(expectedTxBytes, rawTx) {
-		return fmt.Errorf("unexpected refund transaction structure: expected %x, got %x", expectedTxBytes, rawTx)
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("unexpected refund transaction structure: expected %x, got %x", expectedTxBytes, rawTx))
 	}
 
 	return nil
