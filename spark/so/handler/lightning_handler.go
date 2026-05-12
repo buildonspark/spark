@@ -2057,6 +2057,9 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbsp
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	if len(req.PaymentHash) != sha256.Size {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("payment hash must be %d bytes", sha256.Size))
+	}
 	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)

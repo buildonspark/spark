@@ -9,13 +9,13 @@ test-unit = """
   GOFLAGS="-tags=lightspark" \
   gotestsum \
     --format testname \
-    $(go list -tags=lightspark ./... | grep -v -E 'so/grpc_test|so/grpc_test_internal|so/tree') \
+    $(go list -tags=lightspark ./... | grep -v -E 'so/grpc_test|so/grpc_test_internal|so/tree|so/security_test') \
 """
 test-unit-oss = """
   GRIPMOCK=true \
   gotestsum \
     --format testname \
-    $(go list ./... | grep -v -E 'so/grpc_test|so/grpc_test_internal|so/tree')
+    $(go list ./... | grep -v -E 'so/grpc_test|so/grpc_test_internal|so/tree|so/security_test')
 """
 test-grpc = """
   gotestsum \
