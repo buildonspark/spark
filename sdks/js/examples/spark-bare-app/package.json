@@ -11,6 +11,7 @@
     "auto-claim-static-deposit": "node ./scripts/run-script.mjs auto-claim-static-deposit",
     "create-lightning-invoice": "node ./scripts/run-script.mjs create-lightning-invoice",
     "transfer": "node ./scripts/run-script.mjs transfer",
+    "repro:agent-suspend-balance": "node ./scripts/run-script.mjs repro-agent-suspend-balance",
     "run": "node ./scripts/run-script.mjs",
     "run:local": "cross-env NODE_ENV=development NETWORK=LOCAL ../../scripts/with-local-routing.sh node ./scripts/run-script.mjs",
     "run:mainnet": "cross-env NODE_ENV=production NETWORK=MAINNET node ./scripts/run-script.mjs",
@@ -21,6 +22,8 @@
     "@buildonspark/bare": "0.0.68",
     "@buildonspark/spark-sdk": "0.8.0",
     "bare": "^1.28.4",
+    "bare-http1": "^4.5.2",
+    "bare-https": "^3.0.0",
     "bare-runtime": "^1.28.4"
   },
   "devDependencies": {

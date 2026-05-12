@@ -7,6 +7,7 @@ const VALID_SCRIPTS = new Set([
   "create-lightning-invoice",
   "get-static-deposit-address",
   "get-or-create-wallet",
+  "repro-agent-suspend-balance",
   "transfer",
 ]);
 
