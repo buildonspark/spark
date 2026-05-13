@@ -12,7 +12,10 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
+
+const MaxTokenMetadataFilterValues = MaxTokenOutputFilterValues
 
 type QueryTokenMetadataHandler struct {
 	config *so.Config
@@ -25,16 +28,41 @@ func NewQueryTokenMetadataHandler(config *so.Config) *QueryTokenMetadataHandler 
 	}
 }
 
+func validateQueryTokenMetadataRequest(req *tokenpb.QueryTokenMetadataRequest) error {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
+	if len(req.TokenIdentifiers) == 0 && len(req.IssuerPublicKeys) == 0 {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("must provide at least one token identifier or issuer public key"))
+	}
+
+	if len(req.TokenIdentifiers) > MaxTokenMetadataFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), MaxTokenMetadataFilterValues),
+		)
+	}
+
+	if len(req.IssuerPublicKeys) > MaxTokenMetadataFilterValues {
+		return sparkerrors.InvalidArgumentOutOfRange(
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), MaxTokenMetadataFilterValues),
+		)
+	}
+
+	return nil
+}
+
 func (h *QueryTokenMetadataHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb.QueryTokenMetadataRequest) (*tokenpb.QueryTokenMetadataResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "QueryTokenMetadataHandler.QueryTokenMetadata")
 	defer span.End()
+
+	if err := validateQueryTokenMetadataRequest(req); err != nil {
+		return nil, err
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-
-	if len(req.TokenIdentifiers) == 0 && len(req.GetIssuerPublicKeys()) == 0 {
-		return nil, fmt.Errorf("must provide at least one token identifier or issuer public key")
 	}
 
 	fields := []string{
@@ -54,7 +82,7 @@ func (h *QueryTokenMetadataHandler) QueryTokenMetadata(ctx context.Context, req 
 		conditions = append(conditions, tokencreate.TokenIdentifierIn(req.TokenIdentifiers...))
 	}
 
-	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
+	issuerPubKeys, err := keys.ParsePublicKeys(req.IssuerPublicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
 	}
