@@ -603,6 +603,23 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			// Purge terminal (COMMITTED / ROLLED_BACK) FlowExecution rows older
+			// than the TTL below. Runs weekly. IN_FLIGHT rows are never
+			// purged — the reconcile/sweep tasks above are responsible for
+			// transitioning them, and a row that's been stuck IN_FLIGHT for
+			// longer than the TTL is a bug we want to investigate, not silently
+			// drop.
+			ExecutionInterval: 7 * 24 * time.Hour,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "purge_terminal_flow_executions",
+				Timeout:      &purgeTerminalFlowExecutionsTimeout,
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return PurgeTerminalFlowExecutions(ctx, purgeTerminalFlowExecutionsTTL, purgeTerminalFlowExecutionsBatchSize)
+				},
+			},
+		},
+		{
 			ExecutionInterval: 1 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "complete_utxo_swap",
