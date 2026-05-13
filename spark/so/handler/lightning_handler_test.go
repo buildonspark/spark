@@ -311,6 +311,126 @@ func TestQueryHTLCRejectsFilterResourceExhaustionBeforeDB(t *testing.T) {
 	}
 }
 
+func TestQueryHTLCRejectsMalformedRequestFieldsWithInvalidArgument(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+	identityKey := keys.GeneratePrivateKey().Public().Serialize()
+
+	base := func() *pb.QueryHtlcRequest {
+		return &pb.QueryHtlcRequest{
+			IdentityPublicKey: identityKey,
+			Limit:             10,
+			Offset:            0,
+		}
+	}
+
+	tests := []struct {
+		name string
+		req  *pb.QueryHtlcRequest
+	}{
+		{
+			name: "missing identity public key",
+			req: &pb.QueryHtlcRequest{
+				Limit: 1,
+			},
+		},
+		{
+			name: "zero limit",
+			req: func() *pb.QueryHtlcRequest {
+				req := base()
+				req.Limit = 0
+				return req
+			}(),
+		},
+		{
+			name: "negative limit",
+			req: func() *pb.QueryHtlcRequest {
+				req := base()
+				req.Limit = -1
+				return req
+			}(),
+		},
+		{
+			name: "negative offset",
+			req: func() *pb.QueryHtlcRequest {
+				req := base()
+				req.Offset = -1
+				return req
+			}(),
+		},
+		{
+			name: "malformed identity public key",
+			req: func() *pb.QueryHtlcRequest {
+				req := base()
+				req.IdentityPublicKey = []byte{0x02, 0x01}
+				return req
+			}(),
+		},
+		{
+			name: "malformed transfer id",
+			req: func() *pb.QueryHtlcRequest {
+				req := base()
+				req.TransferIds = []string{"not-a-uuid"}
+				return req
+			}(),
+		},
+		{
+			name: "invalid status",
+			req: func() *pb.QueryHtlcRequest {
+				req := base()
+				badStatus := pb.PreimageRequestStatus(999)
+				req.Status = &badStatus
+				return req
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := handler.QueryHTLC(ctx, tt.req)
+			require.Nil(t, resp)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}
+
+func TestQueryUserSignedRefundsRejectsMalformedIdentityAndMissingRequest(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+	identityKey := keys.GeneratePrivateKey().Public().Serialize()
+
+	tests := []struct {
+		name     string
+		req      *pb.QueryUserSignedRefundsRequest
+		wantCode codes.Code
+	}{
+		{
+			name: "malformed identity public key",
+			req: &pb.QueryUserSignedRefundsRequest{
+				PaymentHash:       bytes.Repeat([]byte{0x01}, 32),
+				IdentityPublicKey: []byte{0x02, 0x01},
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "missing preimage request",
+			req: &pb.QueryUserSignedRefundsRequest{
+				PaymentHash:       bytes.Repeat([]byte{0x02}, 32),
+				IdentityPublicKey: identityKey,
+			},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := handler.QueryUserSignedRefunds(ctx, tt.req)
+			require.Nil(t, resp)
+			require.Equal(t, tt.wantCode, status.Code(err))
+		})
+	}
+}
+
 type trackingFrostServiceClientConnection struct {
 	client pbfrost.FrostServiceClient
 }

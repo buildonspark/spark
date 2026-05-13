@@ -138,6 +138,7 @@ func StartPostgresServer() (stop func()) {
 	}
 
 	cfg := epg.DefaultConfig().
+		Version(epg.V16).
 		Username("postgres").
 		Password("postgres").
 		Database("spark_test").

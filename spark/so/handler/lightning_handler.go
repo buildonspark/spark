@@ -2063,7 +2063,7 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbsp
 	}
 	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqIdentityPubKey); err != nil {
 		return nil, err
@@ -2080,25 +2080,28 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbsp
 			req.IdentityPublicKey,
 			req.PaymentHash,
 		)
-		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err)
+		if ent.IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("QueryUserSignedRefunds: preimage request not found for public key %x and payment hash %x", req.IdentityPublicKey, req.PaymentHash))
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err))
 	}
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %w", err)
+		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("unable to get transfer: %w", err))
 	}
 
 	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-		return nil, fmt.Errorf("expected either status sender key tweak pending or sender initiated coordinator, got status: %s", transfer.Status)
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("expected either status sender key tweak pending or sender initiated coordinator, got status: %s", transfer.Status))
 	}
 
 	if transfer.ExpiryTime.Before(time.Now()) {
-		return nil, fmt.Errorf("expiry time is in the past")
+		return nil, sparkerrors.FailedPreconditionExpired(fmt.Errorf("expiry time is in the past"))
 	}
 
 	userSignedRefunds, err := preimageRequest.QueryTransactions().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get user signed transactions: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("unable to get user signed transactions: %w", err))
 	}
 
 	protos := make([]*pbspark.UserSignedRefund, len(userSignedRefunds))
@@ -2148,15 +2151,15 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 	}
 
 	if len(req.IdentityPublicKey) == 0 {
-		return nil, fmt.Errorf("identity public key is required")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("identity public key is required"))
 	}
 
 	if req.Limit <= 0 {
-		return nil, fmt.Errorf("expect limit to be greater than 0")
+		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("expect limit to be greater than 0"))
 	}
 
 	if req.Offset < 0 {
-		return nil, fmt.Errorf("expect non-negative offset")
+		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("expect non-negative offset"))
 	}
 
 	if len(req.TransferIds) > maxQueryHTLCFilterValues {
@@ -2174,12 +2177,12 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
 	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqIdentityPubKey); err != nil {
 		return nil, err
@@ -2192,7 +2195,7 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 		for i, transferID := range req.TransferIds {
 			transferUUID, err := uuid.Parse(transferID)
 			if err != nil {
-				return nil, fmt.Errorf("unable to parse transfer id as a uuid %s: %w", transferID, err)
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id as a uuid %s: %w", transferID, err))
 			}
 			transferUUIDs[i] = transferUUID
 		}
@@ -2209,7 +2212,7 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 		var preimageRequestStatus st.PreimageRequestStatus
 		err := preimageRequestStatus.UnmarshalProto(*req.Status)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal status: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to unmarshal status: %w", err))
 		}
 		conditions = append(conditions, preimagerequest.StatusEQ(preimageRequestStatus))
 	}
@@ -2237,7 +2240,7 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 		),
 	).WithTransfers().Limit(limit).Offset(offset).All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query preimage requests: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query preimage requests: %w", err))
 	}
 
 	// Convert to protobuf response
