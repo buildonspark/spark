@@ -529,6 +529,124 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedNetwork(t *testing.T) {
 	require.ErrorContains(t, err, "does not match counter transfer network")
 }
 
+func TestCreateTransfer_CounterSwapV3_FailsWithNonPrimarySwapTransfer(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// The linked transfer has the right status, amount, network, and reversed parties,
+	// but it is not a PRIMARY_SWAP_V3 transfer.
+	alicePub := keys.GeneratePrivateKey().Public()
+	bobPub := keys.GeneratePrivateKey().Public()
+
+	nonSwapTransfer, err := client.Transfer.Create().
+		SetSenderIdentityPubkey(alicePub).
+		SetReceiverIdentityPubkey(bobPub).
+		SetStatus(st.TransferStatusSenderKeyTweakPending).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetType(st.TransferTypeTransfer).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = client.TransferSender.Create().SetTransferID(nonSwapTransfer.ID).SetIdentityPubkey(alicePub).Save(ctx)
+	require.NoError(t, err)
+	_, err = client.TransferReceiver.Create().
+		SetTransferID(nonSwapTransfer.ID).
+		SetIdentityPubkey(bobPub).
+		SetStatus(st.TransferReceiverStatusInitiated).
+		Save(ctx)
+	require.NoError(t, err)
+
+	tree, err := client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(bobPub).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	p2tr, err := common.P2TRScriptFromPubKey(alicePub)
+	require.NoError(t, err)
+
+	nodeTx := &wire.MsgTx{Version: 3}
+	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	nodeTx.AddTxOut(common.EphemeralAnchorOutput())
+	nodeBytes := mustSerializeTx(t, nodeTx)
+	nodeHash := nodeTx.TxHash()
+
+	const oldTimeLock uint32 = 600
+	oldRefund := &wire.MsgTx{Version: 3}
+	oldRefund.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
+		Sequence:         oldTimeLock,
+	})
+	oldRefund.AddTxOut(common.EphemeralAnchorOutput())
+	oldRefundBytes := mustSerializeTx(t, oldRefund)
+
+	newRefund := &wire.MsgTx{Version: 3}
+	newRefund.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
+		Sequence:         oldTimeLock - spark.TimeLockInterval,
+	})
+	newRefund.AddTxOut(&wire.TxOut{Value: 0, PkScript: p2tr})
+	newRefundBytes := mustSerializeTx(t, newRefund)
+
+	secret := keys.GeneratePrivateKey()
+	keyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"key": secret.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetValue(1000).
+		SetVerifyingPubkey(keys.GeneratePrivateKey().Public()).
+		SetOwnerIdentityPubkey(bobPub).
+		SetOwnerSigningPubkey(bobPub).
+		SetSigningKeyshare(keyshare).
+		SetRawTx(nodeBytes).
+		SetRawRefundTx(oldRefundBytes).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leafCpfpRefundMap := map[string][]byte{
+		leaf.ID.String(): newRefundBytes,
+	}
+
+	h := NewBaseTransferHandler(config)
+	_, _, err = h.createTransfer(
+		ctx,
+		uuid.New(),
+		nil,
+		st.TransferTypeCounterSwapV3,
+		time.Now().Add(10*time.Minute),
+		bobPub,
+		alicePub,
+		leafCpfpRefundMap,
+		map[string][]byte{},
+		map[string][]byte{},
+		nil,
+		TransferRoleCoordinator,
+		false,
+		"",
+		nonSwapTransfer.ID,
+		nil,
+	)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "has invalid type")
+}
+
 // Test that the Swap V3 counter transfer fails if the sender/receiver don't match the primary transfer parties in reverse.
 func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 	config := sparktesting.TestConfig(t)
