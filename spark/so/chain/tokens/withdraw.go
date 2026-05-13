@@ -160,6 +160,10 @@ func processWithdrawal(
 			withdrawal.txHash, expectedSePubKey, withdrawal.withdrawalTx.seEntityPubKey)
 		return nil
 	}
+	if err := validateWithdrawalAnnouncementShape(withdrawal.outputsToWithdraw); err != nil {
+		logger.With(zap.Error(err)).Sugar().Infof("Rejecting withdrawal %s: malformed announcement", withdrawal.txHash)
+		return nil
+	}
 
 	tokenOutputMap, err := queryTokenOutputs(ctx, dbClient, withdrawal.outputsToWithdraw)
 	if err != nil {
@@ -345,6 +349,18 @@ func parseTokenWithdrawal(script []byte) (*parsedWithdrawalTransaction, []parsed
 		},
 		seEntityPubKey: seEntityPubKey,
 	}, withdrawals, nil
+}
+
+func validateWithdrawalAnnouncementShape(outputs []parsedOutputWithdrawal) error {
+	seenBitcoinVouts := make(map[uint16]struct{}, len(outputs))
+	for _, output := range outputs {
+		bitcoinVout := output.withdrawal.BitcoinVout
+		if _, ok := seenBitcoinVouts[bitcoinVout]; ok {
+			return fmt.Errorf("duplicate bitcoin vout %d", bitcoinVout)
+		}
+		seenBitcoinVouts[bitcoinVout] = struct{}{}
+	}
+	return nil
 }
 
 func validateOutputWithdrawable(
