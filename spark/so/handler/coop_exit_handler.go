@@ -38,6 +38,13 @@ func NewCooperativeExitHandler(config *so.Config) *CooperativeExitHandler {
 // It will lock the transferred leaves based on seeing a txid confirming on-chain.
 // It enforces the use of direct transactions for unilateral exits.
 func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.CooperativeExitRequest) (resp *pb.CooperativeExitResponse, retErr error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.Transfer == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	}
+
 	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer owner identity public key: %w", err))
@@ -55,13 +62,22 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	cpfpLeafRefundMap := make(map[string][]byte)
 	directLeafRefundMap := make(map[string][]byte)
 	directFromCpfpLeafRefundMap := make(map[string][]byte)
+	if len(req.Transfer.LeavesToSend) == 0 {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one leaf to send is required"))
+	}
 	for _, job := range req.Transfer.LeavesToSend {
+		if job == nil {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf refund tx signing job is required"))
+		}
+		if job.RefundTxSigningJob == nil {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required for leaf %s", job.LeafId))
+		}
 		cpfpLeafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
 		if job.DirectRefundTxSigningJob != nil {
 			directLeafRefundMap[job.LeafId] = job.DirectRefundTxSigningJob.RawTx
 		}
 		if job.DirectFromCpfpRefundTxSigningJob == nil {
-			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version"))
 		}
 		directFromCpfpLeafRefundMap[job.LeafId] = job.DirectFromCpfpRefundTxSigningJob.RawTx
 	}
