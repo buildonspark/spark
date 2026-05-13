@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
@@ -239,4 +240,100 @@ func TestFrostSigningHandler_GenerateRandomNonces_DatabaseError(t *testing.T) {
 	resp, err := handler.GenerateRandomNonces(ctx, 1)
 	require.Error(t, err)
 	assert.Nil(t, resp)
+}
+
+func TestRetryFingerprintBindsSigningJobInputs(t *testing.T) {
+	newJob := func() *pb.SigningJob {
+		return &pb.SigningJob{
+			Message:          []byte("message"),
+			VerifyingKey:     []byte("verifying-key"),
+			AdaptorPublicKey: []byte("adaptor-public-key"),
+			UserCommitments: &pbcommon.SigningCommitment{
+				Hiding:  []byte("user-hiding"),
+				Binding: []byte("user-binding"),
+			},
+			Commitments: map[string]*pbcommon.SigningCommitment{
+				"operator-b": {
+					Hiding:  []byte("operator-b-hiding"),
+					Binding: []byte("operator-b-binding"),
+				},
+				"operator-a": {
+					Hiding:  []byte("operator-a-hiding"),
+					Binding: []byte("operator-a-binding"),
+				},
+			},
+		}
+	}
+
+	baseFingerprint := retryFingerprint(newJob())
+
+	sameJobDifferentMapOrder := &pb.SigningJob{
+		Message:          []byte("message"),
+		VerifyingKey:     []byte("verifying-key"),
+		AdaptorPublicKey: []byte("adaptor-public-key"),
+		UserCommitments: &pbcommon.SigningCommitment{
+			Hiding:  []byte("user-hiding"),
+			Binding: []byte("user-binding"),
+		},
+		Commitments: map[string]*pbcommon.SigningCommitment{
+			"operator-a": {
+				Hiding:  []byte("operator-a-hiding"),
+				Binding: []byte("operator-a-binding"),
+			},
+			"operator-b": {
+				Hiding:  []byte("operator-b-hiding"),
+				Binding: []byte("operator-b-binding"),
+			},
+		},
+	}
+	assert.Equal(t, baseFingerprint, retryFingerprint(sameJobDifferentMapOrder))
+
+	for _, tc := range []struct {
+		name   string
+		mutate func(*pb.SigningJob)
+	}{
+		{
+			name: "message",
+			mutate: func(job *pb.SigningJob) {
+				job.Message = []byte("other-message")
+			},
+		},
+		{
+			name: "verifying key",
+			mutate: func(job *pb.SigningJob) {
+				job.VerifyingKey = []byte("other-verifying-key")
+			},
+		},
+		{
+			name: "adaptor key",
+			mutate: func(job *pb.SigningJob) {
+				job.AdaptorPublicKey = []byte("other-adaptor-public-key")
+			},
+		},
+		{
+			name: "user commitment",
+			mutate: func(job *pb.SigningJob) {
+				job.UserCommitments.Binding = []byte("other-user-binding")
+			},
+		},
+		{
+			name: "operator identifier",
+			mutate: func(job *pb.SigningJob) {
+				job.Commitments["operator-c"] = job.Commitments["operator-b"]
+				delete(job.Commitments, "operator-b")
+			},
+		},
+		{
+			name: "operator commitment",
+			mutate: func(job *pb.SigningJob) {
+				job.Commitments["operator-b"].Hiding = []byte("other-operator-hiding")
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			job := newJob()
+			tc.mutate(job)
+			assert.NotEqual(t, baseFingerprint, retryFingerprint(job))
+		})
+	}
 }
