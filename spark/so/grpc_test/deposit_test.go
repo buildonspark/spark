@@ -21,6 +21,8 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/db"
+	entdepositaddress "github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
@@ -1608,6 +1610,50 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	require.NoError(t, err, "directFromCpfpRefund tx signature should be valid")
 }
 
+func seedConfirmedDepositUtxos(t *testing.T, config *wallet.TestWalletConfig, address string, txs ...*wire.MsgTx) {
+	t.Helper()
+	require.NotEmpty(t, txs)
+
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+	defer entClient.Close()
+
+	depositAddress, err := entClient.DepositAddress.Query().
+		Where(entdepositaddress.Address(address)).
+		Where(entdepositaddress.IsStatic(false)).
+		Where(entdepositaddress.NetworkEQ(config.Network)).
+		Only(t.Context())
+	require.NoError(t, err)
+
+	confirmedAt := time.Now()
+	_, err = entClient.DepositAddress.UpdateOne(depositAddress).
+		SetConfirmationHeight(1).
+		SetConfirmationTxid(txs[0].TxHash().String()).
+		SetAvailabilityConfirmedAt(confirmedAt).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	for _, tx := range txs {
+		require.NotEmpty(t, tx.TxOut)
+
+		txidBytes, err := hex.DecodeString(tx.TxID())
+		require.NoError(t, err)
+
+		err = entClient.Utxo.Create().
+			SetTxid(txidBytes).
+			SetVout(0).
+			SetAmount(uint64(tx.TxOut[0].Value)).
+			SetPkScript(tx.TxOut[0].PkScript).
+			SetNetwork(config.Network).
+			SetBlockHeight(1).
+			SetAvailabilityConfirmedAt(confirmedAt).
+			SetDepositAddress(depositAddress).
+			OnConflictColumns("network", "txid", "vout").
+			UpdateNewValues().
+			Exec(t.Context())
+		require.NoError(t, err)
+	}
+}
+
 func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
@@ -1651,7 +1697,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 	_, err = client.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
 
-	time.Sleep(3 * time.Second)
+	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1, depositTx2)
 
 	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
 	require.NoError(t, err)

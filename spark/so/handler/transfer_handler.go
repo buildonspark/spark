@@ -3084,10 +3084,21 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	// Store key tweaks - batch all updates into a single SQL statement
 	leafIDs := make([]uuid.UUID, 0, len(req.LeavesToReceive))
 	keyTweakValues := make([][]byte, 0, len(req.LeavesToReceive))
+	seenLeafIDs := make(map[string]struct{}, len(req.LeavesToReceive))
 	for _, leafTweak := range req.LeavesToReceive {
-		leaf, exists := leafMap[leafTweak.LeafId]
+		leafID, err := uuid.Parse(leafTweak.LeafId)
+		if err != nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid leaf id %s: %w", leafTweak.LeafId, err))
+		}
+		leafIDString := leafID.String()
+		if _, exists := seenLeafIDs[leafIDString]; exists {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate leaf id: %s", leafIDString))
+		}
+		seenLeafIDs[leafIDString] = struct{}{}
+
+		leaf, exists := leafMap[leafIDString]
 		if !exists {
-			return fmt.Errorf("unexpected leaf id %s", leafTweak.LeafId)
+			return fmt.Errorf("unexpected leaf id %s", leafIDString)
 		}
 		leafTweakBytes, err := proto.Marshal(leafTweak)
 		if err != nil {
