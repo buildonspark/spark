@@ -205,6 +205,9 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 
 	legacy.TokenOutputs = make([]*tokenpb.TokenOutput, len(partial.PartialTokenOutputs))
 	for i, partialOutput := range partial.PartialTokenOutputs {
+		if partialOutput == nil {
+			return nil, fmt.Errorf("partial token output %d is nil", i)
+		}
 		var withdrawBond *uint64
 		if v := partialOutput.GetWithdrawBondSats(); v != 0 {
 			withdrawBond = proto.Uint64(v)

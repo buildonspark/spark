@@ -458,6 +458,18 @@ func TestConvertPartialToV2TxShape(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unknown token input type") {
 		t.Fatalf("ConvertPartialToV2TxShape() expected unknown token input type error, got: %v", err)
 	}
+
+	_, err = ConvertPartialToV2TxShape(&tokenpb.PartialTokenTransaction{
+		Version:                  3,
+		TokenTransactionMetadata: &tokenpb.TokenTransactionMetadata{},
+		TokenInputs: &tokenpb.PartialTokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{IssuerPublicKey: issuerPubKey},
+		},
+		PartialTokenOutputs: []*tokenpb.PartialTokenOutput{nil},
+	})
+	if err == nil || !strings.Contains(err.Error(), "partial token output 0 is nil") {
+		t.Fatalf("ConvertPartialToV2TxShape() expected nil partial output error, got: %v", err)
+	}
 }
 
 func TestConvertFinalToV2TxShape(t *testing.T) {
