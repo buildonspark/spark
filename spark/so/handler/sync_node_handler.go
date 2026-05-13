@@ -35,6 +35,11 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		return fmt.Errorf("invalid node ids: %v", req.NodeIds)
 	}
 
+	operator, ok := h.config.SigningOperatorMap[req.OperatorId]
+	if !ok {
+		return fmt.Errorf("operator %s not found", req.OperatorId)
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -52,7 +57,7 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUUIDsToFix, err)
 	}
 
-	conn, err := h.config.SigningOperatorMap[req.OperatorId].NewOperatorGRPCConnection()
+	conn, err := operator.NewOperatorGRPCConnection()
 	if err != nil {
 		return fmt.Errorf("failed to get operator grpc connection: %w", err)
 	}
