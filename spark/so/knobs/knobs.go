@@ -168,11 +168,6 @@ const (
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
 
-	// Rows of transfers fetched per backfill_transfer_type batch. Each
-	// invocation drains rows in a loop until empty; this just bounds the
-	// per-UPDATE row count.
-	KnobBackfillTransferTypeBatchSize = "spark.so.backfill_transfer_type_batch_size"
-
 	// Seconds a PARTICIPANT FlowExecution row can stay IN_FLIGHT before the
 	// reconciliation task considers it stuck and asks the coordinator for
 	// the final outcome. Must exceed the gossip retry interval so gossip

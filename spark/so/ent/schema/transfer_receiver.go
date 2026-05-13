@@ -46,9 +46,8 @@ func (TransferReceiver) Fields() []ent.Field {
 			Optional().
 			Comment("The time when the transfer claim was completed."),
 		field.Enum("transfer_type").
-			Optional().
 			GoType(schematype.TransferType("")).
-			Comment("Denormalized from transfers.type. Optional during the backfill window; required after.").
+			Comment("Denormalized from transfers.type.").
 			Annotations(entexample.Default(schematype.TransferTypeTransfer)),
 	}
 }

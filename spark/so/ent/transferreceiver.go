@@ -33,7 +33,7 @@ type TransferReceiver struct {
 	Status schematype.TransferReceiverStatus `json:"status,omitempty"`
 	// The time when the transfer claim was completed.
 	CompletionTime time.Time `json:"completion_time,omitempty"`
-	// Denormalized from transfers.type. Optional during the backfill window; required after.
+	// Denormalized from transfers.type.
 	TransferType schematype.TransferType `json:"transfer_type,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferReceiverQuery when eager-loading is set.

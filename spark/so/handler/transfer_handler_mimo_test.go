@@ -76,6 +76,7 @@ func TestClaimTransferMIMO_ReceiverPubkeyMismatch(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -112,6 +113,7 @@ func TestClaimTransferMIMO_AlreadyCompleted(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusCompleted).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -146,6 +148,7 @@ func TestClaimTransferMIMO_TransferNotReady(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -180,6 +183,7 @@ func TestClaimTransferMIMO_TransferExpired(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -223,12 +227,14 @@ func TestClaimTransferMIMO_LeafScopedByReceiver(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
 	sender, err := sessionCtx.Client.TransferSender.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(senderPubKey).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -282,6 +288,7 @@ func TestClaimTransferMIMO_ReceiverNotClaimableStatus(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusCancelled).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -395,6 +402,7 @@ func TestClaimTransferTweakKeys_DualWritesReceiverStatusMimoEnabled(t *testing.T
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -496,6 +504,7 @@ func TestClaimTransferTweakKeys_DualWritesReceiverStatus(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -612,6 +621,7 @@ func TestClaimTransferTweakKeys_MultipleReceiversRejected(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -619,6 +629,7 @@ func TestClaimTransferTweakKeys_MultipleReceiversRejected(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiver2PubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -653,6 +664,7 @@ func TestClaimTransferSignRefunds_MultipleReceiversRejected(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusKeyTweaked).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -660,6 +672,7 @@ func TestClaimTransferSignRefunds_MultipleReceiversRejected(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiver2PubKey).
 		SetStatus(st.TransferReceiverStatusKeyTweaked).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -713,6 +726,7 @@ func TestClaimTransferSignRefunds_DualWritesReceiverStatus(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusKeyTweaked).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -929,6 +943,7 @@ func TestLoadTransferReceiverByPublicKeyForUpdate(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1007,6 +1022,7 @@ func TestLoadSingleTransferReceiverForUnsupportedMimoPath(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1024,6 +1040,7 @@ func TestLoadSingleTransferReceiverForUnsupportedMimoPath(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1031,6 +1048,7 @@ func TestLoadSingleTransferReceiverForUnsupportedMimoPath(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiver2PubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1060,12 +1078,14 @@ func TestGetTransferLeavesForReceiverQuery(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
 	sender, err := sessionCtx.Client.TransferSender.Create().
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(senderPubKey).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1130,6 +1150,7 @@ func TestRevertClaimTransfer(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusKeyTweaked).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1160,6 +1181,7 @@ func TestRevertClaimTransfer(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusKeyTweakApplied).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1175,6 +1197,7 @@ func TestRevertClaimTransfer(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1223,6 +1246,7 @@ func TestRevertClaimTransfer(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusKeyTweaked).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1264,6 +1288,7 @@ func TestInitiateSettleReceiverKeyTweak_RefundSignedReturnsEarly(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1308,6 +1333,7 @@ func TestSettleReceiverKeyTweak_RefundSignedReturnsEarly(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1339,6 +1365,7 @@ func TestInitiateSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T)
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1359,6 +1386,7 @@ func TestInitiateSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T)
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1390,6 +1418,7 @@ func TestSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1411,6 +1440,7 @@ func TestSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1431,6 +1461,7 @@ func TestSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPubKey).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1541,6 +1572,7 @@ func TestClaimTransferMIMO_RejectsInitiatedReceiver(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1580,6 +1612,7 @@ func TestInitiateSettleReceiverKeyTweak_RejectsInitiatedReceiver(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1615,6 +1648,7 @@ func TestSettleReceiverKeyTweak_RejectsInitiatedReceiverOnCommit(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1650,6 +1684,7 @@ func TestSettleReceiverKeyTweak_AcceptsReceiverClaimPendingOnRollback(t *testing
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 

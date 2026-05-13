@@ -1182,6 +1182,7 @@ func TestVerifyAndUpdateTransfer_UpdatesReceiverStatus(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPub).
 		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1242,6 +1243,7 @@ func TestVerifyAndUpdateTransfer_SkipsAlreadyCompletedReceiver(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPub).
 		SetStatus(st.TransferReceiverStatusCompleted).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1302,6 +1304,7 @@ func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPub1).
 		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1309,6 +1312,7 @@ func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPub2).
 		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1374,6 +1378,7 @@ func TestFinalizeNodeSignatures_RejectsSubstitutedTransferLeaf(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPub).
 		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 

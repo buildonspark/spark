@@ -333,16 +333,6 @@ func TransferTypeNotIn(vs ...schematype.TransferType) predicate.TransferReceiver
 	return predicate.TransferReceiver(sql.FieldNotIn(FieldTransferType, v...))
 }
 
-// TransferTypeIsNil applies the IsNil predicate on the "transfer_type" field.
-func TransferTypeIsNil() predicate.TransferReceiver {
-	return predicate.TransferReceiver(sql.FieldIsNull(FieldTransferType))
-}
-
-// TransferTypeNotNil applies the NotNil predicate on the "transfer_type" field.
-func TransferTypeNotNil() predicate.TransferReceiver {
-	return predicate.TransferReceiver(sql.FieldNotNull(FieldTransferType))
-}
-
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.
 func HasTransfer() predicate.TransferReceiver {
 	return predicate.TransferReceiver(func(s *sql.Selector) {

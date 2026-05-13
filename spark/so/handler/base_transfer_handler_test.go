@@ -309,12 +309,13 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedAmount(t *testing.T) {
 		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
-	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(senderPub).Save(ctx)
+	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(senderPub).SetTransferType(primaryTransfer.Type).Save(ctx)
 	require.NoError(t, err)
 	_, err = client.TransferReceiver.Create().
 		SetTransferID(primaryTransfer.ID).
 		SetIdentityPubkey(receiverPub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(primaryTransfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -431,12 +432,13 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedNetwork(t *testing.T) {
 		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
-	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(alicePub).Save(ctx)
+	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(alicePub).SetTransferType(primaryTransfer.Type).Save(ctx)
 	require.NoError(t, err)
 	_, err = client.TransferReceiver.Create().
 		SetTransferID(primaryTransfer.ID).
 		SetIdentityPubkey(bobPub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(primaryTransfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -670,12 +672,13 @@ func TestCreateTransfer_CounterSwapV3_FailsWithMismatchedParties(t *testing.T) {
 		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
-	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(alicePub).Save(ctx)
+	_, err = client.TransferSender.Create().SetTransferID(primaryTransfer.ID).SetIdentityPubkey(alicePub).SetTransferType(primaryTransfer.Type).Save(ctx)
 	require.NoError(t, err)
 	_, err = client.TransferReceiver.Create().
 		SetTransferID(primaryTransfer.ID).
 		SetIdentityPubkey(bobPub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(primaryTransfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -917,6 +920,7 @@ func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPub).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -949,6 +953,7 @@ func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPub).
 			SetStatus(st.TransferReceiverStatusCancelled).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -998,6 +1003,7 @@ func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPub).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1025,6 +1031,7 @@ func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPub).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1032,6 +1039,7 @@ func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiverPub2).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 

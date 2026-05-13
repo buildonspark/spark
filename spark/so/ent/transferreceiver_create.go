@@ -93,14 +93,6 @@ func (trc *TransferReceiverCreate) SetTransferType(st schematype.TransferType) *
 	return trc
 }
 
-// SetNillableTransferType sets the "transfer_type" field if the given value is not nil.
-func (trc *TransferReceiverCreate) SetNillableTransferType(st *schematype.TransferType) *TransferReceiverCreate {
-	if st != nil {
-		trc.SetTransferType(*st)
-	}
-	return trc
-}
-
 // SetID sets the "id" field.
 func (trc *TransferReceiverCreate) SetID(u uuid.UUID) *TransferReceiverCreate {
 	trc.mutation.SetID(u)
@@ -202,6 +194,9 @@ func (trc *TransferReceiverCreate) check() error {
 		if err := transferreceiver.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TransferReceiver.status": %w`, err)}
 		}
+	}
+	if _, ok := trc.mutation.TransferType(); !ok {
+		return &ValidationError{Name: "transfer_type", err: errors.New(`ent: missing required field "TransferReceiver.transfer_type"`)}
 	}
 	if v, ok := trc.mutation.TransferType(); ok {
 		if err := transferreceiver.TransferTypeValidator(v); err != nil {
@@ -394,12 +389,6 @@ func (u *TransferReceiverUpsert) UpdateTransferType() *TransferReceiverUpsert {
 	return u
 }
 
-// ClearTransferType clears the value of the "transfer_type" field.
-func (u *TransferReceiverUpsert) ClearTransferType() *TransferReceiverUpsert {
-	u.SetNull(transferreceiver.FieldTransferType)
-	return u
-}
-
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -517,13 +506,6 @@ func (u *TransferReceiverUpsertOne) SetTransferType(v schematype.TransferType) *
 func (u *TransferReceiverUpsertOne) UpdateTransferType() *TransferReceiverUpsertOne {
 	return u.Update(func(s *TransferReceiverUpsert) {
 		s.UpdateTransferType()
-	})
-}
-
-// ClearTransferType clears the value of the "transfer_type" field.
-func (u *TransferReceiverUpsertOne) ClearTransferType() *TransferReceiverUpsertOne {
-	return u.Update(func(s *TransferReceiverUpsert) {
-		s.ClearTransferType()
 	})
 }
 
@@ -811,13 +793,6 @@ func (u *TransferReceiverUpsertBulk) SetTransferType(v schematype.TransferType) 
 func (u *TransferReceiverUpsertBulk) UpdateTransferType() *TransferReceiverUpsertBulk {
 	return u.Update(func(s *TransferReceiverUpsert) {
 		s.UpdateTransferType()
-	})
-}
-
-// ClearTransferType clears the value of the "transfer_type" field.
-func (u *TransferReceiverUpsertBulk) ClearTransferType() *TransferReceiverUpsertBulk {
-	return u.Update(func(s *TransferReceiverUpsert) {
-		s.ClearTransferType()
 	})
 }
 

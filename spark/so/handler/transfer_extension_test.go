@@ -28,6 +28,7 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverAPub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -35,6 +36,7 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverBPub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 

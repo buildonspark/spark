@@ -84,12 +84,6 @@ func (tru *TransferReceiverUpdate) SetNillableTransferType(st *schematype.Transf
 	return tru
 }
 
-// ClearTransferType clears the value of the "transfer_type" field.
-func (tru *TransferReceiverUpdate) ClearTransferType() *TransferReceiverUpdate {
-	tru.mutation.ClearTransferType()
-	return tru
-}
-
 // Mutation returns the TransferReceiverMutation object of the builder.
 func (tru *TransferReceiverUpdate) Mutation() *TransferReceiverMutation {
 	return tru.mutation
@@ -188,9 +182,6 @@ func (tru *TransferReceiverUpdate) sqlSave(ctx context.Context) (n int, err erro
 	if value, ok := tru.mutation.TransferType(); ok {
 		_spec.SetField(transferreceiver.FieldTransferType, field.TypeEnum, value)
 	}
-	if tru.mutation.TransferTypeCleared() {
-		_spec.ClearField(transferreceiver.FieldTransferType, field.TypeEnum)
-	}
 	_spec.AddModifiers(tru.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tru.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -264,12 +255,6 @@ func (truo *TransferReceiverUpdateOne) SetNillableTransferType(st *schematype.Tr
 	if st != nil {
 		truo.SetTransferType(*st)
 	}
-	return truo
-}
-
-// ClearTransferType clears the value of the "transfer_type" field.
-func (truo *TransferReceiverUpdateOne) ClearTransferType() *TransferReceiverUpdateOne {
-	truo.mutation.ClearTransferType()
 	return truo
 }
 
@@ -400,9 +385,6 @@ func (truo *TransferReceiverUpdateOne) sqlSave(ctx context.Context) (_node *Tran
 	}
 	if value, ok := truo.mutation.TransferType(); ok {
 		_spec.SetField(transferreceiver.FieldTransferType, field.TypeEnum, value)
-	}
-	if truo.mutation.TransferTypeCleared() {
-		_spec.ClearField(transferreceiver.FieldTransferType, field.TypeEnum)
 	}
 	_spec.AddModifiers(truo.modifiers...)
 	_node = &TransferReceiver{config: truo.config}

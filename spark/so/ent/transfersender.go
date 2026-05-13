@@ -29,7 +29,7 @@ type TransferSender struct {
 	TransferID uuid.UUID `json:"transfer_id,omitempty"`
 	// The identity public key of this sender of the transfer.
 	IdentityPubkey keys.Public `json:"identity_pubkey,omitempty"`
-	// Denormalized from transfers.type. Optional during the backfill window; required after.
+	// Denormalized from transfers.type.
 	TransferType schematype.TransferType `json:"transfer_type,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferSenderQuery when eager-loading is set.

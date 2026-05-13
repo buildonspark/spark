@@ -1483,7 +1483,7 @@ var (
 		{Name: "identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "RECEIVER_CLAIM_PENDING", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_KEY_TWEAK_APPLIED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "CANCELLED"}},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
-		{Name: "transfer_type", Type: field.TypeEnum, Nullable: true, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
+		{Name: "transfer_type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
 		{Name: "transfer_id", Type: field.TypeUUID},
 	}
 	// TransferReceiversTable holds the schema information for the "transfer_receivers" table.
@@ -1571,7 +1571,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "identity_pubkey", Type: field.TypeBytes},
-		{Name: "transfer_type", Type: field.TypeEnum, Nullable: true, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
+		{Name: "transfer_type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
 		{Name: "transfer_id", Type: field.TypeUUID},
 	}
 	// TransferSendersTable holds the schema information for the "transfer_senders" table.

@@ -50,12 +50,6 @@ func (tsu *TransferSenderUpdate) SetNillableTransferType(st *schematype.Transfer
 	return tsu
 }
 
-// ClearTransferType clears the value of the "transfer_type" field.
-func (tsu *TransferSenderUpdate) ClearTransferType() *TransferSenderUpdate {
-	tsu.mutation.ClearTransferType()
-	return tsu
-}
-
 // Mutation returns the TransferSenderMutation object of the builder.
 func (tsu *TransferSenderUpdate) Mutation() *TransferSenderMutation {
 	return tsu.mutation
@@ -134,9 +128,6 @@ func (tsu *TransferSenderUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if value, ok := tsu.mutation.TransferType(); ok {
 		_spec.SetField(transfersender.FieldTransferType, field.TypeEnum, value)
 	}
-	if tsu.mutation.TransferTypeCleared() {
-		_spec.ClearField(transfersender.FieldTransferType, field.TypeEnum)
-	}
 	_spec.AddModifiers(tsu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tsu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -176,12 +167,6 @@ func (tsuo *TransferSenderUpdateOne) SetNillableTransferType(st *schematype.Tran
 	if st != nil {
 		tsuo.SetTransferType(*st)
 	}
-	return tsuo
-}
-
-// ClearTransferType clears the value of the "transfer_type" field.
-func (tsuo *TransferSenderUpdateOne) ClearTransferType() *TransferSenderUpdateOne {
-	tsuo.mutation.ClearTransferType()
 	return tsuo
 }
 
@@ -292,9 +277,6 @@ func (tsuo *TransferSenderUpdateOne) sqlSave(ctx context.Context) (_node *Transf
 	}
 	if value, ok := tsuo.mutation.TransferType(); ok {
 		_spec.SetField(transfersender.FieldTransferType, field.TypeEnum, value)
-	}
-	if tsuo.mutation.TransferTypeCleared() {
-		_spec.ClearField(transfersender.FieldTransferType, field.TypeEnum)
 	}
 	_spec.AddModifiers(tsuo.modifiers...)
 	_node = &TransferSender{config: tsuo.config}

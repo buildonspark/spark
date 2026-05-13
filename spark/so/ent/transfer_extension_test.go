@@ -220,6 +220,7 @@ func seedTransferInDB(t *testing.T, ctx context.Context, client *ent.Client) dbF
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(recv1Pub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -227,6 +228,7 @@ func seedTransferInDB(t *testing.T, ctx context.Context, client *ent.Client) dbF
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(recv2Pub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 

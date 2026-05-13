@@ -1,4 +1,4 @@
-h1:GQBDvTaTkuQyEb9zBzDin4TEcCXuJ7W+AJvbmwXJ0xE=
+h1:OIQl+FVNdMtR9GCZ+udj9rELMaX5x1b35F505Pn6UjA=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -162,3 +162,4 @@ h1:GQBDvTaTkuQyEb9zBzDin4TEcCXuJ7W+AJvbmwXJ0xE=
 20260506203858_add_outgoing_in_flight_sender_partial.sql h1:JKKY0EtXd37ol2tsgRyTuFrpfJXCXgMDnQiMnuoGsL8=
 20260506224522_sp_three_zero_five_zero_denormalize_transfer_type.sql h1:r6SpPRMmytFdXDV197kr/aVV4Fs+cumakMu4GSRGYVU=
 20260511180916_add_transfer_type_composite_indexes.sql h1:OZxx2gUcT5+tP056IiNNGUC4gvs0m0jYjFinGfUH4Qk=
+20260512233608_transfer_type_not_null.sql h1:k/9lIO/o8WHN7ZTnAFUroIXJ4ldwu0jE3PjLmRwNlK8=

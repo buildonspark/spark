@@ -935,6 +935,7 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(primaryReceiverKey).
 		SetStatus(schematype.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(t.Context())
 	require.NoError(t, err)
 
@@ -942,6 +943,7 @@ func TestEventRouter_MIMOFanOutNotifications(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(secondaryReceiverKey).
 		SetStatus(schematype.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(t.Context())
 	require.NoError(t, err)
 

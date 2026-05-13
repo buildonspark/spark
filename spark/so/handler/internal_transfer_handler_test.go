@@ -341,6 +341,7 @@ func TestFinalizeTransfer(t *testing.T) {
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverIdentityPrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -350,6 +351,7 @@ func TestFinalizeTransfer(t *testing.T) {
 			SetIdentityPubkey(otherReceiverPrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusCompleted).
 			SetCompletionTime(time.Now()).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -430,6 +432,7 @@ func TestFinalizeTransferReceiver(t *testing.T) {
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverPrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -518,6 +521,7 @@ func TestFinalizeTransferReceiver(t *testing.T) {
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverIdentityPrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -763,6 +767,7 @@ func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
 		SetTransfer(transfer).
 		SetIdentityPubkey(receiver1IdentityPrivKey.Public()).
 		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -771,6 +776,7 @@ func TestFinalizeTransferReceiverMultiReceiver(t *testing.T) {
 		SetTransfer(transfer).
 		SetIdentityPubkey(receiver2IdentityPrivKey.Public()).
 		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -961,6 +967,7 @@ func TestFinalizeTransferReceiver_EarlyIdempotency(t *testing.T) {
 			SetIdentityPubkey(receiver1PrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusCompleted).
 			SetCompletionTime(time.Now()).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -992,6 +999,7 @@ func TestFinalizeTransferReceiver_EarlyIdempotency(t *testing.T) {
 			SetIdentityPubkey(receiver1PrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusCompleted).
 			SetCompletionTime(time.Now()).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1031,6 +1039,7 @@ func TestFinalizeTransferReceiver_EarlyIdempotency(t *testing.T) {
 			SetIdentityPubkey(receiver1PrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusCompleted).
 			SetCompletionTime(time.Now()).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1038,6 +1047,7 @@ func TestFinalizeTransferReceiver_EarlyIdempotency(t *testing.T) {
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiver2PrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusRefundSigned).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1091,6 +1101,7 @@ func TestFinalizeTransferReceiver_RejectsEarlyTransferStatus(t *testing.T) {
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverPrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -1120,6 +1131,7 @@ func TestFinalizeTransferReceiver_RejectsEarlyTransferStatus(t *testing.T) {
 			SetTransfer(transfer).
 			SetIdentityPubkey(receiverPrivKey.Public()).
 			SetStatus(st.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 

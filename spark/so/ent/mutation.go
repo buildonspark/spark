@@ -30782,22 +30782,9 @@ func (m *TransferReceiverMutation) OldTransferType(ctx context.Context) (v schem
 	return oldValue.TransferType, nil
 }
 
-// ClearTransferType clears the value of the "transfer_type" field.
-func (m *TransferReceiverMutation) ClearTransferType() {
-	m.transfer_type = nil
-	m.clearedFields[transferreceiver.FieldTransferType] = struct{}{}
-}
-
-// TransferTypeCleared returns if the "transfer_type" field was cleared in this mutation.
-func (m *TransferReceiverMutation) TransferTypeCleared() bool {
-	_, ok := m.clearedFields[transferreceiver.FieldTransferType]
-	return ok
-}
-
 // ResetTransferType resets all changes to the "transfer_type" field.
 func (m *TransferReceiverMutation) ResetTransferType() {
 	m.transfer_type = nil
-	delete(m.clearedFields, transferreceiver.FieldTransferType)
 }
 
 // ClearTransfer clears the "transfer" edge to the Transfer entity.
@@ -31019,9 +31006,6 @@ func (m *TransferReceiverMutation) ClearedFields() []string {
 	if m.FieldCleared(transferreceiver.FieldCompletionTime) {
 		fields = append(fields, transferreceiver.FieldCompletionTime)
 	}
-	if m.FieldCleared(transferreceiver.FieldTransferType) {
-		fields = append(fields, transferreceiver.FieldTransferType)
-	}
 	return fields
 }
 
@@ -31038,9 +31022,6 @@ func (m *TransferReceiverMutation) ClearField(name string) error {
 	switch name {
 	case transferreceiver.FieldCompletionTime:
 		m.ClearCompletionTime()
-		return nil
-	case transferreceiver.FieldTransferType:
-		m.ClearTransferType()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferReceiver nullable field %s", name)
@@ -31446,22 +31427,9 @@ func (m *TransferSenderMutation) OldTransferType(ctx context.Context) (v schemat
 	return oldValue.TransferType, nil
 }
 
-// ClearTransferType clears the value of the "transfer_type" field.
-func (m *TransferSenderMutation) ClearTransferType() {
-	m.transfer_type = nil
-	m.clearedFields[transfersender.FieldTransferType] = struct{}{}
-}
-
-// TransferTypeCleared returns if the "transfer_type" field was cleared in this mutation.
-func (m *TransferSenderMutation) TransferTypeCleared() bool {
-	_, ok := m.clearedFields[transfersender.FieldTransferType]
-	return ok
-}
-
 // ResetTransferType resets all changes to the "transfer_type" field.
 func (m *TransferSenderMutation) ResetTransferType() {
 	m.transfer_type = nil
-	delete(m.clearedFields, transfersender.FieldTransferType)
 }
 
 // ClearTransfer clears the "transfer" edge to the Transfer entity.
@@ -31651,11 +31619,7 @@ func (m *TransferSenderMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TransferSenderMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(transfersender.FieldTransferType) {
-		fields = append(fields, transfersender.FieldTransferType)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -31668,11 +31632,6 @@ func (m *TransferSenderMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TransferSenderMutation) ClearField(name string) error {
-	switch name {
-	case transfersender.FieldTransferType:
-		m.ClearTransferType()
-		return nil
-	}
 	return fmt.Errorf("unknown TransferSender nullable field %s", name)
 }
 

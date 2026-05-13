@@ -1130,17 +1130,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
-		{
-			ExecutionInterval: 10 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "backfill_transfer_type",
-				RunInTestEnv: false,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					batchSize := int(knobsService.GetValue(knobs.KnobBackfillTransferTypeBatchSize, sp3050BackfillDefaultBatchSize))
-					return backfillTransferType(ctx, config, batchSize)
-				},
-			},
-		},
 	}
 }
 

@@ -38,9 +38,8 @@ func (TransferSender) Fields() []ent.Field {
 				"02112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3",
 			)),
 		field.Enum("transfer_type").
-			Optional().
 			GoType(schematype.TransferType("")).
-			Comment("Denormalized from transfers.type. Optional during the backfill window; required after.").
+			Comment("Denormalized from transfers.type.").
 			Annotations(entexample.Default(schematype.TransferTypeTransfer)),
 	}
 }

@@ -623,12 +623,13 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 			SetNetwork(tree.Network).
 			Save(ctx)
 		require.NoError(t, err)
-		_, err = dbTx.TransferSender.Create().SetTransferID(transfer.ID).SetIdentityPubkey(sender).Save(ctx)
+		_, err = dbTx.TransferSender.Create().SetTransferID(transfer.ID).SetIdentityPubkey(sender).SetTransferType(transfer.Type).Save(ctx)
 		require.NoError(t, err)
 		_, err = dbTx.TransferReceiver.Create().
 			SetTransferID(transfer.ID).
 			SetIdentityPubkey(receiver).
 			SetStatus(schematype.TransferReceiverStatusInitiated).
+			SetTransferType(transfer.Type).
 			Save(ctx)
 		require.NoError(t, err)
 		return transfer
