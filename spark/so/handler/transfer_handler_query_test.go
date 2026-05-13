@@ -592,8 +592,8 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                  100,
-		knobs.KnobReadMIMODataModelQueryTransfers: 100,
+		knobs.KnobPrivacyEnabled:                 100,
+		knobs.KnobReadMIMOMultiParticipantFormat: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
@@ -673,6 +673,191 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	assert.True(t, received[transfer1.ID.String()])
 	assert.True(t, received[transfer2.ID.String()])
 	assert.False(t, received[transfer3.ID.String()])
+}
+
+// TestQueryTransfers_WithTransferIds_MultiReceiverAccess_MIMO verifies that a
+// multi-receiver transfer is visible to a viewer who has access to any one of
+// the receivers (not just the receiver named in the deprecated column).
+// Locks down the walk-all-participants semantics in checkTransferAccessMIMO —
+// the previous single-cardinality assertion would have errored on this shape.
+func TestQueryTransfers_WithTransferIds_MultiReceiverAccess_MIMO(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{1})
+	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	otherReceiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled:                 100,
+		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+	})
+	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
+
+	for _, pk := range []keys.Public{senderPubkey, otherReceiverPubkey, viewerPubkey} {
+		_, err = dbTx.WalletSetting.Create().
+			SetOwnerIdentityPublicKey(pk).
+			SetPrivateEnabled(true).
+			Save(ctx)
+		require.NoError(t, err)
+	}
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
+	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
+
+	// Multi-receiver transfer: viewer is one of two receivers. The deprecated
+	// receiver_identity_pubkey column names the OTHER receiver, so the legacy
+	// access check would deny visibility — only the edge-walk should grant it.
+	transfer, err := dbTx.Transfer.Create().
+		SetType(schematype.TransferTypeTransfer).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetSenderIdentityPubkey(senderPubkey).
+		SetReceiverIdentityPubkey(otherReceiverPubkey).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetNetwork(tree.Network).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbTx.TransferSender.Create().SetTransferID(transfer.ID).SetIdentityPubkey(senderPubkey).SetTransferType(transfer.Type).Save(ctx)
+	require.NoError(t, err)
+	_, err = dbTx.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(otherReceiverPubkey).
+		SetStatus(schematype.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbTx.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(viewerPubkey).
+		SetStatus(schematype.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf := createTestTreeNodeForTransferQuery(t, ctx, rng, dbTx, tree, viewerPubkey)
+	prevRefund := createOldBitcoinTxBytes(t, viewerPubkey)
+	interRefund := createOldBitcoinTxBytes(t, viewerPubkey)
+	_, err = dbTx.TransferLeaf.Create().SetTransfer(transfer).SetLeaf(leaf).SetPreviousRefundTx(prevRefund).SetIntermediateRefundTx(interRefund).Save(ctx)
+	require.NoError(t, err)
+
+	filter := &pb.TransferFilter{
+		TransferIds: []string{transfer.ID.String()},
+		Network:     pb.Network_REGTEST,
+	}
+
+	handler := NewTransferHandler(cfg)
+	resp, err := handler.queryTransfers(ctx, filter, false, false)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.Transfers, 1, "viewer is one of the two receivers; should see the transfer")
+	assert.Equal(t, transfer.ID.String(), resp.Transfers[0].Id)
+}
+
+// TestQueryTransfers_WithTransferIds_MissingSendersEdges_MIMO locks down the
+// totally-edgeless data-integrity case — no TransferSender or TransferReceiver
+// rows. checkTransferAccessMIMO must surface this as a loud error rather than
+// silently routing through a fallback.
+func TestQueryTransfers_WithTransferIds_MissingSendersEdges_MIMO(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{2})
+	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled:                 100,
+		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+	})
+	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
+	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
+
+	transfer, err := dbTx.Transfer.Create().
+		SetType(schematype.TransferTypeTransfer).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetSenderIdentityPubkey(viewerPubkey).
+		SetReceiverIdentityPubkey(receiverPubkey).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetNetwork(tree.Network).
+		Save(ctx)
+	require.NoError(t, err)
+	leaf := createTestTreeNodeForTransferQuery(t, ctx, rng, dbTx, tree, receiverPubkey)
+	prevRefund := createOldBitcoinTxBytes(t, receiverPubkey)
+	interRefund := createOldBitcoinTxBytes(t, receiverPubkey)
+	_, err = dbTx.TransferLeaf.Create().SetTransfer(transfer).SetLeaf(leaf).SetPreviousRefundTx(prevRefund).SetIntermediateRefundTx(interRefund).Save(ctx)
+	require.NoError(t, err)
+
+	filter := &pb.TransferFilter{
+		TransferIds: []string{transfer.ID.String()},
+		Network:     pb.Network_REGTEST,
+	}
+
+	handler := NewTransferHandler(cfg)
+	resp, err := handler.queryTransfers(ctx, filter, false, false)
+	require.Error(t, err, "transfer with no TransferSender rows must surface as a loud error")
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), transfer.ID.String(), "error should name the bad transfer")
+	assert.Contains(t, err.Error(), "no TransferSenders and/or TransferReceivers edges")
+}
+
+// TestQueryTransfers_WithTransferIds_MissingReceiversEdges_MIMO locks down the
+// partial-edges data-integrity case — TransferSender row present but no
+// TransferReceiver row. The unified empty-edges check must still fire here so
+// a partial-write bug doesn't slip through.
+func TestQueryTransfers_WithTransferIds_MissingReceiversEdges_MIMO(t *testing.T) {
+	ctx, cfg := createTestContextForTransferQuery(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{3})
+	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled:                 100,
+		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+	})
+	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
+	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
+
+	transfer, err := dbTx.Transfer.Create().
+		SetType(schematype.TransferTypeTransfer).
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetSenderIdentityPubkey(viewerPubkey).
+		SetReceiverIdentityPubkey(receiverPubkey).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetNetwork(tree.Network).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbTx.TransferSender.Create().SetTransferID(transfer.ID).SetIdentityPubkey(viewerPubkey).SetTransferType(transfer.Type).Save(ctx)
+	require.NoError(t, err)
+	leaf := createTestTreeNodeForTransferQuery(t, ctx, rng, dbTx, tree, receiverPubkey)
+	prevRefund := createOldBitcoinTxBytes(t, receiverPubkey)
+	interRefund := createOldBitcoinTxBytes(t, receiverPubkey)
+	_, err = dbTx.TransferLeaf.Create().SetTransfer(transfer).SetLeaf(leaf).SetPreviousRefundTx(prevRefund).SetIntermediateRefundTx(interRefund).Save(ctx)
+	require.NoError(t, err)
+
+	filter := &pb.TransferFilter{
+		TransferIds: []string{transfer.ID.String()},
+		Network:     pb.Network_REGTEST,
+	}
+
+	handler := NewTransferHandler(cfg)
+	resp, err := handler.queryTransfers(ctx, filter, false, false)
+	require.Error(t, err, "transfer with no TransferReceiver rows must surface as a loud error")
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), transfer.ID.String(), "error should name the bad transfer")
+	assert.Contains(t, err.Error(), "no TransferSenders and/or TransferReceivers edges")
 }
 
 // createTestTransferWithTime creates a transfer with a specific create time for testing time filters

@@ -45,7 +45,6 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
-	enttransfersender "github.com/lightsparkdev/spark/so/ent/transfersender"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1919,24 +1918,53 @@ func (h *TransferHandler) checkTransferAccessLegacy(
 	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey, accessMap)
 }
 
-// checkTransferAccessMIMO checks if the viewer has read access using the transfer's edges (transfer must be loaded with WithTransferSenders/WithTransferReceivers).
+// checkTransferAccessMIMO grants access if the viewer matches any sender or
+// receiver of the transfer. Requires WithTransferSenders/WithTransferReceivers
+// to be pre-loaded. Errors if either edge is empty — every transfer must have
+// at least one of each.
 func (h *TransferHandler) checkTransferAccessMIMO(
 	ctx context.Context,
 	transfer *ent.Transfer,
 	accessMap map[keys.Public]bool,
 ) (bool, error) {
-	senderPubkey, receiverPubkey, err := mimo.GetSingleTransferSenderReceiver(ctx, transfer)
-	if err != nil {
-		return false, err
+	if len(transfer.Edges.TransferSenders) == 0 || len(transfer.Edges.TransferReceivers) == 0 {
+		return false, fmt.Errorf("transfer %s has no TransferSenders and/or TransferReceivers edges — every transfer must have at least one of each", transfer.ID)
 	}
-	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, senderPubkey, receiverPubkey, accessMap)
+
+	walletHandler := NewWalletSettingHandler(h.config)
+	check := func(pubkey keys.Public) (bool, error) {
+		if access, ok := accessMap[pubkey]; ok {
+			return access, nil
+		}
+		access, err := walletHandler.HasReadAccessToWallet(ctx, pubkey)
+		if err != nil {
+			return false, fmt.Errorf("failed to check viewer access to transfer %s: %w", transfer.ID, err)
+		}
+		accessMap[pubkey] = access
+		return access, nil
+	}
+	for _, s := range transfer.Edges.TransferSenders {
+		if access, err := check(s.IdentityPubkey); err != nil || access {
+			return access, err
+		}
+	}
+	for _, r := range transfer.Edges.TransferReceivers {
+		if access, err := check(r.IdentityPubkey); err != nil || access {
+			return access, err
+		}
+	}
+	return false, nil
 }
 
+// queryTransfers is a critical customer-facing read endpoint. Traffic that
+// lands here either fell through the specialized handlers gated by per-RPC
+// MIMO knobs, or is a TransferIds-only fetch — the common shape, still
+// efficient through direct ID predicates regardless of MIMO rollout state.
 func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, pendingOnly bool, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
 
-	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMODataModelQueryTransfers, 0) > 0
+	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMOMultiParticipantFormat, 0) > 0
 	start := time.Now()
 	defer func() {
 		resultCount := 0
@@ -1980,16 +2008,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
 	}
-	// The MIMO branches below query TransferSender/TransferReceiver by
-	// identity_pubkey using a composite (identity_pubkey, create_time DESC)
-	// index, avoiding the expensive JOIN to transfers for sorting.
-	// The final transfers query still sorts by transfers.create_time.
-	//
-	// TODO(SP-2727): getSSPCounterSwapFilter bypasses this by using the direct
-	// column since each transfer currently has exactly one sender. The entire
-	// query strategy here needs reworking before multi-sender support is
-	// enabled — both the inverted lookups and the counter-swap filter (which
-	// assumes a single SSP identity per swap).
 	var filterType string
 	switch filter.Participant.(type) {
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
@@ -2031,18 +2049,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid receiver identity public key: %w", err))
 		}
-		if useMIMO {
-			transferIDs, err := queryReceiverTransferIDs(ctx, db, receiverIDPubKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to query receiver transfer IDs: %w", err)
-			}
-			if len(transferIDs) == 0 {
-				return &pb.QueryTransfersResponse{Offset: -1}, nil
-			}
-			transferPredicate = append(transferPredicate, enttransfer.IDIn(transferIDs...))
-		} else {
-			transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
-		}
+		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
 		if pendingOnly {
 			transferPredicate = append(transferPredicate, enttransfer.StatusIn(receiverPendingStatuses...))
 		}
@@ -2052,18 +2059,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender identity public key: %w", err))
 		}
-		if useMIMO {
-			transferIDs, err := querySenderTransferIDs(ctx, db, senderIDPubKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to query sender transfer IDs: %w", err)
-			}
-			if len(transferIDs) == 0 {
-				return &pb.QueryTransfersResponse{Offset: -1}, nil
-			}
-			transferPredicate = append(transferPredicate, enttransfer.IDIn(transferIDs...))
-		} else {
-			transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
-		}
+		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
 		if pendingOnly {
 			transferPredicate = append(transferPredicate,
 				enttransfer.StatusIn(senderPendingStatuses...),
@@ -2076,74 +2072,15 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender or receiver identity public key: %w", err))
 		}
-		if useMIMO {
-			receiverTransferIDs, err := queryReceiverTransferIDs(ctx, db, identityPubKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to query receiver transfer IDs: %w", err)
-			}
-			senderTransferIDs, err := querySenderTransferIDs(ctx, db, identityPubKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to query sender transfer IDs: %w", err)
-			}
-
-			if len(receiverTransferIDs) == 0 && len(senderTransferIDs) == 0 {
-				return &pb.QueryTransfersResponse{Offset: -1}, nil
-			}
-
-			if pendingOnly {
-				// Keep IDs separate to preserve role-based status filtering.
-				// Guard each arm against empty ID slices — a wallet may have
-				// only sent or only received transfers.
-				var pendingParts []predicate.Transfer
-				if len(receiverTransferIDs) > 0 {
-					pendingParts = append(pendingParts, enttransfer.And(
-						enttransfer.IDIn(receiverTransferIDs...),
-						enttransfer.StatusIn(receiverPendingStatuses...),
-					))
-				}
-				if len(senderTransferIDs) > 0 {
-					pendingParts = append(pendingParts, enttransfer.And(
-						enttransfer.IDIn(senderTransferIDs...),
-						enttransfer.StatusIn(senderPendingStatuses...),
-						enttransfer.ExpiryTimeLT(time.Now()),
-					))
-				}
-				if len(pendingParts) == 0 {
-					return &pb.QueryTransfersResponse{Offset: -1}, nil
-				}
-				transferPredicate = append(transferPredicate, enttransfer.Or(pendingParts...))
-			} else {
-				// Deduplicate transfer IDs for the non-pending path.
-				seen := make(map[uuid.UUID]struct{}, len(receiverTransferIDs)+len(senderTransferIDs))
-				allIDs := make([]uuid.UUID, 0, len(receiverTransferIDs)+len(senderTransferIDs))
-				for _, id := range receiverTransferIDs {
-					if _, ok := seen[id]; !ok {
-						seen[id] = struct{}{}
-						allIDs = append(allIDs, id)
-					}
-				}
-				for _, id := range senderTransferIDs {
-					if _, ok := seen[id]; !ok {
-						seen[id] = struct{}{}
-						allIDs = append(allIDs, id)
-					}
-				}
-				if len(allIDs) > maxMIMOTransferIDs {
-					allIDs = allIDs[:maxMIMOTransferIDs]
-				}
-				transferPredicate = append(transferPredicate, enttransfer.IDIn(allIDs...))
-			}
+		receiverMatchesIdentity := enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey)
+		senderMatchesIdentity := enttransfer.SenderIdentityPubkeyEQ(identityPubKey)
+		if pendingOnly {
+			transferPredicate = append(transferPredicate, enttransfer.Or(
+				enttransfer.And(receiverMatchesIdentity, enttransfer.StatusIn(receiverPendingStatuses...)),
+				enttransfer.And(senderMatchesIdentity, enttransfer.StatusIn(senderPendingStatuses...), enttransfer.ExpiryTimeLT(time.Now())),
+			))
 		} else {
-			receiverMatchesIdentity := enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey)
-			senderMatchesIdentity := enttransfer.SenderIdentityPubkeyEQ(identityPubKey)
-			if pendingOnly {
-				transferPredicate = append(transferPredicate, enttransfer.Or(
-					enttransfer.And(receiverMatchesIdentity, enttransfer.StatusIn(receiverPendingStatuses...)),
-					enttransfer.And(senderMatchesIdentity, enttransfer.StatusIn(senderPendingStatuses...), enttransfer.ExpiryTimeLT(time.Now())),
-				))
-			} else {
-				transferPredicate = append(transferPredicate, enttransfer.Or(receiverMatchesIdentity, senderMatchesIdentity))
-			}
+			transferPredicate = append(transferPredicate, enttransfer.Or(receiverMatchesIdentity, senderMatchesIdentity))
 		}
 		walletIdentityPubkey = &identityPubKey
 	default:
@@ -2635,38 +2572,6 @@ const maxTransferPageSize = 100
 // maxTransferIDFilterValues caps caller-provided transfer ID filters before
 // UUID parsing and SQL IN predicate construction.
 const maxTransferIDFilterValues = 1000
-
-// maxMIMOTransferIDs caps the number of transfer IDs fetched from
-// TransferSender/TransferReceiver to stay within PostgreSQL's bind
-// parameter limit (65,535). With other predicates also consuming
-// parameters, 50,000 provides safe headroom.
-const maxMIMOTransferIDs = 50_000
-
-// queryReceiverTransferIDs returns up to maxMIMOTransferIDs transfer IDs for
-// the given receiver identity pubkey, ordered by the receiver record's create_time DESC.
-func queryReceiverTransferIDs(ctx context.Context, db *ent.Client, pubkey keys.Public) ([]uuid.UUID, error) {
-	var ids []uuid.UUID
-	err := db.TransferReceiver.Query().
-		Where(enttransferreceiver.IdentityPubkeyEQ(pubkey)).
-		Order(ent.Desc(enttransferreceiver.FieldCreateTime)).
-		Limit(maxMIMOTransferIDs).
-		Select(enttransferreceiver.FieldTransferID).
-		Scan(ctx, &ids)
-	return ids, err
-}
-
-// querySenderTransferIDs returns up to maxMIMOTransferIDs transfer IDs for
-// the given sender identity pubkey, ordered by the sender record's create_time DESC.
-func querySenderTransferIDs(ctx context.Context, db *ent.Client, pubkey keys.Public) ([]uuid.UUID, error) {
-	var ids []uuid.UUID
-	err := db.TransferSender.Query().
-		Where(enttransfersender.IdentityPubkeyEQ(pubkey)).
-		Order(ent.Desc(enttransfersender.FieldCreateTime)).
-		Limit(maxMIMOTransferIDs).
-		Select(enttransfersender.FieldTransferID).
-		Scan(ctx, &ids)
-	return ids, err
-}
 
 // pendingParticipantRole enumerates which arm of the pending-transfer query
 // to dispatch. Replaces an `any` field that previously held the proto

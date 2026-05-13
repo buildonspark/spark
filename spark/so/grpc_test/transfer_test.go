@@ -2020,7 +2020,7 @@ func TestQueryAllTransfersMIMO(t *testing.T) {
 	// Enable the MIMO query path.
 	kc, err := sparktesting.NewKnobController(t)
 	require.NoError(t, err)
-	err = kc.SetKnob(t, knobs.KnobReadMIMODataModelQueryTransfers, 100)
+	err = kc.SetKnob(t, knobs.KnobReadMIMOMultiParticipantFormat, 100)
 	require.NoError(t, err)
 
 	network, err := senderConfig.Network.ToProtoNetwork()
@@ -2132,7 +2132,7 @@ func TestQueryPendingTransfersMIMO(t *testing.T) {
 	// Enable the MIMO query path.
 	kc, err := sparktesting.NewKnobController(t)
 	require.NoError(t, err)
-	err = kc.SetKnob(t, knobs.KnobReadMIMODataModelQueryTransfers, 100)
+	err = kc.SetKnob(t, knobs.KnobReadMIMOMultiParticipantFormat, 100)
 	require.NoError(t, err)
 
 	network, err := senderConfig.Network.ToProtoNetwork()
