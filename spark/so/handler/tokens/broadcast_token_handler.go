@@ -15,6 +15,7 @@ import (
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -538,6 +539,7 @@ func (h *BroadcastTokenHandler) constructFinalTokenTransaction(
 		lrc20Config := h.config.Lrc20Configs[strings.ToLower(network.String())]
 
 		for i, output := range final.FinalTokenOutputs {
+			output.Id = schema.NewID().String()
 			keyshareIDStrings[i] = keyshares[i].ID.String()
 			output.RevocationCommitment = keyshares[i].PublicKey.Serialize()
 			if output.PartialTokenOutput != nil {

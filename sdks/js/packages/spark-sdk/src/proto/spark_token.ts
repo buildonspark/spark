@@ -287,6 +287,7 @@ export interface PartialTokenOutput {
 export interface FinalTokenOutput {
   partialTokenOutput: PartialTokenOutput | undefined;
   revocationCommitment: Uint8Array;
+  id: string;
 }
 
 /**
@@ -1403,7 +1404,7 @@ export const PartialTokenOutput: MessageFns<PartialTokenOutput> = {
 };
 
 function createBaseFinalTokenOutput(): FinalTokenOutput {
-  return { partialTokenOutput: undefined, revocationCommitment: new Uint8Array(0) };
+  return { partialTokenOutput: undefined, revocationCommitment: new Uint8Array(0), id: "" };
 }
 
 export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
@@ -1413,6 +1414,9 @@ export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
     }
     if (message.revocationCommitment.length !== 0) {
       writer.uint32(18).bytes(message.revocationCommitment);
+    }
+    if (message.id !== "") {
+      writer.uint32(26).string(message.id);
     }
     return writer;
   },
@@ -1440,6 +1444,14 @@ export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
           message.revocationCommitment = reader.bytes();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1457,6 +1469,7 @@ export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
       revocationCommitment: isSet(object.revocationCommitment)
         ? bytesFromBase64(object.revocationCommitment)
         : new Uint8Array(0),
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
     };
   },
 
@@ -1467,6 +1480,9 @@ export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
     }
     if (message.revocationCommitment.length !== 0) {
       obj.revocationCommitment = base64FromBytes(message.revocationCommitment);
+    }
+    if (message.id !== "") {
+      obj.id = message.id;
     }
     return obj;
   },
@@ -1480,6 +1496,7 @@ export const FinalTokenOutput: MessageFns<FinalTokenOutput> = {
       ? PartialTokenOutput.fromPartial(object.partialTokenOutput)
       : undefined;
     message.revocationCommitment = object.revocationCommitment ?? new Uint8Array(0);
+    message.id = object.id ?? "";
     return message;
   },
 };
