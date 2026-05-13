@@ -379,14 +379,14 @@ func preemptOrRejectTransaction(
 // logWillPreemptExistingTransaction logs that we will pre-empt the existing transaction
 func logWillPreemptExistingTransaction(ctx context.Context, existingTransaction *ent.TokenTransaction, reason, details string) error {
 	_, logger := logging.WithAttrs(ctx, getPreviousEntTokenTransactionAttrs(existingTransaction)...)
-	logger.Info(fmt.Sprintf("Pre-empting existing transaction with new transaction (%s: %s)", reason, details))
+	logger.Sugar().Infof("Pre-empting existing transaction with new transaction (%s: %s)", reason, details)
 	return nil
 }
 
 // rejectNewTransaction rejects the new transaction and logs the action
 func rejectNewTransaction(ctx context.Context, newTransaction *tokenpb.TokenTransaction, existingTransaction *ent.TokenTransaction, reason, details string) error {
 	_, logger := logging.WithAttrs(ctx, getPreviousEntTokenTransactionAttrs(existingTransaction)...)
-	logger.Info(fmt.Sprintf("Rejecting new transaction due to existing transaction having %s (%s)", reason, details))
+	logger.Sugar().Infof("Rejecting new transaction due to existing transaction having %s (%s)", reason, details)
 	return tokens.NewTransactionPreemptedError(newTransaction, reason, details)
 }
 

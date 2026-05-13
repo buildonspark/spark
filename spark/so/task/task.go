@@ -393,7 +393,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 
 					for treeID, treeNodeIDs := range treeToTreeNodes {
-						logger.Info(fmt.Sprintf("Deleting stale tree %s along with associated tree nodes (%d in total).", treeID, len(treeNodeIDs)))
+						logger.Sugar().Infof("Deleting stale tree %s along with associated tree nodes (%d in total).", treeID, len(treeNodeIDs))
 
 						numDeleted, err := tx.TreeNode.Delete().Where(treenode.IDIn(treeNodeIDs...)).Exec(ctx)
 						if err != nil {
@@ -401,7 +401,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							return err
 						}
 
-						logger.Info(fmt.Sprintf("Deleted %d tree nodes.", numDeleted))
+						logger.Sugar().Infof("Deleted %d tree nodes.", numDeleted)
 
 						// Delete the associated trees
 						_, err = tx.Tree.Delete().Where(tree.IDEQ(treeID)).Exec(ctx)
