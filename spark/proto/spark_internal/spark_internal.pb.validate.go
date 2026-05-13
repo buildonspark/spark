@@ -8589,6 +8589,490 @@ var _ interface {
 	ErrorName() string
 } = StorePreimageSharePrepareRequestValidationError{}
 
+// Validate checks the field values on SendTransferPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SendTransferPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SendTransferPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SendTransferPrepareRequestMultiError, or nil if none found.
+func (m *SendTransferPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SendTransferPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SendTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SendTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SendTransferPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return SendTransferPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SendTransferPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by SendTransferPrepareRequest.ValidateAll() if
+// the designated constraints aren't met.
+type SendTransferPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SendTransferPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SendTransferPrepareRequestMultiError) AllErrors() []error { return m }
+
+// SendTransferPrepareRequestValidationError is the validation error returned
+// by SendTransferPrepareRequest.Validate if the designated constraints aren't met.
+type SendTransferPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SendTransferPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SendTransferPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SendTransferPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SendTransferPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SendTransferPrepareRequestValidationError) ErrorName() string {
+	return "SendTransferPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SendTransferPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSendTransferPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SendTransferPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SendTransferPrepareRequestValidationError{}
+
+// Validate checks the field values on SendTransferCommitRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SendTransferCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SendTransferCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SendTransferCommitRequestMultiError, or nil if none found.
+func (m *SendTransferCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SendTransferCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SendTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SendTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SendTransferCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return SendTransferCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SendTransferCommitRequestMultiError is an error wrapping multiple validation
+// errors returned by SendTransferCommitRequest.ValidateAll() if the
+// designated constraints aren't met.
+type SendTransferCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SendTransferCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SendTransferCommitRequestMultiError) AllErrors() []error { return m }
+
+// SendTransferCommitRequestValidationError is the validation error returned by
+// SendTransferCommitRequest.Validate if the designated constraints aren't met.
+type SendTransferCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SendTransferCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SendTransferCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SendTransferCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SendTransferCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SendTransferCommitRequestValidationError) ErrorName() string {
+	return "SendTransferCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SendTransferCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSendTransferCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SendTransferCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SendTransferCommitRequestValidationError{}
+
+// Validate checks the field values on SendTransferLeafSignatures with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SendTransferLeafSignatures) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SendTransferLeafSignatures with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SendTransferLeafSignaturesMultiError, or nil if none found.
+func (m *SendTransferLeafSignatures) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SendTransferLeafSignatures) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for RefundSignature
+
+	// no validation rules for DirectRefundSignature
+
+	// no validation rules for DirectFromCpfpRefundSignature
+
+	if len(errors) > 0 {
+		return SendTransferLeafSignaturesMultiError(errors)
+	}
+
+	return nil
+}
+
+// SendTransferLeafSignaturesMultiError is an error wrapping multiple
+// validation errors returned by SendTransferLeafSignatures.ValidateAll() if
+// the designated constraints aren't met.
+type SendTransferLeafSignaturesMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SendTransferLeafSignaturesMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SendTransferLeafSignaturesMultiError) AllErrors() []error { return m }
+
+// SendTransferLeafSignaturesValidationError is the validation error returned
+// by SendTransferLeafSignatures.Validate if the designated constraints aren't met.
+type SendTransferLeafSignaturesValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SendTransferLeafSignaturesValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SendTransferLeafSignaturesValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SendTransferLeafSignaturesValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SendTransferLeafSignaturesValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SendTransferLeafSignaturesValidationError) ErrorName() string {
+	return "SendTransferLeafSignaturesValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SendTransferLeafSignaturesValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSendTransferLeafSignatures.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SendTransferLeafSignaturesValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SendTransferLeafSignaturesValidationError{}
+
+// Validate checks the field values on SendTransferRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SendTransferRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SendTransferRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SendTransferRollbackRequestMultiError, or nil if none found.
+func (m *SendTransferRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SendTransferRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	if len(errors) > 0 {
+		return SendTransferRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SendTransferRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by SendTransferRollbackRequest.ValidateAll() if
+// the designated constraints aren't met.
+type SendTransferRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SendTransferRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SendTransferRollbackRequestMultiError) AllErrors() []error { return m }
+
+// SendTransferRollbackRequestValidationError is the validation error returned
+// by SendTransferRollbackRequest.Validate if the designated constraints
+// aren't met.
+type SendTransferRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SendTransferRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SendTransferRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SendTransferRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SendTransferRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SendTransferRollbackRequestValidationError) ErrorName() string {
+	return "SendTransferRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SendTransferRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSendTransferRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SendTransferRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SendTransferRollbackRequestValidationError{}
+
 // Validate checks the field values on ConsensusPrepareRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

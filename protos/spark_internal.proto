@@ -574,6 +574,39 @@ message StorePreimageSharePrepareRequest {
     spark.StorePreimageShareV2Request original_request = 1;
 }
 
+// SendTransferPrepareRequest is the 2PC prepare payload for consensus
+// send-transfer (v3). Each SO validates the transfer package, decrypts its
+// slice of the key tweak package, persists the transfer + transfer_leaf rows
+// in a locked-but-not-yet-tweaked state, and produces FROST signature shares
+// over the refund transactions.
+message SendTransferPrepareRequest {
+    spark.StartTransferV3Request original_request = 1;
+}
+
+// SendTransferCommitRequest is the 2PC commit payload built by the coordinator
+// in BuildCommitPayload. It carries the aggregated refund signatures per leaf
+// so every SO can apply identical state during Commit without re-aggregating.
+message SendTransferCommitRequest {
+    string transfer_id = 1;
+    repeated SendTransferLeafSignatures leaf_signatures = 2;
+}
+
+// SendTransferLeafSignatures carries the aggregated FROST signatures for a
+// single leaf's refund tx variants.
+message SendTransferLeafSignatures {
+    string leaf_id = 1;
+    bytes refund_signature = 2;
+    bytes direct_refund_signature = 3;
+    bytes direct_from_cpfp_refund_signature = 4;
+}
+
+// SendTransferRollbackRequest is the 2PC rollback payload. SOs delete the
+// transfer + transfer_leaf rows they wrote in Prepare and unlock any leaves
+// they locked.
+message SendTransferRollbackRequest {
+    string transfer_id = 1;
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).
