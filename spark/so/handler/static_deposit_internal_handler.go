@@ -510,6 +510,10 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 	if err != nil {
 		return nil, fmt.Errorf("invalid transfer_id: %w", err)
 	}
+	utxoSwapID, err := uuid.Parse(req.UtxoSwapId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid utxo_swap_id: %w", err)
+	}
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
@@ -560,12 +564,13 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 	}
 
 	swap, err := db.UtxoSwap.Query().
+		Where(utxoswap.IDEQ(utxoSwapID)).
 		Where(utxoswap.RequestedTransferIDEQ(transferID)).
 		Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get utxo swap for transfer %s: %w", transferID, err)
+		return nil, fmt.Errorf("failed to get utxo swap %s for transfer %s: %w", utxoSwapID, transferID, err)
 	}
 
 	if targetUtxo.inner.Amount != swap.UtxoValueSats {
