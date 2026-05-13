@@ -3446,6 +3446,10 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 		return fmt.Errorf("invalid refund signing public key for leaf %s: %w", job.LeafId, err)
 	}
 
+	if !refundDestPubKey.Equals(leaf.OwnerSigningPubkey) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund signing public key %x does not match leaf owner signing pubkey %x for leaf %s", refundDestPubKey.Serialize(), leaf.OwnerSigningPubkey.Serialize(), job.LeafId))
+	}
+
 	if err := validateSingleLeafRefundTxs(
 		ctx,
 		leaf,

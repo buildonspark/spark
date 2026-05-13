@@ -755,7 +755,7 @@ func TestClaimTransferSignRefunds_DualWritesReceiverStatus(t *testing.T) {
 		TransferId:             transfer.ID.String(),
 		OwnerIdentityPublicKey: receiverPubKey.Serialize(),
 		SigningJobs: []*pb.LeafRefundTxSigningJob{
-			createTestLeafRefundTxSigningJob(t, rng, leaf),
+			createTestLeafRefundTxSigningJob(t, rng, leaf, leaf.VerifyingPubkey.Sub(keyshare.PublicKey).Sub(tweakPrivKey.Public())),
 		},
 	}
 	resp, err := handler.ClaimTransferSignRefunds(ctx, req)

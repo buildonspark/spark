@@ -262,7 +262,13 @@ func createRefundTxBytes(t *testing.T, sourceTxBytes []byte, receiverPubKey keys
 	return buf.Bytes()
 }
 
-func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.TreeNode) *pb.LeafRefundTxSigningJob {
+// createTestLeafRefundTxSigningJob builds a signing job whose SigningPublicKey and
+// tx-output destination both use destPubKey. validateReceivedRefundTransactions now
+// enforces SigningPublicKey == leaf.OwnerSigningPubkey, and SettleReceiverKeyTweak
+// rewrites leaf.OwnerSigningPubkey to leaf.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
+// (= VerifyingPubkey - keyshare.PublicKey - pubKeyTweak) during the claim flow, so
+// callers must compute and pass that post-settle value here.
+func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.TreeNode, destPubKey keys.Public) *pb.LeafRefundTxSigningJob {
 	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawRefundTx.TxIn)
@@ -272,7 +278,7 @@ func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.Tre
 	expectedCpfpTimelock := currentTimelock - 100
 	expectedDirectTimelock := expectedCpfpTimelock + 50
 
-	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	pubKey := destPubKey
 
 	// Create transactions that spend from the correct UTXOs
 	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, pubKey, expectedCpfpTimelock, false)
@@ -316,15 +322,25 @@ func createTestTreeNodeForValidation(t *testing.T, rng io.Reader, ownerPubKey ke
 
 	// Create a mock TreeNode (not persisted to DB, just for unit testing the validation function)
 	return &ent.TreeNode{
-		RawTx:       parentTxBytes,
-		DirectTx:    directTxBytes,
-		RawRefundTx: cpfpRefundTx,
-		Vout:        leafVout,
+		RawTx:              parentTxBytes,
+		DirectTx:           directTxBytes,
+		RawRefundTx:        cpfpRefundTx,
+		Vout:               leafVout,
+		OwnerSigningPubkey: ownerPubKey,
 	}
 }
 
 // createValidSigningJobForLeaf creates a LeafRefundTxSigningJob with valid transactions that should pass validation
 func createValidSigningJobForLeaf(t *testing.T, rng io.Reader, leaf *ent.TreeNode, isSwap bool) *pb.LeafRefundTxSigningJob {
+	return createSigningJobForLeafWithDest(t, rng, leaf, leaf.OwnerSigningPubkey, isSwap)
+}
+
+// createSigningJobForLeafWithDest builds a LeafRefundTxSigningJob whose SigningPublicKey
+// and tx-output destination both use refundDestPubKey. Pass leaf.OwnerSigningPubkey for
+// the canonical/valid case; pass any other key to simulate a client that consistently
+// supplies a non-canonical destination (the shape that downstream byte-comparison alone
+// does not catch).
+func createSigningJobForLeafWithDest(t *testing.T, rng io.Reader, leaf *ent.TreeNode, refundDestPubKey keys.Public, isSwap bool) *pb.LeafRefundTxSigningJob {
 	// Parse existing refund tx to get the current timelock
 	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
 	require.NoError(t, err)
@@ -335,9 +351,6 @@ func createValidSigningJobForLeaf(t *testing.T, rng io.Reader, leaf *ent.TreeNod
 	// New timelock should be TimeLockInterval shorter
 	expectedCpfpTimelock := currentTimelock - 100       // spark.TimeLockInterval is 100
 	expectedDirectTimelock := expectedCpfpTimelock + 50 // spark.DirectTimelockOffset is 50
-
-	// Generate a new refund destination pubkey
-	refundDestPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Create new refund transactions
 	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedCpfpTimelock, false)
@@ -392,6 +405,26 @@ func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 
 	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
 	require.NoError(t, err)
+}
+
+// TestValidateReceivedRefundTransactions_RejectsNonCanonicalDestination simulates the
+// exploit shape: the client consistently supplies an attacker-controlled key in both
+// the SigningPublicKey field AND the tx-output destination. The downstream
+// reconstruct-and-compare in validateSingleLeafRefundTxs reconstructs from the same
+// caller-supplied SigningPublicKey, so a self-consistent payload passes that check.
+// Only the explicit equality against leaf.OwnerSigningPubkey catches it.
+func TestValidateReceivedRefundTransactions_RejectsNonCanonicalDestination(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{99})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	job := createSigningJobForLeafWithDest(t, rng, leaf, attackerPubKey, false /* isSwap */)
+
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match leaf owner signing pubkey")
 }
 
 func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
@@ -492,7 +525,7 @@ func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *te
 	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
 	expectedCpfpTimelock := currentTimelock - 100
 
-	refundDestPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	refundDestPubKey := leaf.OwnerSigningPubkey
 	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedCpfpTimelock, false)
 
 	// Job with only CPFP refund tx but no DirectFromCpfp (required for transfers)
@@ -523,7 +556,7 @@ func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testi
 	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
 	expectedCpfpTimelock := currentTimelock - 100
 
-	refundDestPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	refundDestPubKey := leaf.OwnerSigningPubkey
 	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, refundDestPubKey, expectedCpfpTimelock, false)
 
 	// Job with only CPFP refund tx - this is sufficient for swaps
@@ -599,11 +632,12 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	_, err = transferLeaf.Update().SetKeyTweak(claimKeyTweakBytes).Save(ctx)
 	require.NoError(t, err)
 
+	postSettleOwnerKey := leaf.VerifyingPubkey.Sub(keyshare.PublicKey).Sub(tweakPrivKey.Public())
 	req := &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.ID.String(),
 		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey.Serialize(),
 		SigningJobs: []*pb.LeafRefundTxSigningJob{
-			createTestLeafRefundTxSigningJob(t, rng, leaf),
+			createTestLeafRefundTxSigningJob(t, rng, leaf, postSettleOwnerKey),
 		},
 	}
 	handler := NewTransferHandler(cfg)
