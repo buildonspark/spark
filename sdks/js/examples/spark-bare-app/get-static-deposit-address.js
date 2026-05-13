@@ -5,13 +5,17 @@ import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 async function getStaticDepositAddress(mnemonicInit) {
   const options = getExampleWalletOptions(process.env, "REGTEST");
-  let { wallet, mnemonic } = await SparkWallet.initialize({
-    mnemonicOrSeed: mnemonicInit,
-    options,
-  });
-  const staticDepositAddress = await wallet.getStaticDepositAddress();
-  await wallet.cleanup();
-  return staticDepositAddress;
+  let wallet;
+  try {
+    const initialized = await SparkWallet.initialize({
+      mnemonicOrSeed: mnemonicInit,
+      options,
+    });
+    wallet = initialized.wallet;
+    return await wallet.getStaticDepositAddress();
+  } finally {
+    await wallet?.cleanup();
+  }
 }
 
 const args = process.argv.slice(2);

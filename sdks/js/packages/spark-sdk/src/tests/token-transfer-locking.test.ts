@@ -502,31 +502,37 @@ describe("token transfer local lock lifecycle", () => {
       lockExpiryMs: 50,
     });
     const receiverSparkAddress = createReceiverSparkAddress();
+    const now = Date.now();
+    const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(now);
 
-    await expect(
-      wallet.transferTokens({
-        tokenIdentifier,
-        tokenAmount: 300n,
-        receiverSparkAddress,
-      }),
-    ).resolves.toBe("tx-hash-ttl-1");
+    try {
+      await expect(
+        wallet.transferTokens({
+          tokenIdentifier,
+          tokenAmount: 300n,
+          receiverSparkAddress,
+        }),
+      ).resolves.toBe("tx-hash-ttl-1");
 
-    await expect(
-      wallet.transferTokens({
-        tokenIdentifier,
-        tokenAmount: 300n,
-        receiverSparkAddress,
-      }),
-    ).rejects.toThrow("Insufficient token amount");
+      await expect(
+        wallet.transferTokens({
+          tokenIdentifier,
+          tokenAmount: 300n,
+          receiverSparkAddress,
+        }),
+      ).rejects.toThrow("Insufficient token amount");
 
-    await new Promise((resolve) => setTimeout(resolve, 70));
+      dateNowSpy.mockReturnValue(now + 70);
 
-    await expect(
-      wallet.transferTokens({
-        tokenIdentifier,
-        tokenAmount: 300n,
-        receiverSparkAddress,
-      }),
-    ).resolves.toBe("tx-hash-ttl-2");
+      await expect(
+        wallet.transferTokens({
+          tokenIdentifier,
+          tokenAmount: 300n,
+          receiverSparkAddress,
+        }),
+      ).resolves.toBe("tx-hash-ttl-2");
+    } finally {
+      dateNowSpy.mockRestore();
+    }
   });
 });

@@ -228,11 +228,8 @@ export function BareHttpTransport({
           // Only unref sockets for response-streaming RPCs so unary calls
           // still keep the process alive while they are in flight.
           if (method.responseStream) {
-            try {
-              res.socket.unref();
+            if (unrefSocket(res.socket)) {
               log("response socket unref applied");
-            } catch {
-              void 0;
             }
           }
           res.on("close", () => {
@@ -271,6 +268,22 @@ export function BareHttpTransport({
           });
         },
       );
+      let requestSocketUnrefApplied = false;
+      const unrefRequestSocket = (
+        socket: { unref?: () => void } | null | undefined,
+      ) => {
+        if (requestSocketUnrefApplied) {
+          return;
+        }
+        if (unrefSocket(socket)) {
+          requestSocketUnrefApplied = true;
+          log("request socket unref applied");
+        }
+      };
+      if (method.responseStream) {
+        unrefRequestSocket(req.socket);
+        req.once("socket", unrefRequestSocket);
+      }
       let clearRequestTimeout = () => {};
       let response: http.IncomingMessage | undefined;
       let requestSetupSettled = false;
@@ -607,4 +620,13 @@ function toTransportClientError(path: string, error: unknown) {
 
   const message = error instanceof Error ? error.message : String(error);
   return new ClientError(path, Status.UNAVAILABLE, message);
+}
+
+function unrefSocket(socket: { unref?: () => void } | null | undefined) {
+  try {
+    socket?.unref?.();
+    return socket?.unref != null;
+  } catch {
+    return false;
+  }
 }

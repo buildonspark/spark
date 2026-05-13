@@ -5,15 +5,20 @@ import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 async function transfer(mnemonicInit, receiverSparkAddress, amountSats) {
   const options = getExampleWalletOptions(process.env, "REGTEST");
-  let { wallet } = await SparkWallet.initialize({
-    mnemonicOrSeed: mnemonicInit,
-    options,
-  });
-  const transfer = await wallet.transfer({
-    receiverSparkAddress,
-    amountSats: Number(amountSats),
-  });
-  return transfer;
+  let wallet;
+  try {
+    const initialized = await SparkWallet.initialize({
+      mnemonicOrSeed: mnemonicInit,
+      options,
+    });
+    wallet = initialized.wallet;
+    return await wallet.transfer({
+      receiverSparkAddress,
+      amountSats: Number(amountSats),
+    });
+  } finally {
+    await wallet?.cleanup();
+  }
 }
 
 const args = process.argv.slice(2);
@@ -50,7 +55,6 @@ try {
     amountSats,
   );
   console.log("Transfer result:", transferResult);
-  process.exit(0);
 } catch (error) {
   console.error(error);
   process.exit(1);

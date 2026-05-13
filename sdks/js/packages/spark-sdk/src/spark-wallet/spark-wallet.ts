@@ -181,7 +181,10 @@ import type {
   UserTokenMetadata,
   WithdrawParams,
 } from "./types.js";
-import { SparkWalletEvent } from "./types.js";
+import {
+  SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
+  SparkWalletEvent,
+} from "./types.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -687,6 +690,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const MAX_DELAY = 15000;
     const RETRY_FOREVER = Number.POSITIVE_INFINITY;
     const STREAM_HEARTBEAT_TIMEOUT_MS = 15_000;
+    // Node.js and Bare timers support unref() so background streams do not
+    // keep short-lived processes alive; browser timers do not need it.
     type StreamActivityTimeoutHandle = ReturnType<typeof setTimeout> & {
       unref?: () => void;
     };
@@ -696,7 +701,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         const timer = setTimeout(() => {
           signal.removeEventListener("abort", onAbort);
           resolve(true);
-        }, ms);
+        }, ms) as ReturnType<typeof setTimeout> & { unref?: () => void };
+        timer.unref?.();
 
         function onAbort() {
           clearTimeout(timer);
@@ -1031,6 +1037,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       });
     }, intervalMs);
+    // Node.js and Bare intervals support unref() so the optimizer does not keep
+    // short-lived scripts alive; browser intervals do not need it.
+    (
+      this.tokenOptimizationInterval as Interval & { unref?: () => void }
+    ).unref?.();
   }
 
   /**
@@ -5946,7 +5957,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     if (this.streamController && !this.streamController.signal.aborted) {
       this.emit(
         SparkWalletEvent.StreamDisconnected,
-        "Wallet cleanup requested",
+        SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
       );
       this.streamController.abort();
     }
@@ -6010,6 +6021,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       });
     }, 10000);
+    // Node.js and Bare intervals support unref() so the claimer does not keep
+    // short-lived scripts alive; browser and React Native intervals do not need it.
+    (
+      this.claimTransfersInterval as Interval & { unref?: () => void }
+    ).unref?.();
   }
 
   public async getUserRequests(

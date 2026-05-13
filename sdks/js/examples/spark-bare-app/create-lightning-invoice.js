@@ -4,16 +4,20 @@ import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 async function createLightningInvoice(mnemonicInit, amountSats) {
   const options = getExampleWalletOptions(process.env, "REGTEST");
-  const { wallet } = await SparkWallet.initialize({
-    mnemonicOrSeed: mnemonicInit,
-    options,
-  });
+  let wallet;
+  try {
+    const initialized = await SparkWallet.initialize({
+      mnemonicOrSeed: mnemonicInit,
+      options,
+    });
+    wallet = initialized.wallet;
 
-  const invoice = await wallet.createLightningInvoice({
-    amountSats: Number(amountSats),
-  });
-  await wallet.cleanup();
-  return invoice;
+    return await wallet.createLightningInvoice({
+      amountSats: Number(amountSats),
+    });
+  } finally {
+    await wallet?.cleanup();
+  }
 }
 
 const args = process.argv.slice(2);

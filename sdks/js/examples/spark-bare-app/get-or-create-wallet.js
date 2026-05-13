@@ -5,18 +5,23 @@ import walletConfig, { getExampleWalletOptions } from "./wallet-config.js";
 
 async function getOrCreateWallet(mnemonicInit) {
   const options = getExampleWalletOptions(process.env, "REGTEST");
-  const { wallet, mnemonic } = await SparkWallet.initialize({
-    mnemonicOrSeed: mnemonicInit,
-    options,
-  });
-  const balance = await wallet.getBalance();
-  const sparkAddress = await wallet.getSparkAddress();
-  await wallet.cleanup();
-  return {
-    mnemonic,
-    balance,
-    sparkAddress,
-  };
+  let wallet;
+  try {
+    const initialized = await SparkWallet.initialize({
+      mnemonicOrSeed: mnemonicInit,
+      options,
+    });
+    wallet = initialized.wallet;
+    const balance = await wallet.getBalance();
+    const sparkAddress = await wallet.getSparkAddress();
+    return {
+      mnemonic: initialized.mnemonic,
+      balance,
+      sparkAddress,
+    };
+  } finally {
+    await wallet?.cleanup();
+  }
 }
 
 const args = process.argv.slice(2);

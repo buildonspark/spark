@@ -17,6 +17,7 @@ import {
   Network,
   NetworkType,
   protoToNetwork,
+  SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
   SparkAddressFormat,
   SparkReadonlyClient,
   SparkWalletEvent,
@@ -901,6 +902,7 @@ async function runCLI() {
         rl.close();
         if (wallet) {
           await wallet.cleanup();
+          wallet = undefined;
         }
         break;
       }
@@ -1325,6 +1327,9 @@ async function runCLI() {
               },
             );
             wallet.on(SparkWalletEvent.StreamDisconnected, (reason: string) => {
+              if (reason === SPARK_WALLET_CLEANUP_DISCONNECT_REASON) {
+                return;
+              }
               console.log("Stream disconnected", reason);
             });
           } catch (error: any) {
@@ -3955,6 +3960,9 @@ async function runCLI() {
       console.error("Error:", error);
       if (isExecMode) process.exit(1);
     }
+  }
+  if (wallet) {
+    await wallet.cleanup();
   }
 }
 

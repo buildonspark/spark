@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import type { SubscribeToEventsResponse } from "../proto/spark.js";
 import { type ConnectionManager } from "../services/connection/connection.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.js";
-import { SparkWalletEvent } from "../spark-wallet/types.js";
+import {
+  SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
+  SparkWalletEvent,
+} from "../spark-wallet/types.js";
 
 type SubscribeToEvents = (
   address: string,
@@ -291,7 +294,129 @@ describe("SparkWallet background stream reconnects", () => {
     await jest.runOnlyPendingTimersAsync();
     await backgroundStreamPromise;
     expect(disconnected).toHaveBeenCalledTimes(1);
-    expect(disconnected).toHaveBeenCalledWith("Wallet cleanup requested");
+    expect(disconnected).toHaveBeenCalledWith(
+      SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
+    );
+    expect(connectionManagerStub.closeConnections).toHaveBeenCalledTimes(1);
+  });
+
+  it("unrefs the background stream retry delay when supported by the runtime", async () => {
+    const unref = jest.fn();
+    jest.spyOn(global, "setTimeout").mockImplementation(
+      ((
+        callback: TimerHandler,
+        delay?: number,
+      ): ReturnType<typeof setTimeout> =>
+        ({
+          callback,
+          delay,
+          unref,
+        }) as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
+    );
+    jest.spyOn(global, "clearTimeout").mockImplementation(() => {});
+
+    const connectionManagerStub = {
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
+      subscribeToEvents: jest.fn<SubscribeToEvents>(async () => {
+        await Promise.resolve();
+        throw new Error("offline");
+      }),
+    };
+    const wallet = new BackgroundStreamRetryTestWallet(connectionManagerStub);
+
+    const backgroundStreamPromise = wallet.runBackgroundStreamForTesting();
+    await flushMicrotasks();
+
+    expect(connectionManagerStub.subscribeToEvents).toHaveBeenCalledTimes(1);
+    expect(unref).toHaveBeenCalledTimes(1);
+
+    await wallet.cleanupConnections();
+    await backgroundStreamPromise;
+    expect(connectionManagerStub.closeConnections).toHaveBeenCalledTimes(1);
+  });
+
+  it("unrefs the token optimization interval when supported by the runtime", async () => {
+    const unref = jest.fn();
+    const setIntervalSpy = jest.spyOn(global, "setInterval").mockImplementation(
+      ((
+        callback: TimerHandler,
+        interval?: number,
+      ): ReturnType<typeof setInterval> =>
+        ({
+          callback,
+          interval,
+          unref,
+        }) as unknown as ReturnType<typeof setInterval>) as typeof setInterval,
+    );
+    jest.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+    const connectionManagerStub = {
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
+      subscribeToEvents: jest.fn<SubscribeToEvents>(async () => {
+        await Promise.resolve();
+        throw new Error("offline");
+      }),
+    };
+    const wallet = new BackgroundStreamRetryTestWallet(connectionManagerStub);
+
+    (
+      wallet as unknown as {
+        startPeriodicTokenOptimization: () => void;
+      }
+    ).startPeriodicTokenOptimization();
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 300_000);
+    expect(unref).toHaveBeenCalledTimes(1);
+
+    await wallet.cleanupConnections();
+    expect(connectionManagerStub.closeConnections).toHaveBeenCalledTimes(1);
+  });
+
+  it("unrefs the claim transfers interval when supported by the runtime", async () => {
+    const unref = jest.fn();
+    const setIntervalSpy = jest.spyOn(global, "setInterval").mockImplementation(
+      ((
+        callback: TimerHandler,
+        interval?: number,
+      ): ReturnType<typeof setInterval> =>
+        ({
+          callback,
+          interval,
+          unref,
+        }) as unknown as ReturnType<typeof setInterval>) as typeof setInterval,
+    );
+    jest.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+    const connectionManagerStub = {
+      closeConnections: jest.fn(async () => {
+        await Promise.resolve();
+      }),
+      subscribeToEvents: jest.fn<SubscribeToEvents>(async () => {
+        await Promise.resolve();
+        throw new Error("offline");
+      }),
+    };
+    const claimTransfers = jest.fn(() => Promise.resolve([]));
+    const wallet = new BackgroundStreamRetryTestWallet(
+      connectionManagerStub,
+      claimTransfers,
+    );
+
+    await (
+      wallet as unknown as {
+        startPeriodicClaimTransfers: () => Promise<void>;
+      }
+    ).startPeriodicClaimTransfers();
+
+    expect(claimTransfers).toHaveBeenCalledTimes(1);
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 10_000);
+    expect(unref).toHaveBeenCalledTimes(1);
+
+    await wallet.cleanupConnections();
     expect(connectionManagerStub.closeConnections).toHaveBeenCalledTimes(1);
   });
 

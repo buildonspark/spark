@@ -215,6 +215,35 @@ describe("BareHttpTransport", () => {
     expect(req.destroy).toHaveBeenCalledWith(expect.any(Error));
   });
 
+  it("clears the unary wall-clock timeout when request setup fails synchronously", async () => {
+    jest.useFakeTimers();
+
+    const req = createMockClientRequest();
+    req.write.mockImplementation(() => {
+      throw new Error("AGENT_SUSPENDED: Agent is suspended");
+    });
+    jest.spyOn(http, "request").mockImplementation(() => req);
+
+    const transport = BareHttpTransport();
+    const iterator = transport({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: queryPendingTransfersMethod,
+      signal: new AbortController().signal,
+      url: "http://example.com/test",
+    });
+
+    const error = await getRejection(iterator[Symbol.asyncIterator]().next());
+    expect(error).toBeInstanceOf(ClientError);
+    expect(error.message).toContain("AGENT_SUSPENDED: Agent is suspended");
+    expect(req.setTimeout).toHaveBeenNthCalledWith(1, 15_000);
+    expect(req.setTimeout).toHaveBeenNthCalledWith(2, 0);
+    expect(req.destroy).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(15_000);
+    expect(req.destroy).not.toHaveBeenCalled();
+  });
+
   it("clears the unary wall-clock timeout after a non-2xx response", async () => {
     const req = createMockClientRequest();
     let onResponse: ((res: IncomingMessage) => void) | undefined;
@@ -366,6 +395,93 @@ describe("BareHttpTransport", () => {
     );
 
     streamRes.destroy(new Error("test cleanup"));
+    await streamDataPromise.then(
+      () => null,
+      () => null,
+    );
+  });
+
+  it("unrefs both request and response sockets for response-streaming RPCs", async () => {
+    const req = createMockClientRequest();
+    const requestSocket = { unref: jest.fn() };
+    Object.assign(req, {
+      socket: requestSocket,
+    });
+    let onResponse: ((res: IncomingMessage) => void) | undefined;
+    jest
+      .spyOn(http, "request")
+      .mockImplementation((...args: Parameters<typeof http.request>) => {
+        onResponse = args[2];
+        return req;
+      });
+
+    const { res, socket: responseSocket } =
+      createMockStreamingIncomingMessage();
+    const transport = BareHttpTransport();
+    const iterator = transport({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: subscribeToEventsMethod,
+      signal: new AbortController().signal,
+      url: "http://example.com/stream",
+    })[Symbol.asyncIterator]();
+
+    const headerPromise = iterator.next();
+    for (let attempt = 0; attempt < 10 && onResponse == null; attempt++) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(onResponse).toBeDefined();
+    onResponse?.(res);
+    await headerPromise;
+
+    expect(requestSocket.unref).toHaveBeenCalledTimes(1);
+    expect(responseSocket.unref).toHaveBeenCalledTimes(1);
+
+    const streamDataPromise = iterator.next();
+    res.destroy(new Error("test cleanup"));
+    await streamDataPromise.then(
+      () => null,
+      () => null,
+    );
+  });
+
+  it("unrefs response-streaming request sockets assigned after request creation", async () => {
+    const req = createMockClientRequest();
+    let onResponse: ((res: IncomingMessage) => void) | undefined;
+    jest
+      .spyOn(http, "request")
+      .mockImplementation((...args: Parameters<typeof http.request>) => {
+        onResponse = args[2];
+        return req;
+      });
+
+    const { res, socket: responseSocket } =
+      createMockStreamingIncomingMessage();
+    const transport = BareHttpTransport();
+    const iterator = transport({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: subscribeToEventsMethod,
+      signal: new AbortController().signal,
+      url: "http://example.com/stream",
+    })[Symbol.asyncIterator]();
+
+    const headerPromise = iterator.next();
+    for (let attempt = 0; attempt < 10 && onResponse == null; attempt++) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(onResponse).toBeDefined();
+
+    const requestSocket = { unref: jest.fn() };
+    req.emit("socket", requestSocket);
+    onResponse?.(res);
+    await headerPromise;
+
+    expect(requestSocket.unref).toHaveBeenCalledTimes(1);
+    expect(responseSocket.unref).toHaveBeenCalledTimes(1);
+
+    const streamDataPromise = iterator.next();
+    res.destroy(new Error("test cleanup"));
     await streamDataPromise.then(
       () => null,
       () => null,

@@ -205,6 +205,9 @@ export const SparkWalletEvent = {
   StreamReconnecting: "stream:reconnecting",
 } as const;
 
+export const SPARK_WALLET_CLEANUP_DISCONNECT_REASON =
+  "Wallet cleanup requested";
+
 export type SparkWalletEventType =
   (typeof SparkWalletEvent)[keyof typeof SparkWalletEvent];
 
