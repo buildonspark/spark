@@ -1554,7 +1554,12 @@ export default class LeafManager {
           }
           nodeIds.push(node.id);
         } else {
-          validNodes.push(node);
+          if (doesTxnNeedRenewed(nodeSequence)) {
+            nodesToRenewNodeTxn.push(node);
+            nodeIds.push(node.id);
+          } else {
+            validNodes.push(node);
+          }
         }
       } catch (err) {
         // Skip this node — don't let one malformed leaf abort the entire batch.
