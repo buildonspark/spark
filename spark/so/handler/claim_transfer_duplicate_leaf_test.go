@@ -39,6 +39,7 @@ func TestClaimTransferTweakKeys_DuplicateLeafIDsRejected(t *testing.T) {
 		SetTransferID(transfer.ID).
 		SetIdentityPubkey(receiverPubKey).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(transfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 

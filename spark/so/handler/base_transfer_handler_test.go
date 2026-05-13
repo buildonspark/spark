@@ -552,12 +552,13 @@ func TestCreateTransfer_CounterSwapV3_FailsWithNonPrimarySwapTransfer(t *testing
 		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
-	_, err = client.TransferSender.Create().SetTransferID(nonSwapTransfer.ID).SetIdentityPubkey(alicePub).Save(ctx)
+	_, err = client.TransferSender.Create().SetTransferID(nonSwapTransfer.ID).SetIdentityPubkey(alicePub).SetTransferType(nonSwapTransfer.Type).Save(ctx)
 	require.NoError(t, err)
 	_, err = client.TransferReceiver.Create().
 		SetTransferID(nonSwapTransfer.ID).
 		SetIdentityPubkey(bobPub).
 		SetStatus(st.TransferReceiverStatusInitiated).
+		SetTransferType(nonSwapTransfer.Type).
 		Save(ctx)
 	require.NoError(t, err)
 
