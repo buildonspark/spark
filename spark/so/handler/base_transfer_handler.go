@@ -2277,6 +2277,9 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
+	if len(senderKeyTweakProofs) != len(transferLeaves) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof count mismatch: expected %d, got %d", len(transferLeaves), len(senderKeyTweakProofs)))
+	}
 
 	for _, leaf := range transferLeaves {
 		keyTweakProto := &pbspark.SendLeafKeyTweak{}
@@ -2284,10 +2287,16 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
+		if keyTweakProto.SecretShareTweak == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", keyTweakProto.LeafId))
+		}
 
 		keyTweakProof, ok := senderKeyTweakProofs[keyTweakProto.LeafId]
 		if !ok {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("key tweak proof not found for leaf: %s", keyTweakProto.LeafId))
+		}
+		if keyTweakProof == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("key tweak proof value is nil for leaf: %s", keyTweakProto.LeafId))
 		}
 
 		if !slices.EqualFunc(keyTweakProof.Proofs, keyTweakProto.SecretShareTweak.Proofs, bytes.Equal) {
