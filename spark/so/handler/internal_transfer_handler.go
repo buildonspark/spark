@@ -788,6 +788,13 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		return fmt.Errorf("invalid transfer id: %s", transferReq.GetTransferId())
 	}
 
+	// Validate exit_txid <-> connector_tx binding before any leaf or chain
+	// work. See parseAndValidateCoopExitTxid.
+	exitTxid, err := parseAndValidateCoopExitTxid(ctx, transferReq.TransferId, req.ExitTxid, req.GetConnectorTx())
+	if err != nil {
+		return err
+	}
+
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(transferReq)
 
 	var keyTweakMap map[string]*pb.SendLeafKeyTweak
@@ -878,11 +885,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	exitTxid, err := st.NewTxIDFromBytes(req.ExitTxid)
-	if err != nil {
-		return fmt.Errorf("failed to parse exit txid for transfer id: %s. exit id: %s and error: %w", transferReq.TransferId, req.ExitId, err)
-	}
-
+	// exit_txid was already parsed + validated above.
 	_, err = db.CooperativeExit.Create().
 		SetID(exitID).
 		SetTransfer(transfer).

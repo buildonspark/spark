@@ -10,7 +10,9 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -20,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func setupUsers(t *testing.T, amountSats int64) (*wallet.TestWalletConfig, *wallet.TestWalletConfig, wallet.LeafKeyTweak) {
@@ -205,6 +208,99 @@ func TestCoopExitBasic(t *testing.T) {
 		if time.Since(startTime) > 15*time.Second {
 			t.Fatalf("timed out waiting for tx to confirm")
 		}
+	}
+}
+
+// TestCoopExit_RejectsMismatchedExitTxid reproduces the Immunefi attack at the
+// gRPC layer: a malicious SSP supplies a structurally-valid connector_tx but
+// pairs it with an unrelated exit_txid. With KnobEnforceCoopExitConnectorBinding
+// enabled, the SO must reject at parseAndValidateCoopExitTxid before any leaf,
+// chain, or DB work.
+//
+// Isolation: this test does NOT call setupUsers, broadcast deposits, or mine
+// blocks. The validator runs in the request handler before any leaf lookup,
+// so it rejects on a hand-built minimal request with a fake leaf. Zero
+// chain-watcher footprint means zero impact on downstream integration tests.
+//
+// KnobEnforceCoopExitConnectorBinding is set to 1 in tilt/spark/Tiltfile so
+// this test does not mutate any ConfigMap.
+func TestCoopExit_RejectsMismatchedExitTxid(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	sparkClient := sparkpb.NewSparkServiceClient(conn)
+
+	// Build a structurally-valid connector_tx whose parent is some arbitrary
+	// hash. Never broadcast.
+	var legitParent chainhash.Hash
+	for i := range legitParent {
+		legitParent[i] = byte(i + 1)
+	}
+	connectorTx := wire.NewMsgTx(2)
+	connectorTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: legitParent, Index: 0}})
+	connectorTx.AddTxOut(&wire.TxOut{Value: 354, PkScript: []byte{0x51}})
+	connectorTxBytes, err := common.SerializeTx(connectorTx)
+	require.NoError(t, err)
+
+	// Alibi exit_txid: 32 bytes that do not match legitParent in either endian.
+	alibiExitTxID := make([]byte, 32)
+	for i := range alibiExitTxID {
+		alibiExitTxID[i] = byte(255 - i)
+	}
+
+	receiverPubKey := keys.GeneratePrivateKey().Public()
+
+	buildTransfer := func() *sparkpb.StartTransferRequest {
+		// Shape-valid leaf -- passes the V2 nil/empty checks. The leaf id is
+		// fabricated; the validator rejects before any DB lookup of the leaf.
+		leaf := &sparkpb.LeafRefundTxSigningJob{
+			LeafId:                           uuid.NewString(),
+			RefundTxSigningJob:               &sparkpb.SigningJob{},
+			DirectFromCpfpRefundTxSigningJob: &sparkpb.SigningJob{},
+		}
+		return &sparkpb.StartTransferRequest{
+			TransferId:                uuid.NewString(),
+			OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
+			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
+			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
+			LeavesToSend:              []*sparkpb.LeafRefundTxSigningJob{leaf},
+		}
+	}
+
+	cases := []struct {
+		name        string
+		withPackage bool
+	}{
+		{"no_transfer_package", false},
+		{"with_transfer_package", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			transfer := buildTransfer()
+			if c.withPackage {
+				transfer.TransferPackage = &sparkpb.TransferPackage{}
+			}
+			req := &sparkpb.CooperativeExitRequest{
+				Transfer:    transfer,
+				ExitId:      uuid.NewString(),
+				ExitTxid:    alibiExitTxID,
+				ConnectorTx: connectorTxBytes,
+			}
+			_, err := sparkClient.CooperativeExitV2(ctx, req)
+			require.Error(t, err, "SO must reject coop exit with mismatched exit_txid")
+			require.Contains(t, err.Error(), "does not match exit_txid",
+				"rejection must come from the connector-binding validator")
+			if s, ok := status.FromError(err); ok {
+				assert.Equal(t, codes.InvalidArgument, s.Code(),
+					"rejection should be reported as InvalidArgument")
+			}
+		})
 	}
 }
 

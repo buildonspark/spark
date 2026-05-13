@@ -87,6 +87,13 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer receiver identity public key: %w", err))
 	}
 
+	// Validate exit_txid <-> connector_tx binding before any DB write, leaf
+	// lookup, or FROST work. See parseAndValidateCoopExitTxid.
+	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.Transfer.TransferId, req.ExitTxid, req.GetConnectorTx())
+	if err != nil {
+		return nil, err
+	}
+
 	entTx, err := ent.GetTxFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
@@ -145,20 +152,12 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.ExitId, err)
 	}
 
-	if len(req.ExitTxid) != 32 {
-		return nil, fmt.Errorf("exit_txid %x is not 32 bytes", req.ExitTxid)
-	}
-
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
 	}
 
-	exitTxid, err := st.NewTxIDFromBytes(req.ExitTxid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse exit txid for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
-	}
-
+	// exit_txid was already parsed + validated above.
 	_, err = db.CooperativeExit.Create().
 		SetID(exitUUID).
 		SetTransfer(transfer).
@@ -239,6 +238,14 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
 	}
 
+	// Validate exit_txid <-> connector_tx binding before any expensive work
+	// (transfer-package validation, leaf lookup, DB writes). See
+	// parseAndValidateCoopExitTxid.
+	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.Transfer.TransferId, req.ExitTxid, req.GetConnectorTx())
+	if err != nil {
+		return nil, err
+	}
+
 	leafTweakMap, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIdentityPubKey, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for coop exit %s: %w", transferID, err)
@@ -287,22 +294,15 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		return nil, fmt.Errorf("failed to create transfer for coop exit %s: %w", transferID, originalErr)
 	}
 
-	// Create cooperative exit record
+	// Create cooperative exit record. exit_txid was already parsed + validated.
 	exitUUID, err := uuid.Parse(req.ExitId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.ExitId, err)
-	}
-	if len(req.ExitTxid) != 32 {
-		return nil, fmt.Errorf("exit_txid %x is not 32 bytes", req.ExitTxid)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
-	}
-	exitTxid, err := st.NewTxIDFromBytes(req.ExitTxid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse exit txid for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
 	}
 	_, err = db.CooperativeExit.Create().
 		SetID(exitUUID).

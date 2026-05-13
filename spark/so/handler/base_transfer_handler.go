@@ -1916,6 +1916,65 @@ func removeTxIn(rawTx []byte, vin int) ([]byte, error) {
 	return modifiedTxRaw, nil
 }
 
+// parseAndValidateCoopExitTxid runs the cheap, request-only validation that
+// must succeed before any coop-exit DB write, leaf lookup, or FROST signing.
+// It (1) parses req.ExitTxid into a typed TxID and (2) if the knob is
+// enabled, verifies that connector_tx.TxIn[0].PreviousOutPoint.Hash binds to
+// exit_txid -- the invariant that prevents a malicious SSP from pairing a
+// structurally-valid connector_tx with an unrelated alibi exit_txid.
+//
+// Errors are returned with InvalidArgument codes so callers can rely on gRPC
+// status mapping without re-wrapping.
+func parseAndValidateCoopExitTxid(ctx context.Context, transferID string, exitTxidBytes []byte, connectorTxBytes []byte) (st.TxID, error) {
+	if len(exitTxidBytes) != 32 {
+		return st.TxID{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("exit_txid %x is not 32 bytes", exitTxidBytes))
+	}
+	exitTxid, err := st.NewTxIDFromBytes(exitTxidBytes)
+	if err != nil {
+		return st.TxID{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse exit txid for transfer id %s exit txid %x: %w", transferID, exitTxidBytes, err))
+	}
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnforceCoopExitConnectorBinding, 0) > 0 {
+		if err := validateConnectorTxBindsToExitTxid(connectorTxBytes, exitTxid); err != nil {
+			return st.TxID{}, fmt.Errorf("coop exit %s: %w", transferID, err)
+		}
+	}
+	return exitTxid, nil
+}
+
+// validateConnectorTxBindsToExitTxid ensures the connector_tx spends the same
+// L1 exit transaction whose txid the SO will hand to the chain watcher. Without
+// this binding, a malicious SSP can pair a structurally-valid connector_tx with
+// an unrelated alibi exit_txid; the watcher confirms on the alibi tx, the Spark
+// leaves rotate to the receiver, and the legitimate L1 exit is never broadcast.
+//
+// The chain watcher accepts ExitTxid in either internal (little-endian) or
+// display (big-endian) byte order, so this validator mirrors that tolerance.
+func validateConnectorTxBindsToExitTxid(connectorTxBytes []byte, exitTxid st.TxID) error {
+	if len(connectorTxBytes) == 0 {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation"))
+	}
+	connectorTx, err := common.TxFromRawTxBytes(connectorTxBytes)
+	if err != nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse connector tx: %w", err))
+	}
+	if len(connectorTx.TxIn) == 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector_tx has no inputs"))
+	}
+
+	parent := connectorTx.TxIn[0].PreviousOutPoint.Hash
+	expectedNormal := exitTxid.Hash()
+	expectedReversed := expectedNormal
+	slices.Reverse(expectedReversed[:])
+	if parent != expectedNormal && parent != expectedReversed {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+			"connector_tx parent %s does not match exit_txid %s",
+			parent.String(),
+			exitTxid.String(),
+		))
+	}
+	return nil
+}
+
 func parseConnectorTxOutputs(connectorTx []byte) (map[wire.OutPoint]*wire.TxOut, error) {
 	if len(connectorTx) == 0 {
 		return nil, nil

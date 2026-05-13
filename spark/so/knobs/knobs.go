@@ -89,6 +89,14 @@ const (
 	// the fallback so they can never disagree when the knob is unset.
 	CoopExitConfirmationThreshold = 6
 
+	// Cooperative Exit
+	// When enabled (> 0), rejects a coop-exit request unless
+	// connector_tx.TxIn[0].PreviousOutPoint.Hash equals the supplied exit_txid.
+	// By default (0) the check is skipped (preserving prior behavior); flip to 1
+	// after observing in dry-run logs that no legitimate caller would be
+	// rejected. When 0, the alibi-tx claim vulnerability is open.
+	KnobEnforceCoopExitConnectorBinding = "spark.so.coop_exit.enforce_connector_binding"
+
 	// Tokens
 	KnobTokenTransactionV3Enabled = "spark.so.tokens.token_transaction_v3_enabled"
 	// Enable Phase 2 of the token transaction v3 migration which combines the internal prepare and sign RPCs into a single RPC.
