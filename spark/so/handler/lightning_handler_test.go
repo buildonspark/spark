@@ -577,6 +577,44 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("nil job entries", func(t *testing.T) {
+		tests := []struct {
+			name                       string
+			leavesToSend               []*pb.UserSignedTxSigningJob
+			directLeavesToSend         []*pb.UserSignedTxSigningJob
+			directFromCpfpLeavesToSend []*pb.UserSignedTxSigningJob
+			expectedErrMsg             string
+		}{
+			{
+				name:           "nil cpfp transaction",
+				leavesToSend:   []*pb.UserSignedTxSigningJob{nil},
+				expectedErrMsg: "cpfp transaction is nil",
+			},
+			{
+				name:               "nil direct transaction",
+				leavesToSend:       []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
+				directLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+				expectedErrMsg:     "direct transaction is nil",
+			},
+			{
+				name:                       "nil direct from cpfp transaction",
+				leavesToSend:               []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
+				directFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+				expectedErrMsg:             "direct from cpfp transaction is nil",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var err error
+				require.NotPanics(t, func() {
+					err = lightningHandler.ValidateDuplicateLeaves(ctx, tt.leavesToSend, tt.directLeavesToSend, tt.directFromCpfpLeavesToSend)
+				})
+				require.ErrorContains(t, err, tt.expectedErrMsg)
+			})
+		}
+	})
+
 	t.Run("duplicate in leavesToSend", func(t *testing.T) {
 		leavesToSend := []*pb.UserSignedTxSigningJob{
 			createSigningJob("leaf1"),
@@ -1371,13 +1409,58 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			},
 			expectedErrMsg: "at least one cpfp leaf tx must be provided",
 		},
+		{
+			name: "nil cpfp transaction",
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
+				return &pb.InitiatePreimageSwapRequest{
+					Transfer: &pb.StartUserSignedTransferRequest{
+						LeavesToSend:              []*pb.UserSignedTxSigningJob{nil},
+						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+					},
+				}
+			},
+			expectedErrMsg: "cpfp transaction is nil",
+		},
+		{
+			name: "nil direct transaction",
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
+				return &pb.InitiatePreimageSwapRequest{
+					Transfer: &pb.StartUserSignedTransferRequest{
+						LeavesToSend:              []*pb.UserSignedTxSigningJob{{LeafId: "test-leaf"}},
+						DirectLeavesToSend:        []*pb.UserSignedTxSigningJob{nil},
+						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+					},
+				}
+			},
+			expectedErrMsg: "direct transaction is nil",
+		},
+		{
+			name: "nil direct from cpfp transaction",
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
+				return &pb.InitiatePreimageSwapRequest{
+					Transfer: &pb.StartUserSignedTransferRequest{
+						LeavesToSend:               []*pb.UserSignedTxSigningJob{{LeafId: "test-leaf"}},
+						DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+						OwnerIdentityPublicKey:     ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey:  receiverIdentityPubKey.Serialize(),
+					},
+				}
+			},
+			expectedErrMsg: "direct from cpfp transaction is nil",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := tt.setUpRequest()
 
-			resp, err := lightningHandler.InitiatePreimageSwap(ctx, req)
+			var resp *pb.InitiatePreimageSwapResponse
+			var err error
+			require.NotPanics(t, func() {
+				resp, err = lightningHandler.InitiatePreimageSwap(ctx, req)
+			})
 
 			require.ErrorContains(t, err, tt.expectedErrMsg)
 			assert.Nil(t, resp)

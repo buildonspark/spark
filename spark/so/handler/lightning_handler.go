@@ -402,12 +402,18 @@ func (h *LightningHandler) ValidateDuplicateLeaves(
 	directLeavesMap := make(map[string]bool)
 	directFromCpfpLeavesMap := make(map[string]bool)
 	for _, leaf := range leavesToSend {
+		if leaf == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("cpfp transaction is nil"))
+		}
 		if leavesMap[leaf.LeafId] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
 		leavesMap[leaf.LeafId] = true
 	}
 	for _, leaf := range directLeavesToSend {
+		if leaf == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct transaction is nil"))
+		}
 		if directLeavesMap[leaf.LeafId] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
@@ -417,6 +423,9 @@ func (h *LightningHandler) ValidateDuplicateLeaves(
 		directLeavesMap[leaf.LeafId] = true
 	}
 	for _, leaf := range directFromCpfpLeavesToSend {
+		if leaf == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp transaction is nil"))
+		}
 		if directFromCpfpLeavesMap[leaf.LeafId] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
