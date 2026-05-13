@@ -1234,14 +1234,13 @@ func (h *LightningHandler) GetPreimageShare(
 	return nil, nil
 }
 
-func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context, signingJobs []*pbspark.UserSignedTxSigningJob, leafIDMap map[string]bool, needDirectTx bool) error {
+func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context, fieldName string, signingJobs []*pbspark.UserSignedTxSigningJob, leafIDMap map[string]bool, needDirectTx bool) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	currentLeafIDMap := make(map[string]bool)
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-	for _, job := range signingJobs {
+	for i, job := range signingJobs {
+		if job == nil {
+			return fmt.Errorf("transfer_request.transfer_package.%s[%d] is required", fieldName, i)
+		}
 		if _, ok := leafIDMap[job.LeafId]; !ok {
 			logger.Sugar().Errorf("leaf id is not in signing jobs %s", job.LeafId)
 			return fmt.Errorf("leaf id %s is not in signing jobs", job.LeafId)
@@ -1250,8 +1249,16 @@ func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context,
 	}
 
 	if needDirectTx {
+		var db *ent.Client
 		for leafID := range leafIDMap {
 			if _, ok := currentLeafIDMap[leafID]; !ok {
+				if db == nil {
+					var err error
+					db, err = ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+				}
 				leafID, err := uuid.Parse(leafID)
 				if err != nil {
 					return fmt.Errorf("failed to parse leaf id: %w", err)
@@ -1276,6 +1283,9 @@ func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context,
 func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) error {
 	// The purpose of the function is to validate that req.Transfer and req.TransferRequest have the same leaves.
 	// The idea is to replace req.Transfer with req.TransferRequest, but until SSP stop using the query user refund call, we can't simply remove req.Transfer.
+	if req.GetTransferRequest().GetTransferPackage() == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request.transfer_package is required"))
+	}
 	if !bytes.Equal(req.Transfer.OwnerIdentityPublicKey, req.TransferRequest.OwnerIdentityPublicKey) ||
 		!bytes.Equal(req.Transfer.ReceiverIdentityPublicKey, req.TransferRequest.ReceiverIdentityPublicKey) ||
 		!bytes.Equal(req.ReceiverIdentityPublicKey, req.TransferRequest.ReceiverIdentityPublicKey) {
@@ -1291,35 +1301,51 @@ func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(c
 	for _, leaf := range req.Transfer.LeavesToSend {
 		leafIDMap[leaf.LeafId] = true
 	}
-	err := h.validateSigningJobsHasAllLeafIDs(ctx, req.TransferRequest.TransferPackage.LeavesToSend, leafIDMap, false)
+	err := h.validateSigningJobsHasAllLeafIDs(ctx, "leaves_to_send", req.TransferRequest.TransferPackage.LeavesToSend, leafIDMap, false)
 	if err != nil {
 		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
 	}
 
-	err = h.validateSigningJobsHasAllLeafIDs(ctx, req.TransferRequest.TransferPackage.DirectLeavesToSend, leafIDMap, true)
+	err = h.validateSigningJobsHasAllLeafIDs(ctx, "direct_leaves_to_send", req.TransferRequest.TransferPackage.DirectLeavesToSend, leafIDMap, true)
 	if err != nil {
 		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
 	}
 
-	err = h.validateSigningJobsHasAllLeafIDs(ctx, req.TransferRequest.TransferPackage.DirectFromCpfpLeavesToSend, leafIDMap, false)
+	err = h.validateSigningJobsHasAllLeafIDs(ctx, "direct_from_cpfp_leaves_to_send", req.TransferRequest.TransferPackage.DirectFromCpfpLeavesToSend, leafIDMap, false)
 	if err != nil {
 		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
 	}
 	return nil
 }
 
-func (h *LightningHandler) loadRefund(req []*pbspark.UserSignedTxSigningJob) map[string][]byte {
+func (h *LightningHandler) loadRefund(fieldName string, req []*pbspark.UserSignedTxSigningJob) (map[string][]byte, error) {
 	refundMap := make(map[string][]byte)
-	for _, job := range req {
+	for i, job := range req {
+		if job == nil {
+			return nil, fmt.Errorf("transfer_request.transfer_package.%s[%d] is required", fieldName, i)
+		}
 		refundMap[job.LeafId] = job.RawTx
 	}
-	return refundMap
+	return refundMap, nil
 }
 
 func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
-	cpfpLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.LeavesToSend)
-	directLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.DirectLeavesToSend)
-	directFromCpfpLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.DirectFromCpfpLeavesToSend)
+	transferPackage := req.GetTransferRequest().GetTransferPackage()
+	if transferPackage == nil {
+		return nil, nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request.transfer_package is required"))
+	}
+	cpfpLeafRefundMap, err := h.loadRefund("leaves_to_send", transferPackage.LeavesToSend)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	directLeafRefundMap, err := h.loadRefund("direct_leaves_to_send", transferPackage.DirectLeavesToSend)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	directFromCpfpLeafRefundMap, err := h.loadRefund("direct_from_cpfp_leaves_to_send", transferPackage.DirectFromCpfpLeavesToSend)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		// We are not building the refund maps for receive preimage swap for now, the transactions are created from SSP.

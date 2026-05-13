@@ -1576,7 +1576,10 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 
 	// Validate leaf IDs and check for duplicates/orphans/mismatches across lists.
 	leavesToSendIDs := make(map[string]struct{}, len(pkg.LeavesToSend))
-	for _, leaf := range pkg.LeavesToSend {
+	for i, leaf := range pkg.LeavesToSend {
+		if leaf == nil {
+			return nil, fmt.Errorf("leaves_to_send[%d] is required", i)
+		}
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.LeafId, err)
@@ -1589,7 +1592,10 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	directLeafIDs := make(map[string]struct{}, len(pkg.DirectLeavesToSend))
-	for _, leaf := range pkg.DirectLeavesToSend {
+	for i, leaf := range pkg.DirectLeavesToSend {
+		if leaf == nil {
+			return nil, fmt.Errorf("direct_leaves_to_send[%d] is required", i)
+		}
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
@@ -1612,7 +1618,10 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
 	}
 	directFromCpfpLeafIDs := make(map[string]struct{}, len(pkg.DirectFromCpfpLeavesToSend))
-	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
+	for i, leaf := range pkg.DirectFromCpfpLeavesToSend {
+		if leaf == nil {
+			return nil, fmt.Errorf("direct_from_cpfp_leaves_to_send[%d] is required", i)
+		}
 		parsed, err := uuid.Parse(leaf.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)

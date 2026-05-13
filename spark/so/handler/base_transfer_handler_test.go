@@ -1167,6 +1167,59 @@ func TestValidateTransferPackage_DuplicateLeafID(t *testing.T) {
 	require.ErrorContains(t, err, "duplicate leaf id in LeavesToSend")
 }
 
+func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	h := NewBaseTransferHandler(config)
+	leafID := uuid.New().String()
+
+	tests := []struct {
+		name    string
+		pkg     *pbspark.TransferPackage
+		wantErr string
+	}{
+		{
+			name: "nil cpfp job",
+			pkg: &pbspark.TransferPackage{
+				KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
+				LeavesToSend:    []*pbspark.UserSignedTxSigningJob{nil},
+			},
+			wantErr: "leaves_to_send[0] is required",
+		},
+		{
+			name: "nil direct job",
+			pkg: &pbspark.TransferPackage{
+				KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
+				LeavesToSend: []*pbspark.UserSignedTxSigningJob{
+					{LeafId: leafID, RawTx: []byte{1}},
+				},
+				DirectLeavesToSend: []*pbspark.UserSignedTxSigningJob{nil},
+			},
+			wantErr: "direct_leaves_to_send[0] is required",
+		},
+		{
+			name: "nil direct from cpfp job",
+			pkg: &pbspark.TransferPackage{
+				KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
+				LeavesToSend: []*pbspark.UserSignedTxSigningJob{
+					{LeafId: leafID, RawTx: []byte{1}},
+				},
+				DirectFromCpfpLeavesToSend: []*pbspark.UserSignedTxSigningJob{nil},
+			},
+			wantErr: "direct_from_cpfp_leaves_to_send[0] is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			require.NotPanics(t, func() {
+				_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), tt.pkg, keys.GeneratePrivateKey().Public(), false)
+			})
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestValidateTransferPackage_OrphanDirectLeaf(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	h := NewBaseTransferHandler(config)

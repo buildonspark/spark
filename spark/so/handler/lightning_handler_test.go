@@ -40,6 +40,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // mockFrostServiceClientConnection implements the FrostServiceClientConnection interface for testing
@@ -752,6 +753,90 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 		err := lightningHandler.ValidateDuplicateLeaves(ctx, []*pb.UserSignedTxSigningJob{}, directLeavesToSend, []*pb.UserSignedTxSigningJob{})
 		require.ErrorContains(t, err, "leaf id leaf1 not found in leaves to send")
 	})
+}
+
+func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{61})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	transferID := uuid.NewString()
+	leafID := uuid.NewString()
+	expiryTime := timestamppb.New(time.Now().Add(time.Hour))
+
+	newRequest := func(pkg *pb.TransferPackage) *pb.InitiatePreimageSwapRequest {
+		return &pb.InitiatePreimageSwapRequest{
+			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+			Transfer: &pb.StartUserSignedTransferRequest{
+				TransferId:                transferID,
+				OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+				ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+				ExpiryTime:                expiryTime,
+				LeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leafID},
+				},
+			},
+			TransferRequest: &pb.StartTransferRequest{
+				TransferId:                transferID,
+				OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+				ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+				ExpiryTime:                expiryTime,
+				TransferPackage:           pkg,
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		pkg     *pb.TransferPackage
+		wantErr string
+	}{
+		{
+			name:    "nil transfer package",
+			pkg:     nil,
+			wantErr: "transfer_request.transfer_package is required",
+		},
+		{
+			name: "nil cpfp job",
+			pkg: &pb.TransferPackage{
+				LeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+			},
+			wantErr: "transfer_request.transfer_package.leaves_to_send[0] is required",
+		},
+		{
+			name: "nil direct job",
+			pkg: &pb.TransferPackage{
+				LeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leafID},
+				},
+				DirectLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+			},
+			wantErr: "transfer_request.transfer_package.direct_leaves_to_send[0] is required",
+		},
+		{
+			name: "nil direct from cpfp job",
+			pkg: &pb.TransferPackage{
+				LeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leafID},
+				},
+				DirectLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leafID},
+				},
+				DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+			},
+			wantErr: "transfer_request.transfer_package.direct_from_cpfp_leaves_to_send[0] is required",
+		},
+	}
+
+	lightningHandler := NewLightningHandler(&so.Config{})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			require.NotPanics(t, func() {
+				err = lightningHandler.validateIdenticalLeavesInTransferAndTransferRequest(t.Context(), newRequest(tt.pkg))
+			})
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
 
 // Note: StorePreimageShare requires complex cryptographic validation
