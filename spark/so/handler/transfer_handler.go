@@ -3142,6 +3142,9 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 		if !exists {
 			return fmt.Errorf("key tweak proof for leaf %s not found", leaf.ID.String())
 		}
+		if proof == nil {
+			return fmt.Errorf("key tweak proof value is nil for leaf %s", leaf.ID.String())
+		}
 		keyTweakProto := &pb.ClaimLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
 		if err != nil {
