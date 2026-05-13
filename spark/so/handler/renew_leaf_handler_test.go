@@ -329,6 +329,48 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 	}
 }
 
+func TestValidateAndConstructRenewSigningJobsRejectMissingRequiredJobs(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{19})
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerIdentityPubKey)
+	parent := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+
+	const sequenceFlag = 1 << 30
+	makeLeaf := func(nodeTimelock uint32, refundTimelock uint32) *ent.TreeNode {
+		t.Helper()
+		leaf := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parent, 0)
+		leaf, err = leaf.Update().
+			SetRawTx(createValidTestTransactionBytesWithSequence(t, nodeTimelock|sequenceFlag)).
+			SetRawRefundTx(createValidTestTransactionBytesWithSequence(t, refundTimelock|sequenceFlag)).
+			Save(ctx)
+		require.NoError(t, err)
+		return leaf
+	}
+
+	nodeLeaf := makeLeaf(100, 100)
+	_, _, _, err = validateAndConstructNodeTimelock(ctx, nodeLeaf, nil)
+	require.ErrorContains(t, err, "renew node timelock signing job is required")
+	_, _, _, err = validateAndConstructNodeTimelock(ctx, nodeLeaf, &pb.RenewNodeTimelockSigningJob{})
+	require.ErrorContains(t, err, "split node tx signing job is required")
+
+	refundLeaf := makeLeaf(200, 100)
+	_, _, _, err = validateAndConstructRefundTimelock(ctx, refundLeaf, nil)
+	require.ErrorContains(t, err, "renew refund timelock signing job is required")
+	_, _, _, err = validateAndConstructRefundTimelock(ctx, refundLeaf, &pb.RenewRefundTimelockSigningJob{})
+	require.ErrorContains(t, err, "node tx signing job is required")
+
+	zeroLeaf := makeLeaf(0, 100)
+	_, _, err = validateAndConstructNodeZeroTimelock(zeroLeaf, nil)
+	require.ErrorContains(t, err, "renew node zero timelock signing job is required")
+	_, _, err = validateAndConstructNodeZeroTimelock(zeroLeaf, &pb.RenewNodeZeroTimelockSigningJob{})
+	require.ErrorContains(t, err, "node tx signing job is required")
+}
+
 func TestConstructRenewRefundTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})

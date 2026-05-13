@@ -166,8 +166,20 @@ func validateAndConstructNodeTimelock(ctx context.Context, leaf *ent.TreeNode, s
 		return nil, nil, nil, fmt.Errorf("validating extend timelock failed: %w", err)
 	}
 
+	if signingJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("renew node timelock signing job is required"))
+	}
+	if signingJob.SplitNodeTxSigningJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("split node tx signing job is required"))
+	}
 	if signingJob.SplitNodeDirectTxSigningJob == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("split node direct tx signing job is required"))
+	}
+	if signingJob.NodeTxSigningJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("node tx signing job is required"))
+	}
+	if signingJob.RefundTxSigningJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required"))
 	}
 	if signingJob.DirectNodeTxSigningJob == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
@@ -221,6 +233,15 @@ func validateAndConstructRefundTimelock(ctx context.Context, leaf *ent.TreeNode,
 		return nil, nil, nil, fmt.Errorf("validating refresh timelock failed: %w", err)
 	}
 
+	if signingJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("renew refund timelock signing job is required"))
+	}
+	if signingJob.NodeTxSigningJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("node tx signing job is required"))
+	}
+	if signingJob.RefundTxSigningJob == nil {
+		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required"))
+	}
 	if signingJob.DirectNodeTxSigningJob == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
@@ -271,6 +292,15 @@ func validateAndConstructNodeZeroTimelock(leaf *ent.TreeNode, signingJob *pb.Ren
 		return nil, nil, fmt.Errorf("validating zero timelock renewal failed: %w", err)
 	}
 
+	if signingJob == nil {
+		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("renew node zero timelock signing job is required"))
+	}
+	if signingJob.NodeTxSigningJob == nil {
+		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("node tx signing job is required"))
+	}
+	if signingJob.RefundTxSigningJob == nil {
+		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required"))
+	}
 	if signingJob.DirectNodeTxSigningJob == nil {
 		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
