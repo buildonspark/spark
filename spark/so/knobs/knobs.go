@@ -81,6 +81,7 @@ const (
 	KnobWatchChainMarkExitingNodesEnabled               = "spark.so.watch_chain.mark_exiting_nodes.enabled"
 	KnobWatchChainTweakKeysForCoopExitDelayEnabled      = "spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled"
 	KnobWatchChainCoopExitKeyTweakRequiredConfirmations = "spark.so.watch_chain.coop_exit_key_tweak_required_confirmations"
+	KnobWatchChainCoopExitPendingExpiryDays             = "spark.so.watch_chain.coop_exit_pending_expiry_days"
 
 	// CoopExitConfirmationThreshold is the default required L1 confirmation
 	// count for both the watch-chain key-tweak advance and the receiver-claim
@@ -88,6 +89,10 @@ const (
 	// KnobWatchChainCoopExitKeyTweakRequiredConfirmations with this value as
 	// the fallback so they can never disagree when the knob is unset.
 	CoopExitConfirmationThreshold = 6
+	// CoopExitPendingExpiryDays is the default number of days after which a
+	// pending (unconfirmed) cooperative exit is considered stale and deleted.
+	// 14 days matches the default Bitcoin Core mempool expiry (DEFAULT_MEMPOOL_EXPIRY).
+	CoopExitPendingExpiryDays = 14
 
 	// Tokens
 	KnobTokenTransactionV3Enabled = "spark.so.tokens.token_transaction_v3_enabled"
