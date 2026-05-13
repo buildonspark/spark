@@ -226,6 +226,54 @@ func TestHydrateSigningKeyshareSecrets_HydratesDuplicatePointersForSameID(t *tes
 	require.True(t, resolvedB.Equals(secret))
 }
 
+func TestMarkSigningKeysharesAsUsedRejectsRequestOverCapWithoutMutating(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoMaxKeysharesPerRequest: 2,
+	}))
+
+	first := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, nil)
+	second := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, nil)
+	third := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, nil)
+	ids := []uuid.UUID{first.ID, second.ID, third.ID}
+
+	_, err := ent.MarkSigningKeysharesAsUsed(ctx, nil, ids)
+	require.ErrorContains(t, err, "keyshare request too large")
+
+	for _, id := range ids {
+		keyshare, err := tc.Client.SigningKeyshare.Get(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, st.KeyshareStatusAvailable, keyshare.Status)
+	}
+}
+
+func TestMarkSigningKeysharesAsUsedRejectsDuplicateIDsWithoutMutating(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, nil)
+
+	_, err := ent.MarkSigningKeysharesAsUsed(ctx, nil, []uuid.UUID{keyshare.ID, keyshare.ID})
+	require.ErrorContains(t, err, "duplicate keyshare id")
+
+	persisted, err := tc.Client.SigningKeyshare.Get(ctx, keyshare.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.KeyshareStatusAvailable, persisted.Status)
+}
+
+func TestMarkSigningKeysharesAsUsedAllowsEmptyIDsWithoutMutating(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, nil)
+
+	keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, keyshares)
+
+	persisted, err := tc.Client.SigningKeyshare.Get(ctx, keyshare.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.KeyshareStatusAvailable, persisted.Status)
+}
+
 func TestUpdateSigningKeyshareWithRotatedSecret_UsesEphemeralAndDualWritesWhenEnabled(t *testing.T) {
 	ctx, tc := db.ConnectToTestPostgres(t)
 	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
@@ -358,7 +406,7 @@ func mustCreateSigningKeyshare(
 ) *ent.SigningKeyshare {
 	t.Helper()
 
-	publicKeySource := keys.MustParsePrivateKeyHex("e6d2b44c26c0c1b507fab0d5e66c388c5676c109b9ee41520ceba5b52e3a2a92")
+	publicKeySource := keys.GeneratePrivateKey()
 
 	create := client.SigningKeyshare.Create().
 		SetID(uuid.New()).

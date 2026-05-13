@@ -632,6 +632,21 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 	defer span.End()
 
 	logger := logging.GetLoggerFromContext(ctx)
+	if len(ids) == 0 {
+		return []*SigningKeyshare{}, nil
+	}
+	maxKeysharesPerRequest := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoMaxKeysharesPerRequest, 1000))
+	if len(ids) > maxKeysharesPerRequest {
+		return nil, fmt.Errorf("keyshare request too large: requested %d, maximum allowed %d", len(ids), maxKeysharesPerRequest)
+	}
+	seenIDs := make(map[uuid.UUID]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := seenIDs[id]; ok {
+			return nil, fmt.Errorf("duplicate keyshare id: %s", id)
+		}
+		seenIDs[id] = struct{}{}
+	}
+
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err

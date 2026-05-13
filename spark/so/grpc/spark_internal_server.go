@@ -31,6 +31,9 @@ func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
 // MarkKeysharesAsUsed marks the keyshares as used.
 // It will return an error if the key is not found or the key is already used.
 func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.MarkKeysharesAsUsedRequest) (*emptypb.Empty, error) {
+	if len(req.GetKeyshareId()) == 0 {
+		return nil, errors.New("keyshare ids must not be empty")
+	}
 	ids, err := uuids.ParseSlice(req.GetKeyshareId())
 	if err != nil {
 		return nil, err
