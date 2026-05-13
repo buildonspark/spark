@@ -372,8 +372,8 @@ export function createReceiverSpendTx({
     index: 0,
   });
 
-  const senderP2TR = p2tr(
-    sequenceLockDestinationPubkey.slice(1, 33),
+  const receiverP2TR = p2tr(
+    hashLockDestinationPubkey.slice(1, 33),
     undefined,
     network,
     true,
@@ -389,7 +389,7 @@ export function createReceiverSpendTx({
   }
 
   spendTx.addOutput({
-    script: senderP2TR,
+    script: receiverP2TR,
     amount: amount,
   });
 
