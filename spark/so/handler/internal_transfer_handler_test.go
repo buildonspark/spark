@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -25,6 +26,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -146,6 +149,271 @@ func createTestTxBytes(t *testing.T, value int64) []byte {
 	return buf.Bytes()
 }
 
+func TestFinalizeTransferRejectsNonCompletableLeafStatuses(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusCreating,
+		st.TreeNodeStatusFrozenByIssuer,
+		st.TreeNodeStatusSplitLocked,
+		st.TreeNodeStatusSplitted,
+		st.TreeNodeStatusAggregated,
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusAggregateLock,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusInvestigation,
+		st.TreeNodeStatusLost,
+		st.TreeNodeStatusReimbursed,
+		st.TreeNodeStatusParentExited,
+		st.TreeNodeStatusRenewLocked,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, dbCtx := db.ConnectToTestPostgres(t)
+			fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, status, false)
+
+			err := NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+				TransferId: fixture.transfer.ID.String(),
+				Nodes:      []*pbinternal.TreeNode{fixture.requestNode},
+				Timestamp:  timestamppb.New(time.Now()),
+			})
+			require.Error(t, err)
+			require.ErrorContains(t, err, "cannot be finalized from status")
+			require.Equal(t, codes.FailedPrecondition, grpcstatus.Code(err))
+
+			refreshed, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, refreshed.Status)
+			require.Equal(t, fixture.originalRawTx, refreshed.RawTx)
+			require.Equal(t, fixture.originalRawRefundTx, refreshed.RawRefundTx)
+		})
+	}
+}
+
+func TestFinalizeTransferReceiverRejectsNonCompletableLeafStatuses(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusCreating,
+		st.TreeNodeStatusFrozenByIssuer,
+		st.TreeNodeStatusSplitLocked,
+		st.TreeNodeStatusSplitted,
+		st.TreeNodeStatusAggregated,
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusAggregateLock,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusInvestigation,
+		st.TreeNodeStatusLost,
+		st.TreeNodeStatusReimbursed,
+		st.TreeNodeStatusParentExited,
+		st.TreeNodeStatusRenewLocked,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, dbCtx := db.ConnectToTestPostgres(t)
+			fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, status, true)
+
+			err := NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+				TransferId:                fixture.transfer.ID.String(),
+				ReceiverIdentityPublicKey: fixture.receiver.Serialize(),
+				InternalNodes:             []*pbinternal.TreeNode{fixture.requestNode},
+				CompletionTimestamp:       timestamppb.New(time.Now()),
+			})
+			require.Error(t, err)
+			require.ErrorContains(t, err, "cannot be finalized from status")
+			require.Equal(t, codes.FailedPrecondition, grpcstatus.Code(err))
+
+			refreshed, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, refreshed.Status)
+			require.Equal(t, fixture.originalRawTx, refreshed.RawTx)
+			require.Equal(t, fixture.originalRawRefundTx, refreshed.RawRefundTx)
+		})
+	}
+}
+
+func TestFinalizeTransferAvailableLeafRequiresMatchingTxs(t *testing.T) {
+	t.Run("rejects mismatched txs before completing transfer", func(t *testing.T) {
+		ctx, dbCtx := db.ConnectToTestPostgres(t)
+		fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, st.TreeNodeStatusAvailable, false)
+
+		err := NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+			TransferId: fixture.transfer.ID.String(),
+			Nodes:      []*pbinternal.TreeNode{fixture.requestNode},
+			Timestamp:  timestamppb.New(time.Now()),
+		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "node is not the same")
+
+		refreshedLeaf, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TreeNodeStatusAvailable, refreshedLeaf.Status)
+		require.Equal(t, fixture.originalRawTx, refreshedLeaf.RawTx)
+		require.Equal(t, fixture.originalRawRefundTx, refreshedLeaf.RawRefundTx)
+
+		refreshedTransfer, err := dbCtx.Client.Transfer.Get(ctx, fixture.transfer.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusReceiverRefundSigned, refreshedTransfer.Status)
+	})
+
+	t.Run("accepts matching txs and completes transfer", func(t *testing.T) {
+		ctx, dbCtx := db.ConnectToTestPostgres(t)
+		fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, st.TreeNodeStatusAvailable, false)
+
+		fixture.requestNode.RawTx = fixture.leaf.RawTx
+		fixture.requestNode.RawRefundTx = fixture.leaf.RawRefundTx
+		fixture.requestNode.DirectRefundTx = fixture.leaf.DirectRefundTx
+		fixture.requestNode.DirectFromCpfpRefundTx = fixture.leaf.DirectFromCpfpRefundTx
+
+		err := NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+			TransferId: fixture.transfer.ID.String(),
+			Nodes:      []*pbinternal.TreeNode{fixture.requestNode},
+			Timestamp:  timestamppb.New(time.Now()),
+		})
+		require.NoError(t, err)
+
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		require.NoError(t, entTx.Commit())
+
+		refreshedLeaf, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TreeNodeStatusAvailable, refreshedLeaf.Status)
+		require.Equal(t, fixture.originalRawTx, refreshedLeaf.RawTx)
+		require.Equal(t, fixture.originalRawRefundTx, refreshedLeaf.RawRefundTx)
+
+		refreshedTransfer, err := dbCtx.Client.Transfer.Get(ctx, fixture.transfer.ID)
+		require.NoError(t, err)
+		require.Equal(t, st.TransferStatusCompleted, refreshedTransfer.Status)
+	})
+}
+
+type finalizeTransferLeafStateFixture struct {
+	transfer            *ent.Transfer
+	leaf                *ent.TreeNode
+	receiver            keys.Public
+	requestNode         *pbinternal.TreeNode
+	originalRawTx       []byte
+	originalRawRefundTx []byte
+}
+
+func finalizeTransferLeafStateConfig() *so.Config {
+	return &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {DepositConfirmationThreshold: 1},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+}
+
+func createFinalizeTransferLeafStateFixture(
+	t *testing.T,
+	ctx context.Context,
+	client *ent.Client,
+	leafStatus st.TreeNodeStatus,
+	withReceiver bool,
+) finalizeTransferLeafStateFixture {
+	t.Helper()
+
+	rng := rand.NewChaCha8([32]byte{12})
+	rawTx := createTestTxBytes(t, 8400)
+	rawRefundTx := createTestTxBytes(t, 8401)
+	directTx := createTestTxBytes(t, 8402)
+	directRefundTx := createTestTxBytes(t, 8403)
+	directFromCpfpRefundTx := createTestTxBytes(t, 8404)
+
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	signingKeyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keysharePrivKey).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	tree, err := client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := client.TreeNode.Create().
+		SetStatus(leafStatus).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetSigningKeyshare(signingKeyshare).
+		SetValue(1000).
+		SetVerifyingPubkey(verifyingPrivKey.Public()).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetOwnerSigningPubkey(ownerSigningPrivKey.Public()).
+		SetRawTx(rawTx).
+		SetRawRefundTx(rawRefundTx).
+		SetDirectTx(directTx).
+		SetDirectRefundTx(directRefundTx).
+		SetDirectFromCpfpRefundTx(directFromCpfpRefundTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer, err := client.Transfer.Create().
+		SetNetwork(tree.Network).
+		SetStatus(st.TransferStatusReceiverRefundSigned).
+		SetType(st.TransferTypeTransfer).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transferLeaf := client.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(leaf).
+		SetPreviousRefundTx(createTestTxBytes(t, 8500)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 8501))
+
+	if withReceiver {
+		receiver, err := createTransferReceiver(ctx, client, transfer, receiverIdentityPrivKey.Public(), st.TransferReceiverStatusRefundSigned)
+		require.NoError(t, err)
+		transferLeaf.SetTransferReceiver(receiver)
+	}
+	_, err = transferLeaf.Save(ctx)
+	require.NoError(t, err)
+
+	return finalizeTransferLeafStateFixture{
+		transfer:            transfer,
+		leaf:                leaf,
+		receiver:            receiverIdentityPrivKey.Public(),
+		originalRawTx:       rawTx,
+		originalRawRefundTx: rawRefundTx,
+		requestNode: &pbinternal.TreeNode{
+			Id:                     leaf.ID.String(),
+			Value:                  1000,
+			VerifyingPubkey:        verifyingPrivKey.Public().Serialize(),
+			OwnerIdentityPubkey:    receiverIdentityPrivKey.Public().Serialize(),
+			OwnerSigningPubkey:     keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+			RawTx:                  createTestTxBytes(t, 8600),
+			RawRefundTx:            createTestTxBytes(t, 8601),
+			DirectTx:               createTestTxBytes(t, 8602),
+			DirectRefundTx:         createTestTxBytes(t, 8603),
+			DirectFromCpfpRefundTx: createTestTxBytes(t, 8604),
+			TreeId:                 tree.ID.String(),
+			SigningKeyshareId:      signingKeyshare.ID.String(),
+			Vout:                   0,
+		},
+	}
+}
+
 func TestFinalizeTransfer(t *testing.T) {
 	ctx, dbCtx := db.ConnectToTestPostgres(t)
 
@@ -202,7 +470,7 @@ func TestFinalizeTransfer(t *testing.T) {
 
 		// Create test tree node (leaf)
 		leaf, err := dbCtx.Client.TreeNode.Create().
-			SetStatus(st.TreeNodeStatusAvailable).
+			SetStatus(st.TreeNodeStatusTransferLocked).
 			SetTree(tree).
 			SetNetwork(tree.Network).
 			SetSigningKeyshare(signingKeyshare).
@@ -363,7 +631,7 @@ func TestFinalizeTransfer(t *testing.T) {
 		require.NoError(t, err)
 
 		leaf, err := dbCtx.Client.TreeNode.Create().
-			SetStatus(st.TreeNodeStatusAvailable).
+			SetStatus(st.TreeNodeStatusTransferLocked).
 			SetTree(tree).
 			SetNetwork(tree.Network).
 			SetSigningKeyshare(signingKeyshare).

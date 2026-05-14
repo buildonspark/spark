@@ -43,6 +43,13 @@ func NewInternalTransferHandler(config *so.Config) *InternalTransferHandler {
 	return &InternalTransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
 }
 
+func validateFinalizeTransferLeafCanComplete(node *ent.TreeNode) error {
+	if node.Status == st.TreeNodeStatusAvailable || node.Status == st.TreeNodeStatusTransferLocked {
+		return nil
+	}
+	return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("tree node %s cannot be finalized from status %s", node.ID, node.Status))
+}
+
 // FinalizeTransfer finalizes a transfer.
 func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbinternal.FinalizeTransferRequest) error {
 	db, err := ent.GetDbFromContext(ctx)
@@ -75,6 +82,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		transferNodeIDs[node.ID] = struct{}{}
 	}
 
+	transferAlreadyCompleted := transfer.Status == st.TransferStatusCompleted
 	for _, node := range req.Nodes {
 		nodeID, err := uuid.Parse(node.Id)
 		if err != nil {
@@ -87,8 +95,11 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		if err != nil {
 			return fmt.Errorf("failed to get dbNode. transfer id: %s. with status: %s. node id: %s and error: %w", transferID, transfer.Status, nodeID, err)
 		}
+		if err := validateFinalizeTransferLeafCanComplete(dbNode); err != nil {
+			return err
+		}
 
-		if transfer.Status == st.TransferStatusCompleted {
+		if dbNode.Status == st.TreeNodeStatusAvailable || transferAlreadyCompleted {
 			// Verify that the transfer details are the same between both nodes.
 			// RawTx is signed once at tree creation and never re-signed; its
 			// witnesses should be byte-identical across gossip deliveries, so
@@ -166,11 +177,13 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			if err != nil {
 				return fmt.Errorf("failed to update dbNode. transfer id: %s. with status: %s. node id: %s and error: %w", transferID, transfer.Status, nodeID, err)
 			}
+		}
+	}
 
-			_, err = transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(req.Timestamp.AsTime()).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to update transfer status to completed for transfer id: %s. with status: %s and error: %w", transferID, transfer.Status, err)
-			}
+	if !transferAlreadyCompleted {
+		_, err = transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(req.Timestamp.AsTime()).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update transfer status to completed for transfer id: %s. with status: %s and error: %w", transferID, transfer.Status, err)
 		}
 	}
 
@@ -283,6 +296,9 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		dbNode, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
 			return fmt.Errorf("failed to get tree node %s: %w", nodeID, err)
+		}
+		if err := validateFinalizeTransferLeafCanComplete(dbNode); err != nil {
+			return err
 		}
 
 		if dbNode.Status == st.TreeNodeStatusAvailable {
