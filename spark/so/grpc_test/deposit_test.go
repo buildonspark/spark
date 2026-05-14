@@ -1837,6 +1837,92 @@ func TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo(t *testing.T) {
 	assert.Contains(t, err.Error(), "does not match confirmed deposit txid")
 }
 
+// TestStartDepositTreeCreationDoesNotReusePendingRootAcrossDeposits is a regression test for a state-corruption bug
+// where StartDepositTreeCreation would reuse a pending root node from an unrelated deposit when two same-owner deposit
+// addresses shared (signing_pubkey, value, vout). The buggy lookup matched a pending root by owner identity/signing pubkey,
+// value, and vout, none of which uniquely identify the deposit, so the second deposit would overwrite the first root's
+// tx bytes and point at the first tree's root edge. The fix scopes the existing-root lookup to the current tree.
+// This test checks the second deposit gets its own root node.
+func TestStartDepositTreeCreationDoesNotReusePendingRootAcrossDeposits(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	// Same owner signing key for both deposit addresses.
+	userSigningKey := keys.GeneratePrivateKey()
+	leafID1 := uuid.NewString()
+	leafID2 := uuid.NewString()
+
+	deposit1, err := wallet.GenerateDepositAddress(ctx, config, userSigningKey.Public(), &leafID1, false)
+	require.NoError(t, err)
+	deposit2, err := wallet.GenerateDepositAddress(ctx, config, userSigningKey.Public(), &leafID2, false)
+	require.NoError(t, err)
+	require.NotEqual(t, deposit1.DepositAddress.Address, deposit2.DepositAddress.Address)
+
+	client := sparktesting.GetBitcoinClient()
+	const amount = 100_000
+
+	fundAndMine := func(address string) *wire.MsgTx {
+		coin, err := faucet.Fund()
+		require.NoError(t, err)
+		depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, address, amount)
+		require.NoError(t, err)
+		signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+		require.NoError(t, err)
+		_, err = client.SendRawTransaction(signedDepositTx, true)
+		require.NoError(t, err)
+		return depositTx
+	}
+
+	depositTx1 := fundAndMine(deposit1.DepositAddress.Address)
+	depositTx2 := fundAndMine(deposit2.DepositAddress.Address)
+	require.NotEqual(t, depositTx1.TxHash(), depositTx2.TxHash())
+
+	// Confirm both deposits.
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(3, randomAddress, nil)
+	require.NoError(t, err)
+	time.Sleep(200 * time.Millisecond)
+
+	verifyingKey1, err := keys.ParsePublicKey(deposit1.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+	verifyingKey2, err := keys.ParsePublicKey(deposit2.DepositAddress.VerifyingKey)
+	require.NoError(t, err)
+	require.NotEqual(t, verifyingKey1, verifyingKey2, "separate deposit addresses must use separate SO keyshares")
+
+	// Start the first deposit's tree but skip finalization, leaving its root in CREATING - the state the buggy lookup would latch onto.
+	_, err = wallet.CreateTreeRoot(ctx, config, userSigningKey, verifyingKey1, depositTx1, 0, true)
+	require.NoError(t, err)
+
+	// Run the full deposit-tree flow for the second deposit. The server must create a fresh root for the second tree (leafID2).
+	// Previously, this call would reuse the first root and return leafID1.
+	resp, err := wallet.CreateTreeRoot(ctx, config, userSigningKey, verifyingKey2, depositTx2, 0, false)
+	require.NoError(t, err)
+	require.Len(t, resp.Nodes, 1)
+	assert.Equal(t, leafID2, resp.Nodes[0].Id, "second deposit must get its own root node")
+	assert.NotEqual(t, leafID1, resp.Nodes[0].Id)
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	require.NoError(t, err)
+	assert.Equal(t, leafID2, rootNode.Id)
+	assert.EqualValues(t, st.TreeNodeStatusAvailable, rootNode.Status)
+
+	// The second root's node tx must spend the second deposit, not the first.
+	rootTx, err := common.TxFromRawTxBytes(rootNode.NodeTx)
+	require.NoError(t, err)
+	require.NotEmpty(t, rootTx.TxIn)
+	assert.Equal(t, depositTx2.TxHash(), rootTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.NotEqual(t, depositTx1.TxHash(), rootTx.TxIn[0].PreviousOutPoint.Hash)
+}
+
 func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
 	var txBuf bytes.Buffer
 	require.NoError(t, tx.Serialize(&txBuf))

@@ -2231,6 +2231,90 @@ func TestVerifyRootTransactionFailureWrongAmountDirect(t *testing.T) {
 	rootTx.AddTxOut(wire.NewTxOut(900, []byte("attacker_script")))
 
 	err := verifyRootTransaction(rootTx, onChainTx, 0, true)
-	require.Error(t, err)
 	require.ErrorContains(t, err, "root transaction has wrong value: root tx value 100 != on-chain tx value 1000")
+}
+
+// TestFindPendingDepositRoot covers the helper that StartDepositTreeCreation uses to locate the pending root for a deposit.
+//
+// The original handler matched a pending root by (owner_identity_pubkey, owner_signing_pubkey, value, vout). So, two
+// same-owner non-static deposits with identical value+vout that could match an unrelated pending root from a different
+// tree and silently overwrite its tx bytes. The query now scopes the lookup to the tree, which is uniquely identified
+// by the on-chain (base_txid, vout).
+func TestFindPendingDepositRoot(t *testing.T) {
+	// Uses Postgres because findPendingDepositRoot uses ForUpdate, which SQLite doesn't support.
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentity := keys.GeneratePrivateKey().Public()
+	ownerSigning := keys.GeneratePrivateKey().Public()
+	verifyingPubkey := keys.GeneratePrivateKey().Public()
+	const value = 100_000
+	const vout = 0
+
+	rawTx := wire.NewMsgTx(3)
+	rawTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	rawTx.AddTxOut(common.EphemeralAnchorOutput())
+	rawTxBytes := mustSerializeTx(t, rawTx)
+
+	mkTree := func() *ent.Tree {
+		return client.Tree.Create().
+			SetStatus(st.TreeStatusPending).
+			SetNetwork(btcnetwork.Regtest).
+			SetOwnerIdentityPubkey(ownerIdentity).
+			SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+			SetVout(vout).
+			SaveX(ctx)
+	}
+
+	mkPendingRoot := func(treeEnt *ent.Tree) *ent.TreeNode {
+		secret := keys.GeneratePrivateKey()
+		ks := client.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secret).
+			SetPublicShares(map[string]keys.Public{"key": secret.Public()}).
+			SetPublicKey(secret.Public()).
+			SetMinSigners(1).
+			SetCoordinatorIndex(1).
+			SaveX(ctx)
+
+		return client.TreeNode.Create().
+			SetTree(treeEnt).
+			SetNetwork(treeEnt.Network).
+			SetStatus(st.TreeNodeStatusCreating).
+			SetOwnerIdentityPubkey(ownerIdentity).
+			SetOwnerSigningPubkey(ownerSigning).
+			SetValue(value).
+			SetVerifyingPubkey(verifyingPubkey).
+			SetSigningKeyshare(ks).
+			SetRawTx(rawTxBytes).
+			SetVout(vout).
+			SaveX(ctx)
+	}
+
+	t.Run("gets right root for each tree", func(t *testing.T) {
+		tree1 := mkTree()
+		tree2 := mkTree()
+		root1 := mkPendingRoot(tree1)
+		root2 := mkPendingRoot(tree2)
+		require.NotEqual(t, root1.ID, root2.ID)
+
+		got1, err := findPendingDepositRoot(ctx, client, tree1.ID, ownerIdentity, ownerSigning, value, vout)
+		require.NoError(t, err)
+		require.NotNil(t, got1)
+		assert.Equal(t, root1.ID, got1.ID)
+
+		got2, err := findPendingDepositRoot(ctx, client, tree2.ID, ownerIdentity, ownerSigning, value, vout)
+		require.NoError(t, err)
+		require.NotNil(t, got2)
+		assert.Equal(t, root2.ID, got2.ID)
+		assert.NotEqual(t, root1.ID, got2.ID, "lookup for tree2 must not return tree1's root")
+	})
+
+	t.Run("tree with no root returns nil", func(t *testing.T) {
+		noRoot := mkTree() // no pending root attached
+		got, err := findPendingDepositRoot(ctx, client, noRoot.ID, ownerIdentity, ownerSigning, value, vout)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
 }

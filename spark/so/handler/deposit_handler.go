@@ -840,6 +840,38 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 	}, nil
 }
 
+// findPendingDepositRoot looks up the pending root TreeNode for a deposit, scoped to a specific tree.
+// Returns (nil, nil) if no such root exists.
+//
+// The lookup is scoped by tree ID because the tree is uniquely identified by the on-chain (base_txid, vout) pair.
+// Without this scoping, two same-owner deposits that share (signing_pubkey, value, vout) could collide on each other's
+// pending roots, causing one tree to silently reuse the other's root and corrupt deposit state.
+func findPendingDepositRoot(
+	ctx context.Context,
+	db *ent.Client,
+	treeID uuid.UUID,
+	ownerIdentityPubkey keys.Public,
+	ownerSigningPubkey keys.Public,
+	value uint64,
+	vout int16,
+) (*ent.TreeNode, error) {
+	root, err := db.TreeNode.Query().
+		Where(treenode.HasTreeWith(tree.ID(treeID))).
+		Where(treenode.OwnerIdentityPubkey(ownerIdentityPubkey)).
+		Where(treenode.OwnerSigningPubkey(ownerSigningPubkey)).
+		Where(treenode.Value(value)).
+		Where(treenode.Vout(vout)).
+		ForUpdate().
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query for existing tree node: %w", err)
+	}
+	return root, nil
+}
+
 // StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *so.Config, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
 	ctx, span := tracer.Start(ctx, "DepositHandler.StartDepositTreeCreation")
@@ -1090,9 +1122,10 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	txid := onChainTx.TxHash()
 
 	// Check if a tree already exists for this deposit
+	onChainUtxoVout := int16(req.OnChainUtxo.Vout)
 	existingTree, err := db.Tree.Query().
 		Where(tree.BaseTxid(st.NewTxID(txid))).
-		Where(tree.Vout(int16(req.OnChainUtxo.Vout))).
+		Where(tree.Vout(onChainUtxoVout)).
 		First(ctx)
 
 	if err != nil && !ent.IsNotFound(err) {
@@ -1116,7 +1149,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 			SetNetwork(network).
 			SetBaseTxid(st.NewTxID(txid)).
-			SetVout(int16(req.OnChainUtxo.Vout)).
+			SetVout(onChainUtxoVout).
 			SetDepositAddress(depositAddress)
 
 		if txConfirmed {
@@ -1125,26 +1158,27 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			treeMutator.SetStatus(st.TreeStatusPending)
 		}
 		entTree, err = treeMutator.Save(ctx)
+		if ent.IsConstraintError(err) {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists: %w", err))
+		}
 		if err != nil {
-			if ent.IsConstraintError(err) {
-				return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists: %w", err))
-			}
 			return nil, err
 		}
 	}
 	var directTx []byte
 	var directRefundTx []byte
-	// Check if a tree node already exists for this deposit
-	existingRoot, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey)).
-		Where(treenode.OwnerSigningPubkey(depositAddress.OwnerSigningPubkey)).
-		Where(treenode.Value(uint64(onChainOutput.Value))).
-		Where(treenode.Vout(int16(req.OnChainUtxo.Vout))).
-		ForUpdate().
-		Only(ctx)
-
-	if err != nil && !ent.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to query for existing tree node: %w", err)
+	onChainOutputValue := uint64(onChainOutput.Value)
+	existingRoot, err := findPendingDepositRoot(
+		ctx,
+		db,
+		entTree.ID,
+		depositAddress.OwnerIdentityPubkey,
+		depositAddress.OwnerSigningPubkey,
+		onChainOutputValue,
+		onChainUtxoVout,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	var root *ent.TreeNode
@@ -1178,7 +1212,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			SetStatus(st.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 			SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).
-			SetValue(uint64(onChainOutput.Value)).
+			SetValue(onChainOutputValue).
 			SetVerifyingPubkey(verifyingKey).
 			SetSigningKeyshare(signingKeyShare).
 			SetRawTx(req.RootTxSigningJob.RawTx).
@@ -1186,7 +1220,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			SetDirectTx(directTx).
 			SetDirectRefundTx(directRefundTx).
 			SetDirectFromCpfpRefundTx(directFromCpfpRefundTxRaw).
-			SetVout(int16(req.OnChainUtxo.Vout))
+			SetVout(onChainUtxoVout)
 
 		if depositAddress.NodeID != uuid.Nil {
 			treeNodeMutator.SetID(depositAddress.NodeID)
