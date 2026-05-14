@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
@@ -123,6 +122,14 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		splitParentID = parentID
 	}
 
+	treeEnt, err := extendedLeafNode.QueryTree().Only(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query tree for extended leaf %s: %w", extendedLeafID, err)
+	}
+	if splitTreeID != treeEnt.ID {
+		return fmt.Errorf("split node tree %s does not match extended leaf tree %s for leaf %s", splitTreeID, treeEnt.ID, extendedLeafID)
+	}
+
 	ownerIdentityPubKey, err := keys.ParsePublicKey(splitNode.GetOwnerIdentityPubkey())
 	if err != nil {
 		return fmt.Errorf("failed to parse owner identity pubkey: %w", err)
@@ -134,12 +141,6 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	verifyingPubKey, err := keys.ParsePublicKey(splitNode.GetVerifyingPubkey())
 	if err != nil {
 		return fmt.Errorf("failed to parse verifying pubkey: %w", err)
-	}
-
-	// TODO(mhr): Remove this when the transfer proto has Network and it has been backfilled.
-	treeEnt, err := db.Tree.Query().Where(tree.IDEQ(splitTreeID)).Only(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query tree %s: %w", splitTreeID, err)
 	}
 
 	// Create the split node
