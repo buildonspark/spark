@@ -174,6 +174,9 @@ func frostRound2(
 ) (map[uuid.UUID]map[so.Identifier][]byte, error) {
 	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[uuid.UUID][]byte, error) {
 		commitmentsArray := collections.MapOfArrayToArrayOfMap(round1)
+		if len(commitmentsArray) < len(jobs) {
+			return nil, fmt.Errorf("frostRound2 received %d signing jobs but transposed commitment array has length %d; every job must have a non-empty Round1Packages map", len(jobs), len(commitmentsArray))
+		}
 
 		signingJobs := make([]*pbinternal.SigningJob, len(jobs))
 		for i, job := range jobs {

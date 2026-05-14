@@ -771,6 +771,55 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 			_, err := helper.SignFrostWithPregeneratedNonceInternal(t.Context(), config, []*helper.SigningJobWithPregeneratedNonce{job}, mockGetKeyPackages, frostSignerFactory)
 			require.ErrorContains(t, err, "frost round 2 failed")
 		})
+
+		// Regression test: a batch where one job has empty Round1Packages used to panic
+		// inside the per-operator goroutine in frostRound2 with index-out-of-range,
+		// crashing the SO process. The helper must convert it to a returned error.
+		t.Run("EmptyRound1PackagesOnOneJobReturnsError", func(t *testing.T) {
+			if config.SigningOperatorMap == nil {
+				config.SigningOperatorMap = make(map[string]*so.SigningOperator)
+			}
+			config.SigningOperatorMap["operator1"] = &so.SigningOperator{Identifier: "operator1"}
+
+			frostSignerFactory := &mockSparkServiceFrostSignerFactory{
+				conn: &mockSparkServiceFrostSigner{
+					frostRound1Response: &pbinternal.FrostRound1Response{},
+					frostRound2Response: &pbinternal.FrostRound2Response{},
+				},
+			}
+
+			validJob := &helper.SigningJobWithPregeneratedNonce{
+				SigningJob: helper.SigningJob{
+					JobID:             uuid.New(),
+					SigningKeyshareID: uuid.New(),
+					Message:           []byte("valid job"),
+					VerifyingKey:      &pubKey,
+					UserCommitment:    &commitment,
+				},
+				Round1Packages: map[string]frost.SigningCommitment{
+					"operator1": commitment,
+				},
+			}
+			emptyCommitmentsJob := &helper.SigningJobWithPregeneratedNonce{
+				SigningJob: helper.SigningJob{
+					JobID:             uuid.New(),
+					SigningKeyshareID: uuid.New(),
+					Message:           []byte("malformed job"),
+					VerifyingKey:      &pubKey,
+					UserCommitment:    &commitment,
+				},
+				Round1Packages: map[string]frost.SigningCommitment{},
+			}
+
+			_, err := helper.SignFrostWithPregeneratedNonceInternal(
+				t.Context(),
+				config,
+				[]*helper.SigningJobWithPregeneratedNonce{validJob, emptyCommitmentsJob},
+				mockGetKeyPackages,
+				frostSignerFactory,
+			)
+			require.ErrorContains(t, err, "transposed commitment array")
+		})
 	})
 }
 

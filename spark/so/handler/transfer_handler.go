@@ -3924,12 +3924,16 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 
 // parseSigningCommitments extracts SO signing commitments from a UserSignedTxSigningJob.
 func parseSigningCommitments(job *pb.UserSignedTxSigningJob) (map[string]frost.SigningCommitment, error) {
-	round1Packages := make(map[string]frost.SigningCommitment)
 	signingCommitments := job.GetSigningCommitments()
 	if signingCommitments == nil {
-		return nil, fmt.Errorf("missing signing_commitments for leaf_id %s", job.LeafId)
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing signing_commitments for leaf_id %s", job.LeafId))
 	}
-	for key, commitment := range signingCommitments.GetSigningCommitments() {
+	rawCommitments := signingCommitments.GetSigningCommitments()
+	if len(rawCommitments) == 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("signing_commitments map is empty for leaf_id %s; expected at least one operator's round 1 commitment. Fetch commitments via GetSigningCommitments before submitting the signing request", job.LeafId))
+	}
+	round1Packages := make(map[string]frost.SigningCommitment, len(rawCommitments))
+	for key, commitment := range rawCommitments {
 		obj := frost.SigningCommitment{}
 		if err := obj.UnmarshalProto(commitment); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal signing commitment: %w", err)
