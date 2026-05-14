@@ -264,6 +264,48 @@ func (h *TransferHandler) syncTransferV3Init(
 	return err
 }
 
+// loadAndMarshalTransfersByIDs loads transfers by ID with the standard preload
+// graph and marshals each one with the wallet-receiver projection when the
+// wallet is on the receiver side, MarshalProto otherwise. Shared across the
+// MIMO-style two-phase query handlers (SQL → IDs → ORM IDIn → marshal).
+func loadAndMarshalTransfersByIDs(ctx context.Context, db *ent.Client, ids []uuid.UUID, walletPubkey keys.Public, order pb.Order) ([]*pb.Transfer, error) {
+	orderFn := ent.Desc(enttransfer.FieldCreateTime)
+	idOrderFn := ent.Desc(enttransfer.FieldID)
+	if order == pb.Order_ASCENDING {
+		orderFn = ent.Asc(enttransfer.FieldCreateTime)
+		idOrderFn = ent.Asc(enttransfer.FieldID)
+	}
+	transfers, err := db.Transfer.Query().
+		Where(enttransfer.IDIn(ids...)).
+		WithSparkInvoice().
+		WithTransferSenders().
+		WithTransferReceivers().
+		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
+			q.WithLeaf(func(q *ent.TreeNodeQuery) {
+				q.WithTree().WithSigningKeyshare().WithParent()
+			})
+		}).
+		Order(orderFn, idOrderFn).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load transfers: %w", err)
+	}
+	protos := make([]*pb.Transfer, 0, len(transfers))
+	for _, t := range transfers {
+		var p *pb.Transfer
+		if t.HasReceiver(walletPubkey) {
+			p, err = t.MarshalProtoForReceiver(ctx, walletPubkey)
+		} else {
+			p, err = t.MarshalProto(ctx)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal transfer %s: %w", t.ID, err)
+		}
+		protos = append(protos, p)
+	}
+	return protos, nil
+}
+
 // shouldRouteToOutgoingInFlight reports whether the request should dispatch
 // to queryOutgoingInFlight. Both the filter shape AND the knob must allow it:
 //
@@ -287,10 +329,10 @@ func shouldRouteToOutgoingInFlight(ctx context.Context, filter *pb.TransferFilte
 	if filter.GetSenderIdentityPublicKey() == nil {
 		return false
 	}
-	if len(filter.Statuses) == 0 {
+	if len(filter.GetStatuses()) == 0 {
 		return false
 	}
-	for _, protoStatus := range filter.Statuses {
+	for _, protoStatus := range filter.GetStatuses() {
 		schemaStatus, err := ent.TransferStatusSchema(protoStatus)
 		if err != nil {
 			return false
@@ -371,7 +413,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		}
 	}
 
-	limit, offset := normalizePendingPagination(filter.Limit, filter.Offset)
+	limit, offset := normalizeTransferPagination(filter.Limit, filter.Offset)
 
 	args := mimo.OutgoingInFlightArgs{
 		WalletPubkey:      walletPubkey,
@@ -410,11 +452,13 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
+			metrics.record(ctx, 0, err)
 			return nil, fmt.Errorf("failed to scan transfer ID: %w", err)
 		}
 		transferIDs = append(transferIDs, id)
 	}
 	if err := rows.Err(); err != nil {
+		metrics.record(ctx, 0, err)
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
@@ -423,44 +467,202 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		return &pb.QueryTransfersResponse{Offset: -1}, nil
 	}
 
-	orderFn := ent.Desc(enttransfer.FieldCreateTime)
-	idOrderFn := ent.Desc(enttransfer.FieldID)
-	if filter.Order == pb.Order_ASCENDING {
-		orderFn = ent.Asc(enttransfer.FieldCreateTime)
-		idOrderFn = ent.Asc(enttransfer.FieldID)
-	}
-	transfers, err := db.Transfer.Query().
-		Where(enttransfer.IDIn(transferIDs...)).
-		WithSparkInvoice().
-		WithTransferSenders().
-		WithTransferReceivers().
-		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
-			q.WithLeaf(func(q *ent.TreeNodeQuery) {
-				q.WithTree().WithSigningKeyshare().WithParent()
-			})
-		}).
-		Order(orderFn, idOrderFn).
-		All(ctx)
-	metrics.record(ctx, len(transfers), err)
+	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.Order)
+	metrics.record(ctx, len(transferProtos), err)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load transfers: %w", err)
-	}
-
-	transferProtos := make([]*pb.Transfer, 0, len(transfers))
-	for _, t := range transfers {
-		var transferProto *pb.Transfer
-		if t.HasReceiver(walletPubkey) {
-			transferProto, err = t.MarshalProtoForReceiver(ctx, walletPubkey)
-		} else {
-			transferProto, err = t.MarshalProto(ctx)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal transfer %s: %w", t.ID, err)
-		}
-		transferProtos = append(transferProtos, transferProto)
+		return nil, err
 	}
 
 	// Gate and advance by SQL ID count, not ORM count — concurrent deletes shouldn't reshape pagination.
+	nextOffset := int64(-1)
+	if len(transferIDs) == limit {
+		nextOffset = int64(offset + len(transferIDs))
+	}
+	return &pb.QueryTransfersResponse{
+		Transfers: transferProtos,
+		Offset:    nextOffset,
+	}, nil
+}
+
+// shouldRouteToByTypes reports whether the request can dispatch to
+// queryByTypes. The shape predicate is intentionally narrow: type filter set,
+// no status filter, no transfer-id filter, not pending-only. Under those
+// conditions both arms collapse to an index-only walk on
+// (identity_pubkey, transfer_type, create_time, transfer_id), and SR1 is a
+// straight UNION-DISTINCT with no status-collapsing translation logic.
+func shouldRouteToByTypes(ctx context.Context, filter *pb.TransferFilter) bool {
+	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelQueryByTypes, 0) {
+		return false
+	}
+	if len(filter.GetTypes()) == 0 {
+		return false
+	}
+	if len(filter.GetStatuses()) != 0 {
+		return false
+	}
+	if len(filter.GetTransferIds()) != 0 {
+		return false
+	}
+	switch filter.GetParticipant().(type) {
+	case *pb.TransferFilter_SenderIdentityPublicKey,
+		*pb.TransferFilter_ReceiverIdentityPublicKey,
+		*pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		return true
+	default:
+		return false
+	}
+}
+
+// queryByTypes handles QueryAllTransfers requests with a type filter and no
+// status filter. The per-arm SQL drives idx_transferreceiver_pubkey_type_time
+// / idx_transfersender_pubkey_type_time directly; SR1 UNIONs the two arms and
+// dedups for self-transfers.
+//
+// Routing in QueryAllTransfers guarantees:
+//   - filter.Participant identifies one of sender / receiver / SR1
+//   - len(filter.Types) > 0
+//   - filter.Statuses, filter.TransferIds are empty
+//   - KnobReadMIMODataModelQueryByTypes is on
+func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.queryByTypes")
+	defer span.End()
+
+	start := time.Now()
+	defer func() {
+		resultCount := 0
+		if resp != nil {
+			resultCount = len(resp.Transfers)
+		}
+		logQueryTransfersInvocation(ctx, "query_by_types", filter,
+			zap.Bool("is_ssp", isSSP),
+			zap.Bool("use_mimo", true),
+			zap.Duration("elapsed", time.Since(start)),
+			zap.Int("result_count", resultCount),
+			zap.Error(err),
+		)
+	}()
+
+	if filter.GetLimit() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
+	}
+	if filter.GetOffset() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
+	}
+	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
+		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
+	}
+	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	}
+
+	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
+
+	baseArgs := mimo.ByTypesArgs{
+		Network:          filter.GetNetwork(),
+		Types:            filter.GetTypes(),
+		HasCreatedAfter:  filter.GetCreatedAfter() != nil,
+		CreatedAfter:     timeOrZero(filter.GetCreatedAfter()),
+		HasCreatedBefore: filter.GetCreatedBefore() != nil,
+		CreatedBefore:    timeOrZero(filter.GetCreatedBefore()),
+		Order:            filter.GetOrder(),
+		Limit:            limit,
+		Offset:           offset,
+	}
+
+	var (
+		walletPubkey keys.Public
+		filterType   string
+		build        func(mimo.ByTypesArgs) (string, []any, error)
+	)
+	switch p := filter.Participant.(type) {
+	case *pb.TransferFilter_SenderIdentityPublicKey:
+		walletPubkey, err = keys.ParsePublicKey(p.SenderIdentityPublicKey)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender identity public key: %w", err))
+		}
+		filterType = "sender"
+		build = mimo.BuildByTypesQuerySender
+	case *pb.TransferFilter_ReceiverIdentityPublicKey:
+		walletPubkey, err = keys.ParsePublicKey(p.ReceiverIdentityPublicKey)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid receiver identity public key: %w", err))
+		}
+		filterType = "receiver"
+		build = mimo.BuildByTypesQueryReceiver
+	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		walletPubkey, err = keys.ParsePublicKey(p.SenderOrReceiverIdentityPublicKey)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender or receiver identity public key: %w", err))
+		}
+		filterType = "sender_or_receiver"
+		build = mimo.BuildByTypesQuerySenderOrReceiver
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "unsupported participant variant: %T", p)
+	}
+
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:      "query_by_types",
+		MIMOEnabled:    true,
+		FilterType:     filterType,
+		HasTypeFilter:  true,
+		HasTransferIDs: len(filter.GetTransferIds()) > 0,
+	})
+
+	if !isSSP {
+		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
+		if accessErr != nil {
+			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
+		}
+		if !hasReadAccess {
+			metrics.record(ctx, 0, nil)
+			return &pb.QueryTransfersResponse{Offset: -1}, nil
+		}
+	}
+
+	baseArgs.WalletPubkey = walletPubkey
+	query, sqlArgs, err := build(baseArgs)
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to build query: %w", err))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	//nolint:forbidigo // raw SQL drives the type composite directly.
+	rows, err := db.QueryContext(ctx, query, sqlArgs...)
+	if err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, fmt.Errorf("failed to execute by-types query: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	transferIDs := make([]uuid.UUID, 0, limit)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			metrics.record(ctx, 0, err)
+			return nil, fmt.Errorf("failed to scan transfer ID: %w", err)
+		}
+		transferIDs = append(transferIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	if len(transferIDs) == 0 {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+
+	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
+	metrics.record(ctx, len(transferProtos), err)
+	if err != nil {
+		return nil, err
+	}
+
 	nextOffset := int64(-1)
 	if len(transferIDs) == limit {
 		nextOffset = int64(offset + len(transferIDs))

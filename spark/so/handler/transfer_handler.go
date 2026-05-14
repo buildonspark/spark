@@ -2361,6 +2361,9 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.
 }
 
 func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (*pb.QueryTransfersResponse, error) {
+	if shouldRouteToByTypes(ctx, filter) {
+		return h.queryByTypes(ctx, filter, isSSP)
+	}
 	if shouldRouteToOutgoingInFlight(ctx, filter) {
 		return h.queryOutgoingInFlight(ctx, filter, isSSP)
 	}
@@ -2467,7 +2470,7 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		return &pb.QueryTransfersResponse{Offset: -1}, nil
 	}
 
-	limit, offset := normalizePendingPagination(filter.Limit, filter.Offset)
+	limit, offset := normalizeTransferPagination(filter.Limit, filter.Offset)
 
 	// Step 1: raw-SQL UNION ALL returning paginated transfer IDs. All filter
 	// predicates and pagination are applied here so step 2 just loads by ID.
@@ -2495,52 +2498,14 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		return &pb.QueryTransfersResponse{Offset: -1}, nil
 	}
 
-	// Step 2: load transfers + edges by ID. Pagination + filters applied in
-	// step 1; this load just preserves ordering for marshaling.
-	//
-	// Both ORDER BY columns must use the same direction as the step-1 SQL
-	// builders (which apply `ORDER BY create_time <dir>, id <dir>` with a
-	// single `<dir>`). Mismatching the secondary sort would reverse tied-row
-	// order across the knob flip, breaking equivalence on transfers that
-	// share a `create_time`.
-	orderFn := ent.Desc(enttransfer.FieldCreateTime)
-	idOrderFn := ent.Desc(enttransfer.FieldID)
-	if filter.Order == pb.Order_ASCENDING {
-		orderFn = ent.Asc(enttransfer.FieldCreateTime)
-		idOrderFn = ent.Asc(enttransfer.FieldID)
-	}
-	transfers, err := db.Transfer.Query().
-		Where(enttransfer.IDIn(transferIDs...)).
-		WithSparkInvoice().
-		WithTransferSenders().
-		WithTransferReceivers().
-		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
-			q.WithLeaf(func(q *ent.TreeNodeQuery) {
-				q.WithTree().WithSigningKeyshare().WithParent()
-			})
-		}).
-		Order(orderFn, idOrderFn).
-		All(ctx)
-	metrics.record(ctx, len(transfers), err)
+	// Step 2: load transfers + edges by ID. Both ORDER BY columns must use the
+	// same direction as the step-1 SQL (`ORDER BY create_time <dir>, id <dir>`);
+	// mismatching the secondary sort reverses tied-row order across the knob
+	// flip, breaking equivalence on transfers that share a `create_time`.
+	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletIdentityPubkey, filter.Order)
+	metrics.record(ctx, len(transferProtos), err)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load pending transfers: %w", err)
-	}
-
-	// Marshal — when participant is a receiver of the transfer, filter leaves
-	// to just that receiver's leaves (claim flow; load-bearing for multi-
-	// receiver MIMO transfers).
-	transferProtos := make([]*pb.Transfer, 0, len(transfers))
-	for _, t := range transfers {
-		var transferProto *pb.Transfer
-		if t.HasReceiver(walletIdentityPubkey) {
-			transferProto, err = t.MarshalProtoForReceiver(ctx, walletIdentityPubkey)
-		} else {
-			transferProto, err = t.MarshalProto(ctx)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal transfer %s: %w", t.ID, err)
-		}
-		transferProtos = append(transferProtos, transferProto)
+		return nil, err
 	}
 
 	// Gate and advance by SQL ID count, not ORM count — concurrent deletes shouldn't reshape pagination.
@@ -2554,7 +2519,7 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 	}, nil
 }
 
-func normalizePendingPagination(limit, offset int64) (int, int) {
+func normalizeTransferPagination(limit, offset int64) (int, int) {
 	if limit <= 0 || limit > maxTransferPageSize {
 		limit = maxTransferPageSize
 	}

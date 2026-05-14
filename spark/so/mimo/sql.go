@@ -82,8 +82,9 @@ func AppendPendingCommonFilters(
 type PendingTimeColumn string
 
 const (
-	ReceiverCreateTimeColumn PendingTimeColumn = "r.create_time"
-	SenderCreateTimeColumn   PendingTimeColumn = "t.create_time"
+	ReceiverCreateTimeColumn   PendingTimeColumn = "r.create_time"
+	SenderCreateTimeColumn     PendingTimeColumn = "t.create_time"
+	SenderEdgeCreateTimeColumn PendingTimeColumn = "s.create_time"
 )
 
 // AppendPendingTimeFilter builds the created_after/created_before clauses
