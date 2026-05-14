@@ -373,6 +373,9 @@ func NewSigningJobWithPregeneratedNonce(
 	// Extract round1 packages from user's signing commitments
 	round1Packages := make(map[string]frost.SigningCommitment)
 	for key, commitment := range operatorCommitments {
+		if commitment == nil {
+			return nil, fmt.Errorf("signing commitment for key %s cannot be nil", key)
+		}
 		obj := frost.SigningCommitment{}
 		if err := obj.UnmarshalProto(commitment); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal signing commitment for key %s: %w", key, err)

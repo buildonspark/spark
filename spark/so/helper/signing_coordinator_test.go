@@ -157,7 +157,7 @@ func TestNewSigningJobWithPregeneratedNonceSigningCommitmentsValidation(t *testi
 			signingCommitments: &pbspark.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{
 				"operator1": nil,
 			}},
-			expectedError: "failed to unmarshal signing commitment for key operator1: cannot unmarshal signing commitment: nil proto",
+			expectedError: "signing commitment for key operator1 cannot be nil",
 		},
 		{
 			name: "valid signing commitments",
