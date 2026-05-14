@@ -70,9 +70,15 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	node, err := db.TreeNode.Get(ctx, nodeID)
+	node, err := db.TreeNode.Query().
+		Where(treenode.ID(nodeID)).
+		ForUpdate().
+		Only(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if node.Status != st.TreeNodeStatusCreating && node.Status != st.TreeNodeStatusAvailable {
+		return nil, fmt.Errorf("node %s is not eligible for tree creation from status %s", nodeID.String(), node.Status)
 	}
 
 	tx, err := common.TxFromRawTxBytes(node.RawTx)

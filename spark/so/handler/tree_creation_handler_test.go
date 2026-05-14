@@ -321,6 +321,79 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	}
 }
 
+func TestFindParentOutputFromNodeOutputRejectsUnavailableParent(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{11})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	handler := createTestHandler()
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := dbTX.Tree.Create().
+		SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetNetwork(btcnetwork.Regtest).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetStatus(st.TreeStatusAvailable).
+		Save(ctx)
+	require.NoError(t, err)
+
+	rawTx, err := common.SerializeTx(createTestTx())
+	require.NoError(t, err)
+
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusFrozenByIssuer,
+		st.TreeNodeStatusTransferLocked,
+		st.TreeNodeStatusSplitLocked,
+		st.TreeNodeStatusSplitted,
+		st.TreeNodeStatusAggregated,
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusAggregateLock,
+		st.TreeNodeStatusInvestigation,
+		st.TreeNodeStatusLost,
+		st.TreeNodeStatusReimbursed,
+		st.TreeNodeStatusParentExited,
+		st.TreeNodeStatusRenewLocked,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+			signingKeyshare, err := dbTX.SigningKeyshare.Create().
+				SetStatus(st.KeyshareStatusAvailable).
+				SetSecretShare(keysharePrivKey).
+				SetPublicShares(map[string]keys.Public{"test": keysharePrivKey.Public()}).
+				SetPublicKey(keysharePrivKey.Public()).
+				SetMinSigners(2).
+				SetCoordinatorIndex(0).
+				Save(ctx)
+			require.NoError(t, err)
+
+			node, err := dbTX.TreeNode.Create().
+				SetTree(tree).
+				SetNetwork(tree.Network).
+				SetStatus(status).
+				SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+				SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+				SetValue(100000).
+				SetVerifyingPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+				SetSigningKeyshare(signingKeyshare).
+				SetRawTx(rawTx).
+				SetVout(0).
+				Save(ctx)
+			require.NoError(t, err)
+
+			output, err := handler.findParentOutputFromNodeOutput(ctx, &pb.NodeOutput{
+				NodeId: node.ID.String(),
+				Vout:   0,
+			})
+
+			require.ErrorContains(t, err, "not eligible for tree creation")
+			require.Nil(t, output)
+		})
+	}
+}
+
 func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	handler := createTestHandler()
