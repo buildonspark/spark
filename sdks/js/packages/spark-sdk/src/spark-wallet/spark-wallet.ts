@@ -130,6 +130,7 @@ import {
   getTxFromRawTxBytes,
   getTxFromRawTxHex,
   getTxId,
+  validateCoopExitPayoutTransaction,
 } from "../utils/bitcoin.js";
 import { getFetch } from "../utils/fetch.js";
 import { newHasher } from "../utils/hashstructure.js";
@@ -4895,6 +4896,32 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (!coopExitRequest?.rawConnectorTransaction) {
         throw new Error("Failed to request coop exit");
       }
+
+      if (
+        !coopExitRequest.rawCoopExitTransaction ||
+        !coopExitRequest.coopExitTxid
+      ) {
+        throw new SparkValidationError(
+          "SSP coop exit response missing L1 transaction fields",
+          {
+            field: "rawCoopExitTransaction",
+          },
+        );
+      }
+
+      const expectedPayoutSats = deductFeeFromWithdrawalAmount
+        ? (targetAmountSats ??
+            leavesToSendToSsp.reduce((acc, leaf) => acc + leaf.value, 0)) -
+          feeAmountSats
+        : targetAmountSats!;
+
+      validateCoopExitPayoutTransaction({
+        rawCoopExitTransaction: coopExitRequest.rawCoopExitTransaction,
+        expectedCoopExitTxid: coopExitRequest.coopExitTxid,
+        expectedPayoutAddress: onchainAddress,
+        expectedPayoutAmountSats: expectedPayoutSats,
+        network: this.config.getNetwork(),
+      });
 
       const connectorTx = getTxFromRawTxHex(
         coopExitRequest.rawConnectorTransaction,

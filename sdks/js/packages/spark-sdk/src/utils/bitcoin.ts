@@ -4,6 +4,7 @@ import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
 import { type TransactionOutput } from "@scure/btc-signer/psbt";
+import { equalBytes } from "@scure/btc-signer/utils";
 import { SparkValidationError } from "../errors/index.js";
 import { getNetwork, type Network } from "./network.js";
 
@@ -237,6 +238,78 @@ export function getTxId(tx: btc.Transaction): string {
 
 export function getTxIdNoReverse(tx: btc.Transaction): string {
   return bytesToHex(sha256(sha256(tx.toBytes(true))));
+}
+
+/**
+ * Validates that an SSP-supplied cooperative-exit L1 transaction actually pays
+ * the user's requested withdrawal address for at least the expected amount, and
+ * that its txid matches the `coopExitTxid` the SSP returned alongside it.
+ *
+ * Without this check a malicious SSP can redirect the on-chain payout while
+ * still returning an internally-consistent connector transaction and txid, and
+ * the SDK would sign cooperative-exit refund material for a transaction the
+ * user never authorized.
+ */
+export function validateCoopExitPayoutTransaction({
+  rawCoopExitTransaction,
+  expectedCoopExitTxid,
+  expectedPayoutAddress,
+  expectedPayoutAmountSats,
+  network,
+}: {
+  rawCoopExitTransaction: string;
+  expectedCoopExitTxid: string;
+  expectedPayoutAddress: string;
+  expectedPayoutAmountSats: number;
+  network: Network;
+}): void {
+  const tx = getTxFromRawTxHex(rawCoopExitTransaction);
+
+  const actualTxid = getTxId(tx);
+  if (actualTxid !== expectedCoopExitTxid) {
+    throw new SparkValidationError(
+      "SSP coop exit response is inconsistent: coopExitTxid does not match rawCoopExitTransaction",
+      {
+        field: "coopExitTxid",
+        value: expectedCoopExitTxid,
+        expected: actualTxid,
+      },
+    );
+  }
+
+  let expectedScript: Uint8Array;
+  try {
+    expectedScript = btc.OutScript.encode(
+      btc.Address(getNetwork(network)).decode(expectedPayoutAddress),
+    );
+  } catch (cause) {
+    throw new SparkValidationError(
+      "Could not decode withdrawal address for payout validation",
+      {
+        field: "onchainAddress",
+        value: expectedPayoutAddress,
+        cause: cause instanceof Error ? cause.message : String(cause),
+      },
+    );
+  }
+
+  for (let i = 0; i < tx.outputsLength; i++) {
+    const output = tx.getOutput(i);
+    if (!output?.script || output.amount === undefined) continue;
+    if (!equalBytes(output.script, expectedScript)) continue;
+    if (output.amount >= BigInt(expectedPayoutAmountSats)) {
+      return;
+    }
+  }
+
+  throw new SparkValidationError(
+    "SSP cooperative exit transaction does not pay the requested withdrawal address for the expected amount",
+    {
+      field: "rawCoopExitTransaction",
+      value: expectedPayoutAddress,
+      expected: `>= ${expectedPayoutAmountSats} sats to requested address`,
+    },
+  );
 }
 
 export function getTxEstimatedVbytesSizeByNumberOfInputsOutputs(

@@ -1,10 +1,11 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { hexToBytes } from "@noble/curves/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { type TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
+import { SparkValidationError } from "../../errors/index.js";
 import { TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
@@ -14,14 +15,19 @@ import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
 import { type ConfigOptions } from "../../services/wallet-config.js";
 import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
+import { DefaultSparkSigner } from "../../signer/signer.js";
+import { ExitSpeed } from "../../types/index.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
   getTxId,
 } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
-import { walletTypes } from "../test-utils.js";
-import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { createNewTree, walletTypes } from "../test-utils.js";
+import {
+  SparkWalletTesting,
+  SparkWalletTestingIntegration,
+} from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 
 describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
@@ -238,3 +244,138 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     await sspTransferService.claimTransfer(transfers.transfers[0]!);
   }, 30000);
 });
+
+describe("malicious SSP cooperative exit rejection", () => {
+  it("SDK refuses to sign when SSP-supplied L1 tx pays a different address", async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const amountSats = 100_000n;
+    const feeAmountSats = 1_000;
+
+    const { wallet: userWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options: { network: "LOCAL" },
+        signer: new DefaultSparkSigner(),
+      });
+
+    const leafId = uuidv7();
+    await createNewTree(userWallet, leafId, faucet, amountSats);
+
+    const initialBalance = await userWallet.getBalance();
+    expect(initialBalance.balance).toBe(amountSats);
+
+    const requestedWithdrawKey = secp256k1.utils.randomPrivateKey();
+    const requestedWithdrawPubKey =
+      secp256k1.getPublicKey(requestedWithdrawKey);
+    const requestedWithdrawalAddress = getP2TRAddressFromPublicKey(
+      requestedWithdrawPubKey,
+      Network.LOCAL,
+    );
+
+    const attackerKey = secp256k1.utils.randomPrivateKey();
+    const attackerPubKey = secp256k1.getPublicKey(attackerKey);
+    const attackerScript = getP2TRScriptFromPublicKey(
+      attackerPubKey,
+      Network.LOCAL,
+    );
+
+    const sspIdentityPublicKey = userWallet
+      .getConfigService()
+      .getSspIdentityPublicKey();
+
+    const maliciousResponse = await buildMaliciousCoopExitResponse({
+      faucet,
+      attackerScript,
+      sspIdentityPublicKey,
+      payoutAmountSats: Number(amountSats) - feeAmountSats,
+    });
+
+    const maliciousSspClient = {
+      requestCoopExit: jest.fn(() => Promise.resolve(maliciousResponse)),
+      completeCoopExit: jest.fn(() => Promise.resolve(maliciousResponse)),
+      getTransfers: jest.fn(() => Promise.resolve([])),
+    };
+
+    (userWallet as unknown as { sspClient: unknown }).sspClient =
+      maliciousSspClient;
+
+    await expect(
+      userWallet.withdraw({
+        amountSats: Number(amountSats),
+        onchainAddress: requestedWithdrawalAddress,
+        feeAmountSats,
+        feeQuoteId: "malicious-ssp-fee-quote",
+        exitSpeed: ExitSpeed.FAST,
+        deductFeeFromWithdrawalAmount: true,
+      }),
+    ).rejects.toThrow(SparkValidationError);
+
+    expect(maliciousSspClient.requestCoopExit).toHaveBeenCalledTimes(1);
+    expect(maliciousSspClient.completeCoopExit).toHaveBeenCalledTimes(0);
+
+    const balanceAfter = await userWallet.getBalance();
+    expect(balanceAfter.balance).toBe(amountSats);
+  }, 600_000);
+});
+
+async function buildMaliciousCoopExitResponse({
+  faucet,
+  attackerScript,
+  sspIdentityPublicKey,
+  payoutAmountSats,
+}: {
+  faucet: BitcoinFaucet;
+  attackerScript: Uint8Array;
+  sspIdentityPublicKey: string;
+  payoutAmountSats: number;
+}) {
+  const faucetCoin = await faucet.fund();
+  const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
+    hexToBytes(sspIdentityPublicKey),
+    Network.LOCAL,
+  );
+
+  const leafCount = 1;
+  const dustAmountSats = 354;
+  const intermediateAmountSats = (leafCount + 1) * dustAmountSats;
+
+  const exitTx = new Transaction();
+  exitTx.addInput(faucetCoin.outpoint);
+  exitTx.addOutput({
+    script: attackerScript,
+    amount: BigInt(payoutAmountSats),
+  });
+  exitTx.addOutput({
+    script: sspIntermediateAddressScript,
+    amount: BigInt(intermediateAmountSats),
+  });
+
+  const exitTxId = getTxId(exitTx);
+  const intermediateOutPoint: TransactionInput = {
+    txid: hexToBytes(exitTxId),
+    index: 1,
+  };
+
+  const connectorP2trAddrs: string[] = [];
+  for (let i = 0; i < leafCount + 1; i++) {
+    const randomConnectorKey = secp256k1.utils.randomPrivateKey();
+    const connectorPubKey = secp256k1.getPublicKey(randomConnectorKey);
+    connectorP2trAddrs.push(
+      getP2TRAddressFromPublicKey(connectorPubKey, Network.LOCAL),
+    );
+  }
+
+  const connectorTx = new Transaction();
+  connectorTx.addInput(intermediateOutPoint);
+  for (const addr of connectorP2trAddrs) {
+    connectorTx.addOutput({
+      script: OutScript.encode(Address(getNetwork(Network.LOCAL)).decode(addr)),
+      amount: BigInt(dustAmountSats),
+    });
+  }
+
+  return {
+    rawCoopExitTransaction: bytesToHex(exitTx.toBytes(true)),
+    rawConnectorTransaction: bytesToHex(connectorTx.toBytes(true)),
+    coopExitTxid: exitTxId,
+  };
+}
