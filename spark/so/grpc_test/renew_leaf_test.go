@@ -2,6 +2,7 @@ package grpctest
 
 import (
 	"testing"
+	"time"
 
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
@@ -55,6 +56,69 @@ func queryLeafByID(t *testing.T, config *wallet.TestWalletConfig, authToken stri
 	return resp.Nodes[leafID]
 }
 
+func transferAndClaimSingleLeaf(
+	t *testing.T,
+	senderConfig *wallet.TestWalletConfig,
+	leaf *pb.TreeNode,
+	signingPrivKey keys.Private,
+) (*wallet.TestWalletConfig, *pb.TreeNode, keys.Private) {
+	t.Helper()
+
+	transferSigningPrivKey := keys.GeneratePrivateKey()
+	receiverIdentityPrivKey := keys.GeneratePrivateKey()
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		t.Context(),
+		senderConfig,
+		[]wallet.LeafKeyTweak{{
+			Leaf:              leaf,
+			SigningPrivKey:    signingPrivKey,
+			NewSigningPrivKey: transferSigningPrivKey,
+		}},
+		receiverIdentityPrivKey.Public(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send transfer for leaf %s", leaf.Id)
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverIdentityPrivKey)
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err)
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+
+	pendingTransfers, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err)
+	var receiverTransfer *pb.Transfer
+	for _, transfer := range pendingTransfers.Transfers {
+		if transfer.Id == senderTransfer.Id {
+			receiverTransfer = transfer
+			break
+		}
+	}
+	require.NotNil(t, receiverTransfer, "receiver should see pending transfer %s", senderTransfer.Id)
+	require.Len(t, receiverTransfer.Leaves, 1)
+
+	transferSecrets, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
+	require.NoError(t, err)
+	require.Equal(t, transferSigningPrivKey, transferSecrets[leaf.Id])
+
+	claimedSigningPrivKey := keys.GeneratePrivateKey()
+	claimedNodes, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		[]wallet.LeafKeyTweak{{
+			Leaf:              receiverTransfer.Leaves[0].Leaf,
+			SigningPrivKey:    transferSigningPrivKey,
+			NewSigningPrivKey: claimedSigningPrivKey,
+		}},
+	)
+	require.NoError(t, err, "failed to claim transfer %s", senderTransfer.Id)
+	require.Len(t, claimedNodes, 1)
+	require.Equal(t, leaf.Id, claimedNodes[0].Id)
+	require.Equal(t, "AVAILABLE", claimedNodes[0].Status)
+
+	return receiverConfig, claimedNodes[0], claimedSigningPrivKey
+}
+
 func TestRenewNodeZeroTimelock(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
@@ -89,6 +153,50 @@ func TestRenewNodeZeroTimelock(t *testing.T) {
 
 	queriedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.Id)
 	require.Equal(t, "AVAILABLE", queriedLeaf.Status)
+}
+
+func TestRenewNodeZeroTimelockAfterRepeatedTransfers(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	signingPrivKey := keys.GeneratePrivateKey()
+	leaf, err := wallet.CreateNewTree(config, faucet, signingPrivKey, 100000)
+	require.NoError(t, err)
+	require.Equal(t, "AVAILABLE", leaf.Status)
+
+	previousRefundTimelock := getTimelockFromTxBytes(t, leaf.RefundTx)
+	require.Equal(t, spark.InitialTimeLock, previousRefundTimelock)
+	require.Equal(t, uint32(spark.ZeroTimelock), getTimelockFromTxBytes(t, leaf.NodeTx))
+
+	const maxTransfersToRenewThreshold = 25
+	transfers := 0
+	for previousRefundTimelock > spark.RenewTimelockThreshold {
+		require.Less(t, transfers, maxTransfersToRenewThreshold, "refund timelock did not reach renew threshold")
+
+		config, leaf, signingPrivKey = transferAndClaimSingleLeaf(t, config, leaf, signingPrivKey)
+		refundTimelock := getTimelockFromTxBytes(t, leaf.RefundTx)
+		nodeTimelock := getTimelockFromTxBytes(t, leaf.NodeTx)
+
+		require.Equal(t, uint32(spark.ZeroTimelock), nodeTimelock, "transfer chain should still use the zero-node renew path")
+		require.Less(t, refundTimelock, previousRefundTimelock, "each completed transfer must reduce the refund timelock")
+
+		previousRefundTimelock = refundTimelock
+		transfers++
+	}
+	require.GreaterOrEqual(t, previousRefundTimelock, uint32(spark.TimeLockInterval))
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), authToken)
+	leaf = queryLeafByID(t, config, authToken, leaf.Id)
+
+	renewedLeaf, err := wallet.RenewNodeZeroTimelock(ctx, config, leaf, signingPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, "AVAILABLE", renewedLeaf.Status)
+	require.Equal(t, uint32(spark.ZeroTimelock), getTimelockFromTxBytes(t, renewedLeaf.NodeTx))
+	require.Equal(t, spark.InitialTimeLock, getTimelockFromTxBytes(t, renewedLeaf.RefundTx))
+
+	_, postRenewLeaf, _ := transferAndClaimSingleLeaf(t, config, renewedLeaf, signingPrivKey)
+	require.Equal(t, "AVAILABLE", postRenewLeaf.Status)
+	require.Less(t, getTimelockFromTxBytes(t, postRenewLeaf.RefundTx), spark.InitialTimeLock)
 }
 
 func TestRenewNodeTimelock(t *testing.T) {
