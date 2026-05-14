@@ -1,9 +1,7 @@
 import { LoggingLevel } from "@lightsparkdev/core";
 import { WalletConfigService } from "../services/config.js";
 import {
-  getDefaultUseTokenPrimitivesBindings,
   LOG_SERVICE_NAMES,
-  WalletConfig,
   type ConfigOptions,
   type LogServicesOptions,
 } from "../services/wallet-config.js";
@@ -29,17 +27,6 @@ const DEFAULT_METHOD_LOGGING_SERVICES = [
   "depositService",
   "tokenTransactionService",
 ] as const;
-
-describe("wallet config", () => {
-  it("defaults to token primitive bindings outside React Native", () => {
-    expect(getDefaultUseTokenPrimitivesBindings(false)).toBe(true);
-    expect(WalletConfig.REGTEST.useTokenPrimitivesBindings).toBe(true);
-  });
-
-  it("keeps token primitive bindings disabled by default in React Native", () => {
-    expect(getDefaultUseTokenPrimitivesBindings(true)).toBe(false);
-  });
-});
 
 describe("WalletConfigService logging normalization", () => {
   it("enables warn service logs when logging is not configured", () => {
