@@ -207,6 +207,71 @@ func TestFinalizeTreeCreationErrorCases(t *testing.T) {
 	}
 }
 
+func TestFinalizeTreeCreationRejectsLeafWithoutRefundTx(t *testing.T) {
+	t.Parallel()
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewInternalDepositHandler(config)
+
+	rawTx := createTestTxBytesWithIndex(t, 1000, 0)
+	node := createTestNode(t, ctx, rawTx, 0)
+	node.RawRefundTx = nil
+
+	err := handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+		Network: pb.Network_REGTEST,
+		Nodes:   []*pbinternal.TreeNode{node},
+	})
+	require.ErrorContains(t, err, "missing refund transaction")
+
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	nodeID, err := uuid.Parse(node.Id)
+	require.NoError(t, err)
+	exists, err := dbTX.TreeNode.Query().Where(treenode.IDEQ(nodeID)).Exist(ctx)
+	require.NoError(t, err)
+	require.False(t, exists, "malformed finalize request should not create a split leaf")
+}
+
+func TestFinalizeTreeCreationRejectsDuplicateNodeID(t *testing.T) {
+	t.Parallel()
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		SupportedNetworks:          []btcnetwork.Network{btcnetwork.Regtest},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewInternalDepositHandler(config)
+
+	rawTx := createTestTxBytesWithIndex(t, 1000, 0)
+	node := createTestNode(t, ctx, rawTx, 0)
+
+	err := handler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{
+		Network: pb.Network_REGTEST,
+		Nodes:   []*pbinternal.TreeNode{node, node},
+	})
+	require.ErrorContains(t, err, "duplicate node id")
+}
+
 func FuzzValidateUserSignature(f *testing.F) {
 	// Add some seed corpus data based on the existing test cases
 	f.Add(
