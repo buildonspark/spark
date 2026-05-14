@@ -203,11 +203,21 @@ func fullConfig(includeSSP bool) *Config {
 			{Status: st.TransferStatusExpired, Weight: 1},
 			{Status: st.TransferStatusReturned, Weight: 1},
 		},
+		// Type weights are scaled from prod pg_stats.most_common_freqs
+		// on transfers.type (basis 10000). SWAP+COUNTER_SWAP dominate the
+		// historical corpus — they predate V3 and count both sides of each
+		// swap. The V3 swaps, PREIMAGE_SWAP, UTXO_SWAP, and COOPERATIVE_EXIT
+		// minorities populate the type-filtered query paths that target
+		// non-SWAP traffic (queryByTypes).
 		TransferTypes: []TypeWeight{
-			{Type: st.TransferTypeTransfer, Weight: 90},
-			{Type: st.TransferTypePreimageSwap, Weight: 8},
-			{Type: st.TransferTypeCooperativeExit, Weight: 1},
-			{Type: st.TransferTypeSwap, Weight: 1},
+			{Type: st.TransferTypeSwap, Weight: 3629},
+			{Type: st.TransferTypeCounterSwap, Weight: 3511},
+			{Type: st.TransferTypeTransfer, Weight: 2200},
+			{Type: st.TransferTypePrimarySwapV3, Weight: 232},
+			{Type: st.TransferTypeCounterSwapV3, Weight: 231},
+			{Type: st.TransferTypePreimageSwap, Weight: 173},
+			{Type: st.TransferTypeUtxoSwap, Weight: 19},
+			{Type: st.TransferTypeCooperativeExit, Weight: 5},
 		},
 		CreateTimeSpanDays: 365,
 		Network:            "MAINNET",
@@ -286,9 +296,32 @@ func realisticSSPConfig() *Config {
 		{Type: st.TransferTypeTransfer, Weight: 2},
 		{Type: st.TransferTypePrimarySwapV3, Weight: 1},
 	}
-	// Completed backdrop — transfer.status COMPLETED maps to
-	// receiver.status COMPLETED. Reuse the pending type weights so the
-	// completed lifetime volume matches the pending swap-family bias.
+	// Completed backdrops use per-pubkey type distributions from prod
+	// (transfer_receivers, grouped by transfer_type). The pending mix is a
+	// lifetime-tiny snapshot of in-flight work; the completed mix is what
+	// drives pg_stats and therefore plan choice on these pubkeys.
+	//
+	// Mainnet SSP (pubkey 023e33e2…261c93): SWAP dominates at 94%, with a
+	// PRIMARY_SWAP_V3 secondary at 4.5%. Prod has literal zero
+	// UTXO_SWAP/COUNTER_SWAP_V3 and ~1 COUNTER_SWAP / 185 TRANSFER on 24M
+	// rows — omitted so the planner sees the same "type doesn't exist for
+	// this pubkey" signal it sees in prod.
+	mainnetCompletedTypes := []TypeWeight{
+		{Type: st.TransferTypeSwap, Weight: 9440},
+		{Type: st.TransferTypePrimarySwapV3, Weight: 450},
+		{Type: st.TransferTypePreimageSwap, Weight: 165},
+		{Type: st.TransferTypeCooperativeExit, Weight: 13},
+	}
+	// Regtest SSP (pubkey 022bf283…170bfe): SWAP and PRIMARY_SWAP_V3 are
+	// closer to 50/50 than mainnet — V3 has been live longer here, so the
+	// historical SWAP-only era is a smaller fraction of the corpus.
+	regtestCompletedTypes := []TypeWeight{
+		{Type: st.TransferTypeSwap, Weight: 5170},
+		{Type: st.TransferTypePrimarySwapV3, Weight: 4360},
+		{Type: st.TransferTypePreimageSwap, Weight: 325},
+		{Type: st.TransferTypeCooperativeExit, Weight: 85},
+		{Type: st.TransferTypeTransfer, Weight: 1},
+	}
 	completedTransferStatus := []StatusWeight{
 		{Status: st.TransferStatusCompleted, Weight: 1},
 	}
@@ -315,7 +348,7 @@ func realisticSSPConfig() *Config {
 						Count:            23_729_623,
 						Role:             PhaseRoleReceiver,
 						TransferStatuses: completedTransferStatus,
-						TransferTypes:    mainnetPendingTypes,
+						TransferTypes:    mainnetCompletedTypes,
 					},
 				},
 			},
@@ -336,7 +369,7 @@ func realisticSSPConfig() *Config {
 						Count:            752_154,
 						Role:             PhaseRoleReceiver,
 						TransferStatuses: completedTransferStatus,
-						TransferTypes:    regtestPendingTypes,
+						TransferTypes:    regtestCompletedTypes,
 					},
 				},
 			},
