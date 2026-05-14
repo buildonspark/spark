@@ -69,6 +69,70 @@ func makeP2TRSpendTx(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, 
 	return buf.Bytes(), nil
 }
 
+func TestInitiateTransferRejectsLegacyNilLeafBeforeRefundMap(t *testing.T) {
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalTransferHandler(cfg)
+	senderIdentityPubKey := keys.GeneratePrivateKey().Public()
+	receiverIdentityPubKey := keys.GeneratePrivateKey().Public()
+	req := &pbinternal.InitiateTransferRequest{
+		TransferId:                uuid.NewString(),
+		SenderIdentityPublicKey:   senderIdentityPubKey.Serialize(),
+		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+		Type:                      sparkProto.TransferType_TRANSFER,
+		Leaves:                    []*pbinternal.InitiateTransferLeaf{nil},
+	}
+
+	var err error
+	require.NotPanics(t, func() {
+		err = handler.InitiateTransfer(t.Context(), req)
+	})
+	require.ErrorContains(t, err, "leaves[0] is required")
+}
+
+func TestDeliverSenderKeyTweakRejectsNilTransferPackage(t *testing.T) {
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalTransferHandler(cfg)
+	senderIdentityPubKey := keys.GeneratePrivateKey().Public()
+	req := &pbinternal.DeliverSenderKeyTweakRequest{
+		TransferId:              uuid.NewString(),
+		SenderIdentityPublicKey: senderIdentityPubKey.Serialize(),
+	}
+
+	var err error
+	require.NotPanics(t, func() {
+		err = handler.DeliverSenderKeyTweak(t.Context(), req)
+	})
+	require.ErrorContains(t, err, "transfer_package is required")
+}
+
+func TestInitiateCooperativeExitRejectsLegacyNilLeafBeforeRefundMap(t *testing.T) {
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalTransferHandler(cfg)
+	senderIdentityPubKey := keys.GeneratePrivateKey().Public()
+	receiverIdentityPubKey := keys.GeneratePrivateKey().Public()
+	var exitTxid chainhash.Hash
+	for i := range exitTxid {
+		exitTxid[i] = byte(i + 1)
+	}
+	req := &pbinternal.InitiateCooperativeExitRequest{
+		Transfer: &pbinternal.InitiateTransferRequest{
+			TransferId:                uuid.NewString(),
+			SenderIdentityPublicKey:   senderIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+			Type:                      sparkProto.TransferType_COOPERATIVE_EXIT,
+			Leaves:                    []*pbinternal.InitiateTransferLeaf{nil},
+		},
+		ExitTxid:    exitTxid[:],
+		ConnectorTx: buildConnectorTxSpending(t, exitTxid),
+	}
+
+	var err error
+	require.NotPanics(t, func() {
+		err = handler.InitiateCooperativeExit(t.Context(), req)
+	})
+	require.ErrorContains(t, err, "leaves[0] is required")
+}
+
 func createTestTxBytes(t *testing.T, value int64) []byte {
 	tx := wire.NewMsgTx(3)
 	input := wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}, nil, nil)

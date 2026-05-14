@@ -24,6 +24,27 @@ func TestLoadLeafRefundMapsFromTransferPackage_NilFields(t *testing.T) {
 	assert.Empty(t, directFromCpfp)
 }
 
+func TestStartTransferV2RejectsLegacyLeafMissingRefundJob(t *testing.T) {
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewTransferHandler(cfg)
+	ownerIdentityPubKey := keys.GeneratePrivateKey().Public()
+	receiverIdentityPubKey := keys.GeneratePrivateKey().Public()
+	req := &pb.StartTransferRequest{
+		TransferId:                uuid.NewString(),
+		OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+		LeavesToSend: []*pb.LeafRefundTxSigningJob{
+			{LeafId: uuid.NewString()},
+		},
+	}
+
+	var err error
+	require.NotPanics(t, func() {
+		_, err = handler.StartTransferV2(t.Context(), req)
+	})
+	require.ErrorContains(t, err, "leaves_to_send[0].refund_tx_signing_job is required")
+}
+
 func TestLoadLeafRefundMapsFromTransferPackage_EmptyLeaves(t *testing.T) {
 	pkg := &pb.TransferPackage{
 		LeavesToSend:               []*pb.UserSignedTxSigningJob{},

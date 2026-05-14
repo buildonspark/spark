@@ -256,6 +256,11 @@ func (h *TransferHandler) startTransferInternal(
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", transferID, err)
 	}
+	if req.GetTransferPackage() == nil {
+		if err := validateLegacyLeafRefundTxSigningJobs(req.GetLeavesToSend()); err != nil {
+			return nil, err
+		}
+	}
 
 	knobService := knobs.GetKnobsService(ctx)
 	if knobService != nil {

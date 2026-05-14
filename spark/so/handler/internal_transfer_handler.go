@@ -404,7 +404,9 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 
 // InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
 func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbinternal.InitiateTransferRequest) error {
-	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(req)
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
@@ -438,6 +440,13 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 			return err
 		}
 	}
+	if req.TransferPackage == nil {
+		if err := validateInternalInitiateTransferLeaves(req.Leaves); err != nil {
+			return err
+		}
+	}
+
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(req)
 
 	if len(req.SparkInvoice) > 0 {
 		leafIDs, err := uuids.ParseSliceFunc(req.GetTransferPackage().GetLeavesToSend(), (*pb.UserSignedTxSigningJob).GetLeafId)
@@ -621,9 +630,11 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 }
 
 func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req *pbinternal.DeliverSenderKeyTweakRequest) error {
-	leafRefundMap := make(map[string][]byte)
-	for _, leaf := range req.TransferPackage.LeavesToSend {
-		leafRefundMap[leaf.LeafId] = leaf.RawTx
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.TransferPackage == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 	senderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
 	if err != nil {
@@ -636,6 +647,10 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, senderIDPubKey, false)
 	if err != nil {
 		return err
+	}
+	leafRefundMap := make(map[string][]byte)
+	for _, leaf := range req.TransferPackage.LeavesToSend {
+		leafRefundMap[leaf.LeafId] = leaf.RawTx
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -773,7 +788,13 @@ func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKe
 // InitiateCooperativeExit initiates a cooperative exit by creating transfer and transfer_leaf,
 // and saving the exit txid.
 func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, req *pbinternal.InitiateCooperativeExitRequest) error {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	transferReq := req.Transfer
+	if transferReq == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	}
 
 	senderIDPubKey, err := keys.ParsePublicKey(transferReq.SenderIdentityPublicKey)
 	if err != nil {
@@ -795,15 +816,19 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		return err
 	}
 
-	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(transferReq)
-
 	var keyTweakMap map[string]*pb.SendLeafKeyTweak
 	if transferReq.TransferPackage != nil {
 		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.TransferPackage, senderIDPubKey, true)
 		if err != nil {
 			return err
 		}
+	} else if err := validateInternalInitiateTransferLeaves(transferReq.Leaves); err != nil {
+		return err
+	}
 
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(transferReq)
+
+	if transferReq.TransferPackage != nil {
 		// Validate required fields for the coop exit single-call path.
 		if transferReq.RefundSignatures == nil {
 			return fmt.Errorf("refund_signatures is required for cooperative exit with transfer package")

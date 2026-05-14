@@ -134,6 +134,18 @@ func loadLeafRefundMaps(req *pbspark.StartTransferRequest) (cpfp, direct, direct
 	return cpfp, direct, directFromCpfp
 }
 
+func validateLegacyLeafRefundTxSigningJobs(leaves []*pbspark.LeafRefundTxSigningJob) error {
+	for i, leaf := range leaves {
+		if leaf == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d] is required", i))
+		}
+		if leaf.RefundTxSigningJob == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d].refund_tx_signing_job is required", i))
+		}
+	}
+	return nil
+}
+
 // loadInternalLeafRefundMaps extracts refund maps from an InitiateTransferRequest,
 // delegating to loadLeafRefundMapsFromTransferPackage when a TransferPackage
 // is present and falling back to the legacy Leaves field otherwise.
@@ -150,6 +162,15 @@ func loadInternalLeafRefundMaps(req *pbinternal.InitiateTransferRequest) (cpfp, 
 		directFromCpfp[leaf.LeafId] = leaf.DirectFromCpfpRefundTx
 	}
 	return cpfp, direct, directFromCpfp
+}
+
+func validateInternalInitiateTransferLeaves(leaves []*pbinternal.InitiateTransferLeaf) error {
+	for i, leaf := range leaves {
+		if leaf == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves[%d] is required", i))
+		}
+	}
+	return nil
 }
 
 // applyRefundSignatures applies sender-provided refund signatures to the three
