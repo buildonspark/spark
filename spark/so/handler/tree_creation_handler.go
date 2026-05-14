@@ -67,7 +67,7 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	return tx.TxOut[utxo.Vout], nil
 }
 
-func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context, nodeOutput *pb.NodeOutput) (*wire.TxOut, error) {
+func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context, nodeOutput *pb.NodeOutput, lockParent bool) (*wire.TxOut, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -76,14 +76,15 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	node, err := db.TreeNode.Query().
-		Where(treenode.ID(nodeID)).
-		ForUpdate().
-		Only(ctx)
+	nodeQuery := db.TreeNode.Query().Where(treenode.ID(nodeID))
+	if lockParent {
+		nodeQuery = nodeQuery.ForUpdate()
+	}
+	node, err := nodeQuery.Only(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if node.Status != st.TreeNodeStatusCreating && node.Status != st.TreeNodeStatusAvailable {
+	if lockParent && node.Status != st.TreeNodeStatusCreating && node.Status != st.TreeNodeStatusAvailable {
 		return nil, fmt.Errorf("node %s is not eligible for tree creation from status %s", nodeID.String(), node.Status)
 	}
 
@@ -95,11 +96,11 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 		return nil, fmt.Errorf("vout out of bounds node output, tx vout: %d, node output vout: %d", len(tx.TxOut), nodeOutput.Vout)
 	}
 
-	query := db.TreeNode.Query().Where(
+	childQuery := db.TreeNode.Query().Where(
 		treenode.HasParentWith(treenode.ID(nodeID)),
 		treenode.Vout(int16(nodeOutput.Vout)),
 	)
-	children, err := query.Count(ctx)
+	children, err := childQuery.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 func (h *TreeCreationHandler) findParentOutputFromPrepareTreeAddressRequest(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*wire.TxOut, error) {
 	switch req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
-		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput())
+		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput(), false)
 	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
 		return h.findParentOutputFromUtxo(ctx, req.GetOnChainUtxo())
 	default:
@@ -124,7 +125,7 @@ func (h *TreeCreationHandler) findParentOutputFromPrepareTreeAddressRequest(ctx 
 func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.Context, req *pb.CreateTreeRequest) (*wire.TxOut, error) {
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
-		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput())
+		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput(), true)
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		return h.findParentOutputFromUtxo(ctx, req.GetOnChainUtxo())
 	default:

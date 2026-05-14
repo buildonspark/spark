@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"math/rand/v2"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -315,7 +316,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			output, err := handler.findParentOutputFromNodeOutput(ctx, tt.nodeOutput)
+			output, err := handler.findParentOutputFromNodeOutput(ctx, tt.nodeOutput, true)
 
 			if tt.expectError {
 				require.ErrorContains(t, err, tt.expectedErrorContains)
@@ -394,11 +395,198 @@ func TestFindParentOutputFromNodeOutputRejectsUnavailableParent(t *testing.T) {
 			output, err := handler.findParentOutputFromNodeOutput(ctx, &pb.NodeOutput{
 				NodeId: node.ID.String(),
 				Vout:   0,
-			})
+			}, true)
 
 			require.ErrorContains(t, err, "not eligible for tree creation")
 			require.Nil(t, output)
 		})
+	}
+}
+
+func TestPrepareSigningJobsRejectsParentNodeOutputChangedWhileWaitingForLock(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{42})
+	ctx, tc := db.ConnectToTestPostgres(t)
+	handler := createTestHandler()
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keysharePrivKey).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	verifyingKey := keysharePrivKey.Public().Add(signingPrivKey.Public())
+	parentScript, err := common.P2TRScriptFromPubKey(verifyingKey)
+	require.NoError(t, err)
+	parentAddress, err := common.P2TRAddressFromPkScript(parentScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+
+	parentTx := wire.NewMsgTx(wire.TxVersion)
+	parentTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: [32]byte{1, 2, 3}, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	parentTx.AddTxOut(&wire.TxOut{Value: 100000, PkScript: parentScript})
+	parentTxBuf, err := common.SerializeTx(parentTx)
+	require.NoError(t, err)
+	parentTxHash := parentTx.TxHash()
+
+	tree, err := dbTX.Tree.Create().
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetNetwork(btcnetwork.Regtest).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetStatus(st.TreeStatusAvailable).
+		Save(ctx)
+	require.NoError(t, err)
+
+	parentNode, err := dbTX.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivKey.Public()).
+		SetValue(100000).
+		SetVerifyingPubkey(verifyingKey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(parentTxBuf).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*parentAddress).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivKey.Public()).
+		SetSigningKeyshare(signingKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	childScript, err := common.P2TRScriptFromPubKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	require.NoError(t, err)
+	childNodeTx := wire.NewMsgTx(wire.TxVersion)
+	childNodeTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTxHash, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	childNodeTx.AddTxOut(&wire.TxOut{Value: 50000, PkScript: childScript})
+	childNodeTxBuf, err := common.SerializeTx(childNodeTx)
+	require.NoError(t, err)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_ParentNodeOutput{
+			ParentNodeOutput: &pb.NodeOutput{
+				NodeId: parentNode.ID.String(),
+				Vout:   0,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  childNodeTxBuf,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: &pbcommon.SigningCommitment{Hiding: make([]byte, 33), Binding: make([]byte, 33)},
+			},
+		},
+	}
+
+	require.NoError(t, ent.DbCommit(ctx))
+
+	session1 := db.NewDefaultSessionFactory(tc.Client).NewSession(t.Context())
+	ctx1 := ent.Inject(t.Context(), session1)
+	defer func() {
+		if tx := session1.GetTxIfExists(); tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	db1, err := ent.GetDbFromContext(ctx1)
+	require.NoError(t, err)
+	_, err = db1.TreeNode.Query().Where(enttreenode.ID(parentNode.ID)).ForUpdate().Only(ctx1)
+	require.NoError(t, err)
+
+	type prepareResult struct {
+		nodes []*ent.TreeNode
+		err   error
+	}
+	done := make(chan prepareResult, 1)
+	started := make(chan struct{}, 1)
+	go func() {
+		session2 := db.NewDefaultSessionFactory(tc.Client).NewSession(t.Context())
+		ctx2 := ent.Inject(t.Context(), session2)
+		nodes := []*ent.TreeNode(nil)
+		started <- struct{}{}
+		_, nodes, err = handler.prepareSigningJobs(ctx2, req, false)
+		if tx := session2.GetTxIfExists(); tx != nil {
+			_ = tx.Rollback()
+		}
+		done <- prepareResult{nodes: nodes, err: err}
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "prepareSigningJobs goroutine did not start")
+	}
+
+	rawDB, err := tc.Client.RawDB()
+	require.NoError(t, err)
+	var earlyResult *prepareResult
+	require.Eventually(t, func() bool {
+		select {
+		case result := <-done:
+			earlyResult = &prepareResult{nodes: result.nodes, err: result.err}
+			return true
+		default:
+		}
+
+		var lockWaits int
+		err := rawDB.QueryRowContext(t.Context(), `
+			SELECT count(*)
+			FROM pg_stat_activity
+			WHERE datname = current_database()
+				AND wait_event_type = 'Lock'
+				AND query LIKE '%tree_nodes%'
+				AND query LIKE '%FOR UPDATE%'
+		`).Scan(&lockWaits)
+		return err == nil && lockWaits > 0
+	}, 5*time.Second, 50*time.Millisecond, "prepareSigningJobs did not wait on the parent row lock")
+	if earlyResult != nil {
+		require.Failf(t, "prepareSigningJobs returned before parent lock was released", "nodes=%d err=%v", len(earlyResult.nodes), earlyResult.err)
+	}
+
+	_, err = db1.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivKey.Public()).
+		SetValue(50000).
+		SetVerifyingPubkey(verifyingKey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(childNodeTxBuf).
+		SetParentID(parentNode.ID).
+		SetVout(0).
+		Save(ctx1)
+	require.NoError(t, err)
+	require.NoError(t, ent.DbCommit(ctx1))
+
+	select {
+	case result := <-done:
+		require.ErrorContains(t, result.err, "already exists")
+		require.Empty(t, result.nodes)
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "prepareSigningJobs did not return after parent lock was released")
 	}
 }
 
