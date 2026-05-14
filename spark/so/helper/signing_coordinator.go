@@ -339,6 +339,14 @@ func NewSigningJobWithPregeneratedNonce(
 	if prevOutput == nil {
 		return nil, errors.New("prevOutput cannot be nil")
 	}
+	signingCommitments := signingJobProto.GetSigningCommitments()
+	if signingCommitments == nil {
+		return nil, errors.New("signingCommitments cannot be nil")
+	}
+	operatorCommitments := signingCommitments.GetSigningCommitments()
+	if len(operatorCommitments) == 0 {
+		return nil, errors.New("signingCommitments cannot be empty")
+	}
 
 	// Create user nonce commitment
 	userNonceCommitment := frost.SigningCommitment{}
@@ -364,7 +372,7 @@ func NewSigningJobWithPregeneratedNonce(
 
 	// Extract round1 packages from user's signing commitments
 	round1Packages := make(map[string]frost.SigningCommitment)
-	for key, commitment := range signingJobProto.SigningCommitments.SigningCommitments {
+	for key, commitment := range operatorCommitments {
 		obj := frost.SigningCommitment{}
 		if err := obj.UnmarshalProto(commitment); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal signing commitment for key %s: %w", key, err)

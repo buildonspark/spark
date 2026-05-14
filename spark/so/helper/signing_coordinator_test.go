@@ -69,6 +69,27 @@ func runWithValues(t *testing.T, prevOutputValue int64, values []int64) (*helper
 	return runWithRawTx(pubKey, pubKey, rawTx, commitment, prevOutputValue)
 }
 
+func pregeneratedNonceSigningJobInputs(signingCommitments *pbspark.SigningCommitments) (*pbspark.UserSignedTxSigningJob, *ent.SigningKeyshare, keys.Public, *wire.MsgTx, *wire.TxOut) {
+	operatorPubKey := keys.GeneratePrivateKey().Public()
+	userPubKey := keys.GeneratePrivateKey().Public()
+	verifyingPubKey := operatorPubKey.Add(userPubKey)
+	signingKeyshare := &ent.SigningKeyshare{
+		ID:        uuid.New(),
+		PublicKey: operatorPubKey,
+	}
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(&wire.TxIn{})
+	tx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: []byte("test-pkscript")})
+	prevOutput := &wire.TxOut{Value: 1000, PkScript: []byte("test-pkscript")}
+
+	return &pbspark.UserSignedTxSigningJob{
+		SigningPublicKey:       userPubKey.Serialize(),
+		SigningNonceCommitment: commitmentProto,
+		SigningCommitments:     signingCommitments,
+	}, signingKeyshare, verifyingPubKey, tx, prevOutput
+}
+
 func TestNewSigningJob(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -111,6 +132,54 @@ func TestNewSigningJob_BadLeafValues(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, _, err := runWithValues(t, test.prevOutputValue, test.values)
 			require.ErrorIs(t, err, test.expectedError)
+		})
+	}
+}
+
+func TestNewSigningJobWithPregeneratedNonceSigningCommitmentsValidation(t *testing.T) {
+	tests := []struct {
+		name               string
+		signingCommitments *pbspark.SigningCommitments
+		expectedError      string
+	}{
+		{
+			name:               "nil signing commitments",
+			signingCommitments: nil,
+			expectedError:      "signingCommitments cannot be nil",
+		},
+		{
+			name:               "empty signing commitments",
+			signingCommitments: &pbspark.SigningCommitments{},
+			expectedError:      "signingCommitments cannot be empty",
+		},
+		{
+			name: "nil signing commitment entry",
+			signingCommitments: &pbspark.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"operator1": nil,
+			}},
+			expectedError: "failed to unmarshal signing commitment for key operator1: cannot unmarshal signing commitment: nil proto",
+		},
+		{
+			name: "valid signing commitments",
+			signingCommitments: &pbspark.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"operator1": commitmentProto,
+			}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			jobProto, signingKeyshare, verifyingPubKey, tx, prevOutput := pregeneratedNonceSigningJobInputs(test.signingCommitments)
+
+			job, err := helper.NewSigningJobWithPregeneratedNonce(jobProto, signingKeyshare, verifyingPubKey, tx, prevOutput)
+			if test.expectedError != "" {
+				require.ErrorContains(t, err, test.expectedError)
+				require.Nil(t, job)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, job)
+			require.Len(t, job.Round1Packages, 1)
 		})
 	}
 }
