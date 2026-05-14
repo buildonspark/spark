@@ -1288,24 +1288,6 @@ async function runCLI() {
                 );
               },
             );
-            wallet.on(SparkWalletEvent.TokenBalanceUpdate, (event) => {
-              console.log("Token balance update:");
-              for (const tx of event.finalizedTokenTransactions) {
-                const hashHex = Buffer.from(tx.tokenTransactionHash).toString(
-                  "hex",
-                );
-                console.log(`  tx: ${hashHex}`);
-                if (tx.tokenIdentifiers.length > 0) {
-                  console.log(`  tokens: ${tx.tokenIdentifiers.join(", ")}`);
-                }
-                if (tx.sparkInvoices.length > 0) {
-                  console.log(`  invoices: ${tx.sparkInvoices.join(", ")}`);
-                }
-              }
-              for (const [id, info] of event.tokenBalances.entries()) {
-                console.log(`  ${id}: ${info.ownedBalance}`);
-              }
-            });
             wallet.on(SparkWalletEvent.StreamConnected, () => {
               console.log("Stream connected");
             });
