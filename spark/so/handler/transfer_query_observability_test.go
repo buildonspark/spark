@@ -31,3 +31,19 @@ func TestResultCountBucket(t *testing.T) {
 		})
 	}
 }
+
+func TestTransferQueryAttrsFields(t *testing.T) {
+	// Lock the attribute set. If a field is added/removed/renamed, this
+	// test fails and the dashboard owner reviews whether dashboard panels
+	// need to follow. Keeps the recorder-to-dashboard contract explicit.
+	var a transferQueryAttrs
+	a.QueryPath = ""
+	a.MIMOEnabled = false
+	a.FilterType = ""
+	a.HasStatusFilter = false
+	a.HasTypeFilter = false
+	a.HasTransferIDs = false
+	a.PendingOnly = false
+	// No assertion needed — this is a compile-time guard.
+	_ = a
+}

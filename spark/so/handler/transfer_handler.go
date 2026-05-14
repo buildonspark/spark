@@ -2025,6 +2025,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		FilterType:      filterType,
 		HasStatusFilter: len(filter.Statuses) > 0,
 		HasTypeFilter:   len(filter.Types) > 0,
+		HasTransferIDs:  len(filter.TransferIds) > 0,
 		PendingOnly:     pendingOnly,
 	})
 
@@ -2443,11 +2444,12 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 	}
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
-		QueryPath:     "query_pending_transfers",
-		MIMOEnabled:   true,
-		FilterType:    filterType,
-		HasTypeFilter: len(filter.Types) > 0,
-		PendingOnly:   true,
+		QueryPath:      "query_pending_transfers",
+		MIMOEnabled:    true,
+		FilterType:     filterType,
+		HasTypeFilter:  len(filter.Types) > 0,
+		HasTransferIDs: len(filter.TransferIds) > 0,
+		PendingOnly:    true,
 	})
 
 	// Upfront access check.

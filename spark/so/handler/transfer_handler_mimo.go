@@ -357,6 +357,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		FilterType:      "sender",
 		HasStatusFilter: true,
 		HasTypeFilter:   len(filter.Types) > 0,
+		HasTransferIDs:  len(filter.TransferIds) > 0,
 	})
 
 	if !isSSP {

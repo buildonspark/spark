@@ -73,6 +73,7 @@ type transferQueryAttrs struct {
 	FilterType      string
 	HasStatusFilter bool
 	HasTypeFilter   bool
+	HasTransferIDs  bool
 	PendingOnly     bool
 }
 
@@ -121,6 +122,7 @@ func (r *transferQueryRecorder) record(ctx context.Context, resultCount int, err
 		attribute.String("filter_type", r.attrs.FilterType),
 		attribute.Bool("has_status_filter", r.attrs.HasStatusFilter),
 		attribute.Bool("has_type_filter", r.attrs.HasTypeFilter),
+		attribute.Bool("has_transfer_ids", r.attrs.HasTransferIDs),
 		attribute.Bool("pending_only", r.attrs.PendingOnly),
 		attribute.String("result_count_bucket", resultCountBucket(resultCount)),
 		attribute.Bool("success", err == nil),
