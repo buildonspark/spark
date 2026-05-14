@@ -110,6 +110,11 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	if err != nil {
 		return nil, err
 	}
+	for _, keyshareID := range keyshareIDs {
+		if keyPackages[keyshareID] == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "signing keyshare %s not found", keyshareID)
+		}
+	}
 
 	// Fetch nonces in one call.
 	commitments := make([]frost.SigningCommitment, len(req.SigningJobs))

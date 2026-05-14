@@ -1,9 +1,12 @@
 package signing_handler
 
 import (
+	"errors"
 	"math"
 	"testing"
 
+	"github.com/google/uuid"
+	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -12,6 +15,7 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -221,6 +225,49 @@ func TestFrostSigningHandler_FrostRound2RejectsMalformedRequestsBeforeDB(t *test
 		})
 	}
 }
+
+func TestFrostSigningHandler_FrostRound2RejectsMissingKeyshareBeforeSigner(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	frostFactory := &rejectingFrostConnectionFactory{}
+	config := &so.Config{
+		Identifier:                 "operator-1",
+		FrostGRPCConnectionFactory: frostFactory,
+	}
+	handler := NewFrostSigningHandler(config)
+
+	nonceResp, err := handler.GenerateRandomNonces(ctx, 1)
+	require.NoError(t, err)
+	require.Len(t, nonceResp.GetSigningCommitments(), 1)
+
+	missingKeyshareID := uuid.NewString()
+	resp, err := handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{{
+			JobId:        "job-1",
+			KeyshareId:   missingKeyshareID,
+			Message:      []byte("message"),
+			VerifyingKey: []byte("verifying-key"),
+			Commitments: map[string]*pbcommon.SigningCommitment{
+				config.Identifier: nonceResp.GetSigningCommitments()[0],
+			},
+		}},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "signing keyshare")
+	require.False(t, frostFactory.called, "missing keyshare IDs must be rejected before calling the signer")
+}
+
+type rejectingFrostConnectionFactory struct {
+	called bool
+}
+
+func (f *rejectingFrostConnectionFactory) NewFrostGRPCConnection(string) (*grpc.ClientConn, error) {
+	f.called = true
+	return nil, errors.New("frost signer should not be called")
+}
+
+func (f *rejectingFrostConnectionFactory) SetTimeoutProvider(sparkgrpc.TimeoutProvider) {}
 
 func TestFrostSigningHandler_NewFrostSigningHandler(t *testing.T) {
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
