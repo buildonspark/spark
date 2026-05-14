@@ -506,7 +506,11 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 		return fmt.Errorf("failed to get preimage requests for %x: %w", gossip.PaymentHash, err)
 	}
 	for _, preimageRequest := range preimageRequests {
-		if _, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx); err != nil {
+		update := preimageRequest.Update().SetPreimage(gossip.Preimage)
+		if preimageRequest.Status == st.PreimageRequestStatusWaitingForPreimage {
+			update = update.SetStatus(st.PreimageRequestStatusPreimageShared)
+		}
+		if _, err = update.Save(ctx); err != nil {
 			return fmt.Errorf("failed to update preimage request for %x: %w", gossip.PaymentHash, err)
 		}
 	}

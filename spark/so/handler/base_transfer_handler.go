@@ -2443,6 +2443,10 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		return nil, err
 	}
 
+	if err := h.validateSenderKeyTweakCommitPreconditions(ctx, transfer); err != nil {
+		return nil, err
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Checking commitSenderKeyTweaks for transfer %s (status: %s)", transfer.ID, transfer.Status)
 	if transfer.Status == st.TransferStatusSenderInitiated {
@@ -2506,6 +2510,39 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	}
 
 	return transfer, nil
+}
+
+func (h *BaseTransferHandler) validateSenderKeyTweakCommitPreconditions(ctx context.Context, transfer *ent.Transfer) error {
+	if transfer.Type != st.TransferTypePreimageSwap {
+		return nil
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("unable to get db: %w", err))
+	}
+	preimageRequest, err := db.PreimageRequest.Query().
+		Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("cannot commit preimage swap sender key tweaks: preimage request not found for transfer %s", transfer.ID),
+		)
+	}
+	if ent.IsNotSingular(err) {
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("cannot commit preimage swap sender key tweaks: multiple preimage requests found for transfer %s", transfer.ID),
+		)
+	}
+	if err != nil {
+		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("unable to query preimage request for transfer %s: %w", transfer.ID, err))
+	}
+	if preimageRequest.Status != st.PreimageRequestStatusPreimageShared {
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("cannot commit preimage swap sender key tweaks: preimage has not been shared for transfer %s (status: %s)", transfer.ID, preimageRequest.Status),
+		)
+	}
+	return nil
 }
 
 // CommitSwapKeyTweaks handles CommitSwapKeyTweaks gossip messages from the coordinator. It is used in
