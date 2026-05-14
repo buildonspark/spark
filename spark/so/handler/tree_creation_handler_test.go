@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 
@@ -78,11 +79,18 @@ func createTestTx() *wire.MsgTx {
 }
 
 func createTestUTXO(rawTx []byte, vout uint32) *pb.UTXO {
+	txid := make([]byte, 32)
+	if tx, err := common.TxFromRawTxBytes(rawTx); err == nil {
+		txHash := tx.TxHash()
+		if txidBytes, err := hex.DecodeString(txHash.String()); err == nil {
+			txid = txidBytes
+		}
+	}
 	return &pb.UTXO{
 		RawTx:   rawTx,
 		Vout:    vout,
 		Network: pb.Network_REGTEST,
-		Txid:    make([]byte, 32),
+		Txid:    txid,
 	}
 }
 
@@ -955,6 +963,104 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
 
 	require.ErrorContains(t, err, "onfirmation txid does not match utxo txid")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsUtxoRawTxidMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{12})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	handler := createTestHandler()
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keysharePrivKey).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	depositPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	depositScript, err := common.P2TRScriptFromPubKey(depositPubKey)
+	require.NoError(t, err)
+
+	confirmedTx := wire.NewMsgTx(wire.TxVersion)
+	confirmedTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: [32]byte{1, 2, 3}, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	confirmedTx.AddTxOut(&wire.TxOut{Value: 100000, PkScript: depositScript})
+	confirmedTxHash := confirmedTx.TxHash()
+	confirmedTxidBytes, err := hex.DecodeString(confirmedTxHash.String())
+	require.NoError(t, err)
+
+	maliciousTx := wire.NewMsgTx(wire.TxVersion)
+	maliciousTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: [32]byte{9, 8, 7}, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	maliciousTx.AddTxOut(&wire.TxOut{Value: 100000, PkScript: depositScript})
+	maliciousTxBuf, err := common.SerializeTx(maliciousTx)
+	require.NoError(t, err)
+	maliciousTxHash := maliciousTx.TxHash()
+	require.NotEqual(t, confirmedTxHash, maliciousTxHash)
+
+	outputAddress, err := common.P2TRAddressFromPkScript(depositScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*outputAddress).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivKey.Public()).
+		SetSigningKeyshare(signingKeyshare).
+		SetConfirmationHeight(100).
+		SetConfirmationTxid(confirmedTxHash.String()).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodePubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	nodeScript, err := common.P2TRScriptFromPubKey(nodePubKey)
+	require.NoError(t, err)
+	nodeTx := wire.NewMsgTx(wire.TxVersion)
+	nodeTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: maliciousTxHash, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	nodeTx.AddTxOut(&wire.TxOut{Value: 100000, PkScript: nodeScript})
+	nodeTxBuf, err := common.SerializeTx(nodeTx)
+	require.NoError(t, err)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   maliciousTxBuf,
+				Txid:    confirmedTxidBytes,
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  nodeTxBuf,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: &pbcommon.SigningCommitment{Hiding: make([]byte, 33), Binding: make([]byte, 33)},
+			},
+		},
+	}
+
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+
+	require.ErrorContains(t, err, "utxo txid does not match raw transaction txid")
 	assert.Empty(t, signingJobs)
 	assert.Empty(t, nodes)
 }

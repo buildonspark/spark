@@ -41,6 +41,13 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	if err != nil {
 		return nil, err
 	}
+	txHash := tx.TxHash()
+	if len(utxo.Txid) > 0 {
+		requestedTxid := hex.EncodeToString(utxo.Txid)
+		if requestedTxid != txHash.String() && requestedTxid != hex.EncodeToString(txHash[:]) {
+			return nil, fmt.Errorf("utxo txid does not match raw transaction txid")
+		}
+	}
 	if len(tx.TxOut) <= int(utxo.Vout) {
 		return nil, fmt.Errorf("vout out of bounds utxo, tx vout: %d, utxo vout: %d", len(tx.TxOut), utxo.Vout)
 	}
@@ -48,7 +55,6 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	txHash := tx.TxHash()
 	query := db.Tree.Query().Where(tree.BaseTxid(st.NewTxID(txHash)))
 	count, err := query.Count(ctx)
 	if err != nil {
