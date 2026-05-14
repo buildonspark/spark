@@ -1691,8 +1691,13 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	leafTweaksMap := make(map[string]*pbspark.SendLeafKeyTweak)
 	for _, leafTweak := range leafTweaks.LeavesToSend {
 		// Validate leaf ID in key tweaks
-		if err := uuid.Validate(leafTweak.LeafId); err != nil {
+		parsedLeafID, err := uuid.Parse(leafTweak.LeafId)
+		if err != nil {
 			return nil, fmt.Errorf("unable to parse key tweaks leaf_id as a uuid %s: %w", leafTweak.LeafId, err)
+		}
+		leafID := parsedLeafID.String()
+		if _, exists := leafTweaksMap[leafID]; exists {
+			return nil, fmt.Errorf("duplicate leaf id in encrypted key tweaks: %s", leafID)
 		}
 
 		// Validate secret share size
@@ -1710,7 +1715,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 			return nil, fmt.Errorf("too many pubkey shares: %d (max: %d)", len(leafTweak.PubkeySharesTweak), maxPubkeySharesTweakCount)
 		}
 
-		leafTweaksMap[leafTweak.LeafId] = leafTweak
+		leafTweaksMap[leafID] = leafTweak
 	}
 
 	// The refund transactions and key tweak package must cover exactly the same set of leaves.
