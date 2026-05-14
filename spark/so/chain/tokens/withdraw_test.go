@@ -451,6 +451,52 @@ func TestHandleTokenWithdrawals_RejectsDuplicateBitcoinVoutInOneAnnouncement(t *
 	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash2)
 }
 
+func TestHandleTokenWithdrawals_DoesNotDoubleSaveDuplicateSparkOutputInOneAnnouncement(t *testing.T) {
+	ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContext(t)
+
+	ownerPrivKey := keys.GeneratePrivateKey()
+	ownerPubKey := ownerPrivKey.Public()
+	revocationPrivKey := keys.GeneratePrivateKey()
+	revocationXOnly := revocationPrivKey.Public().SerializeXOnly()
+	revocationCommitment := revocationPrivKey.Public().Serialize()
+
+	bondSats := uint64(10000)
+	csvBlocks := uint64(1000)
+
+	sparkTxHash := fixtures.RandomBytes(32)
+	tokenOutput := createTestTokenOutput(t, ctx, dbClient, fixtures, sparkTxHash, 0, ownerPubKey, revocationCommitment, bondSats, csvBlocks)
+	require.NotNil(t, tokenOutput)
+
+	expectedOutput, err := ConstructRevocationCsvTaprootOutput(revocationXOnly, ownerPubKey.SerializeXOnly(), csvBlocks)
+	require.NoError(t, err)
+
+	ownerSignature := make([]byte, 64)
+	withdrawalScript := buildWithdrawalScript(t, sePubKey.Serialize(), ownerSignature, []withdrawalRecord{
+		{bitcoinVout: 0, sparkTxHash: sparkTxHash, sparkTxVout: 0},
+		{bitcoinVout: 1, sparkTxHash: sparkTxHash, sparkTxVout: 0},
+	})
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxOut(&wire.TxOut{Value: int64(bondSats), PkScript: expectedOutput.ScriptPubKey})
+	tx.AddTxOut(&wire.TxOut{Value: int64(bondSats), PkScript: expectedOutput.ScriptPubKey})
+	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
+
+	blockHash := chainhash.Hash{}
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	require.NoError(t, err)
+
+	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	outputWithdrawals, err := dbClient.L1TokenOutputWithdrawal.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, outputWithdrawals, 1)
+	assert.Equal(t, uint16(0), outputWithdrawals[0].BitcoinVout)
+
+	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
+}
+
 func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {
 	ctx, dbClient, fixtures, config, _ := setupWithdrawalTestContext(t)
 
