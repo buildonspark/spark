@@ -1802,6 +1802,105 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	require.Equal(t, "OUT_OF_RANGE", reason)
 }
 
+func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{4})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHashBytes := sha256.Sum256([]byte("negative refund output"))
+	paymentHash := paymentHashBytes[:]
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(validPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": validPubKey}).
+		SetPublicKey(validPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440001")
+	outputScript, err := common.P2TRScriptFromPubKey(validPubKey)
+	require.NoError(t, err)
+
+	parentTx, refundTx := createParentAndRefundTx(t, outputScript, 1000)
+	refundMsgTx, err := common.TxFromRawTxBytes(refundTx)
+	require.NoError(t, err)
+	refundMsgTx.TxOut[0].Value = -1
+	refundTx, err = common.SerializeTx(refundMsgTx)
+	require.NoError(t, err)
+
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(nodeID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(validPubKey).
+		SetOwnerSigningPubkey(validPubKey).
+		SetRawTx(parentTx).
+		SetDirectTx(parentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	testTx := &pb.UserSignedTxSigningJob{
+		LeafId: nodeID.String(),
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"test": {
+					Hiding:  []byte("test_hiding"),
+					Binding: []byte("test_binding"),
+				},
+			},
+		},
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  []byte("test_nonce_hiding"),
+			Binding: []byte("test_nonce_binding"),
+		},
+		UserSignature: []byte("test_signature"),
+		RawTx:         refundTx,
+	}
+
+	err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+		ctx,
+		&mockFrostServiceClientConnection{},
+		paymentHash,
+		[]*pb.UserSignedTxSigningJob{testTx},
+		[]*pb.UserSignedTxSigningJob{},
+		[]*pb.UserSignedTxSigningJob{},
+		&pb.InvoiceAmount{ValueSats: 1000},
+		validPubKey,
+		0,
+		pb.InitiatePreimageSwapRequest_REASON_SEND,
+		false,
+	)
+
+	require.ErrorContains(t, err, "cpfp refund tx output 0 value must be positive")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "OUT_OF_RANGE", reason)
+}
+
 func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{3})
 	ctx, _ := db.ConnectToTestPostgres(t)

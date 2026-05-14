@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -860,7 +861,14 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if !bytes.Equal(pubkeyScript, cpfpRefundTx.TxOut[0].PkScript) {
 			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid cpfp destination pubkey"))
 		}
-		totalAmountSats += uint64(cpfpRefundTx.TxOut[0].Value)
+		outputValueSats, err := validateLightningRefundOutputValue(cpfpRefundTx.TxOut[0].Value, "cpfp", cpfpTransaction.LeafId)
+		if err != nil {
+			return err
+		}
+		if outputValueSats > math.MaxUint64-totalAmountSats {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("cpfp refund output amount overflow"))
+		}
+		totalAmountSats += outputValueSats
 	}
 
 	// Validate direct transactions
@@ -880,6 +888,9 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		}
 		if !bytes.Equal(pubkeyScript, directRefundTx.TxOut[0].PkScript) {
 			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid direct destination pubkey for directTransaction leaf_id: %s", directTransaction.LeafId))
+		}
+		if _, err := validateLightningRefundOutputValue(directRefundTx.TxOut[0].Value, "direct", directTransaction.LeafId); err != nil {
+			return err
 		}
 	}
 
@@ -901,6 +912,9 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if !bytes.Equal(pubkeyScript, directFromCpfpRefundTx.TxOut[0].PkScript) {
 			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid direct from cpfp destination pubkey for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.LeafId))
 		}
+		if _, err := validateLightningRefundOutputValue(directFromCpfpRefundTx.TxOut[0].Value, "direct from cpfp", directFromCpfpTransaction.LeafId); err != nil {
+			return err
+		}
 	}
 
 	if reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
@@ -914,6 +928,13 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmountSats))
 	}
 	return nil
+}
+
+func validateLightningRefundOutputValue(value int64, txType string, leafID string) (uint64, error) {
+	if value <= 0 {
+		return 0, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("%s refund tx output 0 value must be positive for leaf_id: %s, got: %d", txType, leafID, value))
+	}
+	return uint64(value), nil
 }
 
 func (h *LightningHandler) storeUserSignedTransactions(
