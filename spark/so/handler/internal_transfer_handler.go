@@ -83,6 +83,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	}
 
 	transferAlreadyCompleted := transfer.Status == st.TransferStatusCompleted
+	requestNodesByID := make(map[uuid.UUID]*pbinternal.TreeNode, len(req.Nodes))
 	for _, node := range req.Nodes {
 		nodeID, err := uuid.Parse(node.Id)
 		if err != nil {
@@ -91,6 +92,11 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		if _, ok := transferNodeIDs[nodeID]; !ok {
 			return fmt.Errorf("node not found in transfer. transfer id: %s. with status: %s. node id: %s", transferID, transfer.Status, nodeID)
 		}
+		delete(transferNodeIDs, nodeID)
+		requestNodesByID[nodeID] = node
+	}
+
+	for nodeID, node := range requestNodesByID {
 		dbNode, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
 			return fmt.Errorf("failed to get dbNode. transfer id: %s. with status: %s. node id: %s and error: %w", transferID, transfer.Status, nodeID, err)

@@ -729,6 +729,129 @@ func TestFinalizeTransfer(t *testing.T) {
 	})
 }
 
+func TestFinalizeTransferRejectsDuplicateNodeID(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {DepositConfirmationThreshold: 1},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	rng := rand.NewChaCha8([32]byte{11})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	tree, err := dbCtx.Client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	createLeaf := func(index int) (*ent.TreeNode, []byte, []byte, string) {
+		t.Helper()
+		keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(keysharePrivKey).
+			SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+			SetPublicKey(keysharePrivKey.Public()).
+			SetMinSigners(2).
+			SetCoordinatorIndex(uint64(index)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		rawTx := createTestTxBytes(t, int64(8400+index*10))
+		rawRefundTx := createTestTxBytes(t, int64(8401+index*10))
+		leaf, err := dbCtx.Client.TreeNode.Create().
+			SetStatus(st.TreeNodeStatusTransferLocked).
+			SetTree(tree).
+			SetNetwork(tree.Network).
+			SetSigningKeyshare(signingKeyshare).
+			SetValue(1000).
+			SetVerifyingPubkey(verifyingPrivKey.Public()).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+			SetOwnerSigningPubkey(ownerSigningPrivKey.Public()).
+			SetRawTx(rawTx).
+			SetRawRefundTx(rawRefundTx).
+			SetDirectTx(createTestTxBytes(t, int64(8402+index*10))).
+			SetDirectRefundTx(createTestTxBytes(t, int64(8403+index*10))).
+			SetDirectFromCpfpRefundTx(createTestTxBytes(t, int64(8404+index*10))).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+		return leaf, rawTx, rawRefundTx, signingKeyshare.ID.String()
+	}
+
+	leafA, leafARawTx, leafARawRefundTx, leafAKeyshareID := createLeaf(0)
+	leafB, leafBRawTx, leafBRawRefundTx, _ := createLeaf(1)
+
+	transfer, err := dbCtx.Client.Transfer.Create().
+		SetNetwork(tree.Network).
+		SetStatus(st.TransferStatusReceiverRefundSigned).
+		SetType(st.TransferTypeTransfer).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(2000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		SetCompletionTime(time.Now()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	for i, leaf := range []*ent.TreeNode{leafA, leafB} {
+		_, err = dbCtx.Client.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(leaf).
+			SetPreviousRefundTx(createTestTxBytes(t, int64(9400+i*10))).
+			SetIntermediateRefundTx(createTestTxBytes(t, int64(9401+i*10))).
+			Save(ctx)
+		require.NoError(t, err)
+	}
+
+	duplicateNode := &pbinternal.TreeNode{
+		Id:                     leafA.ID.String(),
+		Value:                  1000,
+		VerifyingPubkey:        verifyingPrivKey.Public().Serialize(),
+		OwnerIdentityPubkey:    receiverIdentityPrivKey.Public().Serialize(),
+		OwnerSigningPubkey:     keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+		RawTx:                  createTestTxBytes(t, 8500),
+		RawRefundTx:            createTestTxBytes(t, 8501),
+		DirectTx:               createTestTxBytes(t, 8502),
+		DirectRefundTx:         createTestTxBytes(t, 8503),
+		DirectFromCpfpRefundTx: createTestTxBytes(t, 8504),
+		TreeId:                 tree.ID.String(),
+		SigningKeyshareId:      leafAKeyshareID,
+		Vout:                   0,
+	}
+
+	err = NewInternalTransferHandler(config).FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+		TransferId: transfer.ID.String(),
+		Nodes:      []*pbinternal.TreeNode{duplicateNode, duplicateNode},
+		Timestamp:  timestamppb.New(time.Now()),
+	})
+	require.ErrorContains(t, err, "node not found in transfer")
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	refreshedTransfer, err := txClient.Transfer.Get(ctx, transfer.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TransferStatusReceiverRefundSigned, refreshedTransfer.Status)
+	refreshedLeafA, err := txClient.TreeNode.Get(ctx, leafA.ID)
+	require.NoError(t, err)
+	require.Equal(t, leafARawTx, refreshedLeafA.RawTx)
+	require.Equal(t, leafARawRefundTx, refreshedLeafA.RawRefundTx)
+	refreshedLeafB, err := txClient.TreeNode.Get(ctx, leafB.ID)
+	require.NoError(t, err)
+	require.Equal(t, leafBRawTx, refreshedLeafB.RawTx)
+	require.Equal(t, leafBRawRefundTx, refreshedLeafB.RawRefundTx)
+}
+
 func TestFinalizeTransferReceiver(t *testing.T) {
 	ctx, dbCtx := db.ConnectToTestPostgres(t)
 
