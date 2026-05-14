@@ -682,7 +682,7 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 		return fmt.Errorf("unable to load leaves for transfer %s: %w", transferID, err)
 	}
 	if transfer.Status != st.TransferStatusSenderInitiated {
-		return fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status))
 	}
 	for _, leaf := range leaves {
 		transferLeaf, err := transfer.QueryTransferLeaves().Where(

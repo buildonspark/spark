@@ -1761,7 +1761,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		return nil, fmt.Errorf("owner_identity_public_key in request does not match the transfer sender identity")
 	}
 	if transfer.Status != st.TransferStatusSenderInitiated {
-		return nil, fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status)
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status))
 	}
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Preparing to send key tweaks to other SOs for transfer %s", transferID)
