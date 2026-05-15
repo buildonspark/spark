@@ -145,6 +145,7 @@ const (
 	KnobEnablePartnerJWT        = "spark.so.enable_partner_jwt"
 	KnobUseConsensusDepositTree = "spark.so.use_consensus_deposit_tree"
 	KnobUseConsensusTransfer    = "spark.so.use_consensus_transfer"
+	KnobUseConsensusClaim       = "spark.so.use_consensus_claim"
 	KnobShutdownHodlInvoices    = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)

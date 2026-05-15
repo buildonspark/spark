@@ -607,6 +607,56 @@ message SendTransferRollbackRequest {
     string transfer_id = 1;
 }
 
+// ClaimTransferPrepareRequest is the 2PC prepare payload for consensus
+// claim-transfer. Each SO validates the claim package, validates and decrypts
+// its slice of the key tweak package, persists the receiver-side state in a
+// locked-but-not-yet-applied form, and produces FROST signature shares over
+// the receiver's refund transactions (cpfp/direct/direct-from-cpfp variants).
+message ClaimTransferPrepareRequest {
+    spark.ClaimTransferRequest original_request = 1;
+}
+
+// ClaimTransferCommitRequest is the 2PC commit payload built by the coordinator
+// in BuildCommitPayload. It carries the aggregated refund signatures per leaf
+// so every SO can apply identical state during Commit (key tweaks + finalized
+// refund transactions) without re-aggregating.
+//
+// receiver_identity_public_key carries the claimer's identity (the
+// OwnerIdentityPublicKey from the original ClaimTransferRequest). Required for
+// MIMO transfers where transferEnt.ReceiverIdentityPubkey may point to a
+// different receiver than the one that initiated the claim — participants must
+// load the same receiver row the coordinator did. For non-MIMO transfers this
+// is redundant with transferEnt.ReceiverIdentityPubkey but harmless.
+message ClaimTransferCommitRequest {
+    string transfer_id = 1;
+    repeated ClaimTransferLeafSignatures leaf_signatures = 2;
+    bytes receiver_identity_public_key = 3;
+}
+
+// ClaimTransferLeafSignatures carries the aggregated FROST signatures for a
+// single leaf's receiver-side refund tx variants.
+message ClaimTransferLeafSignatures {
+    string leaf_id = 1;
+    bytes refund_signature = 2;
+    bytes direct_refund_signature = 3;
+    bytes direct_from_cpfp_refund_signature = 4;
+}
+
+// ClaimTransferRollbackRequest is the 2PC rollback payload. SOs revert any
+// receiver-side state they wrote in Prepare (key tweak proofs, locked
+// transfer/receiver status) so the transfer remains claimable on retry.
+//
+// receiver_identity_public_key carries the claimer's identity. Required for
+// MIMO transfers where transferEnt.ReceiverIdentityPubkey may point to a
+// different receiver than the one that initiated the claim — without this,
+// rollback would revert the wrong receiver's row and leave the actual claimer
+// permanently stuck. For non-MIMO transfers this is redundant with
+// transferEnt.ReceiverIdentityPubkey but harmless.
+message ClaimTransferRollbackRequest {
+    string transfer_id = 1;
+    bytes receiver_identity_public_key = 2;
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).

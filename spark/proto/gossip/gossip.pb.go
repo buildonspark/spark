@@ -37,6 +37,7 @@ const (
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE  ConsensusOperationType = 2
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RENEW_LEAF            ConsensusOperationType = 3
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER         ConsensusOperationType = 4
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER        ConsensusOperationType = 5
 )
 
 // Enum value maps for ConsensusOperationType.
@@ -47,6 +48,7 @@ var (
 		2: "CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE",
 		3: "CONSENSUS_OPERATION_TYPE_RENEW_LEAF",
 		4: "CONSENSUS_OPERATION_TYPE_SEND_TRANSFER",
+		5: "CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER",
 	}
 	ConsensusOperationType_value = map[string]int32{
 		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":           0,
@@ -54,6 +56,7 @@ var (
 		"CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE":  2,
 		"CONSENSUS_OPERATION_TYPE_RENEW_LEAF":            3,
 		"CONSENSUS_OPERATION_TYPE_SEND_TRANSFER":         4,
+		"CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER":        5,
 	}
 )
 
@@ -1910,13 +1913,14 @@ const file_gossip_proto_rawDesc = "" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
-	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xfe\x01\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xab\x02\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
 	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +
 	"-CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE\x10\x02\x12'\n" +
 	"#CONSENSUS_OPERATION_TYPE_RENEW_LEAF\x10\x03\x12*\n" +
-	"&CONSENSUS_OPERATION_TYPE_SEND_TRANSFER\x10\x042H\n" +
+	"&CONSENSUS_OPERATION_TYPE_SEND_TRANSFER\x10\x04\x12+\n" +
+	"'CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER\x10\x052H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
 

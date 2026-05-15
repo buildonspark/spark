@@ -9073,6 +9073,496 @@ var _ interface {
 	ErrorName() string
 } = SendTransferRollbackRequestValidationError{}
 
+// Validate checks the field values on ClaimTransferPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ClaimTransferPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClaimTransferPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ClaimTransferPrepareRequestMultiError, or nil if none found.
+func (m *ClaimTransferPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClaimTransferPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ClaimTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ClaimTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ClaimTransferPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ClaimTransferPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClaimTransferPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by ClaimTransferPrepareRequest.ValidateAll() if
+// the designated constraints aren't met.
+type ClaimTransferPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClaimTransferPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClaimTransferPrepareRequestMultiError) AllErrors() []error { return m }
+
+// ClaimTransferPrepareRequestValidationError is the validation error returned
+// by ClaimTransferPrepareRequest.Validate if the designated constraints
+// aren't met.
+type ClaimTransferPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClaimTransferPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClaimTransferPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClaimTransferPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClaimTransferPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClaimTransferPrepareRequestValidationError) ErrorName() string {
+	return "ClaimTransferPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ClaimTransferPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClaimTransferPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClaimTransferPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClaimTransferPrepareRequestValidationError{}
+
+// Validate checks the field values on ClaimTransferCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ClaimTransferCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClaimTransferCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ClaimTransferCommitRequestMultiError, or nil if none found.
+func (m *ClaimTransferCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClaimTransferCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ClaimTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ClaimTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ClaimTransferCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for ReceiverIdentityPublicKey
+
+	if len(errors) > 0 {
+		return ClaimTransferCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClaimTransferCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by ClaimTransferCommitRequest.ValidateAll() if
+// the designated constraints aren't met.
+type ClaimTransferCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClaimTransferCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClaimTransferCommitRequestMultiError) AllErrors() []error { return m }
+
+// ClaimTransferCommitRequestValidationError is the validation error returned
+// by ClaimTransferCommitRequest.Validate if the designated constraints aren't met.
+type ClaimTransferCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClaimTransferCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClaimTransferCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClaimTransferCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClaimTransferCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClaimTransferCommitRequestValidationError) ErrorName() string {
+	return "ClaimTransferCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ClaimTransferCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClaimTransferCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClaimTransferCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClaimTransferCommitRequestValidationError{}
+
+// Validate checks the field values on ClaimTransferLeafSignatures with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ClaimTransferLeafSignatures) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClaimTransferLeafSignatures with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ClaimTransferLeafSignaturesMultiError, or nil if none found.
+func (m *ClaimTransferLeafSignatures) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClaimTransferLeafSignatures) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for RefundSignature
+
+	// no validation rules for DirectRefundSignature
+
+	// no validation rules for DirectFromCpfpRefundSignature
+
+	if len(errors) > 0 {
+		return ClaimTransferLeafSignaturesMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClaimTransferLeafSignaturesMultiError is an error wrapping multiple
+// validation errors returned by ClaimTransferLeafSignatures.ValidateAll() if
+// the designated constraints aren't met.
+type ClaimTransferLeafSignaturesMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClaimTransferLeafSignaturesMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClaimTransferLeafSignaturesMultiError) AllErrors() []error { return m }
+
+// ClaimTransferLeafSignaturesValidationError is the validation error returned
+// by ClaimTransferLeafSignatures.Validate if the designated constraints
+// aren't met.
+type ClaimTransferLeafSignaturesValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClaimTransferLeafSignaturesValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClaimTransferLeafSignaturesValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClaimTransferLeafSignaturesValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClaimTransferLeafSignaturesValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClaimTransferLeafSignaturesValidationError) ErrorName() string {
+	return "ClaimTransferLeafSignaturesValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ClaimTransferLeafSignaturesValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClaimTransferLeafSignatures.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClaimTransferLeafSignaturesValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClaimTransferLeafSignaturesValidationError{}
+
+// Validate checks the field values on ClaimTransferRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ClaimTransferRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClaimTransferRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ClaimTransferRollbackRequestMultiError, or nil if none found.
+func (m *ClaimTransferRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClaimTransferRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	// no validation rules for ReceiverIdentityPublicKey
+
+	if len(errors) > 0 {
+		return ClaimTransferRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClaimTransferRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by ClaimTransferRollbackRequest.ValidateAll() if
+// the designated constraints aren't met.
+type ClaimTransferRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClaimTransferRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClaimTransferRollbackRequestMultiError) AllErrors() []error { return m }
+
+// ClaimTransferRollbackRequestValidationError is the validation error returned
+// by ClaimTransferRollbackRequest.Validate if the designated constraints
+// aren't met.
+type ClaimTransferRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClaimTransferRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClaimTransferRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClaimTransferRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClaimTransferRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClaimTransferRollbackRequestValidationError) ErrorName() string {
+	return "ClaimTransferRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ClaimTransferRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClaimTransferRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClaimTransferRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClaimTransferRollbackRequestValidationError{}
+
 // Validate checks the field values on ConsensusPrepareRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
