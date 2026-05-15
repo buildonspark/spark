@@ -359,6 +359,16 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
 				return nil, fmt.Errorf("utxo swap is already completed by another user")
 			}
+			spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.RefundTxSigningJob.GetRawTx())
+			if err != nil {
+				return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
+			}
+			// Refund retries may use a different transaction, for example to adjust
+			// fees, but each distinct transaction still needs a fresh user
+			// authorization because the sighash is part of the signed statement.
+			if err := validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, schemaNetwork, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
+				return nil, fmt.Errorf("user signature validation failed: %w", err)
+			}
 			spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
