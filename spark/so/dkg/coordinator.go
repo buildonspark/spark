@@ -15,18 +15,22 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/helper"
+	"go.uber.org/zap"
 )
 
 const defaultDelayBeforeConfirmation = 15 * time.Second
 
 // GenerateKeys runs the DKG protocol to generate the keys.
 func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	start := time.Now()
+
 	// Init clients
 	clientMap := make(map[string]pbdkg.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
 		connection, err := operator.NewOperatorGRPCConnectionForDKG()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to connect to signing operator %s: %w", identifier, err)
 		}
 		defer connection.Close()
 		client := pbdkg.NewDKGServiceClient(connection)
@@ -49,10 +53,10 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 
 	round1Packages := make([]*pbcommon.PackageMap, int(keyCount))
 
-	for _, client := range clientMap {
+	for identifier, client := range clientMap {
 		round1Response, err := client.InitiateDkg(ctx, initRequest)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to initiate DKG with signing operator %s: %w", identifier, err)
 		}
 		for i, p := range round1Response.Round1Package {
 			if round1Packages[i] == nil {
@@ -67,14 +71,14 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 	// Round 1 Validation
 	round1Signatures := make(map[string][]byte)
 
-	for _, client := range clientMap {
+	for identifier, client := range clientMap {
 		round1SignatureRequest := &pbdkg.Round1PackagesRequest{
 			RequestId:      requestIDString,
 			Round1Packages: round1Packages,
 		}
 		round1SignatureResponse, err := client.Round1Packages(ctx, round1SignatureRequest)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get round 1 signatures from signing operator %s: %w", identifier, err)
 		}
 		round1Signatures[round1SignatureResponse.Identifier] = round1SignatureResponse.Round1Signature
 	}
@@ -82,7 +86,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 	wg := sync.WaitGroup{}
 
 	// Round 1 Signature Delivery
-	for _, client := range clientMap {
+	for identifier, client := range clientMap {
 		wg.Go(func() {
 			round1SignatureRequest := &pbdkg.Round1SignatureRequest{
 				RequestId:        requestIDString,
@@ -90,16 +94,19 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 			}
 			round1SignatureResponse, err := client.Round1Signature(ctx, round1SignatureRequest)
 			if err != nil {
+				logger.With(zap.Error(err)).Sugar().Warnf("failed to deliver round 1 signatures to signing operator %s", identifier)
 				return
 			}
 
 			if len(round1SignatureResponse.ValidationFailures) > 0 {
+				logger.Sugar().Warnf("round 1 signature delivery to signing operator %s returned %d validation failures", identifier, len(round1SignatureResponse.ValidationFailures))
 				return
 			}
 		})
 	}
 
 	wg.Wait()
+	logger.Sugar().Infof("DKG protocol phases complete in %s (request_id: %s)", time.Since(start), requestIDString)
 
 	// Optionally confirm and mark keys AVAILABLE only when the feature is enabled.
 	if config.DKGConfig.EnableKeyConfirmation {
@@ -114,10 +121,15 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 		if config.DKGConfig.InitialDelayBeforeConfirmation != nil && *config.DKGConfig.InitialDelayBeforeConfirmation > 0 {
 			delay = *config.DKGConfig.InitialDelayBeforeConfirmation
 		}
+		logger.Sugar().Infof("DKG sleeping %s before confirmation (elapsed: %s, request_id: %s)", delay, time.Since(start), requestIDString)
 		select {
 		case <-time.After(delay):
-			return ConfirmAndMarkAvailableKeys(ctx, config, keyIDs, requestID)
+			logger.Sugar().Infof("DKG confirmation delay complete, starting confirmation queries (elapsed: %s, request_id: %s)", time.Since(start), requestIDString)
+			err := ConfirmAndMarkAvailableKeys(ctx, config, keyIDs, requestID)
+			logger.Sugar().Infof("DKG ConfirmAndMarkAvailableKeys returned (total elapsed: %s, request_id: %s, err: %v)", time.Since(start), requestIDString, err)
+			return err
 		case <-ctx.Done():
+			logger.With(zap.Error(ctx.Err())).Sugar().Warnf("DKG cancelled during confirmation delay (elapsed: %s, request_id: %s)", time.Since(start), requestIDString)
 			return ctx.Err()
 		}
 	}

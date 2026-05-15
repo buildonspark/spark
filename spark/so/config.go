@@ -217,7 +217,7 @@ type DkgConfig struct {
 	EnableKeyConfirmation bool `yaml:"enable_key_confirmation"`
 	// InitialDelayBeforeConfirmation is the delay before starting the confirmation round after Round2.
 	// This gives participants time to complete Round3 (crypto + DB writes).
-	// Defaults to 5 seconds if not set or set to 0.
+	// Defaults to 15 seconds if not set or set to 0 (see defaultDelayBeforeConfirmation in so/dkg/coordinator.go).
 	InitialDelayBeforeConfirmation *time.Duration `yaml:"initial_delay_before_confirmation"`
 }
 
