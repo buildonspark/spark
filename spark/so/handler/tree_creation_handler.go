@@ -55,7 +55,10 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	query := db.Tree.Query().Where(tree.BaseTxid(st.NewTxID(txHash)))
+	query := db.Tree.Query().Where(
+		tree.BaseTxid(st.NewTxID(txHash)),
+		tree.Vout(int16(utxo.Vout)),
+	)
 	count, err := query.Count(ctx)
 	if err != nil {
 		return nil, err

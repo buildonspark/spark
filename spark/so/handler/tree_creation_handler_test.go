@@ -186,6 +186,42 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 	}
 }
 
+func TestFindParentOutputFromUtxoAllowsDifferentVoutInSameTransaction(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{21})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	handler := createTestHandler()
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	testTx := createTestTx()
+	firstOutput := testTx.TxOut[0]
+	secondOutput := &wire.TxOut{
+		Value:    firstOutput.Value + 1,
+		PkScript: append([]byte(nil), firstOutput.PkScript...),
+	}
+	testTx.AddTxOut(secondOutput)
+	txBuf, err := common.SerializeTx(testTx)
+	require.NoError(t, err)
+	txHash := testTx.TxHash()
+
+	_, err = dbTX.Tree.Create().
+		SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetNetwork(btcnetwork.Regtest).
+		SetBaseTxid(st.NewTxID(txHash)).
+		SetVout(0).
+		SetStatus(st.TreeStatusPending).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = handler.findParentOutputFromUtxo(ctx, createTestUTXO(txBuf, 0))
+	require.ErrorContains(t, err, "already exists")
+
+	output, err := handler.findParentOutputFromUtxo(ctx, createTestUTXO(txBuf, 1))
+	require.NoError(t, err)
+	require.Equal(t, secondOutput.Value, output.Value)
+	require.Equal(t, secondOutput.PkScript, output.PkScript)
+}
+
 func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
 	ctx, _ := db.ConnectToTestPostgres(t)
