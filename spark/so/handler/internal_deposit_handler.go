@@ -49,6 +49,10 @@ func NewInternalDepositHandler(config *so.Config) *InternalDepositHandler {
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
 func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Context, req *pbinternal.MarkKeyshareForDepositAddressRequest) (*pbinternal.MarkKeyshareForDepositAddressResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	logger.Sugar().Infof("Marking keyshare %s for deposit address", req.KeyshareId)
@@ -117,6 +121,10 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 
 // GenerateStaticDepositAddressProofs generates proofs of possession for a static deposit address.
 func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.Context, req *pbinternal.GenerateStaticDepositAddressProofsRequest) (*pbinternal.GenerateStaticDepositAddressProofsResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	keyshareID, err := uuid.Parse(req.KeyshareId)
@@ -159,6 +167,21 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 	}, nil
 }
 
+func validateInternalFinalizeTreeCreationRequest(req *pbinternal.FinalizeTreeCreationRequest) error {
+	if req == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if len(req.GetNodes()) == 0 {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("at least one node is required"))
+	}
+	for i, node := range req.GetNodes() {
+		if node == nil {
+			return errors.InvalidArgumentMissingField(fmt.Errorf("nodes[%d] is required", i))
+		}
+	}
+	return nil
+}
+
 // FinalizeTreeCreation finalizes a tree creation during deposit
 //
 // NOTE: We cannot validate that every "leaf" node (node with no children in the request)
@@ -169,6 +192,10 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 // children are gossiped/persisted separately, a SPLIT root arrives with no children in
 // the request and no RawRefundTx, which would be incorrectly flagged as an invalid leaf.
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
+	if err := validateInternalFinalizeTreeCreationRequest(req); err != nil {
+		return err
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	treeNodeIDs := make([]string, len(req.Nodes))
@@ -662,6 +689,13 @@ func GetSecondaryTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwa
 }
 
 func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *so.Config, req *pbinternal.RollbackUtxoSwapRequest) (*pbinternal.RollbackUtxoSwapResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetOnChainUtxo() == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -743,6 +777,13 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 
 // Since instant static deposits has stages, we need to specify what statuses are ok to rollback from and the status we want to rollback to.
 func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, config *so.Config, req *pbinternal.RollbackInstantUtxoSwapRequest) (*pbinternal.RollbackInstantUtxoSwapResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetOnChainUtxo() == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -908,6 +949,13 @@ func CreateLinkUtxoSwapTransferStatement(transferID string) ([]byte, error) {
 }
 
 func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *so.Config, req *pbinternal.UtxoSwapCompletedRequest) (*pbinternal.UtxoSwapCompletedResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetOnChainUtxo() == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
