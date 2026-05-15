@@ -90,6 +90,9 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("preimage share proofs is empty"))
 	}
 
+	// Do not require the authenticated session identity to match
+	// user_identity_public_key. LNURL and hosted Lightning providers may create
+	// invoices and store preimage shares on behalf of wallet users.
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
 			SecretShare: secretsharing.SecretShare{
@@ -152,6 +155,9 @@ func (h *LightningHandler) StorePreimageShareV2(ctx context.Context, req *pbspar
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
+	// Keep the same LNURL/provider invariant as StorePreimageShare: the caller
+	// may be a Lightning service storing shares for a user-owned invoice, so the
+	// request owner is not necessarily the authenticated session principal.
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
 	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.StorePreimageShareV2", spanOpt)

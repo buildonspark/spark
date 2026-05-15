@@ -843,6 +843,7 @@ func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
 // that's difficult to mock in unit tests. These tests focus on basic validation.
 func TestStorePreimageShareEdgeCases(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{7})
 
 	config := &so.Config{
 		Threshold:                  2,
@@ -881,6 +882,34 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 		code, reason := sparkerrors.CodeAndReasonFrom(err)
 		require.Equal(t, codes.InvalidArgument, code)
 		require.Equal(t, "MISSING_FIELD", reason)
+	})
+
+	t.Run("allows provider session to store for LNURL user owner", func(t *testing.T) {
+		providerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		providerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(providerIdentityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+
+		authConfig := &so.Config{
+			AuthzEnforced:              true,
+			Threshold:                  2,
+			Index:                      0,
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		}
+		authHandler := NewLightningHandler(authConfig)
+
+		req := &pb.StorePreimageShareRequest{
+			PaymentHash:           []byte("payment_hash"),
+			PreimageShare:         &pb.SecretShare{SecretShare: []byte("test"), Proofs: [][]byte{{1}}},
+			Threshold:             uint32(authConfig.Threshold),
+			InvoiceString:         "invalid_bolt11",
+			UserIdentityPublicKey: userIdentityPubKey.Serialize(),
+		}
+
+		err := authHandler.StorePreimageShare(providerCtx, req)
+		require.Error(t, err)
+		require.NotEqual(t, codes.PermissionDenied, status.Code(err))
+		require.NotContains(t, err.Error(), "session identity does not match request identity")
+		require.ErrorContains(t, err, "unable to validate share")
 	})
 }
 
@@ -948,6 +977,32 @@ func TestStorePreimageShareV2EdgeCases(t *testing.T) {
 		require.ErrorContains(t, err, "preimage share proofs is empty")
 	})
 
+	t.Run("allows provider session to coordinate share storage for LNURL user owner", func(t *testing.T) {
+		providerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		providerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(providerIdentityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+
+		authConfig := &so.Config{
+			AuthzEnforced:              true,
+			Identifier:                 soIdentifier,
+			IdentityPrivateKey:         soIdentityKey,
+			Threshold:                  2,
+			Index:                      0,
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		}
+		authHandler := NewLightningHandler(authConfig)
+
+		req := &pb.StorePreimageShareV2Request{
+			PaymentHash:           []byte("payment_hash"),
+			UserIdentityPublicKey: userIdentityPubKey.Serialize(),
+		}
+
+		err := authHandler.StorePreimageShareV2(providerCtx, req)
+		require.Error(t, err)
+		require.NotEqual(t, codes.PermissionDenied, status.Code(err))
+		require.NotContains(t, err.Error(), "session identity does not match request identity")
+		require.ErrorContains(t, err, "no consensus engine in context")
+	})
 }
 
 func TestGetSigningCommitments(t *testing.T) {
