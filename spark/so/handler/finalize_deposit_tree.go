@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -155,6 +156,38 @@ type additionalUtxoData struct {
 	onChainTx     *wire.MsgTx
 	onChainOutput *wire.TxOut
 	vout          uint32
+}
+
+func checkedDepositRootTotalValue(primaryOutput *wire.TxOut, additionalUtxos []additionalUtxoData) (uint64, error) {
+	if primaryOutput == nil {
+		return 0, fmt.Errorf("primary output is required")
+	}
+
+	totalValue := uint64(0)
+	addValue := func(label string, value int64) error {
+		if value <= 0 {
+			return fmt.Errorf("%s output value must be greater than zero", label)
+		}
+		valueUint := uint64(value)
+		if totalValue > uint64(math.MaxInt64)-valueUint {
+			return fmt.Errorf("total deposit value overflows int64 transaction output limit")
+		}
+		totalValue += valueUint
+		return nil
+	}
+
+	if err := addValue("primary utxo", primaryOutput.Value); err != nil {
+		return 0, err
+	}
+	for i, add := range additionalUtxos {
+		if add.onChainOutput == nil {
+			return 0, fmt.Errorf("additional utxo %d output is required", i)
+		}
+		if err := addValue(fmt.Sprintf("additional utxo %d", i), add.onChainOutput.Value); err != nil {
+			return 0, err
+		}
+	}
+	return totalValue, nil
 }
 
 // load the deposit address and validate it
@@ -450,7 +483,6 @@ func verifyMultiInputRootTransaction(
 		PreviousOutPoint: wire.OutPoint{Hash: primaryTxHash, Index: onChainVout},
 		Sequence:         spark.ZeroSequence,
 	})
-	totalValue := onChainOutput.Value
 
 	// Inputs 1..N: additional UTXOs in request array order
 	for _, add := range additionalUtxos {
@@ -459,11 +491,15 @@ func verifyMultiInputRootTransaction(
 			PreviousOutPoint: wire.OutPoint{Hash: addHash, Index: add.vout},
 			Sequence:         spark.ZeroSequence,
 		})
-		totalValue += add.onChainOutput.Value
+	}
+
+	totalValue, err := checkedDepositRootTotalValue(onChainOutput, additionalUtxos)
+	if err != nil {
+		return err
 	}
 
 	// Output 0: combined value, same pkScript as deposit address
-	expectedTx.AddTxOut(wire.NewTxOut(totalValue, onChainOutput.PkScript))
+	expectedTx.AddTxOut(wire.NewTxOut(int64(totalValue), onChainOutput.PkScript))
 	// Output 1: ephemeral anchor
 	expectedTx.AddTxOut(common.EphemeralAnchorOutput())
 
@@ -906,10 +942,9 @@ func createTreeAndNode(
 		return existingTree, rootNode, nil
 	}
 
-	// Calculate total value from all UTXOs
-	totalValue := uint64(onChainOutput.Value)
-	for _, add := range additionalUtxos {
-		totalValue += uint64(add.onChainOutput.Value)
+	totalValue, err := checkedDepositRootTotalValue(onChainOutput, additionalUtxos)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// Determine tree status based on deposit confirmation.

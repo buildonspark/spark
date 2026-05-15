@@ -1,8 +1,13 @@
 package handler
 
 import (
+	"math"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/require"
@@ -111,6 +116,28 @@ func TestValidateFinalizeDepositTreeCreationRequestRejectsMissingFields(t *testi
 func TestValidateFinalizeDepositTreeCreationRequestAcceptsMinimalValidRequest(t *testing.T) {
 	err := validateFinalizeDepositTreeCreationRequest(finalizeDepositTreeCreationRequestWith(func(*pb.FinalizeDepositTreeCreationRequest) {}))
 	require.NoError(t, err)
+}
+
+func TestVerifyMultiInputRootTransactionRejectsTotalValueOverflow(t *testing.T) {
+	depositScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	var primarySource chainhash.Hash
+	primarySource[0] = 1
+	primaryTx := newTestTx(math.MaxInt64, 0, &primarySource, depositScript)
+
+	var additionalSource chainhash.Hash
+	additionalSource[0] = 2
+	additionalTx := newTestTx(1, 0, &additionalSource, depositScript)
+	additionalUtxos := []additionalUtxoData{{
+		onChainTx:     additionalTx,
+		onChainOutput: additionalTx.TxOut[0],
+		vout:          0,
+	}}
+
+	err = verifyMultiInputRootTransaction(wire.NewMsgTx(3), primaryTx, 0, primaryTx.TxOut[0], additionalUtxos)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "total deposit value overflows int64 transaction output limit")
 }
 
 func validFinalizeDepositTreeCreationRequestForValidation() *pb.FinalizeDepositTreeCreationRequest {
