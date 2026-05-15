@@ -306,6 +306,35 @@ func loadAndMarshalTransfersByIDs(ctx context.Context, db *ent.Client, ids []uui
 	return protos, nil
 }
 
+// extractParticipant resolves the TransferFilter participant oneof into the
+// wallet pubkey and matching participantRole + display label. Shared between
+// the two-phase MIMO query handlers so they dispatch on the same enum rather
+// than re-doing the oneof type-switch per call site.
+func extractParticipant(filter *pb.TransferFilter) (keys.Public, participantRole, string, error) {
+	switch p := filter.GetParticipant().(type) {
+	case *pb.TransferFilter_ReceiverIdentityPublicKey:
+		pubkey, err := keys.ParsePublicKey(p.ReceiverIdentityPublicKey)
+		if err != nil {
+			return keys.Public{}, 0, "", sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid receiver identity public key: %w", err))
+		}
+		return pubkey, participantRoleReceiver, "receiver", nil
+	case *pb.TransferFilter_SenderIdentityPublicKey:
+		pubkey, err := keys.ParsePublicKey(p.SenderIdentityPublicKey)
+		if err != nil {
+			return keys.Public{}, 0, "", sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender identity public key: %w", err))
+		}
+		return pubkey, participantRoleSender, "sender", nil
+	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		pubkey, err := keys.ParsePublicKey(p.SenderOrReceiverIdentityPublicKey)
+		if err != nil {
+			return keys.Public{}, 0, "", sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender or receiver identity public key: %w", err))
+		}
+		return pubkey, participantRoleSenderOrReceiver, "sender_or_receiver", nil
+	default:
+		return keys.Public{}, 0, "", status.Errorf(codes.InvalidArgument, "unsupported participant variant: %T", p)
+	}
+}
+
 // shouldRouteToOutgoingInFlight reports whether the request should dispatch
 // to queryOutgoingInFlight. Both the filter shape AND the knob must allow it:
 //
@@ -569,35 +598,19 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 		Offset:           offset,
 	}
 
-	var (
-		walletPubkey keys.Public
-		filterType   string
-		build        func(mimo.ByTypesArgs) (string, []any, error)
-	)
-	switch p := filter.Participant.(type) {
-	case *pb.TransferFilter_SenderIdentityPublicKey:
-		walletPubkey, err = keys.ParsePublicKey(p.SenderIdentityPublicKey)
-		if err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender identity public key: %w", err))
-		}
-		filterType = "sender"
+	walletPubkey, role, filterType, err := extractParticipant(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	var build func(mimo.ByTypesArgs) (string, []any, error)
+	switch role {
+	case participantRoleSender:
 		build = mimo.BuildByTypesQuerySender
-	case *pb.TransferFilter_ReceiverIdentityPublicKey:
-		walletPubkey, err = keys.ParsePublicKey(p.ReceiverIdentityPublicKey)
-		if err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid receiver identity public key: %w", err))
-		}
-		filterType = "receiver"
+	case participantRoleReceiver:
 		build = mimo.BuildByTypesQueryReceiver
-	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
-		walletPubkey, err = keys.ParsePublicKey(p.SenderOrReceiverIdentityPublicKey)
-		if err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender or receiver identity public key: %w", err))
-		}
-		filterType = "sender_or_receiver"
+	case participantRoleSenderOrReceiver:
 		build = mimo.BuildByTypesQuerySenderOrReceiver
-	default:
-		return nil, status.Errorf(codes.InvalidArgument, "unsupported participant variant: %T", p)
 	}
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{

@@ -2428,27 +2428,9 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		return nil, fmt.Errorf("failed to get db from context: %w", err)
 	}
 
-	var filterType string
-	var walletIdentityPubkey keys.Public
-	var role pendingParticipantRole
-	switch p := filter.Participant.(type) {
-	case *pb.TransferFilter_ReceiverIdentityPublicKey:
-		walletIdentityPubkey, err = keys.ParsePublicKey(p.ReceiverIdentityPublicKey)
-		role = pendingParticipantRoleReceiver
-		filterType = "receiver"
-	case *pb.TransferFilter_SenderIdentityPublicKey:
-		walletIdentityPubkey, err = keys.ParsePublicKey(p.SenderIdentityPublicKey)
-		role = pendingParticipantRoleSender
-		filterType = "sender"
-	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
-		walletIdentityPubkey, err = keys.ParsePublicKey(p.SenderOrReceiverIdentityPublicKey)
-		role = pendingParticipantRoleSenderOrReceiver
-		filterType = "sender_or_receiver"
-	default:
-		return nil, status.Errorf(codes.InvalidArgument, "unsupported participant variant: %T", p)
-	}
+	walletIdentityPubkey, role, filterType, err := extractParticipant(filter)
 	if err != nil {
-		return nil, fmt.Errorf("invalid participant identity public key: %w", err)
+		return nil, err
 	}
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
@@ -2545,21 +2527,20 @@ const maxTransferPageSize = 100
 // UUID parsing and SQL IN predicate construction.
 const maxTransferIDFilterValues = 1000
 
-// pendingParticipantRole enumerates which arm of the pending-transfer query
-// to dispatch. Replaces an `any` field that previously held the proto
-// oneof variant directly — typed enum dedup the participant-discrimination
-// type-switch between queryPendingTransfersMIMO (which extracts the pubkey)
-// and queryMIMOPendingTransferIDs (which dispatches to a per-arm builder).
-type pendingParticipantRole int
+// participantRole enumerates which side of a transfer a query targets:
+// receiver, sender, or either (SR1). Lets handlers extract the wallet
+// pubkey from the proto oneof once and then dispatch to per-arm SQL
+// builders without repeating the type-switch downstream.
+type participantRole int
 
 const (
-	pendingParticipantRoleReceiver pendingParticipantRole = iota
-	pendingParticipantRoleSender
-	pendingParticipantRoleSenderOrReceiver
+	participantRoleReceiver participantRole = iota
+	participantRoleSender
+	participantRoleSenderOrReceiver
 )
 
 type queryMIMOPendingArgs struct {
-	participant       pendingParticipantRole
+	participant       participantRole
 	walletPubkey      keys.Public
 	network           pb.Network
 	types             []pb.TransferType
@@ -2594,11 +2575,11 @@ func queryMIMOPendingTransferIDs(ctx context.Context, db *ent.Client, args query
 	var err error
 
 	switch args.participant {
-	case pendingParticipantRoleReceiver:
+	case participantRoleReceiver:
 		query, sqlArgs, err = buildPendingIDsQueryReceiver(args)
-	case pendingParticipantRoleSender:
+	case participantRoleSender:
 		query, sqlArgs, err = buildPendingIDsQuerySender(args)
-	case pendingParticipantRoleSenderOrReceiver:
+	case participantRoleSenderOrReceiver:
 		query, sqlArgs, err = buildPendingIDsQuerySenderOrReceiver(args)
 	default:
 		return nil, fmt.Errorf("unsupported participant role: %d", args.participant)
