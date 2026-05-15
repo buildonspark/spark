@@ -84,8 +84,27 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.CreateStaticDepositUtxoSwap")
 	defer span.End()
 
-	logger := logging.GetLoggerFromContext(ctx)
+	if reqWithSignature == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	req := reqWithSignature.Request
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.OnChainUtxo == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+	if req.Transfer == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	}
+	if req.Transfer.TransferPackage == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
+	}
+	if req.SpendTxSigningJob == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("spend_tx_signing_job is required"))
+	}
+
+	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Start CreateStaticDepositUtxoSwap request for on-chain utxo %x", req.OnChainUtxo.Txid)
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
@@ -290,6 +309,9 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.CreateInstantStaticDepositUtxoSwap")
 	defer span.End()
 
+	if reqWithSignature == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	if reqWithSignature.Request == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
@@ -300,6 +322,9 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	}
 	if req.Transfer == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	}
+	if req.Transfer.TransferPackage == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
@@ -364,11 +389,6 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating instant swap: %w", err)
 	}
 
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get db: %w", err)
-	}
-
 	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.GetTransfer().GetTransferId(), err)
@@ -377,6 +397,15 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	transferHandler := NewBaseTransferHandler(h.config)
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey, false); err != nil {
+		return nil, fmt.Errorf("error validating transfer package: %w", err)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
 
 	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
@@ -503,8 +532,11 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.SaveUtxoForInstantStaticDeposit")
 	defer span.End()
 
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	if req.OnChainUtxo == nil {
-		return nil, fmt.Errorf("on_chain_utxo is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}
 	transferID, err := uuid.Parse(req.TransferId)
 	if err != nil {
@@ -605,8 +637,21 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.CreateStaticDepositUtxoRefund")
 	defer span.End()
 
-	logger := logging.GetLoggerFromContext(ctx)
+	if reqWithSignature == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	req := reqWithSignature.Request
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.OnChainUtxo == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
+	}
+	if req.RefundTxSigningJob == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund_tx_signing_job is required"))
+	}
+
+	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Start CreateStaticDepositUtxoRefund request for on-chain utxo %x", req.OnChainUtxo.Txid)
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
@@ -817,6 +862,10 @@ func (h *StaticDepositInternalHandler) ArchiveStaticDepositAddress(ctx context.C
 func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context, config *so.Config, req *pbinternal.LinkUtxoSwapTransferRequest) (*pbinternal.LinkUtxoSwapTransferResponse, error) {
 	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.LinkUtxoSwapTransfer")
 	defer span.End()
+
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 
 	logger := logging.GetLoggerFromContext(ctx)
 
