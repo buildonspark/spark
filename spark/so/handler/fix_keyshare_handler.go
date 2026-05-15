@@ -97,6 +97,9 @@ func (h *FixKeyshareHandler) parseRequest(ctx context.Context, badKeyshareId str
 // FixKeyshare fixes the bad key share using the good key shares.
 // The operator with the bad key share acts as coordinator.
 func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshareRequest) error {
+	if req == nil {
+		return fmt.Errorf("fix keyshare request is required")
+	}
 	args, err := h.parseRequest(ctx, req.BadKeyshareId, req.BadOperatorId, req.GoodOperatorIds)
 	if err != nil {
 		return fmt.Errorf("fix keyshare error: %w", err)
@@ -305,6 +308,9 @@ func (h FixKeyshareHandler) createReceiver(args FixKeyshareArgs) (*secretsharing
 }
 
 func (h FixKeyshareHandler) Round1(ctx context.Context, req *pb.FixKeyshareRound1Request) (*pb.FixKeyshareRound1Response, error) {
+	if req == nil {
+		return nil, fmt.Errorf("fix keyshare round 1 request is required")
+	}
 	args, err := h.parseRequest(ctx, req.BadKeyshareId, req.BadOperatorId, req.GoodOperatorIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request: %w", err)
@@ -349,6 +355,9 @@ func (h FixKeyshareHandler) coreRound1(ctx context.Context, args *FixKeyshareArg
 }
 
 func (h FixKeyshareHandler) Round2(ctx context.Context, req *pb.FixKeyshareRound2Request) (*pb.FixKeyshareRound2Response, error) {
+	if req == nil {
+		return nil, fmt.Errorf("fix keyshare round 2 request is required")
+	}
 	args, err := h.parseRequest(ctx, req.BadKeyshareId, req.BadOperatorId, req.GoodOperatorIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request: %w", err)
