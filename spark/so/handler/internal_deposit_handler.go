@@ -160,6 +160,14 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 }
 
 // FinalizeTreeCreation finalizes a tree creation during deposit
+//
+// NOTE: We cannot validate that every "leaf" node (node with no children in the request)
+// has a RawRefundTx. When the coordinator gossips tree creation to peer SOs, it only sends
+// the createdNode (the root of that finalize call), not the full subtree. For sub-tree
+// creation, this root is typically a SPLIT internal node. SPLIT nodes have no RawRefundTx
+// by design—they're intermediate nodes whose children carry their own refund txs. Since
+// children are gossiped/persisted separately, a SPLIT root arrives with no children in
+// the request and no RawRefundTx, which would be incorrectly flagged as an invalid leaf.
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
