@@ -163,10 +163,6 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	if err := validateFinalizeTreeCreationRequest(req); err != nil {
-		return err
-	}
-
 	treeNodeIDs := make([]string, len(req.Nodes))
 	for i, node := range req.Nodes {
 		treeNodeIDs[i] = node.Id
@@ -353,37 +349,6 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 				continue
 			}
 			return err
-		}
-	}
-	return nil
-}
-
-func validateFinalizeTreeCreationRequest(req *pbinternal.FinalizeTreeCreationRequest) error {
-	if req == nil {
-		return fmt.Errorf("finalize tree creation request is required")
-	}
-	if len(req.Nodes) == 0 {
-		return fmt.Errorf("no node in the request")
-	}
-
-	nodeIDs := make(map[string]struct{}, len(req.Nodes))
-	parentIDs := make(map[string]struct{}, len(req.Nodes))
-	for i, node := range req.Nodes {
-		if node == nil {
-			return fmt.Errorf("node %d is required", i)
-		}
-		if _, exists := nodeIDs[node.Id]; exists {
-			return fmt.Errorf("duplicate node id %s in finalize tree creation request", node.Id)
-		}
-		nodeIDs[node.Id] = struct{}{}
-		if node.ParentNodeId != nil {
-			parentIDs[node.GetParentNodeId()] = struct{}{}
-		}
-	}
-
-	for _, node := range req.Nodes {
-		if _, hasChildInRequest := parentIDs[node.Id]; !hasChildInRequest && len(node.RawRefundTx) == 0 {
-			return fmt.Errorf("leaf node %s is missing refund transaction", node.Id)
 		}
 	}
 	return nil
