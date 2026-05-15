@@ -102,7 +102,7 @@ func LogInterceptor(rootLogger *zap.Logger, tableLogger *logging.TableLogger) gr
 		ctx = logging.Inject(ctx, loggerWithAccumulatedRequestFields)
 
 		if tableLogger != nil {
-			tableLogger.Log(ctx, duration, reqProto, respProto, err)
+			tableLogger.Log(ctx, info.FullMethod, duration, reqProto, respProto, err)
 		}
 
 		if err != nil {

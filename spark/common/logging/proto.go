@@ -68,7 +68,7 @@ func FormatProtoMessage(msg proto.Message) (string, error) {
 
 	// We don't want to be logging values that are too big.
 	if len(jsonBytes) > maxBytes {
-		return "", fmt.Errorf("ERR_MSG_TOO_BIG")
+		return "", fmt.Errorf("MSG_TOO_BIG")
 	}
 
 	return string(output), nil

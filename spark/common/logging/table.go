@@ -140,6 +140,19 @@ func ObserveServiceCall(ctx context.Context, method string, duration time.Durati
 	statsMap.stats[method].serviceRequestDuration += duration
 }
 
+const omittedResponseMessagePlaceholder = "MSG_OMITTED"
+
+// High-volume read-only gRPC methods whose response body should be omitted from spark-requests,
+// as they dominate log storage and don't typically contain useful or interesting information for
+// debugging.
+var methodsWithoutResponseBodyLogging = map[string]struct{}{
+	"/spark.SparkService/query_nodes":                         {},
+	"/spark.SparkService/query_pending_transfers":             {},
+	"/spark.SparkService/query_all_transfers":                 {},
+	"/spark_token.SparkTokenService/query_token_outputs":      {},
+	"/spark_token.SparkTokenService/query_token_transactions": {},
+}
+
 type ClientInfoProvider interface {
 	GetClientIP(ctx context.Context) (string, error)
 }
@@ -156,6 +169,7 @@ func NewTableLogger(clientInfo ClientInfoProvider) *TableLogger {
 
 func (t *TableLogger) Log(
 	ctx context.Context,
+	method string,
 	duration time.Duration,
 	req proto.Message,
 	res proto.Message,
@@ -183,8 +197,12 @@ func (t *TableLogger) Log(
 		if err != nil {
 			result["response.message"] = err.Error()
 		} else {
-			result["response.message"] = resJSON
 			result["response.length"] = len(resJSON)
+			if _, omit := methodsWithoutResponseBodyLogging[method]; omit {
+				result["response.message"] = omittedResponseMessagePlaceholder
+			} else {
+				result["response.message"] = resJSON
+			}
 		}
 	}
 
