@@ -73,6 +73,65 @@ func TestCheckRefundTimelockMonotonicity(t *testing.T) {
 	}
 }
 
+func TestFinalizeRenewTimelockRejectsMalformedRequestsWithoutPanic(t *testing.T) {
+	handler := NewInternalRenewLeafHandler(nil)
+
+	tests := []struct {
+		name    string
+		call    func() error
+		wantErr string
+	}{
+		{
+			name: "node finalize nil request",
+			call: func() error {
+				return handler.FinalizeRenewNodeTimelock(t.Context(), nil)
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "node finalize missing node",
+			call: func() error {
+				return handler.FinalizeRenewNodeTimelock(t.Context(), &pbinternal.FinalizeRenewNodeTimelockRequest{})
+			},
+			wantErr: "node is required",
+		},
+		{
+			name: "node finalize missing split node",
+			call: func() error {
+				return handler.FinalizeRenewNodeTimelock(t.Context(), &pbinternal.FinalizeRenewNodeTimelockRequest{
+					Node: &pbinternal.TreeNode{},
+				})
+			},
+			wantErr: "split_node is required",
+		},
+		{
+			name: "refund finalize nil request",
+			call: func() error {
+				return handler.FinalizeRenewRefundTimelock(t.Context(), nil)
+			},
+			wantErr: "request is required",
+		},
+		{
+			name: "refund finalize missing node",
+			call: func() error {
+				return handler.FinalizeRenewRefundTimelock(t.Context(), &pbinternal.FinalizeRenewRefundTimelockRequest{})
+			},
+			wantErr: "node is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			require.NotPanics(t, func() {
+				err = tt.call()
+			})
+			require.ErrorContains(t, err, tt.wantErr)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}
+
 func TestFinalizeRenewNodeTimelockRejectsSplitNodeFromDifferentTree(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	rng := rand.NewChaCha8([32]byte{11})

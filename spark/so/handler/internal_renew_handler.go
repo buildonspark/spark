@@ -51,6 +51,16 @@ func NewInternalRenewLeafHandler(config *so.Config) *InternalRenewLeafHandler {
 // FinalizeRenewNodeTimelock finalizes a renew leaf operation.
 // This creates the new split node and updates the extended leaf.
 func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context, req *pbinternal.FinalizeRenewNodeTimelockRequest) error {
+	if req == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetNode() == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("node is required"))
+	}
+	if req.GetSplitNode() == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("split_node is required"))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -229,6 +239,13 @@ func checkNodeRenewPrecondition(currentRawTx []byte, leafID uuid.UUID) error {
 // FinalizeRenewRefundTimelock finalizes a renew refund timelock operation.
 // This only updates the existing leaf node without creating a split node.
 func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Context, req *pbinternal.FinalizeRenewRefundTimelockRequest) error {
+	if req == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetNode() == nil {
+		return errors.InvalidArgumentMissingField(fmt.Errorf("node is required"))
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
