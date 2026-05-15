@@ -351,6 +351,10 @@ func ValidateSequenceTimelock(sequence uint32, expectedTimelock uint32) error {
 	if providedTimelock != expectedTimelock {
 		return fmt.Errorf("provided timelock 0x%08X does not match expected timelock 0x%08X", providedTimelock, expectedTimelock)
 	}
+	unsupportedHighBits := sequence & ^(wire.SequenceLockTimeMask | spark.ZeroSequence)
+	if unsupportedHighBits != 0 {
+		return fmt.Errorf("sequence contains unsupported high bits 0x%08X", unsupportedHighBits)
+	}
 	return nil
 }
 

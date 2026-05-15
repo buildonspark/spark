@@ -371,6 +371,183 @@ func TestValidateAndConstructRenewSigningJobsRejectMissingRequiredJobs(t *testin
 	require.ErrorContains(t, err, "node tx signing job is required")
 }
 
+func TestConstructRenewTransactionsRejectUnsupportedSequenceHighBits(t *testing.T) {
+	const unsupportedHighBit = uint32(1 << 16)
+
+	newFixture := func(t *testing.T) (context.Context, io.Reader, *ent.TreeNode, *ent.TreeNode) {
+		t.Helper()
+		ctx, _ := db.NewTestSQLiteContext(t)
+		rng := rand.NewChaCha8([32]byte{31})
+		dbClient, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+		tree := createTestRenewTree(t, ctx, ownerIdentityPubKey)
+		parentNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+		leafNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parentNode, 0)
+		return ctx, rng, leafNode, parentNode
+	}
+
+	tests := []struct {
+		name string
+		run  func(*testing.T, context.Context, io.Reader, *ent.TreeNode, *ent.TreeNode) error
+	}{
+		{
+			name: "renew node split node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.SplitNodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.ZeroSequence|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew node split direct tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.SplitNodeDirectTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.DirectTimelockOffset|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew node node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.NodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.InitialSequence()|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew node refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.RefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.InitialSequence()|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew node direct node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectNodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew node direct refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectRefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew node direct from cpfp refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew refund node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.NodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialTimeLock-spark.TimeLockInterval)|unsupportedHighBit)
+				_, err := constructRenewRefundTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew refund refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.RefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.InitialTimeLock|unsupportedHighBit)
+				_, err := constructRenewRefundTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew refund direct node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectNodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewRefundTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew refund direct refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectRefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialTimeLock+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewRefundTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew refund direct from cpfp refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialTimeLock+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewRefundTransactions(leafNode, parentNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew zero node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.NodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.ZeroTimelock|unsupportedHighBit)
+				_, err := constructRenewZeroNodeTransactions(leafNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew zero refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.RefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.InitialTimeLock|unsupportedHighBit)
+				_, err := constructRenewZeroNodeTransactions(leafNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew zero direct node tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectNodeTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, spark.DirectTimelockOffset|unsupportedHighBit)
+				_, err := constructRenewZeroNodeTransactions(leafNode, signingJob)
+				return err
+			},
+		},
+		{
+			name: "renew zero direct from cpfp refund tx",
+			run: func(t *testing.T, ctx context.Context, rng io.Reader, leafNode *ent.TreeNode, parentNode *ent.TreeNode) error {
+				signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leafNode, 0)
+				signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = createValidTestTransactionBytesWithSequence(t, (spark.InitialTimeLock+spark.DirectTimelockOffset)|unsupportedHighBit)
+				_, err := constructRenewZeroNodeTransactions(leafNode, signingJob)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, rng, leafNode, parentNode := newFixture(t)
+			err := tt.run(t, ctx, rng, leafNode, parentNode)
+			require.ErrorContains(t, err, "unsupported high bits 0x00010000")
+		})
+	}
+}
+
 func TestConstructRenewRefundTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})

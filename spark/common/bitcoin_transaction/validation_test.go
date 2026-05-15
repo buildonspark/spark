@@ -498,20 +498,23 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 			_, err = bitcointransaction.ValidateSequence(currTimelock, tc.txType, clientSeqWithBit22)
 			require.ErrorContains(t, err, "bit 22 clear")
 
-			// Provide a client sequence with only harmless upper bits (e.g., bit 30)
-			upperHarmless := uint32(0x28200000) // bits that are not 31 or 22
-			clientSeq := upperHarmless | (tc.expectedTimelock & 0xFFFF)
+			// Spark's legacy bit 30 remains supported for backwards compatibility.
+			clientSeq := spark.ZeroSequence | (tc.expectedTimelock & 0xFFFF)
 
 			serverSeq, err := bitcointransaction.ValidateSequence(currTimelock, tc.txType, clientSeq)
 			require.NoError(t, err)
 
-			expectedServerSeq := upperHarmless | (tc.expectedTimelock & 0xFFFF)
+			expectedServerSeq := spark.ZeroSequence | (tc.expectedTimelock & 0xFFFF)
 			assert.Equal(t, expectedServerSeq, serverSeq)
 
 			tx, err := bitcointransaction.ConstructExpectedTransaction(dbLeaf.RawTx, uint32(0), currTimelock, tc.txType, refundDestPubkey, clientSeq, defaultVersion)
 			require.NoError(t, err)
 			require.Len(t, tx.TxIn, 1)
 			assert.Equal(t, expectedServerSeq, tx.TxIn[0].Sequence)
+
+			unsupportedSeq := uint32(1<<16) | (tc.expectedTimelock & 0xFFFF)
+			_, err = bitcointransaction.ValidateSequence(currTimelock, tc.txType, unsupportedSeq)
+			require.ErrorContains(t, err, "unsupported high bits 0x00010000")
 		})
 	}
 }
