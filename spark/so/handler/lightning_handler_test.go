@@ -1699,6 +1699,106 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 	})
 }
 
+func TestValidateLightningRefundLeafIDsRejectsDuplicates(t *testing.T) {
+	leafID := uuid.New().String()
+	err := validateLightningRefundLeafIDs("cpfp_transactions", []*pb.UserSignedTxSigningJob{
+		{LeafId: leafID},
+		{LeafId: leafID},
+	})
+
+	require.ErrorContains(t, err, "duplicate leaf id in cpfp_transactions")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "DUPLICATE_FIELD", reason)
+}
+
+func TestValidateGetPreimageRequestRejectsDuplicateCpfpLeafBeforeAmountAggregation(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{7})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	destinationScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+	parentTx, refundTx := createParentAndRefundTx(t, destinationScript, 1000)
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(secretShare).
+		SetPublicShares(map[string]keys.Public{"operator1": secretShare.Public()}).
+		SetPublicKey(secretShare.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leafID := uuid.New()
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(leafID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(secretShare.Public()).
+		SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetRawTx(parentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	job := &pb.UserSignedTxSigningJob{
+		LeafId: leafID.String(),
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"operator1": {
+					Hiding:  []byte("test_hiding"),
+					Binding: []byte("test_binding"),
+				},
+			},
+		},
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  []byte("test_nonce_hiding"),
+			Binding: []byte("test_nonce_binding"),
+		},
+		UserSignature: []byte("test_signature"),
+		RawTx:         refundTx,
+	}
+
+	err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+		ctx,
+		&mockFrostServiceClientConnection{},
+		bytes.Repeat([]byte{0x42}, 32),
+		[]*pb.UserSignedTxSigningJob{job, proto.Clone(job).(*pb.UserSignedTxSigningJob)},
+		nil,
+		nil,
+		&pb.InvoiceAmount{ValueSats: 1500},
+		destinationPubKey,
+		0,
+		pb.InitiatePreimageSwapRequest_REASON_SEND,
+		false,
+	)
+
+	require.ErrorContains(t, err, "duplicate leaf id in cpfp_transactions")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "DUPLICATE_FIELD", reason)
+}
+
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8086
 func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})

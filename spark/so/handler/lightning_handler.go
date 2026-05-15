@@ -503,6 +503,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	if len(cpfpTransactions) == 0 && len(directTransactions) == 0 && len(directFromCpfpTransactions) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one transaction type must be provided"))
 	}
+	if err := validateLightningRefundLeafIDs("cpfp_transactions", cpfpTransactions); err != nil {
+		return err
+	}
+	if err := validateLightningRefundLeafIDs("direct_transactions", directTransactions); err != nil {
+		return err
+	}
+	if err := validateLightningRefundLeafIDs("direct_from_cpfp_transactions", directFromCpfpTransactions); err != nil {
+		return err
+	}
 
 	// Validate transaction limits to prevent DoS
 	maxTransactionsPerRequest := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoMaxTransactionsPerRequest, 100))
@@ -1340,6 +1349,9 @@ func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(c
 }
 
 func (h *LightningHandler) loadRefund(fieldName string, req []*pbspark.UserSignedTxSigningJob) (map[string][]byte, error) {
+	if err := validateLightningRefundLeafIDs("transfer_request.transfer_package."+fieldName, req); err != nil {
+		return nil, err
+	}
 	refundMap := make(map[string][]byte)
 	for i, job := range req {
 		if job == nil {
@@ -1348,6 +1360,25 @@ func (h *LightningHandler) loadRefund(fieldName string, req []*pbspark.UserSigne
 		refundMap[job.LeafId] = job.RawTx
 	}
 	return refundMap, nil
+}
+
+func validateLightningRefundLeafIDs(fieldName string, jobs []*pbspark.UserSignedTxSigningJob) error {
+	seenLeafIDs := make(map[string]struct{}, len(jobs))
+	for _, job := range jobs {
+		if job == nil {
+			continue
+		}
+		leafID, err := uuid.Parse(job.GetLeafId())
+		if err != nil {
+			continue
+		}
+		normalizedLeafID := leafID.String()
+		if _, exists := seenLeafIDs[normalizedLeafID]; exists {
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id in %s: %s", fieldName, normalizedLeafID))
+		}
+		seenLeafIDs[normalizedLeafID] = struct{}{}
+	}
+	return nil
 }
 
 func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
