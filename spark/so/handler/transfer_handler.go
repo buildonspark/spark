@@ -2123,32 +2123,14 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 
 	if len(filter.Types) > 0 {
 		transferTypes := make([]st.TransferType, len(filter.Types))
-
-		networkString := network.String()
-		filterSSPCounterSwap := knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobFilterSSPCounterSwapAsTransfer, &networkString, 0) > 0
-
 		for i, protoType := range filter.Types {
 			schemaType, err := st.TransferTypeFromProto(protoType.String())
 			if err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid transfer type: %s", protoType.String())
 			}
 			transferTypes[i] = schemaType
-
-			if filterSSPCounterSwap && (schemaType == st.TransferTypeCounterSwap || schemaType == st.TransferTypeCounterSwapV3) {
-				filterSSPCounterSwap = false
-			}
 		}
 		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
-
-		// Filter out legacy SSP "recovery transfers" — when a counter-swap
-		// failed, the SSP sent a plain transfer instead. No longer occurs
-		// with swap v3, but historical data still needs filtering.
-		// TODO(SP-2727): https://lightspark.atlassian.net/browse/SP-2727
-		if filterSSPCounterSwap && walletIdentityPubkey != nil {
-			if pred := h.getSSPCounterSwapFilter(ctx, db, network, *walletIdentityPubkey); pred != nil {
-				transferPredicate = append(transferPredicate, pred)
-			}
-		}
 	}
 
 	transferPredicate = append(transferPredicate, enttransfer.NetworkEQ(network))
@@ -2261,42 +2243,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		Transfers: transferProtos,
 		Offset:    nextOffset,
 	}, nil
-}
-
-func (h *TransferHandler) getSSPCounterSwapFilter(ctx context.Context, db *ent.Client, network btcnetwork.Network, walletIdentityPubkey keys.Public) predicate.Transfer {
-	metrics := newTransferQueryRecorder(transferQueryAttrs{
-		QueryPath:   "get_ssp_counter_swap_filter",
-		MIMOEnabled: false,
-		FilterType:  "sender",
-	})
-	var resultCount int
-	var internalErr error
-	defer func() { metrics.record(ctx, resultCount, internalErr) }()
-
-	swap, err := db.Transfer.Query().
-		Where(
-			enttransfer.SenderIdentityPubkeyEQ(walletIdentityPubkey),
-			enttransfer.TypeIn(st.TransferTypeSwap, st.TransferTypePrimarySwapV3),
-			enttransfer.NetworkEQ(network),
-		).
-		Order(ent.Desc(enttransfer.FieldCreateTime)).
-		First(ctx)
-	if err != nil || swap == nil {
-		if err != nil && !ent.IsNotFound(err) {
-			logger := logging.GetLoggerFromContext(ctx)
-			logger.Sugar().Warnf("failed to find swap for wallet %s: %v", walletIdentityPubkey.String(), err)
-			internalErr = err
-		}
-		return nil
-	}
-
-	resultCount = 1
-	return enttransfer.Not(
-		enttransfer.And(
-			enttransfer.SenderIdentityPubkeyEQ(swap.ReceiverIdentityPubkey),
-			enttransfer.TypeEQ(st.TransferTypeTransfer),
-		),
-	)
 }
 
 // participantPubkeyHex returns a lowercase-hex representation of the

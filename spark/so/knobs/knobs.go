@@ -152,10 +152,6 @@ const (
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
 
-	// The SSP sometimes sends a counter swap as a normal transfer when it happens from a celery job
-	// This knob filters out these transfers from the query transfers endpoint if counter swaps are not explicitly requested.
-	KnobFilterSSPCounterSwapAsTransfer = "spark.so.filter_ssp_counter_swap_as_transfer"
-
 	// KnobMimoTransferMultiReceiverEnabled enables multi-input multi-output transfer support
 	// with multiple independent receivers. When enabled, ClaimTransfer resolves the receiver
 	// by identity public key and tracks per-receiver claim status.
