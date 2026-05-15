@@ -273,12 +273,7 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 			if v := partialOutput.GetWithdrawRelativeBlockLocktime(); v != 0 {
 				withdrawLocktime = proto.Uint64(v)
 			}
-			var outputID *string
-			if id := finalOutput.GetId(); id != "" {
-				outputID = proto.String(id)
-			}
 			legacy.TokenOutputs[i] = &tokenpb.TokenOutput{
-				Id:                            outputID,
 				OwnerPublicKey:                partialOutput.GetOwnerPublicKey(),
 				WithdrawBondSats:              withdrawBond,
 				WithdrawRelativeBlockLocktime: withdrawLocktime,
@@ -433,7 +428,6 @@ func ConvertV2TxShapeToFinal(legacy *tokenpb.TokenTransaction) (*tokenpb.FinalTo
 				TokenAmount:                   legacyOutput.GetTokenAmount(),
 			},
 			RevocationCommitment: legacyOutput.GetRevocationCommitment(),
-			Id:                   legacyOutput.GetId(),
 		}
 	}
 

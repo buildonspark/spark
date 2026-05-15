@@ -4,7 +4,7 @@
     {
       "name": "mint_v3_full",
       "description": "Full mint transaction V3 with all fields including expiry time",
-      "expectedHash": "6f9054d1b78d13657fb2bf5b8984392763bf948f336e30aadf4bed7a2e4caba8",
+      "expectedHash": "fd28b274ab3c46724bf461dee23d9ab23c9c218af7f884bec028dd7ca1f4aa09",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -59,7 +59,7 @@
     {
       "name": "transfer_v3_full",
       "description": "Full transfer transaction V3 without invoice attachments",
-      "expectedHash": "7c085d029048ed681001fb7eb4ca79b8e9ee7d680bdc4f05e5d927b18c214aa3",
+      "expectedHash": "7fb13e81a55269d585491ec0fca9b6d3087cb5b3191fead481f8e8b0efb36b64",
       "tokenTransaction": {
         "version": 3,
         "transferInput": {
@@ -93,7 +93,7 @@
     {
       "name": "transfer_v3_with_invoice_attachments",
       "description": "Full transfer transaction V3 with invoice attachments",
-      "expectedHash": "1ed63326fc1f9ae46f4be53b78c22530819344f80ab9035d971455eca0e7a915",
+      "expectedHash": "c5875326984413a90de3965c0de775bf21b802d6133bcade478443bc409d3206",
       "tokenTransaction": {
         "version": 3,
         "transferInput": {
@@ -184,7 +184,7 @@
     {
       "name": "mint_v3_multiple_outputs",
       "description": "Mint transaction with multiple token outputs",
-      "expectedHash": "98ce9e5bf364bbf5d7df0874c3597a6f699ca965f2f9a591cfec1277b8b9ff6f",
+      "expectedHash": "50c90ae5308bb30aaef02efcf58a3c19f1b27b6221d60d42df7dbd30a2a7ce0c",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -223,7 +223,7 @@
     {
       "name": "transfer_v3_multiple_inputs",
       "description": "Transfer transaction with multiple inputs to spend",
-      "expectedHash": "f24f8b9991738bc72fe6dc440d2b56c825034a959c5da899db5e016429e2f3a6",
+      "expectedHash": "caf12b034ae0777fff7775c0c2063057e1cf4bb6e384aa28451424445f827fff",
       "tokenTransaction": {
         "version": 3,
         "transferInput": {
@@ -311,7 +311,7 @@
     {
       "name": "mint_v3_mainnet",
       "description": "Mint transaction on MAINNET network",
-      "expectedHash": "155680f6765869558834e869c19d9eed168d25673f0753fbf5b27db2d49f0000",
+      "expectedHash": "79b70d9eac8cc94c0e3ac5507a3ccf25ae2b97b69f2bf29e993c7e9b331a646e",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {
@@ -341,7 +341,7 @@
     {
       "name": "mint_v3_testnet",
       "description": "Mint transaction on TESTNET network",
-      "expectedHash": "94586ce704c547f8c1f8a1f4a493ab3075a79e5bdf45e354dd78541ce3fd81b8",
+      "expectedHash": "4430a6dd17c486bbec4232aa6da8240a2fae87ef8b5a839fc70e72bde0f2c9bf",
       "tokenTransaction": {
         "version": 3,
         "mintInput": {

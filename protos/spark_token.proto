@@ -105,7 +105,6 @@ message PartialTokenOutput {
 message FinalTokenOutput {
     PartialTokenOutput partial_token_output = 1;
     bytes revocation_commitment = 2 [(validate.rules).bytes.len = 33];
-    string id = 3 [(validate.rules).string = {uuid: true, ignore_empty: true}];
 }
 
 enum TokenTransactionType {

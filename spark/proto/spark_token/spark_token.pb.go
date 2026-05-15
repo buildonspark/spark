@@ -692,7 +692,6 @@ type FinalTokenOutput struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	PartialTokenOutput   *PartialTokenOutput    `protobuf:"bytes,1,opt,name=partial_token_output,json=partialTokenOutput,proto3" json:"partial_token_output,omitempty"`
 	RevocationCommitment []byte                 `protobuf:"bytes,2,opt,name=revocation_commitment,json=revocationCommitment,proto3" json:"revocation_commitment,omitempty"`
-	Id                   string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -739,13 +738,6 @@ func (x *FinalTokenOutput) GetRevocationCommitment() []byte {
 		return x.RevocationCommitment
 	}
 	return nil
-}
-
-func (x *FinalTokenOutput) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
 }
 
 // This proto is constructed by the wallet and is the core transaction data
@@ -3195,11 +3187,10 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x12withdraw_bond_sats\x18\x02 \x01(\x04R\x10withdrawBondSats\x12G\n" +
 	" withdraw_relative_block_locktime\x18\x03 \x01(\x04R\x1dwithdrawRelativeBlockLocktime\x122\n" +
 	"\x10token_identifier\x18\x04 \x01(\fB\a\xfaB\x04z\x02h R\x0ftokenIdentifier\x12*\n" +
-	"\ftoken_amount\x18\x05 \x01(\fB\a\xfaB\x04z\x02h\x10R\vtokenAmount\"\xc0\x01\n" +
+	"\ftoken_amount\x18\x05 \x01(\fB\a\xfaB\x04z\x02h\x10R\vtokenAmount\"\xa3\x01\n" +
 	"\x10FinalTokenOutput\x12Q\n" +
 	"\x14partial_token_output\x18\x01 \x01(\v2\x1f.spark_token.PartialTokenOutputR\x12partialTokenOutput\x12<\n" +
-	"\x15revocation_commitment\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x14revocationCommitment\x12\x1b\n" +
-	"\x02id\x18\x03 \x01(\tB\v\xfaB\br\x06\xd0\x01\x01\xb0\x01\x01R\x02id\"\xf5\x06\n" +
+	"\x15revocation_commitment\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x14revocationCommitment\"\xf5\x06\n" +
 	"\x10TokenTransaction\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12<\n" +
 	"\n" +
