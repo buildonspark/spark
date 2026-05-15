@@ -496,6 +496,22 @@ func TestValidateReceivedRefundTransactions_RetryWithDifferentDirectTx_RunsValid
 	require.Error(t, err, "Expected validation to run and fail for mismatched direct txs, but it passed (retry detection bypassed validation)")
 }
 
+func TestValidateRefundSigningRetryMatchesStoredRejectsChangedRefundTx(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{9})
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	job := &pb.LeafRefundTxSigningJob{
+		LeafId: leaf.ID.String(),
+		RefundTxSigningJob: &pb.SigningJob{
+			RawTx: append(append([]byte(nil), leaf.RawRefundTx...), 0x01),
+		},
+	}
+
+	err := validateRefundSigningRetryMatchesStored(job, leaf)
+	require.ErrorContains(t, err, "must not change refund transaction")
+}
+
 func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{4})
 	ctx, _ := db.ConnectToTestPostgres(t)
@@ -681,4 +697,110 @@ func TestClaimTransferSignRefundsV2RejectsNotFoundAndInvalidStatus(t *testing.T)
 		require.Equal(t, codes.FailedPrecondition, status.Code(err))
 		require.ErrorContains(t, err, "expected to be at status")
 	})
+}
+func TestClaimTransferSignRefunds_RejectsChangedRefundTxAfterRefundSigned(t *testing.T) {
+	ctx, client, req, handler, transfer, leaves := setupClaimTransferSignRefundsFixture(t, 1)
+	defer func() { _ = gripmock.Clear() }()
+
+	leaf := leaves[0]
+	job := req.SigningJobs[0]
+	_, err := leaf.Update().
+		SetRawRefundTx(job.RefundTxSigningJob.RawTx).
+		SetDirectRefundTx(job.DirectRefundTxSigningJob.RawTx).
+		SetDirectFromCpfpRefundTx(job.DirectFromCpfpRefundTxSigningJob.RawTx).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
+	require.NoError(t, err)
+
+	job.RefundTxSigningJob.RawTx = append(append([]byte(nil), job.RefundTxSigningJob.RawTx...), 0x01)
+
+	_, err = handler.ClaimTransferSignRefunds(ctx, req)
+	require.ErrorContains(t, err, "must not change refund transaction")
+
+	refreshed, err := client.Transfer.Get(ctx, transfer.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TransferStatusReceiverRefundSigned, refreshed.Status)
+}
+
+func setupClaimTransferSignRefundsFixture(t *testing.T, leafCount int) (context.Context, *ent.Client, *pb.ClaimTransferSignRefundsRequest, *TransferHandler, *ent.Transfer, []*ent.TreeNode) {
+	t.Helper()
+	sparktesting.RequireGripMock(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	err := gripmock.AddStub("spark_internal.SparkInternalService", "initiate_settle_receiver_key_tweak", nil, nil)
+	require.NoError(t, err, "Failed to add initiate_settle_receiver_key_tweak stub")
+
+	err = gripmock.AddStub("spark_internal.SparkInternalService", "settle_receiver_key_tweak", nil, nil)
+	require.NoError(t, err, "Failed to add settle_receiver_key_tweak stub")
+
+	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput)
+	require.NoError(t, err, "Failed to add frost_round1 stub")
+
+	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput)
+	require.NoError(t, err, "Failed to add frost_round2 stub")
+
+	rng := rand.NewChaCha8([32]byte{})
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	tree := createTestTreeForClaim(t, ctx, ownerIdentityPrivKey.Public(), sessionCtx.Client)
+	transfer := createTestTransfer(t, ctx, rng, sessionCtx.Client, st.TransferStatusReceiverKeyTweaked)
+	if leafCount > 1 {
+		_, err = transfer.Update().SetTotalValue(uint64(leafCount) * 1000).Save(ctx)
+		require.NoError(t, err)
+	}
+
+	leaves := make([]*ent.TreeNode, 0, leafCount)
+	signingJobs := make([]*pb.LeafRefundTxSigningJob, 0, leafCount)
+	for range leafCount {
+		leaf := createTestTreeNode(t, ctx, rng, sessionCtx.Client, tree, keyshare)
+		transferLeaf := createTestTransferLeaf(t, ctx, sessionCtx.Client, transfer, leaf)
+		tweakPubKey := setTestClaimKeyTweak(t, ctx, rng, transferLeaf)
+		postSettleOwnerKey := leaf.VerifyingPubkey.Sub(keyshare.PublicKey).Sub(tweakPubKey)
+		leaves = append(leaves, leaf)
+		signingJobs = append(signingJobs, createTestLeafRefundTxSigningJob(t, rng, leaf, postSettleOwnerKey))
+	}
+
+	req := &pb.ClaimTransferSignRefundsRequest{
+		TransferId:             transfer.ID.String(),
+		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey.Serialize(),
+		SigningJobs:            signingJobs,
+	}
+	return ctx, sessionCtx.Client, req, NewTransferHandler(sparktesting.TestConfig(t)), transfer, leaves
+}
+
+func setTestClaimKeyTweak(t *testing.T, ctx context.Context, rng io.Reader, transferLeaf *ent.TransferLeaf) keys.Public {
+	t.Helper()
+	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	secretInt := new(big.Int).SetBytes(tweakPrivKey.Serialize())
+	pubkeyShareTweakPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	cfg := sparktesting.TestConfig(t)
+	threshold := int(cfg.Threshold)
+	numberOfShares := len(cfg.SigningOperatorMap)
+
+	shares, err := secretsharing.SplitSecretWithProofs(secretInt, secp256k1.S256().N, threshold, numberOfShares)
+	require.NoError(t, err)
+	require.NotEmpty(t, shares, "expected at least one share")
+
+	share := shares[0]
+	secretShareBytes := make([]byte, 32)
+	share.Share.FillBytes(secretShareBytes)
+
+	claimKeyTweak := &pb.ClaimLeafKeyTweak{
+		SecretShareTweak: &pb.SecretShare{
+			SecretShare: secretShareBytes,
+			Proofs:      share.Proofs,
+		},
+		PubkeySharesTweak: map[string][]byte{
+			"operator1": pubkeyShareTweakPubKey.Serialize(),
+		},
+	}
+
+	claimKeyTweakBytes, err := proto.Marshal(claimKeyTweak)
+	require.NoError(t, err)
+
+	_, err = transferLeaf.Update().SetKeyTweak(claimKeyTweakBytes).Save(ctx)
+	require.NoError(t, err)
+	return tweakPrivKey.Public()
 }

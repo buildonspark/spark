@@ -3236,6 +3236,26 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 	return nil
 }
 
+func validateRefundSigningRetryMatchesStored(job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode) error {
+	rawTx := func(signingJob *pb.SigningJob) []byte {
+		if signingJob == nil {
+			return nil
+		}
+		return signingJob.RawTx
+	}
+
+	if !bytes.Equal(rawTx(job.RefundTxSigningJob), leaf.RawRefundTx) {
+		return fmt.Errorf("refund signing retry for leaf %s must not change refund transaction", job.LeafId)
+	}
+	if !bytes.Equal(rawTx(job.DirectRefundTxSigningJob), leaf.DirectRefundTx) {
+		return fmt.Errorf("refund signing retry for leaf %s must not change direct refund transaction", job.LeafId)
+	}
+	if !bytes.Equal(rawTx(job.DirectFromCpfpRefundTxSigningJob), leaf.DirectFromCpfpRefundTx) {
+		return fmt.Errorf("refund signing retry for leaf %s must not change direct from cpfp refund transaction", job.LeafId)
+	}
+	return nil
+}
+
 func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType) error {
 	if job.RefundTxSigningJob == nil {
 		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.LeafId)
@@ -4188,6 +4208,10 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, err
 	}
+	isRefundSigningRetry := transfer.Status == st.TransferStatusReceiverRefundSigned
+	if receiver != nil && receiver.Status == st.TransferReceiverStatusRefundSigned {
+		isRefundSigningRetry = true
+	}
 
 	// Validate leaves count
 	leavesToTransfer, err := transfer.QueryTransferLeaves().All(ctx)
@@ -4199,11 +4223,13 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	keyTweakProofs := map[string]*pb.SecretProof{}
+	leavesByID := make(map[string]*ent.TreeNode, len(leavesToTransfer))
 	for _, leaf := range leavesToTransfer {
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID, err)
 		}
+		leavesByID[treeNode.ID.String()] = treeNode
 		leafKeyTweak := &pb.ClaimLeafKeyTweak{}
 		if leaf.KeyTweak != nil {
 			err = proto.Unmarshal(leaf.KeyTweak, leafKeyTweak)
@@ -4212,6 +4238,24 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 			}
 			keyTweakProofs[treeNode.ID.String()] = &pb.SecretProof{
 				Proofs: leafKeyTweak.SecretShareTweak.Proofs,
+			}
+		}
+	}
+
+	if isRefundSigningRetry {
+		for i, job := range req.SigningJobs {
+			if job == nil {
+				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing_jobs[%d] is required", i))
+			}
+			if job.GetRefundTxSigningJob() == nil {
+				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signing_jobs[%d].refund_tx_signing_job is required", i))
+			}
+			leaf, ok := leavesByID[job.GetLeafId()]
+			if !ok {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unexpected leaf id %s", job.GetLeafId()))
+			}
+			if err := validateRefundSigningRetryMatchesStored(job, leaf); err != nil {
+				return nil, err
 			}
 		}
 	}
