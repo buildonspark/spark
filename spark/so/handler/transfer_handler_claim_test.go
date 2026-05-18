@@ -616,7 +616,6 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 
 	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	secretInt := new(big.Int).SetBytes(tweakPrivKey.Serialize())
-	pubkeyShareTweakPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	cfg := sparktesting.TestConfig(t)
 	threshold := int(cfg.Threshold)
@@ -632,14 +631,17 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	secretShareBytes := make([]byte, 32)
 	share.Share.FillBytes(secretShareBytes)
 
+	// pubkey_shares_tweak entries must equal f(operator.ID+1)·G where f is
+	// the polynomial committed to by share.Proofs — helper.ValidatePubkeySharesTweak
+	// rejects anything else (added in #6867 to close the prod divergence).
+	pubkeySharesTweak := buildValidPubkeySharesTweak(t, cfg, share.Proofs)
+
 	claimKeyTweak := &pb.ClaimLeafKeyTweak{
 		SecretShareTweak: &pb.SecretShare{
 			SecretShare: secretShareBytes,
 			Proofs:      share.Proofs,
 		},
-		PubkeySharesTweak: map[string][]byte{
-			"operator1": pubkeyShareTweakPubKey.Serialize(),
-		},
+		PubkeySharesTweak: pubkeySharesTweak,
 	}
 
 	claimKeyTweakBytes, err := proto.Marshal(claimKeyTweak)

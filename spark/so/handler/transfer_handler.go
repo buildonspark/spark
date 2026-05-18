@@ -2995,6 +2995,9 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse public key shares tweaks: %w", err)
 	}
+	if err := helper.ValidatePubkeySharesTweak(h.config, req.SecretShareTweak.Proofs, pubKeySharesTweak); err != nil {
+		return nil, fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", leaf.ID, err)
+	}
 	tweakedKeyshare, err := keyshare.TweakKeyShare(ctx, secretShare, pubKeyTweak, pubKeySharesTweak)
 	if err != nil {
 		return nil, fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)

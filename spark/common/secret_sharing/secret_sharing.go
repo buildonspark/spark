@@ -223,6 +223,35 @@ func RecoverSecret[T LagrangeInterpolatable](shares []T) (*big.Int, error) {
 	return result, nil
 }
 
+// EvaluatePolynomialCommitment evaluates the polynomial committed to by
+// `proofs` at the public group point f(index)·G, where proofs[i] = a_i·G is
+// the commitment to the i-th coefficient. The result is
+// sum_{i=0..len(proofs)-1} proofs[i] · index^i.
+//
+// `index` is reduced modulo `fieldModulus` before exponentiation.
+func EvaluatePolynomialCommitment(proofs [][]byte, index *big.Int, fieldModulus *big.Int) (keys.Public, error) {
+	if len(proofs) == 0 {
+		return keys.Public{}, fmt.Errorf("proofs must not be empty")
+	}
+	result, err := keys.ParsePublicKey(proofs[0])
+	if err != nil {
+		return keys.Public{}, fmt.Errorf("parse proofs[0]: %w", err)
+	}
+	for i := 1; i < len(proofs); i++ {
+		coeffPub, err := keys.ParsePublicKey(proofs[i])
+		if err != nil {
+			return keys.Public{}, fmt.Errorf("parse proofs[%d]: %w", i, err)
+		}
+		exp := curve.ScalarFromBigInt(new(big.Int).Exp(index, big.NewInt(int64(i)), fieldModulus))
+		res, err := curve.NewPointFromPublicKey(coeffPub).ScalarMul(exp).ToPublicKey()
+		if err != nil {
+			return keys.Public{}, fmt.Errorf("scalar mul proofs[%d]: %w", i, err)
+		}
+		result = result.Add(res)
+	}
+	return result, nil
+}
+
 // ValidateShare validates a share of a secret.
 func ValidateShare(share *VerifiableSecretShare) error {
 	if len(share.Proofs) > share.Threshold {
@@ -233,25 +262,10 @@ func ValidateShare(share *VerifiableSecretShare) error {
 		return fmt.Errorf("invalid secret share: %w", err)
 	}
 	targetPubKey := targetPrivKey.Public()
-	resultPubKey, err := keys.ParsePublicKey(share.Proofs[0])
+
+	resultPubKey, err := EvaluatePolynomialCommitment(share.Proofs, share.Index, share.FieldModulus)
 	if err != nil {
 		return err
-	}
-	for i, proof := range share.Proofs {
-		if i == 0 {
-			continue
-		}
-		pubKey, err := keys.ParsePublicKey(proof)
-		if err != nil {
-			return err
-		}
-
-		exp := curve.ScalarFromBigInt(new(big.Int).Exp(share.Index, big.NewInt(int64(i)), share.FieldModulus))
-		res, err := curve.NewPointFromPublicKey(pubKey).ScalarMul(exp).ToPublicKey()
-		if err != nil {
-			return err
-		}
-		resultPubKey = resultPubKey.Add(res)
 	}
 
 	if !resultPubKey.Equals(targetPubKey) {

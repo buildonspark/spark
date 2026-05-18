@@ -880,7 +880,7 @@ func handleBlock(
 			if blockHeight-*coopExit.ConfirmationHeight+1 >= requiredConfirmations {
 				// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 				// since this is not critical for the block processing.
-				err = tweakKeysForCoopExitFunc(ctx, coopExit, blockHeight)
+				err = tweakKeysForCoopExitFunc(ctx, config, coopExit, blockHeight)
 				if err != nil {
 					logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle transfer key tweak for coop exit %s", coopExit.ID)
 					continue
@@ -922,7 +922,7 @@ func handleBlock(
 
 			// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 			// since this is not critical for the block processing.
-			err = tweakKeysForCoopExitFunc(ctx, coopExit, blockHeight)
+			err = tweakKeysForCoopExitFunc(ctx, config, coopExit, blockHeight)
 			if err != nil {
 				logger.With(zap.Error(err)).Sugar().Errorf("Failed to tweak keys for coop exit %s", coopExit.ID)
 				continue
@@ -1306,7 +1306,7 @@ func storeDepositUtxos(ctx context.Context, dbClient *ent.Client, creditedAddres
 	return nil
 }
 
-func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+func tweakKeysForCoopExit(ctx context.Context, config *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	transfer, err := coopExit.QueryTransfer().ForUpdate().Only(ctx)
 	if err != nil {
@@ -1343,7 +1343,7 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 		if err != nil {
 			return fmt.Errorf("failed to query leaf: %w", err)
 		}
-		treeNodeUpdate, err := helper.TweakLeafKeyUpdate(ctx, treeNode, keyTweak)
+		treeNodeUpdate, err := helper.TweakLeafKeyUpdate(ctx, config, treeNode, keyTweak)
 		if err != nil {
 			return fmt.Errorf("failed to tweak leaf key: %w", err)
 		}

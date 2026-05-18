@@ -733,7 +733,6 @@ func TestClaimTransferSignRefunds_DualWritesReceiverStatus(t *testing.T) {
 	// Set up VSS shares and key tweaks (same pattern as TestClaimTransferSignRefunds_Success).
 	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	secretInt := new(big.Int).SetBytes(tweakPrivKey.Serialize())
-	pubkeyShareTweakPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	cfg := sparktesting.TestConfig(t)
 	threshold := int(cfg.Threshold)
@@ -747,14 +746,15 @@ func TestClaimTransferSignRefunds_DualWritesReceiverStatus(t *testing.T) {
 	secretShareBytes := make([]byte, 32)
 	share.Share.FillBytes(secretShareBytes)
 
+	// pubkey_shares_tweak entries must equal f(operator.ID+1)·G — see #6867.
+	pubkeySharesTweak := buildValidPubkeySharesTweak(t, cfg, share.Proofs)
+
 	claimKeyTweak := &pb.ClaimLeafKeyTweak{
 		SecretShareTweak: &pb.SecretShare{
 			SecretShare: secretShareBytes,
 			Proofs:      share.Proofs,
 		},
-		PubkeySharesTweak: map[string][]byte{
-			"operator1": pubkeyShareTweakPubKey.Serialize(),
-		},
+		PubkeySharesTweak: pubkeySharesTweak,
 	}
 
 	claimKeyTweakBytes, err := proto.Marshal(claimKeyTweak)

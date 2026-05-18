@@ -662,7 +662,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 
 	// Mock tweakKeysForCoopExit to succeed immediately
 	originalTweakFunc := tweakKeysForCoopExitFunc
-	tweakKeysForCoopExitFunc = func(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
 		return nil
 	}
 	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
@@ -863,7 +863,7 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	ctx = knobs.InjectKnobsService(ctx, knobsService)
 
 	originalTweakFunc := tweakKeysForCoopExitFunc
-	tweakKeysForCoopExitFunc = func(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
 		return nil
 	}
 	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
@@ -1034,7 +1034,7 @@ func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
 
 	// Mock tweakKeysForCoopExit to succeed immediately
 	originalTweakFunc := tweakKeysForCoopExitFunc
-	tweakKeysForCoopExitFunc = func(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
 		return nil
 	}
 	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
@@ -1323,10 +1323,10 @@ func TestTweakKeysForCoopExit_UsesEphemeralSecrets(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	err = tweakKeysForCoopExit(ctx, coopExit, 200)
+	err = tweakKeysForCoopExit(ctx, &so.Config{}, coopExit, 200)
 	require.ErrorContains(t, err, "ephemeral DB is unavailable")
 
-	err = tweakKeysForCoopExit(ctxWithEphemeral, coopExit, 200)
+	err = tweakKeysForCoopExit(ctxWithEphemeral, &so.Config{}, coopExit, 200)
 	require.NoError(t, err)
 
 	updatedTransfer, err := dbClient.Transfer.Get(ctxWithEphemeral, transfer.ID)
@@ -1535,7 +1535,7 @@ func TestTweakKeysForCoopExit_TxBackedEphemeralSessionReopensForMultipleLeaves(t
 
 	txCoopExit, err := mainTx.Client().CooperativeExit.Get(chainCtx, coopExit.ID)
 	require.NoError(t, err)
-	err = tweakKeysForCoopExit(chainCtx, txCoopExit, 200)
+	err = tweakKeysForCoopExit(chainCtx, &so.Config{}, txCoopExit, 200)
 	require.NoError(t, err)
 	require.Nil(t, ephemeralSession.GetTxIfExists(), "each leaf rotation should commit its ephemeral tx inline")
 
@@ -1601,7 +1601,7 @@ func TestTweakKeysForCoopExit_ResumesWhenLeafKeyTweakAlreadyCleared(t *testing.T
 
 	txCoopExit, err := mainTx.Client().CooperativeExit.Get(chainCtx, coopExit.ID)
 	require.NoError(t, err)
-	err = tweakKeysForCoopExit(chainCtx, txCoopExit, 200)
+	err = tweakKeysForCoopExit(chainCtx, &so.Config{}, txCoopExit, 200)
 	require.NoError(t, err)
 
 	chainTip := Tip{Height: 1, Hash: chainhash.Hash{}}
@@ -1644,7 +1644,7 @@ func TestTweakKeysForCoopExit_EmptyKeyTweakDoesNotResume(t *testing.T) {
 
 	txCoopExit, err := mainTx.Client().CooperativeExit.Get(chainCtx, coopExit.ID)
 	require.NoError(t, err)
-	err = tweakKeysForCoopExit(chainCtx, txCoopExit, 200)
+	err = tweakKeysForCoopExit(chainCtx, &so.Config{}, txCoopExit, 200)
 	require.ErrorContains(t, err, "secret share tweak is not provided")
 
 	updatedTransfer, err := mainTx.Client().Transfer.Get(chainCtx, transferID)

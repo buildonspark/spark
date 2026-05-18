@@ -2479,7 +2479,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 			return nil, fmt.Errorf("unable to get tree node: %w", err)
 		}
 		logger.Sugar().Infof("Tweaking leaf %s for transfer %s", treeNode.ID, transfer.ID)
-		treeNodeUpdate, err := helper.TweakLeafKeyUpdate(ctx, treeNode, keyTweak)
+		treeNodeUpdate, err := helper.TweakLeafKeyUpdate(ctx, h.config, treeNode, keyTweak)
 		if err != nil {
 			return nil, fmt.Errorf("unable to tweak leaf key: %w", err)
 		}
