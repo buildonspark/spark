@@ -113,6 +113,12 @@ pub fn hash_partial_token_transaction(
     token_transaction::hash_partial_token_transaction_impl(&partial_token_transaction_bytes)
 }
 
+pub fn hash_final_token_transaction(
+    final_token_transaction_bytes: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    token_transaction::hash_final_token_transaction_impl(&final_token_transaction_bytes)
+}
+
 pub fn build_broadcast_transaction_request(
     request: BroadcastBuildRequest,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {

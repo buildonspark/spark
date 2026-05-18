@@ -11,15 +11,15 @@ use super::{
     construct::{decode_u128_be, encode_u128_be},
     construct_partial_transfer_transaction_impl,
     hash::hex_string,
-    hash_partial_token_transaction_impl,
+    hash_final_token_transaction_impl, hash_partial_token_transaction_impl,
 };
 use crate::{
     proto::{
         spark::{self, Network, SparkAddress, SparkInvoiceFields, TokensPayment},
         spark_token::{
-            self, partial_token_transaction, BroadcastTransactionRequest, PartialTokenOutput,
-            PartialTokenTransaction, TokenOutputToSpend, TokenTransactionMetadata,
-            TokenTransferInput,
+            self, final_token_transaction, partial_token_transaction, BroadcastTransactionRequest,
+            FinalTokenOutput, FinalTokenTransaction, PartialTokenOutput, PartialTokenTransaction,
+            TokenOutputToSpend, TokenTransactionMetadata, TokenTransferInput,
         },
     },
     BroadcastBuildRequest, ReceiverTokenOutput, SelectedTokenOutput, SignatureWithIndexInput,
@@ -673,6 +673,219 @@ fn hash_partial_token_transaction_matches_shared_hash_cases() {
             tc.name
         );
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct V3HashCaseFile {
+    #[serde(rename = "testCases")]
+    test_cases: Vec<V3HashCase>,
+}
+
+#[derive(Debug, Deserialize)]
+struct V3HashCase {
+    name: String,
+    #[serde(rename = "expectedHash")]
+    expected_hash: String,
+    #[serde(rename = "tokenTransaction")]
+    token_transaction: V2TokenTransactionJson,
+}
+
+#[derive(Debug, Deserialize)]
+struct V2TokenTransactionJson {
+    version: u32,
+    #[serde(rename = "mintInput")]
+    mint_input: Option<TokenMintInputJson>,
+    #[serde(rename = "transferInput")]
+    transfer_input: Option<TokenTransferInputJson>,
+    #[serde(rename = "createInput")]
+    create_input: Option<TokenCreateInputJson>,
+    #[serde(rename = "tokenOutputs", default)]
+    token_outputs: Vec<V2TokenOutputJson>,
+    #[serde(rename = "sparkOperatorIdentityPublicKeys", default)]
+    spark_operator_identity_public_keys: Vec<String>,
+    network: String,
+    // V2 has expiry_time but FinalTokenTransaction does not; the conversion drops it.
+    #[serde(rename = "clientCreatedTimestamp")]
+    client_created_timestamp: Option<String>,
+    #[serde(rename = "invoiceAttachments", default)]
+    invoice_attachments: Vec<InvoiceAttachmentJson>,
+    // protojson serializes uint64 as a JSON string, but the shared fixture file
+    // mixes string and integer encodings, so accept both.
+    #[serde(rename = "validityDurationSeconds", default)]
+    validity_duration_seconds: Option<StringOrU64>,
+    #[serde(rename = "executeBefore")]
+    execute_before: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum StringOrU64 {
+    String(String),
+    U64(u64),
+}
+
+impl StringOrU64 {
+    fn to_u64(&self) -> u64 {
+        match self {
+            StringOrU64::String(s) => s.parse().unwrap(),
+            StringOrU64::U64(n) => *n,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct V2TokenOutputJson {
+    #[serde(rename = "ownerPublicKey")]
+    owner_public_key: String,
+    #[serde(rename = "revocationCommitment")]
+    revocation_commitment: Option<String>,
+    #[serde(rename = "withdrawBondSats")]
+    withdraw_bond_sats: Option<String>,
+    #[serde(rename = "withdrawRelativeBlockLocktime")]
+    withdraw_relative_block_locktime: Option<String>,
+    #[serde(rename = "tokenIdentifier")]
+    token_identifier: Option<String>,
+    #[serde(rename = "tokenAmount")]
+    token_amount: String,
+}
+
+fn build_final_transaction(json: V2TokenTransactionJson) -> FinalTokenTransaction {
+    let token_inputs = match (json.mint_input, json.transfer_input, json.create_input) {
+        (Some(mint_input), None, None) => Some(final_token_transaction::TokenInputs::MintInput(
+            spark_token::TokenMintInput {
+                issuer_public_key: decode_base64(&mint_input.issuer_public_key),
+                token_identifier: mint_input
+                    .token_identifier
+                    .map(|token_identifier| decode_base64(&token_identifier)),
+            },
+        )),
+        (None, Some(transfer_input), None) => Some(
+            final_token_transaction::TokenInputs::TransferInput(TokenTransferInput {
+                outputs_to_spend: transfer_input
+                    .outputs_to_spend
+                    .into_iter()
+                    .map(|output| TokenOutputToSpend {
+                        prev_token_transaction_hash: decode_base64(
+                            &output.prev_token_transaction_hash,
+                        ),
+                        prev_token_transaction_vout: output.prev_token_transaction_vout,
+                    })
+                    .collect(),
+            }),
+        ),
+        (None, None, Some(create_input)) => Some(
+            final_token_transaction::TokenInputs::CreateInput(spark_token::TokenCreateInput {
+                issuer_public_key: decode_base64(&create_input.issuer_public_key),
+                token_name: create_input.token_name,
+                token_ticker: create_input.token_ticker,
+                decimals: create_input.decimals,
+                max_supply: decode_base64(&create_input.max_supply),
+                is_freezable: create_input.is_freezable,
+                creation_entity_public_key: create_input
+                    .creation_entity_public_key
+                    .map(|public_key| decode_base64(&public_key)),
+                extra_metadata: create_input
+                    .extra_metadata
+                    .map(|extra_metadata| decode_base64(&extra_metadata)),
+            }),
+        ),
+        _ => panic!("expected exactly one token input variant"),
+    };
+
+    FinalTokenTransaction {
+        version: json.version,
+        token_transaction_metadata: Some(TokenTransactionMetadata {
+            spark_operator_identity_public_keys: json
+                .spark_operator_identity_public_keys
+                .into_iter()
+                .map(|key| decode_base64(&key))
+                .collect(),
+            network: parse_network(&json.network),
+            client_created_timestamp: json
+                .client_created_timestamp
+                .as_deref()
+                .map(parse_timestamp),
+            validity_duration_seconds: json
+                .validity_duration_seconds
+                .as_ref()
+                .map(|v| v.to_u64())
+                .unwrap_or_default(),
+            invoice_attachments: json
+                .invoice_attachments
+                .into_iter()
+                .map(|invoice| spark_token::InvoiceAttachment {
+                    spark_invoice: invoice.spark_invoice,
+                })
+                .collect(),
+        }),
+        token_inputs,
+        final_token_outputs: json
+            .token_outputs
+            .into_iter()
+            .map(|output| FinalTokenOutput {
+                partial_token_output: Some(PartialTokenOutput {
+                    owner_public_key: decode_base64(&output.owner_public_key),
+                    withdraw_bond_sats: parse_u64_string(output.withdraw_bond_sats.as_deref()),
+                    withdraw_relative_block_locktime: parse_u64_string(
+                        output.withdraw_relative_block_locktime.as_deref(),
+                    ),
+                    token_identifier: output
+                        .token_identifier
+                        .as_deref()
+                        .map(decode_base64)
+                        .unwrap_or_default(),
+                    token_amount: decode_base64(&output.token_amount),
+                }),
+                revocation_commitment: output
+                    .revocation_commitment
+                    .as_deref()
+                    .map(decode_base64)
+                    .unwrap_or_default(),
+            })
+            .collect(),
+        execute_before: json.execute_before.as_deref().map(parse_timestamp),
+    }
+}
+
+fn v3_hash_cases_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../spark/testdata/token_transaction_v3_hash_cases.json")
+}
+
+#[test]
+fn hash_final_token_transaction_matches_shared_hash_cases() {
+    let data = fs::read_to_string(v3_hash_cases_path()).unwrap();
+    let file: V3HashCaseFile = serde_json::from_str(&data).unwrap();
+
+    let mut checked = 0;
+    for tc in file.test_cases {
+        // The shared fixture file mixes partial-hash cases and final-hash cases.
+        // Per the Go cross-language test (token_transaction_cross_language_test.go),
+        // any test whose name contains "partial" is a partial-hash case; the rest
+        // exercise the final hash, which is what this function tests.
+        if tc.name.contains("partial") {
+            continue;
+        }
+        if tc.expected_hash.is_empty() {
+            continue;
+        }
+
+        let derived_final_transaction = build_final_transaction(tc.token_transaction);
+        let derived_encoded_bytes = derived_final_transaction.encode_to_vec();
+
+        let hash = hash_final_token_transaction_impl(&derived_encoded_bytes).unwrap();
+        let got_hex = hex_string(&hash);
+
+        assert_eq!(
+            tc.expected_hash.to_ascii_lowercase(),
+            got_hex,
+            "final hash mismatch for {}",
+            tc.name
+        );
+        checked += 1;
+    }
+
+    assert!(checked > 0, "no final hash cases were exercised");
 }
 
 #[test]

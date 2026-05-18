@@ -4,8 +4,9 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     proto::spark_token::{
-        self, partial_token_transaction, PartialTokenOutput, PartialTokenTransaction,
-        TokenOutputToSpend, TokenTransactionMetadata, TokenTransferInput,
+        self, final_token_transaction, partial_token_transaction, FinalTokenOutput,
+        FinalTokenTransaction, PartialTokenOutput, PartialTokenTransaction, TokenOutputToSpend,
+        TokenTransactionMetadata, TokenTransferInput,
     },
     SparkTokenPrimitivesError,
 };
@@ -33,6 +34,24 @@ pub(super) fn hash_partial_token_transaction(
     partial_transaction: &PartialTokenTransaction,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
     hash_partial_token_transaction_message(partial_transaction)
+}
+
+pub(crate) fn hash_final_token_transaction_impl(
+    final_token_transaction_bytes: &[u8],
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    let final_transaction =
+        FinalTokenTransaction::decode(final_token_transaction_bytes).map_err(|err| {
+            SparkTokenPrimitivesError::Spark(format!(
+                "failed to decode FinalTokenTransaction: {err}"
+            ))
+        })?;
+    hash_final_token_transaction(&final_transaction)
+}
+
+pub(super) fn hash_final_token_transaction(
+    final_transaction: &FinalTokenTransaction,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    hash_final_token_transaction_message(final_transaction)
 }
 
 fn hash_partial_token_transaction_message(
@@ -80,6 +99,70 @@ fn hash_partial_token_transaction_message(
         fields.push(field_hash(7, hash_timestamp_message(execute_before)));
     }
 
+    Ok(hash_map(fields))
+}
+
+fn hash_final_token_transaction_message(
+    message: &FinalTokenTransaction,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    let mut fields = Vec::new();
+
+    if message.version != 0 {
+        fields.push(field_hash(1, hash_uint64(message.version as u64)));
+    }
+    if let Some(metadata) = &message.token_transaction_metadata {
+        fields.push(field_hash(
+            2,
+            hash_token_transaction_metadata_message(metadata)?,
+        ));
+    }
+    if let Some(token_inputs) = &message.token_inputs {
+        match token_inputs {
+            final_token_transaction::TokenInputs::MintInput(mint_input) => {
+                fields.push(field_hash(3, hash_token_mint_input_message(mint_input)?));
+            }
+            final_token_transaction::TokenInputs::TransferInput(transfer_input) => {
+                fields.push(field_hash(
+                    4,
+                    hash_token_transfer_input_message(transfer_input)?,
+                ));
+            }
+            final_token_transaction::TokenInputs::CreateInput(create_input) => {
+                fields.push(field_hash(
+                    5,
+                    hash_token_create_input_message(create_input)?,
+                ));
+            }
+        }
+    }
+    if !message.final_token_outputs.is_empty() {
+        let item_hashes = message
+            .final_token_outputs
+            .iter()
+            .map(hash_final_token_output_message)
+            .collect::<Result<Vec<_>, _>>()?;
+        fields.push(field_hash(6, hash_list(item_hashes)));
+    }
+    if let Some(execute_before) = &message.execute_before {
+        fields.push(field_hash(7, hash_timestamp_message(execute_before)));
+    }
+
+    Ok(hash_map(fields))
+}
+
+fn hash_final_token_output_message(
+    output: &FinalTokenOutput,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    let mut fields = Vec::new();
+    if let Some(partial_token_output) = &output.partial_token_output {
+        fields.push(field_hash(
+            1,
+            hash_partial_token_output_message(partial_token_output)?,
+        ));
+    }
+    if !output.revocation_commitment.is_empty() {
+        fields.push(field_hash(2, hash_bytes(&output.revocation_commitment)));
+    }
     Ok(hash_map(fields))
 }
 
