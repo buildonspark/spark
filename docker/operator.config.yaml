@@ -71,6 +71,7 @@ knobs:
     spark.so.tokens.coordinated_freeze_enabled: 0
     spark.so.tokens.enable_justice_transactions: 1
     spark.so.tokens.enforce_withdrawal_signature_validation: 0
+    spark.so.tokens.l1_exit_withdrawals_enabled: 1
     spark.so.tokens.multisig_issuer_enabled: 0
     spark.so.tokens.token_transaction_v3_enabled: 100
     spark.so.tokens.token_transaction_v3_phase2_enabled: 100

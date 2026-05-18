@@ -70,12 +70,15 @@ func buildWithdrawalScript(t *testing.T, sePubKey []byte, ownerSignature []byte,
 }
 
 func setupWithdrawalTestContext(t *testing.T) (ctx context.Context, dbClient *ent.Client, fixtures *entfixtures.Fixtures, config *so.Config, sePubKey keys.Public) {
-	return setupWithdrawalTestContextWithKnobs(t, map[string]float64{})
+	return setupWithdrawalTestContextWithKnobs(t, map[string]float64{
+		knobs.KnobTokenL1ExitWithdrawalsEnabled: 1,
+	})
 }
 
 func setupWithdrawalTestContextWithEnforcement(t *testing.T) (ctx context.Context, dbClient *ent.Client, fixtures *entfixtures.Fixtures, config *so.Config, sePubKey keys.Public) {
 	return setupWithdrawalTestContextWithKnobs(t, map[string]float64{
 		knobs.KnobEnforceWithdrawalSignatureValidation: 1,
+		knobs.KnobTokenL1ExitWithdrawalsEnabled:        1,
 	})
 }
 
@@ -1250,8 +1253,11 @@ func TestHandleTokenWithdrawals_AcceptsMultipleOutputsWithValidOwnerSignature(t 
 }
 
 func TestHandleTokenWithdrawals_RejectsDifferentOwnersEvenWhenValidationSkipped(t *testing.T) {
-	// Use empty knobs map - validation is skipped by default
-	ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContextWithKnobs(t, map[string]float64{})
+	// KnobEnforceWithdrawalSignatureValidation is unset (0) so owner-signature validation
+	// is skipped; KnobTokenL1ExitWithdrawalsEnabled is set so the processing path runs.
+	ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContextWithKnobs(t, map[string]float64{
+		knobs.KnobTokenL1ExitWithdrawalsEnabled: 1,
+	})
 
 	// Create two outputs with DIFFERENT owners
 	ownerPrivKey1 := keys.GeneratePrivateKey()
@@ -1305,4 +1311,49 @@ func TestHandleTokenWithdrawals_RejectsDifferentOwnersEvenWhenValidationSkipped(
 	// because owner consistency check should reject the batch even when validation is skipped
 	assertOutputStillSpendable(t, ctx, config, ownerPubKey1, sparkTxHash1)
 	assertOutputStillSpendable(t, ctx, config, ownerPubKey2, sparkTxHash2)
+}
+
+func TestHandleTokenWithdrawals_KillswitchBlocksProcessing(t *testing.T) {
+	ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContextWithKnobs(t, map[string]float64{
+		knobs.KnobTokenL1ExitWithdrawalsEnabled: 0,
+	})
+
+	ownerPrivKey := keys.GeneratePrivateKey()
+	ownerPubKey := ownerPrivKey.Public()
+	revocationPrivKey := keys.GeneratePrivateKey()
+	revocationXOnly := revocationPrivKey.Public().SerializeXOnly()
+	revocationCommitment := revocationPrivKey.Public().Serialize()
+
+	sparkTxHash := fixtures.RandomBytes(32)
+	bondSats := uint64(10000)
+	csvBlocks := uint64(1000)
+
+	tokenOutput := createTestTokenOutput(t, ctx, dbClient, fixtures, sparkTxHash, 0, ownerPubKey, revocationCommitment, bondSats, csvBlocks)
+	require.NotNil(t, tokenOutput)
+
+	expectedOutput, err := ConstructRevocationCsvTaprootOutput(revocationXOnly, ownerPubKey.SerializeXOnly(), csvBlocks)
+	require.NoError(t, err)
+
+	ownerSignature := make([]byte, 64)
+	withdrawalScript := buildWithdrawalScript(t, sePubKey.Serialize(), ownerSignature, []withdrawalRecord{
+		{bitcoinVout: 0, sparkTxHash: sparkTxHash, sparkTxVout: 0},
+	})
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxOut(&wire.TxOut{Value: int64(bondSats), PkScript: expectedOutput.ScriptPubKey})
+	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
+
+	blockHash := chainhash.Hash{}
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	require.NoError(t, err)
+
+	withdrawalTxCount, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 0, withdrawalTxCount, "withdrawal transaction must not be saved while killswitch is engaged")
+
+	outputWithdrawalCount, err := dbClient.L1TokenOutputWithdrawal.Query().Count(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 0, outputWithdrawalCount, "output withdrawal must not be saved while killswitch is engaged")
+
+	assertOutputStillSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
 }

@@ -131,6 +131,10 @@ const (
 	// When enabled (> 0), the SO will broadcast justice transactions to reclaim funds
 	// from invalid withdrawals where the revocation secret is available.
 	KnobEnableJusticeTransactions = "spark.so.tokens.enable_justice_transactions"
+	// When enabled (> 0), allows token L1 exit withdrawals to be processed.
+	// By default (0), all token L1 exit withdrawals observed on Bitcoin L1 are skipped and not
+	// recorded. Flip to 1 per-environment when the L1 exit flow is ready.
+	KnobTokenL1ExitWithdrawalsEnabled = "spark.so.tokens.l1_exit_withdrawals_enabled"
 
 	// When enabled (> 0), emits per-participant TokenTransactionEvent
 	// notifications on the unified SubscribeToEvents stream.

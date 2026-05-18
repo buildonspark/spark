@@ -155,6 +155,11 @@ func processWithdrawal(
 	withdrawnInBlock map[tokenOutputKey]struct{},
 	network btcnetwork.Network,
 ) error {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobTokenL1ExitWithdrawalsEnabled, 0) <= 0 {
+		logger.Sugar().Infof("Skipping withdrawal %s: token L1 exit withdrawals are disabled by killswitch", withdrawal.txHash)
+		return nil
+	}
+
 	if withdrawal.withdrawalTx.seEntityPubKey != expectedSePubKey {
 		logger.Sugar().Infof("Rejecting withdrawal %s: invalid SE entity public key (expected: %s, got: %s)",
 			withdrawal.txHash, expectedSePubKey, withdrawal.withdrawalTx.seEntityPubKey)
