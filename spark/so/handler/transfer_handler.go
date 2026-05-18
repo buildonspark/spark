@@ -2313,6 +2313,9 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 	if shouldRouteToOutgoingInFlight(ctx, filter) {
 		return h.queryOutgoingInFlight(ctx, filter, isSSP)
 	}
+	if shouldRouteToReceiverByTypeStatus(ctx, filter) {
+		return h.queryReceiverByTypeStatus(ctx, filter, isSSP)
+	}
 	return h.queryTransfers(ctx, filter, false, isSSP)
 }
 
