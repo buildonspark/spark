@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -57,6 +58,73 @@ func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) *internalSignTokenP
 		client:   dbClient,
 		fixtures: entfixtures.New(t, ctx, dbClient),
 	}
+}
+
+func TestSignAndPersistTokenTransactionRejectsMismatchedFinalHash(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandlerPostgres(t)
+
+	tokenCreate := setup.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+	_, inputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+
+	operatorPublicKeys := make([]keys.Public, 0, len(setup.handler.config.SigningOperatorMap))
+	for _, operator := range setup.handler.config.SigningOperatorMap {
+		operatorPublicKeys = append(operatorPublicKeys, operator.IdentityPublicKey)
+	}
+	transferResult := setup.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		[]*ent.TokenOutput{inputs[0]},
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: operatorPublicKeys,
+			Status:             st.TokenTransactionStatusStarted,
+		},
+	)
+	_, err := setup.client.TokenTransaction.Update().
+		Where(tokentransaction.IDEQ(transferResult.Transaction.ID)).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetClientCreatedTimestamp(time.Now()).
+		SetValidityDurationSeconds(uint64(time.Hour / time.Second)).
+		Save(setup.ctx)
+	require.NoError(t, err)
+
+	lockedTx, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.IDEQ(transferResult.Transaction.ID)).
+		WithSpentOutput().
+		WithCreatedOutput().
+		WithMint().
+		WithCreate().
+		Only(setup.ctx)
+	require.NoError(t, err)
+
+	mismatchedHash := bytes.Repeat([]byte{0x42}, 32)
+	require.False(t, bytes.Equal(transferResult.Hash, mismatchedHash))
+
+	_, err = setup.handler.SignAndPersistTokenTransaction(
+		setup.ctx,
+		lockedTx,
+		transferResult.Proto,
+		mismatchedHash,
+		nil,
+	)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "final token transaction hash mismatch")
+
+	updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, transferResult.Transaction.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusStarted, updatedTx.Status)
+	require.Empty(t, updatedTx.OperatorSignature)
+
+	updatedInput, err := setup.client.TokenOutput.Get(setup.ctx, inputs[0].ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenOutputStatusSpentStarted, updatedInput.Status)
+
+	updatedOutput, err := setup.client.TokenOutput.Get(setup.ctx, transferResult.Outputs[0].ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenOutputStatusCreatedStarted, updatedOutput.Status)
 }
 
 // createTestSpentOutputWithShares creates a spent output with threshold recovery set up:

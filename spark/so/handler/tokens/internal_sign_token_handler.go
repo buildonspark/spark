@@ -87,6 +87,18 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		}
 	}
 
+	calculatedHash, err := utils.HashTokenTransaction(finalTokenTransaction, false)
+	if err != nil {
+		return nil, tokens.FormatErrorWithTransactionEnt("failed to hash final token transaction", tokenTransaction, err)
+	}
+	if !bytes.Equal(calculatedHash, finalTokenTransactionHash) {
+		return nil, tokens.FormatErrorWithTransactionEnt(
+			"final token transaction hash mismatch",
+			tokenTransaction,
+			sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("expected %x, got %x", calculatedHash, finalTokenTransactionHash)),
+		)
+	}
+
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash)
 
 	// Order the signatures according to their index before updating the DB.
