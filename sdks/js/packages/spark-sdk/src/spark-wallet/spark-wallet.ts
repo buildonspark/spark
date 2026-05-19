@@ -91,7 +91,10 @@ import {
   TokenTransactionService,
 } from "../services/tokens/token-transactions.js";
 import type { LeafKeyTweak } from "../services/transfer.js";
-import { TransferService } from "../services/transfer.js";
+import {
+  PENDING_TRANSFERS_BATCH_SIZE,
+  TransferService,
+} from "../services/transfer.js";
 import {
   type ConfigOptions,
   ELECTRS_CREDENTIALS,
@@ -187,6 +190,8 @@ import {
   SparkWalletEvent,
 } from "./types.js";
 
+const MAX_FALLBACK_CLAIM_BATCHES = 100;
+
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
  * It provides methods for creating and managing wallets, handling deposits, executing transfers,
@@ -219,6 +224,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private claimTransferMutex = new Mutex();
   private claimTransfersInterval: Interval | null = null;
+  private periodicClaimTransfersInProgress = false;
   private mutexes: Map<string, Mutex> = new Map();
   private sparkAddress: SparkAddressFormat | undefined;
   private streamController: AbortController | null = null;
@@ -3315,30 +3321,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     });
     return await this.processClaimedTransferResults(result, transfer, emit);
   }
-  /**
-   * Claims all pending transfers.
-   *
-   * @returns {Promise<string[]>} Array of successfully claimed transfer IDs
-   * @private
-   */
-  private async claimTransfers(
+
+  private partitionClaimablePendingTransfers(
+    transfers: Transfer[],
     types?: TransferType[],
-    emit?: boolean,
-  ): Promise<string[]> {
-    const transfers = await this.transferService.queryPendingTransfers();
-    this.logDebug(
-      "claimTransfers",
-      `found pendingTransfers=${transfers.transfers.length}${types ? ` typeFilterCount=${types.length}` : ""}`,
-    );
-    this.logEvent(
-      `claimTransfers: found ${transfers.transfers.length} pending transfers${types ? ` (filtering types=[${types.join(",")}])` : ""}`,
-    );
-    const promises: Promise<string | null>[] = [];
-    let skippedType = 0;
-    let skippedStatus = 0;
-    for (const transfer of transfers.transfers) {
+  ): {
+    claimableTransfers: Transfer[];
+    skippedByTypeFilterCount: number;
+    skippedByStatusCount: number;
+  } {
+    const claimableTransfers: Transfer[] = [];
+    let skippedByTypeFilterCount = 0;
+    let skippedByStatusCount = 0;
+
+    for (const transfer of transfers) {
       if (types && !types.includes(transfer.type)) {
-        skippedType++;
+        skippedByTypeFilterCount++;
         continue;
       }
 
@@ -3353,50 +3351,211 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         transfer.status !==
           TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED
       ) {
-        skippedStatus++;
+        skippedByStatusCount++;
         continue;
       }
-      this.logDebug(
-        "claimTransfers",
-        `claiming transfer=${transfer.id} type=${transfer.type} status=${transfer.status} leafCount=${transfer.leaves.length}`,
-      );
+
+      claimableTransfers.push(transfer);
+    }
+
+    return {
+      claimableTransfers,
+      skippedByTypeFilterCount,
+      skippedByStatusCount,
+    };
+  }
+
+  private async claimTransferBatch(
+    transfers: Transfer[],
+    emit?: boolean,
+  ): Promise<string[]> {
+    const claimed: string[] = [];
+
+    for (const transfer of transfers) {
       this.logEvent(
         `claimTransfers: claiming transfer=${transfer.id} type=${transfer.type} status=${transfer.status} totalValue=${transfer.totalValue}`,
       );
-      promises.push(
-        this.claimTransfer({ transfer, emit })
-          .then(() => transfer.id)
-          .catch((error) => {
-            this.logger.warn(
-              `Failed to claim transfer ${transfer.id}: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-            return null;
-          }),
-      );
+
+      try {
+        await this.claimTransfer({ transfer, emit });
+        claimed.push(transfer.id);
+      } catch (error) {
+        this.logger.warn(`Failed to claim transfer ${transfer.id}:`, error);
+      }
     }
-    if (skippedType > 0 || skippedStatus > 0) {
-      this.logDebug(
-        "claimTransfers",
-        `skipped byType=${skippedType} byStatus=${skippedStatus}`,
+
+    return claimed;
+  }
+
+  private async getClaimTransfersSnapshotCreatedBefore(): Promise<
+    Date | undefined
+  > {
+    if (!this.connectionManager.isTimeSynced()) {
+      try {
+        await this.transferService.queryPendingTransfers({
+          limit: 1,
+          offset: 0,
+        });
+      } catch (error) {
+        this.logger.warn(
+          "Unable to warm up server time for pending-transfer claim snapshot; falling back to first-page drain",
+          error,
+        );
+        return undefined;
+      }
+    }
+
+    if (!this.connectionManager.isTimeSynced()) {
+      this.logger.warn(
+        "Server time was not available for pending-transfer claim snapshot; falling back to first-page drain",
       );
+      return undefined;
+    }
+
+    return this.connectionManager.getCurrentServerTime();
+  }
+
+  /**
+   * Claims all pending transfers.
+   *
+   * @returns {Promise<string[]>} Array of successfully claimed transfer IDs
+   * @private
+   */
+  private async claimTransfers(
+    types?: TransferType[],
+    emit?: boolean,
+  ): Promise<string[]> {
+    const claimed: string[] = [];
+    let skippedByTypeFilterCount = 0;
+    let skippedByStatusCount = 0;
+    let attemptedTransferCount = 0;
+    let batchNumber = 0;
+    let offset = 0;
+    const snapshotCreatedBefore =
+      await this.getClaimTransfersSnapshotCreatedBefore();
+    const hasSnapshotCreatedBefore = snapshotCreatedBefore != null;
+    const typeFilterLog = types
+      ? ` (filtering types=[${types.join(",")}])`
+      : "";
+
+    while (true) {
+      // We batch pending-transfer queries to keep each RPC small, but offset is
+      // only stable while the filtered pending set is unchanged. Successful
+      // claims shrink that set, so any batch that makes progress must restart
+      // from offset=0; we only advance the offset when a batch is entirely
+      // unclaimable or makes no progress. Resetting can re-read skipped head
+      // entries, but preserving the old offset after removals can skip entries
+      // that shifted into earlier positions.
+      //
+      // This assumes the server returns a stable order for a fixed snapshot.
+      // MIMO query_pending_transfers orders by (create_time, id), so ties are
+      // stable. The legacy SO path only orders by create_time, so tied rows are
+      // best-effort in rare multi-page/no-progress cases; later claim passes can
+      // retry anything this pass misses.
+      batchNumber++;
+      const transfers = await this.transferService.queryPendingTransfers({
+        createdBefore: snapshotCreatedBefore,
+        limit: PENDING_TRANSFERS_BATCH_SIZE,
+        offset,
+      });
+
       this.logEvent(
-        `claimTransfers: skipped ${skippedType} by type, ${skippedStatus} by status`,
+        `claimTransfers: batch=${batchNumber} fetched ${transfers.transfers.length} pending transfers at offset=${offset}${typeFilterLog}`,
+      );
+
+      if (transfers.transfers.length === 0) {
+        break;
+      }
+
+      const {
+        claimableTransfers,
+        skippedByTypeFilterCount: batchSkippedByTypeFilterCount,
+        skippedByStatusCount: batchSkippedByStatusCount,
+      } = this.partitionClaimablePendingTransfers(transfers.transfers, types);
+      skippedByTypeFilterCount += batchSkippedByTypeFilterCount;
+      skippedByStatusCount += batchSkippedByStatusCount;
+
+      if (claimableTransfers.length === 0) {
+        if (transfers.transfers.length < PENDING_TRANSFERS_BATCH_SIZE) {
+          this.logEvent(
+            `claimTransfers: reached end of snapshot with no claimable transfers in batch=${batchNumber}`,
+          );
+          break;
+        }
+
+        if (
+          !hasSnapshotCreatedBefore &&
+          batchNumber >= MAX_FALLBACK_CLAIM_BATCHES
+        ) {
+          this.logEvent(
+            `claimTransfers: no server-time snapshot; stopping after ${batchNumber} fallback batches`,
+          );
+          break;
+        }
+
+        offset += transfers.transfers.length;
+        this.logEvent(
+          `claimTransfers: batch=${batchNumber} had no claimable transfers; advancing to offset=${offset}`,
+        );
+        continue;
+      }
+
+      attemptedTransferCount += claimableTransfers.length;
+      const claimedThisBatch = await this.claimTransferBatch(
+        claimableTransfers,
+        emit,
+      );
+      claimed.push(...claimedThisBatch);
+
+      if (claimedThisBatch.length > 0) {
+        if (transfers.transfers.length < PENDING_TRANSFERS_BATCH_SIZE) {
+          break;
+        }
+
+        if (
+          !hasSnapshotCreatedBefore &&
+          batchNumber >= MAX_FALLBACK_CLAIM_BATCHES
+        ) {
+          this.logEvent(
+            `claimTransfers: no server-time snapshot; stopping after ${batchNumber} fallback batches`,
+          );
+          break;
+        }
+
+        offset = 0;
+        continue;
+      }
+
+      if (transfers.transfers.length < PENDING_TRANSFERS_BATCH_SIZE) {
+        this.logEvent(
+          `claimTransfers: batch=${batchNumber} made no claim progress and reached end of snapshot`,
+        );
+        break;
+      }
+
+      if (
+        !hasSnapshotCreatedBefore &&
+        batchNumber >= MAX_FALLBACK_CLAIM_BATCHES
+      ) {
+        this.logEvent(
+          `claimTransfers: no server-time snapshot; stopping after ${batchNumber} fallback batches`,
+        );
+        break;
+      }
+
+      offset += transfers.transfers.length;
+      this.logEvent(
+        `claimTransfers: batch=${batchNumber} made no claim progress; advancing to offset=${offset}`,
       );
     }
-    const results = await Promise.allSettled(promises);
-    const claimed = results
-      .filter(
-        (result) => result.status === "fulfilled" && result.value !== null,
-      )
-      .map((result) => (result as PromiseFulfilledResult<string>).value);
-    this.logDebug(
-      "claimTransfers",
-      `completed claimed=${claimed.length} attempted=${promises.length}`,
-    );
+
+    if (skippedByTypeFilterCount > 0 || skippedByStatusCount > 0) {
+      this.logEvent(
+        `claimTransfers: skipped ${skippedByTypeFilterCount} by type filter, ${skippedByStatusCount} by non-claimable status`,
+      );
+    }
     this.logEvent(
-      `claimTransfers: completed. Claimed ${claimed.length} of ${promises.length} attempted`,
+      `claimTransfers: completed. Claimed ${claimed.length} of ${attemptedTransferCount} attempted`,
     );
     return claimed;
   }
@@ -6021,18 +6180,38 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     SparkWallet.initMutexes.clear();
   }
 
-  // Add this new method to start periodic claiming
-  private async startPeriodicClaimTransfers() {
+  private runPeriodicClaimTransfers(
+    types?: TransferType[],
+    emit?: boolean,
+  ): void {
+    if (this.periodicClaimTransfersInProgress) {
+      this.logEvent(
+        "claimTransfers: skipping periodic claim pass because a previous pass is still running",
+      );
+      return;
+    }
+
+    this.periodicClaimTransfersInProgress = true;
+    void this.claimTransfers(types, emit)
+      .catch((error) => {
+        this.logger.error("Error in periodic transfer claiming:", error);
+      })
+      .finally(() => {
+        this.periodicClaimTransfersInProgress = false;
+      });
+  }
+
+  private startPeriodicClaimTransfers() {
     // Clear any existing interval first
     if (this.claimTransfersInterval) {
       clearInterval(this.claimTransfersInterval);
     }
 
-    await this.claimTransfers();
+    this.runPeriodicClaimTransfers();
 
-    // Set up new interval to claim transfers every 5 seconds
+    // Set up new interval to claim transfers every 10 seconds.
     this.claimTransfersInterval = setInterval(() => {
-      void this.claimTransfers(
+      this.runPeriodicClaimTransfers(
         [
           TransferType.TRANSFER,
           TransferType.COOPERATIVE_EXIT,
@@ -6040,13 +6219,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           TransferType.UTXO_SWAP,
         ],
         true,
-      ).catch((error: unknown) => {
-        this.logger.error(
-          `Error in periodic transfer claiming: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      });
+      );
     }, 10000);
     // Node.js and Bare intervals support unref() so the claimer does not keep
     // short-lived scripts alive; browser and React Native intervals do not need it.

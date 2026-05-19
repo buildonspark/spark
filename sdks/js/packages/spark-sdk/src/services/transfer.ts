@@ -121,6 +121,16 @@ export type TransferQueryOptions = {
   createdBefore?: Date;
 };
 
+export const PENDING_TRANSFERS_BATCH_SIZE = 25;
+
+export type PendingTransferQueryOptions = {
+  transferIds?: string[];
+  limit?: number;
+  offset?: number;
+  createdAfter?: Date;
+  createdBefore?: Date;
+};
+
 type TransferPackageCommitmentsOverride = {
   leavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
   directLeavesToSend: UserSignedTxSigningJobWithSelfCommitment[];
@@ -1042,13 +1052,33 @@ export class TransferService extends BaseTransferService {
     return nodes;
   }
 
-  // When transferIds is not provided, all pending transfers for the receiver will be returned.
+  // When transferIds is not provided, pending transfers for the receiver are returned.
   async queryPendingTransfers(
-    transferIds?: string[],
+    optionsOrTransferIds: PendingTransferQueryOptions | string[] = {},
   ): Promise<QueryTransfersResponse> {
+    const options = Array.isArray(optionsOrTransferIds)
+      ? { transferIds: optionsOrTransferIds }
+      : optionsOrTransferIds;
+    if (options.createdAfter && options.createdBefore) {
+      throw new Error(
+        "createdAfter and createdBefore are mutually exclusive - only one can be specified",
+      );
+    }
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
+    const timeFilter =
+      options.createdAfter != null
+        ? {
+            $case: "createdAfter" as const,
+            createdAfter: options.createdAfter,
+          }
+        : options.createdBefore != null
+          ? {
+              $case: "createdBefore" as const,
+              createdBefore: options.createdBefore,
+            }
+          : undefined;
     let pendingTransfersResp: QueryTransfersResponse;
     try {
       pendingTransfersResp = await sparkClient.query_pending_transfers({
@@ -1057,7 +1087,10 @@ export class TransferService extends BaseTransferService {
           receiverIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
         },
-        transferIds,
+        transferIds: options.transferIds,
+        limit: options.limit,
+        offset: options.offset,
+        timeFilter,
         network: this.config.getNetworkProto(),
       });
     } catch (error) {
@@ -2391,9 +2424,9 @@ export class TransferService extends BaseTransferService {
 
     const fetchData = async (context: RetryContext<TreeNode[], Transfer>) => {
       const transferToUse = context.data || transfer;
-      const updatedTransfer = await this.queryPendingTransfers([
-        transferToUse.id,
-      ]);
+      const updatedTransfer = await this.queryPendingTransfers({
+        transferIds: [transferToUse.id],
+      });
       if (!updatedTransfer.transfers[0]) {
         return undefined;
       }

@@ -5,6 +5,7 @@ import {
   type Transfer,
 } from "../../proto/spark.js";
 import type { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
+import type { PendingTransferQueryOptions } from "../../services/transfer.js";
 import { type SparkSigner } from "../../signer/signer.js";
 import { BitcoinFaucet } from "./test-faucet.js";
 
@@ -45,8 +46,10 @@ export class SparkWalletTesting extends SparkWallet {
     return this.config.signer;
   }
 
-  public async queryPendingTransfers(): Promise<QueryTransfersResponse> {
-    return await this.transferService.queryPendingTransfers();
+  public async queryPendingTransfers(
+    options?: PendingTransferQueryOptions,
+  ): Promise<QueryTransfersResponse> {
+    return await this.transferService.queryPendingTransfers(options);
   }
 
   public async verifyPendingTransfer(

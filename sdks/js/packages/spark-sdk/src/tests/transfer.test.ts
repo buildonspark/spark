@@ -10,10 +10,15 @@ import type {
 import { KeyDerivationType } from "../signer/types.js";
 import {
   BaseTransferService,
+  TransferService,
   type LeafRefundSigningData,
 } from "../services/transfer.js";
+import type { WalletConfigService } from "../services/config.js";
+import type { ConnectionManager } from "../services/connection/connection.js";
+import type { SigningService } from "../services/signing.js";
 import type {
   LeafRefundTxSigningResult,
+  QueryTransfersResponse,
   SigningResult as ProtoSigningResult,
 } from "../proto/spark.js";
 import { getSigHashFromTx, getTxFromRawTxHex } from "../utils/bitcoin.js";
@@ -21,6 +26,38 @@ import { Network } from "../utils/network.js";
 import { createInitialTimelockRefundTxs } from "../utils/transaction.js";
 
 describe("transfer", () => {
+  function createTransferService(queryResponse?: QueryTransfersResponse) {
+    const query_pending_transfers = jest.fn<
+      () => Promise<QueryTransfersResponse>
+    >(() => Promise.resolve(queryResponse ?? { transfers: [], offset: -1 }));
+    const createSparkClient = jest.fn(() =>
+      Promise.resolve({ query_pending_transfers }),
+    );
+
+    const service = new TransferService(
+      {
+        getCoordinatorAddress: () => "mock://coordinator",
+        getNetwork: () => "LOCAL",
+        getNetworkProto: () => Network.REGTEST,
+        signer: {
+          getIdentityPublicKey: jest.fn<() => Promise<Uint8Array>>(() =>
+            Promise.resolve(new Uint8Array([1, 2, 3])),
+          ),
+        },
+      } as unknown as WalletConfigService,
+      {
+        createSparkClient,
+      } as unknown as ConnectionManager,
+      {} as unknown as SigningService,
+    );
+
+    return {
+      service,
+      query_pending_transfers,
+      createSparkClient,
+    };
+  }
+
   function makeCommitment(): SigningCommitmentWithOptionalNonce {
     return {
       commitment: {
@@ -394,5 +431,52 @@ describe("transfer", () => {
     expect(
       signatures[0]?.directFromCpfpRefundTxSignature.length,
     ).toBeGreaterThan(0);
+  });
+
+  it("queryPendingTransfers passes structured pagination options through to grpc-js", async () => {
+    const { service, query_pending_transfers, createSparkClient } =
+      createTransferService();
+    const createdBefore = new Date("2026-04-23T22:30:15.125Z");
+
+    await service.queryPendingTransfers({
+      transferIds: ["transfer-1"],
+      limit: 25,
+      offset: 0,
+      createdBefore,
+    });
+
+    expect(createSparkClient).toHaveBeenCalledWith("mock://coordinator");
+    expect(query_pending_transfers).toHaveBeenCalledWith({
+      participant: {
+        $case: "receiverIdentityPublicKey",
+        receiverIdentityPublicKey: new Uint8Array([1, 2, 3]),
+      },
+      transferIds: ["transfer-1"],
+      limit: 25,
+      offset: 0,
+      timeFilter: {
+        $case: "createdBefore",
+        createdBefore,
+      },
+      network: Network.REGTEST,
+    });
+  });
+
+  it("queryPendingTransfers preserves transfer ID array compatibility", async () => {
+    const { service, query_pending_transfers } = createTransferService();
+
+    await service.queryPendingTransfers(["transfer-1"]);
+
+    expect(query_pending_transfers).toHaveBeenCalledWith({
+      participant: {
+        $case: "receiverIdentityPublicKey",
+        receiverIdentityPublicKey: new Uint8Array([1, 2, 3]),
+      },
+      transferIds: ["transfer-1"],
+      limit: undefined,
+      offset: undefined,
+      timeFilter: undefined,
+      network: Network.REGTEST,
+    });
   });
 });
