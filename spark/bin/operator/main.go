@@ -651,12 +651,19 @@ func main() {
 		),
 	}
 
-	// Establish base values from config, then allow runtime knobs to override
-	// grpcConnTimeout, grpcKeepaliveTime and grpcKeepaliveTimeout are set when
-	// the server is created and cannot be changed at runtime.
+	// Establish base values from config, then allow runtime knobs to override.
+	// All of these (grpcConnTimeout, grpcKeepaliveTime, grpcKeepaliveTimeout,
+	// and the max connection age values) are read once when the server is
+	// created and cannot be changed at runtime; flipping the knob takes effect
+	// on the next operator restart. The enforcement-policy values
+	// (grpcKeepaliveMinTime, grpcKeepalivePermitWithoutStream) are config-only
+	// for the same reason — there's no live override that could affect an
+	// already-running server.
 	grpcConnTimeout := knobsService.GetDuration(knobs.KnobGrpcServerConnectionTimeout, config.GRPC.ServerConnectionTimeout)
 	grpcKeepaliveTime := knobsService.GetDuration(knobs.KnobGrpcServerKeepaliveTime, config.GRPC.ServerKeepaliveTime)
 	grpcKeepaliveTimeout := knobsService.GetDuration(knobs.KnobGrpcServerKeepaliveTimeout, config.GRPC.ServerKeepaliveTimeout)
+	grpcKeepaliveMinTime := config.GRPC.ServerKeepaliveMinTime
+	grpcKeepalivePermitWithoutStream := config.GRPC.ServerKeepalivePermitWithoutStream != nil && *config.GRPC.ServerKeepalivePermitWithoutStream
 	grpcMaxConnectionAge := knobsService.GetDuration(knobs.KnobGrpcServerMaxConnectionAge, config.GRPC.ServerMaxConnectionAge)
 	grpcMaxConnectionAgeGrace := knobsService.GetDuration(knobs.KnobGrpcServerMaxConnectionAgeGrace, config.GRPC.ServerMaxConnectionAgeGrace)
 
@@ -676,6 +683,20 @@ func main() {
 		MaxConnectionAge:      grpcMaxConnectionAge,
 		MaxConnectionAgeGrace: grpcMaxConnectionAgeGrace,
 	}))
+
+	// Enforcement policy bounds how aggressively clients are allowed to ping.
+	// The grpc-go default (MinTime=5m, PermitWithoutStream=false) is stricter
+	// than sparkcore Python clients, which ping idle channels every 30s; the
+	// resulting ENHANCE_YOUR_CALM GOAWAYs forced reconnects and added tail
+	// latency to subsequent calls (e.g. Lightning completion).
+	serverOpts = append(serverOpts, grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+		MinTime:             grpcKeepaliveMinTime,
+		PermitWithoutStream: grpcKeepalivePermitWithoutStream,
+	}))
+	logger.Sugar().Infof(
+		"gRPC server keepalive: time=%s timeout=%s max_conn_age=%s max_conn_age_grace=%s enforcement_min_time=%s permit_without_stream=%t",
+		grpcKeepaliveTime, grpcKeepaliveTimeout, grpcMaxConnectionAge, grpcMaxConnectionAgeGrace, grpcKeepaliveMinTime, grpcKeepalivePermitWithoutStream,
+	)
 
 	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService, sparkgrpc.KnobTargetName_UnaryGlobalLimit)
 	concurrencyStreamGuard := sparkgrpc.NewConcurrencyGuard(knobsService, sparkgrpc.KnobTargetName_StreamGlobalLimit)

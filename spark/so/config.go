@@ -46,12 +46,14 @@ var (
 	defaultPoolMaxConnIdleTime       = 5 * time.Minute
 	defaultPoolHealthCheckPeriod     = 30 * time.Second
 	// Defaults for gRPC server behavior
-	defaultGRPCServerConnectionTimeout     = 5 * time.Second
-	defaultGRPCServerKeepaliveTime         = 300 * time.Second
-	defaultGRPCServerKeepaliveTimeout      = 20 * time.Second
-	defaultGRPCServerUnaryHandlerTimeout   = 60 * time.Second
-	defaultGRPCServerMaxConnectionAge      = 10 * time.Minute
-	defaultGRPCServerMaxConnectionAgeGrace = 1 * time.Minute
+	defaultGRPCServerConnectionTimeout            = 5 * time.Second
+	defaultGRPCServerKeepaliveTime                = 300 * time.Second
+	defaultGRPCServerKeepaliveTimeout             = 20 * time.Second
+	defaultGRPCServerKeepaliveMinTime             = 20 * time.Second
+	defaultGRPCServerKeepalivePermitWithoutStream = true
+	defaultGRPCServerUnaryHandlerTimeout          = 60 * time.Second
+	defaultGRPCServerMaxConnectionAge             = 10 * time.Minute
+	defaultGRPCServerMaxConnectionAgeGrace        = 1 * time.Minute
 	// Defaults for gRPC client behavior
 	// 0 or unset means to fall back to the default value.
 	// < 0 means disable timeouts
@@ -270,6 +272,18 @@ type GRPCConfig struct {
 	ServerKeepaliveTime time.Duration `yaml:"server_keepalive_time"`
 	// ServerKeepaliveTimeout is the timeout waiting for keepalive ack before closing the connection.
 	ServerKeepaliveTimeout time.Duration `yaml:"server_keepalive_timeout"`
+	// ServerKeepaliveMinTime is the minimum time a client must wait between
+	// keepalive pings before the server treats them as abusive and closes the
+	// connection with GOAWAY ENHANCE_YOUR_CALM. The grpc-go default (5m) is
+	// stricter than the 30s pings sparkcore Python clients send, which triggered
+	// "too_many_pings" GOAWAYs and reconnect-induced tail latency.
+	ServerKeepaliveMinTime time.Duration `yaml:"server_keepalive_min_time"`
+	// ServerKeepalivePermitWithoutStream allows clients to send keepalive pings
+	// on idle connections (no active RPCs). Required so sparkcore Python idle
+	// channels are not killed for pinging without streams. Pointer so an
+	// explicit "false" in YAML is preserved instead of being overwritten by the
+	// default.
+	ServerKeepalivePermitWithoutStream *bool `yaml:"server_keepalive_permit_without_stream"`
 	// ServerMaxConnectionAge is the maximum amount of time a connection may exist before it will be closed by sending a GoAway.
 	ServerMaxConnectionAge time.Duration `yaml:"server_max_connection_age"`
 	// ServerMaxConnectionAgeGrace is the additive period after ServerMaxConnectionAge after which the connection will be forcibly closed.
@@ -818,6 +832,13 @@ func setGrpcDefaults(cfg *GRPCConfig) {
 	}
 	if cfg.ServerKeepaliveTimeout == 0 {
 		cfg.ServerKeepaliveTimeout = defaultGRPCServerKeepaliveTimeout
+	}
+	if cfg.ServerKeepaliveMinTime == 0 {
+		cfg.ServerKeepaliveMinTime = defaultGRPCServerKeepaliveMinTime
+	}
+	if cfg.ServerKeepalivePermitWithoutStream == nil {
+		v := defaultGRPCServerKeepalivePermitWithoutStream
+		cfg.ServerKeepalivePermitWithoutStream = &v
 	}
 	if cfg.ServerUnaryHandlerTimeout == 0 {
 		cfg.ServerUnaryHandlerTimeout = defaultGRPCServerUnaryHandlerTimeout
