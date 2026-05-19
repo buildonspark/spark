@@ -10,10 +10,10 @@ build
 .env.local
 `;
 
-export async function transformTemplate(
+export function transformTemplate(
   targetDir: string,
   projectName: string,
-): Promise<void> {
+): void {
   ensureGitignore(targetDir);
   gitInit(targetDir);
 

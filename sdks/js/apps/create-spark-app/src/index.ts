@@ -83,7 +83,7 @@ async function main(): Promise<void> {
 
   try {
     await downloadAndExtractTemplate(template.dir, targetDir, branch);
-    await transformTemplate(targetDir, dirName);
+    transformTemplate(targetDir, dirName);
   } catch (err) {
     rmSync(targetDir, { recursive: true, force: true });
     throw err;

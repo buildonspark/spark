@@ -14,6 +14,8 @@
     "clean": "rm -rf dist",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
+    "lint:fix": "eslint --fix .",
+    "lint": "eslint .",
     "types": "tsc",
     "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\""
   },
@@ -23,7 +25,9 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@types/node": "^22.13.2",
+    "eslint": "^9.25.0",
     "prettier": "^3.7.4",
     "publint": "^0.3.9",
     "tsdown": "^0.20.3",
