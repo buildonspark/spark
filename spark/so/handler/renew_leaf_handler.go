@@ -106,6 +106,10 @@ func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbint
 // RenewLeaf manages timelocks of nodes. This function validates user-sent signing jobs, signs them, aggregates them,
 // and then updates internal data model with the signed transactions.
 func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
+	if req == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	// Get the leaf from the database
 	leafUUID, err := uuid.Parse(req.LeafId)
 	if err != nil {

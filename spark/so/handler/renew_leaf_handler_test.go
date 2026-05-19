@@ -371,6 +371,16 @@ func TestValidateAndConstructRenewSigningJobsRejectMissingRequiredJobs(t *testin
 	require.ErrorContains(t, err, "node tx signing job is required")
 }
 
+func TestRenewLeafRejectsNilRequest(t *testing.T) {
+	handler := NewRenewLeafHandler(nil)
+
+	require.NotPanics(t, func() {
+		resp, err := handler.RenewLeaf(t.Context(), nil)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "request is required")
+	})
+}
+
 func TestConstructRenewTransactionsRejectUnsupportedSequenceHighBits(t *testing.T) {
 	const unsupportedHighBit = uint32(1 << 16)
 

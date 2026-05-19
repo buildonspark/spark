@@ -51,6 +51,9 @@ func (h *RenewLeafFlowHandler) Prepare(ctx context.Context, op proto.Message) (p
 	if !ok {
 		return nil, fmt.Errorf("unexpected operation type %T for renew leaf prepare", op)
 	}
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 
 	leafID, err := uuid.Parse(req.LeafId)
 	if err != nil {
@@ -162,6 +165,9 @@ func (h *RenewLeafFlowHandler) Rollback(ctx context.Context, op proto.Message) e
 	req, ok := op.(*pb.RenewLeafRequest)
 	if !ok {
 		return fmt.Errorf("unexpected operation type %T for renew leaf rollback", op)
+	}
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 	nodeIDStr := req.LeafId
 

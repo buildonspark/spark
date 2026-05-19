@@ -82,6 +82,18 @@ func TestRenewLeafFlowHandler_Prepare_RejectsNonAvailable(t *testing.T) {
 	assert.Contains(t, err.Error(), "expected Available")
 }
 
+func TestRenewLeafFlowHandler_Prepare_RejectsNilRequest(t *testing.T) {
+	t.Parallel()
+
+	handler := NewRenewLeafFlowHandler(nil)
+	var req *pbspark.RenewLeafRequest
+	require.NotPanics(t, func() {
+		resp, err := handler.Prepare(t.Context(), req)
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "request is required")
+	})
+}
+
 func TestRenewLeafFlowHandler_Rollback_ResetsToAvailable(t *testing.T) {
 	t.Parallel()
 	ctx, _ := db.ConnectToTestPostgres(t)
@@ -116,6 +128,17 @@ func TestRenewLeafFlowHandler_Rollback_IdempotentOnAvailable(t *testing.T) {
 	updated, err := tx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.TreeNodeStatusAvailable, updated.Status)
+}
+
+func TestRenewLeafFlowHandler_Rollback_RejectsNilRequest(t *testing.T) {
+	t.Parallel()
+
+	handler := NewRenewLeafFlowHandler(nil)
+	var req *pbspark.RenewLeafRequest
+	require.NotPanics(t, func() {
+		err := handler.Rollback(t.Context(), req)
+		require.ErrorContains(t, err, "request is required")
+	})
 }
 
 func TestRenewLeafFlowHandler_Rollback_NonExistentNode(t *testing.T) {
