@@ -9,10 +9,7 @@
     "rootDir": ".",
     "declaration": true,
     "noEmit": true,
-    "forceConsistentCasingInFileNames": true,
-    /* Allow implicit any due to generated files. TODO look into resolving
-         implicit any for generated files or move them out of the type checks */
-    "noImplicitAny": false
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["*.ts"],
   "exclude": ["node_modules", "dist"]

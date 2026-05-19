@@ -12,12 +12,16 @@
     "build": "tsc",
     "types": "tsc",
     "format:fix": "prettier . --write",
-    "format": "prettier . --check"
+    "format": "prettier . --check",
+    "lint:fix": "eslint --fix .",
+    "lint": "eslint ."
   },
   "author": "",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@types/node": "^22.13.2",
+    "eslint": "^9.25.0",
     "prettier": "^3.7.4",
     "typescript": "^5.7.3"
   },

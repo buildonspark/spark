@@ -107,7 +107,7 @@ export class ElectrsApi {
     }
 
     const utxos: BitcoinUtxo[] = [];
-    for (const [key, output] of outputs.entries()) {
+    for (const output of outputs.values()) {
       const isSpent = inputs.some(
         (input) => input.txid === output.txid && input.vout === output.vout,
       );

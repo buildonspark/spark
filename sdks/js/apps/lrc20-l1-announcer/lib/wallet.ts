@@ -3,8 +3,8 @@ import { initEccLib, payments, Psbt, type Network } from "bitcoinjs-lib";
 import * as ecc from "@bitcoinerlab/secp256k1";
 import { ECPairFactory, type ECPairInterface } from "ecpair";
 
-import { NetworkType } from "./types.js";
-import { TokenPubkeyAnnouncement } from "./announcement.js";
+import type { NetworkType } from "./types.js";
+import type { TokenPubkeyAnnouncement } from "./announcement.js";
 import { ElectrsApi, type BasicAuth, type BitcoinUtxo } from "./electrs-api.js";
 
 initEccLib(ecc);

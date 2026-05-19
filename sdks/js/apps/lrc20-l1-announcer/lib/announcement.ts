@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import { TokenPubkey } from "./types.js";
+import type { TokenPubkey } from "./types.js";
 
 const MAX_NAME_SIZE = 20;
 const MIN_NAME_SIZE = 3;
