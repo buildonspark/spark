@@ -25,6 +25,8 @@
     "clean": "rm -rf dist",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
+    "lint:fix": "eslint --fix .",
+    "lint": "eslint .",
     "types": "tsc --noEmit"
   },
   "author": "",
@@ -40,8 +42,10 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@types/node": "^22.13.2",
     "cross-env": "^7.0.3",
+    "eslint": "^9.25.0",
     "prettier": "^3.7.4",
     "tsdown": "^0.20.3",
     "tsx": "^4.19.3",

@@ -1,7 +1,7 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import {
-  Bech32mTokenIdentifier,
-  ConfigOptions,
+  type Bech32mTokenIdentifier,
+  type ConfigOptions,
   constructFeeBumpTx,
   constructUnilateralExitFeeBumpPackages,
   decodeBech32mTokenIdentifier,
@@ -15,10 +15,10 @@ import {
   getP2WPKHAddressFromPublicKey,
   isEphemeralAnchorOutput,
   Network,
-  NetworkType,
+  type NetworkType,
   protoToNetwork,
   SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
-  SparkAddressFormat,
+  type SparkAddressFormat,
   SparkReadonlyClient,
   SparkWalletEvent,
   validateSparkInvoiceSignature,
@@ -28,19 +28,20 @@ import {
   InvoiceStatus,
   PreimageRequestRole,
   PreimageRequestStatus,
+  type SparkServiceClient,
   TreeNode,
 } from "@buildonspark/spark-sdk/proto/spark";
 import {
-  QueryTokenTransactionsResponse,
-  TokenOutputRef,
+  type QueryTokenTransactionsResponse,
+  type TokenOutputRef,
   TokenTransactionStatus,
 } from "@buildonspark/spark-sdk/proto/spark_token";
 import {
-  BitcoinNetwork,
-  CoopExitFeeQuote,
+  type BitcoinNetwork,
+  type CoopExitFeeQuote,
   ExitSpeed,
-  SparkUserRequestStatus,
-  SparkUserRequestType,
+  type SparkUserRequestStatus,
+  type SparkUserRequestType,
   SparkWalletWebhookEventType,
 } from "@buildonspark/spark-sdk/types";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
@@ -71,40 +72,53 @@ export interface FeeRate {
   satPerVbyte: number;
 }
 
-// Helper function to convert WIF private key to hex
-function wifToHex(wif: string): string {
-  try {
-    // WIF decoding using base58 (simplified version)
-    const base58Alphabet =
-      "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+type InstantStaticDepositClaimParams = Parameters<
+  IssuerSparkWallet["experimental_ClaimInstantStaticDeposit"]
+>[0];
 
-    // Decode base58
-    let decoded = BigInt(0);
-    for (let i = 0; i < wif.length; i++) {
-      const char = wif[i];
-      const index = base58Alphabet.indexOf(char);
-      if (index === -1) {
-        throw new Error("Invalid character in WIF");
-      }
-      decoded = decoded * BigInt(58) + BigInt(index);
-    }
+type InstantStaticDepositQuoteData = {
+  quote: InstantStaticDepositClaimParams["quote"];
+  fulfillmentPlans: InstantStaticDepositClaimParams["plan"][];
+};
 
-    // Convert to hex and pad to ensure proper length
-    let hex = decoded.toString(16);
+type QueryNodesNetwork = NonNullable<
+  Parameters<SparkServiceClient["query_nodes"]>[0]["network"]
+>;
 
-    // WIF format: [version][32-byte private key][compression flag][4-byte checksum]
-    // We want the 32-byte private key part (skip version byte, take 32 bytes)
-    if (hex.length >= 74) {
-      // 1 + 32 + 1 + 4 = 38 bytes = 76 hex chars minimum
-      // Skip version byte (2 hex chars) and take 32 bytes (64 hex chars)
-      const privateKeyHex = hex.substring(2, 66);
-      return privateKeyHex;
-    }
+type WalletInternals = {
+  config: {
+    getCoordinatorAddress(): string;
+    getElectrsUrl(): string;
+    getNetwork(): Network;
+    getNetworkProto(): QueryNodesNetwork;
+    getNetworkType(): NetworkType;
+  };
+  connectionManager: {
+    createSparkClient(coordinatorAddress: string): Promise<SparkServiceClient>;
+  };
+};
 
-    throw new Error("Invalid WIF length");
-  } catch (error) {
-    throw new Error(`Failed to convert WIF to hex: ${error}`);
-  }
+type ElectrsTransaction = {
+  txid: string;
+  vin: {
+    txid: string;
+    vout: number;
+  }[];
+  vout: {
+    desc?: string;
+    scriptpubkey: string;
+    scriptpubkey_address?: string;
+    value: number;
+  }[];
+};
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// Fee-bump commands use SDK internals; keep this type in sync with IssuerSparkWallet.
+function getWalletInternals(wallet: IssuerSparkWallet): WalletInternals {
+  return wallet as unknown as WalletInternals;
 }
 
 // Helper function to create RIPEMD160(SHA256(data)) hash
@@ -114,10 +128,10 @@ function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(sha256Hash);
 }
 
-async function signPsbtWithExternalKey(
+function signPsbtWithExternalKey(
   psbtHex: string,
   privateKeyInput: string,
-): Promise<string> {
+): string {
   const tx = Transaction.fromPSBT(hexToBytes(psbtHex), {
     allowUnknown: true,
     allowLegacyWitnessUtxo: true,
@@ -187,7 +201,7 @@ function hexToWif(hexPrivateKey: string): string {
 
     return encoded;
   } catch (error) {
-    throw new Error(`Failed to convert hex to WIF: ${error}`);
+    throw new Error(`Failed to convert hex to WIF: ${getErrorMessage(error)}`);
   }
 }
 
@@ -723,7 +737,7 @@ async function runCLI() {
   if (configFile) {
     try {
       const data = fs.readFileSync(configFile, "utf8");
-      config = JSON.parse(data);
+      config = JSON.parse(data) as ConfigOptions;
       if (config.network !== network) {
         console.error("Network mismatch in config file");
         return;
@@ -734,15 +748,18 @@ async function runCLI() {
     }
   } else {
     switch (network) {
-      case "MAINNET":
+      case "MAINNET": {
         config = WalletConfig.MAINNET;
         break;
-      case "REGTEST":
+      }
+      case "REGTEST": {
         config = WalletConfig.REGTEST;
         break;
-      default:
+      }
+      default: {
         config = WalletConfig.LOCAL;
         break;
+      }
     }
   }
 
@@ -924,17 +941,19 @@ async function runCLI() {
 
     try {
       switch (lowerCommand) {
-        case "help":
+        case "help": {
           console.log(helpMessage);
           break;
-        case "setprivacyenabled":
+        }
+        case "setprivacyenabled": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
           }
           await wallet.setPrivacyEnabled(args[0] === "true");
           break;
-        case "getwalletsettings":
+        }
+        case "getwalletsettings": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -942,6 +961,7 @@ async function runCLI() {
           const walletSettings = await wallet.getWalletSettings();
           console.log(walletSettings);
           break;
+        }
         case "registerwebhook": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
@@ -999,7 +1019,7 @@ async function runCLI() {
           console.log("Webhooks:", JSON.stringify(listResult, null, 2));
           break;
         }
-        case "nontrustydeposit":
+        case "nontrustydeposit": {
           if (process.env.NODE_ENV !== "development" || network !== "REGTEST") {
             console.log(
               "This command is only available in the development environment and on the REGTEST network",
@@ -1007,7 +1027,8 @@ async function runCLI() {
             break;
           }
           /**
-           * This is an example of how to create a non-trusty deposit. Real implementation may differ.
+           * This is an example of how to create a non-trusty deposit. Real implementation may
+           * differ.
            *
            * 1. Get an address to deposit funds from L1 to Spark
            * 2. Construct a tx spending from the L1 address to the Spark address
@@ -1050,7 +1071,8 @@ async function runCLI() {
               },
             );
 
-            const transactions: any = await response.json();
+            const transactions =
+              (await response.json()) as ElectrsTransaction[];
 
             // Find unspent outputs
             const utxos: {
@@ -1064,9 +1086,9 @@ async function runCLI() {
               for (let voutIndex = 0; voutIndex < tx.vout.length; voutIndex++) {
                 const output = tx.vout[voutIndex];
                 if (output.scriptpubkey_address === sourceAddress) {
-                  const isSpent = transactions.some((otherTx: any) =>
+                  const isSpent = transactions.some((otherTx) =>
                     otherTx.vin.some(
-                      (input: any) =>
+                      (input) =>
                         input.txid === tx.txid && input.vout === voutIndex,
                     ),
                   );
@@ -1077,7 +1099,7 @@ async function runCLI() {
                       vout: voutIndex,
                       value: BigInt(output.value),
                       scriptPubKey: output.scriptpubkey,
-                      desc: output.desc,
+                      desc: output.desc ?? "",
                     });
                   }
                 }
@@ -1153,16 +1175,18 @@ async function runCLI() {
 
             const txid = await broadcastResponse.text();
             console.log("Transaction broadcast successful!", txid);
-          } catch (error: any) {
+          } catch (error) {
             console.error("Error creating deposit:", error);
-            console.error("Error details:", error.message);
+            console.error("Error details:", getErrorMessage(error));
           }
           break;
-        case "getlatesttx":
+        }
+        case "getlatesttx": {
           const latestTx = await getLatestDepositTxId(args[0]);
           console.log(latestTx);
           break;
-        case "gettransferfromssp":
+        }
+        case "gettransferfromssp": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1170,7 +1194,8 @@ async function runCLI() {
           const transfer1 = await wallet.getTransferFromSsp(args[0]);
           console.log(transfer1);
           break;
-        case "gettransfer":
+        }
+        case "gettransfer": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1178,7 +1203,8 @@ async function runCLI() {
           const transfer2 = await wallet.getTransfer(args[0]);
           console.log(transfer2);
           break;
-        case "claimdeposit":
+        }
+        case "claimdeposit": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1189,7 +1215,8 @@ async function runCLI() {
 
           console.log(depositResult);
           break;
-        case "gettransfers":
+        }
+        case "gettransfers": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1207,7 +1234,8 @@ async function runCLI() {
           const transfers = await wallet.getTransfers(limit, offset);
           console.log(transfers);
           break;
-        case "getlightningsendrequest":
+        }
+        case "getlightningsendrequest": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1217,7 +1245,8 @@ async function runCLI() {
           );
           console.log(lightningSendRequest);
           break;
-        case "getlightningreceiverequest":
+        }
+        case "getlightningreceiverequest": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1226,7 +1255,8 @@ async function runCLI() {
             await wallet.getLightningReceiveRequest(args[0]);
           console.log(lightningReceiveRequest);
           break;
-        case "getcoopexitrequest":
+        }
+        case "getcoopexitrequest": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1234,7 +1264,8 @@ async function runCLI() {
           const coopExitRequest = await wallet.getCoopExitRequest(args[0]);
           console.log(coopExitRequest);
           break;
-        case "initwallet":
+        }
+        case "initwallet": {
           if (wallet) {
             await wallet.cleanup();
           }
@@ -1256,7 +1287,7 @@ async function runCLI() {
             );
             break;
           }
-          let options: ConfigOptions = {
+          const options: ConfigOptions = {
             ...config,
             network,
           };
@@ -1314,12 +1345,13 @@ async function runCLI() {
               }
               console.log("Stream disconnected", reason);
             });
-          } catch (error: any) {
+          } catch (error) {
             console.error("Error initializing wallet:", error);
             break;
           }
           break;
-        case "getbalance":
+        }
+        case "getbalance": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1352,7 +1384,8 @@ async function runCLI() {
             }
           }
           break;
-        case "getdepositaddress":
+        }
+        case "getdepositaddress": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1363,7 +1396,8 @@ async function runCLI() {
           );
           console.log(depositAddress);
           break;
-        case "getstaticdepositaddress":
+        }
+        case "getstaticdepositaddress": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1372,7 +1406,8 @@ async function runCLI() {
           console.log("This is a multi-use address.");
           console.log(staticDepositAddress);
           break;
-        case "claimstaticdepositquote":
+        }
+        case "claimstaticdepositquote": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1394,7 +1429,8 @@ async function runCLI() {
             console.log(claimDepositQuote);
           }
           break;
-        case "claimstaticdeposit":
+        }
+        case "claimstaticdeposit": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1419,7 +1455,8 @@ async function runCLI() {
             console.log(claimDeposit);
           }
           break;
-        case "claimstaticdepositwithmaxfee":
+        }
+        case "claimstaticdepositwithmaxfee": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1444,7 +1481,8 @@ async function runCLI() {
             console.log(claimDepositWithMaxFee);
           }
           break;
-        case "instantstaticdepositquote":
+        }
+        case "instantstaticdepositquote": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1464,14 +1502,17 @@ async function runCLI() {
             console.log(JSON.stringify(instantQuote, null, 2));
           }
           break;
-        case "claiminstantstaticdeposit":
+        }
+        case "claiminstantstaticdeposit": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
           }
 
           {
-            const quoteData = JSON.parse(args[0]);
+            const quoteData = JSON.parse(
+              args[0],
+            ) as InstantStaticDepositQuoteData;
             const planIdx = args[1] !== undefined ? parseInt(args[1]) : 0;
 
             if (planIdx < 0 || planIdx >= quoteData.fulfillmentPlans.length) {
@@ -1497,7 +1538,8 @@ async function runCLI() {
             console.log(result);
           }
           break;
-        case "getutxosfordepositaddress":
+        }
+        case "getutxosfordepositaddress": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1510,7 +1552,8 @@ async function runCLI() {
           );
           console.log(utxos);
           break;
-        case "refundstaticdepositlegacy":
+        }
+        case "refundstaticdepositlegacy": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1524,7 +1567,8 @@ async function runCLI() {
           console.log("Broadcast the transaction below to refund the deposit");
           console.log(refundDepositLegacy);
           break;
-        case "refundstaticdeposit":
+        }
+        case "refundstaticdeposit": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1538,7 +1582,8 @@ async function runCLI() {
           console.log("Broadcast the transaction below to refund the deposit");
           console.log(refundDeposit);
           break;
-        case "refundandbroadcaststaticdeposit":
+        }
+        case "refundandbroadcaststaticdeposit": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1552,7 +1597,8 @@ async function runCLI() {
           console.log("Refund transaction broadcasted! Transaction ID:");
           console.log(refundedTxId);
           break;
-        case "identity":
+        }
+        case "identity": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1560,7 +1606,8 @@ async function runCLI() {
           const identity = await wallet.getIdentityPublicKey();
           console.log(identity);
           break;
-        case "getsparkaddress":
+        }
+        case "getsparkaddress": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1568,7 +1615,8 @@ async function runCLI() {
           const sparkAddress = await wallet.getSparkAddress();
           console.log(sparkAddress);
           break;
-        case "decodesparkaddress":
+        }
+        case "decodesparkaddress": {
           if (args.length !== 2) {
             console.log(
               "Usage: decodesparkaddress <sparkAddress> <network> (mainnet, regtest, testnet, signet, local)",
@@ -1582,7 +1630,8 @@ async function runCLI() {
           );
           console.log(decodedAddress);
           break;
-        case "encodeaddress":
+        }
+        case "encodeaddress": {
           if (args.length !== 2) {
             console.log(
               "Usage: encodeaddress <identityPublicKey> <network> (mainnet, regtest, testnet, signet, local)",
@@ -1595,7 +1644,8 @@ async function runCLI() {
           });
           console.log(encodedAddress);
           break;
-        case "createinvoice":
+        }
+        case "createinvoice": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1616,7 +1666,8 @@ async function runCLI() {
           });
           console.log(invoice);
           break;
-        case "createhodlinvoice":
+        }
+        case "createhodlinvoice": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1638,12 +1689,13 @@ async function runCLI() {
           });
           console.log(hodlInvoice);
           break;
-        case "payinvoice":
+        }
+        case "payinvoice": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
           }
-          let maxFeeSats = parseInt(args[1]);
+          const maxFeeSats = parseInt(args[1]);
           if (isNaN(maxFeeSats)) {
             console.log("Invalid maxFeeSats value");
             break;
@@ -1656,12 +1708,14 @@ async function runCLI() {
           });
           console.log(payment);
           break;
-        case "validateinvoicesig":
+        }
+        case "validateinvoicesig": {
           const sig = args[0];
           validateSparkInvoiceSignature(sig as SparkAddressFormat);
           console.log("signature valid");
           break;
-        case "createsparkinvoice":
+        }
+        case "createsparkinvoice": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1698,7 +1752,8 @@ async function runCLI() {
           }
           console.log(sparkInvoice);
           break;
-        case "createhtlc":
+        }
+        case "createhtlc": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1711,7 +1766,8 @@ async function runCLI() {
           });
           console.log(createdHTLC);
           break;
-        case "claimhtlc":
+        }
+        case "claimhtlc": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1719,7 +1775,8 @@ async function runCLI() {
           const htlc = await wallet.claimHTLC(args[0]);
           console.log(htlc);
           break;
-        case "gethtlcpreimage":
+        }
+        case "gethtlcpreimage": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1727,39 +1784,47 @@ async function runCLI() {
           const preimage = await wallet.getHTLCPreimage(args[0]);
           console.log(bytesToHex(preimage));
           break;
-        case "queryhtlc":
+        }
+        case "queryhtlc": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
           }
           let status: PreimageRequestStatus | undefined;
           switch (args[1]) {
-            case "waiting_for_preimage":
+            case "waiting_for_preimage": {
               status =
                 PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE;
               break;
-            case "preimage_shared":
+            }
+            case "preimage_shared": {
               status =
                 PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED;
               break;
-            case "returned":
+            }
+            case "returned": {
               status = PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_RETURNED;
               break;
-            case "null":
+            }
+            case "null": {
               status = undefined;
               break;
+            }
           }
           let matchRole: PreimageRequestRole | undefined;
           switch (args[3]) {
-            case "sender":
+            case "sender": {
               matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_SENDER;
               break;
-            case "both":
+            }
+            case "both": {
               matchRole =
                 PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER;
               break;
-            default:
+            }
+            default: {
               matchRole = PreimageRequestRole.PREIMAGE_REQUEST_ROLE_RECEIVER;
+            }
           }
           const queriedHtlcs = await wallet.queryHTLC({
             paymentHashes: args[0] === "null" ? [] : args[0].split(","),
@@ -1769,7 +1834,8 @@ async function runCLI() {
           });
           console.log(queriedHtlcs);
           break;
-        case "createhtlcsenderspendtx":
+        }
+        case "createhtlcsenderspendtx": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1783,7 +1849,8 @@ async function runCLI() {
           });
           console.log(senderSpendTx);
           break;
-        case "createhtlcreceiverspendtx":
+        }
+        case "createhtlcreceiverspendtx": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1798,7 +1865,8 @@ async function runCLI() {
           });
           console.log(receiverSpendTx);
           break;
-        case "sendtransfer":
+        }
+        case "sendtransfer": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1809,6 +1877,7 @@ async function runCLI() {
           });
           console.log(transfer);
           break;
+        }
         case "sendtransferv2": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
@@ -1885,7 +1954,7 @@ async function runCLI() {
           }
           break;
         }
-        case "transfertokens":
+        case "transfertokens": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1916,7 +1985,8 @@ async function runCLI() {
             console.error(`Failed to transfer tokens: ${errorMsg}`);
           }
           break;
-        case "batchtransfertokens":
+        }
+        case "batchtransfertokens": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -1928,7 +1998,7 @@ async function runCLI() {
             break;
           }
 
-          let tokenTransfers = [];
+          const tokenTransfers = [];
 
           for (let i = 0; i < args.length; i++) {
             const parts = args[i].split(":");
@@ -1972,6 +2042,7 @@ async function runCLI() {
             console.error(`Failed to batch transfer tokens: ${errorMsg}`);
           }
           break;
+        }
         case "fulfillsparkinvoice": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
@@ -2023,9 +2094,7 @@ async function runCLI() {
           }
 
           try {
-            const response = await wallet.fulfillSparkInvoice(
-              sparkInvoices as any,
-            );
+            const response = await wallet.fulfillSparkInvoice(sparkInvoices);
             for (const tx of response.satsTransactionSuccess) {
               console.log("--------------------------------");
               console.log("Sats invoice success:", tx.invoice);
@@ -2086,7 +2155,7 @@ async function runCLI() {
           const sparkInvoices = args;
 
           try {
-            const res = await wallet.querySparkInvoices(sparkInvoices as any);
+            const res = await wallet.querySparkInvoices(sparkInvoices);
             for (const invoice of res.invoiceStatuses) {
               console.log("--------------------------------");
               console.log("Invoice:", invoice.invoice);
@@ -2117,7 +2186,7 @@ async function runCLI() {
           }
           break;
         }
-        case "withdraw":
+        case "withdraw": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
@@ -2133,24 +2202,28 @@ async function runCLI() {
 
           let feeAmountSats: number | undefined;
           switch (exitSpeed) {
-            case ExitSpeed.FAST:
+            case ExitSpeed.FAST: {
               feeAmountSats =
                 coopExitFeeQuote.l1BroadcastFeeFast?.originalValue +
                 coopExitFeeQuote.userFeeFast?.originalValue;
               break;
-            case ExitSpeed.MEDIUM:
+            }
+            case ExitSpeed.MEDIUM: {
               feeAmountSats =
                 coopExitFeeQuote.l1BroadcastFeeMedium?.originalValue +
                 coopExitFeeQuote.userFeeMedium?.originalValue;
               break;
-            case ExitSpeed.SLOW:
+            }
+            case ExitSpeed.SLOW: {
               feeAmountSats =
                 coopExitFeeQuote.l1BroadcastFeeSlow?.originalValue +
                 coopExitFeeQuote.userFeeSlow?.originalValue;
               break;
-            default:
+            }
+            default: {
               console.log("Invalid exit speed");
               break;
+            }
           }
 
           const withdrawal = await wallet.withdraw({
@@ -2163,13 +2236,14 @@ async function runCLI() {
           });
           console.log(withdrawal);
           break;
+        }
         case "getuserrequests": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
           }
           try {
-            const parsed = await yargs(args)
+            const parsed = (await yargs(args)
               .option("first", {
                 type: "number",
                 description: "Number of results to return",
@@ -2221,8 +2295,16 @@ async function runCLI() {
                 },
               })
               .help(false)
-              .parse();
-            const params: any = {};
+              .parse()) as {
+              after?: string;
+              first?: number;
+              networks?: BitcoinNetwork[];
+              statuses?: SparkUserRequestStatus[];
+              types?: SparkUserRequestType[];
+            };
+            const params: NonNullable<
+              Parameters<IssuerSparkWallet["getUserRequests"]>[0]
+            > = {};
             if (parsed.first !== undefined) params.first = parsed.first;
             if (parsed.after !== undefined) params.after = parsed.after;
             if (parsed.types !== undefined) params.types = parsed.types;
@@ -2233,7 +2315,7 @@ async function runCLI() {
 
             const userRequests = await wallet.getUserRequests(params);
             console.log(userRequests);
-          } catch (error) {
+          } catch {
             console.log(
               "Usage: getuserrequests [--first <number>] [--after <cursor>] [--types <types>] [--statuses <statuses>] [--networks <networks>]",
             );
@@ -2330,7 +2412,7 @@ async function runCLI() {
               tokenName: md.tokenName,
               tokenIdentifier: encodeBech32mTokenIdentifier({
                 tokenIdentifier: md.rawTokenIdentifier,
-                network: (wallet as any).config.getNetworkType(),
+                network: getWalletInternals(wallet).config.getNetworkType(),
               }),
             });
           }
@@ -2347,7 +2429,7 @@ async function runCLI() {
             console.log("Token Metadata:", {
               tokenIdentifier: encodeBech32mTokenIdentifier({
                 tokenIdentifier: md.rawTokenIdentifier,
-                network: (wallet as any).config.getNetworkType(),
+                network: getWalletInternals(wallet).config.getNetworkType(),
               }),
               tokenPublicKey: md.tokenPublicKey,
               tokenName: md.tokenName,
@@ -2972,10 +3054,7 @@ async function runCLI() {
 
           const feeBumpTx = args[0];
           const privateKeyHex = args[1];
-          const signedTx = await signPsbtWithExternalKey(
-            feeBumpTx,
-            privateKeyHex,
-          );
+          const signedTx = signPsbtWithExternalKey(feeBumpTx, privateKeyHex);
           console.log("Signed Fee Bump Transaction:", signedTx);
           break;
         }
@@ -3011,7 +3090,7 @@ async function runCLI() {
 
             // Parse UTXOs and node hex strings
             const utxos = [];
-            const nodeHexStrings = [];
+            const nodeHexStrings: string[] = [];
             let parsingUtxos = true;
             let validationFailed = false;
 
@@ -3028,7 +3107,7 @@ async function runCLI() {
 
                   try {
                     valueNum = BigInt(value);
-                  } catch (error) {
+                  } catch {
                     console.log(
                       `Invalid UTXO value: ${value}. Must be a valid integer.`,
                     );
@@ -3099,7 +3178,9 @@ async function runCLI() {
                   nodeHexStrings.push(hexString);
                   console.log(`✅ Leaf ID: ${leaf.id} (${leaf.value} sats)`);
                 } catch (error) {
-                  console.log(`❌ Error converting leaf ${leaf.id}: ${error}`);
+                  console.log(
+                    `❌ Error converting leaf ${leaf.id}: ${getErrorMessage(error)}`,
+                  );
                 }
               }
 
@@ -3109,7 +3190,7 @@ async function runCLI() {
               }
 
               console.log(
-                `Successfully converted ${nodeHexStrings.length} leaves to hex strings.`,
+                `Successfully converted ${String(nodeHexStrings.length)} leaves to hex strings.`,
               );
               console.log("");
             }
@@ -3120,17 +3201,17 @@ async function runCLI() {
             console.log(`Fee rate: ${feeRate} sat/vbyte`);
 
             // Get sparkClient from wallet's connection manager
-            const sparkClient = await (
-              wallet as any
-            ).connectionManager.createSparkClient(
-              (wallet as any).config.getCoordinatorAddress(),
-            );
+            const walletInternals = getWalletInternals(wallet);
+            const sparkClient =
+              await walletInternals.connectionManager.createSparkClient(
+                walletInternals.config.getCoordinatorAddress(),
+              );
 
             const feeBumpChains = await constructUnilateralExitFeeBumpPackages(
               nodeHexStrings,
               utxos,
               { satPerVbyte: feeRate },
-              (wallet as any).config.getNetwork(),
+              walletInternals.config.getNetwork(),
               sparkClient,
             );
 
@@ -3204,11 +3285,11 @@ async function runCLI() {
 
           try {
             // Get sparkClient from wallet's connection manager
-            const sparkClient = await (
-              wallet as any
-            ).connectionManager.createSparkClient(
-              (wallet as any).config.getCoordinatorAddress(),
-            );
+            const walletInternals = getWalletInternals(wallet);
+            const sparkClient =
+              await walletInternals.connectionManager.createSparkClient(
+                walletInternals.config.getCoordinatorAddress(),
+              );
 
             const nodeIds = args;
             const hexStrings = [];
@@ -3228,7 +3309,7 @@ async function runCLI() {
                     },
                   },
                   includeParents: true,
-                  network: (wallet as any).config.getNetworkProto(),
+                  network: walletInternals.config.getNetworkProto(),
                 });
 
                 const node = response.nodes[nodeId];
@@ -3246,7 +3327,9 @@ async function runCLI() {
                 console.log(`   Hex string: ${hexString}`);
                 console.log("");
               } catch (error) {
-                console.log(`❌ Error converting leaf ID ${nodeId}: ${error}`);
+                console.log(
+                  `❌ Error converting leaf ID ${nodeId}: ${getErrorMessage(error)}`,
+                );
                 console.log("");
               }
             }
@@ -3352,7 +3435,7 @@ async function runCLI() {
                 console.log("  ---");
               }
               const totalValue = leaves.reduce(
-                (sum: number, leaf: any) => sum + leaf.value,
+                (sum, leaf) => sum + leaf.value,
                 0,
               );
               console.log(`Total value: ${totalValue} sats`);
@@ -3376,9 +3459,6 @@ async function runCLI() {
 
           // Get the public key and address
           const publicKey = secp256k1.getPublicKey(privateKeyBytes, true);
-          const pubKeyHash = hash160(publicKey);
-          const p2wpkhScript = new Uint8Array([0x00, 0x14, ...pubKeyHash]);
-
           // Create a regtest P2WPKH address
           const regtestAddress = getP2WPKHAddressFromPublicKey(
             publicKey,
@@ -3421,7 +3501,7 @@ async function runCLI() {
               console.log("Invalid value. Must be a positive integer.");
               break;
             }
-          } catch (error) {
+          } catch {
             console.log("Invalid value. Must be a valid integer.");
             break;
           }
@@ -3437,8 +3517,11 @@ async function runCLI() {
             const utxoString = `${txid}:${vout}:${value.toString()}:${scriptHex}:${publicKey}`;
             console.log(`Generated UTXO String:`);
             console.log(utxoString);
-          } catch (error: any) {
-            console.error("Error generating UTXO string:", error.message);
+          } catch (error) {
+            console.error(
+              "Error generating UTXO string:",
+              getErrorMessage(error),
+            );
           }
           break;
         }
@@ -3490,7 +3573,7 @@ async function runCLI() {
               );
             });
 
-            let selectedLeaves: any[] = [];
+            let selectedLeaves: typeof leaves = [];
 
             if (selectionInput.toLowerCase().trim() === "all") {
               selectedLeaves = leaves;
@@ -3527,7 +3610,7 @@ async function runCLI() {
             console.log("");
 
             console.log("📋 Step 2: Converting leaves to hex strings...");
-            let hexStrings: string[] = [];
+            const hexStrings: string[] = [];
             for (const leaf of selectedLeaves) {
               const encodedBytes = TreeNode.encode(leaf).finish();
               const hexString = bytesToHex(encodedBytes);
@@ -3552,7 +3635,7 @@ async function runCLI() {
                     `⚠️  Leaf ${leaf.id}: Timelocks have not expired yet.`,
                   );
                 }
-              } catch (error) {
+              } catch {
                 console.log(
                   `⚠️  Could not check timelock status for leaf ${leaf.id}, proceeding anyway...`,
                 );
@@ -3584,7 +3667,8 @@ async function runCLI() {
             console.log(`✅ Fee rate: ${feeRate} sat/vbyte`);
             console.log("");
 
-            const electrsUrl = (wallet as any).config.getElectrsUrl();
+            const walletInternals = getWalletInternals(wallet);
+            const electrsUrl = walletInternals.config.getElectrsUrl();
 
             let privateKeyHex = "";
             const utxos: Utxo[] = [];
@@ -3603,7 +3687,7 @@ async function runCLI() {
               // Create a regtest P2WPKH address
               const regtestAddress = getP2WPKHAddressFromPublicKey(
                 publicKey,
-                (wallet as any).config.getNetwork(),
+                walletInternals.config.getNetwork(),
               );
 
               console.log(`Generated test wallet:`);
@@ -3729,7 +3813,7 @@ async function runCLI() {
                 let valueNum: bigint;
                 try {
                   valueNum = BigInt(value);
-                } catch (error) {
+                } catch {
                   console.log(`❌ Invalid value in UTXO: ${utxoString}`);
                   validationFailed = true;
                   break;
@@ -3756,17 +3840,16 @@ async function runCLI() {
             console.log("📋 Step 7: Generating fee bump packages...");
 
             // Get sparkClient from wallet's connection manager
-            const sparkClient = await (
-              wallet as any
-            ).connectionManager.createSparkClient(
-              (wallet as any).config.getCoordinatorAddress(),
-            );
+            const sparkClient =
+              await walletInternals.connectionManager.createSparkClient(
+                walletInternals.config.getCoordinatorAddress(),
+              );
 
             const feeBumpChains = await constructUnilateralExitFeeBumpPackages(
               hexStrings, // Use all selected leaves
               utxos,
               { satPerVbyte: feeRate },
-              (wallet as any).config.getNetwork(),
+              walletInternals.config.getNetwork(),
               sparkClient,
             );
 
@@ -3796,7 +3879,7 @@ async function runCLI() {
                 console.log(`    Original tx: ${pkg.tx}`);
                 if (pkg.feeBumpPsbt) {
                   if (isTestMode && privateKeyHex !== "") {
-                    const signedTx = await signPsbtWithExternalKey(
+                    const signedTx = signPsbtWithExternalKey(
                       pkg.feeBumpPsbt,
                       privateKeyHex,
                     );
@@ -3851,7 +3934,7 @@ async function runCLI() {
 
           const regtestAddress = getP2WPKHAddressFromPublicKey(
             publicKey,
-            (wallet as any).config.getNetwork(),
+            getWalletInternals(wallet).config.getNetwork(),
           );
 
           console.log(`Generated test wallet:`);
@@ -3876,7 +3959,7 @@ async function runCLI() {
           }
 
           const headers: Record<string, string> = {};
-          const electrsUrl = (wallet as any).config.getElectrsUrl();
+          const electrsUrl = getWalletInternals(wallet).config.getElectrsUrl();
 
           if (network === "REGTEST") {
             const auth = btoa(
@@ -3927,10 +4010,7 @@ async function runCLI() {
             undefined,
           );
 
-          const signedTx = await signPsbtWithExternalKey(
-            feeBumpPsbt,
-            privateKeyHex,
-          );
+          const signedTx = signPsbtWithExternalKey(feeBumpPsbt, privateKeyHex);
 
           console.log("Signed fee bump transaction:");
           console.log(signedTx);
@@ -3948,4 +4028,4 @@ async function runCLI() {
   }
 }
 
-runCLI();
+void runCLI();
