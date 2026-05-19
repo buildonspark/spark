@@ -3,13 +3,14 @@ package handler
 import (
 	"context"
 	"crypto/sha256"
+	stdsql "database/sql"
 	"encoding/binary"
 	"encoding/hex"
+	errs "errors"
 	"fmt"
 	"math"
 	"strings"
 
-	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
@@ -377,13 +378,19 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			nodeMutator.SetStatus(st.TreeNodeStatusCreating)
 		}
 
-		_, err = nodeMutator.Save(ctx)
-		if err != nil {
-			if sqlgraph.IsUniqueConstraintError(err) {
-				logger.Debug("skipped creating node that was concurrently created", zap.Stringer("node_id", nodeID))
-				continue
-			}
-			return err
+		err = nodeMutator.
+			OnConflictColumns(treenode.FieldID).
+			DoNothing().
+			Exec(ctx)
+		// ON CONFLICT DO NOTHING returns 0 rows on the (expected) idempotent race,
+		// which Ent surfaces as stdsql.ErrNoRows; that path is a no-op, not a create.
+		switch {
+		case err == nil:
+			// node created
+		case errs.Is(err, stdsql.ErrNoRows):
+			logger.Debug("skipped creating node that was concurrently created", zap.Stringer("node_id", nodeID))
+		default:
+			return fmt.Errorf("failed to create tree node %s: %w", nodeID, err)
 		}
 	}
 	return nil

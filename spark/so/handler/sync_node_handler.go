@@ -2,9 +2,10 @@ package handler
 
 import (
 	"context"
+	stdsql "database/sql"
+	errs "errors"
 	"fmt"
 
-	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -280,17 +281,21 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 		createBuilder.SetParentID(parentUUID)
 	}
 
-	_, err = createBuilder.Save(ctx)
-	if err != nil {
-		// Handle pkey violation as AlreadyExists (race condition)
-		if sqlgraph.IsUniqueConstraintError(err) {
-			return nil
-		}
+	err = createBuilder.
+		OnConflictColumns(treenode.FieldID).
+		DoNothing().
+		Exec(ctx)
+	// ON CONFLICT DO NOTHING returns 0 rows on the (expected) idempotent race,
+	// which Ent surfaces as stdsql.ErrNoRows; that path is a no-op, not a create.
+	logger := logging.GetLoggerFromContext(ctx)
+	switch {
+	case err == nil:
+		logger.Info("Created missing split node", zap.Stringer("nodeId", nodeUUID))
+	case errs.Is(err, stdsql.ErrNoRows):
+		logger.Debug("skipped creating node that was concurrently created", zap.Stringer("nodeId", nodeUUID))
+	default:
 		return fmt.Errorf("unable to create node %s: %w", node.Id, err)
 	}
-
-	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Created missing split node %d", zap.Stringer("nodeId", nodeUUID))
 
 	return nil
 }
