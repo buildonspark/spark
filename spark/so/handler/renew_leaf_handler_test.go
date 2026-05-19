@@ -548,6 +548,240 @@ func TestConstructRenewTransactionsRejectUnsupportedSequenceHighBits(t *testing.
 	}
 }
 
+func serializeRenewTestTx(t *testing.T, tx *wire.MsgTx) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	err := tx.Serialize(&buf)
+	require.NoError(t, err)
+	return buf.Bytes()
+}
+
+func mutateRenewTestTx(t *testing.T, tx *wire.MsgTx, mutate func(*wire.MsgTx)) []byte {
+	t.Helper()
+
+	clonedTx, err := common.TxFromRawTxBytes(serializeRenewTestTx(t, tx))
+	require.NoError(t, err)
+	mutate(clonedTx)
+	return serializeRenewTestTx(t, clonedTx)
+}
+
+func renewTestWrongOutputValue(t *testing.T, tx *wire.MsgTx) []byte {
+	t.Helper()
+
+	return mutateRenewTestTx(t, tx, func(clonedTx *wire.MsgTx) {
+		require.NotEmpty(t, clonedTx.TxOut)
+		if clonedTx.TxOut[0].Value > 0 {
+			clonedTx.TxOut[0].Value--
+		} else {
+			clonedTx.TxOut[0].Value++
+		}
+	})
+}
+
+func renewTestWrongPrevoutIndex(t *testing.T, tx *wire.MsgTx) []byte {
+	t.Helper()
+
+	return mutateRenewTestTx(t, tx, func(clonedTx *wire.MsgTx) {
+		require.NotEmpty(t, clonedTx.TxIn)
+		clonedTx.TxIn[0].PreviousOutPoint.Index++
+	})
+}
+
+func createRenewValidationFixture(t *testing.T, leafNodeSequence uint32, leafRefundSequence uint32) (context.Context, io.Reader, *ent.TreeNode, *ent.TreeNode) {
+	t.Helper()
+
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{71})
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerIdentityPubKey)
+	parent := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+	leaf := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parent, 0)
+	leaf, err = leaf.Update().
+		SetRawTx(createValidTestTransactionBytesWithSequence(t, leafNodeSequence)).
+		SetRawRefundTx(createValidTestTransactionBytesWithSequence(t, leafRefundSequence)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return ctx, rng, leaf, parent
+}
+
+func setValidRenewNodeTimelockRawTxs(t *testing.T, signingJob *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions) {
+	t.Helper()
+
+	signingJob.SplitNodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.SplitNodeTx)
+	signingJob.NodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.NodeTx)
+	signingJob.RefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.RefundTx)
+	signingJob.SplitNodeDirectTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectSplitNodeTx)
+	signingJob.DirectNodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectNodeTx)
+	signingJob.DirectRefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectRefundTx)
+	signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectFromCpfpRefundTx)
+}
+
+func setValidRenewRefundTimelockRawTxs(t *testing.T, signingJob *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions) {
+	t.Helper()
+
+	signingJob.NodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.NodeTx)
+	signingJob.RefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.RefundTx)
+	signingJob.DirectNodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectNodeTx)
+	signingJob.DirectRefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectRefundTx)
+	signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectFromCpfpRefundTx)
+}
+
+func setValidRenewNodeZeroTimelockRawTxs(t *testing.T, signingJob *pb.RenewNodeZeroTimelockSigningJob, txs *RenewZeroNodeTransactions) {
+	t.Helper()
+
+	signingJob.NodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.NodeTx)
+	signingJob.RefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.RefundTx)
+	signingJob.DirectNodeTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectNodeTx)
+	signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = serializeRenewTestTx(t, txs.DirectFromCpfpRefundTx)
+}
+
+func TestValidateAndConstructRenewNodeTimelockRejectsMismatchedRawTxs(t *testing.T) {
+	mutations := []struct {
+		name   string
+		mutate func(*testing.T, *wire.MsgTx) []byte
+	}{
+		{name: "wrong output value", mutate: renewTestWrongOutputValue},
+		{name: "wrong previous outpoint", mutate: renewTestWrongPrevoutIndex},
+	}
+	txFields := []struct {
+		name string
+		set  func(*testing.T, *pb.RenewNodeTimelockSigningJob, *RenewNodeTransactions, func(*testing.T, *wire.MsgTx) []byte)
+	}{
+		{name: "split node tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.SplitNodeTxSigningJob.RawTx = mutate(t, txs.SplitNodeTx)
+		}},
+		{name: "node tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.NodeTxSigningJob.RawTx = mutate(t, txs.NodeTx)
+		}},
+		{name: "refund tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.RefundTxSigningJob.RawTx = mutate(t, txs.RefundTx)
+		}},
+		{name: "direct split node tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.SplitNodeDirectTxSigningJob.RawTx = mutate(t, txs.DirectSplitNodeTx)
+		}},
+		{name: "direct node tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectNodeTxSigningJob.RawTx = mutate(t, txs.DirectNodeTx)
+		}},
+		{name: "direct refund tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectRefundTxSigningJob.RawTx = mutate(t, txs.DirectRefundTx)
+		}},
+		{name: "direct from cpfp refund tx", set: func(t *testing.T, job *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectFromCpfpRefundTxSigningJob.RawTx = mutate(t, txs.DirectFromCpfpRefundTx)
+		}},
+	}
+
+	for _, txField := range txFields {
+		for _, mutation := range mutations {
+			t.Run(txField.name+" "+mutation.name, func(t *testing.T) {
+				ctx, rng, leaf, parent := createRenewValidationFixture(t, spark.RenewTimelockThreshold|spark.ZeroSequence, spark.RenewTimelockThreshold|spark.ZeroSequence)
+				signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leaf, 0)
+				renewTxs, err := constructRenewNodeTransactions(leaf, parent, signingJob)
+				require.NoError(t, err)
+				setValidRenewNodeTimelockRawTxs(t, signingJob, renewTxs)
+				txField.set(t, signingJob, renewTxs, mutation.mutate)
+
+				_, _, _, err = validateAndConstructNodeTimelock(ctx, leaf, signingJob)
+				require.ErrorContains(t, err, "user transaction validation failed")
+			})
+		}
+	}
+}
+
+func TestValidateAndConstructRenewRefundTimelockRejectsMismatchedRawTxs(t *testing.T) {
+	mutations := []struct {
+		name   string
+		mutate func(*testing.T, *wire.MsgTx) []byte
+	}{
+		{name: "wrong output value", mutate: renewTestWrongOutputValue},
+		{name: "wrong previous outpoint", mutate: renewTestWrongPrevoutIndex},
+	}
+	txFields := []struct {
+		name string
+		set  func(*testing.T, *pb.RenewRefundTimelockSigningJob, *RenewRefundTransactions, func(*testing.T, *wire.MsgTx) []byte)
+	}{
+		{name: "node tx", set: func(t *testing.T, job *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.NodeTxSigningJob.RawTx = mutate(t, txs.NodeTx)
+		}},
+		{name: "refund tx", set: func(t *testing.T, job *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.RefundTxSigningJob.RawTx = mutate(t, txs.RefundTx)
+		}},
+		{name: "direct node tx", set: func(t *testing.T, job *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectNodeTxSigningJob.RawTx = mutate(t, txs.DirectNodeTx)
+		}},
+		{name: "direct refund tx", set: func(t *testing.T, job *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectRefundTxSigningJob.RawTx = mutate(t, txs.DirectRefundTx)
+		}},
+		{name: "direct from cpfp refund tx", set: func(t *testing.T, job *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectFromCpfpRefundTxSigningJob.RawTx = mutate(t, txs.DirectFromCpfpRefundTx)
+		}},
+	}
+
+	for _, txField := range txFields {
+		for _, mutation := range mutations {
+			t.Run(txField.name+" "+mutation.name, func(t *testing.T) {
+				ctx, rng, leaf, parent := createRenewValidationFixture(t, spark.InitialTimeLock|spark.ZeroSequence, spark.TimeLockInterval|spark.ZeroSequence)
+				signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leaf, 0)
+				renewTxs, err := constructRenewRefundTransactions(leaf, parent, signingJob)
+				require.NoError(t, err)
+				setValidRenewRefundTimelockRawTxs(t, signingJob, renewTxs)
+				txField.set(t, signingJob, renewTxs, mutation.mutate)
+
+				_, _, _, err = validateAndConstructRefundTimelock(ctx, leaf, signingJob)
+				require.ErrorContains(t, err, "user transaction validation failed")
+			})
+		}
+	}
+}
+
+func TestValidateAndConstructRenewNodeZeroTimelockRejectsMismatchedRawTxs(t *testing.T) {
+	mutations := []struct {
+		name   string
+		mutate func(*testing.T, *wire.MsgTx) []byte
+	}{
+		{name: "wrong output value", mutate: renewTestWrongOutputValue},
+		{name: "wrong previous outpoint", mutate: renewTestWrongPrevoutIndex},
+	}
+	txFields := []struct {
+		name string
+		set  func(*testing.T, *pb.RenewNodeZeroTimelockSigningJob, *RenewZeroNodeTransactions, func(*testing.T, *wire.MsgTx) []byte)
+	}{
+		{name: "node tx", set: func(t *testing.T, job *pb.RenewNodeZeroTimelockSigningJob, txs *RenewZeroNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.NodeTxSigningJob.RawTx = mutate(t, txs.NodeTx)
+		}},
+		{name: "refund tx", set: func(t *testing.T, job *pb.RenewNodeZeroTimelockSigningJob, txs *RenewZeroNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.RefundTxSigningJob.RawTx = mutate(t, txs.RefundTx)
+		}},
+		{name: "direct node tx", set: func(t *testing.T, job *pb.RenewNodeZeroTimelockSigningJob, txs *RenewZeroNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectNodeTxSigningJob.RawTx = mutate(t, txs.DirectNodeTx)
+		}},
+		{name: "direct from cpfp refund tx", set: func(t *testing.T, job *pb.RenewNodeZeroTimelockSigningJob, txs *RenewZeroNodeTransactions, mutate func(*testing.T, *wire.MsgTx) []byte) {
+			job.DirectFromCpfpRefundTxSigningJob.RawTx = mutate(t, txs.DirectFromCpfpRefundTx)
+		}},
+	}
+
+	for _, txField := range txFields {
+		for _, mutation := range mutations {
+			t.Run(txField.name+" "+mutation.name, func(t *testing.T) {
+				_, rng, leaf, _ := createRenewValidationFixture(t, spark.ZeroTimelock, spark.TimeLockInterval|spark.ZeroSequence)
+				signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leaf, 0)
+				renewTxs, err := constructRenewZeroNodeTransactions(leaf, signingJob)
+				require.NoError(t, err)
+				setValidRenewNodeZeroTimelockRawTxs(t, signingJob, renewTxs)
+				txField.set(t, signingJob, renewTxs, mutation.mutate)
+
+				_, _, err = validateAndConstructNodeZeroTimelock(leaf, signingJob)
+				require.ErrorContains(t, err, "user transaction validation failed")
+			})
+		}
+	}
+}
+
 func TestConstructRenewRefundTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
