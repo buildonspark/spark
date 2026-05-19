@@ -36,6 +36,13 @@ func (SigningKeyshare) Indexes() []ent.Index {
 				entsql.IndexWhere("CAST(status AS TEXT) IN ('AVAILABLE', 'PENDING')"),
 			).
 			StorageKey("idx_signing_keyshares_coordinator_available_or_pending"),
+		// Temporary index to optimize queries for signing keyshares missing secret_version,
+		// which is needed for the migration to backfill signing keyshares that haven't changed
+		// in a long time
+		// TODO: Remove(SP-3129) after backfill is complete
+		index.Fields("id").
+			Annotations(entsql.IndexWhere("secret_version IS NULL")).
+			StorageKey("idx_signing_keyshares_missing_secret_version_id"),
 	}
 }
 

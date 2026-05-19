@@ -679,6 +679,14 @@ var (
 					Where: "CAST(status AS TEXT) IN ('AVAILABLE', 'PENDING')",
 				},
 			},
+			{
+				Name:    "idx_signing_keyshares_missing_secret_version_id",
+				Unique:  false,
+				Columns: []*schema.Column{SigningKeysharesColumns[0]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "secret_version IS NULL",
+				},
+			},
 		},
 	}
 	// SigningNoncesColumns holds the columns for the "signing_nonces" table.
