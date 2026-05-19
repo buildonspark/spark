@@ -777,7 +777,13 @@ func TestClaimTransferSignRefunds_DualWritesReceiverStatus(t *testing.T) {
 	assert.NotNil(t, resp)
 
 	// Verify receiver status was dual-written during the settle phase.
-	updatedReceiver, err := sessionCtx.Client.TransferReceiver.Get(ctx, receiver.ID)
+	// Read from the session's tx — see comment in
+	// TestClaimTransferSignRefunds_Success on why we no longer use
+	// sessionCtx.Client (bare client) after the InitiateSettleReceiverKeyTweak
+	// / SettleReceiverKeyTweak mid-flow commits were removed.
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	updatedReceiver, err := txClient.TransferReceiver.Get(ctx, receiver.ID)
 	require.NoError(t, err)
 	assert.NotEqual(t, st.TransferReceiverStatusKeyTweaked, updatedReceiver.Status,
 		"receiver status should have advanced beyond KeyTweaked")

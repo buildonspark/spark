@@ -3236,6 +3236,27 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 			return fmt.Errorf("unable to settle receiver key tweak: %w", err)
 		}
 	}
+
+	// Commit the settle phase. On COMMIT, this persists Phase 1 SELF's
+	// status transition AND Phase 2 SELF's keyshare mutation on this SO,
+	// matching the peers' middleware-committed Phase 2 mutations. Without
+	// this commit, any downstream failure in the caller (refund signing,
+	// FROST aggregation, finalize) would roll the outer tx back — reverting
+	// the coordinator's keyshare apply while the peers' Phase 2 commits
+	// remain durable, reproducing the same partial-commit divergent state
+	// just shifted later in the call chain.
+	//
+	// On ROLLBACK, the commit persists revertClaimTransfer's revert of the
+	// transfer's RKL/RKT row + cleared leaf.KeyTweak — i.e. the rollback
+	// itself is made durable.
+	entTx, err := ent.GetTxFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get db for settle-phase commit: %w", err)
+	}
+	if err := entTx.Commit(); err != nil {
+		return fmt.Errorf("unable to commit settle phase: %w", err)
+	}
+
 	if action == pbinternal.SettleKeyTweakAction_ROLLBACK {
 		return fmt.Errorf("unable to settle receiver key tweak; rolled back: %w", rollbackCause)
 	}
@@ -3549,6 +3570,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 
 	// Decrypt and extract key tweak proofs from the coordinator's portion of the claim package.
 	keyTweakProofs := map[string]*pb.SecretProof{}
+	var coordinatorClaimKeyTweaks *pb.ClaimLeafKeyTweaks
 	coordinatorKeyTweaks := claimPackage.KeyTweakPackage[h.config.Identifier]
 	if !useStoredKeyTweaks && len(coordinatorKeyTweaks) > 0 {
 		decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
@@ -3556,11 +3578,11 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		if err != nil {
 			return nil, fmt.Errorf("unable to decrypt coordinator claim key tweaks: %w", err)
 		}
-		claimKeyTweaks := &pb.ClaimLeafKeyTweaks{}
-		if err := proto.Unmarshal(decrypted, claimKeyTweaks); err != nil {
+		coordinatorClaimKeyTweaks = &pb.ClaimLeafKeyTweaks{}
+		if err := proto.Unmarshal(decrypted, coordinatorClaimKeyTweaks); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal coordinator claim key tweaks: %w", err)
 		}
-		for _, leafTweak := range claimKeyTweaks.LeavesToReceive {
+		for _, leafTweak := range coordinatorClaimKeyTweaks.LeavesToReceive {
 			if leafTweak.SecretShareTweak == nil {
 				return nil, fmt.Errorf("missing secret share tweak for leaf %s", leafTweak.LeafId)
 			}
@@ -3610,6 +3632,60 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		encryptedKeyTweakPackage = claimPackage.KeyTweakPackage
 		claimSignature = claimPackage.UserSignature
 	}
+
+	// Persist this SO's leaf.KeyTweak before the 2PC begins, in an early
+	// commit. Two reasons:
+	//
+	//   1. Atomicity. With the early commit, InitiateSettleReceiverKeyTweak
+	//      and SettleReceiverKeyTweak below no longer need to entTx.Commit()
+	//      mid-flow — Phase 1 SELF, Phase 2 fan-out, and Phase 2 SELF all
+	//      run under a single fresh tx that holds the FOR UPDATE row lock
+	//      throughout. A mid-flow commit would release the lock during
+	//      Phase 2 fan-out; a concurrent ROLLBACK could then revert the
+	//      coordinator to SENDER_KEY_TWEAKED while Phase 2 fan-out had
+	//      already committed peers at action=COMMIT, so Phase 2 SELF would
+	//      see a status mismatch and error out — leaving the cluster with
+	//      peers committed at one polynomial and the coordinator stranded.
+	//      A subsequent retry with a fresh polynomial could then slip past
+	//      the RKA bypass and apply a different polynomial on the
+	//      coordinator alone.
+	//
+	//   2. Durability across cancellation. The early-committed leaf.KeyTweak
+	//      survives outer claim_transfer rollback. If a peer commits Phase 1
+	//      (status RKL with proofs_A) before the coordinator's outer tx
+	//      rolls back, persisting the coordinator's own proofs_A means the
+	//      cluster stays consistent: gossip-driven recovery or a retry
+	//      forwarded as a stored-keytweak claim (useStoredKeyTweaks=true
+	//      at RKL) can finish the original 2PC against the original
+	//      polynomial.
+	//
+	// Note that persistCoordinatorClaimKeyTweak DOES NOT enforce
+	// anti-replay against fresh-polynomial retries — see the override
+	// rationale in that function. The anti-replay invariant is enforced by
+	// peer InitiateSettleReceiverKeyTweak's alreadyLocked +
+	// ValidateKeyTweakProof path: a peer that already committed Phase 1
+	// with proofs_A rejects a fresh proofs_B request, and the coordinator
+	// promotes that to action=ROLLBACK so the existing 2PC cleanup handles
+	// it.
+	if !useStoredKeyTweaks && coordinatorClaimKeyTweaks != nil {
+		if err := h.persistCoordinatorClaimKeyTweak(ctx, transfer, receiver, coordinatorClaimKeyTweaks); err != nil {
+			return nil, fmt.Errorf("unable to persist coordinator claim key tweak: %w", err)
+		}
+		// After the early commit, the outer claim_transfer tx is closed.
+		// Reload `transfer` / `receiver` from a fresh tx so subsequent
+		// ent operations don't operate on stale row references.
+		transfer, err = h.loadTransferForUpdate(ctx, transferID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to reload transfer after early commit %s: %w", transferID, err)
+		}
+		if receiver != nil {
+			_, receiver, err = h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, &receiver.IdentityPubkey)
+			if err != nil {
+				return nil, fmt.Errorf("unable to reload transfer receiver after early commit: %w", err)
+			}
+		}
+	}
+
 	err = h.settleReceiverKeyTweakWithClaimPackage(ctx, transfer, receiver, keyTweakProofs, userPublicKeys, encryptedKeyTweakPackage, claimSignature)
 	if err != nil {
 		return nil, fmt.Errorf("unable to settle receiver key tweak: %w", err)
@@ -3873,6 +3949,151 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	}
 
 	return &pb.ClaimTransferResponse{Transfer: transferProto}, nil
+}
+
+// persistCoordinatorClaimKeyTweak stores the coordinator's decrypted portion
+// of a claim_package's key tweaks on this SO and transitions the transfer
+// state to ReceiverKeyTweaked. It commits in its own transaction so the
+// stored state survives any outer claim_transfer cancellation or rollback.
+//
+// The decoupling — store leaf.KeyTweak first with an early commit, then run
+// the 2PC under a single uncommitted outer tx — closes a race where a
+// mid-flow commit inside InitiateSettleReceiverKeyTweak /
+// SettleReceiverKeyTweak would release the FOR UPDATE row lock during
+// Phase 2 fan-out. A concurrent ROLLBACK could then flip the coordinator
+// back to SENDER_KEY_TWEAKED while peers had already committed Phase 2;
+// the coordinator's Phase 2 SELF would then see a status mismatch and fail,
+// leaving the cluster with peers committed and the coordinator stranded —
+// a subsequent retry could slip a different polynomial past the RKA bypass.
+//
+// The function assumes the caller has already verified the claim_package
+// signature so it can skip re-verifying.
+func (h *TransferHandler) persistCoordinatorClaimKeyTweak(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	receiver *ent.TransferReceiver,
+	coordinatorClaimKeyTweaks *pb.ClaimLeafKeyTweaks,
+) error {
+	ctx, span := tracer.Start(ctx, "TransferHandler.persistCoordinatorClaimKeyTweak")
+	defer span.End()
+
+	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get transfer leaves for transfer %s: %w", transfer.ID, err)
+	}
+	if len(transferLeaves) != len(coordinatorClaimKeyTweaks.LeavesToReceive) {
+		return fmt.Errorf("transfer has %d leaves but claim key tweaks has %d", len(transferLeaves), len(coordinatorClaimKeyTweaks.LeavesToReceive))
+	}
+
+	leafMap := make(map[string]*ent.TransferLeaf, len(transferLeaves))
+	for _, leaf := range transferLeaves {
+		leafMap[leaf.Edges.Leaf.ID.String()] = leaf
+	}
+
+	// Validate every leaf's secret share against its polynomial commitment
+	// BEFORE we commit anything. We're about to durably overwrite the
+	// existing leaf.KeyTweak (see the store loop below); without this check
+	// a receiver could persist a protobuf-valid-but-mathematically-invalid
+	// SecretShareTweak and brick the transfer for this leaf (every retry
+	// would rehydrate the same stored-but-invalid share and fail at
+	// secretsharing.ValidateShare inside Phase 2's claimLeafTweakKey).
+	// Validation runs at the coordinator's polynomial index — same check
+	// claimLeafTweakKey would have done downstream, just moved upstream of
+	// the durable write so failure isn't sticky.
+	for _, leafTweak := range coordinatorClaimKeyTweaks.LeavesToReceive {
+		if leafTweak.SecretShareTweak == nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("missing secret share tweak for leaf %s", leafTweak.LeafId))
+		}
+		if len(leafTweak.SecretShareTweak.SecretShare) == 0 {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("empty secret share for leaf %s", leafTweak.LeafId))
+		}
+		if err := secretsharing.ValidateShare(
+			&secretsharing.VerifiableSecretShare{
+				SecretShare: secretsharing.SecretShare{
+					FieldModulus: secp256k1.S256().N,
+					Threshold:    int(h.config.Threshold),
+					Index:        big.NewInt(int64(h.config.Index + 1)),
+					Share:        new(big.Int).SetBytes(leafTweak.SecretShareTweak.SecretShare),
+				},
+				Proofs: leafTweak.SecretShareTweak.Proofs,
+			},
+		); err != nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid secret share tweak for leaf %s: %w", leafTweak.LeafId, err))
+		}
+	}
+
+	// Overwrite leaf.KeyTweak unconditionally. Reachable only when
+	// transfer.Status ∈ {SKT, RKT}: the caller skips this function when
+	// useStoredKeyTweaks is true (RKL / RKA / RRS), and ClaimTransfer
+	// rejects Completed / Expired / Returned upstream. At SKT and RKT no
+	// peer has durably committed Phase 2 — coordinator's RKL transition is
+	// uncommitted T2 state that the middleware rolls back on failure — so
+	// the polynomial isn't yet locked across the cluster.
+	//
+	// Overriding is what unblocks transient-Unavailable retries: the JS SDK
+	// generates a fresh polynomial on every claim attempt (see
+	// prepareClaimLeafKeyTweaks in sdks/js/.../transfer.ts), so if attempt
+	// 1's T1 committed proofs_A and then Phase 1 fan-out hit
+	// codes.Unavailable, attempt 2 carries fresh proofs_B and needs to
+	// install them on the coordinator. Without override the coordinator's
+	// stale proofs_A would force Phase 1 SELF's ValidateKeyTweakProof to
+	// mismatch, requiring an extra ROLLBACK round-trip before recovery
+	// could complete.
+	//
+	// The anti-replay invariant — "once a peer has durably committed
+	// Phase 1 or Phase 2 with one polynomial, the cluster cannot switch
+	// to a different one" — is preserved by peer-side checks, not by this
+	// guard:
+	//   - InitiateSettleReceiverKeyTweak's alreadyLocked branch keeps the
+	//     stored proofs when status is RKL.
+	//   - ValidateKeyTweakProof compares the request's proofs against the
+	//     stored proofs and returns AbortedConcurrentClaimConflict on
+	//     mismatch — which the coordinator promotes to action=ROLLBACK so
+	//     the existing 2PC cleanup handles divergence.
+	for _, leafTweak := range coordinatorClaimKeyTweaks.LeavesToReceive {
+		leaf, exists := leafMap[leafTweak.LeafId]
+		if !exists {
+			return fmt.Errorf("unexpected leaf id %s in claim key tweaks", leafTweak.LeafId)
+		}
+		leafTweakBytes, err := proto.Marshal(leafTweak)
+		if err != nil {
+			return fmt.Errorf("unable to marshal leaf tweak: %w", err)
+		}
+		if _, err := leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx); err != nil {
+			return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
+		}
+	}
+
+	// Transition transfer.Status from SenderKeyTweaked to ReceiverKeyTweaked.
+	// If a racing attempt already advanced past SKT this is a no-op; we
+	// don't want to clobber its progress.
+	if transfer.Status == st.TransferStatusSenderKeyTweaked {
+		if _, err := transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx); err != nil {
+			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+		}
+	}
+
+	// Mirror the receiver-side dual write performed inside
+	// InitiateSettleReceiverKeyTweak at the same status transition.
+	if receiver != nil && receiver.Status == st.TransferReceiverStatusReceiverClaimPending {
+		if _, err := receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweaked).Save(ctx); err != nil {
+			return fmt.Errorf("unable to update transfer receiver status %s: %w", transfer.ID, err)
+		}
+	}
+
+	// Commit in our own transaction. Subsequent 2PC steps will pick up a
+	// fresh tx via the session's GetOrBeginTx, re-acquire the FOR UPDATE
+	// row lock, and run under that single tx until the outer
+	// claim_transfer handler returns (the middleware then commits or
+	// rolls back as appropriate).
+	entTx, err := ent.GetTxFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get db: %w", err)
+	}
+	if err := entTx.Commit(); err != nil {
+		return fmt.Errorf("unable to commit early-store transaction: %w", err)
+	}
+	return nil
 }
 
 // parseSigningCommitments extracts SO signing commitments from a UserSignedTxSigningJob.
@@ -4751,15 +4972,14 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
-	entTx, err := ent.GetTxFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to get db: %w", err)
-	}
-	err = entTx.Commit()
-	if err != nil {
-		return fmt.Errorf("unable to commit db: %w", err)
-	}
-
+	// Intentionally NOT committing the tx here. A mid-flow commit would
+	// release the FOR UPDATE row lock between Phase 1 SELF and Phase 2 SELF;
+	// a concurrent ROLLBACK could then revert the coordinator to
+	// SENDER_KEY_TWEAKED while Phase 2 fan-out had already committed the
+	// peers. The store-leaf.KeyTweak step that needs to survive outer
+	// cancellation now happens in persistCoordinatorClaimKeyTweak before
+	// the 2PC starts; everything past that point is part of one outer tx
+	// committed by the gRPC middleware on handler return.
 	return nil
 }
 
@@ -4940,13 +5160,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		return fmt.Errorf("invalid action %s", req.Action)
 	}
 
-	entTx, err := ent.GetTxFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to get db: %w", err)
-	}
-	if err := entTx.Commit(); err != nil {
-		return fmt.Errorf("unable to commit db: %w", err)
-	}
+	// Intentionally NOT committing the tx here — see the matching comment
+	// in InitiateSettleReceiverKeyTweak. The mid-flow commit used to allow
+	// concurrent ROLLBACKs to interleave between Phase 1 SELF and Phase 2
+	// SELF on the coordinator; under the new design the outer
+	// claim_transfer handler owns the single tx that spans both phases.
 	return nil
 }
 

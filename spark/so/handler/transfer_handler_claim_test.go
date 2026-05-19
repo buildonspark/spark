@@ -664,9 +664,25 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
 
-	updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
+	// Read back from the session's transaction. ClaimTransferSignRefunds no
+	// longer calls entTx.Commit() inside InitiateSettleReceiverKeyTweak or
+	// SettleReceiverKeyTweak — those mid-flow commits used to release the
+	// FOR UPDATE row lock between Phase 1 SELF and Phase 2 SELF, letting a
+	// concurrent ROLLBACK flip the coordinator back to SENDER_KEY_TWEAKED.
+	// The handler's transaction is now committed by the gRPC middleware on
+	// return; in this in-process test we read via ent.GetDbFromContext to
+	// see the still-open tx state.
+	//
+	// The final status is ReceiverRefundSigned because the handler advances
+	// past ReceiverKeyTweakApplied (the post-settle state) to RRS at the
+	// status-update step that previously sat after the mid-flow commit;
+	// asserting RKA only used to pass because the bare-client read could
+	// only see the explicitly-committed-state, not the further in-tx update.
+	txClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, st.TransferStatusReceiverKeyTweakApplied, updatedTransfer.Status)
+	updatedTransfer, err := txClient.Transfer.Get(ctx, transfer.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TransferStatusReceiverRefundSigned, updatedTransfer.Status)
 }
 
 func TestClaimTransferSignRefundsV2RejectsNotFoundAndInvalidStatus(t *testing.T) {
