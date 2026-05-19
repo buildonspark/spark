@@ -2316,6 +2316,9 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 	if shouldRouteToReceiverByTypeStatus(ctx, filter) {
 		return h.queryReceiverByTypeStatus(ctx, filter, isSSP)
 	}
+	if shouldRouteToCounterSwap(ctx, filter) {
+		return h.queryCounterSwap(ctx, filter, isSSP)
+	}
 	return h.queryTransfers(ctx, filter, false, isSSP)
 }
 

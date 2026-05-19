@@ -1571,6 +1571,19 @@ var (
 					Where: "status IN ('RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')",
 				},
 			},
+			{
+				Name:    "idx_transferreceiver_initiated_pubkey_type_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[3], TransferReceiversColumns[6], TransferReceiversColumns[1], TransferReceiversColumns[7]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						TransferReceiversColumns[1].Name: true,
+
+						TransferReceiversColumns[7].Name: true,
+					},
+					Where: "status = 'INITIATED'",
+				},
+			},
 		},
 	}
 	// TransferSendersColumns holds the columns for the "transfer_senders" table.

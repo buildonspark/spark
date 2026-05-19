@@ -108,5 +108,17 @@ func (TransferReceiver) Indexes() []ent.Index {
 				entsql.IndexWhere("status IN ('RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED')"),
 			).
 			StorageKey("idx_transferreceiver_stuck_create_time"),
+
+		// Partial index covering the pre-tweak INITIATED r.status only.
+		// Sibling of claim_pending — together they cover every receiver-axis
+		// active state. Used by queryCounterSwap's collapsing-remainder
+		// receiver-arm sub-query to find INITIATED rows for a (pubkey, type)
+		// pair without scanning the broader type composite.
+		index.Fields("identity_pubkey", "transfer_type", "create_time", "transfer_id").
+			Annotations(
+				entsql.DescColumns("create_time", "transfer_id"),
+				entsql.IndexWhere("status = 'INITIATED'"),
+			).
+			StorageKey("idx_transferreceiver_initiated_pubkey_type_time"),
 	}
 }

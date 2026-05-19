@@ -691,6 +691,9 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 // non-empty types AND statuses, no transfer-id filter, and every requested
 // status must translate to a receiver-axis equivalent. SR1 and sender
 // participants stay on legacy until per-caller handlers exist.
+//
+// This call surface is exposed publicly, but 100% of 7d traffic
+// is the SSP via gen_all_inbound_transfers
 func shouldRouteToReceiverByTypeStatus(ctx context.Context, filter *pb.TransferFilter) bool {
 	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelReceiverByTypeStatus, 0) {
 		return false
@@ -733,6 +736,9 @@ func shouldRouteToReceiverByTypeStatus(ctx context.Context, filter *pb.TransferF
 //   - filter.TransferIds is empty
 //   - every requested status is receiver-axis translatable
 //   - KnobReadMIMODataModelReceiverByTypeStatus is on
+//
+// This call surface is exposed publicly, but 100% of 7d traffic
+// is the SSP via gen_all_inbound_transfers
 func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryReceiverByTypeStatus")
 	defer span.End()
@@ -830,6 +836,198 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 	if err != nil {
 		metrics.record(ctx, 0, err)
 		return nil, fmt.Errorf("failed to execute receiver-by-type-status query: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	transferIDs := make([]uuid.UUID, 0, limit)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			metrics.record(ctx, 0, err)
+			return nil, fmt.Errorf("failed to scan transfer ID: %w", err)
+		}
+		transferIDs = append(transferIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	if len(transferIDs) == 0 {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+
+	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
+	metrics.record(ctx, len(transferProtos), err)
+	if err != nil {
+		return nil, err
+	}
+
+	nextOffset := int64(-1)
+	if len(transferIDs) == limit {
+		nextOffset = int64(offset + len(transferIDs))
+	}
+	return &pb.QueryTransfersResponse{
+		Transfers: transferProtos,
+		Offset:    nextOffset,
+	}, nil
+}
+
+// shouldRouteToCounterSwap reports whether the request can dispatch to
+// queryCounterSwap. The shape requires sender-or-receiver participant,
+// non-empty types where every type is in {COUNTER_SWAP, COUNTER_SWAP_V3},
+// non-empty statuses where every status is receiver-axis translatable,
+// and no transfer-id filter. Narrow type scoping matches the SDK's
+// queryCounterSwapTransfers caller — broadening to arbitrary types lands
+// sender-or-receiver traffic on a path whose per-arm perf hasn't been
+// validated for that shape.
+func shouldRouteToCounterSwap(ctx context.Context, filter *pb.TransferFilter) bool {
+	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelCounterSwap, 0) {
+		return false
+	}
+	if len(filter.GetTransferIds()) != 0 {
+		return false
+	}
+	if _, ok := filter.GetParticipant().(*pb.TransferFilter_SenderOrReceiverIdentityPublicKey); !ok {
+		return false
+	}
+	if len(filter.GetTypes()) == 0 || len(filter.GetStatuses()) == 0 {
+		return false
+	}
+	for _, t := range filter.GetTypes() {
+		schemaType, err := st.TransferTypeFromProto(t.String())
+		if err != nil {
+			return false
+		}
+		if schemaType != st.TransferTypeCounterSwap && schemaType != st.TransferTypeCounterSwapV3 {
+			return false
+		}
+	}
+	for _, s := range filter.GetStatuses() {
+		schemaStatus, err := ent.TransferStatusSchema(s)
+		if err != nil {
+			return false
+		}
+		if !mimo.IsReceiverAxisTranslatable(schemaStatus) {
+			return false
+		}
+	}
+	return true
+}
+
+// queryCounterSwap handles QueryAllTransfers sender-or-receiver requests
+// carrying a counter-swap type filter and a status filter — the SDK's
+// queryCounterSwapTransfers caller. The SQL builder emits an asymmetric
+// cross-arm UNION DISTINCT (column-based sender arm + edge-based receiver
+// arm); see mimo.BuildCounterSwapQuery for the full design rationale —
+// per-status sender decomposition, per-type × per-bucket receiver
+// structure, collapsing-narrowing optimization, and the MIMO v0
+// single-sender assumption.
+//
+// Routing in QueryAllTransfers guarantees:
+//   - filter.Participant is SenderOrReceiverIdentityPublicKey
+//   - len(filter.Types) > 0 and every type is in {COUNTER_SWAP, COUNTER_SWAP_V3}
+//   - len(filter.Statuses) > 0 and every status is receiver-axis translatable
+//   - filter.TransferIds is empty
+//   - KnobReadMIMODataModelCounterSwap is on
+func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.queryCounterSwap")
+	defer span.End()
+
+	start := time.Now()
+	defer func() {
+		resultCount := 0
+		if resp != nil {
+			resultCount = len(resp.Transfers)
+		}
+		logQueryTransfersInvocation(ctx, "query_counter_swap", filter,
+			zap.Bool("is_ssp", isSSP),
+			zap.Bool("use_mimo", true),
+			zap.Duration("elapsed", time.Since(start)),
+			zap.Int("result_count", resultCount),
+			zap.Error(err),
+		)
+	}()
+
+	if filter.GetLimit() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
+	}
+	if filter.GetOffset() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
+	}
+	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
+		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
+	}
+	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	}
+
+	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
+
+	statuses := make([]st.TransferStatus, len(filter.GetStatuses()))
+	for i, s := range filter.GetStatuses() {
+		schemaStatus, schemaErr := ent.TransferStatusSchema(s)
+		if schemaErr != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer status: %w", schemaErr))
+		}
+		statuses[i] = schemaStatus
+	}
+
+	walletPubkey, _, filterType, err := extractParticipant(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:       "query_counter_swap",
+		MIMOEnabled:     true,
+		FilterType:      filterType,
+		HasTypeFilter:   true,
+		HasStatusFilter: true,
+		HasTransferIDs:  false,
+	})
+
+	if !isSSP {
+		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
+		if accessErr != nil {
+			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
+		}
+		if !hasReadAccess {
+			metrics.record(ctx, 0, nil)
+			return &pb.QueryTransfersResponse{Offset: -1}, nil
+		}
+	}
+
+	args := mimo.CounterSwapArgs{
+		WalletPubkey:     walletPubkey,
+		Network:          filter.GetNetwork(),
+		Types:            filter.GetTypes(),
+		Statuses:         statuses,
+		HasCreatedAfter:  filter.GetCreatedAfter() != nil,
+		CreatedAfter:     timeOrZero(filter.GetCreatedAfter()),
+		HasCreatedBefore: filter.GetCreatedBefore() != nil,
+		CreatedBefore:    timeOrZero(filter.GetCreatedBefore()),
+		Order:            filter.GetOrder(),
+		Limit:            limit,
+		Offset:           offset,
+	}
+
+	query, sqlArgs, err := mimo.BuildCounterSwapQuery(args)
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to build query: %w", err))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	//nolint:forbidigo // raw SQL drives partial + composite indexes directly.
+	rows, err := db.QueryContext(ctx, query, sqlArgs...)
+	if err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, fmt.Errorf("failed to execute counter-swap query: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
