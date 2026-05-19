@@ -820,7 +820,24 @@ func handleBlock(
 	}
 
 	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
-	// TODO: expire pending coop exits after some time so this doesn't become too large
+	// Expire pending (unconfirmed) coop exits older than the configured threshold.
+	// This prevents the set from growing unbounded when transactions are never confirmed
+	// (e.g. evicted from mempool due to low fee or RBF replacement).
+	expiryDays := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitPendingExpiryDays, knobs.CoopExitPendingExpiryDays))
+	expiryThreshold := time.Now().AddDate(0, 0, -expiryDays)
+	expiredCount, err := dbClient.CooperativeExit.Delete().
+		Where(
+			cooperativeexit.ConfirmationHeightIsNil(),
+			cooperativeexit.CreateTimeLT(expiryThreshold),
+		).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to expire stale pending coop exits: %w", err)
+	}
+	if expiredCount > 0 {
+		logger.Sugar().Infof("Expired %d stale pending coop exit(s) older than %d days", expiredCount, expiryDays)
+	}
+
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled, 0) > 0 {
 		// Build lists of both normal and reversed TxIDs to handle both endianness
 		confirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet)*2)
