@@ -174,7 +174,37 @@ func createTestTokenOutputWithSig(
 	csvBlocks uint64,
 	seWithdrawalSig []byte,
 ) *ent.TokenOutput {
-	tokenCreate := fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+	return createTestTokenOutputWithSigAndNetwork(
+		t,
+		ctx,
+		dbClient,
+		fixtures,
+		sparkTxHash,
+		sparkTxVout,
+		ownerPubKey,
+		revocationCommitment,
+		bondSats,
+		csvBlocks,
+		btcnetwork.Regtest,
+		seWithdrawalSig,
+	)
+}
+
+func createTestTokenOutputWithSigAndNetwork(
+	t *testing.T,
+	ctx context.Context,
+	dbClient *ent.Client,
+	fixtures *entfixtures.Fixtures,
+	sparkTxHash []byte,
+	sparkTxVout int32,
+	ownerPubKey keys.Public,
+	revocationCommitment []byte,
+	bondSats uint64,
+	csvBlocks uint64,
+	network btcnetwork.Network,
+	seWithdrawalSig []byte,
+) *ent.TokenOutput {
+	tokenCreate := fixtures.CreateTokenCreate(network, nil, nil)
 	revocationKeyshare := fixtures.CreateKeyshare()
 
 	tokenTx, err := dbClient.TokenTransaction.Create().
@@ -196,7 +226,7 @@ func createTestTokenOutputWithSig(
 		SetTokenAmount(tokenAmount).
 		SetCreatedTransactionOutputVout(sparkTxVout).
 		SetCreatedTransactionFinalizedHash(sparkTxHash).
-		SetNetwork(btcnetwork.Regtest).
+		SetNetwork(network).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
 		SetRevocationKeyshare(revocationKeyshare).
 		SetOutputCreatedTokenTransaction(tokenTx).
@@ -498,6 +528,64 @@ func TestHandleTokenWithdrawals_DoesNotDoubleSaveDuplicateSparkOutputInOneAnnoun
 	assert.Equal(t, uint16(0), outputWithdrawals[0].BitcoinVout)
 
 	assertOutputNotSpendable(t, ctx, config, ownerPubKey, sparkTxHash)
+}
+
+func TestHandleTokenWithdrawals_RejectsTokenOutputFromDifferentNetwork(t *testing.T) {
+	ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContext(t)
+
+	ownerPrivKey := keys.GeneratePrivateKey()
+	ownerPubKey := ownerPrivKey.Public()
+	revocationPrivKey := keys.GeneratePrivateKey()
+	revocationXOnly := revocationPrivKey.Public().SerializeXOnly()
+	revocationCommitment := revocationPrivKey.Public().Serialize()
+
+	sparkTxHash := fixtures.RandomBytes(32)
+	sparkTxVout := int32(0)
+	bondSats := uint64(10000)
+	csvBlocks := uint64(1000)
+
+	tokenOutput := createTestTokenOutputWithSigAndNetwork(
+		t,
+		ctx,
+		dbClient,
+		fixtures,
+		sparkTxHash,
+		sparkTxVout,
+		ownerPubKey,
+		revocationCommitment,
+		bondSats,
+		csvBlocks,
+		btcnetwork.Testnet,
+		nil,
+	)
+	require.NotNil(t, tokenOutput)
+
+	expectedOutput, err := ConstructRevocationCsvTaprootOutput(revocationXOnly, ownerPubKey.SerializeXOnly(), csvBlocks)
+	require.NoError(t, err)
+
+	ownerSignature := make([]byte, 64)
+	withdrawalScript := buildWithdrawalScript(t, sePubKey.Serialize(), ownerSignature, []withdrawalRecord{
+		{bitcoinVout: 0, sparkTxHash: sparkTxHash, sparkTxVout: uint32(sparkTxVout)},
+	})
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxOut(&wire.TxOut{Value: int64(bondSats), PkScript: expectedOutput.ScriptPubKey})
+	tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
+
+	blockHash := chainhash.Hash{}
+	err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+	require.NoError(t, err)
+
+	count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	updatedOutput, err := dbClient.TokenOutput.Query().
+		Where(tokenoutput.ID(tokenOutput.ID)).
+		WithWithdrawal().
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, updatedOutput.Edges.Withdrawal)
 }
 
 func TestHandleTokenWithdrawals_RejectsWrongSEPubKey(t *testing.T) {

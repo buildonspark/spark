@@ -170,7 +170,7 @@ func processWithdrawal(
 		return nil
 	}
 
-	tokenOutputMap, err := queryTokenOutputs(ctx, dbClient, withdrawal.outputsToWithdraw)
+	tokenOutputMap, err := queryTokenOutputs(ctx, dbClient, withdrawal.outputsToWithdraw, network)
 	if err != nil {
 		return fmt.Errorf("failed to query token outputs: %w", err)
 	}
@@ -485,7 +485,7 @@ func validateOwnerSignature(ctx context.Context, tokenOutputs []*ent.TokenOutput
 }
 
 // queryTokenOutputs fetches token outputs by their (txHash, vout) pairs.
-func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []parsedOutputWithdrawal) (map[tokenOutputKey]*ent.TokenOutput, error) {
+func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []parsedOutputWithdrawal, network btcnetwork.Network) (map[tokenOutputKey]*ent.TokenOutput, error) {
 	if len(outputs) == 0 {
 		return nil, nil
 	}
@@ -496,6 +496,7 @@ func queryTokenOutputs(ctx context.Context, dbClient *ent.Client, outputs []pars
 			tokenoutput.And(
 				tokenoutput.CreatedTransactionFinalizedHash(output.sparkTxHash),
 				tokenoutput.CreatedTransactionOutputVout(int32(output.sparkTxVout)),
+				tokenoutput.NetworkEQ(network),
 			),
 		)
 	}
