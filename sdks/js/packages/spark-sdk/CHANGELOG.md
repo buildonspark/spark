@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.8.1
+
+### Patch Changes
+
+- 0d2e399: - Add `SparkWallet.cleanup()` as the preferred public cleanup API and deprecate `cleanupConnections()` as a compatibility alias.
+- 69f3d25: Prevent background Spark wallet streams, retry timers, and periodic wallet maintenance intervals from keeping Node.js and Bare processes alive after foreground work completes, and clean up Spark CLI wallet connections on exit.
+- - Enable the native `spark-token-primitives` bindings on React Native by default, matching Node.js and the browser. RN runtimes no longer fall back to the legacy non-bindings token code path.
+  - Bump transitive dependencies (`protobufjs`, `fast-xml-parser` via Artillery/AWS, `handlebars` via `ts-jest`) to pull in upstream security patches.
+  - General fixes and performance improvements.
+
 ## 0.8.0
 
 ### Minor Changes

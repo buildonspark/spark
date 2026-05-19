@@ -1,5 +1,16 @@
 # @buildonspark/spark-cli
 
+## 0.0.126
+
+### Patch Changes
+
+- 69f3d25: Prevent background Spark wallet streams, retry timers, and periodic wallet maintenance intervals from keeping Node.js and Bare processes alive after foreground work completes, and clean up Spark CLI wallet connections on exit.
+- Updated dependencies [0d2e399]
+- Updated dependencies [69f3d25]
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.8.1
+  - @buildonspark/issuer-sdk@0.1.37
+
 ## 0.0.125
 
 ### Patch Changes
