@@ -4,6 +4,7 @@ import {
   Network,
   type Transfer,
   type TransferLeaf,
+  TransferReceiverStatus,
   TransferStatus,
   TransferType,
   type TreeNode,
@@ -162,8 +163,18 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "",
         network: Network.REGTEST,
         receivers: [
-          { identityPublicKey: hexToBytes("03ef12"), amountSats: 600 },
-          { identityPublicKey: hexToBytes("04abcd"), amountSats: 400 },
+          {
+            identityPublicKey: hexToBytes("03ef12"),
+            amountSats: 600,
+            status:
+              TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+          },
+          {
+            identityPublicKey: hexToBytes("04abcd"),
+            amountSats: 400,
+            status:
+              TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+          },
         ],
       };
 
@@ -188,8 +199,18 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "",
         network: Network.REGTEST,
         receivers: [
-          { identityPublicKey: hexToBytes("03ef12"), amountSats: 600 },
-          { identityPublicKey: hexToBytes("04abcd"), amountSats: 400 },
+          {
+            identityPublicKey: hexToBytes("03ef12"),
+            amountSats: 600,
+            status:
+              TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+          },
+          {
+            identityPublicKey: hexToBytes("04abcd"),
+            amountSats: 400,
+            status:
+              TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+          },
         ],
       };
 

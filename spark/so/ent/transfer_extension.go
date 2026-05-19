@@ -113,9 +113,14 @@ func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf
 			if _, ok := amountByReceiver[r.ID]; !ok {
 				continue
 			}
+			receiverStatus, err := TransferReceiverStatusProto(r.Status)
+			if err != nil {
+				return nil, err
+			}
 			receivers = append(receivers, &pb.TransferReceiver{
 				IdentityPublicKey: r.IdentityPubkey.Serialize(),
 				AmountSats:        amountByReceiver[r.ID],
+				Status:            *receiverStatus,
 			})
 		}
 	}
@@ -212,6 +217,28 @@ func TransferStatusSchema(transferStatusProto pb.TransferStatus) (st.TransferSta
 	default:
 		return "", fmt.Errorf("unknown transfer status: %v", transferStatusProto)
 	}
+}
+
+func TransferReceiverStatusProto(s st.TransferReceiverStatus) (*pb.TransferReceiverStatus, error) {
+	switch s {
+	case st.TransferReceiverStatusInitiated:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_INITIATED.Enum(), nil
+	case st.TransferReceiverStatusReceiverClaimPending:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_CLAIM_PENDING.Enum(), nil
+	case st.TransferReceiverStatusKeyTweaked:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_KEY_TWEAKED.Enum(), nil
+	case st.TransferReceiverStatusKeyTweakLocked:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED.Enum(), nil
+	case st.TransferReceiverStatusKeyTweakApplied:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED.Enum(), nil
+	case st.TransferReceiverStatusRefundSigned:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_REFUND_SIGNED.Enum(), nil
+	case st.TransferReceiverStatusCompleted:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_COMPLETED.Enum(), nil
+	case st.TransferReceiverStatusCancelled:
+		return pb.TransferReceiverStatus_TRANSFER_RECEIVER_STATUS_CANCELLED.Enum(), nil
+	}
+	return nil, fmt.Errorf("unknown transfer receiver status %s", s)
 }
 
 func TransferTypeProto(transferType st.TransferType) (*pb.TransferType, error) {

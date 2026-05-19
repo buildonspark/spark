@@ -9744,6 +9744,8 @@ func (m *TransferReceiver) validate(all bool) error {
 
 	// no validation rules for AmountSats
 
+	// no validation rules for Status
+
 	if len(errors) > 0 {
 		return TransferReceiverMultiError(errors)
 	}

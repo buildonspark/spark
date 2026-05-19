@@ -820,6 +820,21 @@ enum TransferStatus {
     TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK = 11;
 }
 
+// Per-receiver status on the receiver edge of a Transfer. For single-receiver
+// (V2) transfers this is always lock-step with Transfer.status. For
+// multi-receiver (V3) transfers each receiver advances independently.
+// This is the authoritative per-receiver state.
+enum TransferReceiverStatus {
+    TRANSFER_RECEIVER_STATUS_INITIATED = 0;
+    TRANSFER_RECEIVER_STATUS_CLAIM_PENDING = 1;
+    TRANSFER_RECEIVER_STATUS_KEY_TWEAKED = 2;
+    TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED = 3;
+    TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED = 4;
+    TRANSFER_RECEIVER_STATUS_REFUND_SIGNED = 5;
+    TRANSFER_RECEIVER_STATUS_COMPLETED = 6;
+    TRANSFER_RECEIVER_STATUS_CANCELLED = 7;
+}
+
 enum TransferType {
     PREIMAGE_SWAP = 0;
     COOPERATIVE_EXIT = 1;
@@ -840,6 +855,7 @@ enum Order {
 message TransferReceiver {
     bytes identity_public_key = 1;
     uint64 amount_sats = 2;
+    TransferReceiverStatus status = 3;
 }
 
 message Transfer {

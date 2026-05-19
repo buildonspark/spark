@@ -191,6 +191,81 @@ export function transferStatusToJSON(object: TransferStatus): string {
   }
 }
 
+/**
+ * Per-receiver status on the receiver edge of a Transfer. For single-receiver
+ * (V2) transfers this is always lock-step with Transfer.status. For
+ * multi-receiver (V3) transfers each receiver advances independently.
+ * This is the authoritative per-receiver state.
+ */
+export enum TransferReceiverStatus {
+  TRANSFER_RECEIVER_STATUS_INITIATED = 0,
+  TRANSFER_RECEIVER_STATUS_CLAIM_PENDING = 1,
+  TRANSFER_RECEIVER_STATUS_KEY_TWEAKED = 2,
+  TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED = 3,
+  TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED = 4,
+  TRANSFER_RECEIVER_STATUS_REFUND_SIGNED = 5,
+  TRANSFER_RECEIVER_STATUS_COMPLETED = 6,
+  TRANSFER_RECEIVER_STATUS_CANCELLED = 7,
+  UNRECOGNIZED = -1,
+}
+
+export function transferReceiverStatusFromJSON(object: any): TransferReceiverStatus {
+  switch (object) {
+    case 0:
+    case "TRANSFER_RECEIVER_STATUS_INITIATED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_INITIATED;
+    case 1:
+    case "TRANSFER_RECEIVER_STATUS_CLAIM_PENDING":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING;
+    case 2:
+    case "TRANSFER_RECEIVER_STATUS_KEY_TWEAKED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED;
+    case 3:
+    case "TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED;
+    case 4:
+    case "TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED;
+    case 5:
+    case "TRANSFER_RECEIVER_STATUS_REFUND_SIGNED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_REFUND_SIGNED;
+    case 6:
+    case "TRANSFER_RECEIVER_STATUS_COMPLETED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_COMPLETED;
+    case 7:
+    case "TRANSFER_RECEIVER_STATUS_CANCELLED":
+      return TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CANCELLED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TransferReceiverStatus.UNRECOGNIZED;
+  }
+}
+
+export function transferReceiverStatusToJSON(object: TransferReceiverStatus): string {
+  switch (object) {
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_INITIATED:
+      return "TRANSFER_RECEIVER_STATUS_INITIATED";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING:
+      return "TRANSFER_RECEIVER_STATUS_CLAIM_PENDING";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED:
+      return "TRANSFER_RECEIVER_STATUS_KEY_TWEAKED";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED:
+      return "TRANSFER_RECEIVER_STATUS_KEY_TWEAK_LOCKED";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED:
+      return "TRANSFER_RECEIVER_STATUS_KEY_TWEAK_APPLIED";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_REFUND_SIGNED:
+      return "TRANSFER_RECEIVER_STATUS_REFUND_SIGNED";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_COMPLETED:
+      return "TRANSFER_RECEIVER_STATUS_COMPLETED";
+    case TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CANCELLED:
+      return "TRANSFER_RECEIVER_STATUS_CANCELLED";
+    case TransferReceiverStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum TransferType {
   PREIMAGE_SWAP = 0,
   COOPERATIVE_EXIT = 1,
@@ -1514,6 +1589,7 @@ export interface FinalizeTransferResponse {
 export interface TransferReceiver {
   identityPublicKey: Uint8Array;
   amountSats: number;
+  status: TransferReceiverStatus;
 }
 
 export interface Transfer {
@@ -9985,7 +10061,7 @@ export const FinalizeTransferResponse: MessageFns<FinalizeTransferResponse> = {
 };
 
 function createBaseTransferReceiver(): TransferReceiver {
-  return { identityPublicKey: new Uint8Array(0), amountSats: 0 };
+  return { identityPublicKey: new Uint8Array(0), amountSats: 0, status: 0 };
 }
 
 export const TransferReceiver: MessageFns<TransferReceiver> = {
@@ -9995,6 +10071,9 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
     }
     if (message.amountSats !== 0) {
       writer.uint32(16).uint64(message.amountSats);
+    }
+    if (message.status !== 0) {
+      writer.uint32(24).int32(message.status);
     }
     return writer;
   },
@@ -10022,6 +10101,14 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
           message.amountSats = longToNumber(reader.uint64());
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -10037,6 +10124,7 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
       amountSats: isSet(object.amountSats) ? globalThis.Number(object.amountSats) : 0,
+      status: isSet(object.status) ? transferReceiverStatusFromJSON(object.status) : 0,
     };
   },
 
@@ -10048,6 +10136,9 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
     if (message.amountSats !== 0) {
       obj.amountSats = Math.round(message.amountSats);
     }
+    if (message.status !== 0) {
+      obj.status = transferReceiverStatusToJSON(message.status);
+    }
     return obj;
   },
 
@@ -10058,6 +10149,7 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
     const message = createBaseTransferReceiver();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.amountSats = object.amountSats ?? 0;
+    message.status = object.status ?? 0;
     return message;
   },
 };

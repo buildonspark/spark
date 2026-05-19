@@ -71,8 +71,8 @@ func preloadedTransfer(t *testing.T) (*ent.Transfer, keys.Public, keys.Public) {
 	leaf1Node := makeLeafNode(700, recv1Pub)
 	leaf2Node := makeLeafNode(300, recv2Pub)
 
-	receiver1 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv1Pub}
-	receiver2 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv2Pub}
+	receiver1 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv1Pub, Status: st.TransferReceiverStatusKeyTweaked}
+	receiver2 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv2Pub, Status: st.TransferReceiverStatusKeyTweaked}
 	recv1ID, recv2ID := receiver1.ID, receiver2.ID
 
 	transferLeaf1 := &ent.TransferLeaf{

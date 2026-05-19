@@ -9,6 +9,7 @@ import {
   type SigningKeyshare,
   type Transfer,
   type TransferLeaf,
+  TransferReceiverStatus,
   TransferStatus,
   TransferType,
   type TreeNode,
@@ -87,7 +88,11 @@ export interface WalletTransfer {
   transferDirection: keyof typeof TransferDirection;
   userRequest: Omit<UserRequestType, "transfer"> | undefined;
   sparkInvoice: string | undefined;
-  receivers?: Array<{ identityPublicKey: string; amountSats: number }>;
+  receivers?: Array<{
+    identityPublicKey: string;
+    amountSats: number;
+    status: keyof typeof TransferReceiverStatus;
+  }>;
 }
 
 export interface WalletTransferLeaf {
@@ -147,6 +152,9 @@ export function mapTransferToWalletTransfer(
         ? proto.receivers.map((r) => ({
             identityPublicKey: bytesToHex(r.identityPublicKey),
             amountSats: r.amountSats,
+            status: TransferReceiverStatus[
+              r.status
+            ] as keyof typeof TransferReceiverStatus,
           }))
         : undefined,
   };
