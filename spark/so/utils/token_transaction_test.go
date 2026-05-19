@@ -1229,6 +1229,54 @@ func TestHashTokenTransactionVersioning(t *testing.T) {
 	})
 }
 
+func TestHashTokenTransactionV0RejectsNilLegacyConversionEntries(t *testing.T) {
+	tests := []struct {
+		name        string
+		tx          *tokenpb.TokenTransaction
+		errContains string
+	}{
+		{
+			name: "nil token output",
+			tx: &tokenpb.TokenTransaction{
+				Version:     0,
+				TokenInputs: &tokenpb.TokenTransaction_MintInput{MintInput: &tokenpb.TokenMintInput{IssuerPublicKey: testTokenPublicKey.Serialize()}},
+				TokenOutputs: []*tokenpb.TokenOutput{
+					nil,
+				},
+				Network: pb.Network_REGTEST,
+			},
+			errContains: "token output 0 is nil",
+		},
+		{
+			name: "nil transfer output to spend",
+			tx: &tokenpb.TokenTransaction{
+				Version: 0,
+				TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+					TransferInput: &tokenpb.TokenTransferInput{
+						OutputsToSpend: []*tokenpb.TokenOutputToSpend{nil},
+					},
+				},
+				TokenOutputs: []*tokenpb.TokenOutput{},
+				Network:      pb.Network_REGTEST,
+			},
+			errContains: "transfer output to spend 0 is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				_, err := HashTokenTransaction(tt.tx, false)
+				require.ErrorContains(t, err, tt.errContains)
+			})
+			require.NotPanics(t, func() {
+				_, err := HashTokenTransaction(tt.tx, true)
+				require.ErrorContains(t, err, tt.errContains)
+			})
+		})
+	}
+}
+
 func TestPartialHashBackwardsCompatible_V2RoundTripMatchesDirectProtohash(t *testing.T) {
 	// Verify that protohashing a PartialTokenTransaction directly produces the same
 	// result as the V2 round-trip path (Partial → V2 shape → back to Partial → protohash).

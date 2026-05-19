@@ -255,6 +255,16 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 			wantErr: "mint_input is nil",
 		},
 		{
+			name: "nil token output",
+			input: &tokenpb.TokenTransaction{
+				TokenOutputs: []*tokenpb.TokenOutput{nil},
+				TokenInputs: &tokenpb.TokenTransaction_MintInput{
+					MintInput: &tokenpb.TokenMintInput{},
+				},
+			},
+			wantErr: "token output 0 is nil",
+		},
+		{
 			name: "nil transfer input",
 			input: &tokenpb.TokenTransaction{
 				TokenOutputs: []*tokenpb.TokenOutput{},
@@ -263,6 +273,18 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 				},
 			},
 			wantErr: "transfer_input is nil",
+		},
+		{
+			name: "nil transfer output to spend",
+			input: &tokenpb.TokenTransaction{
+				TokenOutputs: []*tokenpb.TokenOutput{},
+				TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+					TransferInput: &tokenpb.TokenTransferInput{
+						OutputsToSpend: []*tokenpb.TokenOutputToSpend{nil},
+					},
+				},
+			},
+			wantErr: "transfer output to spend 0 is nil",
 		},
 		{
 			name: "unknown token inputs type",
@@ -286,6 +308,58 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 			}
 			if out != nil {
 				t.Errorf("SparkTokenTransactionFromTokenProto() want nil but got %v", out)
+			}
+		})
+	}
+}
+
+func TestTokenProtoFromSparkTokenTransaction_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   *legacypb.TokenTransaction
+		wantErr string
+	}{
+		{
+			name:    "nil input",
+			input:   nil,
+			wantErr: "input spark token transaction cannot be nil",
+		},
+		{
+			name: "nil token output",
+			input: &legacypb.TokenTransaction{
+				TokenOutputs: []*legacypb.TokenOutput{nil},
+				TokenInputs: &legacypb.TokenTransaction_MintInput{
+					MintInput: &legacypb.TokenMintInput{},
+				},
+			},
+			wantErr: "token output 0 is nil",
+		},
+		{
+			name: "nil transfer output to spend",
+			input: &legacypb.TokenTransaction{
+				TokenOutputs: []*legacypb.TokenOutput{},
+				TokenInputs: &legacypb.TokenTransaction_TransferInput{
+					TransferInput: &legacypb.TokenTransferInput{
+						OutputsToSpend: []*legacypb.TokenOutputToSpend{nil},
+					},
+				},
+			},
+			wantErr: "transfer output to spend 0 is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := TokenProtoFromSparkTokenTransaction(tt.input)
+			if err == nil {
+				t.Errorf("TokenProtoFromSparkTokenTransaction() expected error but got none")
+				return
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("TokenProtoFromSparkTokenTransaction() error = %v, want error containing %q", err, tt.wantErr)
+			}
+			if out != nil {
+				t.Errorf("TokenProtoFromSparkTokenTransaction() want nil but got %v", out)
 			}
 		})
 	}

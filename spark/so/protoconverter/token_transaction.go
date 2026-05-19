@@ -18,6 +18,9 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*le
 
 	tokenOutputs := make([]*legacypb.TokenOutput, len(tokenTx.TokenOutputs))
 	for i, o := range tokenTx.TokenOutputs {
+		if o == nil {
+			return nil, fmt.Errorf("token output %d is nil", i)
+		}
 		tokenOutputs[i] = &legacypb.TokenOutput{
 			Id:                            o.Id,
 			OwnerPublicKey:                o.OwnerPublicKey,
@@ -74,6 +77,9 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*le
 		}
 		outputsToSpend := make([]*legacypb.TokenOutputToSpend, len(x.TransferInput.OutputsToSpend))
 		for i, o := range x.TransferInput.OutputsToSpend {
+			if o == nil {
+				return nil, fmt.Errorf("transfer output to spend %d is nil", i)
+			}
 			outputsToSpend[i] = &legacypb.TokenOutputToSpend{
 				PrevTokenTransactionHash: o.PrevTokenTransactionHash,
 				PrevTokenTransactionVout: o.PrevTokenTransactionVout,
@@ -99,6 +105,9 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *legacypb.TokenTransaction) (*t
 
 	tokenOutputs := make([]*tokenpb.TokenOutput, len(sparkTx.TokenOutputs))
 	for i, o := range sparkTx.TokenOutputs {
+		if o == nil {
+			return nil, fmt.Errorf("token output %d is nil", i)
+		}
 		tokenOutputs[i] = &tokenpb.TokenOutput{
 			Id:                            o.Id,
 			OwnerPublicKey:                o.OwnerPublicKey,
@@ -155,6 +164,9 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *legacypb.TokenTransaction) (*t
 		}
 		outputsToSpend := make([]*tokenpb.TokenOutputToSpend, len(x.TransferInput.OutputsToSpend))
 		for i, o := range x.TransferInput.OutputsToSpend {
+			if o == nil {
+				return nil, fmt.Errorf("transfer output to spend %d is nil", i)
+			}
 			outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
 				PrevTokenTransactionHash: o.PrevTokenTransactionHash,
 				PrevTokenTransactionVout: o.PrevTokenTransactionVout,
