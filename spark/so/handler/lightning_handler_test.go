@@ -588,21 +588,21 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 			expectedErrMsg             string
 		}{
 			{
-				name:           "nil cpfp transaction",
+				name:           "nil cpfp job",
 				leavesToSend:   []*pb.UserSignedTxSigningJob{nil},
-				expectedErrMsg: "cpfp transaction is nil",
+				expectedErrMsg: "leaves_to_send[0] is required",
 			},
 			{
-				name:               "nil direct transaction",
+				name:               "nil direct job",
 				leavesToSend:       []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
 				directLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
-				expectedErrMsg:     "direct transaction is nil",
+				expectedErrMsg:     "direct_leaves_to_send[0] is required",
 			},
 			{
-				name:                       "nil direct from cpfp transaction",
+				name:                       "nil direct from cpfp job",
 				leavesToSend:               []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
 				directFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
-				expectedErrMsg:             "direct from cpfp transaction is nil",
+				expectedErrMsg:             "direct_from_cpfp_leaves_to_send[0] is required",
 			},
 		}
 
@@ -754,6 +754,99 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 		err := lightningHandler.ValidateDuplicateLeaves(ctx, []*pb.UserSignedTxSigningJob{}, directLeavesToSend, []*pb.UserSignedTxSigningJob{})
 		require.ErrorContains(t, err, "leaf id leaf1 not found in leaves to send")
 	})
+
+	t.Run("nil signing job entries return invalid argument", func(t *testing.T) {
+		tests := []struct {
+			name                 string
+			leavesToSend         []*pb.UserSignedTxSigningJob
+			directLeavesToSend   []*pb.UserSignedTxSigningJob
+			directFromCpfpLeaves []*pb.UserSignedTxSigningJob
+			wantContains         string
+		}{
+			{
+				name:         "leaves_to_send",
+				leavesToSend: []*pb.UserSignedTxSigningJob{nil},
+				wantContains: "leaves_to_send[0] is required",
+			},
+			{
+				name:               "direct_leaves_to_send",
+				leavesToSend:       []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
+				directLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
+				wantContains:       "direct_leaves_to_send[0] is required",
+			},
+			{
+				name:                 "direct_from_cpfp_leaves_to_send",
+				leavesToSend:         []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
+				directFromCpfpLeaves: []*pb.UserSignedTxSigningJob{nil},
+				wantContains:         "direct_from_cpfp_leaves_to_send[0] is required",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var err error
+				require.NotPanics(t, func() {
+					err = lightningHandler.ValidateDuplicateLeaves(ctx, tt.leavesToSend, tt.directLeavesToSend, tt.directFromCpfpLeaves)
+				})
+				require.ErrorContains(t, err, tt.wantContains)
+				code, reason := sparkerrors.CodeAndReasonFrom(err)
+				require.Equal(t, codes.InvalidArgument, code)
+				require.Equal(t, "MISSING_FIELD", reason)
+			})
+		}
+	})
+}
+
+func TestValidateSigningJobsHasAllLeafIDsRejectsNilJobs(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	lightningHandler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+	var err error
+	require.NotPanics(t, func() {
+		err = lightningHandler.validateSigningJobsHasAllLeafIDs(ctx, "leaves_to_send", []*pb.UserSignedTxSigningJob{nil}, map[string]bool{"leaf1": true}, false)
+	})
+	require.ErrorContains(t, err, "leaves_to_send[0] is required")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "MISSING_FIELD", reason)
+}
+
+func TestValidateIdenticalLeavesRejectsNilTransferPackage(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	lightningHandler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+	ownerIdentity := keys.GeneratePrivateKey().Public().Serialize()
+	receiverIdentity := keys.GeneratePrivateKey().Public().Serialize()
+	expiry := timestamppb.New(time.Now().Add(time.Hour))
+	transferID := uuid.NewString()
+
+	validTransfer := &pb.StartUserSignedTransferRequest{
+		TransferId:                transferID,
+		OwnerIdentityPublicKey:    ownerIdentity,
+		ReceiverIdentityPublicKey: receiverIdentity,
+		ExpiryTime:                expiry,
+		LeavesToSend:              []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
+	}
+	req := &pb.InitiatePreimageSwapRequest{
+		ReceiverIdentityPublicKey: receiverIdentity,
+		Transfer:                  validTransfer,
+		TransferRequest: &pb.StartTransferRequest{
+			TransferId:                transferID,
+			OwnerIdentityPublicKey:    ownerIdentity,
+			ReceiverIdentityPublicKey: receiverIdentity,
+			ExpiryTime:                expiry,
+			TransferPackage:           nil,
+		},
+	}
+
+	var err error
+	require.NotPanics(t, func() {
+		err = lightningHandler.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
+	})
+	require.ErrorContains(t, err, "transfer_request.transfer_package is required")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "MISSING_FIELD", reason)
 }
 
 func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
@@ -801,7 +894,7 @@ func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
 			pkg: &pb.TransferPackage{
 				LeavesToSend: []*pb.UserSignedTxSigningJob{nil},
 			},
-			wantErr: "transfer_request.transfer_package.leaves_to_send[0] is required",
+			wantErr: "leaves_to_send[0] is required",
 		},
 		{
 			name: "nil direct job",
@@ -811,7 +904,7 @@ func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
 				},
 				DirectLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
 			},
-			wantErr: "transfer_request.transfer_package.direct_leaves_to_send[0] is required",
+			wantErr: "direct_leaves_to_send[0] is required",
 		},
 		{
 			name: "nil direct from cpfp job",
@@ -824,7 +917,7 @@ func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
 				},
 				DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
 			},
-			wantErr: "transfer_request.transfer_package.direct_from_cpfp_leaves_to_send[0] is required",
+			wantErr: "direct_from_cpfp_leaves_to_send[0] is required",
 		},
 	}
 
@@ -1561,10 +1654,10 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 					},
 				}
 			},
-			expectedErrMsg: "cpfp transaction is nil",
+			expectedErrMsg: "leaves_to_send[0] is required",
 		},
 		{
-			name: "nil direct transaction",
+			name: "nil direct job",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
@@ -1575,10 +1668,10 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 					},
 				}
 			},
-			expectedErrMsg: "direct transaction is nil",
+			expectedErrMsg: "direct_leaves_to_send[0] is required",
 		},
 		{
-			name: "nil direct from cpfp transaction",
+			name: "nil direct from cpfp job",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
@@ -1589,7 +1682,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 					},
 				}
 			},
-			expectedErrMsg: "direct from cpfp transaction is nil",
+			expectedErrMsg: "direct_from_cpfp_leaves_to_send[0] is required",
 		},
 	}
 

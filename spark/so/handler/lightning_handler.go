@@ -408,18 +408,18 @@ func (h *LightningHandler) ValidateDuplicateLeaves(
 	leavesMap := make(map[string]bool)
 	directLeavesMap := make(map[string]bool)
 	directFromCpfpLeavesMap := make(map[string]bool)
-	for _, leaf := range leavesToSend {
+	for i, leaf := range leavesToSend {
 		if leaf == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("cpfp transaction is nil"))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d] is required", i))
 		}
 		if leavesMap[leaf.LeafId] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
 		}
 		leavesMap[leaf.LeafId] = true
 	}
-	for _, leaf := range directLeavesToSend {
+	for i, leaf := range directLeavesToSend {
 		if leaf == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct transaction is nil"))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct_leaves_to_send[%d] is required", i))
 		}
 		if directLeavesMap[leaf.LeafId] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
@@ -429,9 +429,9 @@ func (h *LightningHandler) ValidateDuplicateLeaves(
 		}
 		directLeavesMap[leaf.LeafId] = true
 	}
-	for _, leaf := range directFromCpfpLeavesToSend {
+	for i, leaf := range directFromCpfpLeavesToSend {
 		if leaf == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp transaction is nil"))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct_from_cpfp_leaves_to_send[%d] is required", i))
 		}
 		if directFromCpfpLeavesMap[leaf.LeafId] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leaf.LeafId))
@@ -1275,7 +1275,7 @@ func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context,
 	currentLeafIDMap := make(map[string]bool)
 	for i, job := range signingJobs {
 		if job == nil {
-			return fmt.Errorf("transfer_request.transfer_package.%s[%d] is required", fieldName, i)
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("%s[%d] is required", fieldName, i))
 		}
 		if _, ok := leafIDMap[job.LeafId]; !ok {
 			logger.Sugar().Errorf("leaf id is not in signing jobs %s", job.LeafId)
