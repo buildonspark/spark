@@ -709,7 +709,10 @@ func FinalizeTransferTransactionWithRevocationKeys(
 	}
 
 	revocationSecretMap := make(map[uint32]keys.Private, len(revocationSecrets))
-	for _, revocationSecret := range revocationSecrets {
+	for i, revocationSecret := range revocationSecrets {
+		if revocationSecret == nil {
+			return sparkerrors.InternalKeyshareError(fmt.Errorf("revocation secret %d is required for txHash %x", i, txHash))
+		}
 		revocationSecretMap[revocationSecret.OutputIndex] = revocationSecret.RevocationSecret
 	}
 

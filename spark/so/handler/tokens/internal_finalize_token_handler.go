@@ -56,6 +56,15 @@ func (h *InternalFinalizeTokenHandler) FinalizeTransferTransactionInternal(
 				len(tokenTransaction.Edges.SpentOutput)),
 			tokenTransaction, nil)
 	}
+	for i, revocationSecret := range revocationSecretsToFinalize {
+		if revocationSecret == nil {
+			return tokens.FormatErrorWithTransactionEnt(
+				"invalid revocation keys",
+				tokenTransaction,
+				fmt.Errorf("revocation secret %d is required", i),
+			)
+		}
+	}
 
 	err = ent.FinalizeTransferTransactionWithRevocationKeys(ctx, tokenTransaction, revocationSecretsToFinalize)
 	if err != nil {

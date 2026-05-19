@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -38,6 +39,40 @@ func setUpInternalFinalizeTokenTestHandlerPostgres(t *testing.T) *internalFinali
 		client:   dbClient,
 		fixtures: entfixtures.New(t, ctx, dbClient),
 	}
+}
+
+func TestFinalizeTransferTransactionInternalRejectsNilRevocationSecret(t *testing.T) {
+	setup := setUpInternalFinalizeTokenTestHandlerPostgres(t)
+
+	owner := keys.GeneratePrivateKey().Public()
+	tokenCreate := setup.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+	_, inputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(owner, big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	transfer := setup.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		inputs,
+		entfixtures.OutputSpecsWithOwner(owner, big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: []keys.Public{setup.handler.config.IdentityPublicKey()},
+			Status:             st.TokenTransactionStatusSigned,
+		},
+	)
+
+	err := setup.handler.FinalizeTransferTransactionInternal(setup.ctx, transfer.Hash, []*ent.RecoveredRevocationSecret{nil})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "revocation secret 0 is required")
+
+	updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, transfer.Transaction.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusSigned, updatedTx.Status)
+
+	updatedInput, err := setup.client.TokenOutput.Get(setup.ctx, inputs[0].ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenOutputStatusSpentSigned, updatedInput.Status)
+	require.True(t, updatedInput.SpentRevocationSecret.IsZero())
 }
 
 func TestFinalizeMintOrCreateTransaction(t *testing.T) {
