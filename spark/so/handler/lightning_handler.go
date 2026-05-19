@@ -2108,6 +2108,12 @@ func (h *LightningHandler) sendPreimageSwapGossipMessage(ctx context.Context, pr
 
 // UpdatePreimageRequest updates the preimage request.
 func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbinternal.UpdatePreimageRequestRequest) error {
+	if req == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if len(req.Preimage) != sha256.Size {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("preimage must be %d bytes", sha256.Size))
+	}
 	logger := logging.GetLoggerFromContext(ctx)
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {

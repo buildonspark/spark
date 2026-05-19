@@ -21,6 +21,7 @@ import (
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authninternal"
@@ -1752,6 +1753,37 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 
 		require.ErrorContains(t, err, "not owned by the authenticated identity public key")
 	})
+}
+
+func TestUpdatePreimageRequestRejectsMalformedPreimageLength(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{61})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	lightningHandler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	receiverPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	shortPreimage := []byte("short")
+	paymentHash := sha256.Sum256(shortPreimage)
+
+	preimageRequest, err := dbTx.PreimageRequest.Create().
+		SetPaymentHash(paymentHash[:]).
+		SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+		SetReceiverIdentityPubkey(receiverPub).
+		Save(ctx)
+	require.NoError(t, err)
+
+	err = lightningHandler.UpdatePreimageRequest(ctx, &pbinternal.UpdatePreimageRequestRequest{
+		Preimage:          shortPreimage,
+		IdentityPublicKey: receiverPub.Serialize(),
+	})
+	require.ErrorContains(t, err, "preimage must be 32 bytes")
+
+	unchanged, err := dbTx.PreimageRequest.Get(ctx, preimageRequest.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.PreimageRequestStatusWaitingForPreimage, unchanged.Status)
+	require.Empty(t, unchanged.Preimage)
 }
 
 func TestValidateLightningRefundLeafIDsRejectsDuplicates(t *testing.T) {
