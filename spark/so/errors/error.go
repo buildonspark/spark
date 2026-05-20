@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/protoadapt"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // Error represents an error that can be converted to a gRPC error
@@ -20,9 +23,10 @@ type Error interface {
 // error cause such that functions up the stack can inspect it with
 // errors.Unwrap() or errors.Is().
 type grpcError struct {
-	Code   codes.Code
-	Cause  error
-	Reason string
+	Code       codes.Code
+	Cause      error
+	Reason     string
+	RetryAfter time.Duration
 }
 
 // newGRPCError creates a new gRPC error with the given code and cause
@@ -31,6 +35,19 @@ func newGRPCError(code codes.Code, cause error, reason string) *grpcError {
 		Code:   code,
 		Cause:  cause,
 		Reason: reason,
+	}
+}
+
+// newRetryableGRPCError creates a gRPC error that surfaces a
+// google.rpc.RetryInfo detail with the given retryAfter delay. Use for
+// transient codes (typically Aborted or Unavailable) where the operation
+// is safe and expected to retry after a short delay.
+func newRetryableGRPCError(code codes.Code, cause error, reason string, retryAfter time.Duration) *grpcError {
+	return &grpcError{
+		Code:       code,
+		Cause:      cause,
+		Reason:     reason,
+		RetryAfter: retryAfter,
 	}
 }
 
@@ -47,8 +64,17 @@ func (e *grpcError) Unwrap() error {
 // Docs: https://pkg.go.dev/google.golang.org/grpc/status#FromError
 func (e *grpcError) GRPCStatus() *status.Status {
 	st := status.New(e.Code, e.Cause.Error())
+	var details []protoadapt.MessageV1
 	if e.Reason != "" {
-		if stWith, err := st.WithDetails(&errdetails.ErrorInfo{Reason: e.Reason}); err == nil {
+		details = append(details, &errdetails.ErrorInfo{Reason: e.Reason})
+	}
+	if e.RetryAfter > 0 {
+		details = append(details, &errdetails.RetryInfo{
+			RetryDelay: durationpb.New(e.RetryAfter),
+		})
+	}
+	if len(details) > 0 {
+		if stWith, err := st.WithDetails(details...); err == nil {
 			st = stWith
 		}
 	}
@@ -80,9 +106,10 @@ func toGRPCError(err error) error {
 	var grpcErr *grpcError
 	if errors.As(err, &grpcErr) {
 		return &grpcError{
-			Code:   grpcErr.Code,
-			Cause:  err,
-			Reason: grpcErr.Reason,
+			Code:       grpcErr.Code,
+			Cause:      err,
+			Reason:     grpcErr.Reason,
+			RetryAfter: grpcErr.RetryAfter,
 		}
 	}
 
@@ -149,7 +176,7 @@ func WrapErrorWithReasonPrefix(err error, prefix string) error {
 			reason = fmt.Sprintf("%s:%s", prefix, reason)
 		}
 	}
-	return &grpcError{Code: code, Cause: err, Reason: reason}
+	return &grpcError{Code: code, Cause: err, Reason: reason, RetryAfter: retryAfterFrom(err)}
 }
 
 func CodeAndReasonFrom(err error) (codes.Code, string) {
@@ -172,16 +199,40 @@ func CodeAndReasonFrom(err error) (codes.Code, string) {
 	return codes.Internal, ""
 }
 
+// retryAfterFrom extracts the retry-after hint from a grpcError or from a
+// google.rpc.RetryInfo detail on a gRPC status. Returns 0 if no hint is set.
+func retryAfterFrom(err error) time.Duration {
+	var ge *grpcError
+	if errors.As(err, &ge) {
+		return ge.RetryAfter
+	}
+	if st, ok := status.FromError(err); ok {
+		for _, d := range st.Details() {
+			if ri, ok := d.(*errdetails.RetryInfo); ok && ri.RetryDelay != nil {
+				return ri.RetryDelay.AsDuration()
+			}
+		}
+	}
+	return 0
+}
+
 func wrapGRPC(err error, codeOverride *codes.Code, reasonOverride *string, msg string) error {
 	if err == nil {
 		return nil
 	}
 	code, reason := CodeAndReasonFrom(err)
+	// The retry-after hint is tied to the original code's semantics — if the
+	// code is being overridden we mustn't carry the hint forward (parallel to
+	// how `reason` is cleared below). Otherwise a caller doing e.g.
+	// WrapErrorWithCode(abortedClaimConflictErr, codes.Internal) would emit
+	// an Internal error with RetryInfo, telling clients it's safe to retry.
+	retryAfter := retryAfterFrom(err)
 	if codeOverride != nil {
 		code = *codeOverride
 		if reasonOverride == nil {
 			reason = ""
 		}
+		retryAfter = 0
 	}
 	if reasonOverride != nil {
 		reason = *reasonOverride
@@ -190,5 +241,5 @@ func wrapGRPC(err error, codeOverride *codes.Code, reasonOverride *string, msg s
 	if msg != "" {
 		cause = fmt.Errorf("%s: %w", msg, err)
 	}
-	return &grpcError{Code: code, Cause: cause, Reason: reason}
+	return &grpcError{Code: code, Cause: cause, Reason: reason, RetryAfter: retryAfter}
 }

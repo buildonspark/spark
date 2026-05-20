@@ -2831,6 +2831,20 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *e
 	return nil
 }
 
+// claimLockConflictError logs the underlying Postgres FOR UPDATE NOWAIT
+// failure and returns the client-facing AbortedConcurrentClaimConflict for
+// the three claim_transfer entry points. The wire message is generic ("locked
+// by another operation") because the same row lock is held during many
+// sender/receiver state transitions and we don't want to overpromise
+// specificity to integrators. The original Postgres error stays available via
+// errors.Unwrap on the returned grpcError for server-side debugging.
+func claimLockConflictError(ctx context.Context, transferID uuid.UUID, lockErr error) error {
+	logging.GetLoggerFromContext(ctx).With(zap.Error(lockErr)).Sugar().Infof(
+		"concurrent claim conflict on transfer %s", transferID)
+	return sparkerrors.AbortedConcurrentClaimConflict(
+		fmt.Errorf("transfer %s is currently locked by another operation; please retry", transferID))
+}
+
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransferTweakKeys")
@@ -2850,6 +2864,9 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 
 	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
 	if err != nil {
+		if sparkdb.IsLockNotAvailableError(err) {
+			return claimLockConflictError(ctx, transferID, err)
+		}
 		return fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
@@ -3462,7 +3479,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
 	if err != nil {
 		if sparkdb.IsLockNotAvailableError(err) {
-			return nil, sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf("unable to load transfer %s: %w", transferID, err))
+			return nil, claimLockConflictError(ctx, transferID, err)
 		}
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
@@ -4432,6 +4449,9 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 
 	transfer, err := h.loadTransferForUpdate(ctx, transferID, sql.WithLockAction(sql.NoWait))
 	if err != nil {
+		if sparkdb.IsLockNotAvailableError(err) {
+			return nil, claimLockConflictError(ctx, transferID, err)
+		}
 		return nil, fmt.Errorf("unable to load transfer %s: %w", transferID, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))

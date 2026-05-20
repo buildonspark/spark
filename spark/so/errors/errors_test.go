@@ -483,6 +483,134 @@ func TestIsTransientPeerError(t *testing.T) {
 	}
 }
 
+func TestAbortedConcurrentClaimConflict_AttachesRetryInfo(t *testing.T) {
+	err := AbortedConcurrentClaimConflict(fmt.Errorf("transfer abc is currently being finalized by another operation; retry in a moment"))
+
+	st, ok := status.FromError(err)
+	require.True(t, ok, "expected a gRPC status error")
+	assert.Equal(t, codes.Aborted, st.Code())
+
+	var retryInfo *errdetails.RetryInfo
+	var errorInfo *errdetails.ErrorInfo
+	for _, d := range st.Details() {
+		switch v := d.(type) {
+		case *errdetails.RetryInfo:
+			retryInfo = v
+		case *errdetails.ErrorInfo:
+			errorInfo = v
+		}
+	}
+	require.NotNil(t, errorInfo, "expected ErrorInfo detail")
+	assert.Equal(t, ReasonAbortedConcurrentClaimConflict, errorInfo.Reason)
+	require.NotNil(t, retryInfo, "expected RetryInfo detail")
+	require.NotNil(t, retryInfo.RetryDelay)
+	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.RetryDelay.AsDuration())
+
+	// A third-party client should not see internal SQLSTATE or table names
+	// leak into the wire message.
+	assert.NotContains(t, st.Message(), "SQLSTATE")
+	assert.NotContains(t, st.Message(), `"transfers"`)
+}
+
+// AbortedTransactionPreempted must NOT carry a RetryInfo hint: its
+// production caller fires for inputs that may be permanently finalized,
+// where a retry will never succeed.
+func TestAbortedTransactionPreempted_OmitsRetryInfo(t *testing.T) {
+	err := AbortedTransactionPreempted(fmt.Errorf("preempted"))
+
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Aborted, st.Code())
+
+	for _, d := range st.Details() {
+		_, isRetry := d.(*errdetails.RetryInfo)
+		require.False(t, isRetry, "AbortedTransactionPreempted must not include RetryInfo")
+	}
+}
+
+func TestNonRetryableError_OmitsRetryInfo(t *testing.T) {
+	err := FailedPreconditionBadSignature(fmt.Errorf("bad sig"))
+
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	for _, d := range st.Details() {
+		_, isRetry := d.(*errdetails.RetryInfo)
+		require.False(t, isRetry, "non-retryable error should not include RetryInfo")
+	}
+}
+
+func TestRetryAfterFrom_RoundTripsThroughStatusDetails(t *testing.T) {
+	// Simulate what a client sees after the error crosses the gRPC wire:
+	// only the status proto survives, the *grpcError type is gone.
+	orig := AbortedConcurrentClaimConflict(fmt.Errorf("conflict"))
+	st, ok := status.FromError(orig)
+	require.True(t, ok)
+	wire := st.Err()
+
+	code, reason := CodeAndReasonFrom(wire)
+	assert.Equal(t, codes.Aborted, code)
+	assert.Equal(t, ReasonAbortedConcurrentClaimConflict, reason)
+	assert.Equal(t, abortedLockConflictRetryAfter, retryAfterFrom(wire))
+}
+
+func TestRetryAfterFrom_NoHint(t *testing.T) {
+	assert.Zero(t, retryAfterFrom(nil))
+	assert.Zero(t, retryAfterFrom(fmt.Errorf("plain")))
+	assert.Zero(t, retryAfterFrom(FailedPreconditionBadSignature(fmt.Errorf("bad"))))
+}
+
+func TestWrapErrorWithMessage_PreservesRetryAfter(t *testing.T) {
+	orig := AbortedConcurrentClaimConflict(fmt.Errorf("conflict"))
+	wrapped := WrapErrorWithMessage(orig, "outer context")
+
+	st, ok := status.FromError(wrapped)
+	require.True(t, ok)
+	var retryInfo *errdetails.RetryInfo
+	for _, d := range st.Details() {
+		if ri, ok := d.(*errdetails.RetryInfo); ok {
+			retryInfo = ri
+		}
+	}
+	require.NotNil(t, retryInfo, "wrapped error must preserve RetryInfo")
+	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.RetryDelay.AsDuration())
+}
+
+func TestWrapErrorWithReasonPrefix_PreservesRetryAfter(t *testing.T) {
+	orig := AbortedConcurrentClaimConflict(fmt.Errorf("conflict"))
+	wrapped := WrapErrorWithReasonPrefix(orig, "external-coordinator")
+
+	st, ok := status.FromError(wrapped)
+	require.True(t, ok)
+	var retryInfo *errdetails.RetryInfo
+	for _, d := range st.Details() {
+		if ri, ok := d.(*errdetails.RetryInfo); ok {
+			retryInfo = ri
+		}
+	}
+	require.NotNil(t, retryInfo, "reason-prefix wrap must preserve RetryInfo")
+	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.RetryDelay.AsDuration())
+
+	// Reason should carry the prefix joined with the original reason.
+	_, reason := CodeAndReasonFrom(wrapped)
+	assert.Contains(t, reason, "external-coordinator")
+	assert.Contains(t, reason, ReasonAbortedConcurrentClaimConflict)
+}
+
+func TestWrapErrorWithCode_ClearsRetryAfter(t *testing.T) {
+	// Overriding the code mustn't carry the retry hint forward — a
+	// retry-safe Aborted shouldn't become a retry-safe Internal.
+	orig := AbortedConcurrentClaimConflict(fmt.Errorf("conflict"))
+	wrapped := WrapErrorWithCode(orig, codes.Internal)
+
+	st, ok := status.FromError(wrapped)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	for _, d := range st.Details() {
+		_, isRetry := d.(*errdetails.RetryInfo)
+		require.False(t, isRetry, "code override must strip RetryInfo")
+	}
+}
+
 // fakeError is an Error interface implementation for testing.
 type fakeError struct {
 	message string

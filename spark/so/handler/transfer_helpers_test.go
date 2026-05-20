@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,9 +12,13 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestLoadLeafRefundMapsFromTransferPackage_NilFields(t *testing.T) {
@@ -473,6 +478,38 @@ func TestBuildSigningResults_LeafWithNoCpfpEntry(t *testing.T) {
 	assert.Nil(t, results[0].RefundTxSigningResult)
 	assert.Nil(t, results[0].DirectRefundTxSigningResult)
 	assert.Nil(t, results[0].DirectFromCpfpRefundTxSigningResult)
+}
+
+func TestClaimLockConflictError_WireShape(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	transferID := uuid.New()
+	lockErr := fmt.Errorf("ERROR: could not obtain lock on row in relation \"transfers\" (SQLSTATE 55P03)")
+
+	err := claimLockConflictError(ctx, transferID, lockErr)
+	require.Error(t, err)
+
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Aborted, st.Code())
+
+	// Wire message names the transfer ID, doesn't leak SQLSTATE or table.
+	assert.Contains(t, st.Message(), transferID.String())
+	assert.NotContains(t, st.Message(), "SQLSTATE")
+	assert.NotContains(t, st.Message(), `"transfers"`)
+
+	// Status details carry the reason + retry hint third-party clients need.
+	var reason string
+	var retryInfo *errdetails.RetryInfo
+	for _, d := range st.Details() {
+		switch v := d.(type) {
+		case *errdetails.ErrorInfo:
+			reason = v.Reason
+		case *errdetails.RetryInfo:
+			retryInfo = v
+		}
+	}
+	assert.Equal(t, sparkerrors.ReasonAbortedConcurrentClaimConflict, reason)
+	require.NotNil(t, retryInfo, "AbortedConcurrentClaimConflict must carry a RetryInfo detail")
 }
 
 // Regression guard: pre-fix, direct/dfc results were only surfaced inside an

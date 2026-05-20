@@ -1,9 +1,15 @@
 package errors
 
 import (
+	"time"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// Default retry hint surfaced as google.rpc.RetryInfo for Aborted errors
+// caused by short-lived row-lock contention (typically resolved in <1s).
+const abortedLockConflictRetryAfter = 100 * time.Millisecond
 
 // ErrShuttingDown is returned by streaming RPC handlers that proactively
 // terminate when the server starts shutting down. The log interceptor
@@ -198,12 +204,18 @@ func FailedPreconditionHashMismatch(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionHashMismatch)
 }
 
+// AbortedTransactionPreempted intentionally omits a RetryInfo hint. The
+// production caller (tokens.NewTransactionPreemptedError) fires for inputs
+// that are "in progress or finalized" — finalized inputs are permanently
+// spent and a retry will only produce the same error. Clients that know
+// their conflict is transient can still retry on the bare Aborted code per
+// gRPC convention; we just don't promise that retry will succeed.
 func AbortedTransactionPreempted(err error) error {
 	return newGRPCError(codes.Aborted, err, ReasonAbortedTransactionPreempted)
 }
 
 func AbortedConcurrentClaimConflict(err error) error {
-	return newGRPCError(codes.Aborted, err, ReasonAbortedConcurrentClaimConflict)
+	return newRetryableGRPCError(codes.Aborted, err, ReasonAbortedConcurrentClaimConflict, abortedLockConflictRetryAfter)
 }
 
 func AlreadyExistsDuplicateOperation(err error) error {
