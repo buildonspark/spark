@@ -136,6 +136,23 @@ func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.
 	}
 }
 
+func validateTreeCreationTxSpendsOutpoint(tx *wire.MsgTx, expectedOutPoint wire.OutPoint, txName string) error {
+	if tx == nil {
+		return fmt.Errorf("%s is required", txName)
+	}
+	if len(tx.TxIn) != 1 {
+		return fmt.Errorf("%s must have exactly one input, got %d", txName, len(tx.TxIn))
+	}
+	if tx.TxIn[0].PreviousOutPoint != expectedOutPoint {
+		return fmt.Errorf("%s input 0 must spend %s, got %s", txName, expectedOutPoint.String(), tx.TxIn[0].PreviousOutPoint.String())
+	}
+	return nil
+}
+
+func isTreeCreationParentStatusEligible(status st.TreeNodeStatus) bool {
+	return status == st.TreeNodeStatusCreating || status == st.TreeNodeStatusAvailable
+}
+
 func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network btcnetwork.Network, output *wire.TxOut) (keys.Public, *ent.SigningKeyshare, error) {
 	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, network)
 	if err != nil {
@@ -449,9 +466,15 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	userIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse user identity public key: %w", err)
+	}
+
 	var parentNode *ent.TreeNode
 	var vout uint32
 	var network btcnetwork.Network
+	var parentOutPoint wire.OutPoint
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		outputID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
@@ -462,12 +485,23 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
+		if !parentNode.OwnerIdentityPubkey.Equals(userIDPubKey) {
+			return nil, nil, fmt.Errorf("parent node owner identity public key does not match request identity public key")
+		}
+		if !isTreeCreationParentStatusEligible(parentNode.Status) {
+			return nil, nil, fmt.Errorf("parent node %s status %s is not eligible for tree creation", parentNode.ID, parentNode.Status)
+		}
 		vout = req.GetParentNodeOutput().Vout
 		parentTree, err := parentNode.QueryTree().Only(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
 		network = parentTree.Network
+		parentTx, err := common.TxFromRawTxBytes(parentNode.RawTx)
+		if err != nil {
+			return nil, nil, err
+		}
+		parentOutPoint = wire.OutPoint{Hash: parentTx.TxHash(), Index: vout}
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		parentNode = nil
 		vout = req.GetOnChainUtxo().Vout
@@ -475,12 +509,18 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
+		onChainTx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().RawTx)
+		if err != nil {
+			return nil, nil, err
+		}
+		parentOutPoint = wire.OutPoint{Hash: onChainTx.TxHash(), Index: vout}
 	default:
 		return nil, nil, errors.New("invalid source")
 	}
 
 	type element struct {
 		output     *wire.TxOut
+		outPoint   wire.OutPoint
 		node       *pb.CreationNode
 		userPubKey keys.Public
 		keyshare   *ent.SigningKeyshare
@@ -510,17 +550,13 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 
 	queue := []*element{{
 		output:     parentOutput,
+		outPoint:   parentOutPoint,
 		node:       req.Node,
 		userPubKey: depositAddress.OwnerSigningPubkey,
 		keyshare:   keyshare,
 		parentNode: parentNode,
 		vout:       vout,
 	}}
-
-	userIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse user identity public key: %w", err)
-	}
 
 	var signingJobs []*helper.SigningJob
 	var nodes []*ent.TreeNode
@@ -536,6 +572,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
+		if err := validateTreeCreationTxSpendsOutpoint(cpfpTx, currentElement.outPoint, "node transaction"); err != nil {
+			return nil, nil, err
+		}
 		signingJobs = append(signingJobs, cpfpSigningJob)
 
 		var directSigningJob *helper.SigningJob
@@ -543,6 +582,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if currentElement.node.DirectNodeTxSigningJob != nil {
 			directSigningJob, directTx, err = helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectNodeTxSigningJob, currentElement.output)
 			if err != nil {
+				return nil, nil, err
+			}
+			if err := validateTreeCreationTxSpendsOutpoint(directTx, currentElement.outPoint, "direct node transaction"); err != nil {
 				return nil, nil, err
 			}
 			signingJobs = append(signingJobs, directSigningJob)
@@ -654,21 +696,35 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if len(cpfpTx.TxOut) == 0 {
 				return nil, nil, fmt.Errorf("vout out of bounds for cpfp node tx, need at least one output")
 			}
-			cpfpRefundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, cpfpTx.TxOut[0])
+			cpfpRefundOutPoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
+			cpfpRefundSigningJob, cpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, cpfpTx.TxOut[0])
 			if err != nil {
+				return nil, nil, err
+			}
+			if err := validateTreeCreationTxSpendsOutpoint(cpfpRefundTx, cpfpRefundOutPoint, "refund transaction"); err != nil {
 				return nil, nil, err
 			}
 			signingJobs = append(signingJobs, cpfpRefundSigningJob)
 			if currentElement.node.DirectRefundTxSigningJob != nil && currentElement.node.DirectFromCpfpRefundTxSigningJob != nil {
+				if directTx == nil {
+					return nil, nil, errors.New("direct node tx signing job is required when direct refund tx signing jobs are provided")
+				}
 				if len(directTx.TxOut) == 0 {
 					return nil, nil, fmt.Errorf("vout out of bounds for cpfp node tx, need at least one output")
 				}
-				directRefundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectRefundTxSigningJob, directTx.TxOut[0])
+				directRefundOutPoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
+				directRefundSigningJob, directRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectRefundTxSigningJob, directTx.TxOut[0])
 				if err != nil {
 					return nil, nil, err
 				}
-				directFromCpfpRefundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectFromCpfpRefundTxSigningJob, cpfpTx.TxOut[0])
+				if err := validateTreeCreationTxSpendsOutpoint(directRefundTx, directRefundOutPoint, "direct refund transaction"); err != nil {
+					return nil, nil, err
+				}
+				directFromCpfpRefundSigningJob, directFromCpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectFromCpfpRefundTxSigningJob, cpfpTx.TxOut[0])
 				if err != nil {
+					return nil, nil, err
+				}
+				if err := validateTreeCreationTxSpendsOutpoint(directFromCpfpRefundTx, cpfpRefundOutPoint, "direct-from-cpfp refund transaction"); err != nil {
 					return nil, nil, err
 				}
 				signingJobs = append(signingJobs, directRefundSigningJob, directFromCpfpRefundSigningJob)
@@ -693,6 +749,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				statechainPublicKeys = append(statechainPublicKeys, signingKeyshare.PublicKey)
 				queue = append(queue, &element{
 					output:     cpfpTx.TxOut[i],
+					outPoint:   wire.OutPoint{Hash: cpfpTx.TxHash(), Index: uint32(i)},
 					node:       child,
 					userPubKey: userSigningKey,
 					keyshare:   signingKeyshare,
