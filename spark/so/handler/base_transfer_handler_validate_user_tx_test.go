@@ -657,7 +657,7 @@ func TestValidateUserTxs_Swap_Package_UnknownLeafIDs_Error(t *testing.T) {
 	require.ErrorContains(t, err, "could not find all tree nodes")
 }
 
-func TestValidateUserTxs_Swap_Package_IgnoresExtraDirectLeaves_Success(t *testing.T) {
+func TestValidateUserTxs_Swap_Package_ValidatesProvidedDirectLeaves_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	leaf := createDbLeaf(t, ctx, true)
@@ -681,6 +681,66 @@ func TestValidateUserTxs_Swap_Package_IgnoresExtraDirectLeaves_Success(t *testin
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeSwap, nil)
 	require.NoError(t, err)
+}
+
+func TestValidateUserTxs_Swap_Package_InvalidDirectRefund_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+
+	cpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)}
+	direct := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: []byte("not a valid tx")}
+	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)}
+
+	req := &pb.StartTransferRequest{
+		ReceiverIdentityPublicKey: refundDest.Serialize(),
+		TransferPackage: &pb.TransferPackage{
+			LeavesToSend:               []*pb.UserSignedTxSigningJob{cpfp},
+			DirectLeavesToSend:         []*pb.UserSignedTxSigningJob{direct},
+			DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{directFromCpfp},
+			KeyTweakPackage:            map[string][]byte{"noop": {}},
+			UserSignature:              []byte{1},
+		},
+	}
+
+	h := handlerWithConfig()
+	for _, transferType := range []st.TransferType{st.TransferTypeSwap, st.TransferTypeCounterSwap, st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3} {
+		t.Run(string(transferType), func(t *testing.T) {
+			err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, transferType, nil)
+			require.ErrorContains(t, err, "direct refund tx validation failed")
+		})
+	}
+}
+
+func TestValidateUserTxs_Swap_Package_InvalidDirectFromCpfpRefund_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+
+	cpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)}
+	direct := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectTx(t, leaf, refundDest)}
+	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: []byte("not a valid tx")}
+
+	req := &pb.StartTransferRequest{
+		ReceiverIdentityPublicKey: refundDest.Serialize(),
+		TransferPackage: &pb.TransferPackage{
+			LeavesToSend:               []*pb.UserSignedTxSigningJob{cpfp},
+			DirectLeavesToSend:         []*pb.UserSignedTxSigningJob{direct},
+			DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{directFromCpfp},
+			KeyTweakPackage:            map[string][]byte{"noop": {}},
+			UserSignature:              []byte{1},
+		},
+	}
+
+	h := handlerWithConfig()
+	for _, transferType := range []st.TransferType{st.TransferTypeSwap, st.TransferTypeCounterSwap, st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3} {
+		t.Run(string(transferType), func(t *testing.T) {
+			err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, transferType, nil)
+			require.ErrorContains(t, err, "direct from CPFP refund tx validation failed")
+		})
+	}
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_WithDirect_Success(t *testing.T) {

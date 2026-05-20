@@ -1839,7 +1839,7 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 		return validateLeaves_transfer(ctx, pkg, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	case st.TransferTypeSwap, st.TransferTypeCounterSwap, st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3:
-		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, refundDestPubkey, transferType)
+		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, transferType)
 
 	case st.TransferTypeCooperativeExit:
 		if len(connectorTx) == 0 {
@@ -1879,12 +1879,20 @@ func validateSingleLeafRefundTxs(
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err))
 	}
 
-	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeCooperativeExit {
-		if len(directFromCpfpRefundTx) == 0 {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing required direct from CPFP refund tx for leaf"))
-		}
+	validateDirectRefunds := transferType == st.TransferTypeTransfer ||
+		transferType == st.TransferTypeCooperativeExit ||
+		transferType == st.TransferTypeSwap ||
+		transferType == st.TransferTypeCounterSwap ||
+		transferType == st.TransferTypePrimarySwapV3 ||
+		transferType == st.TransferTypeCounterSwapV3
+	requireDirectFromCpfpRefund := transferType == st.TransferTypeTransfer || transferType == st.TransferTypeCooperativeExit
 
-		if err := bitcointransaction.VerifyTransactionWithDatabase(
+	if validateDirectRefunds {
+		if len(directFromCpfpRefundTx) == 0 {
+			if requireDirectFromCpfpRefund {
+				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing required direct from CPFP refund tx for leaf"))
+			}
+		} else if err := bitcointransaction.VerifyTransactionWithDatabase(
 			ctx,
 			directFromCpfpRefundTx,
 			node,
@@ -1917,7 +1925,7 @@ func validateSingleLeafRefundTxs(
 			); err != nil {
 				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx validation failed for leaf: %w", err))
 			}
-		} else if !hasDirectRefundTx && hasDirectNodeTx && !isZeroNode {
+		} else if requireDirectFromCpfpRefund && hasDirectNodeTx && !isZeroNode {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String()))
 		}
 	}
@@ -2246,6 +2254,8 @@ func validateLeaves_swap(
 	ctx context.Context,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 	transferType st.TransferType,
 ) error {
@@ -2255,14 +2265,12 @@ func validateLeaves_swap(
 			return fmt.Errorf("leaf %s not found in loaded leaves", leafID)
 		}
 
-		cpfpRefundTx := leafCpfpRefundMap[leafID]
-
 		if err := validateSingleLeafRefundTxs(
 			ctx,
 			node,
-			cpfpRefundTx,
-			nil,
-			nil,
+			leafCpfpRefundMap[leafID],
+			leafDirectFromCpfpRefundMap[leafID],
+			leafDirectRefundMap[leafID],
 			refundDestPubkey,
 			transferType,
 		); err != nil {
