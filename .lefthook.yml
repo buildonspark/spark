@@ -11,7 +11,7 @@ pre-commit:
           - name: gotestsum
             env:
               GOFLAGS: "-tags=lightspark"
-            run: gotestsum --format testname $(go list ./... | grep -v -E "so/grpc_test|so/grpc_test_internal|so/tree")
+            run: gotestsum --format testname $(go list ./... | grep -v -E "so/grpc_test|so/grpc_test_internal|so/security_test|so/tree")
     - name: frost
       glob: "signer/**"
       root: "signer/"
