@@ -149,6 +149,10 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	cachedRootsMap := make(map[uuid.UUID]*cachedRoot, len(exitingTrees))
 	for i, exitingTree := range exitingTrees {
 		tree := trees[i]
+		tree, err := validateExitTreeStillSignable(ctx, tree)
+		if err != nil {
+			return nil, err
+		}
 		root, err := tree.GetRoot(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get root of tree %s: %w", tree.ID.String(), err)
@@ -209,4 +213,26 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	}
 
 	return pbSigningResults, nil
+}
+
+func validateExitTreeStillSignable(ctx context.Context, tree *ent.Tree) (*ent.Tree, error) {
+	if tree == nil {
+		return nil, fmt.Errorf("tree is required")
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	latest, err := db.Tree.
+		Query().
+		Where(enttree.ID(tree.ID)).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to reload tree %s before exit signing: %w", tree.ID.String(), err)
+	}
+	if latest.Status != st.TreeStatusAvailable {
+		return nil, fmt.Errorf("tree %s is in status %s and is not eligible for exit signing", tree.ID.String(), latest.Status)
+	}
+	return latest, nil
 }
