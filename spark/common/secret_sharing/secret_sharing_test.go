@@ -84,12 +84,27 @@ func TestVerifiableSecretSharing(t *testing.T) {
 	})
 
 	// Check that invalid proof length is caught
-	t.Run("CatchInvalidProofLength", func(t *testing.T) {
+	t.Run("CatchInvalidProofLengthTooMany", func(t *testing.T) {
 		share := shares[0]
 		// Add an extra proof to make the length incorrect
 		share.Proofs = append(share.Proofs, share.Proofs[0])
 		err := secretsharing.ValidateShare(share)
 		require.Error(t, err, "failed to catch invalid proof length")
+		require.ErrorContains(t, err, "invalid VSS proof length")
+	})
+
+	// Check that too few proofs are rejected (regression: previously > instead of !=
+	// allowed fewer proofs than threshold to pass, causing the verification loop
+	// to be trivially satisfiable).
+	t.Run("CatchInvalidProofLengthTooFew", func(t *testing.T) {
+		// Use shares[4] (untouched by other sub-tests) and make a shallow copy.
+		share := *shares[4]
+		originalProofs := make([][]byte, len(shares[4].Proofs))
+		copy(originalProofs, shares[4].Proofs)
+		// Remove a proof to make the length less than threshold.
+		share.Proofs = originalProofs[:len(originalProofs)-1]
+		err := secretsharing.ValidateShare(&share)
+		require.Error(t, err, "failed to catch too-few proofs (fewer than threshold)")
 		require.ErrorContains(t, err, "invalid VSS proof length")
 	})
 }
