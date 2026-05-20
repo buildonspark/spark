@@ -159,6 +159,17 @@ type StartupTaskSpec struct {
 func AllScheduledTasks() []ScheduledTaskSpec {
 	return []ScheduledTaskSpec{
 		{
+			ExecutionInterval: backfillSigningKeyshareSecretsInterval,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "backfill_signing_keyshare_secrets",
+				Timeout:      &backfillSigningKeyshareSecretsTaskTimeout,
+				RunInTestEnv: false,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return backfillSigningKeyshareSecrets(ctx, knobsService)
+				},
+			},
+		},
+		{
 			ExecutionInterval: 10 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "dkg",

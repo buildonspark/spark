@@ -2,6 +2,7 @@ package entephemeral
 
 import (
 	"context"
+	dbSql "database/sql"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -92,6 +93,10 @@ func getLatestSigningKeyshareSecretVersionForUpdateLocked(
 // inserting a duplicate (signingKeyshareID, version) pair will return a constraint error (check
 // with IsConstraintError). Version numbers do not need to be sequential, but callers that want
 // automatic sequential versioning should use AddSigningKeyshareSecretVersion instead.
+//
+// On Postgres, a constraint error from this call aborts the surrounding transaction and any
+// subsequent statement on it will fail with SQLSTATE 25P02 until rollback. Callers that need
+// idempotent insert-or-read semantics should use GetOrCreateSigningKeyshareSecretVersion instead.
 func CreateSigningKeyshareSecretVersion(
 	ctx context.Context,
 	signingKeyshareID uuid.UUID,
@@ -107,6 +112,52 @@ func CreateSigningKeyshareSecretVersion(
 	}
 
 	return createSigningKeyshareSecretVersionLocked(ctx, tx, signingKeyshareID, version, secretShare)
+}
+
+// GetOrCreateSigningKeyshareSecretVersion atomically inserts or reads the secret version row
+// for (signingKeyshareID, version). On conflict the existing row is left untouched (INSERT ...
+// ON CONFLICT DO NOTHING), so this never aborts the surrounding Postgres transaction.
+//
+// The returned row reflects whatever is currently stored in the database. When a row already
+// existed, its secret_share may differ from the secretShare argument — callers MUST check the
+// returned secret_share against their expectation before treating the call as a no-op.
+func GetOrCreateSigningKeyshareSecretVersion(
+	ctx context.Context,
+	signingKeyshareID uuid.UUID,
+	version int32,
+	secretShare keys.Private,
+) (*SigningKeyshareSecret, error) {
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := lockSigningKeyshareIDForVersioning(ctx, tx, signingKeyshareID); err != nil {
+		return nil, err
+	}
+
+	// Ent's DoNothing().Exec emits INSERT ... ON CONFLICT DO NOTHING RETURNING id; on conflict
+	// no row is returned and the driver surfaces sql.ErrNoRows. That's the no-op success path —
+	// only non-ErrNoRows errors are real failures.
+	if err := tx.SigningKeyshareSecret.Create().
+		SetSigningKeyshareID(signingKeyshareID).
+		SetVersion(version).
+		SetSecretShare(secretShare).
+		OnConflictColumns(signingkeysharesecret.FieldSigningKeyshareID, signingkeysharesecret.FieldVersion).
+		DoNothing().
+		Exec(ctx); err != nil && !errors.Is(err, dbSql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to upsert signing keyshare secret version %d for keyshare %s: %w", version, signingKeyshareID, err)
+	}
+
+	secret, err := tx.SigningKeyshareSecret.Query().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID),
+			signingkeysharesecret.VersionEQ(version),
+		).
+		Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read back signing keyshare secret version %d for keyshare %s: %w", version, signingKeyshareID, err)
+	}
+	return secret, nil
 }
 
 func AddSigningKeyshareSecretVersion(
