@@ -1034,6 +1034,19 @@ func TestValidateRenewNodeTimelocks(t *testing.T) {
 			errorContains:  "refund transaction sequence must be at least 100 for renewal",
 		},
 		{
+			name:           "invalid refund timelock - below TimeLockInterval",
+			nodeSequence:   200,
+			refundSequence: 99,
+			expectError:    true,
+			errorContains:  "refund transaction sequence must be at least 100 for renewal",
+		},
+		{
+			name:           "valid refund timelock - exactly TimeLockInterval",
+			nodeSequence:   200,
+			refundSequence: 100,
+			expectError:    false,
+		},
+		{
 			name:           "valid timelocks - node 150, refund 200",
 			nodeSequence:   150,
 			refundSequence: 200,
@@ -1246,6 +1259,19 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 			name:           "valid zero timelock - node 0, refund 150",
 			nodeSequence:   0,
 			refundSequence: 150,
+			expectError:    false,
+		},
+		{
+			name:           "invalid refund timelock - below TimeLockInterval",
+			nodeSequence:   0,
+			refundSequence: 99,
+			expectError:    true,
+			errorContains:  "refund transaction sequence must be at least 100 for renewal",
+		},
+		{
+			name:           "valid refund timelock - exactly TimeLockInterval",
+			nodeSequence:   0,
+			refundSequence: 100,
 			expectError:    false,
 		},
 		{
