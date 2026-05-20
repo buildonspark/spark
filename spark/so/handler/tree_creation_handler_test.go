@@ -23,6 +23,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func createTestHandler() *TreeCreationHandler {
@@ -842,6 +844,315 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 	}
 }
 
+func TestPrepareSigningJobsRejectsParentNodeOwnerMismatchBeforeNodeValidation(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{73})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	parentOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attacker := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingKeyshare := createTreeCreationOwnerAuthKeyshare(t, ctx, rng, dbTX)
+	parentOutputPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentOutputScript, err := common.P2TRScriptFromPubKey(parentOutputPubkey)
+	require.NoError(t, err)
+	parentRawTx := createTreeCreationOwnerAuthTx(t, parentOutputScript)
+
+	tree, err := dbTX.Tree.Create().
+		SetOwnerIdentityPubkey(parentOwner).
+		SetNetwork(btcnetwork.Regtest).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetStatus(st.TreeStatusAvailable).
+		Save(ctx)
+	require.NoError(t, err)
+
+	parentNode, err := dbTX.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(parentOwner).
+		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetValue(100000).
+		SetVerifyingPubkey(parentOutputPubkey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(parentRawTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := createTestHandler()
+	_, _, err = handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: attacker.Serialize(),
+		Source: &pb.CreateTreeRequest_ParentNodeOutput{
+			ParentNodeOutput: &pb.NodeOutput{
+				NodeId: parentNode.ID.String(),
+				Vout:   0,
+			},
+		},
+	}, false)
+
+	require.Error(t, err)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "parent node owner")
+}
+
+func TestPrepareTreeAddressRejectsParentNodeOwnerMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{77})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	parentOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attacker := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingKeyshare := createTreeCreationOwnerAuthKeyshare(t, ctx, rng, dbTX)
+	parentOutputPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentOutputScript, err := common.P2TRScriptFromPubKey(parentOutputPubkey)
+	require.NoError(t, err)
+	parentRawTx := createTreeCreationOwnerAuthTx(t, parentOutputScript)
+
+	tree, err := dbTX.Tree.Create().
+		SetOwnerIdentityPubkey(parentOwner).
+		SetNetwork(btcnetwork.Regtest).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetStatus(st.TreeStatusAvailable).
+		Save(ctx)
+	require.NoError(t, err)
+
+	parentNode, err := dbTX.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(parentOwner).
+		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetValue(100000).
+		SetVerifyingPubkey(parentOutputPubkey).
+		SetSigningKeyshare(signingKeyshare).
+		SetRawTx(parentRawTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := createTestHandler()
+	_, err = handler.PrepareTreeAddress(ctx, &pb.PrepareTreeAddressRequest{
+		UserIdentityPublicKey: attacker.Serialize(),
+		Source: &pb.PrepareTreeAddressRequest_ParentNodeOutput{
+			ParentNodeOutput: &pb.NodeOutput{
+				NodeId: parentNode.ID.String(),
+				Vout:   0,
+			},
+		},
+	})
+
+	require.Error(t, err)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "tree node owner")
+}
+
+func TestPrepareSigningJobsRejectsDepositAddressOwnerMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{74})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	depositOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attacker := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingKeyshare := createTreeCreationOwnerAuthKeyshare(t, ctx, rng, dbTX)
+	depositOutputPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	depositOutputScript, err := common.P2TRScriptFromPubKey(depositOutputPubkey)
+	require.NoError(t, err)
+	depositAddress, err := common.P2TRAddressFromPkScript(depositOutputScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+	rawTx := createTreeCreationOwnerAuthTx(t, depositOutputScript)
+	parsedTx, err := common.TxFromRawTxBytes(rawTx)
+	require.NoError(t, err)
+	txid := parsedTx.TxHash()
+
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*depositAddress).
+		SetOwnerIdentityPubkey(depositOwner).
+		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetSigningKeyshare(signingKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := createTestHandler()
+	_, _, err = handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: attacker.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   rawTx,
+				Txid:    txid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+	}, false)
+
+	require.Error(t, err)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "deposit address owner")
+}
+
+func TestPrepareTreeAddressRejectsDepositAddressOwnerMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{75})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	depositOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attacker := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingKeyshare := createTreeCreationOwnerAuthKeyshare(t, ctx, rng, dbTX)
+	depositOutputPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	depositOutputScript, err := common.P2TRScriptFromPubKey(depositOutputPubkey)
+	require.NoError(t, err)
+	depositAddress, err := common.P2TRAddressFromPkScript(depositOutputScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+	rawTx := createTreeCreationOwnerAuthTx(t, depositOutputScript)
+	parsedTx, err := common.TxFromRawTxBytes(rawTx)
+	require.NoError(t, err)
+	txid := parsedTx.TxHash()
+
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*depositAddress).
+		SetOwnerIdentityPubkey(depositOwner).
+		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetSigningKeyshare(signingKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := createTestHandler()
+	_, err = handler.PrepareTreeAddress(ctx, &pb.PrepareTreeAddressRequest{
+		UserIdentityPublicKey: attacker.Serialize(),
+		Source: &pb.PrepareTreeAddressRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   rawTx,
+				Txid:    txid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+	})
+
+	require.Error(t, err)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "deposit address owner")
+}
+
+func TestPrepareSigningJobsRejectsChildDepositAddressOwnerMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{76})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	requestOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	childOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentOwnerSigningPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentKeyshare := createTreeCreationOwnerAuthKeyshare(t, ctx, rng, dbTX)
+
+	parentOutputPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentOutputScript, err := common.P2TRScriptFromPubKey(parentOutputPubkey)
+	require.NoError(t, err)
+	parentAddress, err := common.P2TRAddressFromPkScript(parentOutputScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+	parentRawTx := createTreeCreationOwnerAuthTx(t, parentOutputScript)
+	parentTx, err := common.TxFromRawTxBytes(parentRawTx)
+	require.NoError(t, err)
+	parentTxid := parentTx.TxHash()
+
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*parentAddress).
+		SetOwnerIdentityPubkey(requestOwner).
+		SetOwnerSigningPubkey(parentOwnerSigningPubkey).
+		SetSigningKeyshare(parentKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	childOutputPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	childOutputScript, err := common.P2TRScriptFromPubKey(childOutputPubkey)
+	require.NoError(t, err)
+	childAddress, err := common.P2TRAddressFromPkScript(childOutputScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*childAddress).
+		SetOwnerIdentityPubkey(childOwner).
+		SetOwnerSigningPubkey(parentOwnerSigningPubkey).
+		SetSigningKeyshare(parentKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	rootTx := wire.NewMsgTx(wire.TxVersion)
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTxid, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	rootTx.AddTxOut(&wire.TxOut{Value: 100000, PkScript: childOutputScript})
+	rootRawTx, err := common.SerializeTx(rootTx)
+	require.NoError(t, err)
+
+	handler := createTestHandler()
+	_, _, err = handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: requestOwner.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  rootRawTx,
+				SigningPublicKey:       parentOwnerSigningPubkey.Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			Children: []*pb.CreationNode{{}},
+		},
+	}, false)
+
+	require.Error(t, err)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "child deposit address owner")
+}
+
+func createTreeCreationOwnerAuthKeyshare(t *testing.T, ctx context.Context, rng *rand.ChaCha8, dbTX *ent.Client) *ent.SigningKeyshare {
+	t.Helper()
+
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"test": publicShare.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+	return signingKeyshare
+}
+
+func createTreeCreationOwnerAuthTx(t *testing.T, pkScript []byte) []byte {
+	t.Helper()
+
+	tx := wire.NewMsgTx(wire.TxVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: [32]byte{1, 2, 3}, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: 100000, PkScript: pkScript})
+	rawTx, err := common.SerializeTx(tx)
+	require.NoError(t, err)
+	return rawTx
+}
+
 func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	handler := createTestHandler()
@@ -1525,7 +1836,8 @@ func TestPrepareSigningJobsRejectsParentNodeOwnerMismatch(t *testing.T) {
 	}
 
 	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
-	require.ErrorContains(t, err, "parent node owner identity public key does not match")
+	require.ErrorContains(t, err, "parent node owner")
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
 	assert.Empty(t, signingJobs)
 	assert.Empty(t, nodes)
 }

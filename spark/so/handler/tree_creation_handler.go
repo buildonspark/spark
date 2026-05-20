@@ -153,17 +153,25 @@ func isTreeCreationParentStatusEligible(status st.TreeNodeStatus) bool {
 	return status == st.TreeNodeStatusCreating || status == st.TreeNodeStatusAvailable
 }
 
-func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network btcnetwork.Network, output *wire.TxOut) (keys.Public, *ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) getDepositAddressFromOutput(ctx context.Context, network btcnetwork.Network, output *wire.TxOut) (*ent.DepositAddress, error) {
 	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, network)
 	if err != nil {
-		return keys.Public{}, nil, err
+		return nil, err
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return keys.Public{}, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return depositAddress, nil
+}
+
+func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network btcnetwork.Network, output *wire.TxOut) (keys.Public, *ent.SigningKeyshare, error) {
+	depositAddress, err := h.getDepositAddressFromOutput(ctx, network, output)
 	if err != nil {
 		return keys.Public{}, nil, err
 	}
@@ -176,12 +184,31 @@ func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, 
 	return depositAddress.OwnerSigningPubkey, keyshare, nil
 }
 
-func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network btcnetwork.Network, req *pb.PrepareTreeAddressRequest) (keys.Public, *ent.SigningKeyshare, error) {
-	parentOutput, err := h.findParentOutputFromPrepareTreeAddressRequest(ctx, req)
+func (h *TreeCreationHandler) getOwnedSigningKeyshareFromOutput(ctx context.Context, network btcnetwork.Network, output *wire.TxOut, ownerIdentityPubkey keys.Public) (keys.Public, *ent.SigningKeyshare, error) {
+	depositAddress, err := h.getDepositAddressFromOutput(ctx, network, output)
 	if err != nil {
 		return keys.Public{}, nil, err
 	}
-	return h.getSigningKeyshareFromOutput(ctx, network, parentOutput)
+	if !ownerIdentityPubkey.Equals(depositAddress.OwnerIdentityPubkey) {
+		return keys.Public{}, nil, sparkerrors.PermissionDeniedNoReadAccess(
+			fmt.Errorf("user identity public key does not match child deposit address owner"),
+		)
+	}
+
+	keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
+	if err != nil {
+		return keys.Public{}, nil, err
+	}
+
+	return depositAddress.OwnerSigningPubkey, keyshare, nil
+}
+
+func (h *TreeCreationHandler) findParentDepositAddress(ctx context.Context, network btcnetwork.Network, req *pb.PrepareTreeAddressRequest) (*ent.DepositAddress, error) {
+	parentOutput, err := h.findParentOutputFromPrepareTreeAddressRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return h.getDepositAddressFromOutput(ctx, network, parentOutput)
 }
 
 func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Context, parentUserPubKey keys.Public, nodes []*pb.AddressRequestNode) (int, error) {
@@ -375,7 +402,9 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		}
 
 		if !reqUserIDPubKey.Equals(treeNode.OwnerIdentityPubkey) {
-			return nil, errors.New("user identity public key does not match tree node owner")
+			return nil, sparkerrors.PermissionDeniedNoReadAccess(
+				fmt.Errorf("user identity public key does not match tree node owner"),
+			)
 		}
 
 		nodeTree, err := treeNode.QueryTree().Only(ctx)
@@ -390,10 +419,20 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		}
 	}
 
-	parentUserPublicKey, signingKeyshare, err := h.findParentPublicKeys(ctx, network, req)
+	parentDepositAddress, err := h.findParentDepositAddress(ctx, network, req)
 	if err != nil {
 		return nil, err
 	}
+	if !reqUserIDPubKey.Equals(parentDepositAddress.OwnerIdentityPubkey) {
+		return nil, sparkerrors.PermissionDeniedNoReadAccess(
+			fmt.Errorf("user identity public key does not match deposit address owner"),
+		)
+	}
+	signingKeyshare, err := parentDepositAddress.QuerySigningKeyshare().First(ctx)
+	if err != nil {
+		return nil, err
+	}
+	parentUserPublicKey := parentDepositAddress.OwnerSigningPubkey
 
 	keyCount, err := h.validateAndCountTreeAddressNodes(ctx, parentUserPublicKey, []*pb.AddressRequestNode{req.Node})
 	if err != nil {
@@ -486,7 +525,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, err
 		}
 		if !parentNode.OwnerIdentityPubkey.Equals(userIDPubKey) {
-			return nil, nil, fmt.Errorf("parent node owner identity public key does not match request identity public key")
+			return nil, nil, sparkerrors.PermissionDeniedNoReadAccess(
+				fmt.Errorf("user identity public key does not match parent node owner"),
+			)
 		}
 		if !isTreeCreationParentStatusEligible(parentNode.Status) {
 			return nil, nil, fmt.Errorf("parent node %s status %s is not eligible for tree creation", parentNode.ID, parentNode.Status)
@@ -535,6 +576,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).WithTree().ForUpdate().Only(ctx)
 	if err != nil {
 		return nil, nil, err
+	}
+	if !userIDPubKey.Equals(depositAddress.OwnerIdentityPubkey) {
+		return nil, nil, sparkerrors.PermissionDeniedNoReadAccess(
+			fmt.Errorf("user identity public key does not match deposit address owner"),
+		)
 	}
 	keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
 	if err != nil {
@@ -741,7 +787,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, fmt.Errorf("vout out of bounds for node split direct tx, had: %d, needed: %d", len(directTx.TxOut), len(currentElement.node.Children))
 			}
 			for i, child := range currentElement.node.Children {
-				userSigningKey, signingKeyshare, err := h.getSigningKeyshareFromOutput(ctx, network, cpfpTx.TxOut[i])
+				userSigningKey, signingKeyshare, err := h.getOwnedSigningKeyshareFromOutput(ctx, network, cpfpTx.TxOut[i], userIDPubKey)
 				if err != nil {
 					return nil, nil, err
 				}
