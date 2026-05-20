@@ -254,6 +254,9 @@ func EvaluatePolynomialCommitment(proofs [][]byte, index *big.Int, fieldModulus 
 
 // ValidateShare validates a share of a secret.
 func ValidateShare(share *VerifiableSecretShare) error {
+	if share.Threshold <= 0 {
+		return fmt.Errorf("invalid threshold: %d", share.Threshold)
+	}
 	if len(share.Proofs) != share.Threshold {
 		return fmt.Errorf("invalid VSS proof length: expected %d, got %d", share.Threshold, len(share.Proofs))
 	}

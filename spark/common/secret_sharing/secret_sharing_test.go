@@ -84,13 +84,22 @@ func TestVerifiableSecretSharing(t *testing.T) {
 	})
 
 	// Check that invalid proof length is caught
-	t.Run("CatchInvalidProofLengthTooMany", func(t *testing.T) {
-		share := shares[0]
-		// Add an extra proof to make the length incorrect
-		share.Proofs = append(share.Proofs, share.Proofs[0])
-		err := secretsharing.ValidateShare(share)
-		require.Error(t, err, "failed to catch invalid proof length")
-		require.ErrorContains(t, err, "invalid VSS proof length")
+	t.Run("CatchInvalidProofLength", func(t *testing.T) {
+		t.Run("extra proof", func(t *testing.T) {
+			share := *shares[0]
+			share.Proofs = append(append([][]byte(nil), shares[0].Proofs...), shares[0].Proofs[0])
+			err := secretsharing.ValidateShare(&share)
+			require.Error(t, err, "failed to catch invalid proof length")
+			require.ErrorContains(t, err, "invalid VSS proof length")
+		})
+
+		t.Run("missing proof", func(t *testing.T) {
+			share := *shares[0]
+			share.Proofs = append([][]byte(nil), shares[0].Proofs[:threshold-1]...)
+			err := secretsharing.ValidateShare(&share)
+			require.Error(t, err, "failed to catch invalid proof length")
+			require.ErrorContains(t, err, "invalid VSS proof length")
+		})
 	})
 
 	// Check that too few proofs are rejected (regression: previously > instead of !=

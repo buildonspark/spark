@@ -31,6 +31,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/lib/pq v1.10.9
+	github.com/lightningnetwork/lnd v0.18.5-beta.rc1
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/nbd-wtf/ln-decodepay v1.13.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -146,7 +147,6 @@ require (
 	github.com/lightninglabs/neutrino v0.16.1-0.20240425105051-602843d34ffd // indirect
 	github.com/lightninglabs/neutrino/cache v1.1.2 // indirect
 	github.com/lightningnetwork/lightning-onion v1.2.1-0.20240712235311-98bd56499dfb // indirect
-	github.com/lightningnetwork/lnd v0.18.5-beta.rc1 // indirect
 	github.com/lightningnetwork/lnd/clock v1.1.1 // indirect
 	github.com/lightningnetwork/lnd/fn v1.2.5 // indirect
 	github.com/lightningnetwork/lnd/fn/v2 v2.0.8 // indirect
