@@ -150,9 +150,21 @@ const (
 
 	KnobEnablePartnerJWT        = "spark.so.enable_partner_jwt"
 	KnobUseConsensusDepositTree = "spark.so.use_consensus_deposit_tree"
-	KnobUseConsensusTransfer    = "spark.so.use_consensus_transfer"
-	KnobUseConsensusClaim       = "spark.so.use_consensus_claim"
-	KnobShutdownHodlInvoices    = "spark.so.shutdown_hodl_invoices"
+	// KnobUseConsensusTransfer routes StartTransferV3 through the 2PC engine
+	// instead of the legacy syncTransferV3Init + syncSettleSenderKeyTweaks fanout.
+	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
+	// StartTransferV3 entry point enforces this at request time and rejects
+	// requests if the reconciler is off.
+	//
+	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback
+	// for SEND_TRANSFER on the coordinator. Today the sweep only flips the
+	// FlowExecution row to ROLLED_BACK — it doesn't undo coordinator-side
+	// domain writes (SENDER_KEY_TWEAKED + tweaked shares), so a coordinator
+	// crash between engine DbCommit and markCommitted leaves the coordinator
+	// stranded while participants reconcile to RETURNED.
+	KnobUseConsensusTransfer = "spark.so.use_consensus_transfer"
+	KnobUseConsensusClaim    = "spark.so.use_consensus_claim"
+	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"

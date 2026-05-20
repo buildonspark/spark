@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/btcsuite/btcd/wire"
@@ -11,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/uuids"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -19,10 +21,14 @@ import (
 	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -75,6 +81,19 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 	}
 	if len(keyTweakMap) == 0 {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer package contains no key tweaks"))
+	}
+
+	// No cross-SO verifySenderKeyTweakProofsMatch call (legacy InitiateTransferV2
+	// has one). V3's TransferPackage is a single user-signed blob; ValidateTransferPackage
+	// above verifies that signature on every SO, which subsumes the legacy parallel-field check.
+
+	// Per-SO transfer-size limit. Mirrors the legacy startTransferV3Internal check
+	// and matches its wire contract (raw status.Errorf so clients see the same
+	// codes.InvalidArgument). TODO: aggregate package counts across senders at the
+	// meta level when multi-sender lands.
+	transferLimit := knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoTransferLimit, 0)
+	if transferLimit > 0 && len(keyTweakMap) > int(transferLimit) {
+		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
 	}
 
 	cpfpMap, directMap, dfcMap := loadLeafRefundMapsFromTransferPackage(parsed.senderPkg.TransferPackage)
@@ -290,6 +309,23 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 
 	leafSignatures := make([]*pbinternal.SendTransferLeafSignatures, 0, len(f.signingJobsByLeaf))
 
+	// Per-leaf per-variant SigningResults preserve parity with the legacy v3
+	// response (built via buildSigningResultProtos). The SDK helper for v3
+	// doesn't consume this field today, but the RPC contract publishes it.
+	cpfpSigningResultMap := make(map[string]*helper.SigningResult, len(f.signingJobsByLeaf))
+	directSigningResultMap := make(map[string]*helper.SigningResult)
+	dfcSigningResultMap := make(map[string]*helper.SigningResult)
+	leafMap := make(map[string]*ent.TreeNode, len(f.signingJobsByLeaf))
+
+	// One FROST gRPC connection for all per-leaf AggregateFrost calls. Up to
+	// 3 jobs/leaf × n leaves would otherwise pay the dial cost per call.
+	frostConn, err := f.config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to frost: %w", err)
+	}
+	defer frostConn.Close()
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+
 	// Sort leaves for deterministic iteration (helps tests + log reproducibility).
 	leafIDs := make([]string, 0, len(f.signingJobsByLeaf))
 	for id := range f.signingJobsByLeaf {
@@ -300,27 +336,31 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 	for _, leafID := range leafIDs {
 		jobs := f.signingJobsByLeaf[leafID]
 		sigs := &pbinternal.SendTransferLeafSignatures{LeafId: leafID}
+		leafMap[leafID] = jobs.leaf
 
 		if jobs.cpfp != nil {
-			sig, err := f.aggregateLeafSignature(ctx, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
+			sig, sr, err := f.aggregateLeafSignature(ctx, frostClient, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
 			if err != nil {
 				return nil, fmt.Errorf("aggregate cpfp signature for leaf %s: %w", leafID, err)
 			}
 			sigs.RefundSignature = sig
+			cpfpSigningResultMap[leafID] = sr
 		}
 		if jobs.direct != nil {
-			sig, err := f.aggregateLeafSignature(ctx, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
+			sig, sr, err := f.aggregateLeafSignature(ctx, frostClient, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
 			if err != nil {
 				return nil, fmt.Errorf("aggregate direct signature for leaf %s: %w", leafID, err)
 			}
 			sigs.DirectRefundSignature = sig
+			directSigningResultMap[leafID] = sr
 		}
 		if jobs.dfc != nil {
-			sig, err := f.aggregateLeafSignature(ctx, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
+			sig, sr, err := f.aggregateLeafSignature(ctx, frostClient, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
 			if err != nil {
 				return nil, fmt.Errorf("aggregate direct-from-cpfp signature for leaf %s: %w", leafID, err)
 			}
 			sigs.DirectFromCpfpRefundSignature = sig
+			dfcSigningResultMap[leafID] = sr
 		}
 		leafSignatures = append(leafSignatures, sigs)
 	}
@@ -345,7 +385,11 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer %s for response: %w", f.parsed.transferID, err)
 	}
-	f.response = &pb.StartTransferResponse{Transfer: transferProto}
+	signingResultProtos, err := buildSigningResultProtos(leafMap, cpfpSigningResultMap, directSigningResultMap, dfcSigningResultMap)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build signing result protos: %w", err)
+	}
+	f.response = &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}
 
 	return commitReq, nil
 }
@@ -355,49 +399,51 @@ func (f *sendTransferCoordinatorFlow) RollbackPayload() proto.Message {
 	return &pbinternal.SendTransferRollbackRequest{TransferId: f.parsed.transferID.String()}
 }
 
-// aggregateLeafSignature drives a single FROST AggregateFrost RPC for one job.
+// aggregateLeafSignature drives a single FROST AggregateFrost RPC for one job
+// and returns both the aggregated signature and a SigningResult mirroring
+// helper.GetSignaturesWithPregeneratedNonce's output shape.
 func (f *sendTransferCoordinatorFlow) aggregateLeafSignature(
 	ctx context.Context,
+	frostClient pbfrost.FrostServiceClient,
 	job *helper.SigningJobWithPregeneratedNonce,
 	allShares map[string]map[string][]byte,
 	leaf *ent.TreeNode,
 	userSignatureShare []byte,
-) ([]byte, error) {
+) ([]byte, *helper.SigningResult, error) {
 	keyPackage, err := ent.GetKeyPackage(ctx, f.config, job.SigningKeyshareID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get key package: %w", err)
+		return nil, nil, fmt.Errorf("unable to get key package: %w", err)
 	}
 	shares, ok := allShares[job.JobID.String()]
 	if !ok {
-		return nil, fmt.Errorf("missing signature shares for job %s", job.JobID)
+		return nil, nil, fmt.Errorf("missing signature shares for job %s", job.JobID)
 	}
-	// Public shares must match the signing set per job, not the global
-	// participant set. Different leaves can carry different round1
-	// commitment sets (the user picks the t-of-n SOs per leaf), so we filter
-	// from the actual contributors to this job's shares.
+	// Public shares filtered to the t-of-n that actually contributed shares
+	// for this job (different leaves can carry different round1 commitment
+	// sets). NOTE: legacy signing_coordinator.go filters by the union of
+	// round1 keys; for single-sender v3 today the two reduce to the same
+	// set because round1 already arrives t-of-n. If a future flow ships
+	// n-of-n round1 commitments with only t-of-n contributing shares, this
+	// SigningResult.PublicKeys would be narrower than the legacy path's —
+	// a wire-contract divergence under KnobUseConsensusTransfer. AggregateFrost
+	// itself only requires t public shares matching t signature shares, so
+	// the FROST math is correct either way.
 	publicShares := make(map[string][]byte, len(shares))
 	for id := range shares {
 		share, ok := keyPackage.PublicShares[id]
 		if !ok {
-			return nil, fmt.Errorf("missing public share for operator %s", id)
+			return nil, nil, fmt.Errorf("missing public share for operator %s", id)
 		}
 		publicShares[id] = share
 	}
 
-	conn, err := f.config.NewFrostGRPCConnection()
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to frost: %w", err)
-	}
-	defer conn.Close()
-	frostClient := pbfrost.NewFrostServiceClient(conn)
-
 	userCommitment, err := job.UserCommitment.MarshalProto()
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal user commitment: %w", err)
+		return nil, nil, fmt.Errorf("unable to marshal user commitment: %w", err)
 	}
 	roundCommitments, err := marshalRoundCommitments(job.Round1Packages)
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal round1 commitments: %w", err)
+		return nil, nil, fmt.Errorf("unable to marshal round1 commitments: %w", err)
 	}
 	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            job.Message,
@@ -410,35 +456,85 @@ func (f *sendTransferCoordinatorFlow) aggregateLeafSignature(
 		UserSignatureShare: userSignatureShare,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
+		return nil, nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
 	}
-	return resp.Signature, nil
+
+	// KeyshareOwnerIdentifiers lists every owner of the keyshare (not just
+	// this job's t-of-n contributors) — matches signing_coordinator.go.
+	// Sorted for deterministic response bytes.
+	keyshareOwnerIdentifiers := make([]string, 0, len(keyPackage.PublicShares))
+	for id := range keyPackage.PublicShares {
+		keyshareOwnerIdentifiers = append(keyshareOwnerIdentifiers, id)
+	}
+	slices.Sort(keyshareOwnerIdentifiers)
+	signingResult := &helper.SigningResult{
+		JobID:                    job.JobID,
+		Message:                  job.Message,
+		SignatureShares:          shares,
+		SigningCommitments:       job.Round1Packages,
+		PublicKeys:               publicShares,
+		KeyshareOwnerIdentifiers: keyshareOwnerIdentifiers,
+		KeyshareThreshold:        keyPackage.MinSigners,
+	}
+	return resp.Signature, signingResult, nil
 }
 
 // buildSendTransferCoordinatorFlow validates the request and pre-computes the
 // signing-job helpers the coordinator needs during BuildCommitPayload's
 // aggregation. The coordinator's own DB writes (createTransferV3, FROST round-2)
 // happen inside engine.Execute via the engine-driven Prepare phase.
-//
-//nolint:unused // wired in PR 3 when StartTransferV3 routes to the engine.
 func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request) (*sendTransferCoordinatorFlow, error) {
 	parsed, err := parseSendTransferRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Pre-load leaves for signing-job construction. The engine's Prepare phase
-	// will re-load these under FOR UPDATE before mutating them — these reads
-	// are only to derive deterministic job IDs and sighashes for later
-	// aggregation.
-	cpfpMap, _, _ := loadLeafRefundMapsFromTransferPackage(parsed.senderPkg.TransferPackage)
+	// Pre-load leaves for signing-job construction. The pre-load is
+	// intentionally non-locking: createTransferV3 inside the engine's Prepare
+	// phase re-loads these under FOR UPDATE before mutating them, and
+	// Prepare's leafAvailableStatus check rejects any leaf whose status
+	// changed under us (e.g., a concurrent renew_leaf flipped Available →
+	// RenewLocked, which is the only Spark flow that mutates leaf.RawTx).
+	// So the worst case here is a wasted job-builder pass that the locked
+	// re-read in Prepare aborts cleanly — not a sighash divergence reaching
+	// signing. Locking at this layer would hold row locks on every leaf for
+	// the entire Prepare RPC fan-out plus FROST aggregation (~seconds),
+	// blocking concurrent transfers/claims/exits touching the same leaves.
+	//
+	// Build a union of all three refund maps so leaves that appear only in
+	// the direct or dfc categories are still loaded — otherwise a
+	// direct/dfc-only leaf would fail the per-leaf lookup in
+	// buildSendTransferAggregationJobs. Today single-sender v3 lists every
+	// leaf in the cpfp map, but that's a per-flow contract; multi-sender work
+	// can introduce direct-only or dfc-only leaves. The union map's values
+	// are intentionally last-writer-wins (a leaf appearing in cpfp+direct
+	// retains the direct refund bytes after the second maps.Copy); only the
+	// keys are consumed downstream (via maps.Keys for the DB query).
+	cpfpMap, directMap, dfcMap := loadLeafRefundMapsFromTransferPackage(parsed.senderPkg.TransferPackage)
+	// Capacity hint: in single-sender v3 every leaf is in cpfpMap, so
+	// len(cpfpMap) is the tight upper bound. Over-allocation is harmless if
+	// multi-sender introduces direct/dfc-only leaves.
+	leafRefundUnion := make(map[string][]byte, len(cpfpMap))
+	maps.Copy(leafRefundUnion, cpfpMap)
+	maps.Copy(leafRefundUnion, directMap)
+	maps.Copy(leafRefundUnion, dfcMap)
+	leafUUIDs, err := uuids.ParseSeq(maps.Keys(leafRefundUnion))
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse leaf IDs for coordinator flow: %w", err)
+	}
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	leaves, _, err := loadLeavesWithLock(ctx, db, cpfpMap)
+	leaves, err := db.TreeNode.Query().
+		Where(treenode.IDIn(leafUUIDs...)).
+		WithTree().
+		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to preload leaves for coordinator flow: %w", err)
+	}
+	if len(leaves) != len(leafRefundUnion) {
+		return nil, fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafRefundUnion))
 	}
 	leafMap := make(map[string]*ent.TreeNode, len(leaves))
 	for _, leaf := range leaves {

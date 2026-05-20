@@ -24,6 +24,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -1699,6 +1701,48 @@ func TestStartTransferV3_MultiReceiverRequiresKnob(t *testing.T) {
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "multi-receiver transfers are not enabled")
 	})
+}
+
+// TestStartTransferV3Consensus_MultiReceiverRejection asserts that the
+// consensus-path entry point enforces the same multi-receiver knob guard as
+// the legacy path (covered by TestStartTransferV3_MultiReceiverRequiresKnob
+// above). Mirrors the rejection branch the legacy test covers — without this,
+// flipping KnobUseConsensusTransfer would silently bypass the MIMO knob.
+func TestStartTransferV3Consensus_MultiReceiverRejection(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{60})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver1PubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiver2PubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	makeReq := func(receivers map[string][]byte) *pb.StartTransferV3Request {
+		return &pb.StartTransferV3Request{
+			TransferId: uuid.New().String(),
+			SenderPackages: []*pb.SenderTransferPackage{{
+				OwnerIdentityPublicKey:     senderPrivKey.Public().Serialize(),
+				TransferPackage:            &pb.TransferPackage{},
+				ReceiverIdentityPublicKeys: receivers,
+			}},
+		}
+	}
+
+	// The consensus path checks the multi-receiver knob before any DB work
+	// (createPendingSendTransferAndCommit / engine.Execute), so we only need
+	// a context with the knob service injected — no DB setup required.
+	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobMimoTransferMultiReceiverEnabled: 0,
+	}))
+
+	_, err := handler.startTransferV3Consensus(ctx, makeReq(map[string][]byte{
+		"leaf-1": receiver1PubKey.Serialize(),
+		"leaf-2": receiver2PubKey.Serialize(),
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err),
+		"multi-receiver rejection should produce FailedPrecondition")
 }
 
 // -----------------------------------------------------------------------------

@@ -89,7 +89,9 @@ func createPendingSendTransferAndCommit(ctx context.Context, transferID uuid.UUI
 }
 
 // buildSigningResultProtos marshals per-leaf signing result maps into the proto
-// response format used by StartTransfer and StartTransferV3.
+// response format used by StartTransfer and StartTransferV3. Each of the three
+// variants (cpfp / direct / direct-from-cpfp) is checked independently — a leaf
+// that has only a direct or dfc result still gets that field populated.
 func buildSigningResultProtos(
 	leafMap map[string]*ent.TreeNode,
 	cpfpSigningResultMap map[string]*helper.SigningResult,
@@ -107,20 +109,20 @@ func buildSigningResultProtos(
 				return nil, fmt.Errorf("unable to marshal cpfp signing result: %w", err)
 			}
 			cpfpProto = cpfRes
-			if res, ok := directSigningResultMap[leafID]; ok && len(directSigningResultMap) > 0 {
-				dirRes, err := res.MarshalProto()
-				if err != nil {
-					return nil, fmt.Errorf("unable to marshal direct signing result: %w", err)
-				}
-				directProto = dirRes
+		}
+		if res, ok := directSigningResultMap[leafID]; ok {
+			dirRes, err := res.MarshalProto()
+			if err != nil {
+				return nil, fmt.Errorf("unable to marshal direct signing result: %w", err)
 			}
-			if res, ok := directFromCpfpSigningResultMap[leafID]; ok && len(directFromCpfpSigningResultMap) > 0 {
-				dirFromCpfpRes, err := res.MarshalProto()
-				if err != nil {
-					return nil, fmt.Errorf("unable to marshal direct from cpfp signing result: %w", err)
-				}
-				directFromCpfpProto = dirFromCpfpRes
+			directProto = dirRes
+		}
+		if res, ok := directFromCpfpSigningResultMap[leafID]; ok {
+			dirFromCpfpRes, err := res.MarshalProto()
+			if err != nil {
+				return nil, fmt.Errorf("unable to marshal direct from cpfp signing result: %w", err)
 			}
+			directFromCpfpProto = dirFromCpfpRes
 		}
 
 		results = append(results, &pb.LeafRefundTxSigningResult{
@@ -838,6 +840,20 @@ func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTran
 }
 
 func (h *TransferHandler) StartTransferV3(ctx context.Context, req *pb.StartTransferV3Request) (*pb.StartTransferResponse, error) {
+	knobsService := knobs.GetKnobsService(ctx)
+	if knobsService.GetValue(knobs.KnobUseConsensusTransfer, 0) > 0 {
+		// Refuse to route through the engine unless the FlowExecution reconciler
+		// is also enabled. The engine commits coordinator-side domain state
+		// (SENDER_KEY_TWEAKED + tweaked shares) inside the request tx before
+		// commit-gossip dispatch; participants need the reconciler to resolve
+		// stale FlowExecution rows after a coordinator crash. See the rollout
+		// note on KnobUseConsensusTransfer.
+		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"KnobUseConsensusTransfer requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route v3 through the engine")
+		}
+		return h.startTransferV3Consensus(ctx, req)
+	}
 	return h.startTransferV3Internal(ctx, req)
 }
 

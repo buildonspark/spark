@@ -12,10 +12,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -220,6 +222,111 @@ func (h *TransferHandler) startTransferV3Internal(
 	}
 
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
+}
+
+// startTransferV3Consensus runs the v3 send-transfer flow through the 2PC
+// consensus engine instead of the legacy syncTransferV3Init +
+// syncSettleSenderKeyTweaks fanout. Gated by KnobUseConsensusTransfer at the
+// public StartTransferV3 entry point.
+//
+// This is intentionally a thin entry point: only the cheap structural checks,
+// session-identity auth, and the MIMO multi-receiver knob guard run on the
+// coordinator before the engine fans out. The expensive package validation
+// (ValidateTransferPackage / createTransferV3 / transfer-size limit) lives
+// inside Prepare so it runs concurrently across all SOs rather than serially
+// on the coordinator first.
+func (h *TransferHandler) startTransferV3Consensus(
+	ctx context.Context,
+	req *pb.StartTransferV3Request,
+) (*pb.StartTransferResponse, error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Consensus")
+	defer span.End()
+
+	// Fast-fail structural validation. Mirrors parseSendTransferRequest (called
+	// later by buildSendTransferCoordinatorFlow) so a malformed request errors
+	// out before we pay for the engine fan-out. The two sites must stay in
+	// sync; if you add a new structural check to parseSendTransferRequest,
+	// mirror it here.
+	if len(req.SenderPackages) != 1 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
+	}
+	senderPkg := req.SenderPackages[0]
+	if senderPkg.TransferPackage == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
+	}
+
+	senderIDPK, err := keys.ParsePublicKey(senderPkg.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPK); err != nil {
+		return nil, err
+	}
+
+	// Count distinct receivers (canonical-serialization dedup) for the MIMO
+	// multi-receiver guard. Parsing here also fails fast on malformed
+	// receiver keys before paying for the engine fan-out.
+	receiverSet := make(map[string]struct{})
+	for leafID, receiverBytes := range senderPkg.ReceiverIdentityPublicKeys {
+		recvPK, err := keys.ParsePublicKey(receiverBytes)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
+		}
+		receiverSet[string(recvPK.Serialize())] = struct{}{}
+	}
+	if len(receiverSet) == 0 {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
+	}
+	if len(receiverSet) > 1 {
+		// Coordinator-only by design (matches legacy InitiateTransferV2).
+		// Participants don't re-check this — during the multi-receiver
+		// rollout, set KnobMimoTransferMultiReceiverEnabled on every SO
+		// before flipping the coordinator-routing knob to avoid
+		// coordinator-accepts-but-participants-reject divergence.
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) == 0 {
+			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("multi-receiver transfers are not enabled"))
+		}
+	}
+
+	// No PendingSendTransfer guard on the consensus path — the engine's
+	// FlowExecution row plus createTransferV3's unique constraint on
+	// Transfer.id already provide mutual exclusivity and recovery. Two
+	// concurrent calls with the same transferID both reach Prepare; the
+	// second's createTransferV3 fails on the duplicate row, the engine
+	// rolls back, and the participant reconciler cleans up. Other consensus
+	// flows (renew_leaf) follow the same pattern.
+
+	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req)
+	if err != nil {
+		return nil, err
+	}
+	engine, err := consensus.GetEngine(ctx)
+	if err != nil {
+		return nil, err
+	}
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	if _, err := engine.Execute(ctx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+		&selection,
+		flow,
+	); err != nil {
+		// engine.Execute can fail two ways post-DbCommit: (a) markCommitted
+		// CAS conflict and (b) commit-gossip dispatch failure. Both mean the
+		// transfer is in fact committed and gossip retries from the persisted
+		// FlowExecution row; the on-call signal in the wrapped inner error
+		// distinguishes those cases from a true pre-commit failure.
+		return nil, fmt.Errorf("consensus send transfer failed: %w", err)
+	}
+
+	// flow.response is set inside BuildCommitPayload. engine.Execute returns
+	// nil only after BuildCommitPayload + DbCommit both succeed, so a nil
+	// response here means the contract was violated (e.g., a future engine
+	// refactor moves response construction off the synchronous path). Surface
+	// it loudly instead of returning nil to the client.
+	if flow.response == nil {
+		return nil, fmt.Errorf("internal: consensus send transfer for %s succeeded but produced no response", req.GetTransferId())
+	}
+	return flow.response, nil
 }
 
 func (h *TransferHandler) syncTransferV3Init(

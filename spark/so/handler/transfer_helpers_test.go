@@ -474,3 +474,38 @@ func TestBuildSigningResults_LeafWithNoCpfpEntry(t *testing.T) {
 	assert.Nil(t, results[0].DirectRefundTxSigningResult)
 	assert.Nil(t, results[0].DirectFromCpfpRefundTxSigningResult)
 }
+
+// Regression guard: pre-fix, direct/dfc results were only surfaced inside an
+// `if cpfp ok` branch, so a direct-only leaf returned an empty
+// LeafRefundTxSigningResult. The fix unnested the three checks; this test
+// asserts a direct-only or dfc-only leaf gets the appropriate field set
+// independently of cpfp presence.
+func TestBuildSigningResults_DirectOnlySurfacesDirect(t *testing.T) {
+	vk := testVerifyingKey()
+	leafMap := map[string]*ent.TreeNode{
+		"leaf1": {VerifyingPubkey: vk},
+	}
+	direct := map[string]*helper.SigningResult{"leaf1": testSigningResult()}
+
+	results, err := buildSigningResultProtos(leafMap, nil, direct, nil)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Nil(t, results[0].RefundTxSigningResult, "no cpfp entry → cpfp proto must be nil")
+	assert.NotNil(t, results[0].DirectRefundTxSigningResult, "direct entry must surface even without cpfp")
+	assert.Nil(t, results[0].DirectFromCpfpRefundTxSigningResult)
+}
+
+func TestBuildSigningResults_DfcOnlySurfacesDfc(t *testing.T) {
+	vk := testVerifyingKey()
+	leafMap := map[string]*ent.TreeNode{
+		"leaf1": {VerifyingPubkey: vk},
+	}
+	dfc := map[string]*helper.SigningResult{"leaf1": testSigningResult()}
+
+	results, err := buildSigningResultProtos(leafMap, nil, nil, dfc)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Nil(t, results[0].RefundTxSigningResult)
+	assert.Nil(t, results[0].DirectRefundTxSigningResult)
+	assert.NotNil(t, results[0].DirectFromCpfpRefundTxSigningResult, "dfc entry must surface even without cpfp")
+}
