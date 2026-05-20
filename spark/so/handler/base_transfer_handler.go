@@ -1758,13 +1758,14 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	for _, leafTweak := range leafTweaksMap {
+		shareInt := new(big.Int).SetBytes(leafTweak.SecretShareTweak.SecretShare)
 		err := secretsharing.ValidateShare(
 			&secretsharing.VerifiableSecretShare{
 				SecretShare: secretsharing.SecretShare{
 					FieldModulus: secp256k1.S256().N,
 					Threshold:    int(h.config.Threshold),
 					Index:        big.NewInt(int64(h.config.Index + 1)),
-					Share:        new(big.Int).SetBytes(leafTweak.SecretShareTweak.SecretShare),
+					Share:        shareInt,
 				},
 				Proofs: leafTweak.SecretShareTweak.Proofs,
 			},
@@ -1776,6 +1777,22 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 			if _, err := keys.ParsePublicKey(pubkeyTweak); err != nil {
 				return nil, fmt.Errorf("encountered error when parsing pubkey tweak: %w", err)
 			}
+		}
+
+		// Cross-verify that PubkeySharesTweak for this SO equals SecretShareTweak * G.
+		// This prevents a malicious client from supplying a secret share and a mismatched
+		// public key share, which could compromise the integrity of the key tweak protocol.
+		ourPubkeyTweakBytes, ok := leafTweak.PubkeySharesTweak[h.config.Identifier]
+		if !ok {
+			return nil, fmt.Errorf("pubkey share tweak missing for this operator in leaf %s", leafTweak.LeafId)
+		}
+		sharePrivKey, err := keys.PrivateKeyFromBigInt(shareInt)
+		if err != nil {
+			return nil, fmt.Errorf("unable to derive private key from secret share: %w", err)
+		}
+		expectedPubkeyBytes := sharePrivKey.Public().Serialize()
+		if !bytes.Equal(expectedPubkeyBytes, ourPubkeyTweakBytes) {
+			return nil, fmt.Errorf("pubkey share tweak does not match secret share * G for leaf %s", leafTweak.LeafId)
 		}
 	}
 
