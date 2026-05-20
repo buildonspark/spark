@@ -1,13 +1,22 @@
 package handler
 
 import (
+	"context"
+	"io"
+	"math/rand/v2"
 	"testing"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -208,4 +217,181 @@ func TestFilterJobsForThisOperator(t *testing.T) {
 	assert.Len(t, filtered, 2)
 	assert.Equal(t, "job-1", filtered[0].JobId)
 	assert.Equal(t, "job-3", filtered[1].JobId)
+}
+
+func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{7})
+	ctx, leaf, parentTx := createSendTransferSigningJobTestLeaf(t, rng)
+	refundScript, err := common.P2TRScriptFromPubKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	require.NoError(t, err)
+
+	parentOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
+	validRefundRaw := createSendTransferSigningJobTestTx(t, parentOutPoint, 900, refundScript, nil)
+	_, err = buildSigningJobForRefund(
+		ctx,
+		createSendTransferUserSignedJob(t, rng, leaf.ID.String(), validRefundRaw),
+		leaf,
+		leaf.RawTx,
+		uuid.New(),
+	)
+	require.NoError(t, err)
+
+	wrongOutPoint := wire.OutPoint{Hash: [32]byte{0x99}, Index: 0}
+	wrongOutpointRaw := createSendTransferSigningJobTestTx(t, wrongOutPoint, 900, refundScript, nil)
+	_, err = buildSigningJobForRefund(
+		ctx,
+		createSendTransferUserSignedJob(t, rng, leaf.ID.String(), wrongOutpointRaw),
+		leaf,
+		leaf.RawTx,
+		uuid.New(),
+	)
+	require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
+
+	extraInputRaw := createSendTransferSigningJobTestTx(t, parentOutPoint, 900, refundScript, &wrongOutPoint)
+	_, err = buildSigningJobForRefund(
+		ctx,
+		createSendTransferUserSignedJob(t, rng, leaf.ID.String(), extraInputRaw),
+		leaf,
+		leaf.RawTx,
+		uuid.New(),
+	)
+	require.ErrorContains(t, err, "refund tx must have exactly 1 input")
+}
+
+func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{8})
+	ctx, leaf, cpfpParentTx := createSendTransferSigningJobTestLeaf(t, rng)
+	refundScript, err := common.P2TRScriptFromPubKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	require.NoError(t, err)
+
+	directParentRaw := createSendTransferSigningJobTestTx(
+		t,
+		wire.OutPoint{Hash: [32]byte{0x42}, Index: 0},
+		950,
+		refundScript,
+		nil,
+	)
+	directParentTx, err := common.TxFromRawTxBytes(directParentRaw)
+	require.NoError(t, err)
+	leaf, err = leaf.Update().SetDirectTx(directParentRaw).Save(ctx)
+	require.NoError(t, err)
+
+	wrongOutPoint := wire.OutPoint{Hash: [32]byte{0x77}, Index: 0}
+	makeWrongJob := func() *pb.UserSignedTxSigningJob {
+		rawTx := createSendTransferSigningJobTestTx(t, wrongOutPoint, 900, refundScript, nil)
+		return createSendTransferUserSignedJob(t, rng, leaf.ID.String(), rawTx)
+	}
+	makeValidJob := func(parentTx *wire.MsgTx) *pb.UserSignedTxSigningJob {
+		rawTx := createSendTransferSigningJobTestTx(
+			t,
+			wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+			900,
+			refundScript,
+			nil,
+		)
+		return createSendTransferUserSignedJob(t, rng, leaf.ID.String(), rawTx)
+	}
+
+	tests := []struct {
+		name    string
+		pkg     func() *pb.TransferPackage
+		wantErr string
+	}{
+		{
+			name: "cpfp leaves",
+			pkg: func() *pb.TransferPackage {
+				return &pb.TransferPackage{LeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()}}
+			},
+			wantErr: "build cpfp signing job",
+		},
+		{
+			name: "direct leaves",
+			pkg: func() *pb.TransferPackage {
+				return &pb.TransferPackage{
+					LeavesToSend:       []*pb.UserSignedTxSigningJob{makeValidJob(cpfpParentTx)},
+					DirectLeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()},
+				}
+			},
+			wantErr: "build direct signing job",
+		},
+		{
+			name: "direct from cpfp leaves",
+			pkg: func() *pb.TransferPackage {
+				return &pb.TransferPackage{
+					LeavesToSend:               []*pb.UserSignedTxSigningJob{makeValidJob(cpfpParentTx)},
+					DirectLeavesToSend:         []*pb.UserSignedTxSigningJob{makeValidJob(directParentTx)},
+					DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()},
+				}
+			},
+			wantErr: "build direct-from-cpfp signing job",
+		},
+	}
+
+	leafMap := map[string]*ent.TreeNode{leaf.ID.String(): leaf}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := buildSendTransferAggregationJobs(ctx, uuid.New(), tt.pkg(), leafMap)
+			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
+		})
+	}
+}
+
+func createSendTransferSigningJobTestLeaf(t *testing.T, rng io.Reader) (context.Context, *ent.TreeNode, *wire.MsgTx) {
+	t.Helper()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	client := sessionCtx.Client
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingKeyshare := createTestSigningKeyshare(t, ctx, rng, client)
+	tree := createTestTreeForClaim(t, ctx, ownerIdentityPubKey, client)
+	parentScript, err := common.P2TRScriptFromPubKey(ownerSigningPubKey)
+	require.NoError(t, err)
+
+	parentTx := wire.NewMsgTx(wire.TxVersion)
+	parentTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: [32]byte{0x41}, Index: 0}, nil, nil))
+	parentTx.AddTxOut(wire.NewTxOut(1000, parentScript))
+	parentTxRaw, err := common.SerializeTx(parentTx)
+	require.NoError(t, err)
+
+	leaf, err := client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusTransferLocked).
+		SetTree(tree).
+		SetNetwork(btcnetwork.Regtest).
+		SetSigningKeyshare(signingKeyshare).
+		SetValue(1000).
+		SetVerifyingPubkey(signingKeyshare.PublicKey.Add(ownerSigningPubKey)).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetRawTx(parentTxRaw).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+	return ctx, leaf, parentTx
+}
+
+func createSendTransferSigningJobTestTx(t *testing.T, prevOut wire.OutPoint, value int64, pkScript []byte, extraPrevOut *wire.OutPoint) []byte {
+	t.Helper()
+	tx := wire.NewMsgTx(wire.TxVersion)
+	tx.AddTxIn(wire.NewTxIn(&prevOut, nil, nil))
+	if extraPrevOut != nil {
+		tx.AddTxIn(wire.NewTxIn(extraPrevOut, nil, nil))
+	}
+	tx.AddTxOut(wire.NewTxOut(value, pkScript))
+	raw, err := common.SerializeTx(tx)
+	require.NoError(t, err)
+	return raw
+}
+
+func createSendTransferUserSignedJob(t *testing.T, rng io.Reader, leafID string, rawTx []byte) *pb.UserSignedTxSigningJob {
+	t.Helper()
+	return &pb.UserSignedTxSigningJob{
+		LeafId:                 leafID,
+		SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+		RawTx:                  rawTx,
+		SigningNonceCommitment: createTestSigningCommitment(rng),
+		SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{"operator": createTestSigningCommitment(rng)}},
+		UserSignature:          []byte{0x01},
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -557,8 +558,6 @@ type sendTransferLeafSigningJobs struct {
 // the coordinator uses for FROST aggregation. Mirrors the iteration logic in
 // SignRefundsWithPregeneratedNonce but with deterministic job IDs and no
 // adaptor public keys (v3 doesn't use adaptor signatures).
-//
-//nolint:unused // reached via buildSendTransferCoordinatorFlow (wired in PR 3).
 func buildSendTransferAggregationJobs(
 	ctx context.Context,
 	transferID uuid.UUID,
@@ -628,6 +627,13 @@ func buildSigningJobForRefund(
 	}
 	if len(parentTx.TxOut) == 0 {
 		return nil, fmt.Errorf("parent tx has no outputs")
+	}
+	if len(refundTx.TxIn) != 1 {
+		return nil, fmt.Errorf("refund tx must have exactly 1 input, got %d", len(refundTx.TxIn))
+	}
+	expectedOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
+	if refundTx.TxIn[0].PreviousOutPoint != expectedOutPoint {
+		return nil, fmt.Errorf("refund tx input 0 must spend parent tx output 0")
 	}
 	sigHash, err := common.SigHashFromTx(refundTx, 0, parentTx.TxOut[0])
 	if err != nil {
