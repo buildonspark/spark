@@ -3460,6 +3460,9 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 
 	// If MIMO receive is enabled, the receiver is guaranteed to match the request owner identity public key.
 	if !isMimoReceiveEnabled {
+		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transfer); err != nil {
+			return nil, err
+		}
 		if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
 			return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", transferID)
 		}
@@ -4806,6 +4809,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	if err != nil {
 		return err
 	}
+	if !isMimoReceiveEnabled {
+		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transfer); err != nil {
+			return err
+		}
+	}
 
 	// Read logic determined by MIMO receive state
 	if isMimoReceiveEnabled {
@@ -5015,6 +5023,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	isMimoReceiveEnabled, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
 	if err != nil {
 		return err
+	}
+	if !isMimoReceiveEnabled {
+		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transfer); err != nil {
+			return err
+		}
 	}
 
 	if isMimoReceiveEnabled {

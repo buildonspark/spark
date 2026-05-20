@@ -482,6 +482,159 @@ func TestClaimTransferMIMO_FallsBackWhenNoReceivers(t *testing.T) {
 	assert.NotContains(t, err.Error(), "no transfer receivers found")
 }
 
+func TestClaimTransferRejectsExistingMultiReceiverWhenMimoReadDisabled(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	rng := rand.NewChaCha8([32]byte{86})
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	tree := createTestTreeForClaim(t, ctx, ownerIdentityPrivKey.Public(), sessionCtx.Client)
+	leafA := createTestTreeNode(t, ctx, rng, sessionCtx.Client, tree, keyshare)
+	leafB := createTestTreeNode(t, ctx, rng, sessionCtx.Client, tree, keyshare)
+
+	receiverAPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverA := receiverAPrivKey.Public()
+	receiverB := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverA, st.TransferStatusSenderKeyTweaked)
+	receiverARow, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverA).
+		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+	receiverBRow, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverB).
+		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transferLeafA := createTestTransferLeaf(t, ctx, sessionCtx.Client, transfer, leafA)
+	_, err = transferLeafA.Update().SetTransferReceiverID(receiverARow.ID).Save(ctx)
+	require.NoError(t, err)
+	transferLeafB := createTestTransferLeaf(t, ctx, sessionCtx.Client, transfer, leafB)
+	_, err = transferLeafB.Update().SetTransferReceiverID(receiverBRow.ID).Save(ctx)
+	require.NoError(t, err)
+	leafAStatus := leafA.Status
+	leafBStatus := leafB.Status
+
+	leafJobs := []*pb.UserSignedTxSigningJob{
+		{LeafId: leafA.ID.String()},
+		{LeafId: leafB.ID.String()},
+	}
+	req := &pb.ClaimTransferRequest{
+		TransferId:             transfer.ID.String(),
+		OwnerIdentityPublicKey: receiverA.Serialize(),
+		ClaimPackage: &pb.ClaimPackage{
+			LeavesToClaim: []*pb.UserSignedTxSigningJob{
+				{LeafId: leafJobs[0].LeafId},
+				{LeafId: leafJobs[1].LeafId},
+			},
+			DirectLeavesToClaim: []*pb.UserSignedTxSigningJob{
+				{LeafId: leafJobs[0].LeafId},
+				{LeafId: leafJobs[1].LeafId},
+			},
+			DirectFromCpfpLeavesToClaim: []*pb.UserSignedTxSigningJob{
+				{LeafId: leafJobs[0].LeafId},
+				{LeafId: leafJobs[1].LeafId},
+			},
+			KeyTweakPackage: map[string][]byte{"so1": []byte("data")},
+			HashVariant:     pb.HashVariant_HASH_VARIANT_V2,
+			UserSignature:   []byte("dummy"),
+		},
+	}
+
+	_, err = NewTransferHandler(sparktesting.TestConfig(t)).ClaimTransfer(ctx, req)
+	require.ErrorContains(t, err, "multi-receiver transfer")
+	require.ErrorContains(t, err, "receiver-scoped MIMO claim handling")
+
+	updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TransferStatusSenderKeyTweaked, updatedTransfer.Status)
+	updatedReceiverA, err := sessionCtx.Client.TransferReceiver.Get(ctx, receiverARow.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending, updatedReceiverA.Status)
+	updatedReceiverB, err := sessionCtx.Client.TransferReceiver.Get(ctx, receiverBRow.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending, updatedReceiverB.Status)
+	updatedLeafA, err := sessionCtx.Client.TreeNode.Get(ctx, leafA.ID)
+	require.NoError(t, err)
+	assert.Equal(t, leafAStatus, updatedLeafA.Status)
+	updatedLeafB, err := sessionCtx.Client.TreeNode.Get(ctx, leafB.ID)
+	require.NoError(t, err)
+	assert.Equal(t, leafBStatus, updatedLeafB.Status)
+}
+
+func TestLegacySettlementHelpersRejectExistingMultiReceiverWhenMimoReadDisabled(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	rng := rand.NewChaCha8([32]byte{87})
+	receiverAPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverBPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	createMultiReceiverTransfer := func(t *testing.T, status st.TransferStatus) *ent.Transfer {
+		t.Helper()
+
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverAPubKey, status)
+		_, err := sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverAPubKey).
+			SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+			SetTransferType(transfer.Type).
+			Save(ctx)
+		require.NoError(t, err)
+		_, err = sessionCtx.Client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(receiverBPubKey).
+			SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+			SetTransferType(transfer.Type).
+			Save(ctx)
+		require.NoError(t, err)
+		return transfer
+	}
+
+	t.Run("initiate settle rejects multi receiver transfer", func(t *testing.T) {
+		transfer := createMultiReceiverTransfer(t, st.TransferStatusSenderKeyTweaked)
+
+		err := handler.InitiateSettleReceiverKeyTweak(ctx, &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			ReceiverIdentityPublicKey: receiverAPubKey.Serialize(),
+		})
+
+		require.ErrorContains(t, err, "multi-receiver transfer")
+		require.ErrorContains(t, err, "receiver-scoped MIMO claim handling")
+
+		updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusSenderKeyTweaked, updatedTransfer.Status)
+	})
+
+	t.Run("settle rejects multi receiver transfer", func(t *testing.T) {
+		transfer := createMultiReceiverTransfer(t, st.TransferStatusReceiverKeyTweaked)
+
+		err := handler.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
+			TransferId:                transfer.ID.String(),
+			Action:                    pbinternal.SettleKeyTweakAction_COMMIT,
+			ReceiverIdentityPublicKey: receiverAPubKey.Serialize(),
+		})
+
+		require.ErrorContains(t, err, "multi-receiver transfer")
+		require.ErrorContains(t, err, "receiver-scoped MIMO claim handling")
+
+		updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusReceiverKeyTweaked, updatedTransfer.Status)
+	})
+}
+
 // TestClaimTransferTweakKeys_DualWritesReceiverStatus verifies that ClaimTransferTweakKeys
 // updates both the Transfer status to ReceiverKeyTweaked AND the TransferReceiver status
 // to KeyTweaked when a single receiver exists (MIMO knob disabled).

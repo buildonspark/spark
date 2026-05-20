@@ -1529,6 +1529,21 @@ func (h *BaseTransferHandler) loadTransferReceiverByPublicKeyForUpdate(ctx conte
 	}
 }
 
+func rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx context.Context, transfer *ent.Transfer) error {
+	receivers, err := transfer.QueryTransferReceivers().
+		ForUpdate(sql.WithLockAction(sql.NoWait)).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to query transfer receivers for transfer %s: %w", transfer.ID, err)
+	}
+	if len(receivers) <= 1 {
+		return nil
+	}
+	return sparkerrors.FailedPreconditionInvalidState(
+		fmt.Errorf("multi-receiver transfer %s requires receiver-scoped MIMO claim handling", transfer.ID),
+	)
+}
+
 // loadSingleTransferReceiver loads the sole TransferReceiver for a transfer, if one exists.
 // Returns an error if the transfer has multiple receivers (legacy endpoints do not support MIMO).
 func (h *BaseTransferHandler) loadSingleTransferReceiverForUnsupportedMimoPath(ctx context.Context, transfer *ent.Transfer) (*ent.TransferReceiver, error) {
