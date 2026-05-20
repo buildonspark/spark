@@ -1590,6 +1590,14 @@ export interface TransferReceiver {
   identityPublicKey: Uint8Array;
   amountSats: number;
   status: TransferReceiverStatus;
+  id: string;
+  completionTime: Date | undefined;
+}
+
+/** Per-sender summary within a Transfer response. */
+export interface TransferSender {
+  id: string;
+  identityPublicKey: Uint8Array;
 }
 
 export interface Transfer {
@@ -1605,8 +1613,8 @@ export interface Transfer {
   type: TransferType;
   sparkInvoice: string;
   network: Network;
-  /** For V3 multi-receiver transfers. Empty for single-receiver (V2) transfers. */
   receivers: TransferReceiver[];
+  senders: TransferSender[];
 }
 
 export interface TransferLeaf {
@@ -1617,6 +1625,8 @@ export interface TransferLeaf {
   intermediateDirectRefundTx: Uint8Array;
   intermediateDirectFromCpfpRefundTx: Uint8Array;
   pendingKeyTweakPublicKey: Uint8Array;
+  transferReceiverId: string;
+  transferSenderId: string;
 }
 
 export interface TransferFilter {
@@ -10061,7 +10071,7 @@ export const FinalizeTransferResponse: MessageFns<FinalizeTransferResponse> = {
 };
 
 function createBaseTransferReceiver(): TransferReceiver {
-  return { identityPublicKey: new Uint8Array(0), amountSats: 0, status: 0 };
+  return { identityPublicKey: new Uint8Array(0), amountSats: 0, status: 0, id: "", completionTime: undefined };
 }
 
 export const TransferReceiver: MessageFns<TransferReceiver> = {
@@ -10074,6 +10084,12 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
     }
     if (message.status !== 0) {
       writer.uint32(24).int32(message.status);
+    }
+    if (message.id !== "") {
+      writer.uint32(34).string(message.id);
+    }
+    if (message.completionTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.completionTime), writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -10109,6 +10125,22 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
           message.status = reader.int32() as any;
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.completionTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -10125,6 +10157,8 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
         : new Uint8Array(0),
       amountSats: isSet(object.amountSats) ? globalThis.Number(object.amountSats) : 0,
       status: isSet(object.status) ? transferReceiverStatusFromJSON(object.status) : 0,
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      completionTime: isSet(object.completionTime) ? fromJsonTimestamp(object.completionTime) : undefined,
     };
   },
 
@@ -10139,6 +10173,12 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
     if (message.status !== 0) {
       obj.status = transferReceiverStatusToJSON(message.status);
     }
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.completionTime !== undefined) {
+      obj.completionTime = message.completionTime.toISOString();
+    }
     return obj;
   },
 
@@ -10150,6 +10190,86 @@ export const TransferReceiver: MessageFns<TransferReceiver> = {
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.amountSats = object.amountSats ?? 0;
     message.status = object.status ?? 0;
+    message.id = object.id ?? "";
+    message.completionTime = object.completionTime ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTransferSender(): TransferSender {
+  return { id: "", identityPublicKey: new Uint8Array(0) };
+}
+
+export const TransferSender: MessageFns<TransferSender> = {
+  encode(message: TransferSender, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.identityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferSender {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferSender();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferSender {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: TransferSender): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferSender>): TransferSender {
+    return TransferSender.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferSender>): TransferSender {
+    const message = createBaseTransferSender();
+    message.id = object.id ?? "";
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
@@ -10169,6 +10289,7 @@ function createBaseTransfer(): Transfer {
     sparkInvoice: "",
     network: 0,
     receivers: [],
+    senders: [],
   };
 }
 
@@ -10212,6 +10333,9 @@ export const Transfer: MessageFns<Transfer> = {
     }
     for (const v of message.receivers) {
       TransferReceiver.encode(v!, writer.uint32(106).fork()).join();
+    }
+    for (const v of message.senders) {
+      TransferSender.encode(v!, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -10327,6 +10451,14 @@ export const Transfer: MessageFns<Transfer> = {
           message.receivers.push(TransferReceiver.decode(reader, reader.uint32()));
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.senders.push(TransferSender.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -10356,6 +10488,9 @@ export const Transfer: MessageFns<Transfer> = {
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
       receivers: globalThis.Array.isArray(object?.receivers)
         ? object.receivers.map((e: any) => TransferReceiver.fromJSON(e))
+        : [],
+      senders: globalThis.Array.isArray(object?.senders)
+        ? object.senders.map((e: any) => TransferSender.fromJSON(e))
         : [],
     };
   },
@@ -10401,6 +10536,9 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.receivers?.length) {
       obj.receivers = message.receivers.map((e) => TransferReceiver.toJSON(e));
     }
+    if (message.senders?.length) {
+      obj.senders = message.senders.map((e) => TransferSender.toJSON(e));
+    }
     return obj;
   },
 
@@ -10422,6 +10560,7 @@ export const Transfer: MessageFns<Transfer> = {
     message.sparkInvoice = object.sparkInvoice ?? "";
     message.network = object.network ?? 0;
     message.receivers = object.receivers?.map((e) => TransferReceiver.fromPartial(e)) || [];
+    message.senders = object.senders?.map((e) => TransferSender.fromPartial(e)) || [];
     return message;
   },
 };
@@ -10435,6 +10574,8 @@ function createBaseTransferLeaf(): TransferLeaf {
     intermediateDirectRefundTx: new Uint8Array(0),
     intermediateDirectFromCpfpRefundTx: new Uint8Array(0),
     pendingKeyTweakPublicKey: new Uint8Array(0),
+    transferReceiverId: "",
+    transferSenderId: "",
   };
 }
 
@@ -10460,6 +10601,12 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     }
     if (message.pendingKeyTweakPublicKey.length !== 0) {
       writer.uint32(58).bytes(message.pendingKeyTweakPublicKey);
+    }
+    if (message.transferReceiverId !== "") {
+      writer.uint32(66).string(message.transferReceiverId);
+    }
+    if (message.transferSenderId !== "") {
+      writer.uint32(74).string(message.transferSenderId);
     }
     return writer;
   },
@@ -10527,6 +10674,22 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
           message.pendingKeyTweakPublicKey = reader.bytes();
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.transferReceiverId = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.transferSenderId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -10553,6 +10716,8 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
       pendingKeyTweakPublicKey: isSet(object.pendingKeyTweakPublicKey)
         ? bytesFromBase64(object.pendingKeyTweakPublicKey)
         : new Uint8Array(0),
+      transferReceiverId: isSet(object.transferReceiverId) ? globalThis.String(object.transferReceiverId) : "",
+      transferSenderId: isSet(object.transferSenderId) ? globalThis.String(object.transferSenderId) : "",
     };
   },
 
@@ -10579,6 +10744,12 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     if (message.pendingKeyTweakPublicKey.length !== 0) {
       obj.pendingKeyTweakPublicKey = base64FromBytes(message.pendingKeyTweakPublicKey);
     }
+    if (message.transferReceiverId !== "") {
+      obj.transferReceiverId = message.transferReceiverId;
+    }
+    if (message.transferSenderId !== "") {
+      obj.transferSenderId = message.transferSenderId;
+    }
     return obj;
   },
 
@@ -10594,6 +10765,8 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     message.intermediateDirectRefundTx = object.intermediateDirectRefundTx ?? new Uint8Array(0);
     message.intermediateDirectFromCpfpRefundTx = object.intermediateDirectFromCpfpRefundTx ?? new Uint8Array(0);
     message.pendingKeyTweakPublicKey = object.pendingKeyTweakPublicKey ?? new Uint8Array(0);
+    message.transferReceiverId = object.transferReceiverId ?? "";
+    message.transferSenderId = object.transferSenderId ?? "";
     return message;
   },
 };

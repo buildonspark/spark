@@ -89,6 +89,7 @@ function createTransfer(
     sparkInvoice: "",
     network: Network.REGTEST,
     receivers: [],
+    senders: [],
   };
 }
 

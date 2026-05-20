@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -74,17 +75,20 @@ func preloadedTransfer(t *testing.T) (*ent.Transfer, keys.Public, keys.Public) {
 	receiver1 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv1Pub, Status: st.TransferReceiverStatusKeyTweaked}
 	receiver2 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv2Pub, Status: st.TransferReceiverStatusKeyTweaked}
 	recv1ID, recv2ID := receiver1.ID, receiver2.ID
+	senderID := uuid.New()
 
 	transferLeaf1 := &ent.TransferLeaf{
 		ID:                   uuid.New(),
 		IntermediateRefundTx: refundTx,
 		TransferReceiverID:   &recv1ID,
+		TransferSenderID:     &senderID,
 		Edges:                ent.TransferLeafEdges{Leaf: leaf1Node},
 	}
 	transferLeaf2 := &ent.TransferLeaf{
 		ID:                   uuid.New(),
 		IntermediateRefundTx: refundTx,
 		TransferReceiverID:   &recv2ID,
+		TransferSenderID:     &senderID,
 		Edges:                ent.TransferLeafEdges{Leaf: leaf2Node},
 	}
 
@@ -140,6 +144,90 @@ func TestMarshalProtoForReceiver_PreloadedReceiverNotInTransfer(t *testing.T) {
 
 	_, err := transfer.MarshalProtoForReceiver(t.Context(), stranger)
 	require.Error(t, err)
+}
+
+func TestMarshalProto_PopulatesSenders(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	senderID := uuid.New()
+	transfer.Edges.TransferSenders = []*ent.TransferSender{
+		{ID: senderID, IdentityPubkey: transfer.SenderIdentityPubkey},
+	}
+
+	proto, err := transfer.MarshalProto(t.Context())
+	require.NoError(t, err)
+	require.Len(t, proto.Senders, 1, "expected one TransferSender")
+	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.Senders[0].IdentityPublicKey)
+	require.Equal(t, senderID.String(), proto.Senders[0].Id)
+}
+
+func TestMarshalProto_PopulatesReceiverIDAndCompletionTime(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	completion := time.Now().UTC().Truncate(time.Second)
+	transfer.Edges.TransferReceivers[0].Status = st.TransferReceiverStatusCompleted
+	transfer.Edges.TransferReceivers[0].CompletionTime = completion
+
+	proto, err := transfer.MarshalProto(t.Context())
+	require.NoError(t, err)
+	require.Len(t, proto.Receivers, 2)
+
+	// receivers[] iteration mirrors edge order; first entry has CompletionTime.
+	var completed *pb.TransferReceiver
+	var pending *pb.TransferReceiver
+	for _, r := range proto.Receivers {
+		if r.Id == transfer.Edges.TransferReceivers[0].ID.String() {
+			completed = r
+		} else {
+			pending = r
+		}
+	}
+	require.NotNil(t, completed)
+	require.NotNil(t, pending)
+	require.Equal(t, completion.Unix(), completed.CompletionTime.AsTime().Unix())
+	require.Nil(t, pending.CompletionTime, "non-completed receiver should have nil completion_time")
+}
+
+func TestMarshalProto_EmitsReceiverWithoutLeaves(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	transfer.Edges.TransferLeaves = []*ent.TransferLeaf{}
+
+	proto, err := transfer.MarshalProto(t.Context())
+	require.NoError(t, err)
+	require.Len(t, proto.Receivers, 2, "receivers should still emit when no leaves point at them")
+	for _, r := range proto.Receivers {
+		require.Equal(t, uint64(0), r.AmountSats, "receivers with no leaves should report 0 sats")
+	}
+}
+
+func TestMarshalProto_PopulatesLeafTransferReceiverID(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+
+	proto, err := transfer.MarshalProto(t.Context())
+	require.NoError(t, err)
+	require.Len(t, proto.Leaves, 2)
+
+	receiverIDs := make(map[string]struct{}, 2)
+	for _, r := range transfer.Edges.TransferReceivers {
+		receiverIDs[r.ID.String()] = struct{}{}
+	}
+	for _, leaf := range proto.Leaves {
+		require.NotEmpty(t, leaf.TransferReceiverId, "each leaf should carry its receiver id")
+		_, ok := receiverIDs[leaf.TransferReceiverId]
+		require.True(t, ok, "leaf.transfer_receiver_id %s should match one of the transfer's receivers", leaf.TransferReceiverId)
+	}
+}
+
+func TestMarshalProto_PopulatesLeafTransferSenderID(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+
+	proto, err := transfer.MarshalProto(t.Context())
+	require.NoError(t, err)
+	require.Len(t, proto.Leaves, 2)
+
+	// All leaves should carry the same single-sender id from the fixture.
+	senderID := transfer.Edges.TransferLeaves[0].TransferSenderID.String()
+	for _, leaf := range proto.Leaves {
+		require.Equal(t, senderID, leaf.TransferSenderId, "each leaf should carry its sender id")
+	}
 }
 
 // dbFixture seeds postgres with a Tree, TreeNode, and Transfer that has two

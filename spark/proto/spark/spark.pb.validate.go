@@ -9746,6 +9746,37 @@ func (m *TransferReceiver) validate(all bool) error {
 
 	// no validation rules for Status
 
+	// no validation rules for Id
+
+	if all {
+		switch v := interface{}(m.GetCompletionTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferReceiverValidationError{
+					field:  "CompletionTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferReceiverValidationError{
+					field:  "CompletionTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCompletionTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferReceiverValidationError{
+				field:  "CompletionTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return TransferReceiverMultiError(errors)
 	}
@@ -9823,6 +9854,110 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TransferReceiverValidationError{}
+
+// Validate checks the field values on TransferSender with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TransferSender) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TransferSender with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TransferSenderMultiError,
+// or nil if none found.
+func (m *TransferSender) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TransferSender) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Id
+
+	// no validation rules for IdentityPublicKey
+
+	if len(errors) > 0 {
+		return TransferSenderMultiError(errors)
+	}
+
+	return nil
+}
+
+// TransferSenderMultiError is an error wrapping multiple validation errors
+// returned by TransferSender.ValidateAll() if the designated constraints
+// aren't met.
+type TransferSenderMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TransferSenderMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TransferSenderMultiError) AllErrors() []error { return m }
+
+// TransferSenderValidationError is the validation error returned by
+// TransferSender.Validate if the designated constraints aren't met.
+type TransferSenderValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TransferSenderValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TransferSenderValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TransferSenderValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TransferSenderValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TransferSenderValidationError) ErrorName() string { return "TransferSenderValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TransferSenderValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTransferSender.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TransferSenderValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TransferSenderValidationError{}
 
 // Validate checks the field values on Transfer with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -10017,6 +10152,40 @@ func (m *Transfer) validate(all bool) error {
 
 	}
 
+	for idx, item := range m.GetSenders() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferValidationError{
+						field:  fmt.Sprintf("Senders[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferValidationError{
+						field:  fmt.Sprintf("Senders[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferValidationError{
+					field:  fmt.Sprintf("Senders[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return TransferMultiError(errors)
 	}
@@ -10156,6 +10325,10 @@ func (m *TransferLeaf) validate(all bool) error {
 	// no validation rules for IntermediateDirectFromCpfpRefundTx
 
 	// no validation rules for PendingKeyTweakPublicKey
+
+	// no validation rules for TransferReceiverId
+
+	// no validation rules for TransferSenderId
 
 	if len(errors) > 0 {
 		return TransferLeafMultiError(errors)

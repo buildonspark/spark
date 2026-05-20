@@ -35,6 +35,7 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "spark1testinvoice",
         network: Network.REGTEST,
         receivers: [],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -58,6 +59,7 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "",
         network: Network.REGTEST,
         receivers: [],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -85,6 +87,7 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "spark1invoice123",
         network: Network.MAINNET,
         receivers: [],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -117,6 +120,7 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "",
         network: Network.REGTEST,
         receivers: [],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -140,6 +144,7 @@ describe("sdk-types mapping functions", () => {
         sparkInvoice: "",
         network: Network.REGTEST,
         receivers: [],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, identityPublicKey);
@@ -164,18 +169,23 @@ describe("sdk-types mapping functions", () => {
         network: Network.REGTEST,
         receivers: [
           {
+            id: "receiver-1",
             identityPublicKey: hexToBytes("03ef12"),
             amountSats: 600,
             status:
               TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+            completionTime: undefined,
           },
           {
+            id: "receiver-2",
             identityPublicKey: hexToBytes("04abcd"),
             amountSats: 400,
             status:
               TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+            completionTime: undefined,
           },
         ],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, secondaryReceiverHex);
@@ -200,18 +210,23 @@ describe("sdk-types mapping functions", () => {
         network: Network.REGTEST,
         receivers: [
           {
+            id: "receiver-1",
             identityPublicKey: hexToBytes("03ef12"),
             amountSats: 600,
             status:
               TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+            completionTime: undefined,
           },
           {
+            id: "receiver-2",
             identityPublicKey: hexToBytes("04abcd"),
             amountSats: 400,
             status:
               TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_CLAIM_PENDING,
+            completionTime: undefined,
           },
         ],
+        senders: [],
       };
 
       const result = mapTransferToWalletTransfer(proto, unrelatedHex);
@@ -230,6 +245,8 @@ describe("sdk-types mapping functions", () => {
         intermediateDirectRefundTx: new Uint8Array(),
         intermediateDirectFromCpfpRefundTx: new Uint8Array(),
         pendingKeyTweakPublicKey: new Uint8Array(),
+        transferReceiverId: "",
+        transferSenderId: "",
       };
 
       const result = mapTransferLeafToWalletTransferLeaf(proto);

@@ -15,6 +15,7 @@ import (
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
 // To marshal the spark invoice, the edge must be pre-loaded via Transfer.WithSparkInvoice().
 // To populate the Receivers field, the edge must also be pre-loaded via Transfer.WithTransferReceivers().
+// To populate the Senders field, the edge must also be pre-loaded via Transfer.WithTransferSenders().
 // If TransferLeaves (with nested Leaf→Tree/SigningKeyshare/Parent) is pre-loaded, that
 // slice is reused; otherwise leaves are lazy-loaded.
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
@@ -28,11 +29,11 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 			return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 		}
 	}
-	return t.marshalWithLeaves(ctx, leaves)
+	return t.marshalWithLeavesAndReceivers(ctx, leaves, t.Edges.TransferReceivers)
 }
 
 // MarshalProtoForReceiver converts a Transfer to a protobuf Transfer,
-// filtering leaves to only those assigned to the given receiver.
+// filtering leaves AND the emitted Receivers list to only the given receiver.
 // The Transfer's TransferReceivers edge must be pre-loaded (WithTransferReceivers).
 // Returns an error if the receiver is not found in this transfer.
 // If TransferLeaves is pre-loaded, the receiver filter is applied in-memory;
@@ -66,7 +67,14 @@ func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey k
 			return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 		}
 	}
-	return t.marshalWithLeaves(ctx, leaves)
+	var receiverOnly []*TransferReceiver
+	for _, r := range t.Edges.TransferReceivers {
+		if r.ID == receiverID {
+			receiverOnly = append(receiverOnly, r)
+			break
+		}
+	}
+	return t.marshalWithLeavesAndReceivers(ctx, leaves, receiverOnly)
 }
 
 // HasReceiver reports whether the given pubkey matches a TransferReceiver on this transfer.
@@ -87,7 +95,7 @@ func (t *Transfer) findReceiverID(pubkey keys.Public) (uuid.UUID, bool) {
 	return uuid.UUID{}, false
 }
 
-func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf) (*pb.Transfer, error) {
+func (t *Transfer) marshalWithLeavesAndReceivers(ctx context.Context, leaves []*TransferLeaf, receiverEdges []*TransferReceiver) (*pb.Transfer, error) {
 	var leavesProto []*pb.TransferLeaf
 	for _, leaf := range leaves {
 		treeNode := leaf.Edges.Leaf
@@ -101,28 +109,36 @@ func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf
 		leavesProto = append(leavesProto, leafProto)
 	}
 
+	amountByReceiver := make(map[uuid.UUID]uint64, len(receiverEdges))
+	for _, leaf := range leaves {
+		if leaf.TransferReceiverID != nil {
+			amountByReceiver[*leaf.TransferReceiverID] += leaf.Edges.Leaf.Value
+		}
+	}
 	var receivers []*pb.TransferReceiver
-	if len(t.Edges.TransferReceivers) > 0 {
-		amountByReceiver := make(map[uuid.UUID]uint64, len(t.Edges.TransferReceivers))
-		for _, leaf := range leaves {
-			if leaf.TransferReceiverID != nil {
-				amountByReceiver[*leaf.TransferReceiverID] += leaf.Edges.Leaf.Value
-			}
+	for _, r := range receiverEdges {
+		receiverStatus, err := TransferReceiverStatusProto(r.Status)
+		if err != nil {
+			return nil, err
 		}
-		for _, r := range t.Edges.TransferReceivers {
-			if _, ok := amountByReceiver[r.ID]; !ok {
-				continue
-			}
-			receiverStatus, err := TransferReceiverStatusProto(r.Status)
-			if err != nil {
-				return nil, err
-			}
-			receivers = append(receivers, &pb.TransferReceiver{
-				IdentityPublicKey: r.IdentityPubkey.Serialize(),
-				AmountSats:        amountByReceiver[r.ID],
-				Status:            *receiverStatus,
-			})
+		receiver := &pb.TransferReceiver{
+			Id:                r.ID.String(),
+			IdentityPublicKey: r.IdentityPubkey.Serialize(),
+			AmountSats:        amountByReceiver[r.ID],
+			Status:            *receiverStatus,
 		}
+		if !r.CompletionTime.IsZero() {
+			receiver.CompletionTime = timestamppb.New(r.CompletionTime)
+		}
+		receivers = append(receivers, receiver)
+	}
+
+	var senders []*pb.TransferSender
+	for _, s := range t.Edges.TransferSenders {
+		senders = append(senders, &pb.TransferSender{
+			Id:                s.ID.String(),
+			IdentityPublicKey: s.IdentityPubkey.Serialize(),
+		})
 	}
 
 	status, err := t.getProtoStatus()
@@ -155,6 +171,7 @@ func (t *Transfer) marshalWithLeaves(ctx context.Context, leaves []*TransferLeaf
 		SparkInvoice:              invoice,
 		Network:                   network,
 		Receivers:                 receivers,
+		Senders:                   senders,
 	}, nil
 }
 

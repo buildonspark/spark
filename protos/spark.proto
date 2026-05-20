@@ -856,6 +856,14 @@ message TransferReceiver {
     bytes identity_public_key = 1;
     uint64 amount_sats = 2;
     TransferReceiverStatus status = 3;
+    string id = 4;
+    google.protobuf.Timestamp completion_time = 5;
+}
+
+// Per-sender summary within a Transfer response.
+message TransferSender {
+    string id = 1;
+    bytes identity_public_key = 2;
 }
 
 message Transfer {
@@ -871,8 +879,8 @@ message Transfer {
     TransferType type = 10;
     string spark_invoice = 11;
     Network network = 12;
-    // For V3 multi-receiver transfers. Empty for single-receiver (V2) transfers.
     repeated TransferReceiver receivers = 13;
+    repeated TransferSender senders = 14;
 }
 
 message TransferLeaf {
@@ -883,6 +891,8 @@ message TransferLeaf {
     bytes intermediate_direct_refund_tx = 5;
     bytes intermediate_direct_from_cpfp_refund_tx = 6;
     bytes pending_key_tweak_public_key = 7;
+    string transfer_receiver_id = 8;
+    string transfer_sender_id = 9;
 }
 
 

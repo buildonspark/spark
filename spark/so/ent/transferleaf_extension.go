@@ -38,7 +38,7 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 		}
 	}
 
-	return &pb.TransferLeaf{
+	pbLeaf := &pb.TransferLeaf{
 		Leaf:                               leafProto,
 		SecretCipher:                       secretCipher,
 		Signature:                          signature,
@@ -46,5 +46,12 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 		IntermediateDirectRefundTx:         t.IntermediateDirectRefundTx,
 		IntermediateDirectFromCpfpRefundTx: t.IntermediateDirectFromCpfpRefundTx,
 		PendingKeyTweakPublicKey:           keyTweakProof,
-	}, nil
+	}
+	if t.TransferReceiverID != nil {
+		pbLeaf.TransferReceiverId = t.TransferReceiverID.String()
+	}
+	if t.TransferSenderID != nil {
+		pbLeaf.TransferSenderId = t.TransferSenderID.String()
+	}
+	return pbLeaf, nil
 }

@@ -324,6 +324,8 @@ function createMockTransferLeaf(leaf: TreeNode): TransferLeaf {
     intermediateDirectRefundTx: new Uint8Array(0),
     intermediateDirectFromCpfpRefundTx: new Uint8Array(0),
     pendingKeyTweakPublicKey: new Uint8Array(0),
+    transferReceiverId: "",
+    transferSenderId: "",
   };
 }
 
@@ -342,6 +344,7 @@ function createMockTransfer(overrides: Partial<Transfer> = {}): Transfer {
     sparkInvoice: "",
     network: Network.REGTEST,
     receivers: [],
+    senders: [],
     ...overrides,
   };
 }
