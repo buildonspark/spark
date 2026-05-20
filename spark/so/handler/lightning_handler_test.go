@@ -1332,7 +1332,10 @@ func TestStorePreimage(t *testing.T) {
 			Save(ctx)
 		require.NoError(t, err)
 
-		updated, err := lightningHandler.StorePreimage(ctx, preimageRequest, preimage)
+		err = lightningHandler.StorePreimage(ctx, preimageRequest, preimage)
+		require.NoError(t, err)
+
+		updated, err := dbTx.PreimageRequest.Get(ctx, preimageRequest.ID)
 		require.NoError(t, err)
 		assert.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
 		assert.Equal(t, preimage, updated.Preimage)
@@ -1360,7 +1363,10 @@ func TestStorePreimage(t *testing.T) {
 			Save(ctx)
 		require.NoError(t, err)
 
-		updated, err := lightningHandler.StorePreimage(ctx, preimageRequest, preimage)
+		err = lightningHandler.StorePreimage(ctx, preimageRequest, preimage)
+		require.NoError(t, err)
+
+		updated, err := dbTx.PreimageRequest.Get(ctx, preimageRequest.ID)
 		require.NoError(t, err)
 		assert.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
 		assert.Equal(t, existingPreimage, updated.Preimage)

@@ -2452,18 +2452,47 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 	return preimageRequest, transfer, nil
 }
 
-func (h *LightningHandler) StorePreimage(ctx context.Context, preimageRequest *ent.PreimageRequest, preimage []byte) (*ent.PreimageRequest, error) {
-	if preimageRequest.Status == st.PreimageRequestStatusWaitingForPreimage {
-		updated, err := preimageRequest.Update().
-			SetStatus(st.PreimageRequestStatusPreimageShared).
-			SetPreimage(preimage).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update preimage request status: %w", err)
-		}
-		return updated, nil
+func (h *LightningHandler) StorePreimage(ctx context.Context, preimageRequest *ent.PreimageRequest, preimage []byte) error {
+	if preimageRequest.Status != st.PreimageRequestStatusWaitingForPreimage {
+		return nil
 	}
-	return preimageRequest, nil
+
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseReadError(
+			fmt.Errorf("failed to get database context: %w", err),
+		)
+	}
+
+	// Conditional update: the WHERE clause ensures this write fails if a
+	// concurrent ReturnStuckTransfers / cancel has already moved the row to
+	// RETURNED between ValidatePreimage's read and this write. Without the
+	// status predicate, Ent would issue `UPDATE ... WHERE id=$1` and silently
+	// overwrite RETURNED → PREIMAGE_SHARED, leaking the preimage for a
+	// cancelled transfer.
+	n, err := tx.PreimageRequest.Update().Where(
+		preimagerequest.IDEQ(preimageRequest.ID),
+		preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
+	).SetStatus(st.PreimageRequestStatusPreimageShared).
+		SetPreimage(preimage).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update preimage request status: %w", err)
+	}
+	if n == 0 {
+		current, err := tx.PreimageRequest.Get(ctx, preimageRequest.ID)
+		if err != nil {
+			return fmt.Errorf("unable to reload preimage request: %w", err)
+		}
+		if current.Status == st.PreimageRequestStatusPreimageShared {
+			return nil
+		}
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("preimage request %s no longer in WAITING_FOR_PREIMAGE status", preimageRequest.ID),
+		)
+	}
+
+	return nil
 }
 
 func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pbinternal.ProvidePreimageRequest) (*ent.Transfer, error) {
@@ -2487,7 +2516,7 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
 
-	_, err = h.StorePreimage(ctx, preimageRequest, req.Preimage)
+	err = h.StorePreimage(ctx, preimageRequest, req.Preimage)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store preimage: %w", err)
 	}
@@ -2599,7 +2628,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 
 	phaseStart = time.Now()
 	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.storePreimage", spanOpt)
-	_, err = h.StorePreimage(storeCtx, preimageRequest, req.Preimage)
+	err = h.StorePreimage(storeCtx, preimageRequest, req.Preimage)
 	endSpanWithError(storeSpan, err)
 	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, phaseStart, err)
 	if err != nil {
