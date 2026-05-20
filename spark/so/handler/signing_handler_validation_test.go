@@ -85,3 +85,26 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 		})
 	}
 }
+
+// When a request supplies node_ids that don't exist in tree_nodes, the
+// response must be NotFound with the missing IDs named — not a silently
+// truncated success that breaks the [count] x [num_node_ids] ordering
+// contract on GetSigningCommitmentsResponse.
+func TestGetSigningCommitmentsRejectsUnknownNodeIDs(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewSigningHandler(&so.Config{
+		SigningOperatorMap:         sparktesting.GetAllSigningOperators(t),
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	})
+
+	missingID := uuid.NewString()
+	resp, err := handler.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
+		NodeIds: []string{missingID},
+		Count:   1,
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.Equal(t, codes.NotFound, status.Code(err))
+	require.ErrorContains(t, err, missingID)
+	require.ErrorContains(t, err, "unknown node ids")
+}

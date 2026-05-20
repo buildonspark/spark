@@ -1140,11 +1140,11 @@ func TestGetSigningCommitments(t *testing.T) {
 			expectEmpty: true,
 		},
 		{
-			name:        "non-existent node ID",
-			nodeIds:     []string{"12345678-1234-1234-1234-123456789012"},
-			count:       1,
-			expectError: false,
-			expectEmpty: true,
+			name:           "non-existent node ID",
+			nodeIds:        []string{"12345678-1234-1234-1234-123456789012"},
+			count:          1,
+			expectError:    true,
+			expectedErrMsg: "unknown node ids: 12345678-1234-1234-1234-123456789012",
 		},
 		{
 			name:        "zero count defaults to 1",

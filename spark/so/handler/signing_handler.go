@@ -122,6 +122,22 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 			return nil, fmt.Errorf("unable to get nodes: %w", err)
 		}
 
+		// Silently truncating would break the response's [count] x [num_node_ids] ordering contract.
+		if len(nodes) != len(nodeIDs) {
+			foundIDs := make(map[string]struct{}, len(nodes))
+			for _, n := range nodes {
+				foundIDs[n.ID.String()] = struct{}{}
+			}
+			missing := make([]string, 0, len(nodeIDs)-len(nodes))
+			for _, id := range nodeIDs {
+				if _, ok := foundIDs[id.String()]; !ok {
+					missing = append(missing, id.String())
+				}
+			}
+			return nil, errors.NotFoundMissingEntity(
+				fmt.Errorf("requested signing commitments for unknown node ids: %s", strings.Join(missing, ", ")))
+		}
+
 		if err := h.validateNodeOwnership(ctx, nodes); err != nil {
 			return nil, err
 		}
