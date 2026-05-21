@@ -27,6 +27,13 @@ declare const __SPARK_PRIVATE_CONFIGS__: {
 };
 declare const __SPARK_LOCAL_CONFIG_AVAILABLE__: boolean;
 
+/* For debugging purposes only, this is not required for the SDK to work: */
+declare global {
+  interface Window {
+    s: typeof spark;
+  }
+}
+
 const PUBLIC_NETWORKS: readonly Network[] = ["MAINNET", "TESTNET", "REGTEST"];
 const LOCALHOST_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 const IS_LOCALHOST = LOCALHOST_HOSTNAMES.has(window.location.hostname);
@@ -198,6 +205,10 @@ function satsToBitcoinAmount(amountSats: number): number {
   return Number((amountSats / 100_000_000).toFixed(8));
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function waitForBalanceAtLeast(
   wallet: SparkWallet,
   targetBalance: bigint,
@@ -350,7 +361,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `WASM error: ${err instanceof Error ? err.message : err}`,
+        message: `WASM error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -378,7 +389,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -402,7 +413,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -417,7 +428,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -435,7 +446,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     } finally {
       setDepositActionPending(false);
@@ -475,7 +486,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     } finally {
       setDepositActionPending(false);
@@ -544,7 +555,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     } finally {
       setDepositActionPending(false);
@@ -564,7 +575,7 @@ function App() {
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -610,11 +621,11 @@ function App() {
         });
         setStatus({ type: "success", message: `Sent! ID: ${result.id}` });
       }
-      refreshBalance();
+      void refreshBalance();
     } catch (err) {
       setStatus({
         type: "error",
-        message: `Error: ${err instanceof Error ? err.message : err}`,
+        message: `Error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -629,11 +640,11 @@ function App() {
         {/* WASM Test */}
         <div className="section">
           <h3>1. Test WASM</h3>
-          <button onClick={testWasm}>Test WASM Signing</button>
+          <button onClick={() => void testWasm()}>Test WASM Signing</button>
           {dummyTx && (
             <div
               className="code clickable"
-              onClick={() => copyToClipboard(dummyTx.txid)}
+              onClick={() => void copyToClipboard(dummyTx.txid)}
             >
               txid: {dummyTx.txid}
             </div>
@@ -682,8 +693,8 @@ function App() {
             rows={3}
           />
           <div className="button-row">
-            <button onClick={initializeWallet}>Load Wallet</button>
-            <button onClick={generateWallet}>Generate New</button>
+            <button onClick={() => void initializeWallet()}>Load Wallet</button>
+            <button onClick={() => void generateWallet()}>Generate New</button>
           </div>
         </div>
 
@@ -695,7 +706,7 @@ function App() {
               {sparkAddress && (
                 <div
                   className="code clickable"
-                  onClick={() => copyToClipboard(sparkAddress)}
+                  onClick={() => void copyToClipboard(sparkAddress)}
                 >
                   {sparkAddress}
                 </div>
@@ -709,7 +720,9 @@ function App() {
                 </div>
               )}
               <div className="button-row">
-                <button onClick={refreshBalance}>Refresh Balance</button>
+                <button onClick={() => void refreshBalance()}>
+                  Refresh Balance
+                </button>
               </div>
             </div>
 
@@ -718,7 +731,7 @@ function App() {
               <h3>4. Deposit</h3>
               <div className="button-row">
                 <button
-                  onClick={createDepositAddress}
+                  onClick={() => void createDepositAddress()}
                   disabled={depositActionPending}
                 >
                   Get Deposit Address
@@ -727,7 +740,7 @@ function App() {
               {depositAddress && (
                 <div
                   className="code clickable"
-                  onClick={() => copyToClipboard(depositAddress)}
+                  onClick={() => void copyToClipboard(depositAddress)}
                 >
                   {depositAddress}
                 </div>
@@ -741,7 +754,10 @@ function App() {
                     onChange={(e) => setDepositAmount(e.target.value)}
                     disabled={depositActionPending}
                   />
-                  <button onClick={fundLocally} disabled={depositActionPending}>
+                  <button
+                    onClick={() => void fundLocally()}
+                    disabled={depositActionPending}
+                  >
                     Fund Locally
                   </button>
                 </div>
@@ -755,7 +771,7 @@ function App() {
                   disabled={depositActionPending}
                 />
                 <button
-                  onClick={() => claimDeposit()}
+                  onClick={() => void claimDeposit()}
                   disabled={depositActionPending}
                 >
                   Claim Deposit
@@ -774,14 +790,17 @@ function App() {
                   onChange={(e) => setInvoiceAmount(e.target.value)}
                   style={{ flex: 1, marginBottom: 0 }}
                 />
-                <button onClick={createInvoice} style={{ marginBottom: 0 }}>
+                <button
+                  onClick={() => void createInvoice()}
+                  style={{ marginBottom: 0 }}
+                >
                   Create Invoice
                 </button>
               </div>
               {invoice && (
                 <div
                   className="code clickable"
-                  onClick={() => copyToClipboard(invoice)}
+                  onClick={() => void copyToClipboard(invoice)}
                 >
                   {invoice}
                 </div>
@@ -830,7 +849,7 @@ function App() {
                   onChange={(e) => setMaxFeeSats(e.target.value)}
                 />
               )}
-              <button onClick={sendTransaction}>
+              <button onClick={() => void sendTransaction()}>
                 {sendType === "lightning" ? "Pay Invoice" : "Send"}
               </button>
             </div>
@@ -844,8 +863,4 @@ function App() {
 export default App;
 
 /* For debugging purposes only, this is not required for the SDK to work: */
-interface SparkWindow extends Window {
-  s: typeof spark;
-}
-declare let window: SparkWindow;
 window.s = spark;
