@@ -86,6 +86,16 @@ Transactions are automatically managed by the gRPC middleware (`so/grpc/database
 - Commits on success, rolls back on error or panic
 - Manual `tx.Commit()`/`tx.Rollback()` only needed in rare cases
 
+### Signing Keyshare Secrets
+
+`signing_keyshares.secret_share` is **nullable**. The real secret may live in the ephemeral DB (`so/entephemeral`) keyed by `(id, secret_version)` — reading the column directly will panic or silently produce empty bytes for any keyshare whose secret has been migrated.
+
+- **Read via `SigningKeyshare.GetSecretShare(ctx)`**, never via `keyshare.SecretShare` direct field access. It checks the main DB column, then the cached `ExternalSecret`, then falls back to the ephemeral store.
+- **Batch readers** should call `ent.HydrateSigningKeyshareSecrets(ctx, keyshares)` once over the full set before iterating, so each per-keyshare `GetSecretShare(ctx)` hits the cache instead of round-tripping to the ephemeral DB.
+- See `so/entephemeral/README.md` for the full read/write/rotation contract.
+
+This applies to any access to `*ent.SigningKeyshare.SecretShare` — typically reached via `Edges.RevocationKeyshare` (token outputs) or `Edges.SigningKeyshare` (tree nodes, deposit addresses, entity DKG key). `TokenPartialRevocationSecretShare.SecretShare` is a different, non-nullable value-type field and is safe to dereference directly.
+
 ## Testing
 
 ### Unit Tests (`*_test.go` alongside source)

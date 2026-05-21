@@ -57,7 +57,11 @@ func (SigningKeyshare) Fields() []ent.Field {
 		field.
 			Bytes("secret_share").
 			GoType(keys.Private{}).
-			Comment("The secret share of the signing keyshare held by this SO.").
+			Comment("The secret share of the signing keyshare held by this SO. " +
+				"NULLABLE: the secret may live in the ephemeral DB (so/entephemeral) keyed by secret_version. " +
+				"Do NOT read this field directly. Use SigningKeyshare.GetSecretShare(ctx), which falls back to the " +
+				"ephemeral store when this column is NULL. For batch reads, call ent.HydrateSigningKeyshareSecrets(ctx, keyshares) " +
+				"first so per-output GetSecretShare(ctx) calls hit the cache. See so/entephemeral/README.md.").
 			Optional().
 			Nillable().
 			Annotations(entexample.Default("adeab186b64a2239f15640cb43d7c57c35376f5e1c42f574671880a34a4a80ad")),

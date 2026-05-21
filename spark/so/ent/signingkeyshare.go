@@ -28,7 +28,7 @@ type SigningKeyshare struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// The status of the signing keyshare (i.e. whether it is in use or not).
 	Status schematype.SigningKeyshareStatus `json:"status,omitempty"`
-	// The secret share of the signing keyshare held by this SO.
+	// The secret share of the signing keyshare held by this SO. NULLABLE: the secret may live in the ephemeral DB (so/entephemeral) keyed by secret_version. Do NOT read this field directly. Use SigningKeyshare.GetSecretShare(ctx), which falls back to the ephemeral store when this column is NULL. For batch reads, call ent.HydrateSigningKeyshareSecrets(ctx, keyshares) first so per-output GetSecretShare(ctx) calls hit the cache. See so/entephemeral/README.md.
 	SecretShare *keys.Private `json:"secret_share,omitempty"`
 	// The active secret version for this signing keyshare.
 	SecretVersion *int32 `json:"secret_version,omitempty"`
