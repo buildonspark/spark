@@ -17,7 +17,7 @@ import (
 const (
 	backfillSigningKeyshareSecretVersion     = int32(0)
 	backfillSigningKeyshareSecretsInterval   = time.Minute
-	backfillSigningKeyshareSecretsTimeout    = time.Minute
+	backfillSigningKeyshareSecretsTimeout    = 2 * time.Minute
 	backfillSigningKeyshareSecretsRunBudget  = 50 * time.Second
 	backfillSigningKeyshareSecretsBatchDelay = 250 * time.Millisecond
 )
