@@ -39,10 +39,16 @@ const (
 	KnobReadMIMODataModelQueryByTypes          = "spark.so.read_mimo_data_model_query_by_types"
 	KnobReadMIMODataModelReceiverByTypeStatus  = "spark.so.read_mimo_data_model_receiver_by_type_status"
 	KnobReadMIMODataModelCounterSwap           = "spark.so.read_mimo_data_model_counter_swap"
+	KnobReadMIMODataModelByParticipantFallback = "spark.so.read_mimo_data_model_by_participant_fallback"
 
 	// Per-call sampling rate (0–100) for the "transfer query invoked" caller-attribution log.
 	// Default 0 = off; bump to 100 (or a small percentage) during diagnosis.
 	KnobLogTransferQueryInvocations = "spark.so.log_transfer_query_invocations"
+
+	// Slow-call threshold in milliseconds. When > 0, "transfer query invoked"
+	// invocations with elapsed >= threshold log unconditionally and carry
+	// slow_query=true regardless of the sampling knob.
+	KnobLogTransferQueryInvocationsSlowMs = "spark.so.log_transfer_query_invocations_slow_ms"
 
 	KnobSoSigningCommitmentNodeLimit  = "spark.so.signing_commitments.nodes_limit"
 	KnobSoSigningCommitmentCountLimit = "spark.so.signing_commitments.count_limit"

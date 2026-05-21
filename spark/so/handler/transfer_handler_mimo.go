@@ -7,7 +7,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uuids"
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
@@ -20,8 +22,11 @@ import (
 	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
+	enttransfersender "github.com/lightsparkdev/spark/so/ent/transfersender"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -500,10 +505,9 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		if resp != nil {
 			resultCount = len(resp.Transfers)
 		}
-		logQueryTransfersInvocation(ctx, "query_outgoing_in_flight", filter,
+		logQueryTransfersInvocation(ctx, "query_outgoing_in_flight", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
 			zap.Bool("use_mimo", true),
-			zap.Duration("elapsed", time.Since(start)),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -669,10 +673,9 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 		if resp != nil {
 			resultCount = len(resp.Transfers)
 		}
-		logQueryTransfersInvocation(ctx, "query_by_types", filter,
+		logQueryTransfersInvocation(ctx, "query_by_types", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
 			zap.Bool("use_mimo", true),
-			zap.Duration("elapsed", time.Since(start)),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -856,10 +859,9 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 		if resp != nil {
 			resultCount = len(resp.Transfers)
 		}
-		logQueryTransfersInvocation(ctx, "query_receiver_by_type_status", filter,
+		logQueryTransfersInvocation(ctx, "query_receiver_by_type_status", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
 			zap.Bool("use_mimo", true),
-			zap.Duration("elapsed", time.Since(start)),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -1048,10 +1050,9 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 		if resp != nil {
 			resultCount = len(resp.Transfers)
 		}
-		logQueryTransfersInvocation(ctx, "query_counter_swap", filter,
+		logQueryTransfersInvocation(ctx, "query_counter_swap", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
 			zap.Bool("use_mimo", true),
-			zap.Duration("elapsed", time.Since(start)),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -1171,4 +1172,257 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 		Transfers: transferProtos,
 		Offset:    nextOffset,
 	}, nil
+}
+
+// shouldRouteToByParticipantFallback reports whether the request should dispatch to
+// queryByParticipantFallback. Fallback only claims participant-bearing shapes —
+// nil-participant traffic stays on legacy queryTransfers, which has the
+// per-transfer access-check pass that this handler doesn't replicate.
+func shouldRouteToByParticipantFallback(ctx context.Context, filter *pb.TransferFilter) bool {
+	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelByParticipantFallback, 0) {
+		return false
+	}
+	return filter.GetParticipant() != nil
+}
+
+// queryByParticipantFallback handles QueryAllTransfers requests via Ent-based edge
+// predicates — the correctness floor for any participant-bearing shape that
+// fell through the specialized handlers. The load-bearing invariant: status
+// filtering on the receiver arm applies to transfer_receivers.status, not
+// transfers.status. For multi-receiver MIMO transfers the parent can lag
+// behind an individual receiver — legacy's parent-axis filter silently drops
+// the row when a sibling hasn't settled.
+//
+// Routing in QueryAllTransfers guarantees:
+//   - filter.GetParticipant() != nil
+//   - KnobReadMIMODataModelByParticipantFallback is on
+//   - No specialized handler claimed this shape upstream
+//
+// Not a hot-path handler — the correctness floor. Multi-second outliers
+// already exist on legacy queryTransfers, so a slow call here isn't
+// necessarily new; lift recurring hot shapes into specialized handlers.
+func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.queryByParticipantFallback")
+	defer span.End()
+
+	start := time.Now()
+	defer func() {
+		resultCount := 0
+		if resp != nil {
+			resultCount = len(resp.Transfers)
+		}
+		logQueryTransfersInvocation(ctx, "query_by_participant_fallback", filter, time.Since(start),
+			zap.Bool("is_ssp", isSSP),
+			zap.Bool("use_mimo", true),
+			zap.Int("result_count", resultCount),
+			zap.Error(err),
+		)
+	}()
+
+	if filter.GetLimit() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
+	}
+	if filter.GetOffset() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
+	}
+	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
+		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
+	}
+	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	}
+
+	network, err := btcnetwork.FromProtoNetwork(filter.GetNetwork())
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
+	}
+
+	if filter.GetParticipant() == nil {
+		return nil, status.Error(codes.InvalidArgument, "queryByParticipantFallback requires a participant")
+	}
+
+	statuses := make([]st.TransferStatus, len(filter.GetStatuses()))
+	for i, s := range filter.GetStatuses() {
+		schemaStatus, statusErr := ent.TransferStatusSchema(s)
+		if statusErr != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer status: %w", statusErr))
+		}
+		statuses[i] = schemaStatus
+	}
+
+	walletPubkey, role, filterType, err := extractParticipant(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:       "query_by_participant_fallback",
+		MIMOEnabled:     true,
+		FilterType:      filterType,
+		HasStatusFilter: len(filter.GetStatuses()) > 0,
+		HasTypeFilter:   len(filter.GetTypes()) > 0,
+		HasTransferIDs:  len(filter.GetTransferIds()) > 0,
+	})
+
+	if !isSSP {
+		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
+		if accessErr != nil {
+			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
+		}
+		if !hasReadAccess {
+			metrics.record(ctx, 0, nil)
+			return &pb.QueryTransfersResponse{Offset: -1}, nil
+		}
+	}
+
+	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
+
+	participantPred, err := buildByParticipantFallbackParticipantPredicate(role, walletPubkey, statuses)
+	if err != nil {
+		return nil, err
+	}
+	preds := []predicate.Transfer{enttransfer.NetworkEQ(network), participantPred}
+
+	if len(filter.GetTransferIds()) > 0 {
+		if len(filter.GetTransferIds()) > maxTransferIDFilterValues {
+			return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("there were %d transfer ids provided, but the max is %d", len(filter.GetTransferIds()), maxTransferIDFilterValues))
+		}
+		transferUUIDs, parseErr := uuids.ParseSlice(filter.GetTransferIds())
+		if parseErr != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", parseErr))
+		}
+		preds = append(preds, enttransfer.IDIn(transferUUIDs...))
+	}
+
+	if len(filter.GetTypes()) > 0 {
+		transferTypes := make([]st.TransferType, len(filter.GetTypes()))
+		for i, protoType := range filter.GetTypes() {
+			schemaType, typeErr := st.TransferTypeFromProto(protoType.String())
+			if typeErr != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid transfer type: %s", protoType.String())
+			}
+			transferTypes[i] = schemaType
+		}
+		preds = append(preds, enttransfer.TypeIn(transferTypes...))
+	}
+
+	if filter.GetCreatedAfter() != nil {
+		preds = append(preds, enttransfer.CreateTimeGT(filter.GetCreatedAfter().AsTime().UTC()))
+	} else if filter.GetCreatedBefore() != nil {
+		preds = append(preds, enttransfer.CreateTimeLT(filter.GetCreatedBefore().AsTime().UTC()))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db from context: %w", err)
+	}
+
+	orderFn := ent.Desc(enttransfer.FieldCreateTime)
+	idOrderFn := ent.Desc(enttransfer.FieldID)
+	if filter.GetOrder() == pb.Order_ASCENDING {
+		orderFn = ent.Asc(enttransfer.FieldCreateTime)
+		idOrderFn = ent.Asc(enttransfer.FieldID)
+	}
+
+	transferIDs, err := db.Transfer.Query().
+		Where(enttransfer.And(preds...)).
+		Order(orderFn, idOrderFn).
+		Limit(limit).
+		Offset(offset).
+		IDs(ctx)
+	if err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, fmt.Errorf("failed to query transfer IDs: %w", err)
+	}
+
+	if len(transferIDs) == 0 {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+
+	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
+	metrics.record(ctx, len(transferProtos), err)
+	if err != nil {
+		return nil, err
+	}
+
+	nextOffset := int64(-1)
+	if len(transferIDs) == limit {
+		nextOffset = int64(offset + len(transferIDs))
+	}
+	return &pb.QueryTransfersResponse{
+		Transfers: transferProtos,
+		Offset:    nextOffset,
+	}, nil
+}
+
+// buildByParticipantFallbackParticipantPredicate builds the participant-axis
+// predicate for queryByParticipantFallback. Sender-axis status filters apply to
+// transfers.status (the parent axis is unambiguous for sender); receiver-axis
+// status filters apply to transfer_receivers.status via the receiver-axis
+// translation + narrowing — preserving MIMO correctness for multi-receiver
+// transfers.
+func buildByParticipantFallbackParticipantPredicate(role participantRole, walletPubkey keys.Public, statuses []st.TransferStatus) (predicate.Transfer, error) {
+	switch role {
+	case participantRoleSender:
+		senderArm := enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(walletPubkey))
+		if len(statuses) > 0 {
+			return enttransfer.And(senderArm, enttransfer.StatusIn(statuses...)), nil
+		}
+		return senderArm, nil
+	case participantRoleReceiver:
+		return buildReceiverArmPredicate(walletPubkey, statuses), nil
+	case participantRoleSenderOrReceiver:
+		senderArm := enttransfer.HasTransferSendersWith(enttransfersender.IdentityPubkeyEQ(walletPubkey))
+		if len(statuses) > 0 {
+			senderArm = enttransfer.And(senderArm, enttransfer.StatusIn(statuses...))
+		}
+		return enttransfer.Or(senderArm, buildReceiverArmPredicate(walletPubkey, statuses)), nil
+	default:
+		return nil, fmt.Errorf("unsupported participant role: %d", role)
+	}
+}
+
+// buildReceiverArmPredicate composes the receiver-axis predicate for a given
+// wallet pubkey and (optional) status filter. With no statuses, just the edge
+// existence. With statuses, mirror ReceiverArmFilters' SQL form in Ent:
+//
+//	r.status IN $indexSet AND (r.status IN $exactMatch OR t.status IN $narrowing)
+//
+// Untranslatable statuses are silently dropped by ReceiverArmFilters. If
+// every input status is untranslatable (indexSet empty) the receiver arm
+// contributes nothing — IDEQ(uuid.Nil) is a never-matches predicate that
+// composes cleanly under Or in the SR1 case.
+func buildReceiverArmPredicate(walletPubkey keys.Public, statuses []st.TransferStatus) predicate.Transfer {
+	if len(statuses) == 0 {
+		return enttransfer.HasTransferReceiversWith(enttransferreceiver.IdentityPubkeyEQ(walletPubkey))
+	}
+	indexSet, exactMatch, narrowingTransfer := mimo.ReceiverArmFilters(statuses)
+	if len(indexSet) == 0 {
+		return enttransfer.IDEQ(uuid.Nil)
+	}
+
+	inIndexSet := enttransfer.HasTransferReceiversWith(
+		enttransferreceiver.IdentityPubkeyEQ(walletPubkey),
+		enttransferreceiver.StatusIn(indexSet...),
+	)
+
+	var orArms []predicate.Transfer
+	if len(exactMatch) > 0 {
+		orArms = append(orArms, enttransfer.HasTransferReceiversWith(
+			enttransferreceiver.IdentityPubkeyEQ(walletPubkey),
+			enttransferreceiver.StatusIn(exactMatch...),
+		))
+	}
+	if len(narrowingTransfer) > 0 {
+		orArms = append(orArms, enttransfer.StatusIn(narrowingTransfer...))
+	}
+	switch len(orArms) {
+	case 0:
+		return inIndexSet
+	case 1:
+		return enttransfer.And(inIndexSet, orArms[0])
+	default:
+		return enttransfer.And(inIndexSet, enttransfer.Or(orArms...))
+	}
 }

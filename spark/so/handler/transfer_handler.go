@@ -1992,11 +1992,10 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if resp != nil {
 			resultCount = len(resp.Transfers)
 		}
-		logQueryTransfersInvocation(ctx, "query_transfers", filter,
+		logQueryTransfersInvocation(ctx, "query_transfers", filter, time.Since(start),
 			zap.Bool("pending_only", pendingOnly),
 			zap.Bool("is_ssp", isSSP),
 			zap.Bool("use_mimo", useMIMO),
-			zap.Duration("elapsed", time.Since(start)),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -2335,6 +2334,9 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 	if shouldRouteToCounterSwap(ctx, filter) {
 		return h.queryCounterSwap(ctx, filter, isSSP)
 	}
+	if shouldRouteToByParticipantFallback(ctx, filter) {
+		return h.queryByParticipantFallback(ctx, filter, isSSP)
+	}
 	return h.queryTransfers(ctx, filter, false, isSSP)
 }
 
@@ -2368,9 +2370,8 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 		if resp != nil {
 			resultCount = len(resp.Transfers)
 		}
-		logQueryTransfersInvocation(ctx, "query_pending_transfers", filter,
+		logQueryTransfersInvocation(ctx, "query_pending_transfers", filter, time.Since(start),
 			zap.Bool("use_mimo", true),
-			zap.Duration("elapsed", time.Since(start)),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)

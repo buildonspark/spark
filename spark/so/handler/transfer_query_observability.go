@@ -145,14 +145,27 @@ func shortPubkeyHash(pubkey []byte) string {
 }
 
 // logQueryTransfersInvocation emits a structured Info log of the caller's
-// filter parameters. Gated by KnobLogTransferQueryInvocations (0–100 per-call
-// sampling rate, default 0). The participant pubkey is hashed (sha256[:8]) so
-// per-wallet grouping survives without writing raw identity pubkeys to logs.
-func logQueryTransfersInvocation(ctx context.Context, queryPath string, filter *pb.TransferFilter, extra ...zap.Field) {
-	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobLogTransferQueryInvocations, 0) {
+// filter parameters. Two independent gates open the log: per-call sampling
+// (KnobLogTransferQueryInvocations, 0–100, default 0) and a slow-call gate
+// (KnobLogTransferQueryInvocationsSlowMs threshold in ms, default 0 = off).
+// slow_query=true marks any record where elapsed >= threshold regardless of
+// which gate opened the log, so OpenSearch filtering on slow_query=true
+// captures every slow caller whether sampled or not. Participant pubkey is
+// hashed (sha256[:8]) so per-wallet grouping survives without writing raw
+// identity pubkeys to logs.
+func logQueryTransfersInvocation(ctx context.Context, queryPath string, filter *pb.TransferFilter, elapsed time.Duration, extra ...zap.Field) {
+	knobsSvc := knobs.GetKnobsService(ctx)
+	sampled := knobsSvc.RolloutRandom(knobs.KnobLogTransferQueryInvocations, 0)
+	slowThresholdMs := knobsSvc.GetValue(knobs.KnobLogTransferQueryInvocationsSlowMs, 0)
+	slowQuery := slowThresholdMs > 0 && elapsed >= time.Duration(slowThresholdMs)*time.Millisecond
+	if !sampled && !slowQuery {
 		return
 	}
-	fields := []zap.Field{zap.String("query_path", queryPath)}
+	fields := []zap.Field{
+		zap.String("query_path", queryPath),
+		zap.Duration("elapsed", elapsed),
+		zap.Bool("slow_query", slowQuery),
+	}
 	if filter != nil {
 		participantType := "none"
 		var participantPubkeyHash string

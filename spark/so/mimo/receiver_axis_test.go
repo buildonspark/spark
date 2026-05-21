@@ -41,6 +41,20 @@ func TestIsReceiverAxisTranslatable_Terminals(t *testing.T) {
 	}
 }
 
+// TestIsReceiverAxisTranslatable_AllEnumValues locks the structural invariant
+// that every TransferStatus enum value translates to a receiver-axis
+// equivalent. queryByParticipantFallback's receiver arm returns a
+// never-matches predicate when this is false, which would silently diverge
+// from legacy queryTransfers for that shape. Iterates over Values() so a
+// future status addition without a map entry breaks loudly instead of
+// slipping through.
+func TestIsReceiverAxisTranslatable_AllEnumValues(t *testing.T) {
+	for _, v := range st.TransferStatus("").Values() {
+		s := st.TransferStatus(v)
+		assert.Truef(t, mimo.IsReceiverAxisTranslatable(s), "%s should be translatable", s)
+	}
+}
+
 func TestReceiverArmFilters_PureReceiverNamed(t *testing.T) {
 	indexSet, exactMatch, narrowing := mimo.ReceiverArmFilters([]st.TransferStatus{
 		st.TransferStatusReceiverKeyTweaked,
