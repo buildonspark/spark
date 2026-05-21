@@ -298,7 +298,7 @@ func (h *InternalSignTokenHandler) exchangeTransferRevocationSecrets(
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to persist partial revocation secret shares", tokenTransaction, err)
 	}
 
-	response, err := h.prepareResponseForExchangeRevocationSecretsShare(inputOperatorShareMap, spentOutputs)
+	response, err := h.prepareResponseForExchangeRevocationSecretsShare(ctx, inputOperatorShareMap, spentOutputs)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to prepare response for exchange revocation secrets share", tokenTransaction, err)
 	}
@@ -348,10 +348,11 @@ func (h *InternalSignTokenHandler) validateAndSignTransactionWithProvidedOwnSign
 }
 
 func (h *InternalSignTokenHandler) prepareResponseForExchangeRevocationSecretsShare(
+	ctx context.Context,
 	inputOperatorShareMap *InputOperatorShareMaps,
 	spentOutputs []*ent.TokenOutput,
 ) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
-	operatorShares, err := h.getSecretSharesNotInInputFromSpentOutputs(inputOperatorShareMap, spentOutputs)
+	operatorShares, err := h.getSecretSharesNotInInputFromSpentOutputs(ctx, inputOperatorShareMap, spentOutputs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token outputs with shares: %w", err)
 	}
@@ -556,7 +557,7 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 		outputsWithKeyShares = outputs
 	}
 
-	operatorShares, err := h.buildOperatorPubkeyToRevocationSecretShareMap(outputsWithKeyShares)
+	operatorShares, err := h.buildOperatorPubkeyToRevocationSecretShareMap(ctx, outputsWithKeyShares)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build operator pubkey to revocation secret share map: %w", err)
 	}
@@ -564,11 +565,16 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 }
 
 func (h *InternalSignTokenHandler) getSecretSharesNotInInputFromSpentOutputs(
+	ctx context.Context,
 	inputOperatorShareMap *InputOperatorShareMaps,
 	spentOutputs []*ent.TokenOutput,
 ) (operatorSharesMap, error) {
 	if len(inputOperatorShareMap.ByUUID) == 0 && len(inputOperatorShareMap.ByHashVout) == 0 {
 		return nil, fmt.Errorf("no input operator shares provided")
+	}
+
+	if err := hydrateRevocationKeyshareSecrets(ctx, spentOutputs); err != nil {
+		return nil, fmt.Errorf("failed to hydrate revocation keyshare secrets: %w", err)
 	}
 
 	excludedShares := make(map[ShareKey]struct{})
@@ -616,9 +622,13 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInputFromSpentOutputs(
 	for _, output := range spentOutputs {
 		if share := output.Edges.RevocationKeyshare; share != nil {
 			if _, excluded := excludeOwnRevocationShare[output.ID]; !excluded {
+				secretShare, err := share.GetSecretShare(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to resolve revocation secret share for keyshare %s: %w", share.ID, err)
+				}
 				operatorShares[thisOperatorIdentityPubkey] = append(
 					operatorShares[thisOperatorIdentityPubkey],
-					newRevocationSecretShareForOutput(output, share.SecretShare.Serialize()),
+					newRevocationSecretShareForOutput(output, secretShare.Serialize()),
 				)
 			}
 		}
@@ -897,17 +907,22 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	return sharesByOutput, nil
 }
 
-func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap(tokenOutputs []*ent.TokenOutput) (operatorSharesMap, error) {
+func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap(ctx context.Context, tokenOutputs []*ent.TokenOutput) (operatorSharesMap, error) {
+	if err := hydrateRevocationKeyshareSecrets(ctx, tokenOutputs); err != nil {
+		return nil, fmt.Errorf("failed to hydrate revocation keyshare secrets: %w", err)
+	}
+
 	operatorShares := make(operatorSharesMap)
 	for _, to := range tokenOutputs {
 		if share := to.Edges.RevocationKeyshare; share != nil {
-			if share.SecretShare == nil {
-				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation keyshare %s has no secret share", share.ID))
+			secretShare, err := share.GetSecretShare(ctx)
+			if err != nil {
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation keyshare %s secret unavailable: %w", share.ID, err))
 			}
 			operatorIdentityPubkey := h.config.IdentityPublicKey()
 			operatorShares[operatorIdentityPubkey] = append(
 				operatorShares[operatorIdentityPubkey],
-				newRevocationSecretShareForOutput(to, share.SecretShare.Serialize()),
+				newRevocationSecretShareForOutput(to, secretShare.Serialize()),
 			)
 		}
 		for _, partialShare := range to.Edges.TokenPartialRevocationSecretShares {
@@ -919,6 +934,22 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 		}
 	}
 	return operatorShares, nil
+}
+
+// hydrateRevocationKeyshareSecrets batch-loads ephemeral secrets for the RevocationKeyshare
+// edge of each token output, so subsequent GetSecretShare(ctx) calls resolve from cache
+// instead of issuing N round-trips to the ephemeral DB.
+func hydrateRevocationKeyshareSecrets(ctx context.Context, tokenOutputs []*ent.TokenOutput) error {
+	keyshares := make([]*ent.SigningKeyshare, 0, len(tokenOutputs))
+	for _, to := range tokenOutputs {
+		if share := to.Edges.RevocationKeyshare; share != nil {
+			keyshares = append(keyshares, share)
+		}
+	}
+	if len(keyshares) == 0 {
+		return nil
+	}
+	return ent.HydrateSigningKeyshareSecrets(ctx, keyshares)
 }
 
 func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
