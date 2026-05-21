@@ -3572,26 +3572,29 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, err
 	}
 
-	// Determine whether we should use the stored key tweaks (from a previous Phase 1 commit)
-	// rather than the new claim package. When the transfer is already at ReceiverKeyTweakLocked
-	// or later receiver-side states, Phase 1 has already committed the key tweaks on all SOs.
-	// Using a new claim package would cause a mismatch: SOs that already stored the original
-	// tweaks would keep them (due to the len(leaf.KeyTweak) == 0 guard), while the coordinator
-	// would extract different proofs from the new package.
+	// Determine whether we should use the stored key tweaks (from a previous attempt) rather
+	// than the new claim package. Once the coordinator has durably committed leaf.KeyTweak via
+	// persistCoordinatorClaimKeyTweak (status RKT) — or any peer has progressed past Phase 1
+	// (RKL/RKA/RRS) — the cluster's polynomial is anchored. A retry carrying a fresh polynomial
+	// must NOT install a new one on the coordinator; instead it drives the existing 2PC with the
+	// anchored proofs so the cluster either heals to a consistent commit (if peers match) or
+	// rolls back to SKT (if peers diverge), letting the next user retry start clean.
 	useStoredKeyTweaks := false
 	if isMimoReceiveEnabled {
 		switch receiver.Status {
-		case st.TransferReceiverStatusKeyTweakLocked,
+		case st.TransferReceiverStatusKeyTweaked,
+			st.TransferReceiverStatusKeyTweakLocked,
 			st.TransferReceiverStatusKeyTweakApplied,
 			st.TransferReceiverStatusRefundSigned:
 			useStoredKeyTweaks = true
 		default:
 			// Use the new claim package — receiver hasn't progressed past
-			// Phase 1 commit yet, so no stored key tweaks to reuse.
+			// persistCoordinatorClaimKeyTweak yet, so no stored key tweaks to reuse.
 		}
 	} else {
 		switch transfer.Status {
-		case st.TransferStatusReceiverKeyTweakLocked,
+		case st.TransferStatusReceiverKeyTweaked,
+			st.TransferStatusReceiverKeyTweakLocked,
 			st.TransferStatusReceiverKeyTweakApplied,
 			st.TransferStatusReceiverRefundSigned:
 			useStoredKeyTweaks = true
@@ -3600,7 +3603,6 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 			st.TransferStatusSenderKeyTweakPending,
 			st.TransferStatusApplyingSenderKeyTweak,
 			st.TransferStatusSenderKeyTweaked,
-			st.TransferStatusReceiverKeyTweaked,
 			st.TransferStatusCompleted,
 			st.TransferStatusExpired,
 			st.TransferStatusReturned:
@@ -3694,19 +3696,22 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	//      survives outer claim_transfer rollback. If a peer commits Phase 1
 	//      (status RKL with proofs_A) before the coordinator's outer tx
 	//      rolls back, persisting the coordinator's own proofs_A means the
-	//      cluster stays consistent: gossip-driven recovery or a retry
-	//      forwarded as a stored-keytweak claim (useStoredKeyTweaks=true
-	//      at RKL) can finish the original 2PC against the original
-	//      polynomial.
+	//      cluster stays consistent: a retry forwarded as a stored-keytweak
+	//      claim (useStoredKeyTweaks=true at RKT/RKL) can finish the
+	//      original 2PC against the original polynomial.
 	//
-	// Note that persistCoordinatorClaimKeyTweak DOES NOT enforce
-	// anti-replay against fresh-polynomial retries — see the override
-	// rationale in that function. The anti-replay invariant is enforced by
-	// peer InitiateSettleReceiverKeyTweak's alreadyLocked +
-	// ValidateKeyTweakProof path: a peer that already committed Phase 1
-	// with proofs_A rejects a fresh proofs_B request, and the coordinator
-	// promotes that to action=ROLLBACK so the existing 2PC cleanup handles
-	// it.
+	// Anti-replay against fresh-polynomial retries is enforced at two layers
+	// once leaf.KeyTweak is stored anywhere:
+	//   - On the coordinator, persistCoordinatorClaimKeyTweak refuses to
+	//     overwrite an already-populated leaf.KeyTweak (see the guard in
+	//     the store loop). Together with useStoredKeyTweaks=true at RKT,
+	//     this means a stranded RKT drives the next retry's 2PC with the
+	//     anchored polynomial, not the SDK's fresh one.
+	//   - On peers, InitiateSettleReceiverKeyTweak's alreadyLocked branch
+	//     keeps the stored proofs at RKL, and ValidateKeyTweakProof
+	//     returns AbortedConcurrentClaimConflict on mismatch — which the
+	//     coordinator promotes to action=ROLLBACK so the existing 2PC
+	//     cleanup handles divergence.
 	if !useStoredKeyTweaks && coordinatorClaimKeyTweaks != nil {
 		if err := h.persistCoordinatorClaimKeyTweak(ctx, transfer, receiver, coordinatorClaimKeyTweaks); err != nil {
 			return nil, fmt.Errorf("unable to persist coordinator claim key tweak: %w", err)
@@ -4062,38 +4067,42 @@ func (h *TransferHandler) persistCoordinatorClaimKeyTweak(
 		}
 	}
 
-	// Overwrite leaf.KeyTweak unconditionally. Reachable only when
-	// transfer.Status ∈ {SKT, RKT}: the caller skips this function when
-	// useStoredKeyTweaks is true (RKL / RKA / RRS), and ClaimTransfer
-	// rejects Completed / Expired / Returned upstream. At SKT and RKT no
-	// peer has durably committed Phase 2 — coordinator's RKL transition is
-	// uncommitted T2 state that the middleware rolls back on failure — so
-	// the polynomial isn't yet locked across the cluster.
+	// Store leaf.KeyTweak only when empty. Once any attempt has durably
+	// committed proofs (here, or in a peer's Phase 1 / Phase 2), the
+	// cluster's polynomial is anchored and must not be swapped — a swap
+	// would diverge from peers that already committed Phase 2 with the
+	// original polynomial, leaving an unrecoverable wrong-keyshare state
+	// (Phase 2 is one-way: the peer's TreeNode keyshare has the tweak
+	// applied, and there's no way to untweak it without a matching
+	// counter-tweak from the receiver).
 	//
-	// Overriding is what unblocks transient-Unavailable retries: the JS SDK
-	// generates a fresh polynomial on every claim attempt (see
-	// prepareClaimLeafKeyTweaks in sdks/js/.../transfer.ts), so if attempt
-	// 1's T1 committed proofs_A and then Phase 1 fan-out hit
-	// codes.Unavailable, attempt 2 carries fresh proofs_B and needs to
-	// install them on the coordinator. Without override the coordinator's
-	// stale proofs_A would force Phase 1 SELF's ValidateKeyTweakProof to
-	// mismatch, requiring an extra ROLLBACK round-trip before recovery
-	// could complete.
+	// Reachability: the caller invokes this function only when
+	// useStoredKeyTweaks is false, which after adding RKT to the
+	// useStoredKeyTweaks=true set means transfer.Status ∈ {SKT, ...pre-RKT
+	// sender-side states}. In the SKT happy path every leaf.KeyTweak is
+	// empty and we write the fresh proofs. The guard below is
+	// belt-and-suspenders: it locks in the no-override invariant even if a
+	// future change widens the reachable status set, and it correctly
+	// no-ops if a racing attempt populated leaf.KeyTweak between the
+	// caller's status check and the store loop.
 	//
-	// The anti-replay invariant — "once a peer has durably committed
-	// Phase 1 or Phase 2 with one polynomial, the cluster cannot switch
-	// to a different one" — is preserved by peer-side checks, not by this
-	// guard:
-	//   - InitiateSettleReceiverKeyTweak's alreadyLocked branch keeps the
-	//     stored proofs when status is RKL.
-	//   - ValidateKeyTweakProof compares the request's proofs against the
-	//     stored proofs and returns AbortedConcurrentClaimConflict on
-	//     mismatch — which the coordinator promotes to action=ROLLBACK so
-	//     the existing 2PC cleanup handles divergence.
+	// Recovery: a stranded RKT (early commit happened but the rest of the
+	// 2PC failed) is recovered by the user retrying ClaimTransfer. The
+	// next call sees status RKT, picks up useStoredKeyTweaks=true, extracts
+	// the anchored proofs from leaf.KeyTweak, and either drives the 2PC
+	// through to a consistent commit (when peers match) or rolls the
+	// cluster back to SKT via ValidateKeyTweakProof mismatch /
+	// hasClaimPackage=false at peers (when peers diverge). After rollback
+	// the next user retry can install a fresh polynomial cleanly.
 	for _, leafTweak := range coordinatorClaimKeyTweaks.LeavesToReceive {
 		leaf, exists := leafMap[leafTweak.LeafId]
 		if !exists {
 			return fmt.Errorf("unexpected leaf id %s in claim key tweaks", leafTweak.LeafId)
+		}
+		if len(leaf.KeyTweak) > 0 {
+			// Already anchored by an earlier attempt — preserve the stored
+			// polynomial. See comment above.
+			continue
 		}
 		leafTweakBytes, err := proto.Marshal(leafTweak)
 		if err != nil {

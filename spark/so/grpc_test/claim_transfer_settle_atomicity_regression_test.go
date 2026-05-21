@@ -171,39 +171,52 @@ func readKeyshareFromAllOperators(
 	return result
 }
 
-// TestClaimTransferV2_FreshPolynomialOverridesStaleEarlyCommitAtRKT covers
-// the availability regression flagged in PR review against the original
-// "no override" guard. The scenario it reproduces:
+// TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds pins down the
+// recovery contract for the wedged-RKT state the prior "override-on-retry"
+// design tried (and failed) to handle. Scenario:
 //
 //  1. Attempt 1 calls claim_transfer. persistCoordinatorClaimKeyTweak's T1
 //     commits proofs_X plus transfer.status = RECEIVER_KEY_TWEAKED on the
 //     coordinator (T1 is durable across outer T2 rollback).
-//  2. Phase 1 fan-out fails with codes.Unavailable. settleReceiverKeyTweakInternal
-//     early-returns before ROLLBACK can run, so coordinator is left at RKT
-//     with proofs_X stored — and no peer has yet committed Phase 1 (their
-//     state stays at SKT, clean).
-//  3. The JS SDK retries. prepareClaimLeafKeyTweaks reseeds the polynomial
-//     on every call (subtractAndSplitSecretWithProofsGivenDerivations
-//     samples fresh random coefficients), so attempt 2's claim_package
-//     carries a *different* polynomial proofs_Y.
+//  2. Something downstream fails (Phase 1 fan-out hits Unavailable, the
+//     process dies, etc.) so the rest of the 2PC never runs. Coordinator
+//     is left stranded at RKT with proofs_X stored; no peer has committed
+//     Phase 1.
+//  3. The user retries. wallet.ClaimTransferV2 / prepareClaimLeafKeyTweaks
+//     reseeds the polynomial on every call, so attempt 2 carries a fresh
+//     proofs_Y in its claim_package.
 //
-// Behavior under test: at SKT or RKT the cluster hasn't yet locked in a
-// polynomial across consensus, so persistCoordinatorClaimKeyTweak must
-// overwrite the stale proofs_X with the incoming proofs_Y and the claim
-// must succeed in a single attempt. The previous "only store if empty"
-// guard turned attempt 2 into a forced ROLLBACK round-trip (extra UX cost
-// for every transient-Unavailable retry).
+// Behavior under test (driven entirely through the public ClaimTransfer
+// API):
 //
-// Setup mirrors the post-attempt-1 wedge by directly writing proofs_X into
-// the coordinator's transfer_leafs.key_tweak row and bumping its
-// transfer.status to RECEIVER_KEY_TWEAKED. The wallet then drives
-// ClaimTransferV2 (which generates fresh proofs_Y); the test asserts that
-// it succeeds and the cluster's keyshare view is internally consistent.
+//   - Attempt 2 must NOT silently install proofs_Y on the coordinator.
+//     With RKT in the useStoredKeyTweaks=true set, attempt 2 ignores the
+//     fresh claim_package, drives the 2PC with the anchored proofs_X,
+//     finds peers at SKT without a claim_package, and rolls the whole
+//     cluster back to SKT. The error surfaces with "rolled back" to the
+//     client.
 //
-// This test fails under the original guard (claim would error with
-// "key tweak proof for leaf %s is invalid"); it passes once
-// persistCoordinatorClaimKeyTweak overwrites unconditionally.
-func TestClaimTransferV2_FreshPolynomialOverridesStaleEarlyCommitAtRKT(t *testing.T) {
+//   - A third attempt with fresh proofs_Z then succeeds end-to-end. This
+//     succeeding IS the observable signal that the rollback actually
+//     cleared coordinator state: if it hadn't, attempt 3 would see RKT +
+//     proofs_X and fail the same way attempt 2 did.
+//
+//   - Cluster keyshare view is internally consistent after recovery.
+//
+// This test fails under the prior "override unconditionally" behavior
+// (attempt 2 would install proofs_Y on the coordinator and Phase 2 would
+// apply divergent keyshares across SOs — the unrecoverable state observed
+// in prod against transfer 019e2705-4b37-7f6f-a8c1-bae077a82d5a). It
+// passes once persistCoordinatorClaimKeyTweak no-ops on populated
+// leaf.KeyTweak AND useStoredKeyTweaks=true at RKT.
+//
+// Staging note: the wedged-RKT state can only be produced by a transient
+// downstream failure between persistCoordinatorClaimKeyTweak's commit and
+// the rest of the 2PC. There's no public API knob to inject that failure,
+// so the test writes the post-T1 state directly via
+// stageEarlyCommittedKeyTweakOnOperator. The actual behavior under test
+// runs through wallet.ClaimTransferV2.
+func TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -237,17 +250,11 @@ func TestClaimTransferV2_FreshPolynomialOverridesStaleEarlyCommitAtRKT(t *testin
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
 
-	// Build a synthetic polynomial P_X for the leaf. The wallet's
-	// claim-time helpers reseed the polynomial on every call, so this P_X
-	// is guaranteed to differ from the P_Y that wallet.ClaimTransferV2
-	// will generate below — the override-vs-reject distinction relies on
-	// that difference.
-	stagedTweaks := buildClaimLeafTweaksAcrossOperators(t, receiverConfig, claimLeaf)
-
 	// Stage the coordinator's persisted state to mimic attempt 1's wedge:
 	// leaf.KeyTweak populated with proofs_X, transfer.status = RKT, only
-	// on the coordinator. Peers stay at SKT so we're exercising the
-	// SKT/RKT "no consensus yet" path where override is safe.
+	// on the coordinator. Peers stay at SKT — no peer has yet committed
+	// Phase 1.
+	stagedTweaks := buildClaimLeafTweaksAcrossOperators(t, receiverConfig, claimLeaf)
 	coordinator := receiverConfig.SigningOperators[receiverConfig.CoordinatorIdentifier]
 	stageEarlyCommittedKeyTweakOnOperator(
 		t, coordinator,
@@ -255,19 +262,27 @@ func TestClaimTransferV2_FreshPolynomialOverridesStaleEarlyCommitAtRKT(t *testin
 		stagedTweaks[receiverConfig.CoordinatorIdentifier],
 	)
 
-	// Drive the unified claim. wallet.ClaimTransferV2 builds its own
-	// claim_package with freshly-split polynomial P_Y; the test confirms
-	// override-at-RKT lets the claim land in one attempt rather than
-	// requiring a ROLLBACK round-trip first.
+	// Attempt 2: drive the unified claim with fresh polynomial P_Y. The
+	// coordinator must ignore the fresh proofs (useStoredKeyTweaks=true at
+	// RKT), proceed with anchored proofs_X, find peers at SKT without a
+	// claim_package, and roll the whole cluster back to SKT.
+	_, err = wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
+	require.Error(t, err, "stranded-RKT retry must surface the rollback error rather than silently overriding the anchored polynomial")
+	assert.Contains(t, err.Error(), "rolled back",
+		"settle phase must report ROLLBACK to the client; got: %v", err)
+
+	// Attempt 3: fresh polynomial P_Z. If the rollback in attempt 2
+	// actually cleared coordinator state (RKT→SKT, leaf.KeyTweak cleared
+	// via revertClaimTransfer + the explicit settle-phase commit), this
+	// is indistinguishable from a first-ever claim and must succeed
+	// end-to-end. Conversely, if rollback didn't run, attempt 3 would hit
+	// the same wedged-RKT state and fail with the same rollback error.
 	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
-	require.NoError(t, err, "fresh-polynomial retry must succeed when coordinator is at RKT with stale stored proofs (no peer locked in)")
+	require.NoError(t, err, "post-rollback retry with fresh polynomial must succeed — attempt 3 succeeding is the observable signal that attempt 2's ROLLBACK cleared the stranded RKT state")
 	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.Status.String())
 
-	// Sanity: after the override-driven claim, the cluster must agree on
-	// the polynomial that actually got applied. Same invariant as
-	// TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs —
-	// override is only acceptable if the resulting cluster state is
-	// internally consistent.
+	// Cluster keyshare view must be internally consistent after recovery
+	// (same invariant as TestClaimTransferV2_SettleAtomicity_*).
 	leafID, err := uuid.Parse(claimLeaf.Leaf.Id)
 	require.NoError(t, err)
 	keysharesByOperatorID := readKeyshareFromAllOperators(t, receiverConfig, leafID)
@@ -285,12 +300,12 @@ func TestClaimTransferV2_FreshPolynomialOverridesStaleEarlyCommitAtRKT(t *testin
 			continue
 		}
 		assert.True(t, ks.PublicKey.Equals(ref.PublicKey),
-			"keyshare PublicKey diverges between operators %d and %d after override-at-RKT claim", refOpID, opID)
+			"keyshare PublicKey diverges between operators %d and %d after stranded-RKT recovery", refOpID, opID)
 		for identifier, refShare := range ref.PublicShares {
 			thisShare, ok := ks.PublicShares[identifier]
 			require.True(t, ok, "operator %d missing PublicShares entry for %s", opID, identifier)
 			assert.True(t, thisShare.Equals(refShare),
-				"PublicShares[%s] diverges across operators %d and %d after override-at-RKT claim",
+				"PublicShares[%s] diverges across operators %d and %d after stranded-RKT recovery",
 				identifier, refOpID, opID)
 		}
 	}

@@ -743,7 +743,26 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     expect(balanceAfterMultipleClaims.balance).toBe(1000n);
   });
 
-  it(`${name} - test querying updated transfer after error`, async () => {
+  it(`${name} - test claimTransfer succeeds in one attempt after claimTransferTweakKeys`, async () => {
+    // After claimTransferTweakKeys has stored the receiver's key tweaks on
+    // every SO (transitioning each to RECEIVER_KEY_TWEAKED), a subsequent
+    // claimTransfer must complete the 2PC against the already-anchored
+    // polynomial — *without* the server overriding the stored proofs with a
+    // fresh polynomial from the unified claim_package. With the server-side
+    // fix (RKT in the useStoredKeyTweaks=true set + no-override guard in
+    // persistCoordinatorClaimKeyTweak), the coordinator extracts proofs
+    // from leaf.KeyTweak, omits the encrypted package on the wire, and
+    // Phase 1 / Phase 2 advance every SO to RECEIVER_KEY_TWEAK_APPLIED in a
+    // single round-trip.
+    //
+    // Pre-fix this same sequence failed on attempt 1 with
+    // AbortedConcurrentClaimConflict (the override installed a different
+    // polynomial on the coordinator than peers had stored), triggering a
+    // withRetry round that rolled the cluster back to SKT and only then
+    // succeeded with fresh proofs on attempt 2. The retry-on-error path
+    // itself is covered by the `mockRejectedValueOnce("Network error")`
+    // test above; this test exists to pin down the no-retry-needed shape
+    // of the post-fix tweak-then-claim handoff.
     const faucet = BitcoinFaucet.getInstance();
 
     const options: ConfigOptions = {
@@ -817,7 +836,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     const res = await receiverTransferService.claimTransfer(transfer);
     expect(res.length).toBe(1);
 
-    expect(claimTransferCoreSpy).toHaveBeenCalledTimes(2);
+    expect(claimTransferCoreSpy).toHaveBeenCalledTimes(1);
   });
 
   it(`${name} - transfer between two wallets that are using different coordinators`, async () => {
