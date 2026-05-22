@@ -1075,6 +1075,8 @@ func (h *InternalTransferHandler) GetTransfers(ctx context.Context, req *pbinter
 	}
 	transfers, err := db.Transfer.Query().
 		Where(enttransfer.IDIn(transferIDs...)).
+		WithTransferSenders().
+		WithTransferReceivers().
 		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
 			q.WithLeaf(func(q *ent.TreeNodeQuery) {
 				q.WithTree().WithSigningKeyshare().WithParent()

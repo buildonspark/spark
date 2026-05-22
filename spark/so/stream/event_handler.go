@@ -325,6 +325,7 @@ func (s *EventRouter) processTransferNotification(ctx context.Context, event pro
 func (s *EventRouter) buildTransferEvent(ctx context.Context, transferID uuid.UUID, isSender bool, receiverPubkey *keys.Public, traceID string) *pb.SubscribeToEventsResponse {
 	transferEnt, err := s.dbClient.Transfer.Query().
 		Where(transfer.ID(transferID)).
+		WithTransferSenders().
 		WithTransferReceivers().
 		Only(ctx)
 	if err != nil {

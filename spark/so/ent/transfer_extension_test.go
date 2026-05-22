@@ -9,13 +9,39 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
+
+// mimoOnContext returns a context with KnobReadMIMOMultiParticipantFormat=100,
+// so MarshalProto emits Senders[]/Receivers[]. Mirrors how prod runs today.
+func mimoOnContext(t *testing.T) context.Context {
+	t.Helper()
+	return knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+	}))
+}
+
+// mimoOnContextWithLogObserver returns a knob-on context plus an observer for
+// captured log entries, so tests can assert on the missing-edge warnings.
+func mimoOnContextWithLogObserver(t *testing.T) (context.Context, *observer.ObservedLogs) {
+	t.Helper()
+	core, logs := observer.New(zapcore.WarnLevel)
+	ctx := logging.Inject(t.Context(), zap.New(core))
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+	}))
+	return ctx, logs
+}
 
 // Valid bitcoin transaction with a parseable encoded user timelock — same
 // fixture used by other spark tests to satisfy the TransferLeaf hooks that
@@ -76,6 +102,7 @@ func preloadedTransfer(t *testing.T) (*ent.Transfer, keys.Public, keys.Public) {
 	receiver2 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv2Pub, Status: st.TransferReceiverStatusKeyTweaked}
 	recv1ID, recv2ID := receiver1.ID, receiver2.ID
 	senderID := uuid.New()
+	sender := &ent.TransferSender{ID: senderID, IdentityPubkey: senderPub}
 
 	transferLeaf1 := &ent.TransferLeaf{
 		ID:                   uuid.New(),
@@ -107,6 +134,7 @@ func preloadedTransfer(t *testing.T) (*ent.Transfer, keys.Public, keys.Public) {
 		Edges: ent.TransferEdges{
 			TransferLeaves:    []*ent.TransferLeaf{transferLeaf1, transferLeaf2},
 			TransferReceivers: []*ent.TransferReceiver{receiver1, receiver2},
+			TransferSenders:   []*ent.TransferSender{sender},
 		},
 	}
 	return transfer, recv1Pub, recv2Pub
@@ -115,7 +143,7 @@ func preloadedTransfer(t *testing.T) (*ent.Transfer, keys.Public, keys.Public) {
 func TestMarshalProto_UsesPreloadedLeaves(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 
-	proto, err := transfer.MarshalProto(t.Context())
+	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
 	require.Len(t, proto.Leaves, 2)
 	require.Equal(t, transfer.ID.String(), proto.Id)
@@ -125,13 +153,14 @@ func TestMarshalProto_UsesPreloadedLeaves(t *testing.T) {
 
 func TestMarshalProtoForReceiver_PreloadedFiltersByReceiver(t *testing.T) {
 	transfer, recv1Pub, recv2Pub := preloadedTransfer(t)
+	ctx := mimoOnContext(t)
 
-	proto1, err := transfer.MarshalProtoForReceiver(t.Context(), recv1Pub)
+	proto1, err := transfer.MarshalProtoForReceiver(ctx, recv1Pub)
 	require.NoError(t, err)
 	require.Len(t, proto1.Leaves, 1)
 	require.Equal(t, uint64(700), proto1.Leaves[0].Leaf.Value)
 
-	proto2, err := transfer.MarshalProtoForReceiver(t.Context(), recv2Pub)
+	proto2, err := transfer.MarshalProtoForReceiver(ctx, recv2Pub)
 	require.NoError(t, err)
 	require.Len(t, proto2.Leaves, 1)
 	require.Equal(t, uint64(300), proto2.Leaves[0].Leaf.Value)
@@ -142,7 +171,7 @@ func TestMarshalProtoForReceiver_PreloadedReceiverNotInTransfer(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 	stranger := keys.GeneratePrivateKey().Public()
 
-	_, err := transfer.MarshalProtoForReceiver(t.Context(), stranger)
+	_, err := transfer.MarshalProtoForReceiver(mimoOnContext(t), stranger)
 	require.Error(t, err)
 }
 
@@ -153,7 +182,7 @@ func TestMarshalProto_PopulatesSenders(t *testing.T) {
 		{ID: senderID, IdentityPubkey: transfer.SenderIdentityPubkey},
 	}
 
-	proto, err := transfer.MarshalProto(t.Context())
+	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
 	require.Len(t, proto.Senders, 1, "expected one TransferSender")
 	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.Senders[0].IdentityPublicKey)
@@ -166,7 +195,7 @@ func TestMarshalProto_PopulatesReceiverIDAndCompletionTime(t *testing.T) {
 	transfer.Edges.TransferReceivers[0].Status = st.TransferReceiverStatusCompleted
 	transfer.Edges.TransferReceivers[0].CompletionTime = completion
 
-	proto, err := transfer.MarshalProto(t.Context())
+	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
 	require.Len(t, proto.Receivers, 2)
 
@@ -190,7 +219,7 @@ func TestMarshalProto_EmitsReceiverWithoutLeaves(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 	transfer.Edges.TransferLeaves = []*ent.TransferLeaf{}
 
-	proto, err := transfer.MarshalProto(t.Context())
+	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
 	require.Len(t, proto.Receivers, 2, "receivers should still emit when no leaves point at them")
 	for _, r := range proto.Receivers {
@@ -201,7 +230,7 @@ func TestMarshalProto_EmitsReceiverWithoutLeaves(t *testing.T) {
 func TestMarshalProto_PopulatesLeafTransferReceiverID(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 
-	proto, err := transfer.MarshalProto(t.Context())
+	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
 	require.Len(t, proto.Leaves, 2)
 
@@ -219,7 +248,7 @@ func TestMarshalProto_PopulatesLeafTransferReceiverID(t *testing.T) {
 func TestMarshalProto_PopulatesLeafTransferSenderID(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 
-	proto, err := transfer.MarshalProto(t.Context())
+	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
 	require.Len(t, proto.Leaves, 2)
 
@@ -228,6 +257,86 @@ func TestMarshalProto_PopulatesLeafTransferSenderID(t *testing.T) {
 	for _, leaf := range proto.Leaves {
 		require.Equal(t, senderID, leaf.TransferSenderId, "each leaf should carry its sender id")
 	}
+}
+
+func TestMarshalProto_KnobOff_OmitsMultiParticipantFields(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	senderID := uuid.New()
+	transfer.Edges.TransferSenders = []*ent.TransferSender{
+		{ID: senderID, IdentityPubkey: transfer.SenderIdentityPubkey},
+	}
+
+	// No knob injection -> KnobReadMIMOMultiParticipantFormat defaults to 0.
+	proto, err := transfer.MarshalProto(t.Context())
+	require.NoError(t, err)
+
+	require.Len(t, proto.Leaves, 2, "Leaves should still emit (legacy field)")
+	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.SenderIdentityPublicKey,
+		"legacy scalar SenderIdentityPublicKey should still emit")
+	require.Empty(t, proto.Senders, "Senders[] should be empty when knob is off")
+	require.Empty(t, proto.Receivers, "Receivers[] should be empty when knob is off")
+}
+
+func TestMarshalProtoForReceiver_KnobOff_OmitsMultiParticipantFields(t *testing.T) {
+	transfer, recv1Pub, _ := preloadedTransfer(t)
+	senderID := uuid.New()
+	transfer.Edges.TransferSenders = []*ent.TransferSender{
+		{ID: senderID, IdentityPubkey: transfer.SenderIdentityPubkey},
+	}
+
+	// MarshalProtoForReceiver still filters leaves by receiver regardless of knob,
+	// since the filtering is required for correctness — only the proto Senders[]/Receivers[]
+	// fields are gated.
+	proto, err := transfer.MarshalProtoForReceiver(t.Context(), recv1Pub)
+	require.NoError(t, err)
+	require.Len(t, proto.Leaves, 1, "leaf filtering by receiver still applies when knob off")
+	require.Empty(t, proto.Senders, "Senders[] should be empty when knob is off")
+	require.Empty(t, proto.Receivers, "Receivers[] should be empty when knob is off")
+}
+
+func TestMarshalProto_KnobOn_WarnsWhenSendersMissing(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	transfer.Edges.TransferSenders = nil
+
+	ctx, logs := mimoOnContextWithLogObserver(t)
+	proto, err := transfer.MarshalProto(ctx)
+	require.NoError(t, err)
+	require.Empty(t, proto.Senders, "Senders[] is empty when the edge isn't pre-loaded")
+
+	warnings := logs.FilterMessageSnippet("TransferSenders not pre-loaded").All()
+	require.Len(t, warnings, 1, "expected one warning about missing TransferSenders edge")
+	require.Equal(t, zapcore.WarnLevel, warnings[0].Level)
+}
+
+func TestMarshalProto_KnobOn_WarnsWhenReceiversMissing(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	transfer.Edges.TransferReceivers = nil
+	transfer.Edges.TransferSenders = []*ent.TransferSender{
+		{ID: uuid.New(), IdentityPubkey: transfer.SenderIdentityPubkey},
+	}
+
+	ctx, logs := mimoOnContextWithLogObserver(t)
+	proto, err := transfer.MarshalProto(ctx)
+	require.NoError(t, err)
+	require.Empty(t, proto.Receivers, "Receivers[] is empty when the edge isn't pre-loaded")
+	require.Len(t, proto.Senders, 1, "Senders[] still emits when its edge is loaded")
+
+	warnings := logs.FilterMessageSnippet("TransferReceivers not pre-loaded").All()
+	require.Len(t, warnings, 1, "expected one warning about missing TransferReceivers edge")
+}
+
+func TestMarshalProto_KnobOff_NoWarningsWhenEdgesMissing(t *testing.T) {
+	transfer, _, _ := preloadedTransfer(t)
+	transfer.Edges.TransferReceivers = nil
+	transfer.Edges.TransferSenders = nil
+
+	core, logs := observer.New(zapcore.WarnLevel)
+	ctx := logging.Inject(t.Context(), zap.New(core))
+	// No knob injection -> knob off -> we never inspect the edges -> no warnings.
+
+	_, err := transfer.MarshalProto(ctx)
+	require.NoError(t, err)
+	require.Zero(t, logs.Len(), "no warnings should fire when the knob is off")
 }
 
 // dbFixture seeds postgres with a Tree, TreeNode, and Transfer that has two

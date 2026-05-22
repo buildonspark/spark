@@ -6,16 +6,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/knobs"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// shouldEmitMultiParticipantFormat reports whether MarshalProto-family functions
+// should populate the multi-participant Senders[]/Receivers[] fields on the
+// output proto. Controlled by KnobReadMIMOMultiParticipantFormat; off by default.
+func shouldEmitMultiParticipantFormat(ctx context.Context) bool {
+	return knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMOMultiParticipantFormat, 0) > 0
+}
+
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
 // To marshal the spark invoice, the edge must be pre-loaded via Transfer.WithSparkInvoice().
-// To populate the Receivers field, the edge must also be pre-loaded via Transfer.WithTransferReceivers().
-// To populate the Senders field, the edge must also be pre-loaded via Transfer.WithTransferSenders().
+// When KnobReadMIMOMultiParticipantFormat is enabled, the Senders[] and Receivers[]
+// fields are populated from the TransferSenders/TransferReceivers edges; callers
+// should pre-load both via WithTransferSenders()/WithTransferReceivers(). A warning
+// is logged for any edge that is not pre-loaded while the knob is on.
 // If TransferLeaves (with nested Leaf→Tree/SigningKeyshare/Parent) is pre-loaded, that
 // slice is reused; otherwise leaves are lazy-loaded.
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
@@ -29,7 +42,11 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 			return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 		}
 	}
-	return t.marshalWithLeavesAndReceivers(ctx, leaves, t.Edges.TransferReceivers)
+	emitMIMO := shouldEmitMultiParticipantFormat(ctx)
+	if emitMIMO {
+		t.warnIfParticipantEdgesMissing(ctx, "MarshalProto", true)
+	}
+	return t.marshalWithLeavesAndReceivers(ctx, leaves, t.Edges.TransferReceivers, emitMIMO)
 }
 
 // MarshalProtoForReceiver converts a Transfer to a protobuf Transfer,
@@ -38,6 +55,10 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 // Returns an error if the receiver is not found in this transfer.
 // If TransferLeaves is pre-loaded, the receiver filter is applied in-memory;
 // otherwise leaves are lazy-loaded with a SQL-side filter.
+// When KnobReadMIMOMultiParticipantFormat is enabled, the Senders[] field is
+// populated from the TransferSenders edge; callers should pre-load it via
+// WithTransferSenders(). A warning is logged if the edge is missing while the
+// knob is on.
 func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey keys.Public) (*pb.Transfer, error) {
 	if t.Edges.TransferReceivers == nil {
 		return nil, fmt.Errorf("TransferReceivers edge not pre-loaded for transfer %s", t.ID)
@@ -74,7 +95,39 @@ func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey k
 			break
 		}
 	}
-	return t.marshalWithLeavesAndReceivers(ctx, leaves, receiverOnly)
+	emitMIMO := shouldEmitMultiParticipantFormat(ctx)
+	if emitMIMO {
+		// TransferReceivers is guaranteed loaded by the early return above; only
+		// Senders is worth checking here.
+		t.warnIfParticipantEdgesMissing(ctx, "MarshalProtoForReceiver", false)
+	}
+	return t.marshalWithLeavesAndReceivers(ctx, leaves, receiverOnly, emitMIMO)
+}
+
+// warnIfParticipantEdgesMissing logs a warning AND increments
+// spark_transfer_marshal_missing_edge_total when the participant edges that
+// MarshalProto-family functions need to populate Senders[]/Receivers[] are not
+// pre-loaded. Only called when the multi-participant format knob is on.
+// checkReceivers should be false for MarshalProtoForReceiver, which guarantees
+// TransferReceivers is loaded via its own precondition check.
+//
+// TODO(SP-3161): once spark_transfer_marshal_missing_edge_total holds at zero, promote to hard error.
+func (t *Transfer) warnIfParticipantEdgesMissing(ctx context.Context, caller string, checkReceivers bool) {
+	logger := logging.GetLoggerFromContext(ctx)
+	if checkReceivers && t.Edges.TransferReceivers == nil {
+		logger.Sugar().Warnf("%s: TransferReceivers not pre-loaded for transfer %s; emitting empty Receivers[]", caller, t.ID)
+		transferMarshalMissingEdgeCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("caller", caller),
+			attribute.String("edge", "TransferReceivers"),
+		))
+	}
+	if t.Edges.TransferSenders == nil {
+		logger.Sugar().Warnf("%s: TransferSenders not pre-loaded for transfer %s; emitting empty Senders[]", caller, t.ID)
+		transferMarshalMissingEdgeCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("caller", caller),
+			attribute.String("edge", "TransferSenders"),
+		))
+	}
 }
 
 // HasReceiver reports whether the given pubkey matches a TransferReceiver on this transfer.
@@ -95,7 +148,7 @@ func (t *Transfer) findReceiverID(pubkey keys.Public) (uuid.UUID, bool) {
 	return uuid.UUID{}, false
 }
 
-func (t *Transfer) marshalWithLeavesAndReceivers(ctx context.Context, leaves []*TransferLeaf, receiverEdges []*TransferReceiver) (*pb.Transfer, error) {
+func (t *Transfer) marshalWithLeavesAndReceivers(ctx context.Context, leaves []*TransferLeaf, receiverEdges []*TransferReceiver, emitMultiParticipantFormat bool) (*pb.Transfer, error) {
 	var leavesProto []*pb.TransferLeaf
 	for _, leaf := range leaves {
 		treeNode := leaf.Edges.Leaf
@@ -109,36 +162,38 @@ func (t *Transfer) marshalWithLeavesAndReceivers(ctx context.Context, leaves []*
 		leavesProto = append(leavesProto, leafProto)
 	}
 
-	amountByReceiver := make(map[uuid.UUID]uint64, len(receiverEdges))
-	for _, leaf := range leaves {
-		if leaf.TransferReceiverID != nil {
-			amountByReceiver[*leaf.TransferReceiverID] += leaf.Edges.Leaf.Value
-		}
-	}
 	var receivers []*pb.TransferReceiver
-	for _, r := range receiverEdges {
-		receiverStatus, err := TransferReceiverStatusProto(r.Status)
-		if err != nil {
-			return nil, err
-		}
-		receiver := &pb.TransferReceiver{
-			Id:                r.ID.String(),
-			IdentityPublicKey: r.IdentityPubkey.Serialize(),
-			AmountSats:        amountByReceiver[r.ID],
-			Status:            *receiverStatus,
-		}
-		if !r.CompletionTime.IsZero() {
-			receiver.CompletionTime = timestamppb.New(r.CompletionTime)
-		}
-		receivers = append(receivers, receiver)
-	}
-
 	var senders []*pb.TransferSender
-	for _, s := range t.Edges.TransferSenders {
-		senders = append(senders, &pb.TransferSender{
-			Id:                s.ID.String(),
-			IdentityPublicKey: s.IdentityPubkey.Serialize(),
-		})
+	if emitMultiParticipantFormat {
+		amountByReceiver := make(map[uuid.UUID]uint64, len(receiverEdges))
+		for _, leaf := range leaves {
+			if leaf.TransferReceiverID != nil {
+				amountByReceiver[*leaf.TransferReceiverID] += leaf.Edges.Leaf.Value
+			}
+		}
+		for _, r := range receiverEdges {
+			receiverStatus, err := TransferReceiverStatusProto(r.Status)
+			if err != nil {
+				return nil, err
+			}
+			receiver := &pb.TransferReceiver{
+				Id:                r.ID.String(),
+				IdentityPublicKey: r.IdentityPubkey.Serialize(),
+				AmountSats:        amountByReceiver[r.ID],
+				Status:            *receiverStatus,
+			}
+			if !r.CompletionTime.IsZero() {
+				receiver.CompletionTime = timestamppb.New(r.CompletionTime)
+			}
+			receivers = append(receivers, receiver)
+		}
+
+		for _, s := range t.Edges.TransferSenders {
+			senders = append(senders, &pb.TransferSender{
+				Id:                s.ID.String(),
+				IdentityPublicKey: s.IdentityPubkey.Serialize(),
+			})
+		}
 	}
 
 	status, err := t.getProtoStatus()

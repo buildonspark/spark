@@ -1881,6 +1881,11 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 	}
 
+	// Update().Save() above strips edges; reload so MarshalProto can populate Senders/Receivers.
+	transfer, err = h.loadTransferNoUpdate(ctx, transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
+	}
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
@@ -2178,14 +2183,13 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 
 	baseQuery := db.Transfer.Query().
 		WithSparkInvoice().
+		WithTransferSenders().
+		WithTransferReceivers().
 		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
 			q.WithLeaf(func(q *ent.TreeNodeQuery) {
 				q.WithTree().WithSigningKeyshare().WithParent()
 			})
 		})
-	if useMIMO {
-		baseQuery = baseQuery.WithTransferSenders().WithTransferReceivers()
-	}
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}
@@ -3960,11 +3964,11 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 	if err != nil {
 		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
 	}
-	freshTransferQuery := marshalDb.Transfer.Query().Where(enttransfer.ID(transfer.ID))
-	if isMimoReceiveEnabled {
-		freshTransferQuery = freshTransferQuery.WithTransferReceivers()
-	}
-	freshTransfer, err := freshTransferQuery.Only(ctx)
+	freshTransfer, err := marshalDb.Transfer.Query().
+		Where(enttransfer.ID(transfer.ID)).
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
 	}
