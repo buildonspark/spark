@@ -577,7 +577,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get db from context: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	//nolint:forbidigo // raw SQL needed for partial-index-driven query.
@@ -751,7 +751,7 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get db from context: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	//nolint:forbidigo // raw SQL drives the type composite directly.
@@ -938,7 +938,7 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get db from context: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	//nolint:forbidigo // raw SQL drives partial + composite indexes directly.
@@ -1129,7 +1129,7 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get db from context: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	//nolint:forbidigo // raw SQL drives partial + composite indexes directly.
@@ -1315,7 +1315,7 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get db from context: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	orderFn := ent.Desc(enttransfer.FieldCreateTime)
