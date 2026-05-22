@@ -63,9 +63,14 @@ knobs:
     spark.so.shutdown_hodl_invoices: 0
     spark.so.mimo_transfer_multi_receiver_enabled: 1
     spark.so.read_mimo_multi_participant_format: 1
-    spark.so.read_mimo_data_model_query_pending_transfers: 1
-    spark.so.read_mimo_data_model_get_stuck_transfers: 1
     spark.so.read_mimo_data_model_transfer_send: 1
+    spark.so.read_mimo_data_model_query_pending_transfers: 100
+    spark.so.read_mimo_data_model_get_stuck_transfers: 100
+    spark.so.read_mimo_data_model_outgoing_in_flight: 100
+    spark.so.read_mimo_data_model_query_by_types: 100
+    spark.so.read_mimo_data_model_receiver_by_type_status: 100
+    spark.so.read_mimo_data_model_counter_swap: 100
+    spark.so.read_mimo_data_model_by_participant_fallback: 100
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
     spark.so.tokens.coordinated_freeze_enabled: 0
