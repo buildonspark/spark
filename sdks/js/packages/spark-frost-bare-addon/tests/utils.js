@@ -14,7 +14,7 @@ function test(name, fn) {
           );
         console.error("  Expected:", safeStringify(expected));
         console.error("  Received:", safeStringify(received));
-      } catch (_) {
+      } catch {
         console.error("  Expected:", String(expected));
         console.error("  Received:", String(received));
       }

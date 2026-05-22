@@ -1,10 +1,6 @@
 const binding = require("../index.js");
 const { imports, test } = require("./utils.js");
-const secp256k1 = require("@noble/secp256k1", imports);
-const {
-  hexToBytes,
-  bytesToHex,
-} = require("@noble/curves/abstract/utils", imports);
+const { bytesToHex } = require("@noble/curves/abstract/utils", imports);
 
 function log(msg, ...args) {
   console.log(`index.js: ${msg}`, ...args);

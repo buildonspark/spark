@@ -22,6 +22,8 @@
     "test": "bare ./test.js",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
+    "lint:fix": "eslint --fix .",
+    "lint": "eslint .",
     "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "prepublishOnly": "node scripts/ensure-prebuilds-present.js"
   },
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@noble/curves": "^1.9.7",
     "@noble/secp256k1": "^2.3.0",
     "bare": "^1.28.4",
@@ -39,8 +42,10 @@
     "cmake-bare": "^1.6.5",
     "cmake-cargo": "^0.0.5",
     "cmake-npm": "^1.1.0",
+    "eslint": "^9.25.0",
     "prettier": "^3.7.4",
     "prettier-config-standard": "^7.0.0",
-    "publint": "^0.3.9"
+    "publint": "^0.3.9",
+    "typescript": "^5.7.3"
   }
 }
