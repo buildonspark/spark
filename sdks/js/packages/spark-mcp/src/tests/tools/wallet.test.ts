@@ -18,6 +18,11 @@ const mockWallet = {
   claimPendingTransfers: claimPendingTransfersMock,
 };
 
+function parseJson<T>(text: string): T {
+  const parsed: unknown = JSON.parse(text);
+  return parsed as T;
+}
+
 const mockResolve = jest
   .fn<(mnemonic?: string) => Promise<SparkWallet>>()
   .mockResolvedValue(mockWallet as unknown as SparkWallet);
@@ -104,7 +109,7 @@ describe("handleDisconnectWallet", () => {
       mockEvict,
       "raw",
     );
-    const parsed = JSON.parse(result.content[0]!.text);
+    const parsed = parseJson<{ evicted: boolean }>(result.content[0].text);
     expect(parsed.evicted).toBe(true);
   });
 

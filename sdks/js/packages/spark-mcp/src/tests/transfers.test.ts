@@ -43,10 +43,10 @@ describe("handleSendTransfer", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("Insufficient balance");
-    expect(result.content[0]!.text).toContain("500 sats");
-    expect(result.content[0]!.text).toContain("1,000 sats");
-    expect(result.content[0]!.text).toContain("settling");
+    expect(result.content[0].text).toContain("Insufficient balance");
+    expect(result.content[0].text).toContain("500 sats");
+    expect(result.content[0].text).toContain("1,000 sats");
+    expect(result.content[0].text).toContain("settling");
     expect(mockWallet.transfer).not.toHaveBeenCalled();
   });
 
@@ -61,7 +61,7 @@ describe("handleSendTransfer", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("Insufficient balance");
+    expect(result.content[0].text).toContain("Insufficient balance");
     expect(mockWallet.transfer).not.toHaveBeenCalled();
   });
 
@@ -80,8 +80,8 @@ describe("handleSendTransfer", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("Transfer sent");
-    expect(result.content[0]!.text).toContain("txn-123");
+    expect(result.content[0].text).toContain("Transfer sent");
+    expect(result.content[0].text).toContain("txn-123");
     expect(mockWallet.transfer).toHaveBeenCalledWith({
       receiverSparkAddress: "sparkl1abc",
       amountSats: 1000,
@@ -103,7 +103,7 @@ describe("handleSendTransfer", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("Transfer sent");
+    expect(result.content[0].text).toContain("Transfer sent");
   });
 
   it("returns error when transfer SDK call fails", async () => {
@@ -118,6 +118,6 @@ describe("handleSendTransfer", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("network timeout");
+    expect(result.content[0].text).toContain("network timeout");
   });
 });

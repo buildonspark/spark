@@ -31,7 +31,25 @@ export function formatSats(sats: bigint): string {
 export function errorMessage(err: unknown): string {
   if (err == null) return "Unknown error";
   if (err instanceof Error) return err.message;
-  return String(err);
+  if (typeof err === "object") {
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return "Unknown error";
+    }
+  }
+  if (
+    typeof err === "string" ||
+    typeof err === "number" ||
+    typeof err === "boolean" ||
+    typeof err === "bigint"
+  ) {
+    return err.toString();
+  }
+  if (typeof err === "symbol") {
+    return err.description ?? "Unknown error";
+  }
+  return "Unknown error";
 }
 
 export function formatTransferList(items: string[], limit = 10): string {

@@ -73,7 +73,7 @@ describe("handleFundAddress", () => {
     await handleFundAddress("bcrt1qtest", undefined, undefined, mockFetch, 0);
 
     const sendCall = mockFetch.mock.calls[0];
-    const body = JSON.parse(sendCall![1]!.body as string) as {
+    const body = JSON.parse(sendCall[1]!.body as string) as {
       params: [string, number];
     };
     // 50,000 sats = 0.0005 BTC
@@ -90,7 +90,7 @@ describe("handleFundAddress", () => {
     await handleFundAddress("bcrt1qtest", undefined, undefined, mockFetch, 0);
 
     const generateCall = mockFetch.mock.calls[2];
-    const body = JSON.parse(generateCall![1]!.body as string) as {
+    const body = JSON.parse(generateCall[1]!.body as string) as {
       params: [number, string];
     };
     expect(body.params[0]).toBe(1);
@@ -106,7 +106,7 @@ describe("handleFundAddress", () => {
 
     await handleFundAddress("bcrt1qtest", 10_000, 1, mockFetch, 0);
 
-    const url = mockFetch.mock.calls[0]![0] as string;
+    const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe("http://192.168.49.2:8332");
   });
 
@@ -120,7 +120,7 @@ describe("handleFundAddress", () => {
 
     await handleFundAddress("bcrt1qtest", 10_000, 1, mockFetch, 0);
 
-    const url = mockFetch.mock.calls[0]![0] as string;
+    const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe("http://custom-host:9332");
   });
 

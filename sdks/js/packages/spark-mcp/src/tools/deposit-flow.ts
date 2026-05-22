@@ -68,7 +68,7 @@ export async function handleDeposit(
         isError: true,
       };
     }
-    const txid = txidMatch[1]!;
+    const txid = txidMatch[1];
 
     // Step 3: Claim the deposit
     const leaves = await wallet.claimDeposit(txid);

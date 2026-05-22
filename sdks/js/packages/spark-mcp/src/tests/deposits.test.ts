@@ -42,9 +42,9 @@ describe("handleClaimDeposit", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("Deposit claimed successfully");
-    expect(result.content[0]!.text).toContain("50,000 sats");
-    expect(result.content[0]!.text).toContain("Wallet balance");
+    expect(result.content[0].text).toContain("Deposit claimed successfully");
+    expect(result.content[0].text).toContain("50,000 sats");
+    expect(result.content[0].text).toContain("Wallet balance");
     // Prior balance + 2 poll calls = 3 total getBalance calls
     expect(mockWallet.getBalance).toHaveBeenCalledTimes(3);
   });
@@ -63,7 +63,7 @@ describe("handleClaimDeposit", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("60,000 sats");
+    expect(result.content[0].text).toContain("60,000 sats");
     expect(mockWallet.getBalance).toHaveBeenCalledTimes(2);
   });
 
@@ -80,8 +80,8 @@ describe("handleClaimDeposit", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("has not settled yet");
-    expect(result.content[0]!.text).toContain("txid-timeout");
+    expect(result.content[0].text).toContain("has not settled yet");
+    expect(result.content[0].text).toContain("txid-timeout");
   });
 
   it("returns error when claim fails", async () => {
@@ -98,7 +98,7 @@ describe("handleClaimDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("Deposit not confirmed");
+    expect(result.content[0].text).toContain("Deposit not confirmed");
   });
 
   it("returns error when wallet resolution fails", async () => {
@@ -112,7 +112,7 @@ describe("handleClaimDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("No wallet specified");
+    expect(result.content[0].text).toContain("No wallet specified");
   });
 
   it("accounts for existing balance when detecting settlement", async () => {
@@ -131,8 +131,8 @@ describe("handleClaimDeposit", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("125,000 sats");
-    expect(result.content[0]!.text).toContain("25,000 sats");
+    expect(result.content[0].text).toContain("125,000 sats");
+    expect(result.content[0].text).toContain("25,000 sats");
   });
 });
 
@@ -150,8 +150,8 @@ describe("handleGetDepositAddress", () => {
     const result = await handleGetDepositAddress(undefined, mockResolve);
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("bcrt1pabc123");
-    expect(result.content[0]!.text).toContain("single-use");
+    expect(result.content[0].text).toContain("bcrt1pabc123");
+    expect(result.content[0].text).toContain("single-use");
   });
 
   it("returns error when wallet resolution fails", async () => {
@@ -162,6 +162,6 @@ describe("handleGetDepositAddress", () => {
     const result = await handleGetDepositAddress(undefined, mockResolve);
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("No wallet specified");
+    expect(result.content[0].text).toContain("No wallet specified");
   });
 });

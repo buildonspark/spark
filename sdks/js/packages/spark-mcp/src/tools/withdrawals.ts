@@ -6,7 +6,7 @@ import {
   type ToolResult,
 } from "../utils.js";
 import type { SparkWallet } from "@buildonspark/spark-sdk";
-import { ExitSpeed } from "@buildonspark/spark-sdk/types";
+import { type ExitSpeed } from "@buildonspark/spark-sdk/types";
 
 type ResolveFn = (mnemonic?: string) => Promise<SparkWallet>;
 

@@ -22,6 +22,11 @@ type WalletTransfer = {
   leaves: unknown[];
 };
 
+function parseJson<T>(text: string): T {
+  const parsed: unknown = JSON.parse(text);
+  return parsed as T;
+}
+
 const getBalanceMock = jest.fn<() => Promise<{ balance: bigint }>>();
 const transferMock =
   jest.fn<
@@ -171,7 +176,9 @@ describe("handleSendMultiTransfer", () => {
       "raw",
     );
     expect(result.isError).toBeFalsy();
-    const parsed = JSON.parse(result.content[0]!.text);
+    const parsed = parseJson<{ id: string; status: string }>(
+      result.content[0].text,
+    );
     expect(parsed.id).toBe("txn-123");
     expect(parsed.status).toBe("COMPLETED");
   });
@@ -186,7 +193,7 @@ describe("handleSendMultiTransfer", () => {
       "verbose",
     );
     expect(result.isError).toBeFalsy();
-    const text = result.content[0]!.text;
+    const text = result.content[0].text;
     expect(text).toContain("Direction: OUTGOING");
     expect(text).toContain("Receivers:");
     expect(text).toContain("sparkl1abc: 500 sats");
@@ -232,7 +239,9 @@ describe("handleListTransfers", () => {
       offset: 0,
     });
     const result = await handleListTransfers(undefined, mockResolve, "raw");
-    const parsed = JSON.parse(result.content[0]!.text);
+    const parsed = parseJson<
+      Array<{ id: string; senderIdentityPublicKey: string }>
+    >(result.content[0].text);
     expect(parsed).toHaveLength(1);
     expect(parsed[0].id).toBe("txn-123");
     expect(parsed[0].senderIdentityPublicKey).toBe("sender-pub-key-abc");
@@ -244,7 +253,7 @@ describe("handleListTransfers", () => {
       offset: 0,
     });
     const result = await handleListTransfers(undefined, mockResolve, "verbose");
-    const text = result.content[0]!.text;
+    const text = result.content[0].text;
     expect(text).toContain("Direction: OUTGOING");
     expect(text).toContain("Sender: sender-pub-key-abc");
     expect(text).toContain("Receiver: receiver-pub-key-xyz");
@@ -261,7 +270,10 @@ describe("output modes for handleGetTransfer", () => {
       mockResolve,
       "raw",
     );
-    const parsed = JSON.parse(result.content[0]!.text);
+    const parsed = parseJson<{
+      id: string;
+      receiverIdentityPublicKey: string;
+    }>(result.content[0].text);
     expect(parsed.id).toBe("txn-123");
     expect(parsed.receiverIdentityPublicKey).toBe("receiver-pub-key-xyz");
   });
@@ -274,7 +286,7 @@ describe("output modes for handleGetTransfer", () => {
       mockResolve,
       "verbose",
     );
-    const text = result.content[0]!.text;
+    const text = result.content[0].text;
     expect(text).toContain("Direction: OUTGOING");
     expect(text).toContain("Sender: sender-pub-key-abc");
   });

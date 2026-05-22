@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { handleDeposit } from "../tools/deposit-flow.js";
-import { handleFundAddress } from "../tools/funding.js";
+import { type handleFundAddress } from "../tools/funding.js";
 import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 type ResolveFn = (mnemonic?: string) => Promise<SparkWallet>;
@@ -45,7 +45,7 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("only works on the LOCAL");
+    expect(result.content[0].text).toContain("only works on the LOCAL");
     expect(mockResolve).not.toHaveBeenCalled();
   });
 
@@ -60,7 +60,7 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("only works on the LOCAL");
+    expect(result.content[0].text).toContain("only works on the LOCAL");
     expect(mockResolve).not.toHaveBeenCalled();
   });
 
@@ -77,7 +77,7 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("LOCAL");
+    expect(result.content[0].text).toContain("LOCAL");
     expect(mockResolve).not.toHaveBeenCalled();
   });
 
@@ -103,9 +103,9 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0]!.text).toContain("Deposit complete");
-    expect(result.content[0]!.text).toContain("50,000 sats");
-    expect(result.content[0]!.text).toContain("txid123");
+    expect(result.content[0].text).toContain("Deposit complete");
+    expect(result.content[0].text).toContain("50,000 sats");
+    expect(result.content[0].text).toContain("txid123");
     expect(mockWallet.getSingleUseDepositAddress).toHaveBeenCalled();
     expect(mockFund).toHaveBeenCalledWith("bcrt1pabc123", 50_000);
     expect(mockWallet.claimDeposit).toHaveBeenCalledWith("txid123");
@@ -127,7 +127,7 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("500");
+    expect(result.content[0].text).toContain("500");
     expect(mockWallet.claimDeposit).not.toHaveBeenCalled();
   });
 
@@ -143,7 +143,7 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("No wallet specified");
+    expect(result.content[0].text).toContain("No wallet specified");
   });
 
   it("handles claim failure", async () => {
@@ -169,7 +169,7 @@ describe("handleDeposit", () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain("Deposit not confirmed");
+    expect(result.content[0].text).toContain("Deposit not confirmed");
   });
 
   it("uses default amount of 50,000 sats", async () => {

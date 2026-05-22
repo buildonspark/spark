@@ -46,7 +46,7 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
     const text = extractText(await handleGetBalance());
     const match = text.match(/([\d,]+) sats/);
     expect(match).not.toBeNull();
-    balanceBeforeSats = parseInt(match![1]!.replace(/,/g, ""), 10);
+    balanceBeforeSats = parseInt(match![1].replace(/,/g, ""), 10);
     console.log(`  balance before: ${text}`);
   }, 15_000);
 
@@ -75,7 +75,7 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
       const text = extractText(await handleGetBalance());
       const match = text.match(/([\d,]+) sats/);
       if (match) {
-        balanceAfterSats = parseInt(match[1]!.replace(/,/g, ""), 10);
+        balanceAfterSats = parseInt(match[1].replace(/,/g, ""), 10);
         if (balanceAfterSats >= balanceBeforeSats + 50_000) {
           console.log(`  balance after: ${text}`);
           break;

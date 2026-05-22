@@ -85,7 +85,7 @@ export async function handleSendTransfer(
         content: [
           {
             type: "text",
-            text: formatTransferVerbose(transfer as WalletTransfer),
+            text: formatTransferVerbose(transfer),
           },
         ],
       };
@@ -146,7 +146,7 @@ export async function handleSendMultiTransfer(
         content: [
           {
             type: "text",
-            text: `${formatTransferVerbose(transfer as WalletTransfer)}\nReceivers:\n${receiverLines}`,
+            text: `${formatTransferVerbose(transfer)}\nReceivers:\n${receiverLines}`,
           },
         ],
       };
@@ -193,16 +193,14 @@ export async function handleGetTransfer(
         content: [
           {
             type: "text",
-            text: formatTransferVerbose(transfer as WalletTransfer),
+            text: formatTransferVerbose(transfer),
           },
         ],
       };
     }
 
     return {
-      content: [
-        { type: "text", text: formatTransfer(transfer as WalletTransfer) },
-      ],
+      content: [{ type: "text", text: formatTransfer(transfer) }],
     };
   } catch (err) {
     return {
