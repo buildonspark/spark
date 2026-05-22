@@ -178,6 +178,10 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	); err != nil {
 		return nil, err
 	}
+	txType, err := utils.InferTokenTransactionType(partialTxV2Shape)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
+	}
 
 	if partial.ExecuteBefore != nil {
 		clientCreatedTs := metadata.GetClientCreatedTimestamp().AsTime()
@@ -197,13 +201,11 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	}
 	if existingPartialTx != nil {
 		// For execute_before transactions: if the processing window (ExpiryTime) has passed
-		// but execute_before hasn't, allow resubmission by treating as a new transaction.
-		// The preemption logic will handle the expired old transaction's locked outputs.
-		resubmittable := !existingPartialTx.ExecuteBefore.IsZero() &&
-			!existingPartialTx.ExpiryTime.IsZero() &&
-			time.Now().After(existingPartialTx.ExpiryTime) &&
-			!time.Now().After(existingPartialTx.ExecuteBefore)
-		if !resubmittable {
+		// but execute_before hasn't, allow non-terminal transfers to be resubmitted by
+		// treating them as a new transaction. The preemption logic handles the expired
+		// old transaction's locked outputs. Mint/create transactions have no spent
+		// outputs to preempt, and terminal transactions must stay idempotent.
+		if !isExistingPartialTransactionResubmittable(existingPartialTx, txType, time.Now()) {
 			return h.handleExistingTransaction(ctx, existingPartialTx)
 		}
 	}
@@ -303,11 +305,6 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	}
 
 	tokenTxEnt, err := ent.FetchAndLockTokenTransactionDataByHash(ctx, finalTxHash)
-	if err != nil {
-		return nil, err
-	}
-
-	txType, err := utils.InferTokenTransactionType(legacyTokenTx)
 	if err != nil {
 		return nil, err
 	}
@@ -610,6 +607,26 @@ func (h *BroadcastTokenHandler) handleExistingTransaction(
 		CommitStatus:          tokenpb.CommitStatus_COMMIT_PROCESSING,
 		CommitProgress:        commitProgress,
 	}, nil
+}
+
+func isExistingPartialTransactionResubmittable(
+	existingTx *ent.TokenTransaction,
+	txType utils.TokenTransactionType,
+	now time.Time,
+) bool {
+	if existingTx == nil {
+		return false
+	}
+	if txType != utils.TokenTransactionTypeTransfer {
+		return false
+	}
+	if existingTx.Status != st.TokenTransactionStatusStarted && existingTx.Status != st.TokenTransactionStatusSigned {
+		return false
+	}
+	return !existingTx.ExecuteBefore.IsZero() &&
+		!existingTx.ExpiryTime.IsZero() &&
+		now.After(existingTx.ExpiryTime) &&
+		!now.After(existingTx.ExecuteBefore)
 }
 
 // fanoutFinalizeMintOrCreateToNonCoordinators sends finalization requests to all non-coordinator SOs

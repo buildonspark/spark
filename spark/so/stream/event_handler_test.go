@@ -1127,8 +1127,11 @@ func TestEventRouter_TokenTransactionFanOut(t *testing.T) {
 		mint := entexample.NewTokenMintExample(t, dbClient).MustExec(t.Context())
 		opSig := make([]byte, 64)
 		_, _ = rng.Read(opSig)
+		partialHash := make([]byte, 32)
+		_, _ = rng.Read(partialHash)
 		tokenTx := entexample.NewTokenTransactionExample(t, dbClient).
 			SetStatus(schematype.TokenTransactionStatusStarted).
+			SetPartialTokenTransactionHash(partialHash).
 			SetFinalizedTokenTransactionHash(hash).
 			SetOperatorSignature(opSig).
 			SetMint(mint).
@@ -1333,6 +1336,8 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 	_, _ = rng.Read(tokenID)
 	opSig := make([]byte, 64)
 	_, _ = rng.Read(opSig)
+	partialHash := make([]byte, 32)
+	_, _ = rng.Read(partialHash)
 
 	tokenCreate := entexample.NewTokenCreateExample(t, dbClient).
 		SetIssuerSignature(issuerSig).
@@ -1341,6 +1346,7 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 	mint := entexample.NewTokenMintExample(t, dbClient).MustExec(t.Context())
 	tokenTx := entexample.NewTokenTransactionExample(t, dbClient).
 		SetStatus(schematype.TokenTransactionStatusStarted).
+		SetPartialTokenTransactionHash(partialHash).
 		SetFinalizedTokenTransactionHash(hash).
 		SetOperatorSignature(opSig).
 		SetMint(mint).

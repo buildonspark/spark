@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -118,6 +119,10 @@ func (TokenTransaction) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("finalized_token_transaction_hash"),
 		index.Fields("partial_token_transaction_hash"),
+		index.Fields("partial_token_transaction_hash").
+			Unique().
+			Annotations(entsql.IndexWhere("status IN ('REVEALED', 'FINALIZED')")).
+			StorageKey("tokentransaction_terminal_partial_hash_unique"),
 		index.Fields("expiry_time", "status"),
 		// Needed for query_token_transactions query
 		index.Fields("create_time"),

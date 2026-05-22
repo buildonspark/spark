@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/protohash"
@@ -26,6 +27,8 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -40,6 +43,7 @@ type broadcastTokenPostgresTestSetup struct {
 	config   *so.Config
 	ctx      context.Context
 	client   *ent.Client
+	root     *ent.Client
 	fixtures *entfixtures.Fixtures
 }
 
@@ -117,6 +121,23 @@ func (s *broadcastTokenPostgresTestSetup) buildMintPartial(issuerKey keys.Privat
 	}
 }
 
+func (s *broadcastTokenPostgresTestSetup) buildCreatePartial(issuerKey keys.Private) *tokenpb.PartialTokenTransaction {
+	return &tokenpb.PartialTokenTransaction{
+		Version:                  3,
+		TokenTransactionMetadata: s.defaultMetadata(),
+		TokenInputs: &tokenpb.PartialTokenTransaction_CreateInput{
+			CreateInput: &tokenpb.TokenCreateInput{
+				IssuerPublicKey: issuerKey.Public().Serialize(),
+				TokenName:       "Test Token",
+				TokenTicker:     "TST",
+				Decimals:        8,
+				MaxSupply:       make([]byte, 16),
+				IsFreezable:     false,
+			},
+		},
+	}
+}
+
 func (s *broadcastTokenPostgresTestSetup) buildTransferPartial(ownerKey keys.Private, tokenCreate *ent.TokenCreate, inputTTXO *ent.TokenOutput) *tokenpb.PartialTokenTransaction {
 	cfgVals := s.config.Lrc20Configs[strings.ToLower(btcnetwork.Regtest.String())]
 	return &tokenpb.PartialTokenTransaction{
@@ -148,7 +169,7 @@ func setUpBroadcastTokenTestHandlerPostgres(t *testing.T) *broadcastTokenPostgre
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -158,6 +179,7 @@ func setUpBroadcastTokenTestHandlerPostgres(t *testing.T) *broadcastTokenPostgre
 		config:   config,
 		ctx:      ctx,
 		client:   dbClient,
+		root:     tc.Client,
 		fixtures: entfixtures.New(t, ctx, dbClient),
 	}
 }
@@ -214,7 +236,7 @@ func setUpPhase2BroadcastTestHandlerPostgres(t *testing.T) *broadcastTokenPostgr
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -257,6 +279,7 @@ func setUpPhase2BroadcastTestHandlerPostgres(t *testing.T) *broadcastTokenPostgr
 		config:   config,
 		ctx:      ctx,
 		client:   dbClient,
+		root:     tc.Client,
 		fixtures: entfixtures.New(t, ctx, dbClient),
 	}
 }
@@ -294,6 +317,30 @@ func preInsertMintTransactionWithHashes(
 	expiryTime time.Time,
 ) {
 	t.Helper()
+	preInsertMintTransactionWithHashesAndExecuteBefore(
+		t,
+		setup,
+		tokenCreate,
+		issuerPubKey,
+		partialHash,
+		finalHash,
+		status,
+		expiryTime,
+		time.Time{},
+	)
+}
+
+func preInsertMintTransactionWithHashesAndExecuteBefore(
+	t *testing.T,
+	setup *broadcastTokenPostgresTestSetup,
+	tokenCreate *ent.TokenCreate,
+	issuerPubKey keys.Public,
+	partialHash, finalHash []byte,
+	status st.TokenTransactionStatus,
+	expiryTime time.Time,
+	executeBefore time.Time,
+) {
+	t.Helper()
 
 	mint, err := setup.client.TokenMint.Create().
 		SetIssuerPublicKey(issuerPubKey).
@@ -313,6 +360,9 @@ func preInsertMintTransactionWithHashes(
 		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300)
+	if !executeBefore.IsZero() {
+		txBuilder = txBuilder.SetExecuteBefore(executeBefore)
+	}
 
 	if status == st.TokenTransactionStatusSigned || status == st.TokenTransactionStatusFinalized {
 		operatorSig := ecdsa.Sign(setup.config.IdentityPrivateKey.ToBTCEC(), finalHash).Serialize()
@@ -321,6 +371,64 @@ func preInsertMintTransactionWithHashes(
 
 	tx := txBuilder.SaveX(setup.ctx)
 	setup.fixtures.CreateOutputForTransaction(tokenCreate, big.NewInt(10), tx, 0)
+}
+
+func preInsertCreateTransactionWithHashesAndExecuteBefore(
+	t *testing.T,
+	setup *broadcastTokenPostgresTestSetup,
+	partial *tokenpb.PartialTokenTransaction,
+	issuerPubKey keys.Public,
+	partialHash, finalHash []byte,
+	status st.TokenTransactionStatus,
+	expiryTime time.Time,
+	executeBefore time.Time,
+) []byte {
+	t.Helper()
+
+	partialLegacy, err := protoconverter.ConvertPartialToV2TxShape(partial)
+	require.NoError(t, err)
+	createInput := partialLegacy.GetCreateInput()
+	require.NotNil(t, createInput)
+	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, partialLegacy.Network)
+	require.NoError(t, err)
+	tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
+	require.NoError(t, err)
+
+	tokenCreateEnt, err := setup.client.TokenCreate.Create().
+		SetIssuerPublicKey(issuerPubKey).
+		SetIssuerSignature(make([]byte, 64)).
+		SetTokenName(createInput.GetTokenName()).
+		SetTokenTicker(createInput.GetTokenTicker()).
+		SetDecimals(uint8(createInput.GetDecimals())).
+		SetMaxSupply(createInput.GetMaxSupply()).
+		SetIsFreezable(createInput.GetIsFreezable()).
+		SetExtraMetadata(createInput.GetExtraMetadata()).
+		SetCreationEntityPublicKey(issuerPubKey).
+		SetNetwork(btcnetwork.Regtest).
+		SetTokenIdentifier(tokenIdentifier).
+		Save(setup.ctx)
+	require.NoError(t, err)
+
+	txBuilder := setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(partialHash).
+		SetFinalizedTokenTransactionHash(finalHash).
+		SetStatus(status).
+		SetCreate(tokenCreateEnt).
+		SetExpiryTime(expiryTime).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetValidityDurationSeconds(300)
+	if !executeBefore.IsZero() {
+		txBuilder = txBuilder.SetExecuteBefore(executeBefore)
+	}
+	if status == st.TokenTransactionStatusSigned || status == st.TokenTransactionStatusFinalized {
+		operatorSig := ecdsa.Sign(setup.config.IdentityPrivateKey.ToBTCEC(), finalHash).Serialize()
+		txBuilder = txBuilder.SetOperatorSignature(operatorSig)
+	}
+	txBuilder.SaveX(setup.ctx)
+
+	return tokenIdentifier
 }
 
 // preInsertTransferTransactionWithHashes creates a transfer transaction with the given hashes for testing
@@ -333,6 +441,30 @@ func preInsertTransferTransactionWithHashes(
 	partialHash, finalHash []byte,
 	status st.TokenTransactionStatus,
 	expiryTime time.Time,
+) {
+	t.Helper()
+	preInsertTransferTransactionWithHashesAndExecuteBefore(
+		t,
+		setup,
+		tokenCreate,
+		spentOutput,
+		partialHash,
+		finalHash,
+		status,
+		expiryTime,
+		time.Time{},
+	)
+}
+
+func preInsertTransferTransactionWithHashesAndExecuteBefore(
+	t *testing.T,
+	setup *broadcastTokenPostgresTestSetup,
+	tokenCreate *ent.TokenCreate,
+	spentOutput *ent.TokenOutput,
+	partialHash, finalHash []byte,
+	status st.TokenTransactionStatus,
+	expiryTime time.Time,
+	executeBefore time.Time,
 ) {
 	t.Helper()
 
@@ -348,18 +480,21 @@ func preInsertTransferTransactionWithHashes(
 		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300).
-		SetOperatorSignature(operatorSig).
-		SaveX(setup.ctx)
+		SetOperatorSignature(operatorSig)
+	if !executeBefore.IsZero() {
+		tx = tx.SetExecuteBefore(executeBefore)
+	}
+	txEnt := tx.SaveX(setup.ctx)
 
 	// Set up balanced inputs and outputs
-	setup.fixtures.CreateOutputForTransaction(tokenCreate, big.NewInt(100), tx, 0)
+	setup.fixtures.CreateOutputForTransaction(tokenCreate, big.NewInt(100), txEnt, 0)
 	setup.client.TokenOutput.UpdateOne(spentOutput).
-		SetOutputSpentTokenTransaction(tx).
+		SetOutputSpentTokenTransaction(txEnt).
 		SaveX(setup.ctx)
 
 	// Now update to target status if different
 	if status != st.TokenTransactionStatusSigned {
-		setup.client.TokenTransaction.UpdateOne(tx).
+		setup.client.TokenTransaction.UpdateOne(txEnt).
 			SetStatus(status).
 			SaveX(setup.ctx)
 	}
@@ -502,6 +637,185 @@ func TestBroadcastTokenTransaction_Phase2_MintSuccess(t *testing.T) {
 	assert.Nil(t, resp.TokenIdentifier, "MINT transactions should not return token identifier")
 }
 
+func TestBroadcastTokenTransaction_DuplicateFinalizedExecuteBeforeMintReturnsExisting(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	issuerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	setup.fixtures.CreateKeyshare()
+	setup.fixtures.CreateKeyshare()
+
+	recipientPriv := keys.GeneratePrivateKey()
+	partial := setup.buildMintPartial(issuerPriv, tokenCreate)
+	partial.TokenTransactionMetadata.ValidityDurationSeconds = 1
+	partial.PartialTokenOutputs[0].OwnerPublicKey = recipientPriv.Public().Serialize()
+	partial.ExecuteBefore = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC().Add(1 * time.Hour)))
+
+	partialHash, finalHash := setup.computeHashes(partial)
+	executeBefore := partial.GetExecuteBefore().AsTime()
+	preInsertMintTransactionWithHashesAndExecuteBefore(
+		t,
+		setup,
+		tokenCreate,
+		issuerPriv.Public(),
+		partialHash,
+		finalHash,
+		st.TokenTransactionStatusFinalized,
+		time.Now().Add(-1*time.Hour),
+		executeBefore,
+	)
+
+	req := setup.signAndBuildRequest(partial, issuerPriv)
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+
+	txs, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
+		WithCreatedOutput().
+		WithMint().
+		All(ctx)
+	require.NoError(t, err)
+	require.Len(t, txs, 1, "replaying a finalized execute_before mint must return the existing transaction, not mint again")
+	require.Equal(t, finalHash, txs[0].FinalizedTokenTransactionHash)
+	require.Len(t, txs[0].Edges.CreatedOutput, 1)
+	require.NotNil(t, txs[0].Edges.Mint)
+}
+
+func TestBroadcastTokenTransaction_DuplicateFinalizedExecuteBeforeCreateReturnsExisting(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	issuerPriv := setup.fixtures.GeneratePrivateKey()
+	partial := setup.buildCreatePartial(issuerPriv)
+	partial.TokenTransactionMetadata.ValidityDurationSeconds = 1
+	partial.ExecuteBefore = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC().Add(1 * time.Hour)))
+
+	partialHash, finalHash := setup.computeHashes(partial)
+	executeBefore := partial.GetExecuteBefore().AsTime()
+	tokenIdentifier := preInsertCreateTransactionWithHashesAndExecuteBefore(
+		t,
+		setup,
+		partial,
+		issuerPriv.Public(),
+		partialHash,
+		finalHash,
+		st.TokenTransactionStatusFinalized,
+		time.Now().Add(-1*time.Hour),
+		executeBefore,
+	)
+
+	req := setup.signAndBuildRequest(partial, issuerPriv)
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+
+	txs, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
+		WithCreate().
+		All(ctx)
+	require.NoError(t, err)
+	require.Len(t, txs, 1, "replaying a finalized execute_before create must return the existing transaction, not create again")
+	require.Equal(t, finalHash, txs[0].FinalizedTokenTransactionHash)
+	require.NotNil(t, txs[0].Edges.Create)
+
+	creates, err := setup.client.TokenCreate.Query().
+		Where(tokencreate.TokenIdentifier(tokenIdentifier)).
+		All(ctx)
+	require.NoError(t, err)
+	require.Len(t, creates, 1)
+}
+
+func TestBroadcastTokenTransaction_NonTerminalExecuteBeforeMintCreateDoNotResubmit(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(t *testing.T, setup *broadcastTokenPostgresTestSetup, ctx context.Context)
+	}{
+		{
+			name: "mint",
+			run: func(t *testing.T, setup *broadcastTokenPostgresTestSetup, ctx context.Context) {
+				issuerPriv, tokenCreateEnt := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+				setup.fixtures.CreateKeyshare()
+
+				partial := setup.buildMintPartial(issuerPriv, tokenCreateEnt)
+				partial.ExecuteBefore = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC().Add(1 * time.Hour)))
+				partialHash, finalHash := setup.computeHashes(partial)
+				preInsertMintTransactionWithHashesAndExecuteBefore(
+					t,
+					setup,
+					tokenCreateEnt,
+					issuerPriv.Public(),
+					partialHash,
+					finalHash,
+					st.TokenTransactionStatusSigned,
+					time.Now().Add(-1*time.Hour),
+					partial.GetExecuteBefore().AsTime(),
+				)
+
+				req := setup.signAndBuildRequest(partial, issuerPriv)
+				resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+				require.Error(t, err)
+				require.Nil(t, resp)
+				_, reason := sparkerrors.CodeAndReasonFrom(err)
+				require.Equal(t, sparkerrors.ReasonAlreadyExistsExpiredTransaction, reason)
+
+				txs, err := setup.client.TokenTransaction.Query().
+					Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
+					All(ctx)
+				require.NoError(t, err)
+				require.Len(t, txs, 1)
+			},
+		},
+		{
+			name: "create",
+			run: func(t *testing.T, setup *broadcastTokenPostgresTestSetup, ctx context.Context) {
+				issuerPriv := setup.fixtures.GeneratePrivateKey()
+				partial := setup.buildCreatePartial(issuerPriv)
+				partial.ExecuteBefore = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC().Add(1 * time.Hour)))
+				partialHash, finalHash := setup.computeHashes(partial)
+				tokenIdentifier := preInsertCreateTransactionWithHashesAndExecuteBefore(
+					t,
+					setup,
+					partial,
+					issuerPriv.Public(),
+					partialHash,
+					finalHash,
+					st.TokenTransactionStatusSigned,
+					time.Now().Add(-1*time.Hour),
+					partial.GetExecuteBefore().AsTime(),
+				)
+
+				req := setup.signAndBuildRequest(partial, issuerPriv)
+				resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+				require.Error(t, err)
+				require.Nil(t, resp)
+				_, reason := sparkerrors.CodeAndReasonFrom(err)
+				require.Equal(t, sparkerrors.ReasonAlreadyExistsExpiredTransaction, reason)
+
+				txs, err := setup.client.TokenTransaction.Query().
+					Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
+					All(ctx)
+				require.NoError(t, err)
+				require.Len(t, txs, 1)
+
+				creates, err := setup.client.TokenCreate.Query().
+					Where(tokencreate.TokenIdentifier(tokenIdentifier)).
+					All(ctx)
+				require.NoError(t, err)
+				require.Len(t, creates, 1)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+			ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+			tc.run(t, setup, ctx)
+		})
+	}
+}
+
 func TestBroadcastTokenTransaction_Phase2_CreateSuccess(t *testing.T) {
 	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
 	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
@@ -509,20 +823,7 @@ func TestBroadcastTokenTransaction_Phase2_CreateSuccess(t *testing.T) {
 	setup.fixtures.CreateKeyshareWithEntityDkgKey()
 	issuerPriv := setup.fixtures.GeneratePrivateKey()
 
-	partial := &tokenpb.PartialTokenTransaction{
-		Version:                  3,
-		TokenTransactionMetadata: setup.defaultMetadata(),
-		TokenInputs: &tokenpb.PartialTokenTransaction_CreateInput{
-			CreateInput: &tokenpb.TokenCreateInput{
-				IssuerPublicKey: issuerPriv.Public().Serialize(),
-				TokenName:       "Test Token",
-				TokenTicker:     "TST",
-				Decimals:        8,
-				MaxSupply:       make([]byte, 16),
-				IsFreezable:     false,
-			},
-		},
-	}
+	partial := setup.buildCreatePartial(issuerPriv)
 
 	req := setup.signAndBuildRequest(partial, issuerPriv)
 	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
@@ -555,6 +856,58 @@ func TestBroadcastTokenTransaction_Phase2_TransferSuccess(t *testing.T) {
 	require.NotNil(t, resp)
 	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
 	assert.NotNil(t, resp.FinalTokenTransaction)
+}
+
+func TestBroadcastTokenTransaction_ExpiredExecuteBeforeTransferCanResubmit(t *testing.T) {
+	setup := setUpPhase2BroadcastTestHandlerPostgres(t)
+	ctx := knobs.InjectKnobsService(setup.ctx, v3Phase2EnabledKnobs())
+
+	ownerPriv, tokenCreate := setup.fixtures.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	_, outputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(ownerPriv.Public(), big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	inputTTXO := outputs[0]
+	setup.fixtures.CreateKeyshare()
+
+	partial := setup.buildTransferPartial(ownerPriv, tokenCreate, inputTTXO)
+	partial.ExecuteBefore = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC().Add(1 * time.Hour)))
+	partialHash, finalHash := setup.computeHashes(partial)
+	preInsertTransferTransactionWithHashesAndExecuteBefore(
+		t,
+		setup,
+		tokenCreate,
+		inputTTXO,
+		partialHash,
+		finalHash,
+		st.TokenTransactionStatusSigned,
+		time.Now().Add(-1*time.Hour),
+		partial.GetExecuteBefore().AsTime(),
+	)
+
+	req := setup.signAndBuildRequest(partial, ownerPriv)
+	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+
+	txs, err := setup.root.TokenTransaction.Query().
+		Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
+		All(t.Context())
+	require.NoError(t, err)
+	require.Len(t, txs, 2, "expired non-terminal execute_before transfers should be allowed to create a fresh processing window")
+
+	resp, err = setup.handler.BroadcastTokenTransaction(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+
+	txs, err = setup.root.TokenTransaction.Query().
+		Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
+		All(t.Context())
+	require.NoError(t, err)
+	require.Len(t, txs, 2, "a duplicate replay should return the active resubmission instead of failing on multiple partial rows")
 }
 
 func TestBroadcastTokenTransaction_DuplicateMintRequest(t *testing.T) {

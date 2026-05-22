@@ -81,3 +81,72 @@ func TestMarshalProto_V3_SortsOperatorKeysAndInvoices(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectPartialTokenTransactionForHashPrefersFinalizedOverRevealed(t *testing.T) {
+	now := time.Now()
+	revealed := &TokenTransaction{
+		ID:         uuid.New(),
+		CreateTime: now,
+		Status:     st.TokenTransactionStatusRevealed,
+		Edges: TokenTransactionEdges{
+			SpentOutput: []*TokenOutput{{ID: uuid.New()}},
+		},
+	}
+	finalized := &TokenTransaction{
+		ID:         uuid.New(),
+		CreateTime: now.Add(-time.Minute),
+		Status:     st.TokenTransactionStatusFinalized,
+		Edges: TokenTransactionEdges{
+			SpentOutput: []*TokenOutput{{ID: uuid.New()}},
+		},
+	}
+
+	got := selectPartialTokenTransactionForHash([]*TokenTransaction{revealed, finalized}, now)
+	if got != finalized {
+		t.Fatalf("expected finalized transaction, got status %s", got.Status)
+	}
+}
+
+func TestSelectPartialTokenTransactionForHashPrefersTerminalWithTypeEdge(t *testing.T) {
+	now := time.Now()
+	withoutTypeEdge := &TokenTransaction{
+		ID:         uuid.New(),
+		CreateTime: now,
+		Status:     st.TokenTransactionStatusFinalized,
+	}
+	withTypeEdge := &TokenTransaction{
+		ID:         uuid.New(),
+		CreateTime: now.Add(-time.Minute),
+		Status:     st.TokenTransactionStatusFinalized,
+		Edges: TokenTransactionEdges{
+			SpentOutput: []*TokenOutput{{ID: uuid.New()}},
+		},
+	}
+
+	got := selectPartialTokenTransactionForHash([]*TokenTransaction{withoutTypeEdge, withTypeEdge}, now)
+	if got != withTypeEdge {
+		t.Fatalf("expected terminal transaction with type edge, got %s", got.ID)
+	}
+}
+
+func TestSelectPartialTokenTransactionForHashPrefersAnchoredTerminalBeforeUnanchoredFinalized(t *testing.T) {
+	now := time.Now()
+	unanchoredFinalized := &TokenTransaction{
+		ID:         uuid.New(),
+		CreateTime: now,
+		Status:     st.TokenTransactionStatusFinalized,
+	}
+	anchoredRevealed := &TokenTransaction{
+		ID:         uuid.New(),
+		CreateTime: now.Add(-time.Minute),
+		Status:     st.TokenTransactionStatusRevealed,
+		Edges: TokenTransactionEdges{
+			SpentOutput: []*TokenOutput{{ID: uuid.New()}},
+		},
+	}
+
+	got := selectPartialTokenTransactionForHash([]*TokenTransaction{unanchoredFinalized, anchoredRevealed}, now)
+	if got != anchoredRevealed {
+		t.Fatalf("expected anchored terminal transaction, got status %s", got.Status)
+	}
+}

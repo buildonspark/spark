@@ -763,7 +763,7 @@ func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransacti
 		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
-	tokenTransaction, err := db.TokenTransaction.Query().
+	tokenTransactions, err := db.TokenTransaction.Query().
 		Where(tokentransaction.PartialTokenTransactionHash(partialTokenTransactionHash)).
 		WithCreatedOutput().
 		WithSpentOutput(func(q *TokenOutputQuery) {
@@ -776,14 +776,71 @@ func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransacti
 		WithMint().
 		WithCreate().
 		WithPeerSignatures().
-		Only(ctx)
+		All(ctx)
 	if err != nil {
-		if IsNotFound(err) {
-			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("partial token transaction not found for hash %x: %w", partialTokenTransactionHash, err))
-		}
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch partial token transaction by hash: %w", err))
 	}
-	return tokenTransaction, nil
+	if len(tokenTransactions) == 0 {
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("partial token transaction not found for hash %x: %w", partialTokenTransactionHash, &NotFoundError{label: tokentransaction.Label}))
+	}
+	return selectPartialTokenTransactionForHash(tokenTransactions, time.Now()), nil
+}
+
+func selectPartialTokenTransactionForHash(tokenTransactions []*TokenTransaction, now time.Time) *TokenTransaction {
+	slices.SortFunc(tokenTransactions, func(a, b *TokenTransaction) int {
+		if cmpResult := b.CreateTime.Compare(a.CreateTime); cmpResult != 0 {
+			return cmpResult
+		}
+		return bytes.Compare(b.ID[:], a.ID[:])
+	})
+
+	for _, requireTypeEdge := range []bool{true, false} {
+		for _, status := range []st.TokenTransactionStatus{
+			st.TokenTransactionStatusFinalized,
+			st.TokenTransactionStatusRevealed,
+		} {
+			if tx := firstTokenTransactionWithStatus(tokenTransactions, status, requireTypeEdge); tx != nil {
+				return tx
+			}
+		}
+	}
+
+	for _, tokenTransaction := range tokenTransactions {
+		switch tokenTransaction.Status { //nolint:exhaustive // Terminal statuses are selected before this live-processing loop.
+		case st.TokenTransactionStatusStarted, st.TokenTransactionStatusSigned:
+			if tokenTransaction.ExpiryTime.IsZero() || !now.After(tokenTransaction.ExpiryTime) {
+				return tokenTransaction
+			}
+		case st.TokenTransactionStatusStartedCancelled,
+			st.TokenTransactionStatusSignedCancelled:
+		}
+	}
+
+	return tokenTransactions[0]
+}
+
+func firstTokenTransactionWithStatus(
+	tokenTransactions []*TokenTransaction,
+	status st.TokenTransactionStatus,
+	requireTypeEdge bool,
+) *TokenTransaction {
+	for _, tokenTransaction := range tokenTransactions {
+		if tokenTransaction.Status != status {
+			continue
+		}
+		if requireTypeEdge && !tokenTransactionHasTypeEdge(tokenTransaction) {
+			continue
+		}
+		return tokenTransaction
+	}
+	return nil
+}
+
+func tokenTransactionHasTypeEdge(tokenTransaction *TokenTransaction) bool {
+	if tokenTransaction.Edges.Create != nil || tokenTransaction.Edges.Mint != nil {
+		return true
+	}
+	return len(tokenTransaction.Edges.SpentOutput) > 0
 }
 
 // FetchAndLockTokenTransactionData refetches the transaction with all its relations.

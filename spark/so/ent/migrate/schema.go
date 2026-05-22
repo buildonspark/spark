@@ -1095,6 +1095,14 @@ var (
 				Columns: []*schema.Column{TokenTransactionsColumns[3]},
 			},
 			{
+				Name:    "tokentransaction_terminal_partial_hash_unique",
+				Unique:  true,
+				Columns: []*schema.Column{TokenTransactionsColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status IN ('REVEALED', 'FINALIZED')",
+				},
+			},
+			{
 				Name:    "tokentransaction_expiry_time_status",
 				Unique:  false,
 				Columns: []*schema.Column{TokenTransactionsColumns[7], TokenTransactionsColumns[6]},
