@@ -324,7 +324,25 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to create prometheus exporter", zap.Error(err))
 	}
-	meterProvider := metric.NewMeterProvider(metric.WithReader(promExporter))
+	// Default gRPC OTEL histogram boundaries top out at 10s; some of our calls are going longer than that.
+	// We top out at 180s because that's our current client and server timeouts
+	grpcLatencyBucketsMs := []float64{
+		0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000,
+		2500, 5000, 7500, 10000, 15000, 30000, 60000, 90000, 120000, 180000,
+	}
+	meterProvider := metric.NewMeterProvider(
+		metric.WithReader(promExporter),
+		metric.WithView(
+			metric.NewView(
+				metric.Instrument{Name: "rpc.server.duration"},
+				metric.Stream{Aggregation: metric.AggregationExplicitBucketHistogram{Boundaries: grpcLatencyBucketsMs}},
+			),
+			metric.NewView(
+				metric.Instrument{Name: "rpc.client.duration"},
+				metric.Stream{Aggregation: metric.AggregationExplicitBucketHistogram{Boundaries: grpcLatencyBucketsMs}},
+			),
+		),
+	)
 	otel.SetMeterProvider(meterProvider)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
