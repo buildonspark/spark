@@ -418,6 +418,24 @@ func loadAndMarshalTransfersByIDs(ctx context.Context, db *ent.Client, ids []uui
 	return protos, nil
 }
 
+// validateBaseTransferFilter checks the four cross-handler input invariants
+// shared by every QueryAllTransfers entry point.
+func validateBaseTransferFilter(filter *pb.TransferFilter) error {
+	if filter.GetLimit() < 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
+	}
+	if filter.GetOffset() < 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
+	}
+	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
+		return status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
+	}
+	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	}
+	return nil
+}
+
 // extractParticipant resolves the TransferFilter participant oneof into the
 // wallet pubkey and matching participantRole + display label. Shared between
 // the two-phase MIMO query handlers so they dispatch on the same enum rather
@@ -513,11 +531,8 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		)
 	}()
 
-	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
-		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
-	}
-	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	if err := validateBaseTransferFilter(filter); err != nil {
+		return nil, err
 	}
 
 	walletPubkey, err := keys.ParsePublicKey(filter.GetSenderIdentityPublicKey())
@@ -682,17 +697,8 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 		)
 	}()
 
-	if filter.GetLimit() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
-	}
-	if filter.GetOffset() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
-	}
-	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
-		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
-	}
-	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	if err := validateBaseTransferFilter(filter); err != nil {
+		return nil, err
 	}
 
 	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
@@ -868,17 +874,8 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 		)
 	}()
 
-	if filter.GetLimit() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
-	}
-	if filter.GetOffset() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
-	}
-	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
-		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
-	}
-	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	if err := validateBaseTransferFilter(filter); err != nil {
+		return nil, err
 	}
 
 	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
@@ -1059,17 +1056,8 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 		)
 	}()
 
-	if filter.GetLimit() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
-	}
-	if filter.GetOffset() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
-	}
-	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
-		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
-	}
-	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	if err := validateBaseTransferFilter(filter); err != nil {
+		return nil, err
 	}
 
 	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
@@ -1220,17 +1208,8 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 		)
 	}()
 
-	if filter.GetLimit() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
-	}
-	if filter.GetOffset() < 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
-	}
-	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
-		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
-	}
-	if filter.GetNetwork() == pb.Network_UNSPECIFIED {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("filter.Network must be specified"))
+	if err := validateBaseTransferFilter(filter); err != nil {
+		return nil, err
 	}
 
 	network, err := btcnetwork.FromProtoNetwork(filter.GetNetwork())
