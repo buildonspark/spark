@@ -198,6 +198,10 @@ const (
 	KnobMaxPendingInstantStaticDepositAmount = "spark.so.max_pending_instant_static_deposit_amount"
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
+	// Per-run cap on the number of aged candidates a single purge invocation
+	// will scan. Combined with the cursor persisted in memcache, this bounds
+	// per-run DB load while still giving eventual full coverage of the table.
+	KnobPurgeDanglingSigningKeyshareSecretsMaxScanCount = "spark.so.purge_dangling_signing_keyshare_secrets_max_scan_count"
 
 	// Seconds a PARTICIPANT FlowExecution row can stay IN_FLIGHT before the
 	// reconciliation task considers it stuck and asks the coordinator for

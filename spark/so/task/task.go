@@ -910,50 +910,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_dangling_signing_keyshare_secrets",
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					batchSize := int(knobsService.GetValue(knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize, purgeDanglingSigningKeyshareSecretsDefaultBatchSize))
-					if batchSize <= 0 {
-						logger.Sugar().Warnf("purge_dangling_signing_keyshare_secrets: invalid batchSize %d (knob %s), skipping run", batchSize, knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize)
-						return nil
-					}
-					cutoffID := uuids.UUIDv7FromTime(time.Now().Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
-					result, err := purgeDanglingSigningKeyshareSecretsBatch(
-						ctx,
-						cutoffID,
-						batchSize,
-					)
-					if err != nil {
-						return err
-					}
-
-					if result.FoundFullDeleteBatch {
-						logger.Sugar().Warnf(
-							"Found a full batch of dangling signing keyshare secrets; deleted %d after scanning %d aged candidates; additional dangling signing keyshare secrets may remain",
-							result.DeletedCount,
-							result.CandidateCount,
-						)
-					} else if result.ScanLimitReached {
-						logger.Sugar().Warnf(
-							"Reached the aged-candidate scan limit after scanning %d rows and deleting %d dangling signing keyshare secrets; additional dangling signing keyshare secrets may remain",
-							result.CandidateCount,
-							result.DeletedCount,
-						)
-					} else if result.DeletedCount > 0 {
-						logger.Sugar().Infof(
-							"Purged %d dangling signing keyshare secrets out of %d aged candidates",
-							result.DeletedCount,
-							result.CandidateCount,
-						)
-					} else if result.CandidateCount > 0 {
-						logger.Sugar().Infof(
-							"No dangling signing keyshare secrets found; %d aged candidates were all actively referenced",
-							result.CandidateCount,
-						)
-					}
-
-					return nil
-				},
+				Task:         runPurgeDanglingSigningKeyshareSecrets,
 			},
 		},
 		{
