@@ -376,6 +376,39 @@ func (h *TransferHandler) syncTransferV3Init(
 	return err
 }
 
+// finishQueryFromIDs wraps the post-SQL-scan tail shared by every MIMO query
+// handler: empty-result short-circuit, load + marshal via
+// loadAndMarshalTransfersByIDs, metrics recording, and nextOffset computation.
+// limit/offset are the post-normalization values; nextOffset advances by SQL ID
+// count (not ORM count) so concurrent deletes don't reshape pagination.
+func finishQueryFromIDs(
+	ctx context.Context,
+	db *ent.Client,
+	transferIDs []uuid.UUID,
+	walletPubkey keys.Public,
+	order pb.Order,
+	limit, offset int,
+	metrics *transferQueryRecorder,
+) (*pb.QueryTransfersResponse, error) {
+	if len(transferIDs) == 0 {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, order)
+	metrics.record(ctx, len(transferProtos), err)
+	if err != nil {
+		return nil, err
+	}
+	nextOffset := int64(-1)
+	if len(transferIDs) == limit {
+		nextOffset = int64(offset + len(transferIDs))
+	}
+	return &pb.QueryTransfersResponse{
+		Transfers: transferProtos,
+		Offset:    nextOffset,
+	}, nil
+}
+
 // loadAndMarshalTransfersByIDs loads transfers by ID with the standard preload
 // graph and marshals each one with the wallet-receiver projection when the
 // wallet is on the receiver side, MarshalProto otherwise. Shared across the
@@ -617,26 +650,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	if len(transferIDs) == 0 {
-		metrics.record(ctx, 0, nil)
-		return &pb.QueryTransfersResponse{Offset: -1}, nil
-	}
-
-	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.Order)
-	metrics.record(ctx, len(transferProtos), err)
-	if err != nil {
-		return nil, err
-	}
-
-	// Gate and advance by SQL ID count, not ORM count — concurrent deletes shouldn't reshape pagination.
-	nextOffset := int64(-1)
-	if len(transferIDs) == limit {
-		nextOffset = int64(offset + len(transferIDs))
-	}
-	return &pb.QueryTransfersResponse{
-		Transfers: transferProtos,
-		Offset:    nextOffset,
-	}, nil
+	return finishQueryFromIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder(), limit, offset, metrics)
 }
 
 // shouldRouteToByTypes reports whether the request can dispatch to
@@ -782,25 +796,7 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	if len(transferIDs) == 0 {
-		metrics.record(ctx, 0, nil)
-		return &pb.QueryTransfersResponse{Offset: -1}, nil
-	}
-
-	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
-	metrics.record(ctx, len(transferProtos), err)
-	if err != nil {
-		return nil, err
-	}
-
-	nextOffset := int64(-1)
-	if len(transferIDs) == limit {
-		nextOffset = int64(offset + len(transferIDs))
-	}
-	return &pb.QueryTransfersResponse{
-		Transfers: transferProtos,
-		Offset:    nextOffset,
-	}, nil
+	return finishQueryFromIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder(), limit, offset, metrics)
 }
 
 // shouldRouteToReceiverByTypeStatus reports whether the request can dispatch
@@ -960,25 +956,7 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	if len(transferIDs) == 0 {
-		metrics.record(ctx, 0, nil)
-		return &pb.QueryTransfersResponse{Offset: -1}, nil
-	}
-
-	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
-	metrics.record(ctx, len(transferProtos), err)
-	if err != nil {
-		return nil, err
-	}
-
-	nextOffset := int64(-1)
-	if len(transferIDs) == limit {
-		nextOffset = int64(offset + len(transferIDs))
-	}
-	return &pb.QueryTransfersResponse{
-		Transfers: transferProtos,
-		Offset:    nextOffset,
-	}, nil
+	return finishQueryFromIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder(), limit, offset, metrics)
 }
 
 // shouldRouteToCounterSwap reports whether the request can dispatch to
@@ -1142,25 +1120,7 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	if len(transferIDs) == 0 {
-		metrics.record(ctx, 0, nil)
-		return &pb.QueryTransfersResponse{Offset: -1}, nil
-	}
-
-	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
-	metrics.record(ctx, len(transferProtos), err)
-	if err != nil {
-		return nil, err
-	}
-
-	nextOffset := int64(-1)
-	if len(transferIDs) == limit {
-		nextOffset = int64(offset + len(transferIDs))
-	}
-	return &pb.QueryTransfersResponse{
-		Transfers: transferProtos,
-		Offset:    nextOffset,
-	}, nil
+	return finishQueryFromIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder(), limit, offset, metrics)
 }
 
 // shouldRouteToByParticipantFallback reports whether the request should dispatch to
@@ -1315,25 +1275,7 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 		return nil, fmt.Errorf("failed to query transfer IDs: %w", err)
 	}
 
-	if len(transferIDs) == 0 {
-		metrics.record(ctx, 0, nil)
-		return &pb.QueryTransfersResponse{Offset: -1}, nil
-	}
-
-	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder())
-	metrics.record(ctx, len(transferProtos), err)
-	if err != nil {
-		return nil, err
-	}
-
-	nextOffset := int64(-1)
-	if len(transferIDs) == limit {
-		nextOffset = int64(offset + len(transferIDs))
-	}
-	return &pb.QueryTransfersResponse{
-		Transfers: transferProtos,
-		Offset:    nextOffset,
-	}, nil
+	return finishQueryFromIDs(ctx, db, transferIDs, walletPubkey, filter.GetOrder(), limit, offset, metrics)
 }
 
 // buildByParticipantFallbackParticipantPredicate builds the participant-axis
