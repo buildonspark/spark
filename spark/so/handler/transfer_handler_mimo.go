@@ -452,7 +452,7 @@ func extractParticipant(filter *pb.TransferFilter) (keys.Public, participantRole
 //
 //   - Filter shape: sender-only participant + non-empty status filter that's
 //     a subset of OutgoingInFlightSenderStatuses (the partial index's WHERE
-//     clause). SR1 (sender_or_receiver) and receiver-only participants fall
+//     clause). sender_or_receiver and receiver-only participants fall
 //     through to legacy; mixed/wider status sets fall through too.
 //   - Knob: KnobReadMIMODataModelOutgoingInFlight is a per-call RolloutRandom
 //     probability (0–100). Bare value is the broad rollout percentage; no
@@ -628,8 +628,9 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 // queryByTypes. The shape predicate is intentionally narrow: type filter set,
 // no status filter, no transfer-id filter. Under those
 // conditions both arms collapse to an index-only walk on
-// (identity_pubkey, transfer_type, create_time, transfer_id), and SR1 is a
-// straight UNION-DISTINCT with no status-collapsing translation logic.
+// (identity_pubkey, transfer_type, create_time, transfer_id), and the
+// sender_or_receiver path is a straight UNION-DISTINCT with no
+// status-collapsing translation logic.
 func shouldRouteToByTypes(ctx context.Context, filter *pb.TransferFilter) bool {
 	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelQueryByTypes, 0) {
 		return false
@@ -655,11 +656,11 @@ func shouldRouteToByTypes(ctx context.Context, filter *pb.TransferFilter) bool {
 
 // queryByTypes handles QueryAllTransfers requests with a type filter and no
 // status filter. The per-arm SQL drives idx_transferreceiver_pubkey_type_time
-// / idx_transfersender_pubkey_type_time directly; SR1 UNIONs the two arms and
-// dedups for self-transfers.
+// / idx_transfersender_pubkey_type_time directly; the sender_or_receiver path
+// UNIONs the two arms and dedups for self-transfers.
 //
 // Routing in QueryAllTransfers guarantees:
-//   - filter.Participant identifies one of sender / receiver / SR1
+//   - filter.Participant identifies one of sender / receiver / sender_or_receiver
 //   - len(filter.Types) > 0
 //   - filter.Statuses, filter.TransferIds are empty
 //   - KnobReadMIMODataModelQueryByTypes is on
@@ -799,8 +800,8 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 // shouldRouteToReceiverByTypeStatus reports whether the request can dispatch
 // to queryReceiverByTypeStatus. The shape requires receiver participant,
 // non-empty types AND statuses, no transfer-id filter, and every requested
-// status must translate to a receiver-axis equivalent. SR1 and sender
-// participants stay on legacy until per-caller handlers exist.
+// status must translate to a receiver-axis equivalent. sender_or_receiver and
+// sender participants stay on legacy until per-caller handlers exist.
 //
 // This call surface is exposed publicly, but 100% of 7d traffic
 // is the SSP via gen_all_inbound_transfers
@@ -1392,7 +1393,7 @@ func buildByParticipantFallbackParticipantPredicate(role participantRole, wallet
 // Untranslatable statuses are silently dropped by ReceiverArmFilters. If
 // every input status is untranslatable (indexSet empty) the receiver arm
 // contributes nothing — IDEQ(uuid.Nil) is a never-matches predicate that
-// composes cleanly under Or in the SR1 case.
+// composes cleanly under Or in the sender_or_receiver case.
 func buildReceiverArmPredicate(walletPubkey keys.Public, statuses []st.TransferStatus) predicate.Transfer {
 	if len(statuses) == 0 {
 		return enttransfer.HasTransferReceiversWith(enttransferreceiver.IdentityPubkeyEQ(walletPubkey))

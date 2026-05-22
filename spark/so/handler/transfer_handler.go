@@ -2501,9 +2501,9 @@ const maxTransferPageSize = 100
 const maxTransferIDFilterValues = 1000
 
 // participantRole enumerates which side of a transfer a query targets:
-// receiver, sender, or either (SR1). Lets handlers extract the wallet
-// pubkey from the proto oneof once and then dispatch to per-arm SQL
-// builders without repeating the type-switch downstream.
+// receiver, sender, or either (sender_or_receiver). Lets handlers extract
+// the wallet pubkey from the proto oneof once and then dispatch to per-arm
+// SQL builders without repeating the type-switch downstream.
 type participantRole int
 
 const (
@@ -2645,9 +2645,9 @@ func buildPendingIDsQueryReceiver(args queryMIMOPendingArgs) (string, []any, err
 // not by planner stability.
 //
 // See buildPendingIDsQuerySenderOrReceiver below for the contrasting
-// column-based sender-arm shape used by SR1 — same logical query, different
-// physical predicate (t.sender_identity_pubkey directly), driving the new
-// partial cleanly without the planner-flip risk.
+// column-based sender-arm shape used by the sender_or_receiver path — same
+// logical query, different physical predicate (t.sender_identity_pubkey
+// directly), driving the new partial cleanly without the planner-flip risk.
 func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error) {
 	sqlArgs := []any{
 		args.walletPubkey.Serialize(),          // $1 - identity_pubkey
@@ -2713,7 +2713,7 @@ func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error
 // in favor of an edge-table partial mirroring the receiver pattern. Tracked
 // in SP-2914.
 //
-// SR1 returns each transfer at most once thanks to two invariants:
+// The sender_or_receiver path returns each transfer at most once thanks to two invariants:
 //
 //  1. PendingSenderStatuses() ∩ PendingReceiverStatuses() = ∅ — a single
 //     transfer's t.status / r.status pair (kept consistent by the dual-write
@@ -2725,8 +2725,8 @@ func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error
 //     (transfer, pubkey) per arm.
 //
 // If invariant #1 is ever broken (a status added to both sets, a state-
-// machine path that produces overlap), SR1 silently emits duplicates and
-// the dual-role fixture in the equivalence test doesn't catch it because
+// machine path that produces overlap), the sender_or_receiver path silently
+// emits duplicates and the dual-role fixture in the equivalence test doesn't catch it because
 // the statuses it uses are in receiverPending only. The unit test is the
 // guard.
 func buildPendingIDsQuerySenderOrReceiver(args queryMIMOPendingArgs) (string, []any, error) {
