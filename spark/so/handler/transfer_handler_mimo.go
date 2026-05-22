@@ -469,6 +469,30 @@ func validateBaseTransferFilter(filter *pb.TransferFilter) error {
 	return nil
 }
 
+// validateWalletReadAccess gates !isSSP MIMO query handlers on HasReadAccessToWallet.
+// Denial returns the empty short-circuit response, matching legacy queryTransfers
+// (empty page rather than PermissionDenied — avoids leaking wallet existence via
+// gRPC code).
+func (h *TransferHandler) validateWalletReadAccess(
+	ctx context.Context,
+	walletPubkey keys.Public,
+	isSSP bool,
+	metrics *transferQueryRecorder,
+) (*pb.QueryTransfersResponse, error) {
+	if isSSP {
+		return nil, nil
+	}
+	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, err)
+	}
+	if !hasReadAccess {
+		metrics.record(ctx, 0, nil)
+		return &pb.QueryTransfersResponse{Offset: -1}, nil
+	}
+	return nil, nil
+}
+
 // extractParticipant resolves the TransferFilter participant oneof into the
 // wallet pubkey and matching participantRole + display label. Shared between
 // the two-phase MIMO query handlers so they dispatch on the same enum rather
@@ -590,15 +614,8 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		HasTransferIDs:  len(filter.TransferIds) > 0,
 	})
 
-	if !isSSP {
-		hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, err)
-		}
-		if !hasReadAccess {
-			metrics.record(ctx, 0, nil)
-			return &pb.QueryTransfersResponse{Offset: -1}, nil
-		}
+	if resp, err := h.validateWalletReadAccess(ctx, walletPubkey, isSSP, metrics); resp != nil || err != nil {
+		return resp, err
 	}
 
 	limit, offset := normalizeTransferPagination(filter.Limit, filter.Offset)
@@ -752,15 +769,8 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 		HasTransferIDs: len(filter.GetTransferIds()) > 0,
 	})
 
-	if !isSSP {
-		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
-		if accessErr != nil {
-			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
-		}
-		if !hasReadAccess {
-			metrics.record(ctx, 0, nil)
-			return &pb.QueryTransfersResponse{Offset: -1}, nil
-		}
+	if resp, err := h.validateWalletReadAccess(ctx, walletPubkey, isSSP, metrics); resp != nil || err != nil {
+		return resp, err
 	}
 
 	baseArgs.WalletPubkey = walletPubkey
@@ -899,15 +909,8 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 		HasTransferIDs:  false,
 	})
 
-	if !isSSP {
-		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
-		if accessErr != nil {
-			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
-		}
-		if !hasReadAccess {
-			metrics.record(ctx, 0, nil)
-			return &pb.QueryTransfersResponse{Offset: -1}, nil
-		}
+	if resp, err := h.validateWalletReadAccess(ctx, walletPubkey, isSSP, metrics); resp != nil || err != nil {
+		return resp, err
 	}
 
 	args := mimo.ReceiverByTypeStatusArgs{
@@ -1063,15 +1066,8 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 		HasTransferIDs:  false,
 	})
 
-	if !isSSP {
-		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
-		if accessErr != nil {
-			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
-		}
-		if !hasReadAccess {
-			metrics.record(ctx, 0, nil)
-			return &pb.QueryTransfersResponse{Offset: -1}, nil
-		}
+	if resp, err := h.validateWalletReadAccess(ctx, walletPubkey, isSSP, metrics); resp != nil || err != nil {
+		return resp, err
 	}
 
 	args := mimo.CounterSwapArgs{
@@ -1204,15 +1200,8 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 		HasTransferIDs:  len(filter.GetTransferIds()) > 0,
 	})
 
-	if !isSSP {
-		hasReadAccess, accessErr := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, walletPubkey)
-		if accessErr != nil {
-			return nil, fmt.Errorf("failed to check read access for wallet %s: %w", walletPubkey, accessErr)
-		}
-		if !hasReadAccess {
-			metrics.record(ctx, 0, nil)
-			return &pb.QueryTransfersResponse{Offset: -1}, nil
-		}
+	if resp, err := h.validateWalletReadAccess(ctx, walletPubkey, isSSP, metrics); resp != nil || err != nil {
+		return resp, err
 	}
 
 	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
