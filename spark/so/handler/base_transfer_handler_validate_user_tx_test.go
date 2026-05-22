@@ -242,6 +242,16 @@ func makeConnectorTx(t *testing.T) *testConnector {
 	}
 }
 
+func replaceFirstInputOutPoint(t *testing.T, rawTx []byte, outPoint wire.OutPoint) []byte {
+	t.Helper()
+
+	tx, err := common.TxFromRawTxBytes(rawTx)
+	require.NoError(t, err)
+	require.NotEmpty(t, tx.TxIn)
+	tx.TxIn[0].PreviousOutPoint = outPoint
+	return serializeTx(t, tx)
+}
+
 func handlerWithConfig() *BaseTransferHandler {
 	return &BaseTransferHandler{config: &so.Config{}}
 }
@@ -421,6 +431,81 @@ func TestValidateUserTxs_Legacy_InvalidDirectRefund_Error(t *testing.T) {
 	require.ErrorContains(t, err, "direct refund tx validation failed")
 }
 
+func TestValidateUserTxs_Legacy_WrongRefundPrevout_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+	wrongOutPoint := wire.OutPoint{Hash: chainhash.Hash{0x99}, Index: 0}
+
+	tests := []struct {
+		name        string
+		req         *pb.StartTransferRequest
+		errContains string
+	}{
+		{
+			name: "cpfp",
+			req: &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				LeavesToSend: []*pb.LeafRefundTxSigningJob{
+					{
+						LeafId: leaf.node.ID.String(),
+						RefundTxSigningJob: &pb.SigningJob{
+							RawTx: replaceFirstInputOutPoint(t, makeClientCpfpTx(t, leaf, refundDest), wrongOutPoint),
+						},
+						DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: makeClientDirectTx(t, leaf, refundDest)},
+						DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)},
+					},
+				},
+			},
+			errContains: "CPFP refund tx validation failed",
+		},
+		{
+			name: "direct",
+			req: &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				LeavesToSend: []*pb.LeafRefundTxSigningJob{
+					{
+						LeafId:                   leaf.node.ID.String(),
+						RefundTxSigningJob:       &pb.SigningJob{RawTx: makeClientCpfpTx(t, leaf, refundDest)},
+						DirectRefundTxSigningJob: &pb.SigningJob{RawTx: replaceFirstInputOutPoint(t, makeClientDirectTx(t, leaf, refundDest), wrongOutPoint)},
+						DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+							RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest),
+						},
+					},
+				},
+			},
+			errContains: "direct refund tx validation failed",
+		},
+		{
+			name: "direct-from-cpfp",
+			req: &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				LeavesToSend: []*pb.LeafRefundTxSigningJob{
+					{
+						LeafId:                   leaf.node.ID.String(),
+						RefundTxSigningJob:       &pb.SigningJob{RawTx: makeClientCpfpTx(t, leaf, refundDest)},
+						DirectRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientDirectTx(t, leaf, refundDest)},
+						DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+							RawTx: replaceFirstInputOutPoint(t, makeClientDirectFromCpfpTx(t, leaf, refundDest), wrongOutPoint),
+						},
+					},
+				},
+			},
+			errContains: "direct from CPFP refund tx validation failed",
+		},
+	}
+
+	h := handlerWithConfig()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, tt.req, st.TransferTypeTransfer, nil)
+			require.ErrorContains(t, err, tt.errContains)
+			require.ErrorContains(t, err, "expected previous outpoint")
+		})
+	}
+}
+
 func TestValidateUserTxs_Package_WithDirect_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
@@ -496,6 +581,85 @@ func TestValidateUserTxs_Package_InvalidDirectRefund_Error(t *testing.T) {
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.ErrorContains(t, err, "direct refund tx validation failed")
+}
+
+func TestValidateUserTxs_Package_WrongRefundPrevout_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+	wrongOutPoint := wire.OutPoint{Hash: chainhash.Hash{0x99}, Index: 0}
+
+	tests := []struct {
+		name        string
+		pkg         *pb.TransferPackage
+		errContains string
+	}{
+		{
+			name: "cpfp",
+			pkg: &pb.TransferPackage{
+				LeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: replaceFirstInputOutPoint(t, makeClientCpfpTx(t, leaf, refundDest), wrongOutPoint)},
+				},
+				DirectLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectTx(t, leaf, refundDest)},
+				},
+				DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)},
+				},
+				KeyTweakPackage: map[string][]byte{"noop": {}},
+				UserSignature:   []byte{1},
+			},
+			errContains: "CPFP refund tx validation failed",
+		},
+		{
+			name: "direct",
+			pkg: &pb.TransferPackage{
+				LeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)},
+				},
+				DirectLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: replaceFirstInputOutPoint(t, makeClientDirectTx(t, leaf, refundDest), wrongOutPoint)},
+				},
+				DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)},
+				},
+				KeyTweakPackage: map[string][]byte{"noop": {}},
+				UserSignature:   []byte{1},
+			},
+			errContains: "direct refund tx validation failed",
+		},
+		{
+			name: "direct-from-cpfp",
+			pkg: &pb.TransferPackage{
+				LeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)},
+				},
+				DirectLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectTx(t, leaf, refundDest)},
+				},
+				DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{
+					{LeafId: leaf.node.ID.String(), RawTx: replaceFirstInputOutPoint(t, makeClientDirectFromCpfpTx(t, leaf, refundDest), wrongOutPoint)},
+				},
+				KeyTweakPackage: map[string][]byte{"noop": {}},
+				UserSignature:   []byte{1},
+			},
+			errContains: "direct from CPFP refund tx validation failed",
+		},
+	}
+
+	h := handlerWithConfig()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				TransferPackage:           tt.pkg,
+			}
+			err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
+			require.ErrorContains(t, err, tt.errContains)
+			require.ErrorContains(t, err, "expected previous outpoint")
+		})
+	}
 }
 
 func TestValidateUserTxs_Package_MismatchedCounts_Error(t *testing.T) {
@@ -914,4 +1078,80 @@ func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
 	h := handlerWithConfig()
 	err = validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
 	require.ErrorContains(t, err, "expected 2 inputs in refund tx, got 3")
+}
+
+func TestValidateUserTxs_CoopExit_Legacy_WrongNodeInput_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	leaf := createDbLeaf(t, ctx, true)
+	refundDest := keys.GeneratePrivateKey().Public()
+	connector := makeConnectorTx(t)
+	wrongOutPoint := wire.OutPoint{Hash: chainhash.Hash{0x99}, Index: 0}
+
+	tests := []struct {
+		name        string
+		req         *pb.StartTransferRequest
+		errContains string
+	}{
+		{
+			name: "cpfp",
+			req: &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				LeavesToSend: []*pb.LeafRefundTxSigningJob{
+					{
+						LeafId: leaf.node.ID.String(),
+						RefundTxSigningJob: &pb.SigningJob{
+							RawTx: replaceFirstInputOutPoint(t, makeClientCoopExitCpfpTx(t, leaf, refundDest, connector), wrongOutPoint),
+						},
+						DirectRefundTxSigningJob:         &pb.SigningJob{RawTx: makeClientCoopExitDirectTx(t, leaf, refundDest, connector)},
+						DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector)},
+					},
+				},
+			},
+			errContains: "CPFP refund validation failed",
+		},
+		{
+			name: "direct",
+			req: &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				LeavesToSend: []*pb.LeafRefundTxSigningJob{
+					{
+						LeafId:                   leaf.node.ID.String(),
+						RefundTxSigningJob:       &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)},
+						DirectRefundTxSigningJob: &pb.SigningJob{RawTx: replaceFirstInputOutPoint(t, makeClientCoopExitDirectTx(t, leaf, refundDest, connector), wrongOutPoint)},
+						DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+							RawTx: makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector),
+						},
+					},
+				},
+			},
+			errContains: "direct refund validation failed",
+		},
+		{
+			name: "direct-from-cpfp",
+			req: &pb.StartTransferRequest{
+				ReceiverIdentityPublicKey: refundDest.Serialize(),
+				LeavesToSend: []*pb.LeafRefundTxSigningJob{
+					{
+						LeafId:                   leaf.node.ID.String(),
+						RefundTxSigningJob:       &pb.SigningJob{RawTx: makeClientCoopExitCpfpTx(t, leaf, refundDest, connector)},
+						DirectRefundTxSigningJob: &pb.SigningJob{RawTx: makeClientCoopExitDirectTx(t, leaf, refundDest, connector)},
+						DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+							RawTx: replaceFirstInputOutPoint(t, makeClientCoopExitDirectFromCpfpTx(t, leaf, refundDest, connector), wrongOutPoint),
+						},
+					},
+				},
+			},
+			errContains: "direct-from-CPFP refund validation failed",
+		},
+	}
+
+	h := handlerWithConfig()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, tt.req, st.TransferTypeCooperativeExit, connector.raw)
+			require.ErrorContains(t, err, tt.errContains)
+			require.ErrorContains(t, err, "refund tx input 0 does not reference the node tx")
+		})
+	}
 }
