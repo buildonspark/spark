@@ -54,7 +54,9 @@ async function main() {
   console.log("Example 3: Paginate through transfers after a cutoff date");
   const cutoffDate = new Date("2025-12-01T00:00:00Z");
   let offset = 0;
-  let allTransfers: any[] = [];
+  let allTransfers: Awaited<
+    ReturnType<typeof wallet.getTransfers>
+  >["transfers"] = [];
 
   while (true) {
     const batch = await wallet.getTransfers(100, offset, cutoffDate);
