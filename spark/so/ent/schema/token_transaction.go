@@ -119,9 +119,10 @@ func (TokenTransaction) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("finalized_token_transaction_hash"),
 		index.Fields("partial_token_transaction_hash"),
+		// Excludes one legacy record per SO that predates this index's uniqueness predicate.
 		index.Fields("partial_token_transaction_hash").
 			Unique().
-			Annotations(entsql.IndexWhere("status IN ('REVEALED', 'FINALIZED')")).
+			Annotations(entsql.IndexWhere("status IN ('REVEALED', 'FINALIZED') AND id NOT IN ('019c9bc6-21ef-70a0-ac25-a663d3bff645', '019c9bc6-2205-7198-9128-daa9c7633622', '019c9bc6-220c-790f-a798-db2f8365338a')")).
 			StorageKey("tokentransaction_terminal_partial_hash_unique"),
 		index.Fields("expiry_time", "status"),
 		// Needed for query_token_transactions query

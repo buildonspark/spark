@@ -1099,7 +1099,7 @@ var (
 				Unique:  true,
 				Columns: []*schema.Column{TokenTransactionsColumns[3]},
 				Annotation: &entsql.IndexAnnotation{
-					Where: "status IN ('REVEALED', 'FINALIZED')",
+					Where: "status IN ('REVEALED', 'FINALIZED') AND id NOT IN ('019c9bc6-21ef-70a0-ac25-a663d3bff645', '019c9bc6-2205-7198-9128-daa9c7633622', '019c9bc6-220c-790f-a798-db2f8365338a')",
 				},
 			},
 			{
