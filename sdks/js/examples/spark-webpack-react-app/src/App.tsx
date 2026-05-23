@@ -1,12 +1,12 @@
 import * as spark from "@buildonspark/spark-sdk";
 import { SparkWallet, getSparkFrost } from "@buildonspark/spark-sdk";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 function App() {
-  const [sparkWallet, setSparkWallet] = useState(null);
-  const [invoice, setInvoice] = useState(null);
+  const [sparkWallet, setSparkWallet] = useState<SparkWallet | null>(null);
+  const [invoice, setInvoice] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
-  const [dummyTx, setDummyTx] = useState(null);
+  const [dummyTx, setDummyTx] = useState<{ txid: string } | null>(null);
 
   const initializeSpark = async () => {
     const { wallet } = await SparkWallet.initialize({
@@ -39,7 +39,7 @@ function App() {
   };
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       const sparkFrost = getSparkFrost();
       const dummyTx = await sparkFrost.createDummyTx(
         "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
@@ -55,15 +55,17 @@ function App() {
       <div className="card">
         <p>Test transaction ID</p>
         <p>{dummyTx ? dummyTx.txid : "Loading..."}</p>
-        <button onClick={initializeSpark}>Initialize Spark Client</button>
+        <button onClick={() => void initializeSpark()}>
+          Initialize Spark Client
+        </button>
         <p>
           {sparkWallet
             ? "Spark client is initialized!"
             : "Click the button to initialize Spark client"}
         </p>
-        <button onClick={createInvoice}>Create Invoice</button>
+        <button onClick={() => void createInvoice()}>Create Invoice</button>
         <p className="invoice-text">Invoice: {invoice}</p>
-        <button onClick={getBalance}>Get Balance</button>
+        <button onClick={() => void getBalance()}>Get Balance</button>
         <p>Balance: {balance}</p>
       </div>
     </div>
@@ -72,5 +74,13 @@ function App() {
 
 export default App;
 
-/* For debugging purposes only, not required: */
-window.s = spark;
+/* For debugging purposes only, this is not required for the SDK to work: */
+declare global {
+  interface Window {
+    s: typeof spark;
+  }
+}
+
+if (process.env.NODE_ENV !== "production") {
+  window.s = spark;
+}

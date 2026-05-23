@@ -4,8 +4,10 @@
   "scripts": {
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
-    "start": "webpack serve --mode development",
-    "build": "webpack --mode production"
+    "lint:fix": "eslint --fix .",
+    "lint": "eslint .",
+    "start": "webpack serve --config webpack.config.mjs --mode development",
+    "build": "tsc --noEmit && webpack --config webpack.config.mjs --mode production"
   },
   "dependencies": {
     "@buildonspark/spark-sdk": "0.8.1",
@@ -16,11 +18,17 @@
     "@babel/core": "^7.27.3",
     "@babel/preset-env": "^7.27.2",
     "@babel/preset-react": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@lightsparkdev/eslint-config": "^0.0.1",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.1.5",
     "babel-loader": "^10.0.0",
     "css-loader": "^7.1.2",
+    "eslint": "^9.25.0",
     "html-webpack-plugin": "^5.6.3",
     "prettier": "^3.7.4",
     "style-loader": "^4.0.0",
+    "typescript": "^5.7.3",
     "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.1"

@@ -1,8 +1,11 @@
-const path = require("path");
-const HtmlWebpackPlugin = require("html-webpack-plugin");
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import HtmlWebpackPlugin from "html-webpack-plugin";
 
-module.exports = {
-  entry: "./src/index.js",
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default {
+  entry: "./src/index.tsx",
   output: {
     path: path.resolve(__dirname, "dist"),
     filename: "bundle.js",
@@ -10,7 +13,7 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.(js|jsx)$/,
+        test: /\.(js|jsx|ts|tsx)$/,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
@@ -35,6 +38,6 @@ module.exports = {
     port: 3000,
   },
   resolve: {
-    extensions: [".js", ".jsx"],
+    extensions: [".js", ".jsx", ".ts", ".tsx"],
   },
 };
