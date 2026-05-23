@@ -1128,7 +1128,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalizeLoaded
 		if output.Edges.TokenPartialRevocationSecretShares != nil {
 			shares = len(output.Edges.TokenPartialRevocationSecretShares)
 		}
-		logger.Info(fmt.Sprintf("output: %s, has %d revocation keyshares", output.ID, shares))
+		logger.Sugar().Infof("output: %s, has %d revocation keyshares", output.ID, shares)
 	}
 	return h.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
 }

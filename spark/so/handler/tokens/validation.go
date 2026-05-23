@@ -197,12 +197,12 @@ func validateNoActiveFreezesForOutputs(ctx context.Context, outputs []*ent.Token
 			continue
 		}
 		for _, freeze := range activeFreezes {
-			logger.Info(fmt.Sprintf(
+			logger.Sugar().Infof(
 				"Found active freeze for owner %x (token: %x, timestamp: %d)",
 				freeze.OwnerPublicKey,
 				freeze.TokenPublicKey,
 				freeze.WalletProvidedFreezeTimestamp,
-			))
+			)
 		}
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("at least one input is frozen. Cannot proceed with transaction"))
 	}
