@@ -13,14 +13,18 @@
     "watch:chrome": "node build.mjs --watch",
     "watch:firefox": "node build.mjs --firefox --watch",
     "format:fix": "prettier . --write",
-    "format": "prettier . --check"
+    "format": "prettier . --check",
+    "lint:fix": "eslint --fix src build.mjs",
+    "lint": "eslint src build.mjs"
   },
   "dependencies": {
     "@buildonspark/spark-sdk": "0.8.1"
   },
   "devDependencies": {
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@types/chrome": "^0.0.276",
     "esbuild": "^0.25.0",
+    "eslint": "^9.25.0",
     "prettier": "^3.7.4",
     "typescript": "^5.7.3"
   }

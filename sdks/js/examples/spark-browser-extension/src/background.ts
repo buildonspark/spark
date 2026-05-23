@@ -1,23 +1,39 @@
 import * as spark from "@buildonspark/spark-sdk";
-import { SparkWallet, getSparkFrost } from "@buildonspark/spark-sdk";
+import { SparkWallet } from "@buildonspark/spark-sdk";
 
 let wallet: SparkWallet | null = null;
-SparkWallet.initialize({
+
+function getMessageType(message: unknown): string | undefined {
+  if (typeof message !== "object" || message === null || !("type" in message)) {
+    return undefined;
+  }
+
+  const { type } = message as { type?: unknown };
+  return typeof type === "string" ? type : undefined;
+}
+
+void SparkWallet.initialize({
   options: {
     network: "REGTEST",
   },
-}).then(({ wallet: initializedWallet }) => {
-  console.log(
-    "[spark-extension] SparkWallet initialised in background",
-    initializedWallet,
-  );
-  wallet = initializedWallet;
-});
+})
+  .then(({ wallet: initializedWallet }) => {
+    console.log(
+      "[spark-extension] SparkWallet initialised in background",
+      initializedWallet,
+    );
+    wallet = initializedWallet;
+  })
+  .catch((error: unknown) => {
+    console.error("Failed to initialize SparkWallet", error);
+  });
 
 console.log("[spark-extension] SparkWallet initialized in background", wallet);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === "GET_WALLET_ADDRESS") {
+  const type = getMessageType(message);
+
+  if (type === "GET_WALLET_ADDRESS") {
     console.log(
       "[spark-extension] background received GET_WALLET_ADDRESS",
       message,
@@ -33,7 +49,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     // Get wallet address asynchronously
-    (async () => {
+    void (async () => {
       try {
         const address = await wallet.getSparkAddress();
         sendResponse({
@@ -53,7 +69,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true; // Will respond asynchronously
   }
 
-  if (message?.type === "PING_FROM_CONTENT") {
+  if (type === "PING_FROM_CONTENT") {
     console.log(
       "[spark-extension] background received PING_FROM_CONTENT",
       message,

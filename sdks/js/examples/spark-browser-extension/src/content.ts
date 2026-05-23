@@ -1,4 +1,10 @@
-async function main() {
+type WalletAddressResponse = {
+  address?: string;
+  error?: string;
+  walletState?: string;
+};
+
+function main() {
   console.log("[spark-extension] Content script loaded");
 
   const container = document.createElement("div");
@@ -22,16 +28,19 @@ async function main() {
 
   const statusEl = container.querySelector("#spark-status");
 
-  chrome.runtime.sendMessage({ type: "GET_WALLET_ADDRESS" }, (response) => {
-    console.log("[spark-extension] content received response", response);
-    if (response?.address) {
-      statusEl.textContent = `Address: ${response.address}`;
-    } else if (response?.error) {
-      statusEl.textContent = `Error: ${response.error}`;
-    } else {
-      statusEl.textContent = `Wallet: ${response?.walletState || "unknown"}`;
-    }
-  });
+  chrome.runtime.sendMessage(
+    { type: "GET_WALLET_ADDRESS" },
+    (response: WalletAddressResponse | undefined) => {
+      console.log("[spark-extension] content received response", response);
+      if (response?.address) {
+        statusEl.textContent = `Address: ${response.address}`;
+      } else if (response?.error) {
+        statusEl.textContent = `Error: ${response.error}`;
+      } else {
+        statusEl.textContent = `Wallet: ${response?.walletState || "unknown"}`;
+      }
+    },
+  );
 }
 
 main();

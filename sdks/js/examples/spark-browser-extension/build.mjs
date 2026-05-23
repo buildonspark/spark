@@ -10,7 +10,7 @@
 //
 
 import { build, context as createContext } from "esbuild";
-import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { argv } from "node:process";
 import path from "node:path";
 
