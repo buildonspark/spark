@@ -24,7 +24,7 @@ router.get(
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
     try {
-      const balance = await wallet!.getIssuerTokenBalance();
+      const balance = await wallet.getIssuerTokenBalance();
       res.json({
         data: { balance: balance },
       });
@@ -54,7 +54,7 @@ router.get(
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
     try {
-      const tokenMetadata = await wallet!.getIssuerTokenMetadata();
+      const tokenMetadata = await wallet.getIssuerTokenMetadata();
       console.log("response: ", tokenMetadata);
       res.json({
         data: { tokenMetadata },
@@ -84,9 +84,7 @@ router.post(
     const wallet = getWallet() as IssuerSparkWallet;
     try {
       const { tokenAmount } = req.body as { tokenAmount: number };
-      const tokenTransactionHash = await wallet!.mintTokens(
-        BigInt(tokenAmount),
-      );
+      const tokenTransactionHash = await wallet.mintTokens(BigInt(tokenAmount));
       res.json({
         data: { tokenTransactionHash },
       });
@@ -115,7 +113,7 @@ router.post(
     const wallet = getWallet() as IssuerSparkWallet;
     try {
       const { tokenAmount } = req.body as { tokenAmount: number };
-      const tokensBurned = await wallet!.burnTokens(BigInt(tokenAmount));
+      const tokensBurned = await wallet.burnTokens(BigInt(tokenAmount));
       res.json({
         data: { tokensBurned },
       });
@@ -146,7 +144,7 @@ router.post(
     const wallet = getWallet() as IssuerSparkWallet;
     try {
       const { sparkAddress } = req.body as { sparkAddress: string };
-      const frozenTokens = await wallet!.freezeTokens(sparkAddress);
+      const frozenTokens = await wallet.freezeTokens(sparkAddress);
       res.json({
         data: {
           impactedTokenOutputs: frozenTokens.impactedTokenOutputs.map((o) => ({
@@ -182,7 +180,7 @@ router.post(
     const wallet = getWallet() as IssuerSparkWallet;
     try {
       const { sparkAddress } = req.body as { sparkAddress: string };
-      const thawedTokens = await wallet!.unfreezeTokens(sparkAddress);
+      const thawedTokens = await wallet.unfreezeTokens(sparkAddress);
       res.json({
         data: {
           impactedTokenOutputs: thawedTokens.impactedTokenOutputs.map((o) => ({

@@ -1,16 +1,16 @@
-import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
+import { type IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
-import { ConfigOptions } from "@buildonspark/spark-sdk";
+import { type ConfigOptions } from "@buildonspark/spark-sdk";
 import {
-  ExitSpeed,
-  WalletTransfer,
+  type ExitSpeed,
+  type WalletTransfer,
   type CoopExitRequest,
   type LightningReceiveRequest,
   type LightningSendRequest,
 } from "@buildonspark/spark-sdk/types";
 import {
   getLatestDepositTxId,
-  Bech32mTokenIdentifier,
+  type Bech32mTokenIdentifier,
 } from "@buildonspark/spark-sdk";
 import { isError } from "@lightsparkdev/core";
 import {
@@ -20,7 +20,7 @@ import {
   type Response,
 } from "express";
 import fs from "fs";
-import { BITCOIN_NETWORK } from "../src/index.js";
+import { BITCOIN_NETWORK } from "../index.js";
 import {
   formatTransferResponse,
   loadMnemonic,
@@ -43,7 +43,7 @@ export const createSparkRouter = (
     if (configFile) {
       try {
         const data = fs.readFileSync(configFile, "utf8");
-        config = JSON.parse(data);
+        config = JSON.parse(data) as ConfigOptions;
         if (config.network !== BITCOIN_NETWORK) {
           console.error("Network mismatch in config file");
         }
@@ -66,7 +66,7 @@ export const createSparkRouter = (
         network: BITCOIN_NETWORK,
       },
     });
-    walletInstance = res?.wallet as SparkWallet | IssuerSparkWallet | undefined;
+    walletInstance = res?.wallet;
     return res;
   };
 
@@ -94,7 +94,7 @@ export const createSparkRouter = (
   };
 
   // Get wallet
-  router.get("/wallet", checkWalletInitialized, async (req, res) => {
+  router.get("/wallet", checkWalletInitialized, (req, res) => {
     res.json(getWallet());
   });
 
@@ -217,7 +217,7 @@ export const createSparkRouter = (
       const balance = await wallet!.getBalance();
       const tokenBalances: Record<
         string,
-        { ownedBalance: BigInt; availableToSendBalance: BigInt }
+        { ownedBalance: bigint; availableToSendBalance: bigint }
       > = balance.tokenBalances
         ? Object.fromEntries(
             [...balance.tokenBalances].map(([key, value]) => [

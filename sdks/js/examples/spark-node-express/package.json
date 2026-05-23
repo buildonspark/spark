@@ -8,6 +8,8 @@
     "build": "tsc",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
+    "lint:fix": "eslint --fix src",
+    "lint": "eslint src",
     "start": "cross-env NODE_ENV=production NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts",
     "start:dev": "cross-env NODE_ENV=development CONFIG_FILE=../../dev-regtest-config.json NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts",
     "typecheck": "tsc --noEmit"
@@ -23,9 +25,11 @@
     "express": "^4.21.2"
   },
   "devDependencies": {
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@types/express": "^5.0.3",
     "@types/node": "^22.13.2",
     "cross-env": "^7.0.3",
+    "eslint": "^9.25.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.7.4",
     "ts-node": "^10.9.2",

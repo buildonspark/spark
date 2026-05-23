@@ -1,7 +1,6 @@
-import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import {
-  WalletTransfer,
-  WalletTransferLeaf,
+  type WalletTransfer,
+  type WalletTransferLeaf,
 } from "@buildonspark/spark-sdk/types";
 import { promises as fs } from "fs";
 /**
@@ -26,33 +25,14 @@ export async function loadMnemonic(path: string) {
   try {
     const mnemonic = await fs.readFile(path, "utf8");
     return mnemonic.trim();
-  } catch (error) {
+  } catch {
     return null;
   }
 }
 
-const TRANSFER_STATUS_MAP = {
-  0: "SENDER_INITIATED",
-  1: "SENDER_KEY_TWEAK_PENDING",
-  2: "SENDER_KEY_TWEAKED",
-  3: "RECEIVER_KEY_TWEAKED",
-  4: "RECEIVER_REFUND_SIGNED",
-  5: "COMPLETED",
-  6: "EXPIRED",
-  [-1]: "UNRECOGNIZED",
-};
-
-const NETWORK_MAP = {
-  0: "MAINNET",
-  1: "REGTEST",
-  2: "TESTNET",
-  3: "SIGNET",
-  [-1]: "UNRECOGNIZED",
-};
-
 /**
  * Formats a transfer object for API response
- * @param {Transfer} transfer - The transfer object from SDK
+ * @param {WalletTransfer} transfer - The transfer object from SDK
  * @returns {Object} Formatted transfer response
  */
 export function formatTransferResponse(transfer: WalletTransfer) {
