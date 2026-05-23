@@ -9,6 +9,8 @@
     "build": "nest build",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
+    "lint:fix": "eslint --fix src test",
+    "lint": "eslint src test",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -29,6 +31,7 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
