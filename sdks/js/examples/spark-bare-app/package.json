@@ -6,6 +6,8 @@
   "scripts": {
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
+    "lint:fix": "eslint --fix *.js *.mjs scripts",
+    "lint": "eslint *.js *.mjs scripts",
     "get-or-create-wallet": "node ./scripts/run-script.mjs get-or-create-wallet",
     "get-static-deposit-address": "node ./scripts/run-script.mjs get-static-deposit-address",
     "auto-claim-static-deposit": "node ./scripts/run-script.mjs auto-claim-static-deposit",
@@ -24,7 +26,10 @@
     "bare-runtime": "^1.28.4"
   },
   "devDependencies": {
+    "@lightsparkdev/eslint-config": "^0.0.1",
     "cross-env": "^7.0.3",
-    "prettier": "^3.7.4"
+    "eslint": "^9.25.0",
+    "prettier": "^3.7.4",
+    "typescript": "^5.7.3"
   }
 }
