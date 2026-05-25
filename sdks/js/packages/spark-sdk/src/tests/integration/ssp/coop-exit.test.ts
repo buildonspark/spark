@@ -8,7 +8,10 @@ import {
 } from "../../utils/spark-testing-wallet.js";
 import { retryUntilSuccess } from "../../utils/utils.js";
 
-export const DEPOSIT_AMOUNT = 30_000n;
+// SSP charges ~99 sats on regtest static-deposit claims, so the credit
+// (what actually drains the SSP leaf pool) is `deposit − 99`. 8291 → 8192,
+// which decomposes to a single 8192-sat leaf instead of multiple smaller ones.
+export const DEPOSIT_AMOUNT = 8_291n;
 
 describe("SSP coop exit integration", () => {
   let userWallet!: SparkWalletTesting;

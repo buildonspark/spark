@@ -6,9 +6,12 @@ import { bytesToHex } from "@noble/hashes/utils";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 import { retryUntilSuccess, waitForBalance } from "../../utils/utils.js";
 
-export const DEPOSIT_AMOUNT = 10000n;
-const SECOND_DEPOSIT_AMOUNT = 20000n;
-const THIRD_DEPOSIT_AMOUNT = 30000n;
+// SSP charges ~99 sats on regtest static-deposit claims, so the credit
+// (what actually drains the SSP leaf pool) is `deposit − 99`. Amounts are
+// picked so each credit is a clean power-of-2, decomposing into a single leaf.
+export const DEPOSIT_AMOUNT = 2147n; // → credit 2048 → 1× 2048-sat leaf
+const SECOND_DEPOSIT_AMOUNT = 4195n; // → credit 4096 → 1× 4096-sat leaf
+const THIRD_DEPOSIT_AMOUNT = 8291n; // → credit 8192 → 1× 8192-sat leaf
 
 describe("SSP static deposit address integration", () => {
   describe("Happy path testing", () => {
