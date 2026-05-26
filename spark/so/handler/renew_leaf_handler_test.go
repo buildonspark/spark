@@ -329,6 +329,182 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 	}
 }
 
+func setRenewParentRawTxOutputs(t *testing.T, parent *ent.TreeNode, outputValues ...int64) *wire.MsgTx {
+	t.Helper()
+
+	parentTx, err := common.TxFromRawTxBytes(parent.RawTx)
+	require.NoError(t, err)
+	parentTx.TxOut = nil
+	for _, value := range outputValues {
+		pkScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+		require.NoError(t, err)
+		parentTx.AddTxOut(wire.NewTxOut(value, pkScript))
+	}
+	rawParentTx, err := common.SerializeTx(parentTx)
+	require.NoError(t, err)
+	parent.RawTx = rawParentTx
+	return parentTx
+}
+
+func serializeRenewParentVoutTestTx(t *testing.T, tx *wire.MsgTx) []byte {
+	t.Helper()
+
+	raw, err := common.SerializeTx(tx)
+	require.NoError(t, err)
+	return raw
+}
+
+func TestConstructRenewTransactionsUseLeafParentVout(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{42})
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
+	parentNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+	leafNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parentNode, 0)
+	leafNode.Vout = 1
+	parentTx := setRenewParentRawTxOutputs(t, parentNode, 111_000, 222_000)
+	parentAmount := parentTx.TxOut[leafNode.Vout].Value
+
+	nodeSigningJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+	nodeRenewTxs, err := constructRenewNodeTransactions(leafNode, parentNode, nodeSigningJob)
+	require.NoError(t, err)
+
+	require.Equal(t, uint32(leafNode.Vout), nodeRenewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Index)
+	require.Equal(t, uint32(leafNode.Vout), nodeRenewTxs.DirectSplitNodeTx.TxIn[0].PreviousOutPoint.Index)
+	require.Equal(t, parentAmount, nodeRenewTxs.SplitNodeTx.TxOut[0].Value)
+	require.Equal(t, parentAmount, nodeRenewTxs.NodeTx.TxOut[0].Value)
+	require.Equal(t, parentAmount, nodeRenewTxs.RefundTx.TxOut[0].Value)
+	require.Equal(t, common.MaybeApplyFee(parentAmount), nodeRenewTxs.DirectSplitNodeTx.TxOut[0].Value)
+	require.Equal(t, common.MaybeApplyFee(parentAmount), nodeRenewTxs.DirectNodeTx.TxOut[0].Value)
+	require.Equal(t, common.MaybeApplyFee(parentAmount), nodeRenewTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+
+	refundSigningJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+	refundRenewTxs, err := constructRenewRefundTransactions(leafNode, parentNode, refundSigningJob)
+	require.NoError(t, err)
+
+	require.Equal(t, uint32(leafNode.Vout), refundRenewTxs.NodeTx.TxIn[0].PreviousOutPoint.Index)
+	require.Equal(t, uint32(leafNode.Vout), refundRenewTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Index)
+	require.Equal(t, parentAmount, refundRenewTxs.NodeTx.TxOut[0].Value)
+	require.Equal(t, parentAmount, refundRenewTxs.RefundTx.TxOut[0].Value)
+	require.Equal(t, common.MaybeApplyFee(parentAmount), refundRenewTxs.DirectNodeTx.TxOut[0].Value)
+	require.Equal(t, common.MaybeApplyFee(parentAmount), refundRenewTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+}
+
+func TestConstructRenewTransactionsRejectOutOfRangeLeafParentVout(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{43})
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
+	parentNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+	leafNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parentNode, 0)
+	leafNode.Vout = 2
+	setRenewParentRawTxOutputs(t, parentNode, 111_000, 222_000)
+
+	nodeSigningJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, 0)
+	_, err = constructRenewNodeTransactions(leafNode, parentNode, nodeSigningJob)
+	require.ErrorContains(t, err, "parent node transaction output 2 out of range")
+
+	refundSigningJob := createTestRenewRefundTimelockSigningJob(t, rng, leafNode, 0)
+	_, err = constructRenewRefundTransactions(leafNode, parentNode, refundSigningJob)
+	require.ErrorContains(t, err, "parent node transaction output 2 out of range")
+}
+
+func createRenewParentVoutValidationFixture(t *testing.T, leafNodeSequence uint32, leafRefundSequence uint32) (context.Context, io.Reader, *ent.TreeNode, *ent.TreeNode) {
+	t.Helper()
+
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{71})
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerIdentityPubKey)
+	parent := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+	leaf := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parent, 0)
+	leaf, err = leaf.Update().
+		SetRawTx(createValidTestTransactionBytesWithSequence(t, leafNodeSequence)).
+		SetRawRefundTx(createValidTestTransactionBytesWithSequence(t, leafRefundSequence)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return ctx, rng, leaf, parent
+}
+
+func setValidRenewParentVoutNodeTimelockRawTxs(t *testing.T, signingJob *pb.RenewNodeTimelockSigningJob, txs *RenewNodeTransactions) {
+	t.Helper()
+
+	signingJob.SplitNodeTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.SplitNodeTx)
+	signingJob.NodeTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.NodeTx)
+	signingJob.RefundTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.RefundTx)
+	signingJob.SplitNodeDirectTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectSplitNodeTx)
+	signingJob.DirectNodeTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectNodeTx)
+	signingJob.DirectRefundTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectRefundTx)
+	signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectFromCpfpRefundTx)
+}
+
+func setValidRenewParentVoutRefundTimelockRawTxs(t *testing.T, signingJob *pb.RenewRefundTimelockSigningJob, txs *RenewRefundTransactions) {
+	t.Helper()
+
+	signingJob.NodeTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.NodeTx)
+	signingJob.RefundTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.RefundTx)
+	signingJob.DirectNodeTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectNodeTx)
+	signingJob.DirectRefundTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectRefundTx)
+	signingJob.DirectFromCpfpRefundTxSigningJob.RawTx = serializeRenewParentVoutTestTx(t, txs.DirectFromCpfpRefundTx)
+}
+
+func TestValidateAndConstructRenewNodeTimelockSigningEntriesUseLeafParentVout(t *testing.T) {
+	ctx, rng, leaf, parent := createRenewParentVoutValidationFixture(t, spark.RenewTimelockThreshold|spark.ZeroSequence, spark.RenewTimelockThreshold|spark.ZeroSequence)
+	leaf.Vout = 1
+	parentTx := setRenewParentRawTxOutputs(t, parent, 111_000, 222_000)
+	parent, err := parent.Update().SetRawTx(parent.RawTx).Save(ctx)
+	require.NoError(t, err)
+
+	signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leaf, 0)
+	renewTxs, err := constructRenewNodeTransactions(leaf, parent, signingJob)
+	require.NoError(t, err)
+	setValidRenewParentVoutNodeTimelockRawTxs(t, signingJob, renewTxs)
+
+	_, _, entries, err := validateAndConstructNodeTimelock(ctx, leaf, signingJob)
+	require.NoError(t, err)
+	require.Len(t, entries, 7)
+
+	require.Equal(t, parentTx.TxOut[1], entries[2].PrevOut)
+	require.Equal(t, parentTx.TxOut[1], entries[3].PrevOut)
+	require.NotEqual(t, parentTx.TxOut[0].Value, entries[2].PrevOut.Value)
+	require.NotEqual(t, parentTx.TxOut[0].Value, entries[3].PrevOut.Value)
+}
+
+func TestValidateAndConstructRenewRefundTimelockSigningEntriesUseLeafParentVout(t *testing.T) {
+	ctx, rng, leaf, parent := createRenewParentVoutValidationFixture(t, spark.InitialTimeLock|spark.ZeroSequence, spark.TimeLockInterval|spark.ZeroSequence)
+	leaf.Vout = 1
+	parentTx := setRenewParentRawTxOutputs(t, parent, 111_000, 222_000)
+	parent, err := parent.Update().SetRawTx(parent.RawTx).Save(ctx)
+	require.NoError(t, err)
+
+	signingJob := createTestRenewRefundTimelockSigningJob(t, rng, leaf, 0)
+	renewTxs, err := constructRenewRefundTransactions(leaf, parent, signingJob)
+	require.NoError(t, err)
+	setValidRenewParentVoutRefundTimelockRawTxs(t, signingJob, renewTxs)
+
+	_, _, entries, err := validateAndConstructRefundTimelock(ctx, leaf, signingJob)
+	require.NoError(t, err)
+	require.Len(t, entries, 5)
+
+	require.Equal(t, parentTx.TxOut[1], entries[0].PrevOut)
+	require.Equal(t, parentTx.TxOut[1], entries[2].PrevOut)
+	require.NotEqual(t, parentTx.TxOut[0].Value, entries[0].PrevOut.Value)
+	require.NotEqual(t, parentTx.TxOut[0].Value, entries[2].PrevOut.Value)
+}
+
 func TestValidateAndConstructRenewSigningJobsRejectMissingRequiredJobs(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{19})

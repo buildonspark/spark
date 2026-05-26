@@ -192,6 +192,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		SetDirectRefundTx(extendedLeaf.DirectRefundTx).
 		SetDirectFromCpfpRefundTx(extendedLeaf.DirectFromCpfpRefundTx).
 		SetParentID(splitNodeID).
+		SetVout(0).
 		SetStatus(st.TreeNodeStatusAvailable).
 		Save(ctx)
 	if err != nil {

@@ -39,6 +39,7 @@ type RenewNodeTransactions struct {
 	DirectNodeTx           *wire.MsgTx
 	DirectRefundTx         *wire.MsgTx
 	DirectFromCpfpRefundTx *wire.MsgTx
+	ParentOutput           *wire.TxOut
 }
 
 // RenewRefundTransactions encapsulates the return values from constructRenewRefundTransactions
@@ -48,6 +49,7 @@ type RenewRefundTransactions struct {
 	DirectNodeTx           *wire.MsgTx
 	DirectRefundTx         *wire.MsgTx
 	DirectFromCpfpRefundTx *wire.MsgTx
+	ParentOutput           *wire.TxOut
 }
 
 // RenewZeroNodeTransactions encapsulates the return values from constructRenewZeroNodeTransactions
@@ -211,16 +213,11 @@ func validateAndConstructNodeTimelock(ctx context.Context, leaf *ent.TreeNode, s
 		return nil, nil, nil, fmt.Errorf("user transaction validation failed: %w", err)
 	}
 
-	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse parent transaction: %w", err)
-	}
-
 	entries := []sigEntry{
 		{signingJob.NodeTxSigningJob, renewTxs.NodeTx, renewTxs.SplitNodeTx.TxOut[0]},
 		{signingJob.RefundTxSigningJob, renewTxs.RefundTx, renewTxs.NodeTx.TxOut[0]},
-		{signingJob.SplitNodeTxSigningJob, renewTxs.SplitNodeTx, parentTx.TxOut[0]},
-		{signingJob.SplitNodeDirectTxSigningJob, renewTxs.DirectSplitNodeTx, parentTx.TxOut[0]},
+		{signingJob.SplitNodeTxSigningJob, renewTxs.SplitNodeTx, renewTxs.ParentOutput},
+		{signingJob.SplitNodeDirectTxSigningJob, renewTxs.DirectSplitNodeTx, renewTxs.ParentOutput},
 		{signingJob.DirectNodeTxSigningJob, renewTxs.DirectNodeTx, renewTxs.SplitNodeTx.TxOut[0]},
 		{signingJob.DirectRefundTxSigningJob, renewTxs.DirectRefundTx, renewTxs.DirectNodeTx.TxOut[0]},
 		{signingJob.DirectFromCpfpRefundTxSigningJob, renewTxs.DirectFromCpfpRefundTx, renewTxs.NodeTx.TxOut[0]},
@@ -272,15 +269,10 @@ func validateAndConstructRefundTimelock(ctx context.Context, leaf *ent.TreeNode,
 		return nil, nil, nil, fmt.Errorf("user transaction validation failed: %w", err)
 	}
 
-	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse parent transaction: %w", err)
-	}
-
 	entries := []sigEntry{
-		{signingJob.NodeTxSigningJob, refundTxs.NodeTx, parentTx.TxOut[0]},
+		{signingJob.NodeTxSigningJob, refundTxs.NodeTx, refundTxs.ParentOutput},
 		{signingJob.RefundTxSigningJob, refundTxs.RefundTx, refundTxs.NodeTx.TxOut[0]},
-		{signingJob.DirectNodeTxSigningJob, refundTxs.DirectNodeTx, parentTx.TxOut[0]},
+		{signingJob.DirectNodeTxSigningJob, refundTxs.DirectNodeTx, refundTxs.ParentOutput},
 		{signingJob.DirectRefundTxSigningJob, refundTxs.DirectRefundTx, refundTxs.DirectNodeTx.TxOut[0]},
 		{signingJob.DirectFromCpfpRefundTxSigningJob, refundTxs.DirectFromCpfpRefundTx, refundTxs.NodeTx.TxOut[0]},
 	}
@@ -358,12 +350,7 @@ func finalizeRenewNodeTimelockDB(
 	signingKeyshare *ent.SigningKeyshare,
 	signatures [][]byte,
 ) (*renewNodeTimelockResult, error) {
-	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse parent transaction: %w", err)
-	}
-
-	signedSplitNodeTx, splitNodeTxBytes, err := applyAndVerifySignature(renewTxs.SplitNodeTx, signatures[2], parentTx.TxOut[0], 0)
+	signedSplitNodeTx, splitNodeTxBytes, err := applyAndVerifySignature(renewTxs.SplitNodeTx, signatures[2], renewTxs.ParentOutput, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply split node tx signature: %w", err)
 	}
@@ -375,7 +362,7 @@ func finalizeRenewNodeTimelockDB(
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply refund tx signature: %w", err)
 	}
-	_, directSplitNodeTxBytes, err := applyAndVerifySignature(renewTxs.DirectSplitNodeTx, signatures[3], parentTx.TxOut[0], 0)
+	_, directSplitNodeTxBytes, err := applyAndVerifySignature(renewTxs.DirectSplitNodeTx, signatures[3], renewTxs.ParentOutput, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply direct split node tx signature: %w", err)
 	}
@@ -427,6 +414,7 @@ func finalizeRenewNodeTimelockDB(
 		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes).
 		SetParentID(splitNode.ID).
+		SetVout(0).
 		SetStatus(st.TreeNodeStatusAvailable).
 		Save(ctx)
 	if err != nil {
@@ -473,12 +461,7 @@ func finalizeRenewRefundTimelockDB(
 	refundTxs *RenewRefundTransactions,
 	signatures [][]byte,
 ) (*renewRefundTimelockResult, error) {
-	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse parent transaction: %w", err)
-	}
-
-	signedNodeTx, nodeTxBytes, err := applyAndVerifySignature(refundTxs.NodeTx, signatures[0], parentTx.TxOut[0], 0)
+	signedNodeTx, nodeTxBytes, err := applyAndVerifySignature(refundTxs.NodeTx, signatures[0], refundTxs.ParentOutput, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply node tx signature: %w", err)
 	}
@@ -486,7 +469,7 @@ func finalizeRenewRefundTimelockDB(
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply refund tx signature: %w", err)
 	}
-	signedDirectNodeTx, directNodeTxBytes, err := applyAndVerifySignature(refundTxs.DirectNodeTx, signatures[2], parentTx.TxOut[0], 0)
+	signedDirectNodeTx, directNodeTxBytes, err := applyAndVerifySignature(refundTxs.DirectNodeTx, signatures[2], refundTxs.ParentOutput, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply direct node tx signature: %w", err)
 	}
@@ -606,6 +589,7 @@ func finalizeRenewNodeZeroTimelockDB(
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes).
 		ClearDirectRefundTx().
 		SetParentID(splitNode.ID).
+		SetVout(0).
 		SetStatus(st.TreeNodeStatusAvailable).
 		Save(ctx)
 	if err != nil {
@@ -641,7 +625,11 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent node transaction: %w", err)
 	}
-	parentAmount := parentTx.TxOut[0].Value
+	parentOutputIndex, parentOutput, err := parentOutputForRenew(leaf, parentTx)
+	if err != nil {
+		return nil, err
+	}
+	parentAmount := parentOutput.Value
 
 	// Construct split node transaction using parent node tx as prev outpoint
 	splitNodeTx := wire.NewMsgTx(3)
@@ -653,7 +641,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 		return nil, fmt.Errorf("failed to validate user provided split node tx timelock: %w", err)
 	}
 	splitNodeTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: parentOutputIndex},
 		Sequence:         userSplitNodeSequence,
 	})
 	outputPkScript, err := common.P2TRScriptFromPubKey(leaf.VerifyingPubkey)
@@ -715,7 +703,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 	}
 
 	directSplitNodeTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: parentOutputIndex},
 		Sequence:         userDirectSplitNodeSequence,
 	})
 	directSplitNodeTx.AddTxOut(&wire.TxOut{
@@ -785,7 +773,22 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 		DirectNodeTx:           directNodeTx,
 		DirectRefundTx:         directRefundTx,
 		DirectFromCpfpRefundTx: directFromCpfpRefundTx,
+		ParentOutput:           parentOutput,
 	}, nil
+}
+
+func parentOutputForRenew(leaf *ent.TreeNode, parentTx *wire.MsgTx) (uint32, *wire.TxOut, error) {
+	if len(parentTx.TxOut) == 0 {
+		return 0, nil, fmt.Errorf("parent node transaction has zero outputs")
+	}
+	if leaf.Vout < 0 {
+		return 0, nil, fmt.Errorf("leaf node has negative parent vout %d", leaf.Vout)
+	}
+	parentOutputIndex := uint32(leaf.Vout)
+	if int(parentOutputIndex) >= len(parentTx.TxOut) {
+		return 0, nil, fmt.Errorf("parent node transaction output %d out of range (tx has %d outputs)", parentOutputIndex, len(parentTx.TxOut))
+	}
+	return parentOutputIndex, parentTx.TxOut[parentOutputIndex], nil
 }
 
 // Create Tree Node transactions that reset the Refunx Tx timelock.
@@ -797,10 +800,11 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent node transaction: %w", err)
 	}
-	if len(parentTx.TxOut) == 0 {
-		return nil, fmt.Errorf("parent node transaction has zero outputs")
+	parentOutputIndex, parentOutput, err := parentOutputForRenew(leaf, parentTx)
+	if err != nil {
+		return nil, err
 	}
-	parentAmount := parentTx.TxOut[0].Value
+	parentAmount := parentOutput.Value
 
 	// ******************************************************************
 	// NODE TX
@@ -826,7 +830,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 
 	nodeTx := wire.NewMsgTx(3)
 	nodeTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: parentOutputIndex},
 		Sequence:         userNodeSequence,
 	})
 
@@ -882,7 +886,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 
 	directNodeTx := wire.NewMsgTx(3)
 	directNodeTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: parentOutputIndex},
 		Sequence:         userDirectNodeSequence,
 	})
 	directNodeTx.AddTxOut(&wire.TxOut{
@@ -938,6 +942,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 		DirectNodeTx:           directNodeTx,
 		DirectRefundTx:         directRefundTx,
 		DirectFromCpfpRefundTx: directFromCpfpRefundTx,
+		ParentOutput:           parentOutput,
 	}, nil
 }
 

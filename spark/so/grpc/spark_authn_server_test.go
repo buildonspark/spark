@@ -333,14 +333,15 @@ func TestVerifyChallenge_ReusedChallenge(t *testing.T) {
 func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	// Use a very short challenge timeout for testing cache expiration
 	shortTimeout := 1 * time.Second
+	clock := authninternal.NewTestClock(time.Now())
 	config := AuthnServerConfig{
 		IdentityPrivateKey: testIdentityKey,
 		ChallengeTimeout:   shortTimeout,
 		SessionDuration:    testSessionDuration,
-		Clock:              authninternal.RealClock{},
+		Clock:              clock,
 	}
 
-	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKey, authninternal.RealClock{})
+	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKey, clock)
 	require.NoError(t, err)
 
 	server, err := NewAuthnServer(config, tokenVerifier)
@@ -364,8 +365,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	require.Equal(t, codes.FailedPrecondition, st.Code())
 	require.ErrorIs(t, err, ErrChallengeReused)
 
-	// Wait for cache to expire
-	time.Sleep(shortTimeout + 50*time.Millisecond)
+	clock.Advance(shortTimeout + time.Second)
 
 	_, err = server.VerifyChallenge(t.Context(), &pb.VerifyChallengeRequest{
 		ProtectedChallenge: challengeResp.ProtectedChallenge,
