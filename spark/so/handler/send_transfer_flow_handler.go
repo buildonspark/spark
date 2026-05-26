@@ -573,16 +573,25 @@ type parsedSendTransferRequest struct {
 // KnobMimoTransferMultiReceiverEnabled in the public StartTransferV3 handler.
 func parseSendTransferRequest(req *pb.StartTransferV3Request) (parsedSendTransferRequest, error) {
 	var empty parsedSendTransferRequest
+	if req == nil {
+		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
 	if len(req.SenderPackages) != 1 {
 		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
 	}
 	senderPkg := req.SenderPackages[0]
+	if senderPkg == nil {
+		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender_package is required"))
+	}
 	if senderPkg.TransferPackage == nil {
 		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
+	}
+	if req.GetExpiryTime() == nil {
+		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("expiry_time is required for transfer %s", transferID))
 	}
 	senderIDPK, err := keys.ParsePublicKey(senderPkg.OwnerIdentityPublicKey)
 	if err != nil {

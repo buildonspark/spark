@@ -78,6 +78,8 @@ import {
   type UserSignedTxSigningJobWithSelfCommitment,
 } from "./signing.js";
 
+const DEFAULT_V3_TRANSFER_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
 // Transfer statuses before the sender key tweak is applied — the sender
 // still owns the leaves in these states.
 export const SENDER_PENDING_STATUSES = [
@@ -912,6 +914,7 @@ export class BaseTransferService {
    */
   async sendTransferV3(leaves: LeafKeyTweak[]): Promise<Transfer> {
     const transferID = uuidv7();
+    const expiryTime = new Date(Date.now() + DEFAULT_V3_TRANSFER_EXPIRY_MS);
 
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,
@@ -945,7 +948,7 @@ export class BaseTransferService {
             receiverIdentityPublicKeys,
           },
         ],
-        expiryTime: undefined,
+        expiryTime,
       });
     } catch (error) {
       throw new SparkRequestError("Failed to start V3 transfer", {

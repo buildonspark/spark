@@ -5,6 +5,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TestSendTransferJobID_Deterministic verifies that the same (transferID,
@@ -96,6 +98,7 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 	makeValid := func() *pb.StartTransferV3Request {
 		return &pb.StartTransferV3Request{
 			TransferId: validTransferID,
+			ExpiryTime: timestamppb.New(time.Now().Add(time.Hour)),
 			SenderPackages: []*pb.SenderTransferPackage{{
 				OwnerIdentityPublicKey: validSenderPK,
 				TransferPackage:        &pb.TransferPackage{},
@@ -112,6 +115,11 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 		wantSub string
 	}{
 		{
+			name:    "empty request",
+			mutate:  func(r *pb.StartTransferV3Request) { *r = pb.StartTransferV3Request{} },
+			wantSub: "expected exactly 1 sender package",
+		},
+		{
 			name:    "zero sender packages",
 			mutate:  func(r *pb.StartTransferV3Request) { r.SenderPackages = nil },
 			wantSub: "expected exactly 1 sender package",
@@ -124,6 +132,13 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			wantSub: "expected exactly 1 sender package",
 		},
 		{
+			name: "nil sender package",
+			mutate: func(r *pb.StartTransferV3Request) {
+				r.SenderPackages[0] = nil
+			},
+			wantSub: "sender_package is required",
+		},
+		{
 			name: "nil transfer package",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].TransferPackage = nil
@@ -134,6 +149,11 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			name:    "invalid transfer id",
 			mutate:  func(r *pb.StartTransferV3Request) { r.TransferId = "not-a-uuid" },
 			wantSub: "invalid transfer id",
+		},
+		{
+			name:    "missing expiry",
+			mutate:  func(r *pb.StartTransferV3Request) { r.ExpiryTime = nil },
+			wantSub: "expiry_time is required",
 		},
 		{
 			name: "invalid sender pubkey",
@@ -178,6 +198,7 @@ func TestParseSendTransferRequest_Happy(t *testing.T) {
 
 	req := &pb.StartTransferV3Request{
 		TransferId: "11111111-1111-1111-1111-111111111111",
+		ExpiryTime: timestamppb.New(time.Now().Add(time.Hour)),
 		SenderPackages: []*pb.SenderTransferPackage{{
 			OwnerIdentityPublicKey: validSenderPK,
 			TransferPackage:        &pb.TransferPackage{},
@@ -194,6 +215,12 @@ func TestParseSendTransferRequest_Happy(t *testing.T) {
 	assert.Equal(t, uuid.MustParse("11111111-1111-1111-1111-111111111111"), parsed.transferID)
 	assert.Len(t, parsed.leafReceiverMap, 3, "leaf→receiver map preserves every leaf")
 	assert.Len(t, parsed.receivers, 2, "duplicate receiver pubkeys collapse into the unique set")
+}
+
+func TestParseSendTransferRequest_NilRequest(t *testing.T) {
+	_, err := parseSendTransferRequest(nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "request is required")
 }
 
 // TestFilterJobsForThisOperator verifies the threshold-signing filter: only

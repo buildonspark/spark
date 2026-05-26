@@ -1649,6 +1649,7 @@ func TestStartTransferV3_MultiReceiverRequiresKnob(t *testing.T) {
 	makeReq := func(receivers map[string][]byte) *pb.StartTransferV3Request {
 		return &pb.StartTransferV3Request{
 			TransferId: uuid.New().String(),
+			ExpiryTime: timestamppb.New(time.Now().Add(time.Hour)),
 			SenderPackages: []*pb.SenderTransferPackage{{
 				OwnerIdentityPublicKey:     senderPrivKey.Public().Serialize(),
 				TransferPackage:            &pb.TransferPackage{},

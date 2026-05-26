@@ -44,11 +44,18 @@ func (h *TransferHandler) startTransferV3Internal(
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Internal")
 	defer span.End()
 
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	// MVP: single sender only.
 	if len(req.SenderPackages) != 1 {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
 	}
 	senderPkg := req.SenderPackages[0]
+	if senderPkg == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender_package is required"))
+	}
 
 	if senderPkg.TransferPackage == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
@@ -66,6 +73,9 @@ func (h *TransferHandler) startTransferV3Internal(
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
+	}
+	if req.GetExpiryTime() == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("expiry_time is required for transfer %s", transferID))
 	}
 
 	// Parse receivers from the leaf→receiver map.
