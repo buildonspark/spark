@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
@@ -43,7 +44,7 @@ func createDepositData(t *testing.T) *depositData {
 	depositTxHash := depositTx.TxHash()
 
 	// 2 types of rootTx
-	cpfpRootTx := newTestTx(depositTestSourceValue, 0, &depositTxHash, srcScript)
+	cpfpRootTx := newTestTx(depositTestSourceValue, spark.ZeroSequence, &depositTxHash, srcScript)
 	cpfpRootTx.AddTxOut(common.EphemeralAnchorOutput())
 	directRootTx := newTestTx(depositTestSourceValue, directSeq, &depositTxHash, srcScript)
 	directRootTx.TxOut[0].Value = common.MaybeApplyFee(depositTestSourceValue)
@@ -303,7 +304,7 @@ func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
 		PkScript: randomScript,
 	})
 	newDepositTxHash := deposit.depositTx.TxHash()
-	newCpfpRootTx := newTestTx(depositTestSourceValue, 0, &newDepositTxHash, randomScript)
+	newCpfpRootTx := newTestTx(depositTestSourceValue, spark.ZeroSequence, &newDepositTxHash, randomScript)
 	newCpfpRootTx.TxIn[0].PreviousOutPoint.Index = 1
 
 	req := &pb.StartDepositTreeCreationRequest{
@@ -331,7 +332,7 @@ func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
 
 	deposit := createDepositData(t)
 	refundDest := keys.GeneratePrivateKey().Public()
-	deposit.cpfpRootTx.TxIn[0].Sequence = 1000 // Should be 0
+	deposit.cpfpRootTx.TxIn[0].Sequence = 1000 // Should be spark.ZeroSequence.
 
 	req := &pb.StartDepositTreeCreationRequest{
 		IdentityPublicKey: keys.GeneratePrivateKey().Serialize(),
@@ -353,6 +354,42 @@ func TestValidateUserTxs_CpfpRootTxInvalidSequence_Error(t *testing.T) {
 	_ = depositHandlerWithConfig()
 	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate client sequence")
+}
+
+func TestValidateUserTxs_CpfpRootTxUnusedSequenceHighBits_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	deposit := createDepositData(t)
+	refundDest := keys.GeneratePrivateKey().Public()
+
+	rootTx, err := common.TxFromRawTxBytes(serializeTx(t, deposit.cpfpRootTx))
+	require.NoError(t, err)
+	rootTx.TxIn[0].Sequence = spark.ZeroSequence | 0x00010000
+	deposit.cpfpRootTx = rootTx
+
+	req := &pb.StartDepositTreeCreationRequest{
+		IdentityPublicKey: keys.GeneratePrivateKey().Serialize(),
+		OnChainUtxo: &pb.UTXO{
+			RawTx:   serializeTx(t, deposit.depositTx),
+			Vout:    0,
+			Txid:    []byte(deposit.depositTx.TxID()),
+			Network: pb.Network_REGTEST,
+		},
+		RootTxSigningJob: &pb.SigningJob{
+			RawTx: serializeTx(t, deposit.cpfpRootTx),
+		},
+		RefundTxSigningJob: &pb.SigningJob{
+			RawTx:            serializeTx(t, makeClientCpfpTxForDeposit(t, deposit, refundDest)),
+			SigningPublicKey: refundDest.Serialize(),
+		},
+		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+			RawTx:            serializeTx(t, makeClientDirectFromCpfpTxForDeposit(t, deposit, refundDest)),
+			SigningPublicKey: refundDest.Serialize(),
+		},
+	}
+
+	err = callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
+	require.ErrorContains(t, err, "unsupported high bits 0x00010000")
 }
 
 func TestValidateUserTxs_CpfpRootTxTwoOutputs_Error(t *testing.T) {
@@ -426,6 +463,65 @@ func TestValidateUserTxs_DirectRootTxInvalidSequence_Error(t *testing.T) {
 	_ = depositHandlerWithConfig()
 	err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
 	require.ErrorContains(t, err, "failed to validate client sequence")
+}
+
+func TestValidateUserTxs_DirectRootTxUnusedSequenceHighBits_Error(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	for bit := 16; bit < 32; bit++ {
+		if bit == 30 {
+			continue
+		}
+		unsupportedHighBit := uint32(1) << bit
+
+		t.Run(fmt.Sprintf("bit_%d", bit), func(t *testing.T) {
+			deposit := createDepositData(t)
+			refundDest := keys.GeneratePrivateKey().Public()
+
+			directRootTx, err := common.TxFromRawTxBytes(serializeTx(t, deposit.directRootTx))
+			require.NoError(t, err)
+			directRootTx.TxIn[0].Sequence |= unsupportedHighBit
+			deposit.directRootTx = directRootTx
+
+			req := &pb.StartDepositTreeCreationRequest{
+				IdentityPublicKey: keys.GeneratePrivateKey().Serialize(),
+				OnChainUtxo: &pb.UTXO{
+					RawTx:   serializeTx(t, deposit.depositTx),
+					Vout:    0,
+					Txid:    []byte(deposit.depositTx.TxID()),
+					Network: pb.Network_REGTEST,
+				},
+				RootTxSigningJob: &pb.SigningJob{
+					RawTx: serializeTx(t, deposit.cpfpRootTx),
+				},
+				DirectRootTxSigningJob: &pb.SigningJob{
+					RawTx: serializeTx(t, deposit.directRootTx),
+				},
+				RefundTxSigningJob: &pb.SigningJob{
+					RawTx:            serializeTx(t, makeClientCpfpTxForDeposit(t, deposit, refundDest)),
+					SigningPublicKey: refundDest.Serialize(),
+				},
+				DirectRefundTxSigningJob: &pb.SigningJob{
+					RawTx:            serializeTx(t, makeClientDirectTxForDeposit(t, deposit, refundDest)),
+					SigningPublicKey: refundDest.Serialize(),
+				},
+				DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+					RawTx:            serializeTx(t, makeClientDirectFromCpfpTxForDeposit(t, deposit, refundDest)),
+					SigningPublicKey: refundDest.Serialize(),
+				},
+			}
+
+			err = callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
+			switch bit {
+			case 22:
+				require.ErrorContains(t, err, "bit 22")
+			case 31:
+				require.ErrorContains(t, err, "bit 31")
+			default:
+				require.ErrorContains(t, err, fmt.Sprintf("unsupported high bits 0x%08X", unsupportedHighBit))
+			}
+		})
+	}
 }
 
 func TestValidateUserTxs_DirectRootTxTwoOutputs_Error(t *testing.T) {

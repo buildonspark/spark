@@ -20,6 +20,7 @@ export const TIME_LOCK_INTERVAL = 100;
 export const DIRECT_TIMELOCK_OFFSET = 50;
 export const HTLC_TIMELOCK_OFFSET = 70;
 export const DIRECT_HTLC_TIMELOCK_OFFSET = 85;
+export const ZERO_SEQUENCE = 0;
 
 export const INITIAL_SEQUENCE = INITIAL_TIMELOCK;
 
@@ -27,7 +28,7 @@ export const TEST_UNILATERAL_SEQUENCE = TEST_UNILATERAL_TIMELOCK;
 export const TEST_UNILATERAL_DIRECT_SEQUENCE =
   TEST_UNILATERAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET;
 
-const INITIAL_ROOT_NODE_SEQUENCE = 0;
+const INITIAL_ROOT_NODE_SEQUENCE = ZERO_SEQUENCE;
 
 // Default fee constants matching Go implementation
 const ESTIMATED_TX_SIZE = 191;
@@ -114,6 +115,7 @@ export async function createRootNodeTx(
   return createNodeTxs({
     parentTx,
     sequence: INITIAL_ROOT_NODE_SEQUENCE,
+    directSequence: DIRECT_TIMELOCK_OFFSET,
     vout,
     network,
   });
@@ -450,9 +452,6 @@ export function getEphemeralAnchorOutput(): TransactionOutput {
     amount: 0n,
   };
 }
-
-// Matches Go spark.ZeroSequence — avoids bit 31 (timelock disabled flag) being set.
-export const ZERO_SEQUENCE = 1 << 30;
 
 /**
  * Creates a multi-input root transaction that consolidates multiple on-chain

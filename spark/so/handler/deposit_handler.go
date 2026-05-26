@@ -867,7 +867,7 @@ func findPendingDepositRoot(
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to query for existing tree node: %w", err)
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to query for existing tree node: %w", err))
 	}
 	return root, nil
 }
@@ -1077,6 +1077,8 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	networkString := network.String()
 	combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 
+	var directTx []byte
+	var directRefundTx []byte
 	directFromCpfpRefundTxRaw := directFromCpfpRefundTxSigningJob.RawTx
 
 	err = validateBitcoinTransactions(
@@ -1094,6 +1096,76 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transaction in tree creation request: %w", err)
+	}
+
+	// Create or locate the tree before signing so retries for the same deposit
+	// can be checked byte-for-byte before producing any new signature shares.
+	txid := onChainTx.TxHash()
+	onChainUtxoVout := int16(req.OnChainUtxo.Vout)
+	onChainOutputValue := uint64(onChainOutput.Value)
+	existingTree, err := db.Tree.Query().
+		Where(tree.BaseTxid(st.NewTxID(txid))).
+		Where(tree.Vout(onChainUtxoVout)).
+		First(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to query for existing tree: %w", err)
+	}
+
+	logger := logging.GetLoggerFromContext(ctx)
+
+	var entTree *ent.Tree
+	if existingTree != nil {
+		entTree = existingTree
+		logger.Sugar().Infof("Found existing tree %s for txid %s", existingTree.ID, txid)
+	} else {
+		if depositAddress.Edges.Tree != nil {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already has a tree"))
+		}
+		treeMutator := db.Tree.
+			Create().
+			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+			SetNetwork(network).
+			SetBaseTxid(st.NewTxID(txid)).
+			SetVout(onChainUtxoVout).
+			SetDepositAddress(depositAddress)
+
+		if txConfirmed {
+			treeMutator.SetStatus(st.TreeStatusAvailable)
+		} else {
+			treeMutator.SetStatus(st.TreeStatusPending)
+		}
+		entTree, err = treeMutator.Save(ctx)
+		if ent.IsConstraintError(err) {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists: %w", err))
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	existingRoot, err := findPendingDepositRoot(
+		ctx,
+		db,
+		entTree.ID,
+		depositAddress.OwnerIdentityPubkey,
+		depositAddress.OwnerSigningPubkey,
+		onChainOutputValue,
+		onChainUtxoVout,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if existingRoot != nil {
+		if err := validateExistingCreatingDepositRootMatchesRequest(
+			existingRoot,
+			req.RootTxSigningJob.RawTx,
+			req.RefundTxSigningJob.RawTx,
+			directTx,
+			directRefundTx,
+			directFromCpfpRefundTxRaw,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
@@ -1118,74 +1190,9 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
-	// Create the tree
-	txid := onChainTx.TxHash()
-
-	// Check if a tree already exists for this deposit
-	onChainUtxoVout := int16(req.OnChainUtxo.Vout)
-	existingTree, err := db.Tree.Query().
-		Where(tree.BaseTxid(st.NewTxID(txid))).
-		Where(tree.Vout(onChainUtxoVout)).
-		First(ctx)
-
-	if err != nil && !ent.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to query for existing tree: %w", err)
-	}
-
-	logger := logging.GetLoggerFromContext(ctx)
-
-	var entTree *ent.Tree
-	if existingTree != nil {
-		// Tree already exists, use the existing one
-		entTree = existingTree
-		logger.Sugar().Infof("Found existing tree %s for txid %s", existingTree.ID, txid)
-	} else {
-		if depositAddress.Edges.Tree != nil {
-			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already has a tree"))
-		}
-		// Create new tree
-		treeMutator := db.Tree.
-			Create().
-			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
-			SetNetwork(network).
-			SetBaseTxid(st.NewTxID(txid)).
-			SetVout(onChainUtxoVout).
-			SetDepositAddress(depositAddress)
-
-		if txConfirmed {
-			treeMutator.SetStatus(st.TreeStatusAvailable)
-		} else {
-			treeMutator.SetStatus(st.TreeStatusPending)
-		}
-		entTree, err = treeMutator.Save(ctx)
-		if ent.IsConstraintError(err) {
-			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists: %w", err))
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-	var directTx []byte
-	var directRefundTx []byte
-	onChainOutputValue := uint64(onChainOutput.Value)
-	existingRoot, err := findPendingDepositRoot(
-		ctx,
-		db,
-		entTree.ID,
-		depositAddress.OwnerIdentityPubkey,
-		depositAddress.OwnerSigningPubkey,
-		onChainOutputValue,
-		onChainUtxoVout,
-	)
-	if err != nil {
-		return nil, err
-	}
 
 	var root *ent.TreeNode
 	if existingRoot != nil {
-		if existingRoot.Status != st.TreeNodeStatusCreating {
-			return nil, errors.FailedPreconditionInvalidState(fmt.Errorf("expected tree node %s to be in creating status; got %s", existingRoot.ID, existingRoot.Status))
-		}
 		logger.Sugar().Infof(
 			"Tree node %s already exists (deposit address %s), updating with new txid %s",
 			existingRoot.ID,
@@ -1248,6 +1255,38 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			DirectFromCpfpRefundTxSigningResult: directFromCpfpRefundTxSigningResult,
 		},
 	}, nil
+}
+
+func validateExistingCreatingDepositRootMatchesRequest(
+	existingRoot *ent.TreeNode,
+	rootTx []byte,
+	refundTx []byte,
+	directTx []byte,
+	directRefundTx []byte,
+	directFromCpfpRefundTx []byte,
+) error {
+	if existingRoot.Status != st.TreeNodeStatusCreating {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("expected tree node %s to be in creating status; got %s", existingRoot.ID, existingRoot.Status))
+	}
+
+	checks := []struct {
+		name      string
+		existing  []byte
+		requested []byte
+	}{
+		{name: "root tx", existing: existingRoot.RawTx, requested: rootTx},
+		{name: "refund tx", existing: existingRoot.RawRefundTx, requested: refundTx},
+		{name: "direct tx", existing: existingRoot.DirectTx, requested: directTx},
+		{name: "direct refund tx", existing: existingRoot.DirectRefundTx, requested: directRefundTx},
+		{name: "direct from cpfp refund tx", existing: existingRoot.DirectFromCpfpRefundTx, requested: directFromCpfpRefundTx},
+	}
+
+	for _, check := range checks {
+		if !bytes.Equal(check.existing, check.requested) {
+			return errors.FailedPreconditionInvalidState(fmt.Errorf("tree node %s already has different %s bytes for this deposit", existingRoot.ID, check.name))
+		}
+	}
+	return nil
 }
 
 // validateDepositUtxoValueAgainstChain cross-checks the claimed UTXO output value

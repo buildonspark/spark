@@ -6,6 +6,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -125,19 +126,112 @@ func TestVerifyMultiInputRootTransactionRejectsTotalValueOverflow(t *testing.T) 
 	var primarySource chainhash.Hash
 	primarySource[0] = 1
 	primaryTx := newTestTx(math.MaxInt64, 0, &primarySource, depositScript)
+	primaryTxHash := primaryTx.TxHash()
 
 	var additionalSource chainhash.Hash
 	additionalSource[0] = 2
 	additionalTx := newTestTx(1, 0, &additionalSource, depositScript)
+	additionalTxHash := additionalTx.TxHash()
 	additionalUtxos := []additionalUtxoData{{
 		onChainTx:     additionalTx,
 		onChainOutput: additionalTx.TxOut[0],
 		vout:          0,
 	}}
 
-	err = verifyMultiInputRootTransaction(wire.NewMsgTx(3), primaryTx, 0, primaryTx.TxOut[0], additionalUtxos)
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: primaryTxHash, Index: 0},
+		Sequence:         0,
+	})
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: additionalTxHash, Index: 0},
+		Sequence:         0,
+	})
+
+	err = verifyMultiInputRootTransaction(rootTx, primaryTx, 0, primaryTx.TxOut[0], additionalUtxos)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "total deposit value overflows int64 transaction output limit")
+}
+
+func TestVerifyMultiInputRootTransactionAcceptsValidRootSequences(t *testing.T) {
+	depositScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	var primarySource chainhash.Hash
+	primarySource[0] = 1
+	primaryTx := newTestTx(1000, 0, &primarySource, depositScript)
+	primaryTxHash := primaryTx.TxHash()
+
+	var additionalSource chainhash.Hash
+	additionalSource[0] = 2
+	additionalTx := newTestTx(2000, 0, &additionalSource, depositScript)
+	additionalTxHash := additionalTx.TxHash()
+	additionalUtxos := []additionalUtxoData{{
+		onChainTx:     additionalTx,
+		onChainOutput: additionalTx.TxOut[0],
+		vout:          0,
+	}}
+
+	for _, tc := range []struct {
+		name     string
+		sequence uint32
+	}{
+		{name: "zero", sequence: 0},
+		{name: "spark zero", sequence: spark.ZeroSequence},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootTx := wire.NewMsgTx(3)
+			rootTx.AddTxIn(&wire.TxIn{
+				PreviousOutPoint: wire.OutPoint{Hash: primaryTxHash, Index: 0},
+				Sequence:         tc.sequence,
+			})
+			rootTx.AddTxIn(&wire.TxIn{
+				PreviousOutPoint: wire.OutPoint{Hash: additionalTxHash, Index: 0},
+				Sequence:         tc.sequence,
+			})
+			rootTx.AddTxOut(wire.NewTxOut(3000, depositScript))
+			rootTx.AddTxOut(common.EphemeralAnchorOutput())
+
+			err = verifyMultiInputRootTransaction(rootTx, primaryTx, 0, primaryTx.TxOut[0], additionalUtxos)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestVerifyMultiInputRootTransactionRejectsUnsupportedSequenceHighBits(t *testing.T) {
+	depositScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	var primarySource chainhash.Hash
+	primarySource[0] = 1
+	primaryTx := newTestTx(1000, 0, &primarySource, depositScript)
+	primaryTxHash := primaryTx.TxHash()
+
+	var additionalSource chainhash.Hash
+	additionalSource[0] = 2
+	additionalTx := newTestTx(2000, 0, &additionalSource, depositScript)
+	additionalTxHash := additionalTx.TxHash()
+	additionalUtxos := []additionalUtxoData{{
+		onChainTx:     additionalTx,
+		onChainOutput: additionalTx.TxOut[0],
+		vout:          0,
+	}}
+
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: primaryTxHash, Index: 0},
+		Sequence:         0x00010000,
+	})
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: additionalTxHash, Index: 0},
+		Sequence:         0,
+	})
+	rootTx.AddTxOut(wire.NewTxOut(3000, depositScript))
+	rootTx.AddTxOut(common.EphemeralAnchorOutput())
+
+	err = verifyMultiInputRootTransaction(rootTx, primaryTx, 0, primaryTx.TxOut[0], additionalUtxos)
+	require.ErrorContains(t, err, "input 0 sequence validation failed")
+	require.ErrorContains(t, err, "unsupported high bits 0x00010000")
 }
 
 func validFinalizeDepositTreeCreationRequestForValidation() *pb.FinalizeDepositTreeCreationRequest {

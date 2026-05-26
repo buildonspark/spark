@@ -476,20 +476,33 @@ func verifyMultiInputRootTransaction(
 
 	// Reconstruct expected root transaction
 	expectedTx := wire.NewMsgTx(3)
+	expectedInputCount := 1 + len(additionalUtxos)
+	if len(clientRootTx.TxIn) != expectedInputCount {
+		return fmt.Errorf("expected %d inputs, got %d", expectedInputCount, len(clientRootTx.TxIn))
+	}
 
 	// Input 0: primary UTXO
 	primaryTxHash := onChainTx.TxHash()
+	primarySequence, err := validateMultiInputDepositRootSequence(clientRootTx, 0)
+	if err != nil {
+		return err
+	}
 	expectedTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: primaryTxHash, Index: onChainVout},
-		Sequence:         spark.ZeroSequence,
+		Sequence:         primarySequence,
 	})
 
 	// Inputs 1..N: additional UTXOs in request array order
-	for _, add := range additionalUtxos {
+	for i, add := range additionalUtxos {
 		addHash := add.onChainTx.TxHash()
+		inputIndex := i + 1
+		sequence, err := validateMultiInputDepositRootSequence(clientRootTx, inputIndex)
+		if err != nil {
+			return err
+		}
 		expectedTx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: wire.OutPoint{Hash: addHash, Index: add.vout},
-			Sequence:         spark.ZeroSequence,
+			Sequence:         sequence,
 		})
 	}
 
@@ -522,6 +535,14 @@ func verifyMultiInputRootTransaction(
 	}
 
 	return nil
+}
+
+func validateMultiInputDepositRootSequence(clientRootTx *wire.MsgTx, inputIndex int) (uint32, error) {
+	sequence, err := bitcointransaction.ValidateSequence(0, bitcointransaction.TxTypeNodeCPFP, clientRootTx.TxIn[inputIndex].Sequence)
+	if err != nil {
+		return 0, fmt.Errorf("input %d sequence validation failed: %w", inputIndex, err)
+	}
+	return sequence, nil
 }
 
 // prepareSigningJobs creates signing jobs for all transactions.

@@ -13,6 +13,7 @@ import {
   TIME_LOCK_INTERVAL,
   DIRECT_TIMELOCK_OFFSET,
   DEFAULT_FEE_SATS,
+  ZERO_SEQUENCE,
 } from "../utils/transaction.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 
@@ -38,8 +39,8 @@ describe("transaction construction via Rust bindings", () => {
       expect(nodeTx).toBeDefined();
       expect(directNodeTx).toBeDefined();
 
-      // Root node uses sequence 0 for CPFP
-      expect(nodeTx.getInput(0).sequence).toBe(0);
+      // Root node uses zero sequence for CPFP
+      expect(nodeTx.getInput(0).sequence).toBe(ZERO_SEQUENCE);
       // Direct node uses DIRECT_TIMELOCK_OFFSET
       expect(directNodeTx.getInput(0).sequence).toBe(DIRECT_TIMELOCK_OFFSET);
 

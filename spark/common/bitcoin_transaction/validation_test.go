@@ -519,6 +519,35 @@ func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
 	}
 }
 
+func TestValidateSequence_NodeTransactionsUseSharedSequenceValidation(t *testing.T) {
+	tests := []struct {
+		name             string
+		txType           bitcointransaction.TxType
+		cpfpTimelock     uint32
+		expectedSequence uint32
+	}{
+		{name: "CPFP root", txType: bitcointransaction.TxTypeNodeCPFP, cpfpTimelock: 0, expectedSequence: 0},
+		{name: "direct root", txType: bitcointransaction.TxTypeNodeDirect, cpfpTimelock: 0, expectedSequence: spark.DirectTimelockOffset},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			unsupportedSeq := uint32(0x00010000) | tc.expectedSequence
+			_, err := bitcointransaction.ValidateSequence(tc.cpfpTimelock, tc.txType, unsupportedSeq)
+			require.ErrorContains(t, err, "unsupported high bits 0x00010000")
+
+			serverSeq, err := bitcointransaction.ValidateSequence(tc.cpfpTimelock, tc.txType, tc.expectedSequence)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedSequence, serverSeq)
+
+			legacySeq := spark.ZeroSequence | tc.expectedSequence
+			serverSeq, err = bitcointransaction.ValidateSequence(tc.cpfpTimelock, tc.txType, legacySeq)
+			require.NoError(t, err)
+			require.Equal(t, legacySeq, serverSeq)
+		})
+	}
+}
+
 // Ensure a mismatch in client-provided timelock is surfaced clearly
 func TestValidateSequence_TimelockMismatchErrorContains(t *testing.T) {
 	dbLeaf, _ := newTestLeafNode(t)
