@@ -1018,7 +1018,7 @@ func (h *TransferHandler) syncTransferInit(
 	return err
 }
 
-func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest, transferType st.TransferType) error {
+func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest, transferType st.TransferType, coordinatorKeyTweakMap map[string]*pb.SendLeafKeyTweak) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.syncDeliverSenderKeyTweak", trace.WithAttributes(
 		transferTypeKey.String(string(transferType)),
 	))
@@ -1026,10 +1026,22 @@ func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb
 	if req.TransferPackage == nil {
 		return fmt.Errorf("expected transfer package to be populated")
 	}
+
+	// Forward the coordinator's plaintext SecretShareTweak.Proofs per leaf so each non-coordinator
+	// SO can verify its decrypted proofs match — ensuring every SO's encrypted share comes from
+	// the same polynomial.
+	senderKeyTweakProofs := make(map[string]*pb.SecretProof, len(coordinatorKeyTweakMap))
+	for leafID, leafTweak := range coordinatorKeyTweakMap {
+		senderKeyTweakProofs[leafID] = &pb.SecretProof{
+			Proofs: leafTweak.SecretShareTweak.Proofs,
+		}
+	}
+
 	deliverSenderKeyTweakRequest := &pbinternal.DeliverSenderKeyTweakRequest{
 		TransferId:              req.TransferId,
 		SenderIdentityPublicKey: req.OwnerIdentityPublicKey,
 		TransferPackage:         req.TransferPackage,
+		SenderKeyTweakProofs:    senderKeyTweakProofs,
 	}
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,
@@ -1779,9 +1791,13 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if transfer.Status != st.TransferStatusSenderInitiated {
 		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status))
 	}
+	coordinatorKeyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, senderPubkey, !transfer.Type.IsSwap())
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate transfer package: %w", err)
+	}
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Preparing to send key tweaks to other SOs for transfer %s", transferID)
-	err = h.syncDeliverSenderKeyTweak(ctx, req, transfer.Type)
+	err = h.syncDeliverSenderKeyTweak(ctx, req, transfer.Type, coordinatorKeyTweakMap)
 	if err != nil {
 		entTx, dbErr := ent.GetTxFromContext(ctx)
 		if dbErr != nil {
@@ -1856,7 +1872,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, fmt.Errorf("failed to update status of transfer %s: %w", transferID, err)
 	}
-	if err = h.setSoCoordinatorKeyTweaks(ctx, transfer, req.TransferPackage, senderPubkey); err != nil {
+	if err = h.setSoCoordinatorKeyTweaks(ctx, transfer, coordinatorKeyTweakMap); err != nil {
 		return nil, err
 	}
 
@@ -5295,12 +5311,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 }
 
 // setSoCoordinatorKeyTweaks sets the key tweaks for each transfer leaf based on the validated transfer package.
-func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, req *pb.TransferPackage, ownerIdentityPubKey keys.Public) error {
-	// Get key tweak map from transfer package
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transfer.ID, req, ownerIdentityPubKey, !transfer.Type.IsSwap())
-	if err != nil {
-		return fmt.Errorf("failed to validate transfer package: %w", err)
-	}
+func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, keyTweakMap map[string]*pb.SendLeafKeyTweak) error {
 	// Query all transfer leaves associated with the transfer
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {

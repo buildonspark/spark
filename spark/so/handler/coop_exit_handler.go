@@ -334,7 +334,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	}
 
 	// Set coordinator key tweaks and update status
-	err = transferHandler.setSoCoordinatorKeyTweaks(ctx, transfer, req.Transfer.TransferPackage, reqTransferOwnerIdentityPubKey)
+	err = transferHandler.setSoCoordinatorKeyTweaks(ctx, transfer, leafTweakMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set coordinator key tweaks for coop exit %s: %w", transferID, err)
 	}

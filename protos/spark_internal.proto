@@ -310,6 +310,8 @@ message DeliverSenderKeyTweakRequest {
     string transfer_id = 1;
     bytes sender_identity_public_key = 2;
     spark.TransferPackage transfer_package = 3;
+    // Cross-SO check: non-coordinator decrypted proofs must match these.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 4;
 }
 
 message InitiateCooperativeExitRequest {
