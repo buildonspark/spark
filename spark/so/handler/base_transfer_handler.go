@@ -1788,26 +1788,27 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate share: %w", err)
 		}
-		for _, pubkeyTweak := range leafTweak.PubkeySharesTweak {
-			if _, err := keys.ParsePublicKey(pubkeyTweak); err != nil {
-				return nil, fmt.Errorf("encountered error when parsing pubkey tweak: %w", err)
+		// Verify every PubkeySharesTweak entry matches the polynomial commitment derived from
+		// the supplied Proofs at each operator's share index.
+		for soID, operator := range h.config.SigningOperatorMap {
+			pubkeyTweakBytes, ok := leafTweak.PubkeySharesTweak[soID]
+			if !ok {
+				return nil, fmt.Errorf("pubkey share tweak missing for operator %s in leaf %s", soID, leafTweak.LeafId)
 			}
-		}
-
-		// Cross-verify that PubkeySharesTweak for this SO equals SecretShareTweak * G.
-		// This prevents a malicious client from supplying a secret share and a mismatched
-		// public key share, which could compromise the integrity of the key tweak protocol.
-		ourPubkeyTweakBytes, ok := leafTweak.PubkeySharesTweak[h.config.Identifier]
-		if !ok {
-			return nil, fmt.Errorf("pubkey share tweak missing for this operator in leaf %s", leafTweak.LeafId)
-		}
-		sharePrivKey, err := keys.PrivateKeyFromBigInt(shareInt)
-		if err != nil {
-			return nil, fmt.Errorf("unable to derive private key from secret share: %w", err)
-		}
-		expectedPubkeyBytes := sharePrivKey.Public().Serialize()
-		if !bytes.Equal(expectedPubkeyBytes, ourPubkeyTweakBytes) {
-			return nil, fmt.Errorf("pubkey share tweak does not match secret share * G for leaf %s", leafTweak.LeafId)
+			if _, err := keys.ParsePublicKey(pubkeyTweakBytes); err != nil {
+				return nil, fmt.Errorf("unable to parse pubkey share tweak for operator %s leaf %s: %w", soID, leafTweak.LeafId, err)
+			}
+			expectedPub, err := secretsharing.EvaluatePolynomialCommitment(
+				leafTweak.SecretShareTweak.Proofs,
+				big.NewInt(int64(operator.ID+1)),
+				secp256k1.S256().N,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("unable to evaluate polynomial commitment for operator %s leaf %s: %w", soID, leafTweak.LeafId, err)
+			}
+			if !bytes.Equal(expectedPub.Serialize(), pubkeyTweakBytes) {
+				return nil, fmt.Errorf("pubkey share tweak for operator %s does not match polynomial commitment for leaf %s", soID, leafTweak.LeafId)
+			}
 		}
 	}
 
