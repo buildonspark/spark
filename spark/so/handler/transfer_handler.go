@@ -3,6 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -2866,6 +2868,24 @@ func claimLockConflictError(ctx context.Context, transferID uuid.UUID, lockErr e
 		fmt.Errorf("transfer %s is currently locked by another operation; please retry", transferID))
 }
 
+// hashClaimLeafKeyTweakProofs returns a hex-encoded SHA-256 over the ordered
+// VSS proofs in a ClaimLeafKeyTweak. Same proofs hash to the same value on
+// every SO, so the digest can be compared across operator logs to detect when
+// a receiver-claim key tweak was committed with divergent proofs.
+func hashClaimLeafKeyTweakProofs(tweak *pb.ClaimLeafKeyTweak) string {
+	if tweak == nil || tweak.SecretShareTweak == nil {
+		return "<nil>"
+	}
+	h := sha256.New()
+	var lenBuf [4]byte
+	for _, p := range tweak.SecretShareTweak.Proofs {
+		binary.BigEndian.PutUint32(lenBuf[:], uint32(len(p)))
+		h.Write(lenBuf[:])
+		h.Write(p)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransferTweakKeys")
@@ -2981,6 +3001,12 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		`, pq.Array(leafIDs), pq.Array(keyTweakValues))
 		if err != nil {
 			return fmt.Errorf("unable to batch update key tweaks: %w", err)
+		}
+		for _, leafTweak := range req.LeavesToReceive {
+			logging.GetLoggerFromContext(ctx).Sugar().Infof(
+				"claim key tweak stored (coordinator) for transfer %s leaf %s: num_proofs=%d proofs_hash=%s",
+				transferID, leafTweak.LeafId, len(leafTweak.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(leafTweak),
+			)
 		}
 	}
 
@@ -4999,6 +5025,10 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 				if err != nil {
 					return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
 				}
+				logging.GetLoggerFromContext(ctx).Sugar().Infof(
+					"claim key tweak stored (peer) for transfer %s leaf %s: num_proofs=%d proofs_hash=%s",
+					transferID, leafTweak.LeafId, len(leafTweak.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(leafTweak),
+				)
 			}
 		}
 
@@ -5158,6 +5188,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		// Track successful leaf IDs to clear key_tweak in a single batch.
 		clearedIDs := make([]uuid.UUID, 0, len(leaves))
 		builders := make([]*ent.TreeNodeCreate, 0, len(leaves))
+		appliedLogs := make([]struct {
+			leafID     uuid.UUID
+			numProofs  int
+			proofsHash string
+		}, 0, len(leaves))
 		for _, leaf := range leaves {
 			treeNode := leaf.Edges.Leaf
 			if treeNode == nil {
@@ -5175,6 +5210,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}
+			appliedLogs = append(appliedLogs, struct {
+				leafID     uuid.UUID
+				numProofs  int
+				proofsHash string
+			}{leaf.ID, len(keyTweakProto.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(keyTweakProto)})
 
 			// Build upsert for batch update. Since records always exist (queried above),
 			// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
@@ -5211,6 +5251,12 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err != nil {
 				return fmt.Errorf("unable to batch update tree node keys: %w", err)
 			}
+		}
+		for _, l := range appliedLogs {
+			logging.GetLoggerFromContext(ctx).Sugar().Infof(
+				"claim key tweak applied for transfer %s leaf %s: num_proofs=%d proofs_hash=%s",
+				transferID, l.leafID, l.numProofs, l.proofsHash,
+			)
 		}
 		if len(clearedIDs) > 0 {
 			if _, err := db.TransferLeaf.Update().Where(enttransferleaf.IDIn(clearedIDs...)).ClearKeyTweak().Save(ctx); err != nil {
