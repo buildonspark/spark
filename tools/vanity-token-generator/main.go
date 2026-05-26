@@ -17,6 +17,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/tyler-smith/go-bip32"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -66,13 +68,15 @@ const bech32Alphabet = "acdefghjklmnpqrstuvwxyz023456789"
 const productionSparkCreationEntityPublicKeyHex = "0205fe807e8fe1f368df955cc291f16d840b7f28374b0ed80b80c3e2e0921a0674"
 
 // sparkCreationEntityPublicKey is the decoded public key for the Spark layer creation entity.
-var sparkCreationEntityPublicKey = func() []byte {
-	key, err := hex.DecodeString(productionSparkCreationEntityPublicKeyHex)
+var sparkCreationEntityPublicKey = mustParsePublicKeyHex(productionSparkCreationEntityPublicKeyHex)
+
+func mustParsePublicKeyHex(hexKey string) keys.Public {
+	key, err := keys.ParsePublicKeyHex(hexKey)
 	if err != nil {
 		panic(fmt.Sprintf("invalid hardcoded creation entity public key: %v", err))
 	}
 	return key
-}()
+}
 
 // validateBech32mPattern validates that a pattern contains only valid bech32m characters
 func validateBech32mPattern(pattern string) error {
@@ -242,15 +246,15 @@ func getAccountNumber(network NetworkType) uint32 {
 	return 0 // For regtest
 }
 
-// networkTypeToNetwork converts our NetworkType to Network
-func networkTypeToNetwork(networkType NetworkType) common.Network {
+// networkTypeToNetwork converts our NetworkType to Network.
+func networkTypeToNetwork(networkType NetworkType) btcnetwork.Network {
 	switch networkType {
 	case MainnetType:
-		return common.Mainnet
+		return btcnetwork.Mainnet
 	case RegtestType:
-		return common.Regtest
+		return btcnetwork.Regtest
 	default:
-		return common.Regtest
+		return btcnetwork.Regtest
 	}
 }
 
@@ -317,10 +321,14 @@ func deriveIdentityPublicKey(mnemonic string, network NetworkType) ([]byte, erro
 // generateTokenIdentifier creates a TokenMetadata with the given issuer public key and computes its identifier
 func generateTokenIdentifier(issuerPublicKey []byte, network NetworkType, tokenName, tokenTicker string, decimals uint8, freezable bool, maxSupplyBytes []byte) (TokenIdentifierResult, error) {
 	commonNetwork := networkTypeToNetwork(network)
+	issuerPubKey, err := keys.ParsePublicKey(issuerPublicKey)
+	if err != nil {
+		return TokenIdentifierResult{}, fmt.Errorf("failed to parse issuer public key: %w", err)
+	}
 
 	// Create TokenMetadata with provided values
 	tokenMetadata := &common.TokenMetadata{
-		IssuerPublicKey:         issuerPublicKey,
+		IssuerPublicKey:         issuerPubKey,
 		TokenName:               tokenName,
 		TokenTicker:             tokenTicker,
 		Decimals:                decimals,
