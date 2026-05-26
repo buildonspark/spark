@@ -694,6 +694,11 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if err != nil {
 		return fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}
+	if !transfer.SenderIdentityPubkey.Equals(senderIDPubKey) {
+		return sparkerrors.InvalidArgumentPublicKeyMismatch(
+			fmt.Errorf("sender identity public key does not match transfer sender for transfer %s", transferID),
+		)
+	}
 	leaves, _, err := loadLeavesWithLock(ctx, db, leafRefundMap)
 	if err != nil {
 		return fmt.Errorf("unable to load leaves for transfer %s: %w", transferID, err)
