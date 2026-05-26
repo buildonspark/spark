@@ -5113,13 +5113,13 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12:\n" +
 	"\x16confirmation_threshold\x18\x04 \x01(\rH\x00R\x15confirmationThreshold\x88\x01\x01B\x19\n" +
 	"\x17_confirmation_threshold\"\x1a\n" +
-	"\x18RollbackUtxoSwapResponse\"\xb7\x02\n" +
+	"\x18RollbackUtxoSwapResponse\"\xd2\x02\n" +
 	"\x1eRollbackInstantUtxoSwapRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
-	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12K\n" +
-	"\x16rollback_from_statuses\x18\x04 \x03(\x0e2\x15.spark.UtxoSwapStatusR\x14rollbackFromStatuses\x12C\n" +
-	"\x12rollback_to_status\x18\x05 \x01(\x0e2\x15.spark.UtxoSwapStatusR\x10rollbackToStatus\"!\n" +
+	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12\\\n" +
+	"\x16rollback_from_statuses\x18\x04 \x03(\x0e2\x15.spark.UtxoSwapStatusB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x82\x01\x02\b\x01R\x14rollbackFromStatuses\x12M\n" +
+	"\x12rollback_to_status\x18\x05 \x01(\x0e2\x15.spark.UtxoSwapStatusB\b\xfaB\x05\x82\x01\x02\b\x03R\x10rollbackToStatus\"!\n" +
 	"\x1fRollbackInstantUtxoSwapResponse\"\xf6\x01\n" +
 	"\x18UtxoSwapCompletedRequest\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +

@@ -9,6 +9,7 @@ import "google/protobuf/timestamp.proto";
 import "spark_internal.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
+import "validate/validate.proto";
 
 service GossipService {
     rpc gossip(GossipMessage) returns (google.protobuf.Empty);
@@ -130,9 +131,12 @@ message GossipMessageRollbackInstantUtxoSwap {
     // Identity key of the Coordinator
     bytes coordinator_public_key = 3;
     // Statuses that are ok to rollback from
-    repeated spark.UtxoSwapStatus rollback_from_statuses = 4;
+    repeated spark.UtxoSwapStatus rollback_from_statuses = 4 [(validate.rules).repeated = {
+        min_items: 1,
+        items: {enum: {const: 1}}
+    }];
     // Status that we want to rollback to
-    spark.UtxoSwapStatus rollback_to_status = 5;
+    spark.UtxoSwapStatus rollback_to_status = 5 [(validate.rules).enum = {const: 3}];
 }
 
 message GossipMessageDepositCleanup {

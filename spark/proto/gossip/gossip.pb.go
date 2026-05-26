@@ -7,6 +7,7 @@
 package gossip
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	_ "github.com/lightsparkdev/spark/proto/common"
 	spark "github.com/lightsparkdev/spark/proto/spark"
 	spark_internal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -1796,7 +1797,7 @@ var File_gossip_proto protoreflect.FileDescriptor
 
 const file_gossip_proto_rawDesc = "" +
 	"\n" +
-	"\fgossip.proto\x12\x06gossip\x1a\vspark.proto\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14spark_internal.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xc1\x10\n" +
+	"\fgossip.proto\x12\x06gossip\x1a\vspark.proto\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14spark_internal.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17validate/validate.proto\"\xc1\x10\n" +
 	"\rGossipMessage\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12N\n" +
@@ -1868,13 +1869,13 @@ const file_gossip_proto_rawDesc = "" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
 	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12:\n" +
 	"\x16confirmation_threshold\x18\x04 \x01(\rH\x00R\x15confirmationThreshold\x88\x01\x01B\x19\n" +
-	"\x17_confirmation_threshold\"\xbd\x02\n" +
+	"\x17_confirmation_threshold\"\xd8\x02\n" +
 	"$GossipMessageRollbackInstantUtxoSwap\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
-	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12K\n" +
-	"\x16rollback_from_statuses\x18\x04 \x03(\x0e2\x15.spark.UtxoSwapStatusR\x14rollbackFromStatuses\x12C\n" +
-	"\x12rollback_to_status\x18\x05 \x01(\x0e2\x15.spark.UtxoSwapStatusR\x10rollbackToStatus\"6\n" +
+	"\x16coordinator_public_key\x18\x03 \x01(\fR\x14coordinatorPublicKey\x12\\\n" +
+	"\x16rollback_from_statuses\x18\x04 \x03(\x0e2\x15.spark.UtxoSwapStatusB\x0f\xfaB\f\x92\x01\t\b\x01\"\x05\x82\x01\x02\b\x01R\x14rollbackFromStatuses\x12M\n" +
+	"\x12rollback_to_status\x18\x05 \x01(\x0e2\x15.spark.UtxoSwapStatusB\b\xfaB\x05\x82\x01\x02\b\x03R\x10rollbackToStatus\"6\n" +
 	"\x1bGossipMessageDepositCleanup\x12\x17\n" +
 	"\atree_id\x18\x01 \x01(\tR\x06treeId\"V\n" +
 	"\x15GossipMessagePreimage\x12\x1a\n" +

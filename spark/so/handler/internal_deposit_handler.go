@@ -810,6 +810,9 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 	if err != nil {
 		return nil, fmt.Errorf("invalid rollback_to_status: %w", err)
 	}
+	if err := validateInstantRollbackTransition(rollbackFromStatuses, rollbackToStatus); err != nil {
+		return nil, err
+	}
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
@@ -908,6 +911,18 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 
 	logger.Sugar().Infof("UTXO swap %s for %x:%d set to %s", utxoSwap.ID, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, req.RollbackToStatus.String())
 	return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
+}
+
+func validateInstantRollbackTransition(rollbackFromStatuses []st.UtxoSwapStatus, rollbackToStatus st.UtxoSwapStatus) error {
+	if rollbackToStatus != st.UtxoSwapStatusCancelled || len(rollbackFromStatuses) == 0 {
+		return fmt.Errorf("invalid instant rollback transition: from %v to %s", rollbackFromStatuses, rollbackToStatus)
+	}
+	for _, rollbackFromStatus := range rollbackFromStatuses {
+		if rollbackFromStatus != st.UtxoSwapStatusCreated {
+			return fmt.Errorf("invalid instant rollback transition: from %v to %s", rollbackFromStatuses, rollbackToStatus)
+		}
+	}
+	return nil
 }
 
 func protoToSchemaUtxoSwapStatus(p pb.UtxoSwapStatus) (st.UtxoSwapStatus, error) {

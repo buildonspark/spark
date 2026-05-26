@@ -552,3 +552,73 @@ func TestRollbackInstantUtxoSwap_StatusNotMatching(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, st.UtxoSwapStatusCompleted, unchangedSwap.Status)
 }
+
+func TestRollbackInstantUtxoSwap_RejectsCompletedToCancelledTransition(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalDepositHandler(cfg)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rng := rand.NewChaCha8([32]byte{4})
+	depositKeyPair := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	const txAmount int64 = 50000
+	rawTx, txHash, addrStr := createTestP2TRTx(t, depositKeyPair.Public(), txAmount, btcnetwork.Regtest)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress, err := sessionCtx.Client.DepositAddress.Create().
+		SetAddress(addrStr).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetSigningKeyshare(keyshare).
+		SetIsStatic(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxo, err := sessionCtx.Client.Utxo.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetTxid(txHash[:]).
+		SetVout(0).
+		SetBlockHeight(50).
+		SetAmount(uint64(txAmount)).
+		SetPkScript([]byte("test_pk_script")).
+		SetDepositAddress(depositAddress).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCompleted).
+		SetUtxo(utxo).
+		SetUtxoValueSats(uint64(txAmount)).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetCreditAmountSats(10000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = depositAddress.Update().AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+
+	req := generateRollbackInstantRequest(t, ctx, cfg, &pb.UTXO{
+		Txid:    txHash[:],
+		Vout:    0,
+		Network: pb.Network_REGTEST,
+	}, rawTx, []pb.UtxoSwapStatus{pb.UtxoSwapStatus_UTXO_SWAP_STATUS_COMPLETED}, pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED)
+
+	_, err = handler.RollbackInstantUtxoSwap(ctx, cfg, req)
+	require.ErrorContains(t, err, "invalid instant rollback transition")
+
+	entTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, entTx.Commit())
+
+	unchangedSwap, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCompleted, unchangedSwap.Status)
+}

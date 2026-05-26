@@ -2766,7 +2766,43 @@ func (m *GossipMessageRollbackInstantUtxoSwap) validate(all bool) error {
 
 	// no validation rules for CoordinatorPublicKey
 
-	// no validation rules for RollbackToStatus
+	if len(m.GetRollbackFromStatuses()) < 1 {
+		err := GossipMessageRollbackInstantUtxoSwapValidationError{
+			field:  "RollbackFromStatuses",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetRollbackFromStatuses() {
+		_, _ = idx, item
+
+		if item != 1 {
+			err := GossipMessageRollbackInstantUtxoSwapValidationError{
+				field:  fmt.Sprintf("RollbackFromStatuses[%v]", idx),
+				reason: "value must equal 1",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if m.GetRollbackToStatus() != 3 {
+		err := GossipMessageRollbackInstantUtxoSwapValidationError{
+			field:  "RollbackToStatus",
+			reason: "value must equal UTXO_SWAP_STATUS_CANCELLED",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return GossipMessageRollbackInstantUtxoSwapMultiError(errors)
