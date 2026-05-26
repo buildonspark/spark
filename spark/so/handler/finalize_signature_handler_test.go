@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -312,6 +313,235 @@ func createTestTreeInternal(t *testing.T, ctx context.Context, network btcnetwor
 	require.NoError(t, err)
 
 	return tree, node
+}
+
+func TestFinalizeNodeSignaturesRejectsInvalidDepositRootSignature(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{9})
+	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
+	keyshareSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	rootSigning := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	keyshare, err := dbTX.SigningKeyshare.Create().
+		SetID(uuid.New()).
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keyshareSecret).
+		SetPublicShares(map[string]keys.Public{"1": publicShare.Public()}).
+		SetPublicKey(keyshareSecret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	depositPubKey := keyshareSecret.Public().Add(ownerSigning.Public())
+	depositAddress, err := common.P2TRAddressFromPublicKey(depositPubKey, btcnetwork.Regtest)
+	require.NoError(t, err)
+	depositScript, err := common.P2TRScriptFromPubKey(depositPubKey)
+	require.NoError(t, err)
+
+	const amount int64 = 1000
+	prevHash := chainhash.Hash{7}
+	depositTx := wire.NewMsgTx(3)
+	depositTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: prevHash, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	depositTx.AddTxOut(wire.NewTxOut(amount, depositScript))
+	depositTxHash := depositTx.TxHash()
+
+	rootScript, err := common.P2TRScriptFromPubKey(rootSigning.Public())
+	require.NoError(t, err)
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: depositTxHash, Index: 0},
+		Sequence:         0,
+	})
+	rootTx.AddTxOut(wire.NewTxOut(amount, rootScript))
+	rootTx.AddTxOut(common.EphemeralAnchorOutput())
+	rootRawTx := serializeTx(t, rootTx)
+
+	depositAddressEnt, err := dbTX.DepositAddress.Create().
+		SetAddress(depositAddress).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetOwnerSigningPubkey(ownerSigning.Public()).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	treeEnt, err := dbTX.Tree.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeStatusPending).
+		SetBaseTxid(st.NewTxID(depositTxHash)).
+		SetVout(0).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetDepositAddress(depositAddressEnt).
+		Save(ctx)
+	require.NoError(t, err)
+
+	node, err := dbTX.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(treeEnt).
+		SetNetwork(treeEnt.Network).
+		SetSigningKeyshare(keyshare).
+		SetValue(uint64(amount)).
+		SetVerifyingPubkey(rootSigning.Public()).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetOwnerSigningPubkey(ownerSigning.Public()).
+		SetRawTx(rootRawTx).
+		SetRawRefundTx(rootRawTx).
+		SetVout(0).
+		SetStatus(st.TreeNodeStatusCreating).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, _, err = NewFinalizeSignatureHandler(&so.Config{}).updateNode(ctx, &pb.NodeSignatures{
+		NodeId:          node.ID.String(),
+		NodeTxSignature: make([]byte, 64),
+	}, pbcommon.SignatureIntent_CREATION, false)
+
+	require.ErrorContains(t, err, "unable to verify root node tx signature")
+}
+
+func TestFinalizeNodeSignaturesAllowsMultiInputDepositRootSignatureValidation(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{10})
+	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
+	keyshareSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	rootSigning := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	keyshare, err := dbTX.SigningKeyshare.Create().
+		SetID(uuid.New()).
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keyshareSecret).
+		SetPublicShares(map[string]keys.Public{"1": publicShare.Public()}).
+		SetPublicKey(keyshareSecret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	depositPubKey := keyshareSecret.Public().Add(ownerSigning.Public())
+	depositAddress, err := common.P2TRAddressFromPublicKey(depositPubKey, btcnetwork.Regtest)
+	require.NoError(t, err)
+	depositScript, err := common.P2TRScriptFromPubKey(depositPubKey)
+	require.NoError(t, err)
+
+	const primaryAmount int64 = 1000
+	depositTx := wire.NewMsgTx(3)
+	depositTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{7}, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	depositTx.AddTxOut(wire.NewTxOut(primaryAmount, depositScript))
+	depositTxHash := depositTx.TxHash()
+
+	const additionalAmount int64 = 2000
+	additionalDepositTx := wire.NewMsgTx(3)
+	additionalDepositTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{8}, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	additionalDepositTx.AddTxOut(wire.NewTxOut(additionalAmount, depositScript))
+	additionalDepositTxHash := additionalDepositTx.TxHash()
+
+	rootScript, err := common.P2TRScriptFromPubKey(rootSigning.Public())
+	require.NoError(t, err)
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: depositTxHash, Index: 0},
+		Sequence:         0,
+	})
+	rootTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: additionalDepositTxHash, Index: 0},
+		Sequence:         0,
+	})
+	rootTx.AddTxOut(wire.NewTxOut(primaryAmount+additionalAmount, rootScript))
+	rootTx.AddTxOut(common.EphemeralAnchorOutput())
+	rootRawTx := serializeTx(t, rootTx)
+
+	depositAddressEnt, err := dbTX.DepositAddress.Create().
+		SetAddress(depositAddress).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetOwnerSigningPubkey(ownerSigning.Public()).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	confirmedAt := time.Now()
+	primaryTxidBytes, err := hex.DecodeString(depositTx.TxID())
+	require.NoError(t, err)
+	_, err = dbTX.Utxo.Create().
+		SetBlockHeight(1).
+		SetTxid(primaryTxidBytes).
+		SetVout(0).
+		SetAmount(uint64(primaryAmount)).
+		SetNetwork(btcnetwork.Regtest).
+		SetPkScript(depositScript).
+		SetAvailabilityConfirmedAt(confirmedAt).
+		SetDepositAddress(depositAddressEnt).
+		Save(ctx)
+	require.NoError(t, err)
+	additionalTxidBytes, err := hex.DecodeString(additionalDepositTx.TxID())
+	require.NoError(t, err)
+	_, err = dbTX.Utxo.Create().
+		SetBlockHeight(1).
+		SetTxid(additionalTxidBytes).
+		SetVout(0).
+		SetAmount(uint64(additionalAmount)).
+		SetNetwork(btcnetwork.Regtest).
+		SetPkScript(depositScript).
+		SetAvailabilityConfirmedAt(confirmedAt).
+		SetDepositAddress(depositAddressEnt).
+		Save(ctx)
+	require.NoError(t, err)
+
+	treeEnt, err := dbTX.Tree.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeStatusPending).
+		SetBaseTxid(st.NewTxID(depositTxHash)).
+		SetVout(0).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetDepositAddress(depositAddressEnt).
+		Save(ctx)
+	require.NoError(t, err)
+
+	node, err := dbTX.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(treeEnt).
+		SetNetwork(treeEnt.Network).
+		SetSigningKeyshare(keyshare).
+		SetValue(uint64(primaryAmount + additionalAmount)).
+		SetVerifyingPubkey(rootSigning.Public()).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetOwnerSigningPubkey(ownerSigning.Public()).
+		SetRawTx(rootRawTx).
+		SetRawRefundTx(rootRawTx).
+		SetVout(0).
+		SetStatus(st.TreeNodeStatusCreating).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, _, err = NewFinalizeSignatureHandler(&so.Config{}).updateNode(ctx, &pb.NodeSignatures{
+		NodeId:          node.ID.String(),
+		NodeTxSignature: make([]byte, 64),
+	}, pbcommon.SignatureIntent_CREATION, false)
+
+	require.ErrorContains(t, err, "unable to verify root node tx signature")
+	require.NotContains(t, err.Error(), "must have exactly one input")
 }
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testing.T) {

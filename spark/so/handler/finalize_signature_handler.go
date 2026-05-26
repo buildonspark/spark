@@ -2,10 +2,15 @@ package handler
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"math"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
@@ -23,6 +28,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -266,6 +272,100 @@ func (o *FinalizeSignatureHandler) validateNodeOwnership(ctx context.Context, re
 	return nil
 }
 
+func (o *FinalizeSignatureHandler) verifyDepositBackedRootNodeSignature(ctx context.Context, node *ent.TreeNode, treeEnt *ent.Tree, signedRootTxBytes []byte) error {
+	depositAddress, err := treeEnt.QueryDepositAddress().Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to query deposit address for root node %s: %w", node.ID, err)
+	}
+
+	signedRootTx, err := common.TxFromRawTxBytes(signedRootTxBytes)
+	if err != nil {
+		return fmt.Errorf("unable to deserialize root node tx: %w", err)
+	}
+	if len(signedRootTx.TxIn) == 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx for node %s must have at least one input", node.ID))
+	}
+	if treeEnt.Vout < 0 {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("tree %s has invalid negative vout %d", treeEnt.ID, treeEnt.Vout))
+	}
+	baseOutpoint := wire.OutPoint{
+		Hash:  treeEnt.BaseTxid.Hash(),
+		Index: uint32(treeEnt.Vout),
+	}
+
+	networkParams, err := treeEnt.Network.Params()
+	if err != nil {
+		return fmt.Errorf("failed to get network params for tree %s: %w", treeEnt.ID, err)
+	}
+	address, err := btcutil.DecodeAddress(depositAddress.Address, networkParams)
+	if err != nil {
+		return fmt.Errorf("failed to decode deposit address %s for root node %s: %w", depositAddress.Address, node.ID, err)
+	}
+	depositPkScript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return fmt.Errorf("failed to build deposit pkscript for root node %s: %w", node.ID, err)
+	}
+	if node.Value > uint64(math.MaxInt64) {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("root node %s value %d exceeds int64 max", node.ID, node.Value))
+	}
+
+	prevOuts := make(map[wire.OutPoint]*wire.TxOut, len(signedRootTx.TxIn))
+	spendsBaseOutpoint := false
+	for inputIndex, txIn := range signedRootTx.TxIn {
+		if txIn == nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx input %d is required", inputIndex))
+		}
+		outpoint := txIn.PreviousOutPoint
+		if outpoint == baseOutpoint {
+			spendsBaseOutpoint = true
+		}
+
+		txidBytes, err := hex.DecodeString(outpoint.Hash.String())
+		if err != nil {
+			return fmt.Errorf("failed to encode root node tx input %d txid: %w", inputIndex, err)
+		}
+		utxoEntity, err := depositAddress.QueryUtxo().
+			Where(entutxo.Txid(txidBytes)).
+			Where(entutxo.Vout(outpoint.Index)).
+			Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) && len(signedRootTx.TxIn) == 1 && outpoint == baseOutpoint {
+				prevOuts[outpoint] = wire.NewTxOut(int64(node.Value), depositPkScript)
+				continue
+			}
+			if ent.IsNotFound(err) {
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx input %d spends outpoint %s that is not recorded for deposit address %s", inputIndex, outpoint.String(), depositAddress.Address))
+			}
+			return fmt.Errorf("failed to query root node tx input %d utxo: %w", inputIndex, err)
+		}
+		if utxoEntity.Amount > uint64(math.MaxInt64) {
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("utxo %s value %d exceeds int64 max", outpoint.String(), utxoEntity.Amount))
+		}
+		prevOuts[outpoint] = wire.NewTxOut(int64(utxoEntity.Amount), utxoEntity.PkScript)
+	}
+	if !spendsBaseOutpoint {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx for node %s must spend tree base outpoint %s", node.ID, baseOutpoint.String()))
+	}
+
+	if err := common.ValidateBitcoinTxVersion(signedRootTx); err != nil {
+		return fmt.Errorf("root node tx version validation failed: %w", err)
+	}
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
+	if len(signedRootTx.TxIn) == 1 {
+		err = common.VerifySignatureInput(signedRootTx, 0, prevOutFetcher)
+	} else {
+		err = common.VerifySignatureMultiInput(signedRootTx, prevOutFetcher)
+	}
+	if err != nil {
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify root node tx signature: %w", err))
+	}
+
+	return nil
+}
+
 func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*ent.Transfer, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -482,7 +582,15 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 					return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
 				}
 			}
-
+		} else {
+			if err := o.verifyDepositBackedRootNodeSignature(ctx, node, treeEnt, cpfpNodeTxBytes); err != nil {
+				return nil, nil, err
+			}
+			if len(directNodeTxBytes) > 0 {
+				if err := o.verifyDepositBackedRootNodeSignature(ctx, node, treeEnt, directNodeTxBytes); err != nil {
+					return nil, nil, err
+				}
+			}
 		}
 	} else {
 		cpfpNodeTxBytes = node.RawTx
