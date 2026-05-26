@@ -140,7 +140,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
 	case *pbgossip.GossipMessage_ArchiveStaticDepositAddress:
 		archiveStaticDepositAddress := gossipMessage.GetArchiveStaticDepositAddress()
-		err = h.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddress)
+		err = h.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddress, forCoordinator)
 	case *pbgossip.GossipMessage_FinalizeTransferReceiver:
 		finalizeTransferReceiver := gossipMessage.GetFinalizeTransferReceiver()
 		err = h.handleFinalizeTransferReceiverGossipMessage(ctx, finalizeTransferReceiver, forCoordinator)
@@ -570,8 +570,12 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 	return nil
 }
 
-func (h *GossipHandler) handleArchiveStaticDepositAddressGossipMessage(ctx context.Context, archiveStaticDepositAddress *pbgossip.GossipMessageArchiveStaticDepositAddress) error {
+func (h *GossipHandler) handleArchiveStaticDepositAddressGossipMessage(ctx context.Context, archiveStaticDepositAddress *pbgossip.GossipMessageArchiveStaticDepositAddress, forCoordinator bool) error {
 	logger := logging.GetLoggerFromContext(ctx)
+
+	if forCoordinator {
+		return nil
+	}
 
 	// Parse coordinator public key
 	coordinatorPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.CoordinatorPublicKey)

@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -121,6 +124,51 @@ func TestHandleRollbackUtxoSwapGossipMessage_NonExistentUtxo_Succeeds(t *testing
 	require.NoError(t, err, "rolling back a non-existent UTXO should succeed")
 }
 
+func TestHandleArchiveStaticDepositAddressGossipMessageSkipsCoordinatorDelivery(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewGossipHandler(cfg)
+
+	depositAddress, ownerIdentityPubKey, address := createDefaultStaticDepositAddressForGossipTest(t, ctx)
+	attackerPrivKey := keys.GeneratePrivateKey()
+
+	err := handler.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddressGossip(
+		t,
+		attackerPrivKey,
+		ownerIdentityPubKey,
+		address,
+	),
+		true, /* forCoordinator */
+	)
+
+	require.NoError(t, err)
+	updatedAddress, err := sessionClient(t, ctx).DepositAddress.Get(ctx, depositAddress.ID)
+	require.NoError(t, err)
+	require.True(t, updatedAddress.IsDefault, "coordinator delivery must not mutate deposit address state")
+}
+
+func TestHandleArchiveStaticDepositAddressGossipMessageAcceptsOperatorSignature(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	handler := NewGossipHandler(cfg)
+
+	depositAddress, ownerIdentityPubKey, address := createDefaultStaticDepositAddressForGossipTest(t, ctx)
+
+	err := handler.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddressGossip(
+		t,
+		cfg.IdentityPrivateKey,
+		ownerIdentityPubKey,
+		address,
+	),
+		false, /* forCoordinator */
+	)
+
+	require.NoError(t, err)
+	updatedAddress, err := sessionClient(t, ctx).DepositAddress.Get(ctx, depositAddress.ID)
+	require.NoError(t, err)
+	require.False(t, updatedAddress.IsDefault)
+}
+
 // --- Consensus commit / rollback row transitions ---
 
 // sessionClient returns the Ent client backed by the same session-managed
@@ -132,6 +180,61 @@ func sessionClient(t *testing.T, ctx context.Context) *ent.Client {
 	tx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
 	return tx.Client()
+}
+
+func createDefaultStaticDepositAddressForGossipTest(t *testing.T, ctx context.Context) (*ent.DepositAddress, keys.Public, string) {
+	t.Helper()
+	client := sessionClient(t, ctx)
+
+	ownerIdentityPrivKey := keys.GeneratePrivateKey()
+	ownerSigningPrivKey := keys.GeneratePrivateKey()
+	operatorSharePrivKey := keys.GeneratePrivateKey()
+	keysharePubKey := keys.GeneratePrivateKey().Public()
+
+	signingKeyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(operatorSharePrivKey).
+		SetPublicShares(map[string]keys.Public{"operator": operatorSharePrivKey.Public()}).
+		SetPublicKey(keysharePubKey).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	address := "archive-gossip-" + uuid.NewString()
+	depositAddress, err := client.DepositAddress.Create().
+		SetAddress(address).
+		SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+		SetOwnerSigningPubkey(ownerSigningPrivKey.Public()).
+		SetSigningKeyshare(signingKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		SetIsStatic(true).
+		SetIsDefault(true).
+		SetAddressSignatures(map[string][]byte{"operator": []byte("address-signature")}).
+		SetPossessionSignature([]byte("possession-signature")).
+		Save(ctx)
+	require.NoError(t, err)
+	return depositAddress, ownerIdentityPrivKey.Public(), address
+}
+
+func archiveStaticDepositAddressGossip(
+	t *testing.T,
+	coordinatorPrivKey keys.Private,
+	ownerIdentityPubKey keys.Public,
+	address string,
+) *pbgossip.GossipMessageArchiveStaticDepositAddress {
+	t.Helper()
+	messageHash, err := CreateArchiveStaticDepositAddressStatement(ownerIdentityPubKey, btcnetwork.Regtest, address)
+	require.NoError(t, err)
+	signature := ecdsa.Sign(coordinatorPrivKey.ToBTCEC(), messageHash)
+
+	return &pbgossip.GossipMessageArchiveStaticDepositAddress{
+		OwnerIdentityPublicKey: ownerIdentityPubKey.Serialize(),
+		Network:                pb.Network_REGTEST,
+		Address:                address,
+		Signature:              signature.Serialize(),
+		CoordinatorPublicKey:   coordinatorPrivKey.Public().Serialize(),
+	}
 }
 
 // insertParticipantRow inserts a PARTICIPANT FlowExecution row keyed by id
