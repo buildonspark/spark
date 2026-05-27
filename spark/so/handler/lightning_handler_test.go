@@ -433,6 +433,84 @@ func TestQueryUserSignedRefundsRejectsMalformedIdentityAndMissingRequest(t *test
 	}
 }
 
+func TestQueryUserSignedRefundsVisibleOnlyToReceiverWhileWaiting(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{48})
+	senderIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attackerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHash := bytes.Repeat([]byte{0x48}, sha256.Size)
+
+	transfer := entexample.NewTransferExample(t, tx).
+		SetSenderIdentityPubkey(senderIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetExpiryTime(time.Now().Add(time.Hour)).
+		SetStatus(st.TransferStatusSenderKeyTweakPending).
+		SetType(st.TransferTypePreimageSwap).
+		MustExec(ctx)
+
+	preimageRequest := entexample.NewPreimageRequestExample(t, tx).
+		SetPaymentHash(paymentHash).
+		SetSenderIdentityPubkey(senderIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+		SetTransfers(transfer).
+		MustExec(ctx)
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, tx)
+	tree := createTestTreeForClaim(t, ctx, receiverIdentityPubKey, tx)
+	leaf := createTestTreeNode(t, ctx, rng, tx, tree, keyshare)
+	entexample.NewUserSignedTransactionExample(t, tx).
+		SetTreeNode(leaf).
+		SetPreimageRequest(preimageRequest).
+		MustExec(ctx)
+
+	handler := NewLightningHandler(&so.Config{
+		AuthzEnforced:              true,
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	})
+
+	queryCtxFor := func(identityPubKey keys.Public) context.Context {
+		return authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+	}
+	query := func(identityPubKey keys.Public) (*pb.QueryUserSignedRefundsResponse, error) {
+		return handler.QueryUserSignedRefunds(queryCtxFor(identityPubKey), &pb.QueryUserSignedRefundsRequest{
+			PaymentHash:       paymentHash,
+			IdentityPublicKey: identityPubKey.Serialize(),
+		})
+	}
+
+	receiverResp, err := query(receiverIdentityPubKey)
+	require.NoError(t, err)
+	require.Len(t, receiverResp.UserSignedRefunds, 1)
+	require.NotNil(t, receiverResp.Transfer)
+	assert.Equal(t, transfer.ID.String(), receiverResp.Transfer.Id)
+
+	senderResp, err := query(senderIdentityPubKey)
+	require.Nil(t, senderResp)
+	require.Equal(t, codes.NotFound, status.Code(err))
+
+	attackerResp, err := query(attackerIdentityPubKey)
+	require.Nil(t, attackerResp)
+	require.Equal(t, codes.NotFound, status.Code(err))
+
+	_, err = handler.QueryUserSignedRefunds(queryCtxFor(attackerIdentityPubKey), &pb.QueryUserSignedRefundsRequest{
+		PaymentHash:       paymentHash,
+		IdentityPublicKey: receiverIdentityPubKey.Serialize(),
+	})
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+
+	_, err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Save(ctx)
+	require.NoError(t, err)
+
+	settledResp, err := query(receiverIdentityPubKey)
+	require.Nil(t, settledResp)
+	require.Equal(t, codes.NotFound, status.Code(err))
+}
+
 type trackingFrostServiceClientConnection struct {
 	client pbfrost.FrostServiceClient
 }
