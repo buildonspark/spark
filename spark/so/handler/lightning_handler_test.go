@@ -396,6 +396,75 @@ func TestQueryHTLCRejectsMalformedRequestFieldsWithInvalidArgument(t *testing.T)
 	}
 }
 
+func TestQueryHTLCFiltersByRoleAndSessionIdentity(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{47})
+	senderIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attackerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHash := bytes.Repeat([]byte{0x47}, sha256.Size)
+
+	transfer := entexample.NewTransferExample(t, tx).
+		SetSenderIdentityPubkey(senderIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetExpiryTime(time.Now().Add(time.Hour)).
+		SetStatus(st.TransferStatusSenderKeyTweakPending).
+		SetType(st.TransferTypePreimageSwap).
+		MustExec(ctx)
+
+	entexample.NewPreimageRequestExample(t, tx).
+		SetPaymentHash(paymentHash).
+		SetSenderIdentityPubkey(senderIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+		SetTransfers(transfer).
+		MustExec(ctx)
+
+	handler := NewLightningHandler(&so.Config{
+		AuthzEnforced:              true,
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	})
+
+	queryCtxFor := func(identityPubKey keys.Public) context.Context {
+		return authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+	}
+
+	baseReqFor := func(identityPubKey keys.Public) *pb.QueryHtlcRequest {
+		return &pb.QueryHtlcRequest{
+			IdentityPublicKey: identityPubKey.Serialize(),
+			PaymentHashes:     [][]byte{paymentHash},
+			TransferIds:       []string{transfer.ID.String()},
+			Limit:             10,
+		}
+	}
+
+	receiverResp, err := handler.QueryHTLC(queryCtxFor(receiverIdentityPubKey), baseReqFor(receiverIdentityPubKey))
+	require.NoError(t, err)
+	require.Len(t, receiverResp.PreimageRequests, 1)
+	assert.Equal(t, paymentHash, receiverResp.PreimageRequests[0].PaymentHash)
+
+	senderDefaultResp, err := handler.QueryHTLC(queryCtxFor(senderIdentityPubKey), baseReqFor(senderIdentityPubKey))
+	require.NoError(t, err)
+	assert.Empty(t, senderDefaultResp.PreimageRequests, "sender should not see receiver-role HTLC rows by default")
+
+	senderRoleReq := baseReqFor(senderIdentityPubKey)
+	senderRoleReq.MatchRole = pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER
+	senderRoleResp, err := handler.QueryHTLC(queryCtxFor(senderIdentityPubKey), senderRoleReq)
+	require.NoError(t, err)
+	require.Len(t, senderRoleResp.PreimageRequests, 1)
+	assert.Equal(t, paymentHash, senderRoleResp.PreimageRequests[0].PaymentHash)
+
+	attackerResp, err := handler.QueryHTLC(queryCtxFor(attackerIdentityPubKey), baseReqFor(attackerIdentityPubKey))
+	require.NoError(t, err)
+	assert.Empty(t, attackerResp.PreimageRequests, "third party should not enumerate another user's HTLC by hash and transfer ID")
+
+	_, err = handler.QueryHTLC(queryCtxFor(attackerIdentityPubKey), baseReqFor(receiverIdentityPubKey))
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+}
+
 func TestQueryUserSignedRefundsRejectsMalformedIdentityAndMissingRequest(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
