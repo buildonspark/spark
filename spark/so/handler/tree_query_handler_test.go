@@ -51,6 +51,103 @@ func TestTreeQueryHandlersRejectNilRequests(t *testing.T) {
 	})
 }
 
+func TestTreeQueryHandlersRejectNegativePagination(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewTreeQueryHandler(&so.Config{})
+	identityPubKey := keys.GeneratePrivateKey().Public().Serialize()
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "QueryNodes negative limit",
+			call: func() error {
+				resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+					Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
+						OwnerIdentityPubkey: identityPubKey,
+					},
+					Network: pb.Network_REGTEST,
+					Limit:   -1,
+				}, false)
+				require.Nil(t, resp)
+				return err
+			},
+		},
+		{
+			name: "QueryNodes negative offset",
+			call: func() error {
+				resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+					Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
+						OwnerIdentityPubkey: identityPubKey,
+					},
+					Network: pb.Network_REGTEST,
+					Limit:   1,
+					Offset:  -1,
+				}, false)
+				require.Nil(t, resp)
+				return err
+			},
+		},
+		{
+			name: "QueryUnusedDepositAddresses negative limit",
+			call: func() error {
+				resp, err := handler.QueryUnusedDepositAddresses(ctx, &pb.QueryUnusedDepositAddressesRequest{
+					IdentityPublicKey: identityPubKey,
+					Network:           pb.Network_REGTEST,
+					Limit:             -1,
+				})
+				require.Nil(t, resp)
+				return err
+			},
+		},
+		{
+			name: "QueryUnusedDepositAddresses negative offset",
+			call: func() error {
+				resp, err := handler.QueryUnusedDepositAddresses(ctx, &pb.QueryUnusedDepositAddressesRequest{
+					IdentityPublicKey: identityPubKey,
+					Network:           pb.Network_REGTEST,
+					Limit:             1,
+					Offset:            -1,
+				})
+				require.Nil(t, resp)
+				return err
+			},
+		},
+		{
+			name: "QueryStaticDepositAddresses negative limit",
+			call: func() error {
+				resp, err := handler.QueryStaticDepositAddresses(ctx, &pb.QueryStaticDepositAddressesRequest{
+					IdentityPublicKey: identityPubKey,
+					Network:           pb.Network_REGTEST,
+					Limit:             -1,
+				})
+				require.Nil(t, resp)
+				return err
+			},
+		},
+		{
+			name: "QueryStaticDepositAddresses negative offset",
+			call: func() error {
+				resp, err := handler.QueryStaticDepositAddresses(ctx, &pb.QueryStaticDepositAddressesRequest{
+					IdentityPublicKey: identityPubKey,
+					Network:           pb.Network_REGTEST,
+					Limit:             1,
+					Offset:            -1,
+				})
+				require.Nil(t, resp)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.ErrorContains(t, tt.call(), "non-negative offset and limit")
+		})
+	}
+}
+
 func TestQueryStaticDepositAddresses(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)
