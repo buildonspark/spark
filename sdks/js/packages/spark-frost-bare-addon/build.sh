@@ -15,3 +15,8 @@ export PATH="/usr/bin:$PATH"
 yarn run bare-make generate
 yarn run bare-make build
 yarn run bare-make install
+case "$(uname -s)" in
+  MINGW*|CYGWIN*|MSYS*)
+    node scripts/normalize-win32-prebuilds.js
+    ;;
+esac
