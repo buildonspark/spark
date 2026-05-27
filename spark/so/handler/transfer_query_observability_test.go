@@ -38,7 +38,6 @@ func TestTransferQueryAttrsFields(t *testing.T) {
 	// need to follow. Keeps the recorder-to-dashboard contract explicit.
 	var a transferQueryAttrs
 	a.QueryPath = ""
-	a.MIMOEnabled = false
 	a.FilterType = ""
 	a.HasStatusFilter = false
 	a.HasTypeFilter = false

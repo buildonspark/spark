@@ -31,7 +31,7 @@ func init() {
 
 	transferQueryDuration, err = transferQueryMeter.Float64Histogram(
 		"spark_transfer_query_duration",
-		metric.WithDescription("Duration of MIMO-gated transfer query paths"),
+		metric.WithDescription("Duration of transfer query paths"),
 		metric.WithUnit("ms"),
 		metric.WithExplicitBucketBoundaries(1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000),
 	)
@@ -44,7 +44,7 @@ func init() {
 
 	transferQueryResultCount, err = transferQueryMeter.Float64Histogram(
 		"spark_transfer_query_result_count",
-		metric.WithDescription("Result count for MIMO-gated transfer query paths"),
+		metric.WithDescription("Result count for transfer query paths"),
 		metric.WithUnit("{count}"),
 		metric.WithExplicitBucketBoundaries(0, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000, 50000),
 	)
@@ -69,7 +69,6 @@ func init() {
 
 type transferQueryAttrs struct {
 	QueryPath       string
-	MIMOEnabled     bool
 	FilterType      string
 	HasStatusFilter bool
 	HasTypeFilter   bool
@@ -118,7 +117,6 @@ func (r *transferQueryRecorder) record(ctx context.Context, resultCount int, err
 
 	attrs := []attribute.KeyValue{
 		attribute.String("query_path", r.attrs.QueryPath),
-		attribute.Bool("mimo_enabled", r.attrs.MIMOEnabled),
 		attribute.String("filter_type", r.attrs.FilterType),
 		attribute.Bool("has_status_filter", r.attrs.HasStatusFilter),
 		attribute.Bool("has_type_filter", r.attrs.HasTypeFilter),

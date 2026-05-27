@@ -592,7 +592,6 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		}
 		logQueryTransfersInvocation(ctx, "query_outgoing_in_flight", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
-			zap.Bool("use_mimo", true),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -617,7 +616,6 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:       "query_outgoing_in_flight",
-		MIMOEnabled:     true,
 		FilterType:      "sender",
 		HasStatusFilter: true,
 		HasTypeFilter:   len(filter.Types) > 0,
@@ -732,7 +730,6 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 		}
 		logQueryTransfersInvocation(ctx, "query_by_types", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
-			zap.Bool("use_mimo", true),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -773,7 +770,6 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:      "query_by_types",
-		MIMOEnabled:    true,
 		FilterType:     filterType,
 		HasTypeFilter:  true,
 		HasTransferIDs: len(filter.GetTransferIds()) > 0,
@@ -884,7 +880,6 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 		}
 		logQueryTransfersInvocation(ctx, "query_receiver_by_type_status", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
-			zap.Bool("use_mimo", true),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -912,7 +907,6 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:       "query_receiver_by_type_status",
-		MIMOEnabled:     true,
 		FilterType:      filterType,
 		HasTypeFilter:   true,
 		HasStatusFilter: true,
@@ -1041,7 +1035,6 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 		}
 		logQueryTransfersInvocation(ctx, "query_counter_swap", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
-			zap.Bool("use_mimo", true),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -1069,7 +1062,6 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:       "query_counter_swap",
-		MIMOEnabled:     true,
 		FilterType:      filterType,
 		HasTypeFilter:   true,
 		HasStatusFilter: true,
@@ -1168,7 +1160,6 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 		}
 		logQueryTransfersInvocation(ctx, "query_by_participant_fallback", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
-			zap.Bool("use_mimo", true),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -1203,7 +1194,6 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:       "query_by_participant_fallback",
-		MIMOEnabled:     true,
 		FilterType:      filterType,
 		HasStatusFilter: len(filter.GetStatuses()) > 0,
 		HasTypeFilter:   len(filter.GetTypes()) > 0,

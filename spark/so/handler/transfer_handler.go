@@ -2018,7 +2018,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		logQueryTransfersInvocation(ctx, "query_transfers", filter, time.Since(start),
 			zap.Bool("pending_only", pendingOnly),
 			zap.Bool("is_ssp", isSSP),
-			zap.Bool("use_mimo", useMIMO),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -2064,7 +2063,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:       "query_transfers",
-		MIMOEnabled:     useMIMO,
 		FilterType:      filterType,
 		HasStatusFilter: len(filter.Statuses) > 0,
 		HasTypeFilter:   len(filter.Types) > 0,
@@ -2393,7 +2391,6 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 			resultCount = len(resp.Transfers)
 		}
 		logQueryTransfersInvocation(ctx, "query_pending_transfers", filter, time.Since(start),
-			zap.Bool("use_mimo", true),
 			zap.Int("result_count", resultCount),
 			zap.Error(err),
 		)
@@ -2426,7 +2423,6 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 
 	metrics := newTransferQueryRecorder(transferQueryAttrs{
 		QueryPath:      "query_pending_transfers",
-		MIMOEnabled:    true,
 		FilterType:     filterType,
 		HasTypeFilter:  len(filter.Types) > 0,
 		HasTransferIDs: len(filter.TransferIds) > 0,
