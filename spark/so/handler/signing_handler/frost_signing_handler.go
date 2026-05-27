@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -87,7 +88,11 @@ func (h *FrostSigningHandler) FrostRound1(ctx context.Context, req *pb.FrostRoun
 	return h.GenerateRandomNonces(ctx, uint32(totalCount))
 }
 
-// FrostRound2 handles FROST signing.
+// FrostRound2 handles FROST signing. It loads each job's KeyPackage from the
+// DB (or ephemeral store) and signs with it. For callers that need to sign
+// with an in-memory-modified KeyPackage (e.g. the consensus claim-transfer
+// Prepare phase, which signs with a post-tweak share without persisting the
+// tweak), use FrostRound2WithKeyPackages instead.
 func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
@@ -100,13 +105,38 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, status.Errorf(codes.InvalidArgument, "signing_jobs[%d] is required", i)
 		}
 	}
-
-	// Fetch key packages in one call.
 	keyshareIDs, err := uuids.ParseSliceFunc(req.GetSigningJobs(), (*pb.SigningJob).GetKeyshareId)
 	if err != nil {
 		return nil, err
 	}
 	keyPackages, err := ent.GetKeyPackages(ctx, h.config, keyshareIDs)
+	if err != nil {
+		return nil, err
+	}
+	return h.FrostRound2WithKeyPackages(ctx, req, keyPackages)
+}
+
+// FrostRound2WithKeyPackages is like FrostRound2 but takes pre-loaded
+// KeyPackages keyed by signing-keyshare ID instead of loading them from the
+// DB. The consensus claim-transfer Prepare phase uses this to sign with a
+// fresh KeyPackage that has the receiver key tweak applied in-memory — the
+// on-disk keyshare stays at the pre-tweak value until Commit.
+//
+// Every job's KeyshareID must be present in keyPackages or this returns an
+// InvalidArgument error.
+func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, req *pb.FrostRound2Request, keyPackages map[uuid.UUID]*pbfrost.KeyPackage) (*pb.FrostRound2Response, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if len(req.GetSigningJobs()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "signing_jobs is required")
+	}
+	for i, job := range req.GetSigningJobs() {
+		if job == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "signing_jobs[%d] is required", i)
+		}
+	}
+	keyshareIDs, err := uuids.ParseSliceFunc(req.GetSigningJobs(), (*pb.SigningJob).GetKeyshareId)
 	if err != nil {
 		return nil, err
 	}
@@ -185,10 +215,12 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		nonceEnt := nonces[commitment]
 		nonceObject := nonceEnt.Nonce
 		nonceProto, _ := nonceObject.MarshalProto()
+
+		keyPackage := keyPackages[keyshareID]
 		signingJobProto := &pbfrost.FrostSigningJob{
 			JobId:            job.JobId,
 			Message:          job.Message,
-			KeyPackage:       keyPackages[keyshareID],
+			KeyPackage:       keyPackage,
 			VerifyingKey:     job.VerifyingKey,
 			Nonce:            nonceProto,
 			Commitments:      job.Commitments,
@@ -249,4 +281,76 @@ func retryFingerprint(job *pb.SigningJob) []byte {
 func writeBytesCollisionResistant(hashState hash.Hash, b []byte) {
 	hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(len(b))))
 	hashState.Write(b)
+}
+
+// ApplyKeysharePackageTweak returns a copy of kp with the additive tweak
+// components folded in: SecretShare += secretShareTweak; PublicKey +=
+// publicKeyTweak; PublicShares[id] += publicSharesTweak[id]. Same math as
+// SigningKeyshare.TweakKeyShare but in-memory only — never touches the DB.
+// The on-disk keyshare stays at the pre-tweak value; only this fresh
+// KeyPackage observes the post-tweak state.
+//
+// All three components must be present and publicSharesTweak must cover
+// every entry in kp.PublicShares; missing components would produce an
+// invalid post-tweak share (silently signs with garbage), which the FROST
+// signer only flags at aggregation time with a cryptic error. Surfaced here
+// so callers see a clear error before the round-2 call fires.
+func ApplyKeysharePackageTweak(kp *pbfrost.KeyPackage, secretShareTweak []byte, publicKeyTweak []byte, publicSharesTweak map[string][]byte) (*pbfrost.KeyPackage, error) {
+	if kp == nil {
+		return nil, fmt.Errorf("nil key package")
+	}
+	if len(secretShareTweak) == 0 {
+		return nil, fmt.Errorf("missing secret_share_tweak")
+	}
+	if len(publicKeyTweak) == 0 {
+		return nil, fmt.Errorf("missing public_key_tweak")
+	}
+	if len(publicSharesTweak) != len(kp.PublicShares) {
+		return nil, fmt.Errorf("public_shares_tweak has %d entries, expected %d to match key package", len(publicSharesTweak), len(kp.PublicShares))
+	}
+
+	secretShare, err := keys.ParsePrivateKey(kp.SecretShare)
+	if err != nil {
+		return nil, fmt.Errorf("parse secret_share: %w", err)
+	}
+	shareTweak, err := keys.ParsePrivateKey(secretShareTweak)
+	if err != nil {
+		return nil, fmt.Errorf("parse secret_share_tweak: %w", err)
+	}
+	newSecretShare := secretShare.Add(shareTweak)
+
+	publicKey, err := keys.ParsePublicKey(kp.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("parse public_key: %w", err)
+	}
+	pubKeyTweak, err := keys.ParsePublicKey(publicKeyTweak)
+	if err != nil {
+		return nil, fmt.Errorf("parse public_key_tweak: %w", err)
+	}
+	newPublicKey := publicKey.Add(pubKeyTweak)
+
+	newPublicShares := make(map[string][]byte, len(kp.PublicShares))
+	for id, oldShareBytes := range kp.PublicShares {
+		shareTweakBytes, ok := publicSharesTweak[id]
+		if !ok {
+			return nil, fmt.Errorf("public_shares_tweak missing entry for operator %s", id)
+		}
+		oldShare, err := keys.ParsePublicKey(oldShareBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse public_share for %s: %w", id, err)
+		}
+		shareTweakPub, err := keys.ParsePublicKey(shareTweakBytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse public_shares_tweak for %s: %w", id, err)
+		}
+		newPublicShares[id] = oldShare.Add(shareTweakPub).Serialize()
+	}
+
+	return &pbfrost.KeyPackage{
+		Identifier:   kp.Identifier,
+		SecretShare:  newSecretShare.Serialize(),
+		PublicShares: newPublicShares,
+		PublicKey:    newPublicKey.Serialize(),
+		MinSigners:   kp.MinSigners,
+	}, nil
 }

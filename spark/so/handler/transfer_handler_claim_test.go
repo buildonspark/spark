@@ -392,7 +392,7 @@ func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
 	require.NoError(t, err)
 }
 
@@ -403,7 +403,7 @@ func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, true /* isSwap */)
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil)
 	require.NoError(t, err)
 }
 
@@ -422,9 +422,9 @@ func TestValidateReceivedRefundTransactions_RejectsNonCanonicalDestination(t *te
 	attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	job := createSigningJobForLeafWithDest(t, rng, leaf, attackerPubKey, false /* isSwap */)
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "does not match leaf owner signing pubkey")
+	assert.Contains(t, err.Error(), "does not match expected owner signing pubkey")
 }
 
 func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
@@ -446,11 +446,11 @@ func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 
 	// When bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) is true,
 	// validation should be skipped and return nil
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
 	require.NoError(t, err)
 
 	// Also works for swap
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil)
 	require.NoError(t, err)
 }
 
@@ -492,7 +492,7 @@ func TestValidateReceivedRefundTransactions_RetryWithDifferentDirectTx_RunsValid
 	}
 
 	// This should NOT be treated as a retry because DirectRefundTx differs.
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer, nil)
 	require.Error(t, err, "Expected validation to run and fail for mismatched direct txs, but it passed (retry detection bypassed validation)")
 }
 
@@ -524,7 +524,7 @@ func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing
 		RefundTxSigningJob: nil,
 	}
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing RefundTxSigningJob")
 }
@@ -555,7 +555,7 @@ func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *te
 		// DirectFromCpfpRefundTxSigningJob is nil - this is required for transfers
 	}
 
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "direct from CPFP refund tx")
 }
@@ -586,7 +586,7 @@ func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testi
 	}
 
 	// For swaps, only CPFP refund tx is required
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil)
 	require.NoError(t, err)
 }
 

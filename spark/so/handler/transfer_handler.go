@@ -3362,7 +3362,14 @@ func validateRefundSigningRetryMatchesStored(job *pb.LeafRefundTxSigningJob, lea
 	return nil
 }
 
-func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType) error {
+// validateReceivedRefundTransactions checks the refund-tx signing pubkey
+// against the leaf's expected owner. By default (expectedOwnerSigningPubKey ==
+// nil) it compares against the leaf's current OwnerSigningPubkey — the legacy
+// claim flow has already applied the receiver key tweak before this check
+// fires. The consensus claim flow passes a per-leaf predicted owner pubkey
+// (leaf.OwnerSigningPubkey - pubkey_tweak) so it can validate without first
+// mutating the on-disk keyshare; the durable apply happens in Commit.
+func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType, expectedOwnerSigningPubKey *keys.Public) error {
 	if job.RefundTxSigningJob == nil {
 		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.LeafId)
 	}
@@ -3390,8 +3397,12 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 		return fmt.Errorf("invalid refund signing public key for leaf %s: %w", job.LeafId, err)
 	}
 
-	if !refundDestPubKey.Equals(leaf.OwnerSigningPubkey) {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund signing public key %x does not match leaf owner signing pubkey %x for leaf %s", refundDestPubKey.Serialize(), leaf.OwnerSigningPubkey.Serialize(), job.LeafId))
+	expected := leaf.OwnerSigningPubkey
+	if expectedOwnerSigningPubKey != nil {
+		expected = *expectedOwnerSigningPubKey
+	}
+	if !refundDestPubKey.Equals(expected) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund signing public key %x does not match expected owner signing pubkey %x for leaf %s", refundDestPubKey.Serialize(), expected.Serialize(), job.LeafId))
 	}
 
 	if err := validateSingleLeafRefundTxs(
@@ -3826,7 +3837,7 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, fmt.Errorf("leaves cannot be empty")
 	}
 
-	result, err := h.prepareClaimRefundSigningJobs(ctx, claimPackage, leavesById, transfer)
+	result, err := h.prepareClaimRefundSigningJobs(ctx, claimPackage, leavesById, transfer, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4221,15 +4232,27 @@ type claimRefundSigningJobsResult struct {
 	directFromCpfpUserRefundMap map[string]*pb.UserSignedTxSigningJob
 }
 
-// prepareClaimRefundSigningJobs validates refund transactions (cpfp, direct, and direct-from-cpfp) from the
-// claim package and persists them on the corresponding leaves. Direct-from-cpfp is required for all leaves;
-// direct refund is required only for non-zero-timelock leaves that have a DirectTx. It then builds FROST signing jobs with
-// pre-generated nonces and returns lookup maps (leaf-to-job, job type) to assist with signing and aggregation.
+// prepareClaimRefundSigningJobs validates refund transactions (cpfp, direct,
+// and direct-from-cpfp) from the claim package and persists them on the
+// corresponding leaves, then builds FROST signing jobs with pre-generated
+// nonces and returns lookup maps (leaf-to-job, job type) to assist with
+// signing and aggregation. Direct-from-cpfp is required for all leaves;
+// direct refund is required only for non-zero-timelock leaves with a DirectTx.
+//
+// predictedOwnerByLeaf controls the destination check in
+// validateReceivedRefundTransactions:
+//   - nil (legacy claim flow): the receiver key tweak is already applied
+//     before this runs, so validation compares the refund's signing pubkey to
+//     the post-tweak leaf.OwnerSigningPubkey already in the DB.
+//   - non-nil (consensus claim flow): this runs BEFORE applying the tweak, so
+//     callers pass a per-leaf predicted post-tweak owner pubkey
+//     (leaf.OwnerSigningPubkey - pubkey_tweak) for validation to use.
 func (h *TransferHandler) prepareClaimRefundSigningJobs(
 	ctx context.Context,
 	claimPackage *pb.ClaimPackage,
 	leaves map[string]*ent.TreeNode,
 	transfer *ent.Transfer,
+	predictedOwnerByLeaf map[string]keys.Public,
 ) (*claimRefundSigningJobsResult, error) {
 	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
 	jobIsDirectRefund := make(map[uuid.UUID]bool)
@@ -4285,7 +4308,13 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 			RawTx:            dfcJob.RawTx,
 			SigningPublicKey: dfcJob.SigningPublicKey,
 		}
-		if err := validateReceivedRefundTransactions(ctx, leafRefundJob, leaf, transfer.Type); err != nil {
+		var expectedOwner *keys.Public
+		if predictedOwnerByLeaf != nil {
+			if predicted, ok := predictedOwnerByLeaf[job.LeafId]; ok {
+				expectedOwner = &predicted
+			}
+		}
+		if err := validateReceivedRefundTransactions(ctx, leafRefundJob, leaf, transfer.Type, expectedOwner); err != nil {
 			return nil, err
 		}
 
@@ -4651,7 +4680,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 
 		if isSupportedTransferType {
-			if err := validateReceivedRefundTransactions(ctx, job, leaf, transfer.Type); err != nil {
+			if err := validateReceivedRefundTransactions(ctx, job, leaf, transfer.Type, nil); err != nil {
 				return nil, err
 			}
 		}
@@ -4867,6 +4896,11 @@ func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.
 	return cpfpRefundSigningJob, directRefundSigningJob, directFromCpfpRefundSigningJob, nil
 }
 
+// InitiateSettleReceiverKeyTweak performs the per-SO key-tweak prepare work
+// (decrypt slice, persist, validate keyshares, status → ReceiverKeyTweakLocked).
+// Does NOT commit the surrounding ent transaction — the caller (gRPC
+// middleware for cross-SO settle, engine's request tx for the consensus
+// claim-transfer 2PC flow handler) owns the commit lifecycle.
 func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pbinternal.InitiateSettleReceiverKeyTweakRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.InitiateSettleReceiverKeyTweak")
 	defer span.End()
@@ -5083,9 +5117,18 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	// cancellation now happens in persistCoordinatorClaimKeyTweak before
 	// the 2PC starts; everything past that point is part of one outer tx
 	// committed by the gRPC middleware on handler return.
+	//
+	// The consensus claim-transfer 2PC flow handler also calls this
+	// function directly: its engine's request tx owns the commit lifecycle.
 	return nil
 }
 
+// SettleReceiverKeyTweak performs the per-SO Phase-2 work (apply tweaks,
+// clear leaf.KeyTweak, status → KeyTweakApplied on COMMIT; or revert on
+// ROLLBACK). Does NOT commit the surrounding ent transaction — the caller
+// (settleReceiverKeyTweakInternal for cross-SO settle, engine's request tx
+// for the consensus claim-transfer 2PC flow handler) owns the commit
+// lifecycle.
 func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbinternal.SettleReceiverKeyTweakRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.SettleReceiverKeyTweak")
 	defer span.End()
@@ -5289,6 +5332,8 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	// concurrent ROLLBACKs to interleave between Phase 1 SELF and Phase 2
 	// SELF on the coordinator; under the new design the outer
 	// claim_transfer handler owns the single tx that spans both phases.
+	// The consensus claim-transfer 2PC flow handler also calls this
+	// function directly: its engine's request tx owns the commit lifecycle.
 	return nil
 }
 
