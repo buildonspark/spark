@@ -54,6 +54,42 @@ func TestValidatePreimageShareRejectsShortProofSet(t *testing.T) {
 	require.ErrorContains(t, err, "invalid VSS proof length")
 }
 
+func TestValidatePreimageShareRejectsThresholdMismatch(t *testing.T) {
+	config := preimageShareFlowTestConfig()
+	preimageBytes, err := hex.DecodeString("77150a1029e4ce4187c1418dfe40f94499ff2c6fa9e2d2f7d3b165892caf1606")
+	require.NoError(t, err)
+	paymentHash := sha256.Sum256(preimageBytes)
+	shares, err := secretsharing.SplitSecretWithProofs(
+		new(big.Int).SetBytes(preimageBytes),
+		secp256k1.S256().N,
+		int(config.Threshold),
+		2,
+	)
+	require.NoError(t, err)
+	secretShare := shares[int(config.Index)].MarshalProto()
+	shareBytes, err := proto.Marshal(secretShare)
+	require.NoError(t, err)
+	publicKey, err := eciesgo.NewPublicKeyFromBytes(config.IdentityPublicKey().Serialize())
+	require.NoError(t, err)
+	encryptedShare, err := eciesgo.Encrypt(publicKey, shareBytes)
+	require.NoError(t, err)
+
+	for _, threshold := range []uint32{0, 1, uint32(config.Threshold) + 1, ^uint32(0)} {
+		t.Run("threshold_mismatch", func(t *testing.T) {
+			_, err := validatePreimageShare(config, &pb.StorePreimageShareV2Request{
+				PaymentHash: paymentHash[:],
+				EncryptedPreimageShares: map[string][]byte{
+					config.Identifier: encryptedShare,
+				},
+				Threshold:             threshold,
+				InvoiceString:         lightningInvoiceForPaymentHash(t, paymentHash),
+				UserIdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
+			})
+			require.ErrorContains(t, err, "threshold mismatch")
+		})
+	}
+}
+
 func preimageShareFlowTestConfig() *so.Config {
 	identityKey := keys.GeneratePrivateKey()
 	identifier := "operator-1"
