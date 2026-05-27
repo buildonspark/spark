@@ -185,7 +185,11 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible", GetProtoTokenTransactionTraceAttributes(ctx, tokenTransactionProto))
 	defer span.End()
 	logger := logging.GetLoggerFromContext(ctx)
-	response, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
+	enforceNotFrozen, err := shouldEnforceFreezeBeforeRevocationExchange(ctx, tokenTransactionHash)
+	if err != nil {
+		return nil, tokens.FormatErrorWithTransactionProto("failed to determine token transaction freeze validation mode", tokenTransactionProto, err)
+	}
+	response, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash, enforceNotFrozen)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("coordinator failed to exchange revocation secret shares with all other operators", tokenTransactionProto, err)
 	}
@@ -212,7 +216,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 
 	if finalized {
 		logger.Sugar().Infof("Operator %s has finalized token transaction %s, exchanging full revocation secret shares with all operators", h.config.Identifier, hex.EncodeToString(tokenTransactionHash))
-		_, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
+		_, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash, false)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to exchange revocation secret shares after finalization", tokenTransactionProto, err)
 		}
@@ -334,7 +338,26 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 	return nil, nil
 }
 
-func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, allOperatorSignaturesResponse map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionHash []byte) (map[string]*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
+func shouldEnforceFreezeBeforeRevocationExchange(ctx context.Context, tokenTransactionHash []byte) (bool, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return false, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w for token txHash: %x", err, tokenTransactionHash))
+	}
+	tokenTransaction, err := db.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash)).
+		Select(tokentransaction.FieldStatus).
+		Only(ctx)
+	if err != nil {
+		return false, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction status for freeze validation: %w for token txHash: %x", err, tokenTransactionHash))
+	}
+	return shouldEnforceFreezeForRevocationExchange(tokenTransaction.Status), nil
+}
+
+func shouldEnforceFreezeForRevocationExchange(status st.TokenTransactionStatus) bool {
+	return status != st.TokenTransactionStatusRevealed && status != st.TokenTransactionStatusFinalized
+}
+
+func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, allOperatorSignaturesResponse map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionHash []byte, enforceNotFrozen bool) (map[string]*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.exchangeRevocationSecretShares", GetProtoTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
 	logger := logging.GetLoggerFromContext(ctx)
@@ -345,6 +368,23 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 			OperatorIdentityPublicKey: h.config.SigningOperatorMap[identifier].IdentityPublicKey.Serialize(),
 			Signature:                 sig.SparkOperatorSignature,
 		})
+	}
+
+	outputsToSpend, spentOutputs, err := h.getOutputsToSpendForExchange(ctx, tokenTransactionHash)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get outputs to spend for exchange: %w for token txHash: %x", err, tokenTransactionHash))
+	}
+	if err := NewInternalSignTokenHandler(h.config).validateTransactionHashAndSpentOutputsInRequest(&tokeninternalpb.ExchangeRevocationSecretsSharesRequest{
+		FinalTokenTransaction:     tokenTransaction,
+		FinalTokenTransactionHash: tokenTransactionHash,
+		OutputsToSpend:            outputsToSpend,
+	}); err != nil {
+		return nil, err
+	}
+	if enforceNotFrozen {
+		if err := validateNoActiveFreezesForOutputs(ctx, spentOutputs); err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto("frozen transfer cannot exchange revocation secrets", tokenTransaction, err)
+		}
 	}
 
 	revocationSecretShares, err := h.prepareRevocationSecretSharesForExchange(ctx, tokenTransaction)
@@ -369,11 +409,6 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	}
 	if err := entTx.Commit(); err != nil {
 		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
-	}
-
-	outputsToSpend, err := h.getOutputsToSpendForExchange(ctx, tokenTransactionHash)
-	if err != nil {
-		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get outputs to spend for exchange: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 
 	// exchange the revocation secret shares with all other operators
@@ -422,10 +457,10 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	return response, nil
 }
 
-func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tokenTransactionHash []byte) ([]*tokeninternalpb.OutputToSpend, error) {
+func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tokenTransactionHash []byte) ([]*tokeninternalpb.OutputToSpend, []*ent.TokenOutput, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w for token txHash: %x", err, tokenTransactionHash))
+		return nil, nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 	spentOutputs, err := db.TokenOutput.Query().
 		Where(tokenoutput.HasOutputSpentTokenTransactionWith(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash))).
@@ -435,19 +470,21 @@ func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tok
 			tokenoutput.FieldCreatedTransactionOutputVout,
 			tokenoutput.FieldSpentTransactionInputVout,
 			tokenoutput.FieldSpentOwnershipSignature,
+			tokenoutput.FieldOwnerPublicKey,
+			tokenoutput.FieldTokenCreateID,
 		).
 		All(ctx)
 	if err != nil {
-		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
+		return nil, nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 	if len(spentOutputs) == 0 {
-		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("no spent outputs found for token txHash: %x", tokenTransactionHash))
+		return nil, nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("no spent outputs found for token txHash: %x", tokenTransactionHash))
 	}
 	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(spentOutputs))
 	for _, outputToSpend := range spentOutputs {
 		sigLen := len(outputToSpend.SpentOwnershipSignature)
 		if sigLen < 64 || sigLen > 73 {
-			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+			return nil, nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
 				"token output %s has invalid spent_ownership_signature length %d (expected 64-73 bytes) for token txHash: %x",
 				outputToSpend.ID, sigLen, tokenTransactionHash))
 		}
@@ -458,7 +495,7 @@ func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tok
 			SpentOwnershipSignature:     outputToSpend.SpentOwnershipSignature,
 		})
 	}
-	return outputsToSpend, nil
+	return outputsToSpend, spentOutputs, nil
 }
 
 func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) ([]*tokeninternalpb.OperatorRevocationShares, error) {

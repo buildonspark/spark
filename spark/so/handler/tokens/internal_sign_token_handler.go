@@ -253,6 +253,11 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		if err := h.validateTransactionHashAndSpentOutputsInRequest(req); err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate tx hash and spent outputs in request: %w", err))
 		}
+		if shouldEnforceFreezeForRevocationExchange(tokenTransaction.Status) {
+			if err := validateNoActiveFreezesForOutputsToSpend(ctx, req.OutputsToSpend); err != nil {
+				return nil, tokens.FormatErrorWithTransactionEnt("frozen transfer cannot exchange revocation secrets", tokenTransaction, err)
+			}
+		}
 		if len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
 			err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)
 			if err != nil {
@@ -328,6 +333,42 @@ func (h *InternalSignTokenHandler) exchangeTransferRevocationSecrets(
 		}
 	}
 	return response, nil
+}
+
+func validateNoActiveFreezesForOutputsToSpend(ctx context.Context, outputsToSpend []*pbtkinternal.OutputToSpend) error {
+	if len(outputsToSpend) == 0 {
+		return nil
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
+	}
+
+	outputPredicates := make([]predicate.TokenOutput, 0, len(outputsToSpend))
+	for _, outputToSpend := range outputsToSpend {
+		outputPredicates = append(outputPredicates, tokenoutput.And(
+			tokenoutput.CreatedTransactionFinalizedHashEQ(outputToSpend.CreatedTokenTransactionHash),
+			tokenoutput.CreatedTransactionOutputVoutEQ(int32(outputToSpend.CreatedTokenTransactionVout)),
+		))
+	}
+
+	spentOutputs, err := db.TokenOutput.Query().
+		Where(tokenoutput.Or(outputPredicates...)).
+		Select(
+			tokenoutput.FieldID,
+			tokenoutput.FieldOwnerPublicKey,
+			tokenoutput.FieldTokenCreateID,
+		).
+		All(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token outputs for freeze validation: %w", err))
+	}
+	if len(spentOutputs) != len(outputsToSpend) {
+		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("found %d token outputs for %d requested outputs", len(spentOutputs), len(outputsToSpend)))
+	}
+
+	return validateNoActiveFreezesForOutputs(ctx, spentOutputs)
 }
 
 func (h *InternalSignTokenHandler) validateAndSignTransactionWithProvidedOwnSignature(ctx context.Context, tokenTransaction *ent.TokenTransaction, ownSignature []byte) error {

@@ -3,6 +3,7 @@ package tokens
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -283,4 +286,54 @@ func TestErrNonRetryableBroadcast_IsSentinel(t *testing.T) {
 	wrapped := fmt.Errorf("outer: %w", errNonRetryableBroadcast)
 	require.ErrorIs(t, wrapped, errNonRetryableBroadcast)
 	require.NotErrorIs(t, fmt.Errorf("unrelated"), errNonRetryableBroadcast)
+}
+
+func TestRetryTokenTransactionBroadcastRejectsFrozenSignedTransferBeforeReveal(t *testing.T) {
+	setup := setUpRetryBroadcastTest(t)
+	ctx := setup.ctx
+	setup.config.Threshold = 1
+	setup.config.SigningOperatorMap = map[string]*so.SigningOperator{
+		setup.config.Identifier: {
+			Identifier:        setup.config.Identifier,
+			IdentityPublicKey: setup.config.IdentityPublicKey(),
+		},
+	}
+
+	ownerPriv := setup.fixtures.GeneratePrivateKey()
+	_, tokenCreate := setup.fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{
+		IsFreezable: true,
+	})
+	_, inputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(ownerPriv.Public(), big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	transferResult := setup.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		inputs,
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: []keys.Public{setup.config.IdentityPublicKey()},
+			Status:             st.TokenTransactionStatusSigned,
+		},
+	)
+	ownerSig := ecdsa.Sign(ownerPriv.ToBTCEC(), transferResult.Hash).Serialize()
+	_, err := inputs[0].Update().
+		SetSpentOwnershipSignature(ownerSig).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NoError(t, ent.ActivateFreeze(ctx, inputs[0].OwnerPublicKey, tokenCreate.ID, []byte("retry-freeze"), uint64(time.Now().UnixMilli())))
+
+	operatorSig := ecdsa.Sign(setup.config.IdentityPrivateKey.ToBTCEC(), transferResult.Hash).Serialize()
+	tx := setup.client.TokenTransaction.UpdateOne(transferResult.Transaction).
+		SetOperatorSignature(operatorSig).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SaveX(ctx)
+
+	err = retryTokenTransactionBroadcast(ctx, setup.config, NewBroadcastTokenHandler(setup.config), tx.ID)
+
+	require.ErrorIs(t, err, errNonRetryableBroadcast)
+	refetched, err := setup.client.TokenTransaction.Get(ctx, tx.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusSigned, refetched.Status)
 }

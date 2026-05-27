@@ -461,6 +461,78 @@ func (s *internalSignTokenPostgresTestSetup) buildOperatorSignaturesProto(signat
 	return operatorSigs
 }
 
+type transferRevocationExchangeSetup struct {
+	tokenCreate    *ent.TokenCreate
+	spentOutput    *ent.TokenOutput
+	transferResult *entfixtures.TransferTransactionWithProtoResult
+	operatorIDs    []string
+	request        *sparktokeninternal.ExchangeRevocationSecretsSharesRequest
+}
+
+func (s *internalSignTokenPostgresTestSetup) createTransferRevocationExchangeSetup(t *testing.T, txStatus st.TokenTransactionStatus) *transferRevocationExchangeSetup {
+	t.Helper()
+
+	operatorIDs := s.setupThresholdOperators()
+	revocationPriv := s.fixtures.GeneratePrivateKey()
+	secretInt := new(big.Int).SetBytes(revocationPriv.Serialize())
+	shares, err := secretsharing.SplitSecret(secretInt, secp256k1.S256().N, 2, 3)
+	require.NoError(t, err)
+
+	tokenCreate := s.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+	spentOutput := createTestSpentOutputWithShares(t, s, tokenCreate, revocationPriv, shares, operatorIDs)
+	operatorPubKeys := []keys.Public{
+		s.handler.config.SigningOperatorMap[operatorIDs[0]].IdentityPublicKey,
+		s.handler.config.SigningOperatorMap[operatorIDs[1]].IdentityPublicKey,
+	}
+	transferResult := s.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		[]*ent.TokenOutput{spentOutput},
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: operatorPubKeys,
+			Status:             txStatus,
+		},
+	)
+
+	signatures := s.buildThresholdSignatures(operatorIDs, transferResult.Hash)
+	operatorSigs := s.buildOperatorSignaturesProto(signatures)
+	share0, err := keys.PrivateKeyFromBigInt(shares[0].Share)
+	require.NoError(t, err)
+
+	return &transferRevocationExchangeSetup{
+		tokenCreate:    tokenCreate,
+		spentOutput:    spentOutput,
+		transferResult: transferResult,
+		operatorIDs:    operatorIDs,
+		request: &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
+			OperatorShares: []*sparktokeninternal.OperatorRevocationShares{
+				{
+					OperatorIdentityPublicKey: s.handler.config.SigningOperatorMap[operatorIDs[0]].IdentityPublicKey.Serialize(),
+					Shares: []*sparktokeninternal.RevocationSecretShare{
+						{
+							SecretShare: share0.Serialize(),
+							InputTtxoRef: &tokenpb.TokenOutputToSpend{
+								PrevTokenTransactionHash: spentOutput.CreatedTransactionFinalizedHash,
+								PrevTokenTransactionVout: uint32(spentOutput.CreatedTransactionOutputVout),
+							},
+						},
+					},
+				},
+			},
+			OperatorTransactionSignatures: operatorSigs,
+			FinalTokenTransaction:         transferResult.Proto,
+			FinalTokenTransactionHash:     transferResult.Hash,
+			OperatorIdentityPublicKey:     s.handler.config.IdentityPublicKey().Serialize(),
+			OutputsToSpend: []*sparktokeninternal.OutputToSpend{
+				{
+					CreatedTokenTransactionHash: spentOutput.CreatedTransactionFinalizedHash,
+					CreatedTokenTransactionVout: uint32(spentOutput.CreatedTransactionOutputVout),
+				},
+			},
+		},
+	}
+}
+
 func (s *internalSignTokenPostgresTestSetup) createMintTransactionWithOutput(
 	testHash []byte,
 	txStatus st.TokenTransactionStatus,
@@ -595,87 +667,40 @@ func TestExchangeRevocationSecretsShares_RejectsThresholdSignaturesWhenFlagDisab
 
 func TestExchangeRevocationSecretsShares_TransferTransaction_HappyPath(t *testing.T) {
 	setup := setUpInternalSignTokenTestHandlerPostgres(t)
-
-	// Configure 3 operators, threshold 2
-	operatorIDs := setup.setupThresholdOperators()
-
-	// Create the revocation secret and split it into shares for threshold recovery
-	revocationPriv := setup.fixtures.GeneratePrivateKey()
-	secretInt := new(big.Int).SetBytes(revocationPriv.Serialize())
-	shares, err := secretsharing.SplitSecret(secretInt, secp256k1.S256().N, 2, 3)
-	require.NoError(t, err)
-
-	tokenCreate := setup.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
-
-	spentOutput := createTestSpentOutputWithShares(t, setup, tokenCreate, revocationPriv, shares, operatorIDs)
-
-	// Get operator public keys for the proto
-	operatorPubKeys := []keys.Public{
-		setup.handler.config.SigningOperatorMap[operatorIDs[0]].IdentityPublicKey,
-		setup.handler.config.SigningOperatorMap[operatorIDs[1]].IdentityPublicKey,
-	}
-
-	// Use fixture to create transfer transaction with matching proto hash
-	transferResult := setup.fixtures.CreateTransferTransactionWithProto(
-		tokenCreate,
-		[]*ent.TokenOutput{spentOutput},
-		entfixtures.OutputSpecs(big.NewInt(100)), // Same amount as spent output
-		entfixtures.TransferTransactionOpts{
-			OperatorPublicKeys: operatorPubKeys,
-			Status:             st.TokenTransactionStatusSigned,
-		},
-	)
-
-	// Build operator signatures for the transfer hash
-	signatures := setup.buildThresholdSignatures(operatorIDs, transferResult.Hash)
-	operatorSigs := setup.buildOperatorSignaturesProto(signatures)
-
-	// Build operator shares - provide share[0] from operator 0
-	// The database already has share[1] from createTestSpentOutputWithShares
-	// Together they reach the threshold of 2
-	share0, err := keys.PrivateKeyFromBigInt(shares[0].Share)
-	require.NoError(t, err)
-
-	operatorShares := []*sparktokeninternal.OperatorRevocationShares{
-		{
-			OperatorIdentityPublicKey: setup.handler.config.SigningOperatorMap[operatorIDs[0]].IdentityPublicKey.Serialize(),
-			Shares: []*sparktokeninternal.RevocationSecretShare{
-				{
-					SecretShare: share0.Serialize(),
-					InputTtxoRef: &tokenpb.TokenOutputToSpend{
-						PrevTokenTransactionHash: spentOutput.CreatedTransactionFinalizedHash,
-						PrevTokenTransactionVout: uint32(spentOutput.CreatedTransactionOutputVout),
-					},
-				},
-			},
-		},
-	}
+	exchangeSetup := setup.createTransferRevocationExchangeSetup(t, st.TokenTransactionStatusSigned)
 
 	t.Run("succeeds and finalizes transfer with threshold shares", func(t *testing.T) {
-		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
-			OperatorShares:                operatorShares,
-			OperatorTransactionSignatures: operatorSigs,
-			FinalTokenTransaction:         transferResult.Proto,
-			FinalTokenTransactionHash:     transferResult.Hash,
-			OperatorIdentityPublicKey:     setup.handler.config.IdentityPublicKey().Serialize(),
-			OutputsToSpend: []*sparktokeninternal.OutputToSpend{
-				{
-					CreatedTokenTransactionHash: spentOutput.CreatedTransactionFinalizedHash,
-					CreatedTokenTransactionVout: uint32(spentOutput.CreatedTransactionOutputVout),
-				},
-			},
-		}
-
-		resp, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, req)
+		resp, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, exchangeSetup.request)
 		require.NoError(t, err, "TRANSFER transaction should succeed with valid operator shares")
 		require.NotNil(t, resp)
 
 		require.NotEmpty(t, resp.ReceivedOperatorShares, "response should include revocation secret shares")
 		require.Len(t, resp.ReceivedOperatorShares, 1)
-		assert.Equal(t, setup.handler.config.SigningOperatorMap[operatorIDs[1]].IdentityPublicKey.Serialize(), resp.ReceivedOperatorShares[0].OperatorIdentityPublicKey)
+		assert.Equal(t, setup.handler.config.SigningOperatorMap[exchangeSetup.operatorIDs[1]].IdentityPublicKey.Serialize(), resp.ReceivedOperatorShares[0].OperatorIdentityPublicKey)
 		require.Len(t, resp.ReceivedOperatorShares[0].Shares, 1)
 		require.NotNil(t, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef)
-		assert.Equal(t, spentOutput.CreatedTransactionFinalizedHash, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionHash)
-		assert.Equal(t, uint32(spentOutput.CreatedTransactionOutputVout), resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionVout)
+		assert.Equal(t, exchangeSetup.spentOutput.CreatedTransactionFinalizedHash, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionHash)
+		assert.Equal(t, uint32(exchangeSetup.spentOutput.CreatedTransactionOutputVout), resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionVout)
 	})
+}
+
+func TestExchangeRevocationSecretsShares_TransferTransaction_RejectsFrozenSignedTransferBeforeReveal(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandlerPostgres(t)
+	exchangeSetup := setup.createTransferRevocationExchangeSetup(t, st.TokenTransactionStatusSigned)
+
+	require.NoError(t, ent.ActivateFreeze(setup.ctx, exchangeSetup.spentOutput.OwnerPublicKey, exchangeSetup.tokenCreate.ID, []byte("internal-exchange-freeze"), 1))
+
+	resp, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, exchangeSetup.request)
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "at least one input is frozen")
+
+	updatedTx, err := setup.client.TokenTransaction.Get(setup.ctx, exchangeSetup.transferResult.Transaction.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TokenTransactionStatusSigned, updatedTx.Status)
+
+	updatedSpentOutput, err := setup.client.TokenOutput.Get(setup.ctx, exchangeSetup.spentOutput.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TokenOutputStatusSpentSigned, updatedSpentOutput.Status)
 }
