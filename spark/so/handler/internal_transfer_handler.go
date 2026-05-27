@@ -673,12 +673,8 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 
 	// Cross-SO consistency: the coordinator's plaintext proofs must match what we decrypted
 	// from our own ECIES blob, ensuring every SO's encrypted share comes from the same polynomial.
-	// TODO: tighten to required (non-nil) after all SOs are on a version that always populates
-	// req.SenderKeyTweakProofs in syncDeliverSenderKeyTweak.
-	if req.SenderKeyTweakProofs != nil {
-		if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
-			return err
-		}
+	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
+		return err
 	}
 
 	leafRefundMap := make(map[string][]byte)
