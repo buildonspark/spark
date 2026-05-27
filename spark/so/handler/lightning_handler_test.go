@@ -1445,6 +1445,33 @@ func TestProvidePreimageRejectsMalformedIdentityPublicKeyWithInvalidArgument(t *
 	require.ErrorContains(t, err, "invalid identity public key")
 }
 
+func TestProvidePreimageRejectsSessionIdentityMismatchBeforeValidation(t *testing.T) {
+	handler := NewLightningHandler(&so.Config{
+		AuthzEnforced:              true,
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	})
+	sessionIdentityPubKey := keys.GeneratePrivateKey().Public()
+	requestIdentityPubKey := keys.GeneratePrivateKey().Public()
+	ctx := authn.InjectSessionForTests(
+		t.Context(),
+		hex.EncodeToString(sessionIdentityPubKey.Serialize()),
+		time.Now().Add(time.Hour).Unix(),
+	)
+
+	preimage := bytes.Repeat([]byte{0x02}, 32)
+	paymentHash := sha256.Sum256(preimage)
+
+	resp, err := handler.ProvidePreimage(ctx, &pb.ProvidePreimageRequest{
+		PaymentHash:       paymentHash[:],
+		Preimage:          preimage,
+		IdentityPublicKey: requestIdentityPubKey.Serialize(),
+	})
+
+	require.Nil(t, resp)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "session identity does not match request identity")
+}
+
 func TestStorePreimage(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
 	ctx, _ := db.NewTestSQLiteContext(t)
