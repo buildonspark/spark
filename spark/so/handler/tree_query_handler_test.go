@@ -669,6 +669,33 @@ func TestQueryNodes_PrivacyEnabled_OwnerIdentityPubkey(t *testing.T) {
 	assert.Empty(t, resp.Nodes, "Should return empty results when owner has privacy enabled and requester doesn't have read access")
 }
 
+func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, false)
+	handler := NewTreeQueryHandler(cfg)
+
+	resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: []string{testData.Node.ID.String()},
+			},
+		},
+	}, false)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Nodes, "Should not reveal a private node by ID when requester doesn't have read access")
+
+	ownerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.OwnerIdentityPubKey.Serialize()), 9999999999)
+	ownerResp, err := handler.QueryNodes(ownerCtx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: []string{testData.Node.ID.String()},
+			},
+		},
+	}, false)
+	require.NoError(t, err)
+	require.Len(t, ownerResp.Nodes, 1, "Owner should still be able to query their own private node by ID")
+	assert.Equal(t, testData.Node.ID.String(), ownerResp.Nodes[testData.Node.ID.String()].Id)
+}
+
 func TestQueryNodes_PrivacyDisabled_OwnerIdentityPubkey(t *testing.T) {
 	// Create test data with privacy disabled and different requester/owner
 	ctx, cfg, testData := createPrivacyTestData(t, false, false, true, false)
