@@ -533,6 +533,43 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 	}
 }
 
+func TestStartDepositTreeCreationRejectsZeroValueUtxoBeforeLookup(t *testing.T) {
+	cfg := &so.Config{}
+	handler := NewDepositHandler(cfg)
+
+	depositScript, err := common.P2TRScriptFromPubKey(keys.GeneratePrivateKey().Public())
+	require.NoError(t, err)
+
+	var prevHash chainhash.Hash
+	prevHash[0] = 1
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: prevHash, Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	tx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		PkScript: depositScript,
+	})
+
+	rawTx, err := common.SerializeTx(tx)
+	require.NoError(t, err)
+
+	resp, err := handler.StartDepositTreeCreation(t.Context(), cfg, &pb.StartDepositTreeCreationRequest{
+		IdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
+		OnChainUtxo: &pb.UTXO{
+			RawTx:   rawTx,
+			Vout:    0,
+			Network: pb.Network_REGTEST,
+		},
+	})
+
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "deposit UTXO output value must be greater than zero")
+}
+
 func TestGenerateDepositAddress(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
