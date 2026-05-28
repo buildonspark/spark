@@ -655,6 +655,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	rawTx := createTestTxBytesWithIndex(t, 500, 0)
+	rawRefundTx := addDummyWitness(t, rawTx)
 	childNode, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -666,7 +667,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
 		SetOwnerSigningPubkey(childOwnerSigning.Public()).
 		SetRawTx(rawTx).
-		SetRawRefundTx(rawTx).
+		SetRawRefundTx(rawRefundTx).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)
@@ -863,6 +864,130 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T
 	updatedNode, err := dbTx.TreeNode.Get(ctx, leafNode.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.TreeNodeStatusCreating, updatedNode.Status, "Node status should remain unchanged when tree is not Available")
+}
+
+func TestUpdateNodeRequiresRefundSignatureForUnsignedTransferRefund(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewFinalizeSignatureHandler(&so.Config{})
+	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
+
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	unsignedRefundTx := createTestTxBytes(t, 900)
+	node, err = node.Update().
+		SetStatus(st.TreeNodeStatusTransferLocked).
+		SetRawRefundTx(unsignedRefundTx).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, _, err = handler.updateNode(ctx, &pb.NodeSignatures{
+		NodeId: node.ID.String(),
+	}, pbcommon.SignatureIntent_TRANSFER, false)
+	require.ErrorContains(t, err, "RefundTxSignature is required")
+
+	updatedNode, err := dbClient.TreeNode.Get(ctx, node.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TreeNodeStatusTransferLocked, updatedNode.Status)
+	require.Equal(t, unsignedRefundTx, updatedNode.RawRefundTx)
+}
+
+func TestUpdateNodeRequiresRefundSignatureForUnsignedCreationRefund(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewFinalizeSignatureHandler(&so.Config{})
+	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
+
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	unsignedRefundTx := createTestTxBytes(t, 900)
+	node, err = node.Update().
+		SetStatus(st.TreeNodeStatusCreating).
+		SetRawRefundTx(unsignedRefundTx).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, _, err = handler.updateNode(ctx, &pb.NodeSignatures{
+		NodeId: node.ID.String(),
+	}, pbcommon.SignatureIntent_CREATION, false)
+	require.ErrorContains(t, err, "RefundTxSignature is required")
+
+	updatedNode, err := dbClient.TreeNode.Get(ctx, node.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TreeNodeStatusCreating, updatedNode.Status)
+	require.Equal(t, unsignedRefundTx, updatedNode.RawRefundTx)
+}
+
+func TestRequiresFinalizeRefundSignatureForUnsignedActiveRefunds(t *testing.T) {
+	unsignedRefundTx := createTestTxBytes(t, 900)
+
+	tests := []struct {
+		name   string
+		node   *ent.TreeNode
+		intent pbcommon.SignatureIntent
+		want   bool
+	}{
+		{
+			name:   "creation creating unsigned refund",
+			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusCreating},
+			intent: pbcommon.SignatureIntent_CREATION,
+			want:   true,
+		},
+		{
+			name:   "transfer locked unsigned refund",
+			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusTransferLocked},
+			intent: pbcommon.SignatureIntent_TRANSFER,
+			want:   true,
+		},
+		{
+			name:   "transfer frozen by issuer unsigned refund",
+			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusFrozenByIssuer},
+			intent: pbcommon.SignatureIntent_TRANSFER,
+			want:   true,
+		},
+		{
+			name:   "transfer renew locked unsigned refund",
+			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusRenewLocked},
+			intent: pbcommon.SignatureIntent_TRANSFER,
+			want:   true,
+		},
+		{
+			name:   "transfer available replay",
+			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusAvailable},
+			intent: pbcommon.SignatureIntent_TRANSFER,
+			want:   false,
+		},
+		{
+			name:   "no refund tx",
+			node:   &ent.TreeNode{Status: st.TreeNodeStatusTransferLocked},
+			intent: pbcommon.SignatureIntent_TRANSFER,
+			want:   false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := requiresFinalizeRefundSignature(test.node, test.intent)
+			require.NoError(t, err)
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestRequiresFinalizeRefundSignatureRejectsMalformedStoredRefund(t *testing.T) {
+	got, err := requiresFinalizeRefundSignature(&ent.TreeNode{
+		ID:          uuid.New(),
+		RawRefundTx: []byte("not a transaction"),
+		Status:      st.TreeNodeStatusTransferLocked,
+	}, pbcommon.SignatureIntent_TRANSFER)
+	require.False(t, got)
+	require.ErrorContains(t, err, "stored raw refund tx")
+}
+
+func addDummyWitness(t *testing.T, rawTx []byte) []byte {
+	t.Helper()
+
+	signedTx, err := common.UpdateTxWithSignature(rawTx, 0, make([]byte, 64))
+	require.NoError(t, err)
+	return signedTx
 }
 
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8045

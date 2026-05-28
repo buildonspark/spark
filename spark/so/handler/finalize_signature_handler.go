@@ -531,6 +531,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to check node children in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
+	nodeCanBecomeAvailable := treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) && !hasChildren
 
 	var cpfpNodeTxBytes []byte
 	var directNodeTxBytes []byte
@@ -669,6 +670,13 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			}
 		}
 	} else {
+		requiresSignature, err := requiresFinalizeRefundSignature(node, intent)
+		if err != nil {
+			return nil, nil, err
+		}
+		if nodeCanBecomeAvailable && requiresSignature {
+			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("RefundTxSignature is required for unsigned refund transaction on node %s", node.ID))
+		}
 		cpfpRefundTxBytes = node.RawRefundTx
 		directRefundTxBytes = node.DirectRefundTx
 		directFromCpfpRefundTxBytes = node.DirectFromCpfpRefundTx
@@ -705,4 +713,41 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %w", node.ID.String(), err)
 	}
 	return nodeSparkProto, internalNode, nil
+}
+
+func txHasWitness(rawTx []byte) (bool, error) {
+	if len(rawTx) == 0 {
+		return false, nil
+	}
+	tx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return false, err
+	}
+	for _, txIn := range tx.TxIn {
+		if len(txIn.Witness) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func requiresFinalizeRefundSignature(node *ent.TreeNode, intent pbcommon.SignatureIntent) (bool, error) {
+	if len(node.RawRefundTx) == 0 {
+		return false, nil
+	}
+	hasWitness, err := txHasWitness(node.RawRefundTx)
+	if err != nil {
+		return false, sparkerrors.InternalDataInconsistency(fmt.Errorf("stored raw refund tx for node %s is malformed: %w", node.ID, err))
+	}
+	if hasWitness {
+		return false, nil
+	}
+	switch intent {
+	case pbcommon.SignatureIntent_CREATION:
+		return node.Status == st.TreeNodeStatusCreating, nil
+	case pbcommon.SignatureIntent_TRANSFER:
+		return node.Status != st.TreeNodeStatusAvailable && node.Status.CanBecomeAvailable(), nil
+	default:
+		return false, nil
+	}
 }
