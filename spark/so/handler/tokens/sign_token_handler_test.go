@@ -464,6 +464,22 @@ func createInputTtxoSignatures(t *testing.T, setup *testSetupCommon, finalTxHash
 	}
 }
 
+func TestCommitTransactionRejectsUnknownFinalizedHash(t *testing.T) {
+	setup := setUpCommonTest(t)
+	tokenTxProto, _, finalTxHash, _ := createCreateTokenTransactionProto(t, setup)
+
+	resp, err := setup.handler.CommitTransaction(setup.ctx, &tokenpb.CommitTransactionRequest{
+		FinalTokenTransaction:          tokenTxProto,
+		FinalTokenTransactionHash:      finalTxHash,
+		OwnerIdentityPublicKey:         setup.pubKey.Serialize(),
+		InputTtxoSignaturesPerOperator: createInputTtxoSignatures(t, setup, finalTxHash, 1),
+	})
+
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "token transaction not found for hash")
+}
+
 func TestCommitTransaction_CreateTransaction_Retry_AfterInternalSignFailed(t *testing.T) {
 	setup := setUpCommonTest(t)
 	tokenTxProto, partialTxHash, finalTxHash, tokenIdentifier := createCreateTokenTransactionProto(t, setup)
