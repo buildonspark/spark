@@ -50,8 +50,14 @@ func makeP2TRFundingTx(value int64, internalPriv keys.Private) (txBytes []byte, 
 }
 
 func makeP2TRSpendTx(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, tweakedPriv keys.Private, sendValue int64, destScript []byte) ([]byte, error) {
+	return makeP2TRSpendTxWithSequence(prevOut, prevPkScript, prevAmt, tweakedPriv, sendValue, destScript, wire.MaxTxInSequenceNum)
+}
+
+func makeP2TRSpendTxWithSequence(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, tweakedPriv keys.Private, sendValue int64, destScript []byte, sequence uint32) ([]byte, error) {
 	tx := wire.NewMsgTx(2)
-	tx.AddTxIn(wire.NewTxIn(&prevOut, nil, nil))
+	txIn := wire.NewTxIn(&prevOut, nil, nil)
+	txIn.Sequence = sequence
+	tx.AddTxIn(txIn)
 	tx.AddTxOut(wire.NewTxOut(sendValue, destScript))
 	prevFetcher := txscript.NewCannedPrevOutputFetcher(prevPkScript, prevAmt)
 	hashes := txscript.NewTxSigHashes(tx, prevFetcher)
@@ -1621,6 +1627,9 @@ func TestApplySignatures(t *testing.T) {
 	dest2 := pkScript
 	directRefundTx, err := makeP2TRSpendTx(out1, pk1, amt1, tweakedPriv, 860, dest2)
 	require.NoError(t, err)
+	wrongDirectOutpoint := wire.OutPoint{Hash: chainhash.DoubleHashH([]byte("wrong direct refund outpoint")), Index: 0}
+	wrongDirectRefundTx, err := makeP2TRSpendTx(wrongDirectOutpoint, pk1, amt1, tweakedPriv, 860, dest2)
+	require.NoError(t, err)
 
 	// Create test signing keyshare
 	secret := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -1691,6 +1700,7 @@ func TestApplySignatures(t *testing.T) {
 
 	// sign the P2TR output
 	signature := getTxOutputSignature(t, directTx, directRefundTx, tweakedPriv)
+	wrongDirectRefundSignature := getTxOutputSignature(t, directTx, wrongDirectRefundTx, tweakedPriv)
 
 	req := &pbinternal.InitiateTransferRequest{
 		SenderIdentityPublicKey:   []byte("test_sender_identity"),
@@ -1747,6 +1757,17 @@ func TestApplySignatures(t *testing.T) {
 			},
 			adaptorPublicKey: adaptorPubKey, // Valid adaptor key
 			expectedError:    "",
+		},
+		{
+			name:           "rejects refund tx spending different outpoint",
+			leafId:         leaf.ID.String(),
+			rawRefundTx:    rawRefundTx,
+			directRefundTx: wrongDirectRefundTx,
+			directRefundSignatures: map[string][]byte{
+				leaf.ID.String(): wrongDirectRefundSignature,
+			},
+			adaptorPublicKey: keys.Public{},
+			expectedError:    "refund tx input 0 spends",
 		},
 		{
 			name:           "failed adaptor signature verification - wrong adaptor key",
@@ -1865,8 +1886,14 @@ func getTxOutpoint(t *testing.T, txBytes []byte, vout uint32) (wire.OutPoint, []
 // makeP2TRSpendTxUnsigned creates a v2 transaction spending prevOut with a single
 // output of sendValue/destScript, but with no witness (unsigned).
 func makeP2TRSpendTxUnsigned(prevOut wire.OutPoint, sendValue int64, destScript []byte) ([]byte, error) {
+	return makeP2TRSpendTxUnsignedWithSequence(prevOut, sendValue, destScript, wire.MaxTxInSequenceNum)
+}
+
+func makeP2TRSpendTxUnsignedWithSequence(prevOut wire.OutPoint, sendValue int64, destScript []byte, sequence uint32) ([]byte, error) {
 	tx := wire.NewMsgTx(2)
-	tx.AddTxIn(wire.NewTxIn(&prevOut, nil, nil))
+	txIn := wire.NewTxIn(&prevOut, nil, nil)
+	txIn.Sequence = sequence
+	tx.AddTxIn(txIn)
 	tx.AddTxOut(wire.NewTxOut(sendValue, destScript))
 	var buf bytes.Buffer
 	if err := tx.Serialize(&buf); err != nil {
@@ -2140,7 +2167,8 @@ func TestUpdateTransferLeavesSignatures(t *testing.T) {
 			Save(ctx)
 		require.NoError(t, err)
 
-		intermediateRefundTx := createTestTxBytes(t, 2001)
+		intermediateRefundTx, err := makeP2TRSpendTxUnsignedWithSequence(outpoint, 870, destScript, 2001)
+		require.NoError(t, err)
 		intermediateDirectRefundTx := createTestTxBytes(t, 3001)
 		intermediateDirectFromCpfpRefundTx := createTestTxBytes(t, 4001)
 
@@ -2179,5 +2207,99 @@ func TestUpdateTransferLeavesSignatures(t *testing.T) {
 		assert.NotEqual(t, intermediateRefundTx, updated.IntermediateRefundTx, "cpfp refund tx should be updated")
 		assert.Nil(t, updated.IntermediateDirectRefundTx, "direct refund tx should be cleared when no signature provided")
 		assert.Nil(t, updated.IntermediateDirectFromCpfpRefundTx, "direct from cpfp refund tx should be cleared when no signature provided")
+	})
+
+	t.Run("rejects cpfp refund tx spending different outpoint", func(t *testing.T) {
+		ctx, dbCtx := db.NewTestSQLiteContext(t)
+		rng := rand.NewChaCha8([32]byte{})
+
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {
+					DepositConfirmationThreshold: 1,
+				},
+			},
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		}
+
+		key := keys.GeneratePrivateKey()
+		rawTx, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, key)
+		require.NoError(t, err)
+
+		destScript := pkScript
+		rawRefundTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 900, destScript)
+		require.NoError(t, err)
+
+		wrongOutpoint := wire.OutPoint{Hash: chainhash.DoubleHashH([]byte("wrong update transfer leaf refund outpoint")), Index: 0}
+		intermediateRefundTx, err := makeP2TRSpendTxUnsignedWithSequence(wrongOutpoint, 870, destScript, 2001)
+		require.NoError(t, err)
+
+		secret := keys.MustGeneratePrivateKeyFromRand(rng)
+		pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secret).
+			SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
+			SetPublicKey(pubKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		tree, err := dbCtx.Client.Tree.Create().
+			SetStatus(st.TreeStatusAvailable).
+			SetNetwork(btcnetwork.Regtest).
+			SetOwnerIdentityPubkey(ownerIdentityPubKey).
+			SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		leaf, err := dbCtx.Client.TreeNode.Create().
+			SetStatus(st.TreeNodeStatusAvailable).
+			SetTree(tree).
+			SetNetwork(tree.Network).
+			SetSigningKeyshare(signingKeyshare).
+			SetValue(1000).
+			SetVerifyingPubkey(key.Public()).
+			SetOwnerIdentityPubkey(key.Public()).
+			SetOwnerSigningPubkey(key.Public()).
+			SetRawTx(rawTx).
+			SetRawRefundTx(rawRefundTx).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(tree.Network).
+			SetStatus(st.TransferStatusReceiverRefundSigned).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(key.Public()).
+			SetReceiverIdentityPubkey(receiverIdentityPubKey).
+			SetTotalValue(900).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbCtx.Client.TransferLeaf.Create().
+			SetLeaf(leaf).
+			SetTransfer(transfer).
+			SetPreviousRefundTx(createTestTxBytes(t, 2000)).
+			SetIntermediateRefundTx(intermediateRefundTx).
+			Save(ctx)
+		require.NoError(t, err)
+
+		cpfpSignature := getTxOutputSignature(t, rawTx, intermediateRefundTx, tweakedPriv)
+		err = NewTransferHandler(config).UpdateTransferLeavesSignatures(
+			ctx,
+			transfer,
+			map[string][]byte{leaf.ID.String(): cpfpSignature},
+			map[string][]byte{},
+			map[string][]byte{},
+		)
+		require.ErrorContains(t, err, "cpfp refund tx input 0 must spend parent tx output 0")
 	})
 }

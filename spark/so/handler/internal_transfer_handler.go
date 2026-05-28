@@ -776,7 +776,11 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 		if err != nil {
 			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID.String(), err)
 		}
-		updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, adaptorPublicKey, nodeTx.TxOut[0], leaf.VerifyingPubkey)
+		nodeOutPoint, nodeTxOut, err := getNodeTxOutputForRefundVerification(nodeTx, leaf.ID.String())
+		if err != nil {
+			return nil, err
+		}
+		updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, adaptorPublicKey, nodeOutPoint, nodeTxOut, leaf.VerifyingPubkey)
 		if err != nil {
 			return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID.String(), err)
 		}
@@ -785,10 +789,28 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 	return resultMap, nil
 }
 
+func getNodeTxOutputForRefundVerification(nodeTx *wire.MsgTx, nodeID string) (wire.OutPoint, *wire.TxOut, error) {
+	if len(nodeTx.TxOut) == 0 {
+		return wire.OutPoint{}, nil, fmt.Errorf("node tx of tree node %s has no outputs", nodeID)
+	}
+	return wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}, nodeTx.TxOut[0], nil
+}
+
 // ApplySignatureToTxAndVerify applies a signature to a transaction and verifies it.
 // This function can take an adaptor public key as an optional parameter to
 // validate adaptor signatures for the Swap V3 flow.
-func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKey keys.Public, outpoint *wire.TxOut, verifyingPubkey keys.Public) ([]byte, error) {
+func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKey keys.Public, expectedOutPoint wire.OutPoint, outpoint *wire.TxOut, verifyingPubkey keys.Public) ([]byte, error) {
+	refundTx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to deserialize tx: %w", err))
+	}
+	if len(refundTx.TxIn) != 1 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund tx must have exactly 1 input, got %d", len(refundTx.TxIn)))
+	}
+	if refundTx.TxIn[0].PreviousOutPoint != expectedOutPoint {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund tx input 0 spends %v, expected %v", refundTx.TxIn[0].PreviousOutPoint, expectedOutPoint))
+	}
+
 	updatedTx, err := common.UpdateTxWithSignature(rawTx, 0, signature)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to update tx signature: %w", err))
@@ -1005,6 +1027,10 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 		if err != nil {
 			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID.String(), err)
 		}
+		nodeOutPoint, nodeTxOut, err := getNodeTxOutputForRefundVerification(nodeTx, leaf.ID.String())
+		if err != nil {
+			return nil, err
+		}
 
 		refundTx, err := common.TxFromRawTxBytes(leafRefund)
 		if err != nil {
@@ -1022,10 +1048,12 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 			if err != nil {
 				return nil, fmt.Errorf("unable to deserialize signed tx for tree node %s: %w", leaf.ID.String(), err)
 			}
+			if signedTx.TxIn[0].PreviousOutPoint != nodeOutPoint {
+				return nil, fmt.Errorf("refund tx input 0 must spend node tx output 0 for tree node %s", leaf.ID.String())
+			}
 
 			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
-			nodeTxHash := nodeTx.TxHash()
-			prevOuts[wire.OutPoint{Hash: nodeTxHash, Index: 0}] = nodeTx.TxOut[0]
+			prevOuts[nodeOutPoint] = nodeTxOut
 
 			connectorOutpoint := signedTx.TxIn[1].PreviousOutPoint
 			connectorTxOut, connectorExists := connectorPrevOuts[connectorOutpoint]
@@ -1041,7 +1069,7 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 			resultMap[leafID] = updatedTx
 		} else {
 			// Single-input or no connector: use standard verification
-			updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, keys.Public{}, nodeTx.TxOut[0], leaf.VerifyingPubkey)
+			updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, keys.Public{}, nodeOutPoint, nodeTxOut, leaf.VerifyingPubkey)
 			if err != nil {
 				return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID.String(), err)
 			}

@@ -621,6 +621,10 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 		if err != nil {
 			return fmt.Errorf("unable to get node tx: %w", err)
 		}
+		nodeOutPoint, nodeTxOut, err := getNodeTxOutputForRefundVerification(nodeTx, leaf.Edges.Leaf.ID.String())
+		if err != nil {
+			return err
+		}
 
 		updatedCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateRefundTx, 0, cpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
 		if err != nil {
@@ -630,9 +634,12 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
+		if err := validateSignedRefundInputSpendsParent(updatedCpfpRefundTx, nodeTx, "cpfp"); err != nil {
+			return fmt.Errorf("invalid cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+		}
 		if len(updatedCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
-			prevOutFetcher.AddPrevOut(updatedCpfpRefundTx.TxIn[0].PreviousOutPoint, nodeTx.TxOut[0])
+			prevOutFetcher.AddPrevOut(nodeOutPoint, nodeTxOut)
 			for _, txIn := range updatedCpfpRefundTx.TxIn[1:] {
 				prevOut, ok := connectorPrevOuts[txIn.PreviousOutPoint]
 				if !ok {
@@ -642,7 +649,7 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			}
 			err = common.VerifySignatureInput(updatedCpfpRefundTx, 0, prevOutFetcher)
 		} else {
-			err = common.VerifySignatureSingleInput(updatedCpfpRefundTx, 0, nodeTx.TxOut[0])
+			err = common.VerifySignatureSingleInput(updatedCpfpRefundTx, 0, nodeTxOut)
 		}
 		if err != nil {
 			return fmt.Errorf("unable to verify leaf cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
@@ -659,9 +666,12 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			if err != nil {
 				return fmt.Errorf("unable to get direct from cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
+			if err := validateSignedRefundInputSpendsParent(updatedDirectFromCpfpRefundTx, nodeTx, "direct-from-cpfp"); err != nil {
+				return fmt.Errorf("invalid direct-from-cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+			}
 			if len(updatedDirectFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 				prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
-				prevOutFetcher.AddPrevOut(updatedDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint, nodeTx.TxOut[0])
+				prevOutFetcher.AddPrevOut(nodeOutPoint, nodeTxOut)
 				for _, txIn := range updatedDirectFromCpfpRefundTx.TxIn[1:] {
 					prevOut, ok := connectorPrevOuts[txIn.PreviousOutPoint]
 					if !ok {
@@ -671,7 +681,7 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				}
 				err = common.VerifySignatureInput(updatedDirectFromCpfpRefundTx, 0, prevOutFetcher)
 			} else {
-				err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTx.TxOut[0])
+				err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTxOut)
 			}
 			if err != nil {
 				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
@@ -687,6 +697,10 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			if err != nil {
 				return fmt.Errorf("unable to get direct node tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
+			directNodeOutPoint, directNodeTxOut, err := getNodeTxOutputForRefundVerification(directNodeTx, leaf.Edges.Leaf.ID.String())
+			if err != nil {
+				return err
+			}
 
 			updatedDirectRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectRefundTx, 0, directSignatureMap[leaf.Edges.Leaf.ID.String()])
 			if err != nil {
@@ -696,10 +710,13 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			if err != nil {
 				return fmt.Errorf("unable to get direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
+			if err := validateSignedRefundInputSpendsParent(updatedDirectRefundTx, directNodeTx, "direct"); err != nil {
+				return fmt.Errorf("invalid direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+			}
 
 			if len(updatedDirectRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 				prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
-				prevOutFetcher.AddPrevOut(updatedDirectRefundTx.TxIn[0].PreviousOutPoint, directNodeTx.TxOut[0])
+				prevOutFetcher.AddPrevOut(directNodeOutPoint, directNodeTxOut)
 				for _, txIn := range updatedDirectRefundTx.TxIn[1:] {
 					prevOut, ok := connectorPrevOuts[txIn.PreviousOutPoint]
 					if !ok {
@@ -709,7 +726,7 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				}
 				err = common.VerifySignatureInput(updatedDirectRefundTx, 0, prevOutFetcher)
 			} else {
-				err = common.VerifySignatureSingleInput(updatedDirectRefundTx, 0, directNodeTx.TxOut[0])
+				err = common.VerifySignatureSingleInput(updatedDirectRefundTx, 0, directNodeTxOut)
 			}
 			if err != nil {
 				return fmt.Errorf("unable to verify leaf signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
@@ -756,6 +773,19 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 	return nil
 }
 
+func validateSignedRefundInputSpendsParent(refundTx *wire.MsgTx, parentTx *wire.MsgTx, refundType string) error {
+	if len(refundTx.TxIn) == 0 {
+		return fmt.Errorf("%s refund tx must have at least 1 input", refundType)
+	}
+
+	expectedOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
+	if refundTx.TxIn[0].PreviousOutPoint != expectedOutPoint {
+		return fmt.Errorf("%s refund tx input 0 must spend parent tx output 0", refundType)
+	}
+
+	return nil
+}
+
 // Updates all transfer leaves associated with a transfer by applying final signatures to their intermediate refund transactions only.
 // If the signatures were adapted then cpfpAdaptorPubKey should be provided for the signature verification.
 func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx context.Context, transfer *ent.Transfer, finalSignatureMap map[string][]byte, cpfpAdaptorPubKey keys.Public) error {
@@ -776,8 +806,12 @@ func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx cont
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp node tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
+		nodeOutPoint, nodeTxOut, err := getNodeTxOutputForRefundVerification(nodeTx, leaf.Edges.Leaf.ID.String())
+		if err != nil {
+			return err
+		}
 
-		updatedTx, err := ApplySignatureToTxAndVerify(leaf.IntermediateRefundTx, finalSignatureMap[leaf.Edges.Leaf.ID.String()], cpfpAdaptorPubKey, nodeTx.TxOut[0], leaf.Edges.Leaf.VerifyingPubkey)
+		updatedTx, err := ApplySignatureToTxAndVerify(leaf.IntermediateRefundTx, finalSignatureMap[leaf.Edges.Leaf.ID.String()], cpfpAdaptorPubKey, nodeOutPoint, nodeTxOut, leaf.Edges.Leaf.VerifyingPubkey)
 		if err != nil {
 			return fmt.Errorf("unable to apply signature to tx and verify for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
