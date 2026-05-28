@@ -778,8 +778,6 @@ func main() {
 			// Inject the 2PC engine after the DB session so handlers that
 			// need consensus can pull it from ctx without constructing one.
 			sparkgrpc.ConsensusEngineInterceptor(consensusEngine),
-			// Idempotency must be after the DB session so we can store idempotency keys
-			sparkgrpc.IdempotencyInterceptor(),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),
@@ -787,6 +785,10 @@ func main() {
 				authz.WithXffClientIpPosition(config.XffClientIpPosition),
 			)).UnaryServerInterceptor,
 			sparkgrpc.ValidationInterceptor(),
+			// Idempotency must be after the DB session so it can store keys,
+			// and after authz/validation so cached responses cannot bypass
+			// internal-service allowlist checks or request-shape validation.
+			sparkgrpc.IdempotencyInterceptor(),
 		)),
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
 			sparkerrors.ErrorStreamingInterceptor(),
