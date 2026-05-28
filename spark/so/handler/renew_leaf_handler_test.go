@@ -23,6 +23,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func createValidTestTransactionBytesWithSequence(t *testing.T, sequence uint32) []byte {
@@ -195,6 +197,31 @@ func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, d
 	leaf, err := nodeCreate.Save(ctx)
 	require.NoError(t, err)
 	return leaf
+}
+
+func TestRenewLeafRejectsMalformedOrIncompleteRequests(t *testing.T) {
+	handler := NewRenewLeafHandler(sparktesting.TestConfig(t))
+
+	t.Run("malformed leaf id", func(t *testing.T) {
+		resp, err := handler.RenewLeaf(t.Context(), &pb.RenewLeafRequest{
+			LeafId: "not-a-uuid",
+		})
+		require.Nil(t, resp)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.Contains(t, err.Error(), "failed to parse leaf id")
+	})
+
+	t.Run("missing signing jobs", func(t *testing.T) {
+		ctx, _ := db.ConnectToTestPostgres(t)
+		leaf := createTestNodeForFlowHandler(t, ctx, st.TreeNodeStatusAvailable)
+
+		resp, err := handler.RenewLeaf(ctx, &pb.RenewLeafRequest{
+			LeafId: leaf.ID.String(),
+		})
+		require.Nil(t, resp)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.Contains(t, err.Error(), "request must specify a signing job")
+	})
 }
 
 func TestConstructRenewNodeTransactions(t *testing.T) {
