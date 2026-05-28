@@ -71,15 +71,26 @@ func createTestNodeForFlowHandler(t *testing.T, ctx context.Context, status st.T
 
 func TestRenewLeafFlowHandler_Prepare_RejectsNonAvailable(t *testing.T) {
 	t.Parallel()
-	ctx, _ := db.ConnectToTestPostgres(t)
 
-	node := createTestNodeForFlowHandler(t, ctx, st.TreeNodeStatusTransferLocked)
+	for _, status := range []st.TreeNodeStatus{
+		st.TreeNodeStatusTransferLocked,
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusLost,
+		st.TreeNodeStatusRenewLocked,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			node := createTestNodeForFlowHandler(t, ctx, status)
 
-	handler := NewRenewLeafFlowHandler(nil)
-	req := &pbspark.RenewLeafRequest{LeafId: node.ID.String()}
-	_, err := handler.Prepare(ctx, req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expected Available")
+			handler := NewRenewLeafFlowHandler(nil)
+			req := &pbspark.RenewLeafRequest{LeafId: node.ID.String()}
+			_, err := handler.Prepare(ctx, req)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), string(status))
+			assert.Contains(t, err.Error(), "expected Available")
+		})
+	}
 }
 
 func TestRenewLeafFlowHandler_Prepare_RejectsNilRequest(t *testing.T) {
