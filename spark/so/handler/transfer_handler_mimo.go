@@ -69,6 +69,9 @@ func (h *TransferHandler) startTransferV3Internal(
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPK); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, senderIDPK); err != nil {
+		return nil, err
+	}
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
@@ -275,6 +278,9 @@ func (h *TransferHandler) startTransferV3Consensus(
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPK); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, senderIDPK); err != nil {
 		return nil, err
 	}
 

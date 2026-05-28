@@ -43,6 +43,9 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, tokenCreateEnt.IssuerPublicKey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, tokenCreateEnt.IssuerPublicKey); err != nil {
+		return nil, err
+	}
 
 	result, err := ValidateAndApplyFreeze(ctx, h.config, req.FreezeTokensPayload, req.IssuerSignature)
 	if err != nil {

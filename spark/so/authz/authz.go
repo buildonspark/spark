@@ -36,6 +36,12 @@ type ErrorCode int
 const (
 	ErrorCodeNoSession ErrorCode = iota
 	ErrorCodeIdentityMismatch
+	// ErrorCodeWalletKillSwitched is returned when the wallet kill switch knob
+	// is set for the caller's identity public key. The on-wire response is
+	// deliberately identical to ErrorCodeIdentityMismatch so that probing
+	// callers cannot distinguish a kill-switched wallet from any other
+	// permission failure. SO logs and tests differentiate via this code.
+	ErrorCodeWalletKillSwitched
 )
 
 // ToGRPCError converts the auth error to an appropriate gRPC error
@@ -44,7 +50,7 @@ func (e *Error) ToGRPCError() error {
 	switch e.Code {
 	case ErrorCodeNoSession:
 		code = codes.Unauthenticated
-	case ErrorCodeIdentityMismatch:
+	case ErrorCodeIdentityMismatch, ErrorCodeWalletKillSwitched:
 		code = codes.PermissionDenied
 	default:
 		code = codes.Internal
@@ -55,6 +61,13 @@ func (e *Error) ToGRPCError() error {
 func (e *Error) GRPCStatus() *status.Status {
 	return status.Convert(e.ToGRPCError())
 }
+
+// identityMismatchMessage is the on-wire message returned by both
+// ErrorCodeIdentityMismatch and ErrorCodeWalletKillSwitched so that a probing
+// caller cannot distinguish the two cases. The kill-switch case is identified
+// only inside the SO (via the internal ErrorCode, the log line in killswitch.go,
+// and the blocked counter).
+const identityMismatchMessage = "session identity does not match request identity"
 
 // EnforceSessionIdentityPublicKeyMatches checks if the request's identity public key matches the current session.
 // Returns an error if authorization fails or is required but not present.
@@ -75,7 +88,7 @@ func EnforceSessionIdentityPublicKeyMatches(ctx context.Context, config Config, 
 	if !session.IdentityPublicKey().Equals(identityPublicKey) {
 		return &Error{
 			Code:    ErrorCodeIdentityMismatch,
-			Message: "session identity does not match request identity",
+			Message: identityMismatchMessage,
 		}
 	}
 

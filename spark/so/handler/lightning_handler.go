@@ -130,6 +130,13 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse user identity public key: %w", err))
 	}
+	// No session-identity check here (see comment above): LNURL/hosted callers
+	// may store on behalf of the user. Apply the wallet kill switch on the
+	// affected user identity directly so an SSP cannot store shares for a
+	// frozen wallet.
+	if err := authz.EnforceWalletNotKillSwitched(ctx, userIdentityPubKey); err != nil {
+		return err
+	}
 	_, err = tx.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
 		SetPreimageShare(req.PreimageShare.SecretShare).
@@ -269,6 +276,11 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse user identity public key: %w", err))
+	}
+	// V2 also runs without a session-identity match (LNURL/hosted providers).
+	// Apply the wallet kill switch on the affected user identity directly.
+	if err := authz.EnforceWalletNotKillSwitched(ctx, userIdentityPubKey); err != nil {
+		return err
 	}
 	err = tx.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
@@ -1594,6 +1606,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		if err = authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, ownerIdentityPubKey); err != nil {
 			return err
 		}
+		if err = authz.EnforceWalletNotKillSwitched(validateCtx, ownerIdentityPubKey); err != nil {
+			return err
+		}
 		if len(req.Transfer.LeavesToSend) == 0 {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
 		}
@@ -2614,6 +2629,11 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, identityPubKey); err != nil {
+		endSpanWithError(validateSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(validateCtx, identityPubKey); err != nil {
 		endSpanWithError(validateSpan, err)
 		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
 		return nil, err

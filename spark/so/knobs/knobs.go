@@ -66,6 +66,13 @@ const (
 	KnobGrpcServerConcurrencyExcludeIps     = "spark.so.grpc.server.concurrency_limit.exclude_ips"
 	KnobGrpcServerConcurrencyExcludePubkeys = "spark.so.grpc.server.concurrency_limit.exclude_pubkeys"
 
+	// KnobKillSwitchWallet blocks state-mutating user-facing operations for a
+	// specific wallet identity public key. Set
+	// spark.so.killswitch.wallet@<identity_pubkey_hex> = 1 to freeze that wallet.
+	// Default 0 (allowed). The check is per-SO; for a system-wide freeze set
+	// this on every SO's knob ConfigMap. Read-only RPCs are unaffected.
+	KnobKillSwitchWallet = "spark.so.killswitch.wallet"
+
 	KnobSoMaxTransactionsPerRequest             = "spark.so.max_transactions_per_request"
 	KnobSoMaxParallelFrostValidationsPerRequest = "spark.so.max_parallel_frost_validations_per_request"
 	KnobSoMaxKeysharesPerRequest                = "spark.so.max_keyshares_per_request"

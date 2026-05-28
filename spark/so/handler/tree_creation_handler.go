@@ -384,6 +384,9 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIDPubKey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqUserIDPubKey); err != nil {
+		return nil, err
+	}
 
 	var network btcnetwork.Network
 	switch reqSource := req.Source.(type) {
@@ -932,6 +935,9 @@ func (h *TreeCreationHandler) createTree(ctx context.Context, req *pb.CreateTree
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIDPubKey); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqUserIDPubKey); err != nil {
 		return nil, err
 	}
 

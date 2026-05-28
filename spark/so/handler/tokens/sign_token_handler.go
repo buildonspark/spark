@@ -57,6 +57,11 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	} else {
 		logging.GetLoggerFromContext(ctx).Sugar().Infof("authorized broadcaster bypassing sender identity check in CommitTransaction for target %s", ownerIDPubKey.ToHex())
 	}
+	// Enforce the wallet kill switch on the target identity even when a
+	// privileged broadcaster bypasses the session-identity check.
+	if err := authz.EnforceWalletNotKillSwitched(ctx, ownerIDPubKey); err != nil {
+		return nil, err
+	}
 
 	calculatedHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
 	if err != nil {

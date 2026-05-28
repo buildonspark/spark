@@ -1143,6 +1143,9 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqSenderIDPubKey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqSenderIDPubKey); err != nil {
+		return nil, err
+	}
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {

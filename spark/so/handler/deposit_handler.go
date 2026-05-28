@@ -72,12 +72,18 @@ func NewDepositHandler(config *so.Config) *DepositHandler {
 }
 
 // validateIdentity parses and validates the identity public key from a request.
+// Used by state-mutating deposit flows (FinalizeDepositTreeCreation); callers
+// must not invoke this from read-only RPCs because it also gates the wallet
+// kill switch.
 func validateIdentity(ctx context.Context, config *so.Config, identityPublicKey []byte) (keys.Public, error) {
 	reqIDPubKey, err := keys.ParsePublicKey(identityPublicKey)
 	if err != nil {
 		return keys.Public{}, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, reqIDPubKey); err != nil {
+		return keys.Public{}, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqIDPubKey); err != nil {
 		return keys.Public{}, err
 	}
 	return reqIDPubKey, nil
@@ -130,6 +136,9 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqIDPubKey); err != nil {
 		return nil, err
 	}
 	reqSigningPubKey, err := keys.ParsePublicKey(req.SigningPublicKey)
@@ -317,6 +326,9 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, idPubKey); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, idPubKey); err != nil {
 		return nil, err
 	}
 
@@ -715,6 +727,10 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 	// Get the identity public key from the session
 	idPubKey := session.IdentityPublicKey() // Returns keys.Public
 
+	if err := authz.EnforceWalletNotKillSwitched(ctx, idPubKey); err != nil {
+		return nil, err
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -888,6 +904,9 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqIDPubKey); err != nil {
 		return nil, err
 	}
 	// Get the on chain tx

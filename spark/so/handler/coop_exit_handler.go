@@ -52,6 +52,9 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransferOwnerIdentityPubKey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqTransferOwnerIdentityPubKey); err != nil {
+		return nil, err
+	}
 
 	if req.Transfer.TransferPackage != nil {
 		return h.cooperativeExitWithTransferPackage(ctx, req)

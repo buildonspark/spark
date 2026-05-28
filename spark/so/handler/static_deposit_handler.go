@@ -359,6 +359,9 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
 				return nil, fmt.Errorf("utxo swap is already completed by another user")
 			}
+			if err := authz.EnforceWalletNotKillSwitched(ctx, userIDPubKey); err != nil {
+				return nil, err
+			}
 			spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.RefundTxSigningJob.GetRawTx())
 			if err != nil {
 				return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)

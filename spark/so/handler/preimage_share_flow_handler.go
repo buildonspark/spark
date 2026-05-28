@@ -16,6 +16,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
@@ -180,6 +181,15 @@ func writePreimageShare(ctx context.Context, req *pb.StorePreimageShareV2Request
 	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse user identity public key: %w", err))
+	}
+	// No session-identity check on the V2 path either: LNURL/hosted callers
+	// may store on behalf of the user. Apply the wallet kill switch on the
+	// affected user identity directly so an SSP (or any other caller) cannot
+	// store shares for a frozen wallet on this SO. Runs on every SO during
+	// the consensus Prepare phase, so a frozen identity aborts the run on all
+	// operators rather than just the coordinator.
+	if err := authz.EnforceWalletNotKillSwitched(ctx, userIdentityPubKey); err != nil {
+		return err
 	}
 
 	err = tx.PreimageShare.Create().

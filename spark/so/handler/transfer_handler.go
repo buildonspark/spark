@@ -251,6 +251,9 @@ func (h *TransferHandler) startTransferInternal(
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIdentityPubKey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqOwnerIdentityPubKey); err != nil {
+		return nil, err
+	}
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
@@ -1780,6 +1783,9 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, senderPubkey); err != nil {
+		return nil, err
+	}
 	// Verify that the request's owner_identity_public_key matches the DB-stored sender identity.
 	// This prevents a caller from supplying a different identity key that could bypass
 	// signature verification in ValidateTransferPackage.
@@ -2893,6 +2899,9 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqOwnerIDPubKey); err != nil {
+		return err
+	}
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
@@ -3517,6 +3526,9 @@ func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransf
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 
@@ -4522,6 +4534,9 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, reqOwnerIDPubKey); err != nil {
+		return nil, err
+	}
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
@@ -5350,6 +5365,16 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 		// Acceptable status
 	default:
 		return nil
+	}
+
+	// Gate the receiver-side kill switch: this background cron completes any
+	// pending sender-initiated transfer including SSP-funded incoming ones,
+	// so a freeze applied between the initial createTransfer commit and the
+	// cron pickup must still stop the credit from landing in the frozen
+	// wallet. Sender-side is intentionally not gated — completing a debit the
+	// sender already pre-authorized is allowed even when the sender is frozen.
+	if err := authz.EnforceWalletNotKillSwitched(ctx, transfer.ReceiverIdentityPubkey); err != nil {
+		return err
 	}
 
 	switch transfer.Type {

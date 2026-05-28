@@ -143,6 +143,9 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, leaf.OwnerIdentityPubkey); err != nil {
 		return nil, err
 	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, leaf.OwnerIdentityPubkey); err != nil {
+		return nil, err
+	}
 
 	flow, err := buildCoordinatorFlow(ctx, h.config, req, leaf)
 	if err != nil {
