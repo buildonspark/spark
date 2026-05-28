@@ -1,9 +1,11 @@
 package tokens
 
 import (
+	"bytes"
 	"testing"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	"github.com/lightsparkdev/spark/so/db"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -62,4 +64,17 @@ func TestValidateQueryTokenMetadataRequestAcceptsMaxFilterValues(t *testing.T) {
 	}
 
 	require.NoError(t, validateQueryTokenMetadataRequest(req))
+}
+
+func TestQueryTokenMetadataReturnsEmptyForUnknownTokenIdentifier(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	handler := NewQueryTokenMetadataHandler(nil)
+
+	resp, err := handler.QueryTokenMetadata(ctx, &tokenpb.QueryTokenMetadataRequest{
+		TokenIdentifiers: [][]byte{bytes.Repeat([]byte{0x11}, 32)},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Empty(t, resp.TokenMetadata)
 }
