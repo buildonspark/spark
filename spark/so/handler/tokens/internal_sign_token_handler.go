@@ -1163,13 +1163,13 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalizeLoaded
 		return false, tokens.FormatErrorWithTransactionEnt("failed to load partial revocation secret shares", tokenTransaction, err)
 	}
 
-	logger := logging.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx).Sugar()
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		shares := 0
 		if output.Edges.TokenPartialRevocationSecretShares != nil {
 			shares = len(output.Edges.TokenPartialRevocationSecretShares)
 		}
-		logger.Info(fmt.Sprintf("output: %s, has %d revocation keyshares", output.ID, shares))
+		logger.Infof("output: %s, has %d revocation keyshares", output.ID, shares)
 	}
 	return h.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
 }

@@ -643,7 +643,7 @@ func main() {
 				logger.Warn("Memcached rate limiter store unavailable, falling back to in-memory", zap.Error(sErr))
 			} else {
 				rlOpts = append(rlOpts, middleware.WithStore(store))
-				logger.Info(fmt.Sprintf("Rate limiter using Memcached store. memcached_addr=%s", memcachedURI))
+				logger.Sugar().Infof("Rate limiter using Memcached store. memcached_addr=%s", memcachedURI)
 			}
 		}
 		rateLimiter, err = createRateLimiter(config, rlOpts...)

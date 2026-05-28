@@ -370,7 +370,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				// very large trees. Disabling for now as we investigate
 				Disabled: true,
 				Task: func(ctx context.Context, _ *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
+					logger := logging.GetLoggerFromContext(ctx).Sugar()
 					tx, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -404,24 +404,24 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 
 					for treeID, treeNodeIDs := range treeToTreeNodes {
-						logger.Info(fmt.Sprintf("Deleting stale tree %s along with associated tree nodes (%d in total).", treeID, len(treeNodeIDs)))
+						logger.Infof("Deleting stale tree %s along with associated tree nodes (%d in total).", treeID, len(treeNodeIDs))
 
 						numDeleted, err := tx.TreeNode.Delete().Where(treenode.IDIn(treeNodeIDs...)).Exec(ctx)
 						if err != nil {
-							logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree nodes for tree %s", treeID)
+							logger.With(zap.Error(err)).Errorf("Failed to delete tree nodes for tree %s", treeID)
 							return err
 						}
 
-						logger.Info(fmt.Sprintf("Deleted %d tree nodes.", numDeleted))
+						logger.Infof("Deleted %d tree nodes.", numDeleted)
 
 						// Delete the associated trees
 						_, err = tx.Tree.Delete().Where(tree.IDEQ(treeID)).Exec(ctx)
 						if err != nil {
-							logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree %s", treeID)
+							logger.With(zap.Error(err)).Errorf("Failed to delete tree %s", treeID)
 							return err
 						}
 
-						logger.Sugar().Infof("Deleted tree %s", treeID)
+						logger.Infof("Deleted tree %s", treeID)
 					}
 
 					return nil
