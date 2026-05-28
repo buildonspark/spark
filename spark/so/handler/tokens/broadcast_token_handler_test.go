@@ -44,6 +44,23 @@ func TestBroadcastTokenHandlerRejectsPreV3Partial(t *testing.T) {
 	)
 }
 
+func TestBroadcastTokenHandlerRejectsNilMetadata(t *testing.T) {
+	handler := NewBroadcastTokenHandler(&so.Config{})
+	ctx := knobs.InjectKnobsService(t.Context(), knobs.New(tokenTransactionV3KnobProvider{}))
+
+	resp, err := handler.BroadcastTokenTransaction(ctx, &tokenpb.BroadcastTransactionRequest{
+		PartialTokenTransaction: &tokenpb.PartialTokenTransaction{
+			Version:                  3,
+			TokenTransactionMetadata: nil,
+		},
+	})
+
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.Contains(t, err.Error(), "token transaction metadata cannot be nil")
+}
+
 func phase2KnobsWithBroadcastAllowedFor(hexKey string) knobs.Knobs {
 	return knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobTokenTransactionV3Enabled:                                  100,
