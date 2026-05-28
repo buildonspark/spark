@@ -160,6 +160,17 @@ func TestQuerySparkInvoicesRejectsNilRequest(t *testing.T) {
 	require.ErrorContains(t, err, "request is required")
 }
 
+func TestQuerySparkInvoicesRejectsMalformedInvoiceString(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	handler := NewSparkInvoiceHandler(config)
+
+	_, err := handler.QuerySparkInvoices(t.Context(), &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{"spark:invalid-invoice"},
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid invoice")
+}
+
 func TestQuerySparkInvoicesReturnsNotFoundForStoredInvoiceWithoutPaymentEdge(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, tc := db.ConnectToTestPostgres(t)
