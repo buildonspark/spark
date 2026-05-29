@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"io"
 	"math/rand/v2"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -197,6 +199,25 @@ func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, d
 	leaf, err := nodeCreate.Save(ctx)
 	require.NoError(t, err)
 	return leaf
+}
+
+func TestRenewLeafRejectsSessionMismatchBeforeConsensus(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	leaf := createTestNodeForFlowHandler(t, ctx, st.TreeNodeStatusAvailable)
+	sessionIdentity := keys.GeneratePrivateKey().Public()
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionIdentity.Serialize()), 9999999999)
+
+	cfg := sparktesting.TestConfig(t)
+	cfg.AuthzEnforced = true
+	handler := NewRenewLeafHandler(cfg)
+
+	resp, err := handler.RenewLeaf(ctx, &pb.RenewLeafRequest{
+		LeafId: leaf.ID.String(),
+	})
+
+	require.Nil(t, resp)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
 }
 
 func TestRenewLeafRejectsMalformedOrIncompleteRequests(t *testing.T) {
