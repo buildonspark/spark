@@ -2021,15 +2021,9 @@ func parseAndValidateCoopExitTxid(ctx context.Context, transferID string, exitTx
 // The chain watcher accepts ExitTxid in either internal (little-endian) or
 // display (big-endian) byte order, so this validator mirrors that tolerance.
 func validateConnectorTxBindsToExitTxid(connectorTxBytes []byte, exitTxid st.TxID) error {
-	if len(connectorTxBytes) == 0 {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation"))
-	}
-	connectorTx, err := common.TxFromRawTxBytes(connectorTxBytes)
+	connectorTx, err := parseCanonicalConnectorTx(connectorTxBytes)
 	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse connector tx: %w", err))
-	}
-	if len(connectorTx.TxIn) == 0 {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector_tx has no inputs"))
+		return err
 	}
 
 	parent := connectorTx.TxIn[0].PreviousOutPoint.Hash
@@ -2046,14 +2040,52 @@ func validateConnectorTxBindsToExitTxid(connectorTxBytes []byte, exitTxid st.TxI
 	return nil
 }
 
+func parseCanonicalConnectorTx(connectorTxBytes []byte) (*wire.MsgTx, error) {
+	if len(connectorTxBytes) == 0 {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation"))
+	}
+	connectorTx, err := common.TxFromRawTxBytes(connectorTxBytes)
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse connector transaction: %w", err))
+	}
+	if err := validateConnectorTxCanonicalShape(connectorTx); err != nil {
+		return nil, err
+	}
+	return connectorTx, nil
+}
+
+func validateConnectorTxCanonicalShape(connectorTx *wire.MsgTx) error {
+	if connectorTx == nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector transaction is required"))
+	}
+	if connectorTx.Version != 3 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector transaction must use version 3, got %d", connectorTx.Version))
+	}
+	if len(connectorTx.TxIn) != 1 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector transaction must have exactly 1 input, got %d", len(connectorTx.TxIn)))
+	}
+	for inputIndex, txIn := range connectorTx.TxIn {
+		if txIn == nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector transaction input %d is required", inputIndex))
+		}
+		if len(txIn.SignatureScript) != 0 {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector transaction input %d must not include signature script", inputIndex))
+		}
+		if len(txIn.Witness) != 0 {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("connector transaction input %d must not include witness", inputIndex))
+		}
+	}
+	return nil
+}
+
 func parseConnectorTxOutputs(connectorTx []byte) (map[wire.OutPoint]*wire.TxOut, error) {
 	if len(connectorTx) == 0 {
 		return nil, nil
 	}
 
-	tx, err := common.TxFromRawTxBytes(connectorTx)
+	tx, err := parseCanonicalConnectorTx(connectorTx)
 	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse connector transaction: %w", err))
+		return nil, err
 	}
 
 	connectorTxHash := tx.TxHash()
@@ -2069,6 +2101,145 @@ func parseConnectorTxOutputs(connectorTx []byte) (map[wire.OutPoint]*wire.TxOut,
 	return prevOuts, nil
 }
 
+func validateRefundInputCountForConnector(refundTx *wire.MsgTx, connectorPrevOuts map[wire.OutPoint]*wire.TxOut, refundType string) error {
+	inputCount := len(refundTx.TxIn)
+	if inputCount == 0 {
+		return fmt.Errorf("%s refund tx must have at least 1 input", refundType)
+	}
+
+	if connectorPrevOuts != nil {
+		if inputCount != 2 {
+			return fmt.Errorf("%s refund tx must have exactly 2 inputs when connector tx is provided, got %d", refundType, inputCount)
+		}
+		return nil
+	}
+
+	if inputCount == 1 {
+		return nil
+	}
+	if inputCount == 2 {
+		return fmt.Errorf("%s refund tx has 2 inputs but no connector tx was provided", refundType)
+	}
+	return fmt.Errorf("%s refund tx has %d inputs; refund transactions support at most 2 inputs", refundType, inputCount)
+}
+
+func parseConnectorRefundTx(refundTxBytes []byte, connectorPrevOuts map[wire.OutPoint]*wire.TxOut, refundType string) (*wire.MsgTx, wire.OutPoint, error) {
+	if len(refundTxBytes) == 0 {
+		return nil, wire.OutPoint{}, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("%s refund transaction is empty", refundType))
+	}
+
+	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+	if err != nil {
+		return nil, wire.OutPoint{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse %s refund transaction: %w", refundType, err))
+	}
+	if err := validateRefundInputCountForConnector(refundTx, connectorPrevOuts, refundType); err != nil {
+		return nil, wire.OutPoint{}, sparkerrors.InvalidArgumentMalformedField(err)
+	}
+
+	if connectorPrevOuts == nil {
+		return refundTx, wire.OutPoint{}, nil
+	}
+
+	connectorOutpoint := refundTx.TxIn[1].PreviousOutPoint
+	if _, exists := connectorPrevOuts[connectorOutpoint]; !exists {
+		return nil, wire.OutPoint{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s refund tx input 1 does not reference a valid connector output: %v", refundType, connectorOutpoint))
+	}
+	return refundTx, connectorOutpoint, nil
+}
+
+func validateCoopExitConnectorLayout(
+	connectorPrevOuts map[wire.OutPoint]*wire.TxOut,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+) error {
+	if connectorPrevOuts == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit validation"))
+	}
+
+	expectedConnectorOutputs := len(leafCpfpRefundMap) + 1 // One connector output per leaf, plus one fee-bump output.
+	if len(connectorPrevOuts) != expectedConnectorOutputs {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+			"connector transaction must have exactly one output per leaf plus one fee-bump output, got %d outputs for %d leaves",
+			len(connectorPrevOuts),
+			len(leafCpfpRefundMap),
+		))
+	}
+
+	usedConnectorOutpoints := make(map[wire.OutPoint]string, len(leafCpfpRefundMap))
+	for leafID, cpfpRefundTx := range leafCpfpRefundMap {
+		_, cpfpConnectorOutpoint, err := parseConnectorRefundTx(cpfpRefundTx, connectorPrevOuts, "cpfp")
+		if err != nil {
+			return fmt.Errorf("leaf %s CPFP refund validation failed: %w", leafID, err)
+		}
+		if otherLeafID, exists := usedConnectorOutpoints[cpfpConnectorOutpoint]; exists {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+				"connector output %s is used by multiple leaves: %s and %s",
+				cpfpConnectorOutpoint.String(),
+				otherLeafID,
+				leafID,
+			))
+		}
+		if cpfpConnectorOutpoint.Index >= uint32(len(leafCpfpRefundMap)) {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+				"leaf %s refund transactions spend connector output index %d, but only indexes 0 through %d are leaf connector outputs",
+				leafID,
+				cpfpConnectorOutpoint.Index,
+				len(leafCpfpRefundMap)-1,
+			))
+		}
+		usedConnectorOutpoints[cpfpConnectorOutpoint] = leafID
+
+		directFromCpfpRefundTx, exists := leafDirectFromCpfpRefundMap[leafID]
+		if !exists || len(directFromCpfpRefundTx) == 0 {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("direct-from-CPFP refund tx is required for leaf %s", leafID))
+		}
+		_, directFromCpfpConnectorOutpoint, err := parseConnectorRefundTx(directFromCpfpRefundTx, connectorPrevOuts, "direct-from-cpfp")
+		if err != nil {
+			return fmt.Errorf("leaf %s direct-from-CPFP refund validation failed: %w", leafID, err)
+		}
+		if directFromCpfpConnectorOutpoint != cpfpConnectorOutpoint {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+				"leaf %s refund transactions must spend the same connector output; CPFP spends %s, direct-from-CPFP spends %s",
+				leafID,
+				cpfpConnectorOutpoint.String(),
+				directFromCpfpConnectorOutpoint.String(),
+			))
+		}
+
+		directRefundTx := leafDirectRefundMap[leafID]
+		if len(directRefundTx) == 0 {
+			continue
+		}
+		_, directConnectorOutpoint, err := parseConnectorRefundTx(directRefundTx, connectorPrevOuts, "direct")
+		if err != nil {
+			return fmt.Errorf("leaf %s direct refund validation failed: %w", leafID, err)
+		}
+		if directConnectorOutpoint != cpfpConnectorOutpoint {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+				"leaf %s refund transactions must spend the same connector output; CPFP spends %s, direct spends %s",
+				leafID,
+				cpfpConnectorOutpoint.String(),
+				directConnectorOutpoint.String(),
+			))
+		}
+	}
+	return nil
+}
+
+func refundTypeName(txType bitcointransaction.TxType) string {
+	switch txType {
+	case bitcointransaction.TxTypeRefundCPFP:
+		return "cpfp"
+	case bitcointransaction.TxTypeRefundDirect:
+		return "direct"
+	case bitcointransaction.TxTypeRefundDirectFromCPFP:
+		return "direct-from-cpfp"
+	default:
+		return "refund"
+	}
+}
+
 func validateRefundTxWithConnector(
 	ctx context.Context,
 	refundTxBytes []byte,
@@ -2078,25 +2249,9 @@ func validateRefundTxWithConnector(
 	refundDestPubkey keys.Public,
 	networkString string,
 ) error {
-	if len(refundTxBytes) == 0 {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("refund transaction is empty"))
-	}
-
-	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+	refundTx, _, err := parseConnectorRefundTx(refundTxBytes, connectorPrevOuts, refundTypeName(txType))
 	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse refund transaction: %w", err))
-	}
-
-	// Verify transaction has exactly 2 inputs
-	if len(refundTx.TxIn) != 2 {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected 2 inputs in refund tx, got %d", len(refundTx.TxIn)))
-	}
-
-	// Verify input 1 references a connector output
-	connectorOutpoint := refundTx.TxIn[1].PreviousOutPoint
-	_, exists := connectorPrevOuts[connectorOutpoint]
-	if !exists {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("refund tx input 1 does not reference a valid connector output: %v", connectorOutpoint))
+		return err
 	}
 
 	// Build the node tx prevout for input 0
@@ -2301,6 +2456,11 @@ func validateTransactionCooperativeExitLeavesToSend(
 		return fmt.Errorf("failed to parse connector transaction: %w", err)
 	}
 	useMultiInputValidation := connectorPrevOuts != nil
+	if useMultiInputValidation {
+		if err := validateCoopExitConnectorLayout(connectorPrevOuts, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap); err != nil {
+			return err
+		}
+	}
 
 	networkString := ""
 

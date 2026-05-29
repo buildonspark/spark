@@ -129,7 +129,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
     const feeBumpAddr = connectorP2trAddrs[connectorP2trAddrs.length - 1];
     connectorP2trAddrs = connectorP2trAddrs.slice(0, -1);
 
-    const connectorTx = new Transaction();
+    const connectorTx = new Transaction({ version: 3 });
     connectorTx.addInput(intermediateOutPoint);
     for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
       connectorTx.addOutput({
@@ -364,7 +364,7 @@ async function buildMaliciousCoopExitResponse({
     );
   }
 
-  const connectorTx = new Transaction();
+  const connectorTx = new Transaction({ version: 3 });
   connectorTx.addInput(intermediateOutPoint);
   for (const addr of connectorP2trAddrs) {
     connectorTx.addOutput({

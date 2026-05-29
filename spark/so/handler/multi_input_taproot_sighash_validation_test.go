@@ -121,7 +121,7 @@ func TestValidateRefundTxWithConnector_ValidatesMultiInputStructure(t *testing.T
 		)
 		if err != nil {
 			require.NotContains(t, err.Error(), "does not reference a valid connector output")
-			require.NotContains(t, err.Error(), "expected 2 inputs")
+			require.NotContains(t, err.Error(), "exactly 2 inputs")
 			require.NotContains(t, err.Error(), "does not reference the node tx")
 		}
 	})
@@ -176,7 +176,7 @@ func TestValidateRefundTxWithConnector_ValidatesMultiInputStructure(t *testing.T
 			btcnetwork.Regtest.String(),
 		)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "expected 2 inputs")
+		require.Contains(t, err.Error(), "exactly 2 inputs")
 	})
 
 	t.Run("rejects refund tx with wrong node reference", func(t *testing.T) {
@@ -474,6 +474,7 @@ func TestValidateTransactionCooperativeExitLeavesToSend_UsesConnectorValidation(
 	connectorTx := wire.NewMsgTx(3)
 	connectorTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, nil, nil))
 	connectorTx.AddTxOut(wire.NewTxOut(200_000, connectorPkScript))
+	connectorTx.AddTxOut(wire.NewTxOut(1_000, connectorPkScript))
 	connectorTxBytes, err := common.SerializeTx(connectorTx)
 	require.NoError(t, err)
 	connectorTxHash := connectorTx.TxHash()
@@ -562,7 +563,7 @@ func TestValidateTransactionCooperativeExitLeavesToSend_UsesConnectorValidation(
 			nodesByID,
 			badLeafCpfpRefundMap,
 			nil, // directRefundMap
-			nil, // directFromCpfpRefundMap
+			map[string][]byte{node.ID.String(): cpfpRefundTxBytes},
 			receiverPriv.Public(),
 			connectorTxBytes,
 		)
@@ -576,7 +577,7 @@ func TestValidateTransactionCooperativeExitLeavesToSend_UsesConnectorValidation(
 			nodesByID,
 			leafCpfpRefundMap,
 			nil, // directRefundMap
-			nil, // directFromCpfpRefundMap
+			map[string][]byte{node.ID.String(): cpfpRefundTxBytes},
 			receiverPriv.Public(),
 			connectorTxBytes,
 		)

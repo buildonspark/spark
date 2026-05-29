@@ -1036,6 +1036,9 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse refund tx for tree node %s: %w", leaf.ID.String(), err)
 		}
+		if err := validateRefundInputCountForConnector(refundTx, connectorPrevOuts, "coop-exit"); err != nil {
+			return nil, fmt.Errorf("invalid refund tx for tree node %s: %w", leaf.ID.String(), err)
+		}
 
 		if len(refundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			// Multi-input refund tx with connector: apply signature and verify with multi-input

@@ -235,6 +235,7 @@ func makeConnectorTx(t *testing.T) *testConnector {
 	connectorTx := wire.NewMsgTx(3)
 	connectorTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, nil, nil))
 	connectorTx.AddTxOut(wire.NewTxOut(200_000, connectorPkScript))
+	connectorTx.AddTxOut(wire.NewTxOut(1_000, connectorPkScript))
 
 	return &testConnector{
 		raw:    serializeTx(t, connectorTx),
@@ -977,7 +978,7 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidDirectRefund_Error(t *testing.T)
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
-	require.ErrorContains(t, err, "failed to parse refund transaction")
+	require.ErrorContains(t, err, "failed to parse direct refund transaction")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
@@ -1000,7 +1001,7 @@ func TestValidateUserTxs_CoopExit_Legacy_InvalidClientCpfp_Error(t *testing.T) {
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
-	require.ErrorContains(t, err, "failed to parse refund transaction")
+	require.ErrorContains(t, err, "failed to parse cpfp refund transaction")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.T) {
@@ -1023,7 +1024,7 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingDirectFromCpfp_Error(t *testing.
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
-	require.ErrorContains(t, err, "refund transaction is empty")
+	require.ErrorContains(t, err, "direct-from-CPFP refund tx is required")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.T) {
@@ -1047,7 +1048,7 @@ func TestValidateUserTxs_CoopExit_Legacy_MissingConnectorInput_Error(t *testing.
 
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
-	require.ErrorContains(t, err, "expected 2 inputs in refund tx, got 1")
+	require.ErrorContains(t, err, "cpfp refund tx must have exactly 2 inputs when connector tx is provided, got 1")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
@@ -1077,7 +1078,7 @@ func TestValidateUserTxs_CoopExit_Legacy_ExceedInput_Error(t *testing.T) {
 
 	h := handlerWithConfig()
 	err = validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeCooperativeExit, connector.raw)
-	require.ErrorContains(t, err, "expected 2 inputs in refund tx, got 3")
+	require.ErrorContains(t, err, "cpfp refund tx must have exactly 2 inputs when connector tx is provided, got 3")
 }
 
 func TestValidateUserTxs_CoopExit_Legacy_WrongNodeInput_Error(t *testing.T) {

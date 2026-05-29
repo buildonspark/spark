@@ -20,7 +20,7 @@ import (
 
 func buildConnectorTxSpending(t *testing.T, parent chainhash.Hash) []byte {
 	t.Helper()
-	tx := wire.NewMsgTx(2)
+	tx := wire.NewMsgTx(3)
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parent, Index: 1},
 	})
@@ -87,7 +87,7 @@ func TestValidateConnectorTxBindsToExitTxid_RejectsEmptyConnectorTx(t *testing.T
 }
 
 func TestValidateConnectorTxBindsToExitTxid_RejectsConnectorTxWithNoInputs(t *testing.T) {
-	tx := wire.NewMsgTx(2)
+	tx := wire.NewMsgTx(3)
 	tx.AddTxOut(&wire.TxOut{Value: 354, PkScript: []byte{0x51}})
 	raw, err := common.SerializeTx(tx)
 	require.NoError(t, err)
@@ -101,4 +101,64 @@ func TestValidateConnectorTxBindsToExitTxid_RejectsConnectorTxWithNoInputs(t *te
 
 	err = validateConnectorTxBindsToExitTxid(raw, exitTxid)
 	require.Error(t, err)
+}
+
+func TestValidateConnectorTxBindsToExitTxid_RejectsNonCanonicalConnectorTx(t *testing.T) {
+	var parent chainhash.Hash
+	for i := range parent {
+		parent[i] = byte(i + 1)
+	}
+	exitTxid, err := st.NewTxIDFromBytes(parent[:])
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		mutate      func(*wire.MsgTx)
+		errContains string
+	}{
+		{
+			name: "wrong version",
+			mutate: func(tx *wire.MsgTx) {
+				tx.Version = 2
+			},
+			errContains: "connector transaction must use version 3",
+		},
+		{
+			name: "extra input",
+			mutate: func(tx *wire.MsgTx) {
+				tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(&chainhash.Hash{}, 0), nil, nil))
+			},
+			errContains: "connector transaction must have exactly 1 input",
+		},
+		{
+			name: "signature script",
+			mutate: func(tx *wire.MsgTx) {
+				tx.TxIn[0].SignatureScript = []byte{0x51}
+			},
+			errContains: "must not include signature script",
+		},
+		{
+			name: "witness",
+			mutate: func(tx *wire.MsgTx) {
+				tx.TxIn[0].Witness = wire.TxWitness{[]byte{0x51}}
+			},
+			errContains: "must not include witness",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tx := wire.NewMsgTx(3)
+			tx.AddTxIn(&wire.TxIn{
+				PreviousOutPoint: wire.OutPoint{Hash: parent, Index: 1},
+			})
+			tx.AddTxOut(&wire.TxOut{Value: 354, PkScript: []byte{0x51}})
+			test.mutate(tx)
+			raw, err := common.SerializeTx(tx)
+			require.NoError(t, err)
+
+			err = validateConnectorTxBindsToExitTxid(raw, exitTxid)
+			require.ErrorContains(t, err, test.errContains)
+		})
+	}
 }

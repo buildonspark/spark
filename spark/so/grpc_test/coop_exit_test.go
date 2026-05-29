@@ -242,8 +242,8 @@ func TestCoopExit_RejectsMismatchedExitTxid(t *testing.T) {
 	for i := range legitParent {
 		legitParent[i] = byte(i + 1)
 	}
-	connectorTx := wire.NewMsgTx(2)
-	connectorTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: legitParent, Index: 0}})
+	connectorTx := wire.NewMsgTx(3)
+	connectorTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: legitParent, Index: 1}})
 	connectorTx.AddTxOut(&wire.TxOut{Value: 354, PkScript: []byte{0x51}})
 	connectorTxBytes, err := common.SerializeTx(connectorTx)
 	require.NoError(t, err)

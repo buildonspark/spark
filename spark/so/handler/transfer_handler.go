@@ -637,6 +637,9 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 		if err := validateSignedRefundInputSpendsParent(updatedCpfpRefundTx, nodeTx, "cpfp"); err != nil {
 			return fmt.Errorf("invalid cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
+		if err := validateRefundInputCountForConnector(updatedCpfpRefundTx, connectorPrevOuts, "cpfp"); err != nil {
+			return fmt.Errorf("invalid cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+		}
 		if len(updatedCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
 			prevOutFetcher.AddPrevOut(nodeOutPoint, nodeTxOut)
@@ -667,6 +670,9 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				return fmt.Errorf("unable to get direct from cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 			if err := validateSignedRefundInputSpendsParent(updatedDirectFromCpfpRefundTx, nodeTx, "direct-from-cpfp"); err != nil {
+				return fmt.Errorf("invalid direct-from-cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+			}
+			if err := validateRefundInputCountForConnector(updatedDirectFromCpfpRefundTx, connectorPrevOuts, "direct-from-cpfp"); err != nil {
 				return fmt.Errorf("invalid direct-from-cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 			if len(updatedDirectFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
@@ -711,6 +717,9 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				return fmt.Errorf("unable to get direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 			if err := validateSignedRefundInputSpendsParent(updatedDirectRefundTx, directNodeTx, "direct"); err != nil {
+				return fmt.Errorf("invalid direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+			}
+			if err := validateRefundInputCountForConnector(updatedDirectRefundTx, connectorPrevOuts, "direct"); err != nil {
 				return fmt.Errorf("invalid direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 
@@ -1145,6 +1154,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		if len(cpfpLeafTx.TxOut) == 0 {
 			return nil, fmt.Errorf("cpfp vout out of bounds")
 		}
+		if err := validateRefundInputCountForConnector(cpfpRefundTx, connectorPrevOuts, "cpfp"); err != nil {
+			return nil, err
+		}
 
 		var cpfpRefundTxSigHash []byte
 		if len(cpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
@@ -1165,7 +1177,6 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		} else {
 			// Single-input sighash (legacy flow):
 			// - Single-input refund tx
-			// - OR multi-input refund tx without connector tx (backwards compatibility)
 			cpfpRefundTxSigHash, err = common.SigHashFromTx(cpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
 		}
 		if err != nil {
@@ -1208,6 +1219,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if len(directLeafTx.TxOut) == 0 {
 				return nil, fmt.Errorf("direct vout out of bounds")
 			}
+			if err := validateRefundInputCountForConnector(directRefundTx, connectorPrevOuts, "direct"); err != nil {
+				return nil, err
+			}
 			var directRefundTxSigHash []byte
 			if len(directRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 				// Multi-input refund tx with connector tx provided (new coop exit flow)
@@ -1227,7 +1241,6 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			} else {
 				// Single-input sighash (legacy flow):
 				// - Single-input refund tx
-				// - OR multi-input refund tx without connector tx (backwards compatibility)
 				directRefundTxSigHash, err = common.SigHashFromTx(directRefundTx, 0, directLeafTx.TxOut[0])
 			}
 			if err != nil {
@@ -1259,6 +1272,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err != nil {
 				return nil, fmt.Errorf("unable to load new refund tx: %w", err)
 			}
+			if err := validateRefundInputCountForConnector(directFromCpfpRefundTx, connectorPrevOuts, "direct-from-cpfp"); err != nil {
+				return nil, err
+			}
 			var directFromCpfpRefundTxSigHash []byte
 			if len(directFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 				// Multi-input refund tx with connector tx provided (new coop exit flow)
@@ -1278,7 +1294,6 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			} else {
 				// Single-input sighash (legacy flow):
 				// - Single-input refund tx
-				// - OR multi-input refund tx without connector tx (backwards compatibility)
 				directFromCpfpRefundTxSigHash, err = common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
 			}
 			if err != nil {
@@ -1422,6 +1437,9 @@ func SignRefundsWithPregeneratedNonce(
 		if len(leafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
+		if err := validateRefundInputCountForConnector(refundTx, connectorPrevOuts, "cpfp"); err != nil {
+			return nil, nil, nil, err
+		}
 
 		var refundTxSigHash []byte
 		if len(refundTx.TxIn) > 1 && connectorPrevOuts != nil {
@@ -1509,6 +1527,9 @@ func SignRefundsWithPregeneratedNonce(
 		if len(directTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
 		}
+		if err := validateRefundInputCountForConnector(directRefundTx, connectorPrevOuts, "direct"); err != nil {
+			return nil, nil, nil, err
+		}
 		var directRefundTxSigHash []byte
 		if len(directRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			directTxHash := directTx.TxHash()
@@ -1585,6 +1606,9 @@ func SignRefundsWithPregeneratedNonce(
 		}
 		if len(directFromCpfpLeafTx.TxOut) == 0 {
 			return nil, nil, nil, fmt.Errorf("vout out of bounds")
+		}
+		if err := validateRefundInputCountForConnector(directFromCpfpRefundTx, connectorPrevOuts, "direct-from-cpfp"); err != nil {
+			return nil, nil, nil, err
 		}
 
 		var directFromCpfpRefundTxSigHash []byte
