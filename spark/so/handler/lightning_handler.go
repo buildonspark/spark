@@ -2038,6 +2038,19 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		return nil, recoverErr
 	}
 
+	// Persist the recovered preimage before settling sender key tweaks. The
+	// sender key-tweak commit guard requires the PREIMAGE_SHARED state to be
+	// backed by the actual preimage, and at this point the recovered preimage
+	// has already been verified against the payment hash.
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database context for preimage update: %w", err)
+	}
+	_, err = db.PreimageRequest.UpdateOneID(preimageRequest.ID).SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
+	}
+
 	phaseStart = time.Now()
 	gossipCtx, gossipSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.sendGossip", spanOpt)
 	gossipErr := h.sendPreimageSwapGossipMessage(gossipCtx, secretBytes, req.PaymentHash, transfer, req.TransferRequest != nil)
@@ -2057,17 +2070,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer %s: %w", transfer.ID, err)
 		}
-	}
-
-	// Use context-based update since preimageRequest's internal client is from
-	// the committed transaction.
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get database context for preimage update: %w", err)
-	}
-	_, err = db.PreimageRequest.UpdateOneID(preimageRequest.ID).SetPreimage(secretBytes).SetStatus(st.PreimageRequestStatusPreimageShared).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	// Save partner attribution after all critical work succeeds.

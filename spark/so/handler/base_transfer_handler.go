@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	dbSql "database/sql"
 	"errors"
 	"fmt"
@@ -2584,6 +2585,17 @@ func (h *BaseTransferHandler) validateSenderKeyTweakCommitPreconditions(ctx cont
 	if preimageRequest.Status != st.PreimageRequestStatusPreimageShared {
 		return sparkerrors.FailedPreconditionInvalidState(
 			fmt.Errorf("cannot commit preimage swap sender key tweaks: preimage has not been shared for transfer %s (status: %s)", transfer.ID, preimageRequest.Status),
+		)
+	}
+	if len(preimageRequest.Preimage) != sha256.Size {
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("cannot commit preimage swap sender key tweaks: preimage request %s is marked shared but does not have a stored %d-byte preimage", preimageRequest.ID, sha256.Size),
+		)
+	}
+	paymentHash := sha256.Sum256(preimageRequest.Preimage)
+	if !bytes.Equal(paymentHash[:], preimageRequest.PaymentHash) {
+		return sparkerrors.FailedPreconditionInvalidState(
+			fmt.Errorf("cannot commit preimage swap sender key tweaks: preimage request %s is marked shared but stored preimage does not match payment hash", preimageRequest.ID),
 		)
 	}
 	return nil
