@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -38,6 +39,86 @@ func TestValidateLeafRefundTxInputRejectsZeroTimelock(t *testing.T) {
 
 	err := validateLeafRefundTxInput(refundTx, spark.TimeLockInterval, &expectedOutPoint, 1)
 	require.ErrorContains(t, err, "time lock on the new refund tx must be greater than 0")
+}
+
+func TestLeafAvailableToTransferRejectsLeafOwnedByDifferentIdentity(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobReadMIMODataModelTransferSend: 100,
+	}))
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	legacySenderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+	leafOwnerPub := keys.GeneratePrivateKey().Public()
+
+	transfer, err := client.Transfer.Create().
+		SetSenderIdentityPubkey(legacySenderPub).
+		SetReceiverIdentityPubkey(receiverPub).
+		SetStatus(st.TransferStatusSenderInitiated).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetType(st.TransferTypeCooperativeExit).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = client.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(senderPub).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+	transfer, err = client.Transfer.Query().
+		Where(enttransfer.IDEQ(transfer.ID)).
+		WithTransferSenders().
+		Only(ctx)
+	require.NoError(t, err)
+
+	tree, err := client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(leafOwnerPub).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	secret := keys.GeneratePrivateKey()
+	keyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"key": secret.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leafSigningPub := keys.GeneratePrivateKey().Public()
+	leaf, err := client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetSigningKeyshare(keyshare).
+		SetValue(1000).
+		SetVerifyingPubkey(keys.GeneratePrivateKey().Public()).
+		SetOwnerIdentityPubkey(leafOwnerPub).
+		SetOwnerSigningPubkey(leafSigningPub).
+		SetRawTx(createOldBitcoinTxBytes(t, leafSigningPub)).
+		SetRawRefundTx(createOldBitcoinTxBytes(t, leafSigningPub)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewBaseTransferHandler(sparktesting.TestConfig(t))
+	err = handler.LeafAvailableToTransfer(ctx, leaf, transfer)
+	require.ErrorContains(t, err, "is not owned by sender")
+
+	leaf, err = leaf.Update().SetOwnerIdentityPubkey(senderPub).Save(ctx)
+	require.NoError(t, err)
+	require.NoError(t, handler.LeafAvailableToTransfer(ctx, leaf, transfer))
 }
 
 func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *testing.T) {
