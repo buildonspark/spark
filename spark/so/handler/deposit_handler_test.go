@@ -621,6 +621,69 @@ func TestGenerateDepositAddress(t *testing.T) {
 	})
 }
 
+func TestGenerateDepositAddressRejectsMalformedKeysAndIdentityMismatch(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{7})
+
+	cfg := sparktesting.TestConfig(t)
+	cfg.AuthzEnforced = true
+	handler := NewDepositHandler(cfg)
+
+	sessionIdentity := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	validSigningKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionIdentity.Serialize()), 9999999999)
+
+	baseReq := func() *pb.GenerateDepositAddressRequest {
+		return &pb.GenerateDepositAddressRequest{
+			SigningPublicKey:  validSigningKey.Serialize(),
+			IdentityPublicKey: sessionIdentity.Serialize(),
+			Network:           pb.Network_REGTEST,
+		}
+	}
+
+	invalidKeys := []struct {
+		name string
+		key  []byte
+	}{
+		{name: "nil", key: nil},
+		{name: "empty", key: []byte{}},
+		{name: "too_short", key: make([]byte, 32)},
+		{name: "too_long", key: make([]byte, 34)},
+		{name: "invalid_compressed", key: append([]byte{0x02}, make([]byte, 32)...)},
+	}
+
+	for _, tc := range invalidKeys {
+		t.Run("identity_"+tc.name, func(t *testing.T) {
+			req := baseReq()
+			req.IdentityPublicKey = tc.key
+
+			_, err := handler.GenerateDepositAddress(ctx, cfg, req)
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.Contains(t, err.Error(), "invalid identity public key")
+		})
+
+		t.Run("signing_"+tc.name, func(t *testing.T) {
+			req := baseReq()
+			req.SigningPublicKey = tc.key
+
+			_, err := handler.GenerateDepositAddress(ctx, cfg, req)
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.Contains(t, err.Error(), "invalid signing public key")
+		})
+	}
+
+	t.Run("request identity must match session", func(t *testing.T) {
+		req := baseReq()
+		req.IdentityPublicKey = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+
+		_, err := handler.GenerateDepositAddress(ctx, cfg, req)
+		require.Error(t, err)
+		require.Equal(t, codes.PermissionDenied, status.Code(err))
+	})
+}
+
 func TestGenerateDepositAddressBlocksUnusedAddress(t *testing.T) {
 	config := &so.Config{
 		SupportedNetworks: []btcnetwork.Network{
