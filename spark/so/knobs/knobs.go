@@ -178,7 +178,32 @@ const (
 	// stranded while participants reconcile to RETURNED.
 	KnobUseConsensusTransfer = "spark.so.use_consensus_transfer"
 	KnobUseConsensusClaim    = "spark.so.use_consensus_claim"
-	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
+	// KnobUseConsensusProvidePreimage routes LightningHandler.ProvidePreimage
+	// through the 2PC engine instead of the legacy fanout-RPC + SettleSenderKeyTweak
+	// gossip path. Interpreted as binary (any non-zero value enables) — not a
+	// percentage rollout.
+	//
+	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
+	// ProvidePreimage entry point enforces this at request time and rejects
+	// requests if the reconciler is off. Without the reconciler, a coordinator
+	// crash between engine DbCommit and commit-gossip dispatch leaves
+	// participant FlowExecution rows IN_FLIGHT indefinitely.
+	//
+	// Behavior diff vs legacy: under 2PC the coordinator's
+	// commitSenderKeyTweaks runs deterministically in BuildCommitPayload
+	// (mirroring CONSENSUS_OPERATION_TYPE_SEND_TRANSFER's pattern). The
+	// legacy path relies on the gossip-loopback in postSendingGossipMessage
+	// firing on the coordinator after all participants ACK, which strands
+	// the coordinator at SenderKeyTweakPending if any participant's gossip
+	// never delivers. The 2PC path is a strictly stronger guarantee.
+	//
+	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback
+	// for PROVIDE_PREIMAGE on the coordinator. Today the sweep only flips
+	// the FlowExecution row to ROLLED_BACK. Rollback for this flow is a
+	// no-op (preimage storage is intentionally irreversible; CommitSenderKeyTweaks
+	// only fires in Commit), so the sweep gap is benign here.
+	KnobUseConsensusProvidePreimage = "spark.so.use_consensus_provide_preimage"
+	KnobShutdownHodlInvoices        = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"

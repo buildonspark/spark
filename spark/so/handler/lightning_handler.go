@@ -54,6 +54,8 @@ import (
 	"github.com/lightsparkdev/spark/so/partner"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -2614,9 +2616,30 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
+	knobsService := knobs.GetKnobsService(ctx)
+	if knobsService.GetValue(knobs.KnobUseConsensusProvidePreimage, 0) > 0 {
+		// Refuse to route through the engine unless the FlowExecution
+		// reconciler is also enabled. Without it, a coordinator crash between
+		// engine DbCommit and commit-gossip dispatch leaves participant
+		// FlowExecution rows stuck IN_FLIGHT.
+		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
+			logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+				"KnobUseConsensusProvidePreimage is enabled but KnobFlowExecutionReconcileEnabled is disabled; refusing to route provide_preimage through the engine to avoid leaving participant FlowExecution rows stuck IN_FLIGHT after a coordinator crash")
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"KnobUseConsensusProvidePreimage requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route provide_preimage through the engine")
+		}
+		return h.providePreimageConsensus(ctx, req)
+	}
+	return h.providePreimageLegacy(ctx, req)
+}
+
+// providePreimageLegacy is the pre-consensus implementation kept in place
+// behind KnobUseConsensusProvidePreimage for one release cycle while the
+// engine-driven path stabilizes.
+func (h *LightningHandler) providePreimageLegacy(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
 	flowStart := time.Now()
-	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage", spanOpt)
+	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage.legacy", spanOpt)
 	defer func() {
 		endSpanWithError(span, retErr)
 		observeLightningFlow(ctx, lightningFlowProvidePreimage, lightningFlowPathUnknown, flowStart, retErr)
@@ -2765,4 +2788,115 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 	}
 
 	return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
+}
+
+// providePreimageConsensus routes ProvidePreimage through the 2PC consensus
+// engine when KnobUseConsensusProvidePreimage is enabled. Replaces the legacy
+// internal RPC fanout + SettleSenderKeyTweak gossip with a single engine.Execute
+// call: every SO runs Prepare (ValidatePreimage + validateKeyTweakProofs +
+// StorePreimage), then Commit (CommitSenderKeyTweaks). The coordinator-side
+// commit runs in BuildCommitPayload so the coordinator's state advances
+// deterministically rather than depending on the gossip-loopback firing.
+func (h *LightningHandler) providePreimageConsensus(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
+	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
+	flowStart := time.Now()
+	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus", spanOpt)
+	defer func() {
+		endSpanWithError(span, retErr)
+		observeLightningFlow(ctx, lightningFlowProvidePreimage, lightningFlowPathUnknown, flowStart, retErr)
+	}()
+
+	phaseStart := time.Now()
+	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus.validate", spanOpt)
+	identityPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
+	if err != nil {
+		endSpanWithError(validateSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, identityPubKey); err != nil {
+		endSpanWithError(validateSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
+		return nil, err
+	}
+	// Kill-switch enforcement parity with providePreimageLegacy. Required on
+	// every state-mutating user-facing handler per so/authz/killswitch.go's
+	// contract — without it, ramping the consensus knob lets a kill-switched
+	// wallet settle a HODL preimage swap that the legacy path would reject.
+	if err := authz.EnforceWalletNotKillSwitched(validateCtx, identityPubKey); err != nil {
+		endSpanWithError(validateSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
+		return nil, err
+	}
+	preimageRequest, transfer, err := h.ValidatePreimage(validateCtx, req)
+	endSpanWithError(validateSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
+	if err != nil {
+		return nil, fmt.Errorf("unable to provide preimage: %w", err)
+	}
+
+	// Short-circuit when the transfer has already advanced past the pre-commit
+	// states — there are no sender key tweaks left to settle and the engine's
+	// bookkeeping overhead would be pure cost for a no-op flow. Same status
+	// condition as the legacy early-exit, but with a subtle ordering
+	// difference: legacy calls StorePreimage unconditionally before checking
+	// the status, while the consensus path calls it inside this branch only.
+	// That covers retries where the coordinator's preimage_request row was
+	// never persisted on the first attempt (e.g., the engine's Prepare-on-self
+	// never completed); StorePreimage is an idempotent CAS so a retry against
+	// an already-shared row is a no-op. The non-short-circuit branch below
+	// reaches StorePreimage via the engine's Prepare-on-self fanout.
+	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
+		phaseStart = time.Now()
+		storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus.storePreimage", spanOpt)
+		err = h.StorePreimage(storeCtx, preimageRequest, req.Preimage)
+		endSpanWithError(storeSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, phaseStart, err)
+		if err != nil {
+			return nil, fmt.Errorf("unable to store preimage: %w", err)
+		}
+		transferProto, err := transfer.MarshalProto(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
+		}
+		return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
+	}
+
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
+	}
+
+	flow, err := buildProvidePreimageCoordinatorFlow(h.config, req, transfer, transferLeaves)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build coordinator flow: %w", err)
+	}
+
+	phaseStart = time.Now()
+	consensusCtx, consensusSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus.execute", spanOpt)
+	engine, err := consensus.GetEngine(consensusCtx)
+	if err != nil {
+		endSpanWithError(consensusSpan, err)
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseConsensusExecute, phaseStart, err)
+		return nil, err
+	}
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	_, err = engine.Execute(consensusCtx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE,
+		&selection, flow)
+	endSpanWithError(consensusSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseConsensusExecute, phaseStart, err)
+	if err != nil {
+		return nil, fmt.Errorf("consensus provide preimage failed: %w", err)
+	}
+
+	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningReceive)
+
+	if flow.response == nil {
+		// Engine returned success but BuildCommitPayload never populated the
+		// response — should not happen in practice, but defend against it
+		// rather than dereference a nil response.
+		return nil, fmt.Errorf("provide preimage consensus completed without building a response for transfer %s", transfer.ID)
+	}
+	return flow.response, nil
 }
