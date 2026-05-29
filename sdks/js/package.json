@@ -53,8 +53,5 @@
     "ts-prune": "^0.10.3",
     "turbo": "^2.4.4"
   },
-  "resolutions": {
-    "protobufjs@8.0.0": "8.0.1"
-  },
   "packageManager": "yarn@4.13.0"
 }
