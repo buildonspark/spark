@@ -511,6 +511,37 @@ message ProvidePreimageRequest {
     map<string, spark.SecretProof> key_tweak_proofs = 4;
 }
 
+// ProvidePreimagePrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE 2PC flow. Wraps the public
+// ProvidePreimageRequest plus the coordinator-derived key_tweak_proofs map
+// so every participant can independently validate the preimage + proofs
+// and write its preimage_request row in one Prepare pass.
+message ProvidePreimagePrepareRequest {
+    spark.ProvidePreimageRequest original_request = 1;
+    // Key tweak proofs derived by the coordinator from its TransferLeaf rows,
+    // mirroring the legacy ProvidePreimage fanout payload. Participants
+    // cross-check against their own stored tweaks via validateKeyTweakProofs.
+    map<string, spark.SecretProof> key_tweak_proofs = 2;
+}
+
+// ProvidePreimageCommitRequest is the Commit payload for the
+// CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE 2PC flow. Carries the transfer id
+// + key tweak proofs so each participant can re-validate proofs and apply
+// the sender key tweaks via CommitSenderKeyTweaks during Commit.
+message ProvidePreimageCommitRequest {
+    string transfer_id = 1;
+    map<string, spark.SecretProof> key_tweak_proofs = 2;
+}
+
+// ProvidePreimageRollbackRequest is the Rollback payload for the
+// CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE 2PC flow. Rollback is a no-op
+// for this flow (preimage storage is intentionally irreversible; sender
+// key tweaks only apply in Commit). The message carries transfer_id only
+// for logging / future use.
+message ProvidePreimageRollbackRequest {
+    string transfer_id = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }

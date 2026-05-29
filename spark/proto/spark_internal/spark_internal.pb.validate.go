@@ -7218,6 +7218,440 @@ var _ interface {
 	ErrorName() string
 } = ProvidePreimageRequestValidationError{}
 
+// Validate checks the field values on ProvidePreimagePrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ProvidePreimagePrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ProvidePreimagePrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// ProvidePreimagePrepareRequestMultiError, or nil if none found.
+func (m *ProvidePreimagePrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ProvidePreimagePrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ProvidePreimagePrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ProvidePreimagePrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ProvidePreimagePrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweakProofs()))
+		i := 0
+		for key := range m.GetKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for KeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, ProvidePreimagePrepareRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, ProvidePreimagePrepareRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return ProvidePreimagePrepareRequestValidationError{
+						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return ProvidePreimagePrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ProvidePreimagePrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by ProvidePreimagePrepareRequest.ValidateAll()
+// if the designated constraints aren't met.
+type ProvidePreimagePrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ProvidePreimagePrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ProvidePreimagePrepareRequestMultiError) AllErrors() []error { return m }
+
+// ProvidePreimagePrepareRequestValidationError is the validation error
+// returned by ProvidePreimagePrepareRequest.Validate if the designated
+// constraints aren't met.
+type ProvidePreimagePrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ProvidePreimagePrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ProvidePreimagePrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ProvidePreimagePrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ProvidePreimagePrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ProvidePreimagePrepareRequestValidationError) ErrorName() string {
+	return "ProvidePreimagePrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ProvidePreimagePrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sProvidePreimagePrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ProvidePreimagePrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ProvidePreimagePrepareRequestValidationError{}
+
+// Validate checks the field values on ProvidePreimageCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ProvidePreimageCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ProvidePreimageCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ProvidePreimageCommitRequestMultiError, or nil if none found.
+func (m *ProvidePreimageCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ProvidePreimageCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweakProofs()))
+		i := 0
+		for key := range m.GetKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for KeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, ProvidePreimageCommitRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, ProvidePreimageCommitRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return ProvidePreimageCommitRequestValidationError{
+						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return ProvidePreimageCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ProvidePreimageCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by ProvidePreimageCommitRequest.ValidateAll() if
+// the designated constraints aren't met.
+type ProvidePreimageCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ProvidePreimageCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ProvidePreimageCommitRequestMultiError) AllErrors() []error { return m }
+
+// ProvidePreimageCommitRequestValidationError is the validation error returned
+// by ProvidePreimageCommitRequest.Validate if the designated constraints
+// aren't met.
+type ProvidePreimageCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ProvidePreimageCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ProvidePreimageCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ProvidePreimageCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ProvidePreimageCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ProvidePreimageCommitRequestValidationError) ErrorName() string {
+	return "ProvidePreimageCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ProvidePreimageCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sProvidePreimageCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ProvidePreimageCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ProvidePreimageCommitRequestValidationError{}
+
+// Validate checks the field values on ProvidePreimageRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ProvidePreimageRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ProvidePreimageRollbackRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// ProvidePreimageRollbackRequestMultiError, or nil if none found.
+func (m *ProvidePreimageRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ProvidePreimageRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	if len(errors) > 0 {
+		return ProvidePreimageRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ProvidePreimageRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by ProvidePreimageRollbackRequest.ValidateAll()
+// if the designated constraints aren't met.
+type ProvidePreimageRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ProvidePreimageRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ProvidePreimageRollbackRequestMultiError) AllErrors() []error { return m }
+
+// ProvidePreimageRollbackRequestValidationError is the validation error
+// returned by ProvidePreimageRollbackRequest.Validate if the designated
+// constraints aren't met.
+type ProvidePreimageRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ProvidePreimageRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ProvidePreimageRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ProvidePreimageRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ProvidePreimageRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ProvidePreimageRollbackRequestValidationError) ErrorName() string {
+	return "ProvidePreimageRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ProvidePreimageRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sProvidePreimageRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ProvidePreimageRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ProvidePreimageRollbackRequestValidationError{}
+
 // Validate checks the field values on ReserveEntityDkgKeyRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
