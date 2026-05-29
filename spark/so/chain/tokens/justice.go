@@ -8,7 +8,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 
@@ -116,7 +115,7 @@ func ConstructAndSignJusticeTransaction(
 // to claim funds from an invalid token withdrawal.
 func BroadcastJusticeTransaction(
 	ctx context.Context,
-	bitcoinClient *rpcclient.Client,
+	bitcoinClient BitcoinBroadcaster,
 	soPrivateKey keys.Private,
 	network btcnetwork.Network,
 	tokenOutput *ent.TokenOutput,

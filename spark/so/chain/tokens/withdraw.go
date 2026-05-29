@@ -9,7 +9,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -67,13 +66,19 @@ type punishedOutputWithdrawal struct {
 	justiceTx        ent.L1TokenJusticeTransaction
 }
 
+// BitcoinBroadcaster is the subset of the Bitcoin RPC client used to broadcast
+// token justice transactions.
+type BitcoinBroadcaster interface {
+	SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*chainhash.Hash, error)
+}
+
 // HandleTokenWithdrawals scans transactions for BTKN withdrawal announcements
 // and records valid withdrawals in the database. For invalid withdrawals where
 // the revocation secret is known, it broadcasts justice transactions.
 func HandleTokenWithdrawals(
 	ctx context.Context,
 	config *so.Config,
-	bitcoinClient *rpcclient.Client,
+	bitcoinClient BitcoinBroadcaster,
 	dbClient *ent.Client,
 	txs []wire.MsgTx,
 	network btcnetwork.Network,
@@ -146,7 +151,7 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 func processWithdrawal(
 	ctx context.Context,
 	config *so.Config,
-	bitcoinClient *rpcclient.Client,
+	bitcoinClient BitcoinBroadcaster,
 	dbClient *ent.Client,
 	logger *zap.Logger,
 	withdrawal parsedWithdrawal,
@@ -165,9 +170,11 @@ func processWithdrawal(
 			withdrawal.txHash, expectedSePubKey, withdrawal.withdrawalTx.seEntityPubKey)
 		return nil
 	}
+
+	var approvalErr error
 	if err := validateWithdrawalAnnouncementShape(withdrawal.outputsToWithdraw); err != nil {
 		logger.With(zap.Error(err)).Sugar().Infof("Rejecting withdrawal %s: malformed announcement", withdrawal.txHash)
-		return nil
+		approvalErr = err
 	}
 
 	tokenOutputMap, err := queryTokenOutputs(ctx, dbClient, withdrawal.outputsToWithdraw, network)
@@ -183,23 +190,30 @@ func processWithdrawal(
 		tokenOutput, ok := tokenOutputMap[key]
 		if !ok {
 			logger.Sugar().Infof("Rejecting withdrawal %s: output %s not found in database", withdrawal.txHash, key)
-			return nil
+			approvalErr = fmt.Errorf("output %s not found in database", key)
+			continue
 		}
 		orderedOutputs = append(orderedOutputs, tokenOutput)
 	}
 
-	if err := validateOwnerSignature(ctx, orderedOutputs, withdrawal.withdrawalTx.entity.OwnerSignature); err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Rejecting withdrawal %s: invalid owner signature", withdrawal.txHash)
-		return nil
+	if approvalErr == nil {
+		approvalErr = validateOwnerSignature(ctx, orderedOutputs, withdrawal.withdrawalTx.entity.OwnerSignature)
+	}
+	if approvalErr != nil {
+		logger.With(zap.Error(approvalErr)).Sugar().Errorf("Rejecting withdrawal %s: announcement is not approved", withdrawal.txHash)
 	}
 
 	var approvedWithdrawals []parsedOutputWithdrawal
 	var tokenOutputs []*ent.TokenOutput
 	var punishedWithdrawals []punishedOutputWithdrawal
 	var punishedTokenOutputIDs []uuid.UUID
+	attemptedJusticeBitcoinVouts := make(map[uint16]struct{})
 
 	for _, outputToWithdraw := range withdrawal.outputsToWithdraw {
 		key := newTokenOutputKey(outputToWithdraw.sparkTxHash, outputToWithdraw.sparkTxVout)
+		if _, ok := tokenOutputMap[key]; !ok {
+			continue
+		}
 
 		tokenOutput, err := validateOutputWithdrawable(outputToWithdraw, withdrawnInBlock, tokenOutputMap)
 		if err != nil {
@@ -212,6 +226,13 @@ func processWithdrawal(
 					logger.Error("Cannot broadcast justice transaction: bitcoin client unavailable")
 					continue
 				}
+				bitcoinVout := outputToWithdraw.withdrawal.BitcoinVout
+				if _, ok := attemptedJusticeBitcoinVouts[bitcoinVout]; ok {
+					logger.Sugar().Infof("Skipping duplicate justice broadcast for withdrawal %s bitcoin vout %d", withdrawal.txHash, bitcoinVout)
+					continue
+				}
+				attemptedJusticeBitcoinVouts[bitcoinVout] = struct{}{}
+
 				justiceTx, justiceTxEnt, err := BroadcastJusticeTransaction(
 					ctx, bitcoinClient, config.IdentityPrivateKey, network,
 					tokenOutput, &withdrawal, &outputToWithdraw,
@@ -227,6 +248,11 @@ func processWithdrawal(
 					punishedTokenOutputIDs = append(punishedTokenOutputIDs, tokenOutput.ID)
 				}
 			}
+			continue
+		}
+
+		if approvalErr != nil {
+			logger.With(zap.Error(approvalErr)).Sugar().Infof("Rejecting withdrawal %s output %s: announcement is not approved", withdrawal.txHash, key)
 			continue
 		}
 
