@@ -2068,6 +2068,12 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			return nil, fmt.Errorf("unable to commit sender key tweaks for transfer %s: %w", transfer.ID, err)
 		}
 
+		// The commit's Update().Save() strips edges; reload before marshaling.
+		transfer, err = baseHandler.loadTransferNoUpdate(ctx, transfer.ID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
+		}
+
 		transferProto, err = transfer.MarshalProto(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer %s: %w", transfer.ID, err)
@@ -2204,7 +2210,10 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbsp
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err))
 	}
 
-	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
+	transfer, err := preimageRequest.QueryTransfers().
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("unable to get transfer: %w", err))
 	}
@@ -2356,7 +2365,9 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlc
 		preimagerequest.And(
 			conditions...,
 		),
-	).WithTransfers().Limit(limit).Offset(offset).All(ctx)
+	).WithTransfers(func(q *ent.TransferQuery) {
+		q.WithTransferSenders().WithTransferReceivers()
+	}).Limit(limit).Offset(offset).All(ctx)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query preimage requests: %w", err))
 	}
@@ -2459,7 +2470,10 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 		)
 	}
 
-	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
+	transfer, err := preimageRequest.QueryTransfers().
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(ctx)
 	if err != nil {
 		return nil, nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("unable to get transfer: %w", err))
 	}
@@ -2763,7 +2777,7 @@ func (h *LightningHandler) providePreimageLegacy(ctx context.Context, req *pbspa
 
 	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningReceive)
 
-	// The span includes DB context lookup; reload_transfer measures only Transfer.Get.
+	// The span includes DB context lookup; reload_transfer measures only the reload query.
 	reloadCtx, reloadSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.reloadTransfer", spanOpt)
 	tx, err := ent.GetDbFromContext(reloadCtx)
 	if err != nil {
@@ -2771,7 +2785,11 @@ func (h *LightningHandler) providePreimageLegacy(ctx context.Context, req *pbspa
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	phaseStart = time.Now()
-	transfer, err = tx.Transfer.Get(reloadCtx, transfer.ID)
+	transfer, err = tx.Transfer.Query().
+		Where(enttransfer.ID(transfer.ID)).
+		WithTransferSenders().
+		WithTransferReceivers().
+		Only(reloadCtx)
 	endSpanWithError(reloadSpan, err)
 	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseReloadTransfer, phaseStart, err)
 	if err != nil {
