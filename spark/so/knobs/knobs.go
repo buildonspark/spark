@@ -178,7 +178,25 @@ const (
 	// crash between engine DbCommit and markCommitted leaves the coordinator
 	// stranded while participants reconcile to RETURNED.
 	KnobUseConsensusTransfer = "spark.so.use_consensus_transfer"
-	KnobUseConsensusClaim    = "spark.so.use_consensus_claim"
+	// KnobUseConsensusClaim routes ClaimTransfer through the 2PC engine
+	// instead of the legacy settleReceiverKeyTweakWithClaimPackage + finalize
+	// gossip fanout. Interpreted as binary (any non-zero value enables) — not
+	// a percentage rollout.
+	//
+	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
+	// ClaimTransfer entry point enforces this at request time and rejects
+	// requests if the reconciler is off. Without the reconciler, a
+	// coordinator crash between engine DbCommit and commit-gossip dispatch
+	// leaves participant FlowExecution rows IN_FLIGHT indefinitely.
+	//
+	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback
+	// for CLAIM_TRANSFER on the coordinator. Today the sweep only flips the
+	// FlowExecution row to ROLLED_BACK — it doesn't undo coordinator-side
+	// domain writes (RECEIVER_KEY_TWEAK_LOCKED + persisted key tweak proofs),
+	// so a coordinator crash between engine DbCommit and markCommitted leaves
+	// the coordinator stranded at RKL/RKA while participants reconcile to
+	// ROLLED_BACK.
+	KnobUseConsensusClaim = "spark.so.use_consensus_claim"
 	// KnobUseConsensusProvidePreimage routes LightningHandler.ProvidePreimage
 	// through the 2PC engine instead of the legacy fanout-RPC + SettleSenderKeyTweak
 	// gossip path. Interpreted as binary (any non-zero value enables) — not a

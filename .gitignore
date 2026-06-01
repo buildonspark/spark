@@ -50,6 +50,7 @@ _data/
 .claude/CLAUDE.local.md
 .claude/settings.local.json
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # Claude Code thoughts/plans
 /thoughts/

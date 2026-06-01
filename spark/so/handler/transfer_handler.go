@@ -3576,7 +3576,33 @@ func validateTransferReadyForReceiverClaim(transfer *ent.Transfer) error {
 // ClaimTransfer claims a transfer in a single call. It combines key tweak delivery,
 // refund signing, signature aggregation, and finalization.
 func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
-	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransfer")
+	knobsService := knobs.GetKnobsService(ctx)
+	if knobsService.GetValue(knobs.KnobUseConsensusClaim, 0) > 0 {
+		// Refuse to route through the engine unless the FlowExecution
+		// reconciler is also enabled. The engine commits coordinator-side
+		// Phase-1 settle state (RECEIVER_KEY_TWEAK_LOCKED + persisted key
+		// tweak proofs) inside the request tx before commit-gossip dispatch;
+		// participants need the reconciler to resolve stale FlowExecution
+		// rows after a coordinator crash. See the rollout note on
+		// KnobUseConsensusClaim.
+		// Match StartTransferV3's guard: surface FailedPrecondition without a
+		// per-request error log. The gRPC code already communicates the
+		// misconfiguration, and logging here would flood at ClaimTransfer rate
+		// while the knobs stay inconsistent.
+		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"KnobUseConsensusClaim requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route claim through the engine")
+		}
+		return h.claimTransferConsensus(ctx, req)
+	}
+	return h.claimTransferLegacy(ctx, req)
+}
+
+// claimTransferLegacy is the pre-consensus implementation kept in place behind
+// KnobUseConsensusClaim for one release cycle while the engine-driven path
+// stabilizes.
+func (h *TransferHandler) claimTransferLegacy(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransfer.legacy")
 	defer span.End()
 
 	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)

@@ -17,9 +17,11 @@ import (
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/consensus"
 	sparkdb "github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -34,6 +36,162 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+// ---------------------------------------------------------------------------
+// Public entry point (consensus path)
+// ---------------------------------------------------------------------------
+
+// claimTransferConsensus runs the claim flow through the 2PC consensus engine
+// instead of the legacy cross-SO fanout (settleReceiverKeyTweakWithClaimPackage
+// + finalize gossip). Gated by KnobUseConsensusClaim at the public
+// ClaimTransfer entry point.
+//
+// Coordinator-side preflight (mirrors claimTransferLegacy so the consensus
+// path has the same fast-fail behavior — same observable error codes, same
+// rejection ordering — before any cross-SO ConsensusPrepare fan-out):
+//
+//  1. parse the request (transferID, ownerIDPK, claimPackage)
+//  2. session-auth the parsed owner identity pubkey
+//  3. NoWait FOR UPDATE on the transfer row (fast-fail on concurrent claims)
+//  4. load receiver under FOR UPDATE
+//  5. non-MIMO: rejectLegacyAggregateClaimForMultiReceiverTransfer + identity match
+//     MIMO: validateTransferReadyForReceiverClaim + checkCoopExitTxBroadcasted
+//  6. validateClaimStatus (claimable status switch)
+//  7. loadClaimReceiverLeaves + leaf-count parity vs claimPackage.LeavesToClaim
+//  8. validateClaimPackageStructure (DFC coverage, KeyTweakPackage non-empty)
+//  9. verifyClaimPackageSignature (user signature over the encrypted package)
+//
+// The receiver leaves loaded at step 7 are then passed into
+// buildClaimTransferCoordinatorFlow which only does signing-job
+// pre-computation for BuildCommitPayload's FROST aggregation — no second
+// round-trip.
+//
+// Participant Prepare repeats the same checks (defense-in-depth) so the
+// engine is the authoritative validator; the coordinator preflight just
+// gives the fast path: it surfaces deterministic gRPC codes to the SDK and
+// avoids wasted RPC fanout / peer locks on requests the coordinator can
+// reject on its own.
+func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransfer.consensus")
+	defer span.End()
+
+	// Parse the request once. parseClaimTransferRequest returns
+	// InvalidArgument-tagged errors for malformed owner pubkey, malformed
+	// transfer id, and missing claim_package; legacy returns plain errors
+	// (gRPC Unknown) for the same conditions. The new codes are more
+	// accurate; the rollout note in KnobUseConsensusClaim's doc covers the
+	// observable change in SDK retry semantics.
+	parsed, err := parseClaimTransferRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, parsed.ownerIDPK); err != nil {
+		return nil, err
+	}
+	// Mirror claimTransferLegacy: a kill-switched wallet must be blocked on the
+	// consensus path too. Without this the cutover would silently re-open
+	// claims for kill-switched wallets the moment KnobUseConsensusClaim flips.
+	if err := authz.EnforceWalletNotKillSwitched(ctx, parsed.ownerIDPK); err != nil {
+		return nil, err
+	}
+
+	// NoWait FOR UPDATE on the transfer row so two concurrent claims on the
+	// same transfer fail fast with AbortedConcurrentClaimConflict rather than
+	// queuing on the row lock. Reuses claimLockConflictError so the lock
+	// failure is logged with the Postgres-level cause server-side (the
+	// client only sees the generic gRPC code).
+	handler := NewClaimTransferFlowHandler(h.config)
+	transferEnt, err := handler.loadTransferForUpdate(ctx, parsed.transferID, sql.WithLockAction(sql.NoWait))
+	if err != nil {
+		if sparkdb.IsLockNotAvailableError(err) {
+			return nil, claimLockConflictError(ctx, parsed.transferID, err)
+		}
+		return nil, fmt.Errorf("unable to load transfer %s: %w", parsed.transferID, err)
+	}
+	// Match legacy: tag the span with transfer_type so tracing of consensus-
+	// path claims carries the same dimension as legacy.
+	span.SetAttributes(transferTypeKey.String(string(transferEnt.Type)))
+	_, receiver, err := handler.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
+	if err != nil {
+		return nil, err
+	}
+	isMimo := isMimoReceiveEnabled(ctx, receiver)
+
+	// Match legacy's coordinator-side gates BEFORE the engine fan-out. The
+	// same gates run again inside each SO's Prepare (defense-in-depth); this
+	// layer just gives us legacy's fast-fail behavior + deterministic gRPC
+	// codes back to the SDK. Check ordering mirrors claimTransferLegacy
+	// exactly: non-MIMO does rejectLegacyAggregate before the identity
+	// check; MIMO does readiness + coop-exit guards.
+	if !isMimo {
+		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transferEnt); err != nil {
+			return nil, err
+		}
+		if !transferEnt.ReceiverIdentityPubkey.Equals(parsed.ownerIDPK) {
+			return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", parsed.transferID)
+		}
+	} else {
+		if err := validateTransferReadyForReceiverClaim(transferEnt); err != nil {
+			return nil, err
+		}
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get db: %w", err)
+		}
+		if err := checkCoopExitTxBroadcasted(ctx, db, transferEnt); err != nil {
+			return nil, err
+		}
+	}
+	if err := validateClaimStatus(parsed.transferID, transferEnt, receiver, isMimo); err != nil {
+		return nil, err
+	}
+
+	// Load receiver leaves so we can do the leaf-count parity check the
+	// legacy path runs before signature verify (catches a wrong-leaf-set
+	// claim package on the coordinator instead of after fanning out to every
+	// peer). The loaded leaves feed buildClaimTransferCoordinatorFlow below.
+	// Count against len(leavesByID) (deduplicated by TreeNode.ID) so the
+	// coordinator and participant Prepare reach the same decision under any
+	// data-integrity edge case where two TransferLeaf rows reference the
+	// same TreeNode.
+	_, leavesByID, err := loadClaimReceiverLeaves(ctx, transferEnt, receiver)
+	if err != nil {
+		return nil, err
+	}
+	if len(leavesByID) != len(parsed.claimPackage.LeavesToClaim) {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", parsed.transferID, len(leavesByID), len(parsed.claimPackage.LeavesToClaim)))
+	}
+	if err := validateClaimPackageStructure(parsed.claimPackage); err != nil {
+		return nil, err
+	}
+	if err := verifyClaimPackageSignature(parsed.transferID, parsed.claimPackage, parsed.ownerIDPK); err != nil {
+		return nil, err
+	}
+
+	// Pre-compute the per-leaf aggregation jobs from the already-loaded
+	// receiver leaves — no redundant query.
+	flow, err := buildClaimTransferCoordinatorFlow(ctx, handler, req, parsed, leavesByID)
+	if err != nil {
+		return nil, err
+	}
+
+	engine, err := consensus.GetEngine(ctx)
+	if err != nil {
+		return nil, err
+	}
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	if _, err := engine.Execute(ctx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER,
+		&selection,
+		flow,
+	); err != nil {
+		return nil, fmt.Errorf("consensus claim transfer failed: %w", err)
+	}
+	if flow.response == nil {
+		return nil, fmt.Errorf("internal: consensus claim transfer for %s succeeded but produced no response", req.GetTransferId())
+	}
+	return flow.response, nil
+}
 
 // ---------------------------------------------------------------------------
 // ClaimTransferFlowHandler — participant side (Prepare / Commit / Rollback)
@@ -85,11 +243,17 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	}
 	isMimo := isMimoReceiveEnabled(ctx, receiver)
 
-	// Non-MIMO: the request's identity must match the transfer's receiver.
-	// loadTransferReceiverByPublicKeyForUpdate returns (false, nil, nil) for
-	// non-MIMO when no receiver row matches, so without this guard a wrong
-	// claimer would slip past validation.
+	// Non-MIMO gates — ordered to match legacy claimTransferLegacy /
+	// claimTransferConsensus preflight: rejectLegacyAggregate (multi-receiver
+	// guard) runs BEFORE the identity check so a multi-receiver request
+	// with a wrong claimer surfaces the same error code at every layer.
 	if !isMimo {
+		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transferEnt); err != nil {
+			return nil, err
+		}
+		// loadTransferReceiverByPublicKeyForUpdate returns (false, nil, nil)
+		// for non-MIMO when no receiver row matches; without this guard a
+		// wrong claimer would slip past validation.
 		if !transferEnt.ReceiverIdentityPubkey.Equals(parsed.ownerIDPK) {
 			return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", parsed.transferID)
 		}
@@ -115,16 +279,11 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 		return nil, err
 	}
 
-	if err := verifyClaimPackageSignature(parsed.transferID, parsed.claimPackage, parsed.ownerIDPK); err != nil {
-		return nil, err
-	}
-
-	if err := validateClaimPackageStructure(parsed.claimPackage); err != nil {
-		return nil, err
-	}
-
-	// Load receiver leaves + verify count BEFORE settling so we can peek at
-	// stored leaf.KeyTweak for the retry-with-stored-tweaks path below.
+	// Load receiver leaves + leaf-count parity check, then structural
+	// validation, then signature verify — matches legacy
+	// claimTransferLegacy's ordering exactly so error precedence is
+	// consistent with the coordinator preflight regardless of which SO
+	// rejects the request first.
 	transferLeavesPre, leavesByID, err := loadClaimReceiverLeaves(ctx, transferEnt, receiver)
 	if err != nil {
 		return nil, err
@@ -132,81 +291,126 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	if len(leavesByID) != len(parsed.claimPackage.LeavesToClaim) {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", parsed.transferID, len(leavesByID), len(parsed.claimPackage.LeavesToClaim)))
 	}
+	if err := validateClaimPackageStructure(parsed.claimPackage); err != nil {
+		return nil, err
+	}
+	if err := verifyClaimPackageSignature(parsed.transferID, parsed.claimPackage, parsed.ownerIDPK); err != nil {
+		return nil, err
+	}
 
-	// useStoredKeyTweaks: if Phase 1 (lock) already committed key tweaks on
-	// this SO from a prior coordinator attempt, the stored proofs may not
-	// match a fresh claim package's decryption. Read tweaks from
-	// leaf.KeyTweak instead of decrypting the package, and forward neither
-	// the package nor the user signature on the settle call — the participant
-	// settle helper detects already-locked state and skips re-stamping.
-	useStoredKeyTweaks := shouldUseStoredKeyTweaks(ctx, transferEnt, receiver)
+	// A claim can re-enter at an already-applied state (KeyTweakApplied /
+	// RefundSigned): a prior consensus attempt, or — during the
+	// KnobUseConsensusClaim cutover — a legacy claim that committed the settle
+	// phase before refund signing and then crashed. The key is tweaked exactly
+	// once and the apply is idempotent, so the two cases need different Prepare
+	// work:
+	//
+	//   - applied (RKA/RRS): the on-disk keyshare and leaf.OwnerSigningPubkey are
+	//     already post-tweak. Do NOT re-lock or re-tweak. Validate the submitted
+	//     refunds against the current owner and FROST-sign with the on-disk
+	//     keyshare as-is. Commit's Phase-2 apply then no-ops (SettleReceiverKeyTweak
+	//     returns nil for an applied status) and just finalizes the signatures.
+	//     This mirrors the legacy refund-signing-only resume.
+	//
+	//   - pre-apply (SKT/RKT/RKL): stage the tweak (Phase-1 lock) and sign with an
+	//     in-memory post-tweak key package; the durable keyshare apply waits for
+	//     Commit.
+	applied := isCommittedClaim(ctx, transferEnt, receiver)
+
+	predictedOwnerByLeaf := make(map[string]keys.Public, len(parsed.claimPackage.LeavesToClaim))
+	// tweaksByLeaf is only needed on the pre-apply path (Phase-1 lock + in-memory
+	// FROST tweak folding); it stays nil when the tweak is already applied.
 	var tweaksByLeaf map[string]*pb.ClaimLeafKeyTweak
-	var encryptedPackage map[string][]byte
-	var claimSignature []byte
-	if useStoredKeyTweaks {
-		tweaksByLeaf, err = decryptStoredClaimKeyTweaks(h.config, transferLeavesPre)
-		if err != nil {
-			return nil, err
+
+	if applied {
+		// leaf.OwnerSigningPubkey is already the receiver's post-tweak key.
+		// Log because this resume path only fires for partials left behind by a
+		// prior attempt / the legacy→consensus cutover — useful for confirming
+		// the cutover drains and for knowing when this branch can be retired.
+		logging.GetLoggerFromContext(ctx).Sugar().Infof(
+			"claim transfer 2pc prepare: resuming already-applied claim for transfer %s (status %s) — signing refunds against the post-tweak owner without re-tweaking",
+			parsed.transferID, transferEnt.Status)
+		for _, job := range parsed.claimPackage.LeavesToClaim {
+			leaf, ok := leavesByID[job.LeafId]
+			if !ok {
+				return nil, fmt.Errorf("claim references unknown leaf %s", job.LeafId)
+			}
+			predictedOwnerByLeaf[job.LeafId] = leaf.OwnerSigningPubkey
 		}
 	} else {
-		tweaksByLeaf, err = decryptClaimKeyTweaks(h.config, parsed.claimPackage)
-		if err != nil {
-			return nil, err
+		// useStoredKeyTweaks: if Phase 1 (lock) already committed key tweaks on
+		// this SO from a prior coordinator attempt (RKL), the stored proofs may
+		// not match a fresh claim package's decryption. Read tweaks from
+		// leaf.KeyTweak instead of decrypting the package, and forward neither
+		// the package nor the user signature on the settle call — the participant
+		// settle helper detects already-locked state and skips re-stamping.
+		useStoredKeyTweaks := shouldUseStoredKeyTweaks(ctx, transferEnt, receiver)
+		var encryptedPackage map[string][]byte
+		var claimSignature []byte
+		if useStoredKeyTweaks {
+			tweaksByLeaf, err = decryptStoredClaimKeyTweaks(h.config, transferLeavesPre)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			tweaksByLeaf, err = decryptClaimKeyTweaks(h.config, parsed.claimPackage)
+			if err != nil {
+				return nil, err
+			}
+			encryptedPackage = parsed.claimPackage.KeyTweakPackage
+			claimSignature = parsed.claimPackage.UserSignature
 		}
-		encryptedPackage = parsed.claimPackage.KeyTweakPackage
-		claimSignature = parsed.claimPackage.UserSignature
-	}
-	keyTweakProofs := make(map[string]*pb.SecretProof, len(tweaksByLeaf))
-	for leafID, leafTweak := range tweaksByLeaf {
-		keyTweakProofs[leafID] = &pb.SecretProof{Proofs: leafTweak.SecretShareTweak.Proofs}
-	}
-
-	userPublicKeys := make(map[string][]byte, len(parsed.claimPackage.LeavesToClaim))
-	for _, job := range parsed.claimPackage.LeavesToClaim {
-		userPublicKeys[job.LeafId] = job.SigningPublicKey
-	}
-
-	// Phase-1 lock only: persist the encrypted tweak package + per-leaf
-	// proofs, validate against the claim signature, advance status to
-	// KeyTweakLocked. We deliberately do NOT call the Phase-2 apply
-	// (SettleReceiverKeyTweak with COMMIT) here — that mutates the
-	// signing keyshare and tree node ownership, which under the consensus
-	// engine must wait until Commit. The engine's ent.Tx is rolled back on
-	// any Prepare failure, undoing this Phase-1 lock cleanly.
-	var receiverIDPKBytes []byte
-	if isMimo {
-		receiverIDPKBytes = receiver.IdentityPubkey.Serialize()
-	}
-	settleReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
-		TransferId:                    parsed.transferID.String(),
-		KeyTweakProofs:                keyTweakProofs,
-		UserPublicKeys:                userPublicKeys,
-		ReceiverIdentityPublicKey:     receiverIDPKBytes,
-		EncryptedClaimKeyTweakPackage: encryptedPackage,
-		ClaimSignature:                claimSignature,
-	}
-	if err := h.InitiateSettleReceiverKeyTweak(ctx, settleReq); err != nil {
-		return nil, fmt.Errorf("unable to settle receiver key tweak locally: %w", err)
-	}
-
-	// Predicted post-tweak owner pubkey per leaf:
-	//   predicted = leaf.OwnerSigningPubkey - SecretShareTweak.Proofs[0]
-	// where Proofs[0] is the public commitment (G * secret_share_tweak) to
-	// the additive scalar tweak. The leaves still carry pre-tweak
-	// OwnerSigningPubkey (Phase-2 apply is deferred to Commit), so
-	// validateReceivedRefundTransactions needs the predicted value to verify
-	// the refund tx pays the receiver's new key.
-	predictedOwnerByLeaf := make(map[string]keys.Public, len(tweaksByLeaf))
-	for leafID, leafTweak := range tweaksByLeaf {
-		leaf, ok := leavesByID[leafID]
-		if !ok {
-			return nil, fmt.Errorf("claim tweak references unknown leaf %s", leafID)
+		keyTweakProofs := make(map[string]*pb.SecretProof, len(tweaksByLeaf))
+		for leafID, leafTweak := range tweaksByLeaf {
+			keyTweakProofs[leafID] = &pb.SecretProof{Proofs: leafTweak.SecretShareTweak.Proofs}
 		}
-		pubKeyTweak, err := keys.ParsePublicKey(leafTweak.SecretShareTweak.Proofs[0])
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse public key tweak for leaf %s: %w", leafID, err)
+
+		userPublicKeys := make(map[string][]byte, len(parsed.claimPackage.LeavesToClaim))
+		for _, job := range parsed.claimPackage.LeavesToClaim {
+			userPublicKeys[job.LeafId] = job.SigningPublicKey
 		}
-		predictedOwnerByLeaf[leafID] = leaf.OwnerSigningPubkey.Sub(pubKeyTweak)
+
+		// Phase-1 lock only: persist the encrypted tweak package + per-leaf
+		// proofs, validate against the claim signature, advance status to
+		// KeyTweakLocked. We deliberately do NOT call the Phase-2 apply
+		// (SettleReceiverKeyTweak with COMMIT) here — that mutates the
+		// signing keyshare and tree node ownership, which under the consensus
+		// engine must wait until Commit. The engine's ent.Tx is rolled back on
+		// any Prepare failure, undoing this Phase-1 lock cleanly.
+		var receiverIDPKBytes []byte
+		if isMimo {
+			receiverIDPKBytes = receiver.IdentityPubkey.Serialize()
+		}
+		settleReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+			TransferId:                    parsed.transferID.String(),
+			KeyTweakProofs:                keyTweakProofs,
+			UserPublicKeys:                userPublicKeys,
+			ReceiverIdentityPublicKey:     receiverIDPKBytes,
+			EncryptedClaimKeyTweakPackage: encryptedPackage,
+			ClaimSignature:                claimSignature,
+		}
+		if err := h.InitiateSettleReceiverKeyTweak(ctx, settleReq); err != nil {
+			return nil, fmt.Errorf("unable to settle receiver key tweak locally: %w", err)
+		}
+
+		// Predicted post-tweak owner pubkey per leaf:
+		//   predicted = leaf.OwnerSigningPubkey - SecretShareTweak.Proofs[0]
+		// where Proofs[0] is the public commitment (G * secret_share_tweak) to
+		// the additive scalar tweak. The leaves still carry pre-tweak
+		// OwnerSigningPubkey (Phase-2 apply is deferred to Commit), so
+		// validateReceivedRefundTransactions needs the predicted value to verify
+		// the refund tx pays the receiver's new key.
+		for leafID, leafTweak := range tweaksByLeaf {
+			leaf, ok := leavesByID[leafID]
+			if !ok {
+				return nil, fmt.Errorf("claim tweak references unknown leaf %s", leafID)
+			}
+			pubKeyTweak, err := keys.ParsePublicKey(leafTweak.SecretShareTweak.Proofs[0])
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse public key tweak for leaf %s: %w", leafID, err)
+			}
+			predictedOwnerByLeaf[leafID] = leaf.OwnerSigningPubkey.Sub(pubKeyTweak)
+		}
 	}
 
 	signingJobsResult, err := h.prepareClaimRefundSigningJobs(ctx, parsed.claimPackage, leavesByID, transferEnt, predictedOwnerByLeaf)
@@ -243,17 +447,24 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 		return nil, nil
 	}
 
-	// Load each job's KeyPackage and fold the receiver key tweak in-memory
-	// before signing. The on-disk keyshare stays at the pre-tweak value —
-	// FROST signs with the post-tweak share via the fresh KeyPackage. The
-	// durable keyshare apply happens in Commit.
-	keyPackages, err := tweakedKeyPackagesForFrost(ctx, h.config, jobs, keyshareToLeafID, tweaksByLeaf)
-	if err != nil {
-		return nil, fmt.Errorf("unable to build tweaked key packages: %w", err)
-	}
-
 	frostHandler := signing_handler.NewFrostSigningHandler(h.config)
-	frostResp, err := frostHandler.FrostRound2WithKeyPackages(ctx, &pbinternal.FrostRound2Request{SigningJobs: jobs}, keyPackages)
+	var frostResp *pbinternal.FrostRound2Response
+	if applied {
+		// On-disk keyshare is already post-tweak — sign with it directly. Folding
+		// the tweak again would double-tweak and produce an invalid signature.
+		frostResp, err = frostHandler.FrostRound2(ctx, &pbinternal.FrostRound2Request{SigningJobs: jobs})
+	} else {
+		// Load each job's KeyPackage and fold the receiver key tweak in-memory
+		// before signing. The on-disk keyshare stays at the pre-tweak value —
+		// FROST signs with the post-tweak share via the fresh KeyPackage. The
+		// durable keyshare apply happens in Commit.
+		var keyPackages map[uuid.UUID]*pbfrost.KeyPackage
+		keyPackages, err = tweakedKeyPackagesForFrost(ctx, h.config, jobs, keyshareToLeafID, tweaksByLeaf)
+		if err != nil {
+			return nil, fmt.Errorf("unable to build tweaked key packages: %w", err)
+		}
+		frostResp, err = frostHandler.FrostRound2WithKeyPackages(ctx, &pbinternal.FrostRound2Request{SigningJobs: jobs}, keyPackages)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("local frost round 2 failed during prepare: %w", err)
 	}
@@ -674,7 +885,10 @@ func assertLeafSignaturesCover(ctx context.Context, transferEnt *ent.Transfer, r
 
 // isCommittedClaim reports whether the claim has already landed Phase-2
 // (KeyTweakApplied or later) for the given receiver. MIMO uses the receiver's
-// per-row status; non-MIMO uses the transfer-level status.
+// per-row status; non-MIMO uses the transfer-level status. Completed is
+// included: it's the primary case for the Rollback caller (a finalized claim
+// can't be rolled back), and in Prepare it's unreachable because
+// validateClaimStatus returns AlreadyExists for Completed before this is called.
 func isCommittedClaim(ctx context.Context, transferEnt *ent.Transfer, receiver *ent.TransferReceiver) bool {
 	if isMimoReceiveEnabled(ctx, receiver) {
 		switch receiver.Status { //nolint:exhaustive // only post-apply states gate the already-committed branch
@@ -813,16 +1027,17 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
 	}
-	freshTransferQuery := freshDb.Transfer.Query().Where(enttransfer.ID(transferEnt.ID))
-	if isMimo {
-		freshTransferQuery = freshTransferQuery.WithTransferReceivers()
-	}
-	// Reload the transfer eagerly with TransferReceivers (for MIMO marshal).
-	// Surface failures rather than silently falling back: the fallback
-	// transferEnt was loaded without WithTransferReceivers, and
-	// MarshalProtoForReceiver requires that edge — falling back produces an
-	// opaque "TransferReceivers edge not pre-loaded" error instead of the
-	// real query failure.
+	// Reload the transfer post-Commit so the marshaled response carries the
+	// final status + edges. Eager-load TransferSenders + TransferReceivers
+	// unconditionally to match legacy claimTransferLegacy's marshal reload
+	// — Transfer.MarshalProto / MarshalProtoForReceiver both consult these
+	// edges and emit a spark_transfer_marshal_missing_edge_total metric when
+	// they're absent (see warnIfParticipantEdgesMissing). The metric is on
+	// track to become a hard error per the TODO in transfer_extension.go.
+	freshTransferQuery := freshDb.Transfer.Query().
+		Where(enttransfer.ID(transferEnt.ID)).
+		WithTransferSenders().
+		WithTransferReceivers()
 	freshTransfer, err := freshTransferQuery.Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
@@ -913,42 +1128,18 @@ func (f *claimTransferCoordinatorFlow) aggregateLeafSignature(
 	return resp.Signature, nil
 }
 
-// buildClaimTransferCoordinatorFlow validates the request and pre-computes the
-// signing-job helpers the coordinator needs during BuildCommitPayload's
-// aggregation. The coordinator's own DB writes happen inside engine.Execute via
-// the engine-driven Prepare phase.
-//
-//nolint:unused // wired in PR 3 when ClaimTransfer routes to the engine.
-func buildClaimTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.ClaimTransferRequest) (*claimTransferCoordinatorFlow, error) {
-	parsed, err := parseClaimTransferRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	handler := NewClaimTransferFlowHandler(config)
-	// NoWait on the coordinator's initial transfer load so two concurrent
-	// claims on the same transfer fail fast with
-	// AbortedConcurrentClaimConflict rather than queuing on the row lock.
-	// Participant Prepare also uses NoWait via
-	// loadTransferReceiverByPublicKeyForUpdate, but only the coordinator entry
-	// here maps the lock-not-available error to AbortedConcurrentClaimConflict;
-	// participants surface it as a generic Prepare failure.
-	transferEnt, err := handler.loadTransferForUpdate(ctx, parsed.transferID, sql.WithLockAction(sql.NoWait))
-	if err != nil {
-		if sparkdb.IsLockNotAvailableError(err) {
-			return nil, sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf("unable to load transfer %s: %w", parsed.transferID, err))
-		}
-		return nil, fmt.Errorf("unable to load transfer %s: %w", parsed.transferID, err)
-	}
-	_, receiver, err := handler.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
-	if err != nil {
-		return nil, err
-	}
-	_, leavesByID, err := loadClaimReceiverLeaves(ctx, transferEnt, receiver)
-	if err != nil {
-		return nil, fmt.Errorf("unable to preload leaves for coordinator flow: %w", err)
-	}
-
+// buildClaimTransferCoordinatorFlow pre-computes the per-leaf signing-job
+// helpers the coordinator needs during BuildCommitPayload's FROST
+// aggregation. The receiver leaves are taken as a parameter (already loaded
+// by claimTransferConsensus's preflight for the leaf-count parity check) so
+// this function doesn't redundantly re-query them.
+func buildClaimTransferCoordinatorFlow(
+	ctx context.Context,
+	handler *ClaimTransferFlowHandler,
+	req *pb.ClaimTransferRequest,
+	parsed parsedClaimTransferRequest,
+	leavesByID map[string]*ent.TreeNode,
+) (*claimTransferCoordinatorFlow, error) {
 	jobsByLeaf, err := buildClaimTransferAggregationJobs(ctx, parsed.transferID, parsed.claimPackage, leavesByID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build signing-job helpers: %w", err)
@@ -963,10 +1154,14 @@ func buildClaimTransferCoordinatorFlow(ctx context.Context, config *so.Config, r
 }
 
 // refreshLeafOwnership reloads every leaf referenced by f.signingJobsByLeaf
-// from the DB and rebinds the in-memory pointer. Called from BuildCommitPayload
-// after Prepare has applied the receiver key tweaks (which rewrite
-// leaf.OwnerSigningPubkey); the original pointers captured pre-Execute carry
-// the pre-tweak owner pubkey and would cause FROST verification to fail when
+// from the DB and rebinds the in-memory pointer. Called from
+// BuildCommitPayload AFTER its early settleReceiverKeyTweakLocal(COMMIT)
+// call has applied the receiver key tweak to the coordinator's keyshare
+// rows — this is the call that rewrites leaf.OwnerSigningPubkey to the
+// post-tweak value. Prepare itself does NOT mutate keyshare state (the
+// in-memory keyshare tweak applied in Prepare's FrostRound2 is local to
+// that signing pass). The original pointers captured pre-Execute carry the
+// pre-tweak owner pubkey and would cause FROST verification to fail when
 // passed to AggregateFrost as UserPublicKey.
 func (f *claimTransferCoordinatorFlow) refreshLeafOwnership(ctx context.Context) error {
 	if len(f.signingJobsByLeaf) == 0 {
@@ -1046,10 +1241,25 @@ func parseClaimTransferRequest(req *pb.ClaimTransferRequest) (parsedClaimTransfe
 	}, nil
 }
 
-// loadClaimContext loads the transfer + receiver under FOR UPDATE locks.
+// loadClaimContext loads the transfer + receiver under FOR UPDATE NoWait
+// locks. NoWait on the transfer row prevents a distributed deadlock when two
+// claims for the same transfer race through different coordinators: each
+// coordinator's preflight holds its own DB's transfer row NoWait, then
+// engine.Execute fans Prepare out to the other; without NoWait here, both
+// participants block waiting for the other's coordinator preflight to
+// release, deadlocking until the engine RPC times out. With NoWait, the
+// loser fails fast with AbortedConcurrentClaimConflict, the engine surfaces
+// it as a Prepare failure, and the cluster rolls back cleanly.
+//
+// The coordinator's own self-Prepare runs in the same request transaction
+// as its preflight, so re-acquiring the lock here is a no-op (Postgres
+// reentrant-lock semantics within the same tx).
 func (h *ClaimTransferFlowHandler) loadClaimContext(ctx context.Context, parsed parsedClaimTransferRequest) (*ent.Transfer, *ent.TransferReceiver, error) {
-	transferEnt, err := h.loadTransferForUpdate(ctx, parsed.transferID)
+	transferEnt, err := h.loadTransferForUpdate(ctx, parsed.transferID, sql.WithLockAction(sql.NoWait))
 	if err != nil {
+		if sparkdb.IsLockNotAvailableError(err) {
+			return nil, nil, sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf("unable to load transfer %s: %w", parsed.transferID, err))
+		}
 		return nil, nil, fmt.Errorf("unable to load transfer %s: %w", parsed.transferID, err)
 	}
 	_, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
@@ -1061,10 +1271,20 @@ func (h *ClaimTransferFlowHandler) loadClaimContext(ctx context.Context, parsed 
 
 // validateClaimStatus enforces the same status preconditions as the legacy
 // ClaimTransfer entry point. Branches on isMimoReceiveEnabled (not just
-// receiver != nil) to match the legacy semantics — when the MIMO knob is
-// off but a TransferReceiver row happens to exist for the requested pubkey
-// (loader returns (false, receiver, nil)), legacy checks transfer.Status,
-// not receiver.Status.
+// receiver != nil) to match the legacy semantics — when the MIMO knob is off
+// but a TransferReceiver row happens to exist for the requested pubkey (loader
+// returns (false, receiver, nil)), legacy checks transfer.Status, not
+// receiver.Status.
+//
+// The already-applied states (KeyTweakApplied / RefundSigned) are claimable, not
+// terminal: a prior attempt — or, during the KnobUseConsensusClaim cutover, a
+// legacy claim that committed the settle phase before refund signing — can leave
+// a durable RKA/RRS transfer that still needs its refunds signed and a finalize
+// to reach COMPLETED. The consensus Prepare path resumes those (see Prepare's
+// applied branch): the key is tweaked exactly once, so it signs against the
+// already-post-tweak owner and Commit's apply no-ops. Returning AlreadyExists
+// here instead would strand such partials — their refunds would never get
+// signed and the SDK would stop retrying.
 func validateClaimStatus(transferID uuid.UUID, transferEnt *ent.Transfer, receiver *ent.TransferReceiver, isMimo bool) error {
 	if isMimo && receiver != nil {
 		switch receiver.Status {
@@ -1083,9 +1303,9 @@ func validateClaimStatus(transferID uuid.UUID, transferEnt *ent.Transfer, receiv
 	switch transferEnt.Status {
 	case st.TransferStatusSenderKeyTweaked,
 		st.TransferStatusReceiverKeyTweaked,
-		st.TransferStatusReceiverRefundSigned,
 		st.TransferStatusReceiverKeyTweakLocked,
-		st.TransferStatusReceiverKeyTweakApplied:
+		st.TransferStatusReceiverKeyTweakApplied,
+		st.TransferStatusReceiverRefundSigned:
 		return nil
 	case st.TransferStatusCompleted:
 		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
@@ -1099,8 +1319,11 @@ func validateClaimStatus(transferID uuid.UUID, transferEnt *ent.Transfer, receiv
 // validateClaimPackageStructure enforces the structural invariants the legacy
 // ClaimTransfer entry point asserts.
 func validateClaimPackageStructure(pkg *pb.ClaimPackage) error {
+	if len(pkg.LeavesToClaim) == 0 {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("claim package leaves_to_claim is required and must be non-empty"))
+	}
 	if len(pkg.KeyTweakPackage) == 0 {
-		return fmt.Errorf("claim package key_tweak_package is required and must be non-empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("claim package key_tweak_package is required and must be non-empty"))
 	}
 	dfcLeafIDs := make(map[string]struct{}, len(pkg.DirectFromCpfpLeavesToClaim))
 	for _, job := range pkg.DirectFromCpfpLeavesToClaim {
@@ -1337,8 +1560,6 @@ type claimTransferLeafSigningJobs struct {
 // buildClaimTransferAggregationJobs constructs the per-leaf signing-job helpers
 // the coordinator uses for FROST aggregation. Deterministic job IDs mirror the
 // ones SOs generate locally in Prepare.
-//
-//nolint:unused // reached via buildClaimTransferCoordinatorFlow (wired in PR 3).
 func buildClaimTransferAggregationJobs(
 	ctx context.Context,
 	transferID uuid.UUID,
@@ -1395,8 +1616,6 @@ func buildClaimTransferAggregationJobs(
 // refund variant. parentTxBytes is the tx whose vout 0 is being spent.
 // Mirrors the send-transfer flow's buildSigningJobForRefund but kept local to
 // avoid coupling claim_transfer PRs to send-transfer's unmerged stack.
-//
-//nolint:unused // reached via buildClaimTransferAggregationJobs (wired in PR 3).
 func buildClaimRefundSigningJob(
 	ctx context.Context,
 	req *pb.UserSignedTxSigningJob,
