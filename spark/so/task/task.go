@@ -170,6 +170,17 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			ExecutionInterval: clearSigningKeyshareSecretSharesInterval,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "clear_signing_keyshare_secret_shares",
+				Timeout:      &clearSigningKeyshareSecretSharesTaskTimeout,
+				RunInTestEnv: false,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return clearSigningKeyshareSecretShares(ctx, knobsService)
+				},
+			},
+		},
+		{
 			ExecutionInterval: 10 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "dkg",
