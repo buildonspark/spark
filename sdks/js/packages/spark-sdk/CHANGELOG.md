@@ -1,5 +1,19 @@
 # @buildonspark/spark-sdk
 
+## 0.8.2
+
+### Patch Changes
+
+- - Require connectors for multi-input refunds.
+  - Prevent conflicting deposit root signatures.
+  - Validate `StartTransferV3` request shape.
+  - Fix `claim_transfer` wedged-RKT recovery.
+  - Progressively drain pending transfer claims.
+  - Add `TransferSender` and leaf-receiver association to the spark proto.
+  - Add `TransferReceiver.status` for per-receiver state in V3 transfers.
+  - Fix spark-token-primitives failures on Android 10 (native binaries now target API 21).
+  - Bump dependencies to pull in upstream security patches (including protobufjs 8.0.1 for GHSA-xq3m-2v4x-88gg), plus general fixes and performance improvements.
+
 ## 0.8.1
 
 ### Patch Changes

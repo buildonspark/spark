@@ -1,6 +1,6 @@
 {
   "name": "spark-browser-extension",
-  "version": "0.0.64",
+  "version": "0.0.65",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,7 @@
     "lint": "eslint src build.mjs"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.8.1"
+    "@buildonspark/spark-sdk": "0.8.2"
   },
   "devDependencies": {
     "@lightsparkdev/eslint-config": "^0.0.1",

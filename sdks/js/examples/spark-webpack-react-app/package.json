@@ -10,7 +10,7 @@
     "build": "tsc --noEmit && webpack --config webpack.config.mjs --mode production"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.8.1",
+    "@buildonspark/spark-sdk": "0.8.2",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
