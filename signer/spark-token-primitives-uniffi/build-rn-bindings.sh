@@ -13,10 +13,13 @@ echo "Script directory: $SCRIPT_DIR"
 echo "Target directory: $TARGET"
 echo "SDK directory: $SDK_DIR"
 
-export CC_armv7_linux_androideabi=armv7a-linux-androideabi33-clang
-export CC_aarch64_linux_android=aarch64-linux-android33-clang
-export CC_i686_linux_android=i686-linux-android33-clang
-export CC_x86_64_linux_android=x86_64-linux-android33-clang
+# API 21 (the SDK's minSdkVersion), not a newer level: linking against an API 30+
+# sysroot makes the unwinder bind to libc.so's LIBC_R-versioned _Unwind_* symbols,
+# which do not exist on Android 10 (API 29) and below. See .cargo/config.toml.
+export CC_armv7_linux_androideabi=armv7a-linux-androideabi21-clang
+export CC_aarch64_linux_android=aarch64-linux-android21-clang
+export CC_i686_linux_android=i686-linux-android21-clang
+export CC_x86_64_linux_android=x86_64-linux-android21-clang
 
 # Add all targets
 echo "Adding build targets..."
@@ -112,3 +115,6 @@ echo "React Native bindings generated successfully!"
 
 echo "Verifying 16kb page size alignment..."
 bash "$SCRIPT_DIR/../../public/scripts/verify-android-page-size.sh"
+
+echo "Verifying Android minimum API compatibility (no LIBC_R imports)..."
+bash "$SCRIPT_DIR/../../public/scripts/verify-android-min-api.sh"

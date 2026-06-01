@@ -53,20 +53,20 @@ rustup target add x86_64-linux-android
 mkdir -p .cargo
 cat > .cargo/config.toml << 'EOL'
 [target.aarch64-linux-android]
-linker = "aarch64-linux-android33-clang"
-rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
+linker = "aarch64-linux-android21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.armv7-linux-androideabi]
-linker = "armv7a-linux-androideabi33-clang"
-rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
+linker = "armv7a-linux-androideabi21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.i686-linux-android]
-linker = "i686-linux-android33-clang"
-rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
+linker = "i686-linux-android21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.x86_64-linux-android]
-linker = "x86_64-linux-android33-clang"
-rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
+linker = "x86_64-linux-android21-clang"
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 EOL
 
 # Build and generate bindings
