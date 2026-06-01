@@ -687,6 +687,14 @@ var (
 					Where: "secret_version IS NULL",
 				},
 			},
+			{
+				Name:    "idx_signing_keyshares_clearable_secret_share_id",
+				Unique:  false,
+				Columns: []*schema.Column{SigningKeysharesColumns[0]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "secret_share IS NOT NULL AND secret_version IS NOT NULL",
+				},
+			},
 		},
 	}
 	// SigningNoncesColumns holds the columns for the "signing_nonces" table.

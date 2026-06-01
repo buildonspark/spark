@@ -43,6 +43,16 @@ func (SigningKeyshare) Indexes() []ent.Index {
 		index.Fields("id").
 			Annotations(entsql.IndexWhere("secret_version IS NULL")).
 			StorageKey("idx_signing_keyshares_missing_secret_version_id"),
+		// Temporary index to optimize the clear_signing_keyshare_secret_shares cron's
+		// cursor-from-nil first-batch SELECT. Without it, scan cost grows monotonically
+		// as cleared rows accumulate (the planner has to walk past every cleared row in
+		// id order to find the next eligible one), and the cron stalls before completing.
+		// The partial index contains only eligible rows, so the first-batch scan is
+		// O(eligible) regardless of how many cleared rows exist.
+		// TODO: Remove(SP-3129) after clear is complete (alongside the SecretShare field removal)
+		index.Fields("id").
+			Annotations(entsql.IndexWhere("secret_share IS NOT NULL AND secret_version IS NOT NULL")).
+			StorageKey("idx_signing_keyshares_clearable_secret_share_id"),
 	}
 }
 
