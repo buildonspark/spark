@@ -18,9 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
-	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
@@ -190,12 +188,22 @@ func checkedDepositRootTotalValue(primaryOutput *wire.TxOut, additionalUtxos []a
 	return totalValue, nil
 }
 
-// load the deposit address and validate it
+// load the deposit address and validate it.
+//
+// enforceUtxoConfirmation gates the on-chain UTXO confirmation checks against
+// the local Utxo table. The coordinator passes true: it authoritatively
+// verifies the deposit is confirmed before fanning out. Participant SOs pass
+// false because they validate during consensus Prepare, where their own chain
+// watcher may not have recorded the deposit UTXOs yet — requiring local
+// confirmation there would make multi-UTXO finalization fail on any SO lagging
+// the coordinator. This mirrors the single-UTXO check below, which is likewise
+// skipped when the local DB hasn't yet observed the confirmation.
 func loadAndValidateDepositAddress(
 	ctx context.Context,
 	network btcnetwork.Network,
 	req *pb.FinalizeDepositTreeCreationRequest,
 	reqIDPubKey keys.Public,
+	enforceUtxoConfirmation bool,
 ) (depositAddress *ent.DepositAddress, onChainTx *wire.MsgTx, onChainOutput *wire.TxOut, additionalUtxos []additionalUtxoData, err error) {
 	// Parse on-chain UTXO
 	onChainTx, err = common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
@@ -336,7 +344,7 @@ func loadAndValidateDepositAddress(
 	// Each UTXO is verified individually against the Utxo table rather than relying on
 	// depositAddress.AvailabilityConfirmedAt, which only indicates that some UTXO to that
 	// address was confirmed — not necessarily the primary UTXO in this request.
-	if len(additionalUtxos) > 0 {
+	if enforceUtxoConfirmation && len(additionalUtxos) > 0 {
 		// Build list of all UTXOs to verify: primary first, then additional
 		type utxoToVerify struct {
 			label string
@@ -389,7 +397,7 @@ func loadAndValidateDepositAddress(
 	// on-chain deposit. Without this check, an attacker could supply fabricated
 	// raw tx bytes paying to a valid deposit address with an inflated value,
 	// and the server would create a tree backed by a UTXO that doesn't exist.
-	if len(additionalUtxos) == 0 && depositAddress.ConfirmationTxid != "" {
+	if enforceUtxoConfirmation && len(additionalUtxos) == 0 && depositAddress.ConfirmationTxid != "" {
 		onChainTxid := onChainTx.TxHash().String()
 		if onChainTxid != depositAddress.ConfirmationTxid {
 			err = fmt.Errorf("primary utxo txid %s does not match confirmed deposit txid %s", onChainTxid, depositAddress.ConfirmationTxid)
@@ -1123,62 +1131,4 @@ func convertToSigningJobsWithPregeneratedNonce(
 	}
 
 	return result, nil
-}
-
-func (o *DepositHandler) sendFinalizeNodeGossip(
-	ctx context.Context,
-	tree *ent.Tree,
-	rootNode *ent.TreeNode,
-) error {
-	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	participants, err := selection.OperatorIdentifierList(o.config)
-	if err != nil {
-		return fmt.Errorf("unable to get operator list: %w", err)
-	}
-	sendGossipHandler := NewSendGossipHandler(o.config)
-
-	protoNetwork, err := tree.Network.ToProtoNetwork()
-	if err != nil {
-		return err
-	}
-
-	// Load the node with all required edges for marshaling
-	// This must happen within the transaction before it commits
-	// We MUST load all edges that MarshalInternalProto might query
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get database: %w", err)
-	}
-
-	rootNodeWithEdges, err := db.TreeNode.Query().
-		Where(treenode.ID(rootNode.ID)).
-		WithTree().
-		WithSigningKeyshare().
-		WithParent(). // Load parent edge to avoid lazy loading in getParentNodeID
-		Only(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load root node with edges: %w", err)
-	}
-
-	// Marshal the node BEFORE CreateCommitAndSendGossipMessage commits the transaction
-	// This ensures all database queries happen within the active transaction
-	internalNode, err := rootNodeWithEdges.MarshalInternalProto(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to marshal root node %s: %w", rootNode.ID.String(), err)
-	}
-	internalNodes := []*spark_internal.TreeNode{internalNode}
-
-	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_FinalizeTreeCreation{
-			FinalizeTreeCreation: &pbgossip.GossipMessageFinalizeTreeCreation{
-				InternalNodes: internalNodes,
-				ProtoNetwork:  protoNetwork,
-			},
-		},
-	}, participants)
-	if err != nil {
-		return fmt.Errorf("unable to create and send gossip message: %w", err)
-	}
-
-	return nil
 }

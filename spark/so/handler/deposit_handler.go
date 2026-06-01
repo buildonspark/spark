@@ -2062,141 +2062,30 @@ func (o *DepositHandler) FinalizeDepositTreeCreation(ctx context.Context, config
 	ctx, span := tracer.Start(ctx, "DepositHandler.FinalizeDepositTreeCreation")
 	defer span.End()
 
-	logger := logging.GetLoggerFromContext(ctx)
-
-	// Validate request
-	err := validateFinalizeDepositTreeCreationRequest(req)
+	flow, err := buildDepositCoordinatorFlow(ctx, config, req)
 	if err != nil {
 		return nil, err
 	}
-
-	// Validate identity
-	reqIDPubKey, err := validateIdentity(ctx, config, req.IdentityPublicKey)
+	engine, err := consensus.GetEngine(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Consensus path: use 2PC engine for all SO communication
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusDepositTree, 0) > 0 {
-		flow, err := buildDepositCoordinatorFlow(ctx, config, req)
-		if err != nil {
-			return nil, err
-		}
-		engine, err := consensus.GetEngine(ctx)
-		if err != nil {
-			return nil, err
-		}
-		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-		_, err = engine.Execute(ctx,
-			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE,
-			&selection,
-			flow,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("consensus deposit tree finalization failed: %w", err)
-		}
-		return flow.response, nil
-	}
-
-	network, err := convertAndValidateProtoNetwork(config, req.OnChainUtxo.Network)
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	_, err = engine.Execute(ctx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE,
+		&selection,
+		flow,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("invalid network %s: %w", req.OnChainUtxo.Network, err)
+		return nil, fmt.Errorf("consensus deposit tree finalization failed: %w", err)
 	}
-
-	// Step 1: Validate request and get deposit address
-	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey)
-	if err != nil {
-		return nil, err
+	if flow.response == nil {
+		// Engine returned success but BuildCommitPayload never populated the
+		// response — should not happen in practice, but defend against it
+		// rather than dereference a nil response.
+		return nil, fmt.Errorf("deposit tree consensus completed without building a response")
 	}
-
-	// Check if tree already exists for this deposit address
-	if depositAddress.Edges.Tree != nil {
-		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists for deposit address %s", depositAddress.Address))
-	}
-
-	logger.Sugar().Infof("Finalizing deposit tree creation for address %s", depositAddress.Address)
-
-	// Step 2: Prepare signing jobs with pregenerated nonces
-	signingJobs, verifyingKey, rootTxInputCount, err := prepareSigningJobs(req, depositAddress, onChainTx, onChainOutput, additionalUtxos)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to SigningJobWithPregeneratedNonce using SE commitments from request
-	signingJobsWithNonce, err := convertToSigningJobsWithPregeneratedNonce(signingJobs, req, rootTxInputCount)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert signing jobs: %w", err)
-	}
-
-	// Step 3: SE signs all transactions using pregenerated commitments
-	logger.Sugar().Infof("SE signing %d transactions for deposit using pregenerated nonces", len(signingJobsWithNonce))
-	signingResults, err := helper.SignFrostWithPregeneratedNonce(ctx, config, signingJobsWithNonce)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign transactions: %w", err)
-	}
-	if len(signingResults) != len(signingJobs) {
-		return nil, fmt.Errorf("expected %d signing results, got %d", len(signingJobs), len(signingResults))
-	}
-	for i, signingResult := range signingResults {
-		if signingResult.JobID != signingJobs[i].JobID {
-			return nil, fmt.Errorf("signing results do not match signing jobs (i=%d resultID=%s jobID=%s)", i, signingResult.JobID, signingJobs[i].JobID)
-		}
-	}
-
-	// Step 4: Aggregate signatures (SE + user)
-	rootSigningPubKey, err := keys.ParsePublicKey(req.RootTxSigningJob.SigningPublicKey)
-	if err != nil {
-		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse root signing key: %w", err))
-	}
-	signatures, err := aggregateDepositSignatures(ctx, config, req, signingResults, verifyingKey, rootSigningPubKey, rootTxInputCount)
-	if err != nil {
-		return nil, err
-	}
-
-	logger.Sugar().Infof("Successfully aggregated %d signatures", len(signatures))
-
-	// Step 5: Apply signatures to transactions
-	signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, err := applySignaturesToTransactions(req, signatures, rootTxInputCount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Step 5b: Verify signed transactions using Bitcoin script engine
-	if err := verifySignedTransactions(signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx, onChainTx, onChainOutput, additionalUtxos); err != nil {
-		return nil, fmt.Errorf("signed transaction verification failed: %w", err)
-	}
-
-	// Step 6: Create tree and node in database with signed transactions
-	// Note: The tree is automatically linked to deposit address via SetDepositAddress() in createTreeAndNode
-	createdTree, createdNode, err := createTreeAndNode(ctx, config, depositAddress, onChainTx, onChainOutput, additionalUtxos, req.OnChainUtxo.Vout, network, verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
-	if err != nil {
-		return nil, err
-	}
-
-	logger.Sugar().Infof("Successfully finalized deposit tree with root node %s", createdNode.ID)
-
-	// Marshal the response BEFORE sending gossip (which commits the transaction)
-	// MarshalSparkProto may need to load edges from the database
-	pbNode, err := createdNode.MarshalSparkProto(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Step 7: Send gossip to other SOs
-	// Note: CreateCommitAndSendGossipMessage will commit the transaction
-	err = o.sendFinalizeNodeGossip(ctx, createdTree, createdNode)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf(
-			"failed to send gossip for new tree (%s) and node (%s)",
-			createdTree.ID.String(), createdNode.ID.String())
-		// Don't return error - gossip failure shouldn't fail the entire operation
-		// The local SO will process the gossip through the normal retry mechanism
-	}
-
-	// Return response
-	return &pb.FinalizeDepositTreeCreationResponse{
-		RootNode: pbNode,
-	}, nil
+	return flow.response, nil
 }
 
 func convertAndValidateProtoNetwork(

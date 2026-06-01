@@ -163,8 +163,7 @@ const (
 	KnobGossipLimit              = "spark.so.gossip.limit"
 	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
 
-	KnobEnablePartnerJWT        = "spark.so.enable_partner_jwt"
-	KnobUseConsensusDepositTree = "spark.so.use_consensus_deposit_tree"
+	KnobEnablePartnerJWT = "spark.so.enable_partner_jwt"
 	// KnobUseConsensusTransfer routes StartTransferV3 through the 2PC engine
 	// instead of the legacy syncTransferV3Init + syncSettleSenderKeyTweaks fanout.
 	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the

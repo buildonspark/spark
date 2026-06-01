@@ -73,8 +73,12 @@ func (h *DepositTreeFlowHandler) Prepare(ctx context.Context, op proto.Message) 
 		return nil, fmt.Errorf("invalid network %s: %w", origReq.OnChainUtxo.Network, err)
 	}
 
-	// 4. Load and validate deposit address (same validation as coordinator)
-	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, origReq, reqIDPubKey)
+	// 4. Load and validate deposit address. The coordinator already
+	// authoritatively verified UTXO confirmation before fanning out; participant
+	// SOs skip that check (enforceUtxoConfirmation=false) since their own chain
+	// watcher may lag the coordinator and hasn't necessarily recorded the deposit
+	// UTXOs yet.
+	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, origReq, reqIDPubKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +305,7 @@ func buildDepositCoordinatorFlow(
 		return nil, fmt.Errorf("invalid network %s: %w", req.OnChainUtxo.Network, err)
 	}
 
-	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey)
+	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey, true)
 	if err != nil {
 		return nil, err
 	}
