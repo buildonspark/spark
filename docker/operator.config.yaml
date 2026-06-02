@@ -57,7 +57,6 @@ knobs:
     spark.so.max_unused_deposit_addresses: 64
     spark.so.enforce_no_direct_transactions_from_deposit_tx@REGTEST: 100
     spark.so.disable_v2_txs@REGTEST: 100
-    spark.so.watch_chain.tweak_keys_for_coop_exit_delay.enabled: 1
     spark.so.enable_instant_static_deposit@REGTEST: 100
     spark.so.max_pending_instant_static_deposit_amount: 1000000
     spark.so.shutdown_hodl_invoices: 0

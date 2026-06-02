@@ -2907,7 +2907,7 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Client, transfer *e
 	if coopExit.ConfirmationHeight == nil {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx hasn't been broadcasted"))
 	}
-	requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations, knobs.CoopExitConfirmationThreshold))
+	requiredConfirmations := int64(knobs.CoopExitConfirmationThreshold)
 	if blockHeight.Height-*coopExit.ConfirmationHeight+1 < requiredConfirmations {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", *coopExit.ConfirmationHeight, blockHeight.Height))
 	}

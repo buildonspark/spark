@@ -819,111 +819,72 @@ func handleBlock(
 
 	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled, 0) > 0 {
-		// Build lists of both normal and reversed TxIDs to handle both endianness
-		confirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet)*2)
-		for txHashBytes := range confirmedTxHashSet {
-			normalTxid, err := st.NewTxIDFromBytes(txHashBytes[:])
-			if err != nil {
-				return fmt.Errorf("failed to parse normal txid from confirmed tx hash: %w", err)
-			}
-			confirmedTxIDs = append(confirmedTxIDs, normalTxid)
-			reversedTxHashBytes := slices.Clone(txHashBytes[:])
-			slices.Reverse(reversedTxHashBytes)
-			reversedTxid, err := st.NewTxIDFromBytes(reversedTxHashBytes)
-			if err != nil {
-				return fmt.Errorf("failed to parse reversed txid from confirmed tx hash: %w", err)
-			}
-			confirmedTxIDs = append(confirmedTxIDs, reversedTxid)
+	// Build lists of both normal and reversed TxIDs to handle both endianness
+	confirmedTxIDs := make([]st.TxID, 0, len(confirmedTxHashSet)*2)
+	for txHashBytes := range confirmedTxHashSet {
+		normalTxid, err := st.NewTxIDFromBytes(txHashBytes[:])
+		if err != nil {
+			return fmt.Errorf("failed to parse normal txid from confirmed tx hash: %w", err)
 		}
-
-		if len(confirmedTxIDs) > 0 {
-			unconfirmedCoopExits, err := dbClient.CooperativeExit.Query().
-				Where(
-					cooperativeexit.And(
-						cooperativeexit.ConfirmationHeightIsNil(),
-						cooperativeexit.ExitTxidIn(confirmedTxIDs...),
-					),
-				).
-				All(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to query unconfirmed coop exits: %w", err)
-			}
-
-			for _, coopExit := range unconfirmedCoopExits {
-				if coopExit.KeyTweakedHeight != nil {
-					return fmt.Errorf("coop exit %s has KeyTweakedHeight set but ConfirmationHeight not set", coopExit.ID)
-				}
-				logger.Sugar().Debugf("Found coop exit %s at block height %d", coopExit.ID, blockHeight)
-				_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to update ConfirmationHeight for coop exit %s: %w", coopExit.ID, err)
-				}
-			}
+		confirmedTxIDs = append(confirmedTxIDs, normalTxid)
+		reversedTxHashBytes := slices.Clone(txHashBytes[:])
+		slices.Reverse(reversedTxHashBytes)
+		reversedTxid, err := st.NewTxIDFromBytes(reversedTxHashBytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse reversed txid from confirmed tx hash: %w", err)
 		}
+		confirmedTxIDs = append(confirmedTxIDs, reversedTxid)
+	}
 
-		coopExitsToTweak, err := dbClient.CooperativeExit.Query().
+	if len(confirmedTxIDs) > 0 {
+		unconfirmedCoopExits, err := dbClient.CooperativeExit.Query().
 			Where(
-				cooperativeexit.ConfirmationHeightNotNil(),
-				cooperativeexit.KeyTweakedHeightIsNil(),
-				cooperativeexit.HasTransferWith(transfer.NetworkEQ(network)),
+				cooperativeexit.And(
+					cooperativeexit.ConfirmationHeightIsNil(),
+					cooperativeexit.ExitTxidIn(confirmedTxIDs...),
+				),
 			).
 			All(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to query coop exits to tweak: %w", err)
+			return fmt.Errorf("failed to query unconfirmed coop exits: %w", err)
 		}
 
-		requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations, knobs.CoopExitConfirmationThreshold))
-		for _, coopExit := range coopExitsToTweak {
-			if blockHeight-*coopExit.ConfirmationHeight+1 >= requiredConfirmations {
-				// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
-				// since this is not critical for the block processing.
-				err = tweakKeysForCoopExitFunc(ctx, config, coopExit, blockHeight)
-				if err != nil {
-					logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle transfer key tweak for coop exit %s", coopExit.ID)
-					continue
-				}
-				_, err = coopExit.Update().SetKeyTweakedHeight(blockHeight).Save(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to update KeyTweakedHeight for coop exit %s: %w", coopExit.ID, err)
-				}
+		for _, coopExit := range unconfirmedCoopExits {
+			if coopExit.KeyTweakedHeight != nil {
+				return fmt.Errorf("coop exit %s has KeyTweakedHeight set but ConfirmationHeight not set", coopExit.ID)
 			}
-		}
-	} else {
-		pendingCoopExits, err := dbClient.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
-		if err != nil {
-			return err
-		}
-		for _, coopExit := range pendingCoopExits {
-			txHash := coopExit.ExitTxid
-			txHashBytes := txHash.Bytes()
-			reversedHash := slices.Clone(txHashBytes)
-			slices.Reverse(reversedHash)
-			_, found := confirmedTxHashSet[[32]byte(txHashBytes)]
-			_, reverseFound := confirmedTxHashSet[[32]byte(reversedHash)]
-			if found {
-				logger.Sugar().Debugf("Found BE coop exit tx at tx hash %s", txHash)
-			} else if reverseFound {
-				logger.Sugar().Debugf("Found LE coop exit tx at tx hash %s", txHash)
-			} else {
-				continue
-			}
-			// Set block height for the coop exit.
+			logger.Sugar().Debugf("Found coop exit %s at block height %d", coopExit.ID, blockHeight)
 			_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to update ConfirmationHeight for coop exit %s: %w", coopExit.ID, err)
 			}
-			_, err = coopExit.Update().SetKeyTweakedHeight(blockHeight).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to update KeyTweakedHeight for coop exit %s: %w", coopExit.ID, err)
-			}
+		}
+	}
 
+	coopExitsToTweak, err := dbClient.CooperativeExit.Query().
+		Where(
+			cooperativeexit.ConfirmationHeightNotNil(),
+			cooperativeexit.KeyTweakedHeightIsNil(),
+			cooperativeexit.HasTransferWith(transfer.NetworkEQ(network)),
+		).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query coop exits to tweak: %w", err)
+	}
+
+	requiredConfirmations := int64(knobs.CoopExitConfirmationThreshold)
+	for _, coopExit := range coopExitsToTweak {
+		if blockHeight-*coopExit.ConfirmationHeight+1 >= requiredConfirmations {
 			// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
 			// since this is not critical for the block processing.
 			err = tweakKeysForCoopExitFunc(ctx, config, coopExit, blockHeight)
 			if err != nil {
-				logger.With(zap.Error(err)).Sugar().Errorf("Failed to tweak keys for coop exit %s", coopExit.ID)
+				logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle transfer key tweak for coop exit %s", coopExit.ID)
 				continue
+			}
+			_, err = coopExit.Update().SetKeyTweakedHeight(blockHeight).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update KeyTweakedHeight for coop exit %s: %w", coopExit.ID, err)
 			}
 		}
 	}

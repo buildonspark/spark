@@ -650,15 +650,9 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	}
 }
 
-func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
+func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	ctx, _ := db.NewTestSQLiteContext(t)
-
-	knobsService := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled:      1.0,
-		knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations: 3.0,
-	})
-	ctx = knobs.InjectKnobsService(ctx, knobsService)
 
 	// Mock tweakKeysForCoopExit to succeed immediately
 	originalTweakFunc := tweakKeysForCoopExitFunc
@@ -820,12 +814,12 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
 	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
 
-	// Process a few more blocks to trigger key tweaking (need >= 2 blocks)
-	blockHeight = int64(102)
+	// Process more blocks to trigger key tweaking (need CoopExitConfirmationThreshold confirmations)
+	blockHeight = int64(100 + knobs.CoopExitConfirmationThreshold - 1)
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
-	// Verify: After 2+ blocks, keys should be tweaked for all confirmed exits
+	// Verify: After enough confirmations, keys should be tweaked for all confirmed exits
 	allCoopExits, err = dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
 
@@ -834,7 +828,7 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 	for _, exit := range allCoopExits {
 		if exit.ConfirmationHeight != nil {
 			// All confirmed exits should now have KeyTweakedHeight set
-			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set after 2+ blocks")
+			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set after enough confirmations")
 			if exit.KeyTweakedHeight != nil {
 				assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
 				require.NotNil(t, exit.Edges.Transfer)
@@ -855,12 +849,6 @@ func TestHandleBlock_CoopExitProcessing_KnobEnabled(t *testing.T) {
 func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	ctx, _ := db.NewTestSQLiteContext(t)
-
-	knobsService := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled:      1.0,
-		knobs.KnobWatchChainCoopExitKeyTweakRequiredConfirmations: 3.0,
-	})
-	ctx = knobs.InjectKnobsService(ctx, knobsService)
 
 	originalTweakFunc := tweakKeysForCoopExitFunc
 	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
@@ -1006,7 +994,7 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	assert.Equal(t, reorgBlockHash.CloneBytes(), *storedBlockHeight.BlockHash)
 
 	// --- Step 3: Process enough blocks for key tweaking ---
-	blockHeight = int64(102)
+	blockHeight = int64(100 + knobs.CoopExitConfirmationThreshold - 1)
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
 
@@ -1020,183 +1008,6 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 2, tweakedCount, "Both exits should have keys tweaked after enough confirmations")
-}
-
-func TestHandleBlock_CoopExitProcessing_KnobDisabled(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
-	ctx, _ := db.NewTestSQLiteContext(t)
-
-	// Disable the knob to use old code path
-	knobsService := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobWatchChainTweakKeysForCoopExitDelayEnabled: 0.0,
-	})
-	ctx = knobs.InjectKnobsService(ctx, knobsService)
-
-	// Mock tweakKeysForCoopExit to succeed immediately
-	originalTweakFunc := tweakKeysForCoopExitFunc
-	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
-		return nil
-	}
-	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
-
-	dbTx, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-
-	// Create test transactions for coop exits (version 2 with two outputs)
-	// Output 1: withdrawal amount to user, Output 2: intermediate amount to connector
-	coopExitTx1 := wire.MsgTx{
-		Version: 2,
-		TxIn:    []*wire.TxIn{{}},
-		TxOut: []*wire.TxOut{
-			{Value: 900},
-			{Value: 100},
-		},
-	}
-	coopExitTx2 := wire.MsgTx{
-		Version: 2,
-		TxIn:    []*wire.TxIn{{}},
-		TxOut: []*wire.TxOut{
-			{Value: 1800},
-			{Value: 200},
-		},
-	}
-	// Transaction not in block
-	coopExitTxNotInBlock := wire.MsgTx{
-		Version: 2,
-		TxIn:    []*wire.TxIn{{}},
-		TxOut: []*wire.TxOut{
-			{Value: 3600},
-			{Value: 400},
-		},
-	}
-
-	// Create transfers and coop exits
-	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-
-	transfer1, err := dbTx.Transfer.Create().
-		SetNetwork(btcnetwork.Testnet).
-		SetStatus(schematype.TransferStatusSenderInitiated).
-		SetType(schematype.TransferTypeCooperativeExit).
-		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
-		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
-		SetTotalValue(1000).
-		SetExpiryTime(time.Now().Add(24 * time.Hour)).
-		Save(ctx)
-	require.NoError(t, err)
-
-	transfer2, err := dbTx.Transfer.Create().
-		SetNetwork(btcnetwork.Testnet).
-		SetStatus(schematype.TransferStatusSenderInitiated).
-		SetType(schematype.TransferTypeCooperativeExit).
-		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
-		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
-		SetTotalValue(2000).
-		SetExpiryTime(time.Now().Add(24 * time.Hour)).
-		Save(ctx)
-	require.NoError(t, err)
-
-	transfer3, err := dbTx.Transfer.Create().
-		SetNetwork(btcnetwork.Testnet).
-		SetStatus(schematype.TransferStatusSenderInitiated).
-		SetType(schematype.TransferTypeCooperativeExit).
-		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
-		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
-		SetTotalValue(3000).
-		SetExpiryTime(time.Now().Add(24 * time.Hour)).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Create cooperative exits with reversed byte order (matching production behavior)
-	// Exit 1: Reversed bytes - should be found
-	txHash1 := coopExitTx1.TxHash()
-	reversedTxHash1 := make([]byte, len(txHash1))
-	copy(reversedTxHash1, txHash1[:])
-	for i := 0; i < len(reversedTxHash1)/2; i++ {
-		reversedTxHash1[i], reversedTxHash1[len(reversedTxHash1)-1-i] = reversedTxHash1[len(reversedTxHash1)-1-i], reversedTxHash1[i]
-	}
-	exitTxid1, err := schematype.NewTxIDFromBytes(reversedTxHash1)
-	require.NoError(t, err)
-	_, err = dbTx.CooperativeExit.Create().
-		SetTransfer(transfer1).
-		SetExitTxid(exitTxid1).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Exit 2: Direct bytes (not reversed) - should be found
-	txHash2 := coopExitTx2.TxHash()
-	exitTxid2, err := schematype.NewTxIDFromBytes(txHash2[:])
-	require.NoError(t, err)
-	_, err = dbTx.CooperativeExit.Create().
-		SetTransfer(transfer2).
-		SetExitTxid(exitTxid2).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Exit 3: Reversed bytes - not in the block, should not be found
-	txHash3 := coopExitTxNotInBlock.TxHash()
-	reversedTxHash3 := make([]byte, len(txHash3))
-	copy(reversedTxHash3, txHash3[:])
-	for i := 0; i < len(reversedTxHash3)/2; i++ {
-		reversedTxHash3[i], reversedTxHash3[len(reversedTxHash3)-1-i] = reversedTxHash3[len(reversedTxHash3)-1-i], reversedTxHash3[i]
-	}
-	exitTxid3, err := schematype.NewTxIDFromBytes(reversedTxHash3)
-	require.NoError(t, err)
-	_, err = dbTx.CooperativeExit.Create().
-		SetTransfer(transfer3).
-		SetExitTxid(exitTxid3).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Create config
-	config := so.Config{
-		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
-		Lrc20Configs: map[string]so.Lrc20Config{
-			btcnetwork.Testnet.String(): {
-				DisableRpcs: true,
-			},
-		},
-		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
-	}
-
-	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
-	bitcoinClient, err := rpcclient.New(connCfg, nil)
-	require.NoError(t, err)
-
-	blockHeight := int64(100)
-	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2}
-
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
-	require.NoError(t, err)
-
-	// Verify: exits 1 and 2 should be confirmed, exit 3 should not
-	allCoopExits, err := dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
-	require.NoError(t, err)
-	require.Len(t, allCoopExits, 3)
-
-	confirmedCount := 0
-	unconfirmedCount := 0
-	confirmedTransferIDs := make(map[uuid.UUID]bool)
-	for _, exit := range allCoopExits {
-		if exit.ConfirmationHeight != nil {
-			confirmedCount++
-			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
-			// In legacy path, KeyTweakedHeight should be set immediately
-			assert.NotNil(t, exit.KeyTweakedHeight, "KeyTweakedHeight should be set immediately in legacy path")
-			assert.Equal(t, blockHeight, *exit.KeyTweakedHeight)
-			// Track which transfers were confirmed
-			require.NotNil(t, exit.Edges.Transfer)
-			confirmedTransferIDs[exit.Edges.Transfer.ID] = true
-		} else {
-			unconfirmedCount++
-		}
-	}
-	assert.Equal(t, 2, confirmedCount, "Expected 2 coop exits to be confirmed")
-	assert.Equal(t, 1, unconfirmedCount, "Expected 1 coop exit to remain unconfirmed")
-	// Verify exits 1 and 2 (transfer1 and transfer2) were confirmed
-	assert.True(t, confirmedTransferIDs[transfer1.ID], "Exit 1 (transfer1) should be confirmed")
-	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
-	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
 }
 
 func TestTweakKeysForCoopExit_UsesEphemeralSecrets(t *testing.T) {
