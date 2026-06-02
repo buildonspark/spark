@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
@@ -1436,16 +1437,16 @@ func SignRefunds(
 		userKeyPackage := CreateUserKeyPackage(leafData.SigningPrivKey)
 
 		// Process regular CPFP refund transaction
-		var refundTxSighash []byte
+		var refundTxSighash sighash.Hash
 		if leafData.ConnectorPrevOutput != nil && len(leafData.RefundTx.TxIn) == 2 {
 			// Multi-input coop exit transaction
 			prevOutputs := map[wire.OutPoint]*wire.TxOut{
 				leafData.RefundTx.TxIn[0].PreviousOutPoint: leafData.Tx.TxOut[0],
 				leafData.RefundTx.TxIn[1].PreviousOutPoint: leafData.ConnectorPrevOutput,
 			}
-			refundTxSighash, _ = common.SigHashFromMultiPrevOutTx(leafData.RefundTx, 0, prevOutputs)
+			refundTxSighash, _ = sighash.FromMultiPrevOutTx(leafData.RefundTx, 0, prevOutputs)
 		} else {
-			refundTxSighash, _ = common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
+			refundTxSighash, _ = sighash.FromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
 		}
 		nonceProto, _ := leafData.Nonce.MarshalProto()
 		nonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
@@ -1457,7 +1458,7 @@ func SignRefunds(
 		}
 		userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 			JobId:            refundJobID,
-			Message:          refundTxSighash,
+			Message:          refundTxSighash.Serialize(),
 			KeyPackage:       userKeyPackage,
 			VerifyingKey:     operatorSigningResult.VerifyingKey,
 			Nonce:            nonceProto,
@@ -1467,7 +1468,7 @@ func SignRefunds(
 		})
 
 		jobToAggregateRequestMap[refundJobID] = &pbfrost.AggregateFrostRequest{
-			Message:          refundTxSighash,
+			Message:          refundTxSighash.Serialize(),
 			SignatureShares:  operatorSigningResult.RefundTxSigningResult.SignatureShares,
 			PublicShares:     operatorSigningResult.RefundTxSigningResult.PublicKeys,
 			VerifyingKey:     operatorSigningResult.VerifyingKey,
@@ -1479,7 +1480,7 @@ func SignRefunds(
 
 		// Process direct refund transaction if present
 		if operatorSigningResult.DirectRefundTxSigningResult != nil && leafData.DirectRefundTx != nil {
-			var directRefundTxSighash []byte
+			var directRefundTxSighash sighash.Hash
 
 			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectRefundTx.TxIn) == 2 {
 				// Multi-input coop exit transaction
@@ -1488,9 +1489,9 @@ func SignRefunds(
 
 					leafData.DirectRefundTx.TxIn[1].PreviousOutPoint: leafData.ConnectorPrevOutput,
 				}
-				directRefundTxSighash, _ = common.SigHashFromMultiPrevOutTx(leafData.DirectRefundTx, 0, prevOutputs)
+				directRefundTxSighash, _ = sighash.FromMultiPrevOutTx(leafData.DirectRefundTx, 0, prevOutputs)
 			} else {
-				directRefundTxSighash, _ = common.SigHashFromTx(leafData.DirectRefundTx, 0, leafData.DirectTx.TxOut[0])
+				directRefundTxSighash, _ = sighash.FromTx(leafData.DirectRefundTx, 0, leafData.DirectTx.TxOut[0])
 			}
 			directRefundNonceProto, _ := leafData.DirectRefundNonce.MarshalProto()
 			directRefundNonceCommitmentProto, _ := leafData.DirectRefundNonce.SigningCommitment().MarshalProto()
@@ -1502,7 +1503,7 @@ func SignRefunds(
 			}
 			userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 				JobId:            directRefundJobID,
-				Message:          directRefundTxSighash,
+				Message:          directRefundTxSighash.Serialize(),
 				KeyPackage:       userKeyPackage,
 				VerifyingKey:     operatorSigningResult.VerifyingKey,
 				Nonce:            directRefundNonceProto,
@@ -1512,7 +1513,7 @@ func SignRefunds(
 			})
 
 			jobToAggregateRequestMap[directRefundJobID] = &pbfrost.AggregateFrostRequest{
-				Message:          directRefundTxSighash,
+				Message:          directRefundTxSighash.Serialize(),
 				SignatureShares:  operatorSigningResult.DirectRefundTxSigningResult.SignatureShares,
 				PublicShares:     operatorSigningResult.DirectRefundTxSigningResult.PublicKeys,
 				VerifyingKey:     operatorSigningResult.VerifyingKey,
@@ -1525,7 +1526,7 @@ func SignRefunds(
 
 		// Process direct from CPFP refund transaction if present
 		if operatorSigningResult.DirectFromCpfpRefundTxSigningResult != nil && leafData.DirectFromCpfpRefundTx != nil {
-			var directFromCpfpRefundTxSighash []byte
+			var directFromCpfpRefundTxSighash sighash.Hash
 
 			if leafData.ConnectorPrevOutput != nil && len(leafData.DirectFromCpfpRefundTx.TxIn) == 2 {
 				// Multi-input coop exit transaction
@@ -1533,9 +1534,9 @@ func SignRefunds(
 					leafData.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint: leafData.Tx.TxOut[0],
 					leafData.DirectFromCpfpRefundTx.TxIn[1].PreviousOutPoint: leafData.ConnectorPrevOutput,
 				}
-				directFromCpfpRefundTxSighash, _ = common.SigHashFromMultiPrevOutTx(leafData.DirectFromCpfpRefundTx, 0, prevOutputs)
+				directFromCpfpRefundTxSighash, _ = sighash.FromMultiPrevOutTx(leafData.DirectFromCpfpRefundTx, 0, prevOutputs)
 			} else {
-				directFromCpfpRefundTxSighash, _ = common.SigHashFromTx(leafData.DirectFromCpfpRefundTx, 0, leafData.Tx.TxOut[0])
+				directFromCpfpRefundTxSighash, _ = sighash.FromTx(leafData.DirectFromCpfpRefundTx, 0, leafData.Tx.TxOut[0])
 			}
 			directFromCpfpRefundNonceProto, _ := leafData.DirectFromCpfpRefundNonce.MarshalProto()
 			directFromCpfpRefundNonceCommitmentProto, _ := leafData.DirectFromCpfpRefundNonce.SigningCommitment().MarshalProto()
@@ -1547,7 +1548,7 @@ func SignRefunds(
 			}
 			userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 				JobId:            directFromCpfpRefundJobID,
-				Message:          directFromCpfpRefundTxSighash,
+				Message:          directFromCpfpRefundTxSighash.Serialize(),
 				KeyPackage:       userKeyPackage,
 				VerifyingKey:     operatorSigningResult.VerifyingKey,
 				Nonce:            directFromCpfpRefundNonceProto,
@@ -1557,7 +1558,7 @@ func SignRefunds(
 			})
 
 			jobToAggregateRequestMap[directFromCpfpRefundJobID] = &pbfrost.AggregateFrostRequest{
-				Message:          directFromCpfpRefundTxSighash,
+				Message:          directFromCpfpRefundTxSighash.Serialize(),
 				SignatureShares:  operatorSigningResult.DirectFromCpfpRefundTxSigningResult.SignatureShares,
 				PublicShares:     operatorSigningResult.DirectFromCpfpRefundTxSigningResult.PublicKeys,
 				VerifyingKey:     operatorSigningResult.VerifyingKey,

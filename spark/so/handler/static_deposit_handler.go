@@ -369,7 +369,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			// Refund retries may use a different transaction, for example to adjust
 			// fees, but each distinct transaction still needs a fresh user
 			// authorization because the sighash is part of the signed statement.
-			if err := validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, schemaNetwork, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
+			if err := validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, schemaNetwork, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
 				return nil, fmt.Errorf("user signature validation failed: %w", err)
 			}
 			spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob, nil)

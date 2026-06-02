@@ -11,6 +11,7 @@ import (
 
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
@@ -575,7 +576,7 @@ func signCoopExitUserRefunds(
 			refundTx.TxIn[0].PreviousOutPoint: nodeTx.TxOut[0],
 			refundTx.TxIn[1].PreviousOutPoint: connectorPrevOutputs[i],
 		}
-		sighash, err := common.SigHashFromMultiPrevOutTx(refundTx, 0, prevOutputs)
+		txSig, err := sighash.FromMultiPrevOutTx(refundTx, 0, prevOutputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate multi-input sighash: %w", err)
 		}
@@ -589,7 +590,7 @@ func signCoopExitUserRefunds(
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
 			JobId:           leaf.Leaf.Id,
-			Message:         sighash,
+			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
 			Nonce:           signingNonceProto,
@@ -639,7 +640,7 @@ func signCoopExitUserRefundsForDirect(
 			refundTx.TxIn[0].PreviousOutPoint: directTx.TxOut[0],
 			refundTx.TxIn[1].PreviousOutPoint: connectorPrevOutputs[i],
 		}
-		sighash, err := common.SigHashFromMultiPrevOutTx(refundTx, 0, prevOutputs)
+		txSig, err := sighash.FromMultiPrevOutTx(refundTx, 0, prevOutputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate sighash for direct refund: %w", err)
 		}
@@ -653,7 +654,7 @@ func signCoopExitUserRefundsForDirect(
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
 			JobId:           leaf.Leaf.Id,
-			Message:         sighash,
+			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
 			Nonce:           signingNonceProto,

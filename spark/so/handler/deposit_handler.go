@@ -25,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -266,7 +267,7 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 	}
 
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(reqIDPubKey, keyshare.PublicKey, []byte(depositAddress), req.GetHashVariant())
-	proofOfPossessionSignature, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
+	proofOfPossessionSignature, err := helper.GenerateProofOfPossessionSignatures(ctx, config, []sighash.Hash{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +504,7 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 	// Generate proof of possession signature for the coordinator's keyshare first.
 	// If this fails, the address is not persisted and the transaction is rolled back.
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(identityPublicKey, keyshare.PublicKey, []byte(depositAddressString), hashVariant)
-	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
+	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, []sighash.Hash{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
 	}
@@ -653,7 +654,7 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 	addressSignatures[config.Identifier] = selfProofs.AddressSignature
 
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(depositAddress.OwnerIdentityPubkey, keyshare.PublicKey, []byte(depositAddress.Address), hashVariant)
-	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
+	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, []sighash.Hash{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1010,12 +1011,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, err
 	}
 
-	cpfpRootTxSigHash, err := common.SigHashFromTx(cpfpRootTx, 0, onChainOutput)
+	cpfpRootTxSigHash, err := sighash.FromTx(cpfpRootTx, 0, onChainOutput)
 	if err != nil {
 		return nil, err
 	}
 
-	cpfpRefundTxSigHash, err := common.SigHashFromTx(cpfpRefundTx, 0, cpfpRootTx.TxOut[0])
+	cpfpRefundTxSigHash, err := sighash.FromTx(cpfpRefundTx, 0, cpfpRootTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
@@ -1073,7 +1074,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if len(cpfpRootTx.TxOut) == 0 {
 		return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
 	}
-	directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundWireTx, 0, cpfpRootTx.TxOut[0])
+	directFromCpfpRefundTxSigHash, err := sighash.FromTx(directFromCpfpRefundWireTx, 0, cpfpRootTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
@@ -1601,18 +1602,18 @@ func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddr
 	return verifyingKey, spendTxSigningResult, nil
 }
 
-func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []byte) ([]byte, uint64, error) {
+func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []byte) (sighash.Hash, uint64, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	onChainTxOut := wire.NewTxOut(int64(targetUtxo.Amount), targetUtxo.PkScript)
 	spendTx, err := common.TxFromRawTxBytes(spendTxRaw)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to parse spend tx: %w", err)
+		return sighash.Hash{}, 0, fmt.Errorf("failed to parse spend tx: %w", err)
 	}
 
-	spendTxSigHash, err := common.SigHashFromTx(spendTx, 0, onChainTxOut)
+	spendTxSigHash, err := sighash.FromTx(spendTx, 0, onChainTxOut)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get spend tx sig hash: %w", err)
+		return sighash.Hash{}, 0, fmt.Errorf("failed to get spend tx sig hash: %w", err)
 	}
 
 	const maxSats uint64 = 21_000_000 * 100_000_000
@@ -1620,22 +1621,22 @@ func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []by
 	var total uint64
 	for i, o := range spendTx.TxOut {
 		if o.Value < 0 {
-			return nil, 0, fmt.Errorf("txout[%d]: negative value %d", i, o.Value)
+			return sighash.Hash{}, 0, fmt.Errorf("txout[%d]: negative value %d", i, o.Value)
 		}
 		v := uint64(o.Value)
 		if v > maxSats {
-			return nil, 0, fmt.Errorf("txout[%d]: value %d exceeds %d", i, v, maxSats)
+			return sighash.Hash{}, 0, fmt.Errorf("txout[%d]: value %d exceeds %d", i, v, maxSats)
 		}
 		if total > maxSats-v {
-			return nil, 0, fmt.Errorf("total amount overflow: %d + %d", total, v)
+			return sighash.Hash{}, 0, fmt.Errorf("total amount overflow: %d + %d", total, v)
 		}
 		total += v
 	}
 
 	if total > maxSats {
-		return nil, 0, fmt.Errorf("total amount %d exceeds %d", total, maxSats)
+		return sighash.Hash{}, 0, fmt.Errorf("total amount %d exceeds %d", total, maxSats)
 	}
-	logger.Sugar().Debugf("Retrieved %x as spend tx sighash", spendTxSigHash)
+	logger.Sugar().Debugf("Retrieved %s as spend tx sighash", spendTxSigHash)
 	return spendTxSigHash, total, nil
 }
 

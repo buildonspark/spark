@@ -271,31 +271,6 @@ func SerializeTxNoWitnessHex(tx *wire.MsgTx) (string, error) {
 	return hex.EncodeToString(txBytes), nil
 }
 
-// SigHashFromTx returns sighash from a tx.
-func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]byte, error) {
-	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
-		prevOutput.PkScript, prevOutput.Value,
-	)
-	sighashes := txscript.NewTxSigHashes(tx, prevOutputFetcher)
-
-	sigHash, err := txscript.CalcTaprootSignatureHash(sighashes, txscript.SigHashDefault, tx, inputIndex, prevOutputFetcher)
-	if err != nil {
-		return nil, err
-	}
-	return sigHash, nil
-}
-
-func SigHashFromMultiPrevOutTx(tx *wire.MsgTx, inputIndex int, prevOutputs map[wire.OutPoint]*wire.TxOut) ([]byte, error) {
-	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOutputs)
-	sighashes := txscript.NewTxSigHashes(tx, prevOutFetcher)
-
-	sigHash, err := txscript.CalcTaprootSignatureHash(sighashes, txscript.SigHashDefault, tx, inputIndex, prevOutFetcher)
-	if err != nil {
-		return nil, err
-	}
-	return sigHash, nil
-}
-
 // UpdateTxWithSignature applies the signature to the transaction.
 // Callsites should verify the signature using `VerifySignature` after calling this function.
 func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte, error) {

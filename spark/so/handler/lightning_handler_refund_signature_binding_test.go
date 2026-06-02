@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
@@ -23,7 +24,7 @@ import (
 
 type messageCheckingFrostServiceClient struct {
 	mockFrostServiceClient
-	expectedMessage []byte
+	expectedMessage sighash.Hash
 }
 
 func (m *messageCheckingFrostServiceClient) ValidateSignatureShare(
@@ -31,7 +32,7 @@ func (m *messageCheckingFrostServiceClient) ValidateSignatureShare(
 	req *pbfrost.ValidateSignatureShareRequest,
 	_ ...grpc.CallOption,
 ) (*emptypb.Empty, error) {
-	if !bytes.Equal(req.Message, m.expectedMessage) {
+	if !bytes.Equal(req.Message, m.expectedMessage.Serialize()) {
 		return nil, status.Error(codes.InvalidArgument, "signature share does not match recomputed sighash")
 	}
 	return &emptypb.Empty{}, nil
@@ -71,7 +72,7 @@ func mutateRefundSequence(t *testing.T, rawTx []byte) []byte {
 	return mutated
 }
 
-func computeRefundSighash(t *testing.T, prevRawTx []byte, refundRawTx []byte) []byte {
+func computeRefundSighash(t *testing.T, prevRawTx []byte, refundRawTx []byte) sighash.Hash {
 	t.Helper()
 
 	prevTx, err := common.TxFromRawTxBytes(prevRawTx)
@@ -81,9 +82,9 @@ func computeRefundSighash(t *testing.T, prevRawTx []byte, refundRawTx []byte) []
 	refundTx, err := common.TxFromRawTxBytes(refundRawTx)
 	require.NoError(t, err)
 
-	sighash, err := common.SigHashFromTx(refundTx, 0, prevTx.TxOut[0])
+	hash, err := sighash.FromTx(refundTx, 0, prevTx.TxOut[0])
 	require.NoError(t, err)
-	return sighash
+	return hash
 }
 
 func TestValidateGetPreimageRequestBindsRefundSignatureSharesToSubmittedTxBytes(t *testing.T) {

@@ -462,7 +462,7 @@ func signRenewTransactions(
 		jobIDs[i] = jobID
 		frostJobs[i] = &pbfrost.FrostSigningJob{
 			JobId:           jobID,
-			Message:         p.sighash,
+			Message:         p.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           p.nonce,

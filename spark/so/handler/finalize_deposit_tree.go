@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -612,8 +613,8 @@ func prepareSigningJobs(
 		}
 
 		for i := range rootTxInputCount {
-			var sigHash []byte
-			sigHash, err = common.SigHashFromMultiPrevOutTx(cpfpRootTx, i, prevOutputs)
+			var sigHash sighash.Hash
+			sigHash, err = sighash.FromMultiPrevOutTx(cpfpRootTx, i, prevOutputs)
 			if err != nil {
 				err = fmt.Errorf("failed to compute root tx sighash for input %d: %w", i, err)
 				return
@@ -645,8 +646,8 @@ func prepareSigningJobs(
 		}
 	} else {
 		// Single-input: original behavior
-		var cpfpRootTxSigHash []byte
-		cpfpRootTxSigHash, err = common.SigHashFromTx(cpfpRootTx, 0, onChainOutput)
+		var cpfpRootTxSigHash sighash.Hash
+		cpfpRootTxSigHash, err = sighash.FromTx(cpfpRootTx, 0, onChainOutput)
 		if err != nil {
 			err = fmt.Errorf("failed to compute root tx sighash: %w", err)
 			return
@@ -668,7 +669,7 @@ func prepareSigningJobs(
 	}
 
 	// Refund tx signing job
-	cpfpRefundTxSigHash, err := common.SigHashFromTx(cpfpRefundTx, 0, cpfpRootTx.TxOut[0])
+	cpfpRefundTxSigHash, err := sighash.FromTx(cpfpRefundTx, 0, cpfpRootTx.TxOut[0])
 	if err != nil {
 		err = fmt.Errorf("failed to compute refund tx sighash: %w", err)
 		return
@@ -698,7 +699,7 @@ func prepareSigningJobs(
 		err = fmt.Errorf("direct from cpfp refund verification failed: %w", err)
 		return
 	}
-	directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
+	directFromCpfpRefundTxSigHash, err := sighash.FromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
 	if err != nil {
 		err = fmt.Errorf("failed to compute direct from cpfp refund tx sighash: %w", err)
 		return
@@ -762,7 +763,7 @@ func aggregateDepositSignatures(
 		}
 
 		result, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResults[i].Message,
+			Message:            signingResults[i].Message.Serialize(),
 			SignatureShares:    signingResults[i].SignatureShares,
 			PublicShares:       signingResults[i].PublicKeys,
 			VerifyingKey:       verifyingKey.Serialize(),
@@ -781,7 +782,7 @@ func aggregateDepositSignatures(
 	refundIdx := rootTxInputCount
 	logger.Sugar().Infof("Aggregating cpfp refund tx signature")
 	refundSigResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            signingResults[refundIdx].Message,
+		Message:            signingResults[refundIdx].Message.Serialize(),
 		SignatureShares:    signingResults[refundIdx].SignatureShares,
 		PublicShares:       signingResults[refundIdx].PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
@@ -799,7 +800,7 @@ func aggregateDepositSignatures(
 	directIdx := rootTxInputCount + 1
 	logger.Sugar().Infof("Aggregating direct from cpfp refund tx signature")
 	directFromCpfpRefundSigResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            signingResults[directIdx].Message,
+		Message:            signingResults[directIdx].Message.Serialize(),
 		SignatureShares:    signingResults[directIdx].SignatureShares,
 		PublicShares:       signingResults[directIdx].PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),

@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -149,16 +150,16 @@ func addRenewVoutResetOutput(t *testing.T, tx *wire.MsgTx, value int64, pubKey k
 func signRenewVoutResetTx(t *testing.T, tx *wire.MsgTx, prevOut *wire.TxOut, signer keys.Private) []byte {
 	t.Helper()
 
-	sighash, err := common.SigHashFromTx(tx, 0, prevOut)
+	hash, err := sighash.FromTx(tx, 0, prevOut)
 	require.NoError(t, err)
-	return createValidRenewVoutResetTaprootSignature(t, signer, sighash)
+	return createValidRenewVoutResetTaprootSignature(t, signer, hash)
 }
 
-func createValidRenewVoutResetTaprootSignature(t *testing.T, signer keys.Private, sighash []byte) []byte {
+func createValidRenewVoutResetTaprootSignature(t *testing.T, signer keys.Private, sighash sighash.Hash) []byte {
 	t.Helper()
 
 	taprootKey := txscript.TweakTaprootPrivKey(*signer.ToBTCEC(), []byte{})
-	sig, err := schnorr.Sign(taprootKey, sighash)
+	sig, err := schnorr.Sign(taprootKey, sighash.Serialize())
 	require.NoError(t, err)
 	return sig.Serialize()
 }

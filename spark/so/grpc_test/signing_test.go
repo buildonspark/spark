@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	"github.com/lightsparkdev/spark/so/db"
@@ -72,14 +73,14 @@ func TestFrostSign(t *testing.T) {
 		{
 			JobID:             uuid.New(),
 			SigningKeyshareID: operatorKeyShare.ID,
-			Message:           msgHash[:],
+			Message:           sighash.Hash(msgHash),
 			VerifyingKey:      &verifyingKey,
 			UserCommitment:    &userNonceCommitment,
 		},
 		{
 			JobID:             uuid.New(),
 			SigningKeyshareID: operatorKeyShare.ID,
-			Message:           msgHash[:],
+			Message:           sighash.Hash(msgHash),
 			VerifyingKey:      &verifyingKey,
 			UserCommitment:    &userNonceCommitment,
 		},
@@ -185,7 +186,7 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	signingJobs := []*helper.SigningJob{{
 		JobID:             uuid.New(),
 		SigningKeyshareID: operatorKeyShare.ID,
-		Message:           msgHash[:],
+		Message:           sighash.Hash(msgHash),
 		VerifyingKey:      &operatorKeyShare.PublicKey,
 		UserCommitment:    nil,
 	}}
@@ -278,7 +279,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	signingJobs := []*helper.SigningJob{{
 		JobID:             uuid.New(),
 		SigningKeyshareID: operatorKeyShare.ID,
-		Message:           msgHash[:],
+		Message:           sighash.Hash(msgHash),
 		VerifyingKey:      &verifyingKey,
 		UserCommitment:    &userNonceCommitment,
 		AdaptorPublicKey:  &adaptorPub,
@@ -441,7 +442,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 		SigningJob: helper.SigningJob{
 			JobID:             uuid.New(),
 			SigningKeyshareID: operatorKeyShare.ID,
-			Message:           msgHash[:],
+			Message:           sighash.Hash(msgHash),
 			VerifyingKey:      &verifyingKey,
 			UserCommitment:    &userNonceCommitment,
 		},

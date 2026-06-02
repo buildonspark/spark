@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/common/uuids"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -829,11 +830,11 @@ func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKe
 	} else {
 		// Swap V3 flow
 		taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC()))
-		sighash, err := common.SigHashFromTx(tx, 0, outpoint)
+		txSighash, err := sighash.FromTx(tx, 0, outpoint)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get sighash: %w", err)
 		}
-		err = common.ValidateAdaptorSignature(taprootKey, sighash, signature, adaptorPublicKey)
+		err = common.ValidateAdaptorSignature(taprootKey, txSighash.Serialize(), signature, adaptorPublicKey)
 		if err != nil {
 			return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate adaptor signature: %w", err))
 		}

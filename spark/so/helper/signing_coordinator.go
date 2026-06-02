@@ -11,6 +11,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
@@ -35,8 +36,10 @@ var (
 type SigningResult struct {
 	// JobID is the ID of the signing job.
 	JobID uuid.UUID
-	// Message is the message that was signed.
-	Message []byte
+	// Message is the 32-byte digest that was signed (typically a BIP-341
+	// taproot sighash; also used for proof-of-possession digests, which are
+	// the same shape).
+	Message sighash.Hash
 	// SignatureShares is the signature shares from all operators.
 	SignatureShares map[string][]byte
 	// SigningCommitments is the signing commitments from all operators.
@@ -194,7 +197,7 @@ func frostRound2(
 			}
 			signingJobs[i] = &pbinternal.SigningJob{
 				JobId:            job.JobID.String(),
-				Message:          job.Message,
+				Message:          job.Message.Serialize(),
 				KeyshareId:       job.SigningKeyshareID.String(),
 				VerifyingKey:     job.VerifyingKey.Serialize(),
 				Commitments:      commitments,
@@ -240,8 +243,8 @@ type SigningJob struct {
 	JobID uuid.UUID
 	// SigningKeyshareID is the ID of the keyshare to use for signing.
 	SigningKeyshareID uuid.UUID
-	// Message is the message to sign.
-	Message []byte
+	// Message is the BIP-341 taproot signing digest.
+	Message sighash.Hash
 	// VerifyingKey is the verifying key for the message.
 	VerifyingKey *keys.Public
 	// UserCommitment is the user commitment for the message.
@@ -291,7 +294,7 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		return nil, nil, fmt.Errorf("%w: totalOutputValue: %d, prevOutputValue: %d", ErrTotalOutputValueGreaterThanPrevOutputValue, totalOutputValue, prevOutput.Value)
 	}
 
-	txSigHash, err := common.SigHashFromTx(tx, 0, prevOutput)
+	txSigHash, err := sighash.FromTx(tx, 0, prevOutput)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -366,7 +369,7 @@ func NewSigningJobWithPregeneratedNonce(
 	}
 
 	// Get signature hash
-	sigHash, err := common.SigHashFromTx(deserializedTx, 0, prevOutput)
+	sigHash, err := sighash.FromTx(deserializedTx, 0, prevOutput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sig hash: %w", err)
 	}

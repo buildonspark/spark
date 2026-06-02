@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
@@ -143,14 +144,14 @@ func createVersion3DirectRefundTx(t *testing.T, parentTxHash chainhash.Hash, vou
 	return buf.Bytes()
 }
 
-func getRefundTxSigHash(t *testing.T, refundTxBytes []byte, parentTxOut *wire.TxOut) []byte {
+func getRefundTxSigHash(t *testing.T, refundTxBytes []byte, parentTxOut *wire.TxOut) sighash.Hash {
 	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
 	require.NoError(t, err, "failed to parse refund transaction")
 
-	sighash, err := common.SigHashFromTx(refundTx, 0, parentTxOut)
+	h, err := sighash.FromTx(refundTx, 0, parentTxOut)
 	require.NoError(t, err, "failed to calculate sighash")
 
-	return sighash
+	return h
 }
 
 func createOldBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {

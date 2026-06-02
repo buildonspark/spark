@@ -393,7 +393,7 @@ func buildDepositInternalSigningJobs(jobs []*helper.SigningJobWithPregeneratedNo
 		}
 		result[i] = &pbinternal.SigningJob{
 			JobId:           fmt.Sprintf("%d", i),
-			Message:         job.Message,
+			Message:         job.Message.Serialize(),
 			KeyshareId:      job.SigningKeyshareID.String(),
 			VerifyingKey:    job.VerifyingKey.Serialize(),
 			Commitments:     commitments,

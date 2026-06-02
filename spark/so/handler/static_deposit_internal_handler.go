@@ -731,7 +731,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
-	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
+	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
@@ -753,7 +753,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		SetRequestType(st.UtxoSwapFromProtoRequestType(pb.UtxoSwapRequestType_Refund)).
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
-		SetSspSignature(spendTxSighash).
+		SetSspSignature(spendTxSighash.Serialize()).
 		SetSspIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
 		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).

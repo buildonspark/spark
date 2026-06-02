@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -1113,7 +1114,7 @@ func (f *claimTransferCoordinatorFlow) aggregateLeafSignature(
 		return nil, fmt.Errorf("unable to marshal round1 commitments: %w", err)
 	}
 	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            job.Message,
+		Message:            job.Message.Serialize(),
 		SignatureShares:    shares,
 		PublicShares:       publicShares,
 		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -1634,7 +1635,7 @@ func buildClaimRefundSigningJob(
 	if len(parentTx.TxOut) == 0 {
 		return nil, fmt.Errorf("parent tx has no outputs")
 	}
-	sigHash, err := common.SigHashFromTx(refundTx, 0, parentTx.TxOut[0])
+	sigHash, err := sighash.FromTx(refundTx, 0, parentTx.TxOut[0])
 	if err != nil {
 		return nil, fmt.Errorf("compute sighash: %w", err)
 	}

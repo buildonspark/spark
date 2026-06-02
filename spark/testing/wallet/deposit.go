@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/frost"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -339,7 +340,7 @@ func QueryStaticDepositAddresses(
 // for signing and to later include in user signing jobs.
 type preparedTxSigningArtifacts struct {
 	rawTx      []byte
-	sighash    []byte
+	sighash    sighash.Hash
 	nonce      *pbfrost.SigningNonce
 	commitment *pbcommon.SigningCommitment
 	signingJob *pb.SigningJob
@@ -355,7 +356,7 @@ func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPub
 	nonceProto, _ := nonce.MarshalProto()
 	commitmentProto, _ := nonce.SigningCommitment().MarshalProto()
 
-	sighash, err := common.SigHashFromTx(tx, 0, prevTxOut)
+	txSig, err := sighash.FromTx(tx, 0, prevTxOut)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +369,7 @@ func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPub
 
 	return &preparedTxSigningArtifacts{
 		rawTx:      buf.Bytes(),
-		sighash:    sighash,
+		sighash:    txSig,
 		nonce:      nonceProto,
 		commitment: commitmentProto,
 		signingJob: job,
@@ -474,7 +475,7 @@ func CreateTreeRoot(
 	userSigningJobs := []*pbfrost.FrostSigningJob{
 		{
 			JobId:           nodeJobID,
-			Message:         rootPrepared.sighash,
+			Message:         rootPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared.nonce,
@@ -483,7 +484,7 @@ func CreateTreeRoot(
 		},
 		{
 			JobId:           refundJobID,
-			Message:         refundPrepared.sighash,
+			Message:         refundPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
 			Nonce:           refundPrepared.nonce,
@@ -492,7 +493,7 @@ func CreateTreeRoot(
 		},
 		{
 			JobId:           directFromCpfpRefundJobID,
-			Message:         directFromCpfpRefundPrepared.sighash,
+			Message:         directFromCpfpRefundPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
 			Nonce:           directFromCpfpRefundPrepared.nonce,
@@ -518,7 +519,7 @@ func CreateTreeRoot(
 	}
 
 	rootSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
-		Message:            rootPrepared.sighash,
+		Message:            rootPrepared.sighash.Serialize(),
 		SignatureShares:    treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SignatureShares,
 		PublicShares:       treeResponse.RootNodeSignatureShares.NodeTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
@@ -532,7 +533,7 @@ func CreateTreeRoot(
 	}
 
 	refundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
-		Message:            refundPrepared.sighash,
+		Message:            refundPrepared.sighash.Serialize(),
 		SignatureShares:    treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SignatureShares,
 		PublicShares:       treeResponse.RootNodeSignatureShares.RefundTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
@@ -546,7 +547,7 @@ func CreateTreeRoot(
 	}
 
 	directFromCpfpRefundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
-		Message:            directFromCpfpRefundPrepared.sighash,
+		Message:            directFromCpfpRefundPrepared.sighash.Serialize(),
 		SignatureShares:    treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SignatureShares,
 		PublicShares:       treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
@@ -659,7 +660,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 	userSigningJobs := []*pbfrost.FrostSigningJob{
 		{
 			JobId:           nodeJobID,
-			Message:         rootPrepared.sighash,
+			Message:         rootPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared.nonce,
@@ -668,7 +669,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 		},
 		{
 			JobId:           refundJobID,
-			Message:         refundPrepared.sighash,
+			Message:         refundPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           refundPrepared.nonce,
@@ -677,7 +678,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 		},
 		{
 			JobId:           directFromCpfpRefundJobID,
-			Message:         directFromCpfpRefundPrepared.sighash,
+			Message:         directFromCpfpRefundPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           directFromCpfpRefundPrepared.nonce,
@@ -783,14 +784,14 @@ func prepareTxSigningArtifactsMultiInput(
 	nonceProto, _ := nonce.MarshalProto()
 	commitmentProto, _ := nonce.SigningCommitment().MarshalProto()
 
-	sighash, err := common.SigHashFromMultiPrevOutTx(tx, inputIndex, prevOutputs)
+	txSig, err := sighash.FromMultiPrevOutTx(tx, inputIndex, prevOutputs)
 	if err != nil {
 		return nil, err
 	}
 
 	return &preparedTxSigningArtifacts{
 		rawTx:      buf.Bytes(),
-		sighash:    sighash,
+		sighash:    txSig,
 		nonce:      nonceProto,
 		commitment: commitmentProto,
 	}, nil
@@ -924,7 +925,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 		jobIDs[i] = uuid.NewString()
 		userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 			JobId:           jobIDs[i],
-			Message:         rootPrepared[i].sighash,
+			Message:         rootPrepared[i].sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared[i].nonce,
@@ -938,7 +939,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 	jobIDs[refundIdx] = uuid.NewString()
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           jobIDs[refundIdx],
-		Message:         refundPrepared.sighash,
+		Message:         refundPrepared.sighash.Serialize(),
 		KeyPackage:      userKeyPackage,
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           refundPrepared.nonce,
@@ -951,7 +952,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 	jobIDs[directIdx] = uuid.NewString()
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           jobIDs[directIdx],
-		Message:         directFromCpfpRefundPrepared.sighash,
+		Message:         directFromCpfpRefundPrepared.sighash.Serialize(),
 		KeyPackage:      userKeyPackage,
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           directFromCpfpRefundPrepared.nonce,
@@ -1160,7 +1161,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 		jobIDs[i] = uuid.NewString()
 		userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 			JobId:           jobIDs[i],
-			Message:         rootPrepared[i].sighash,
+			Message:         rootPrepared[i].sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared[i].nonce,
@@ -1172,7 +1173,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 	jobIDs[2] = uuid.NewString()
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           jobIDs[2],
-		Message:         refundPrepared.sighash,
+		Message:         refundPrepared.sighash.Serialize(),
 		KeyPackage:      userKeyPackage,
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           refundPrepared.nonce,
@@ -1183,7 +1184,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 	jobIDs[3] = uuid.NewString()
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           jobIDs[3],
-		Message:         directFromCpfpRefundPrepared.sighash,
+		Message:         directFromCpfpRefundPrepared.sighash.Serialize(),
 		KeyPackage:      userKeyPackage,
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           directFromCpfpRefundPrepared.nonce,
@@ -1337,7 +1338,7 @@ func RefundStaticDeposit(
 	if err := params.SpendTx.Serialize(&spendTxBytes); err != nil {
 		return nil, err
 	}
-	spendTxSighash, err := common.SigHashFromTx(params.SpendTx, 0, params.PrevTxOut)
+	spendTxSighash, err := sighash.FromTx(params.SpendTx, 0, params.PrevTxOut)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sighash: %w", err)
 	}
@@ -1396,7 +1397,7 @@ func RefundStaticDeposit(
 	userJobID := uuid.NewString()
 	userSigningJobs := []*pbfrost.FrostSigningJob{{
 		JobId:           userJobID,
-		Message:         spendTxSighash,
+		Message:         spendTxSighash.Serialize(),
 		KeyPackage:      &userKeyPackage,
 		VerifyingKey:    swapResponse.DepositAddress.VerifyingPublicKey,
 		Nonce:           userNonceProto,
@@ -1421,7 +1422,7 @@ func RefundStaticDeposit(
 	}
 
 	signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            spendTxSighash,
+		Message:            spendTxSighash.Serialize(),
 		SignatureShares:    swapResponse.RefundTxSigningResult.SignatureShares,
 		PublicShares:       swapResponse.RefundTxSigningResult.PublicKeys,
 		VerifyingKey:       swapResponse.DepositAddress.VerifyingPublicKey,

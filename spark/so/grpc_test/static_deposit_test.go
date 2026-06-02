@@ -6,6 +6,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -146,7 +147,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	// *********************************************************************************
 	// Create request signature
 	// *********************************************************************************
-	spendTxSighash, err := common.SigHashFromTx(
+	spendTxSighash, err := sighash.FromTx(
 		spendTx,
 		0,
 		signedDepositTx.TxOut[vout],
@@ -158,7 +159,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		quoteAmount,
-		spendTxSighash,
+		spendTxSighash.Serialize(),
 		aliceConfig.IdentityPrivateKey,
 	)
 	require.NoError(t, err)
@@ -204,7 +205,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			btcnetwork.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
-			spendTxSighash,
+			spendTxSighash.Serialize(),
 			bobConfig.IdentityPrivateKey,
 		)
 		require.NoError(t, err)
@@ -262,7 +263,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		require.NoError(t, err)
 		spendTx2.AddTxOut(wire.NewTxOut(int64(quoteAmount), spendPkScript2))
 
-		spendTxSighash2, err := common.SigHashFromTx(spendTx2, 0, signedDepositTx.TxOut[vout])
+		spendTxSighash2, err := sighash.FromTx(spendTx2, 0, signedDepositTx.TxOut[vout])
 		require.NoError(t, err)
 		userSignature2, err := wallet.CreateUserSignature(
 			signedDepositTx.TxHash().String(),
@@ -270,7 +271,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			btcnetwork.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
-			spendTxSighash2,
+			spendTxSighash2.Serialize(),
 			aliceConfig.IdentityPrivateKey,
 		)
 		require.NoError(t, err)

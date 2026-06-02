@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -664,16 +665,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if len(cpfpTx.TxOut) == 0 {
 			return sparkerrors.InternalDataInconsistency(fmt.Errorf("cpfpTx vout out of bounds for cpfpTransaction, tree_node id: %s", nodeID))
 		}
-		cpfpSighash, err := common.SigHashFromTx(cpfpRefundTx, 0, cpfpTx.TxOut[0])
+		cpfpSighash, err := sighash.FromTx(cpfpRefundTx, 0, cpfpTx.TxOut[0])
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp sighash for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
-		sighash := cpfpSighash
 		ownerPubKey := node.OwnerSigningPubkey
 		jobs = append(jobs, frostValidationJob{
 			request: &pbfrost.ValidateSignatureShareRequest{
-				Message:         sighash,
+				Message:         cpfpSighash.Serialize(),
 				SignatureShare:  cpfpTransaction.UserSignature,
 				Role:            pbfrost.SigningRole_USER,
 				VerifyingKey:    node.VerifyingPubkey.Serialize(),
@@ -682,7 +682,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 				UserCommitments: cpfpTransaction.SigningNonceCommitment,
 			},
 			wrapErr: func(err error) error {
-				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for tree_node id: %s, sighash: %v, user pubkey: %v", err, nodeID, hex.EncodeToString(sighash), ownerPubKey))
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate cpfp signature share: %w, for tree_node id: %s, sighash: %s, user pubkey: %v", err, nodeID, cpfpSighash, ownerPubKey))
 			},
 		})
 	}
@@ -742,16 +742,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if len(directTx.TxOut) == 0 {
 			return sparkerrors.InternalDataInconsistency(fmt.Errorf("direct tx vout out of bounds for directTransaction, tree_node id: %s", nodeID))
 		}
-		directSighash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		directSighash, err := sighash.FromTx(directRefundTx, 0, directTx.TxOut[0])
 		if err != nil {
 			return fmt.Errorf("unable to get direct sighash for directTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
-		sighash := directSighash
 		ownerPubKey := node.OwnerSigningPubkey
 		jobs = append(jobs, frostValidationJob{
 			request: &pbfrost.ValidateSignatureShareRequest{
-				Message:         sighash,
+				Message:         directSighash.Serialize(),
 				SignatureShare:  directTransaction.UserSignature,
 				Role:            pbfrost.SigningRole_USER,
 				VerifyingKey:    node.VerifyingPubkey.Serialize(),
@@ -760,7 +759,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 				UserCommitments: directTransaction.SigningNonceCommitment,
 			},
 			wrapErr: func(err error) error {
-				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for tree_node id: %s, sighash: %v, user pubkey: %v", err, nodeID, hex.EncodeToString(sighash), ownerPubKey))
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct signature share: %w, for tree_node id: %s, sighash: %s, user pubkey: %v", err, nodeID, directSighash, ownerPubKey))
 			},
 		})
 	}
@@ -819,16 +818,15 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if len(cpfpTx.TxOut) == 0 {
 			return sparkerrors.InternalDataInconsistency(fmt.Errorf("direct from cpfp vout out of bounds for directFromCpfpTransaction, tree_node id: %s", nodeID))
 		}
-		directFromCpfpSighash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpTx.TxOut[0])
+		directFromCpfpSighash, err := sighash.FromTx(directFromCpfpRefundTx, 0, cpfpTx.TxOut[0])
 		if err != nil {
 			return fmt.Errorf("unable to get direct from cpfp sighash for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
-		sighash := directFromCpfpSighash
 		ownerPubKey := node.OwnerSigningPubkey
 		jobs = append(jobs, frostValidationJob{
 			request: &pbfrost.ValidateSignatureShareRequest{
-				Message:         sighash,
+				Message:         directFromCpfpSighash.Serialize(),
 				SignatureShare:  directFromCpfpTransaction.UserSignature,
 				Role:            pbfrost.SigningRole_USER,
 				VerifyingKey:    node.VerifyingPubkey.Serialize(),
@@ -837,7 +835,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 				UserCommitments: directFromCpfpTransaction.SigningNonceCommitment,
 			},
 			wrapErr: func(err error) error {
-				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for tree_node id: %s, sighash: %v, user pubkey: %v", err, nodeID, hex.EncodeToString(sighash), ownerPubKey))
+				return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate direct from cpfp signature share: %w, for tree_node id: %s, sighash: %s, user pubkey: %v", err, nodeID, directFromCpfpSighash, ownerPubKey))
 			},
 		})
 	}

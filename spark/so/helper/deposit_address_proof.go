@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	"github.com/lightsparkdev/spark/so"
@@ -11,7 +12,7 @@ import (
 )
 
 // GenerateProofOfPossessionSignatures generates the proof of possession signatures for the given messages and keyshares.
-func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config, messages [][]byte, keyshares []*ent.SigningKeyshare) ([][]byte, error) {
+func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config, messages []sighash.Hash, keyshares []*ent.SigningKeyshare) ([][]byte, error) {
 	jobID := uuid.New()
 	signingJobs := make([]*SigningJob, len(messages))
 	for i, message := range messages {
@@ -44,7 +45,7 @@ func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config,
 	signatures := make([][]byte, len(messages))
 	for i, message := range messages {
 		signature, err := client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:         message,
+			Message:         message.Serialize(),
 			SignatureShares: signingResult[i].SignatureShares,
 			PublicShares:    signingResult[i].PublicKeys,
 			VerifyingKey:    keyshares[i].PublicKey.Serialize(),

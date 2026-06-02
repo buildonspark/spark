@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -274,7 +275,7 @@ func TestSignFrostInternal(t *testing.T) {
 		job := &helper.SigningJob{
 			JobID:             jobID,
 			SigningKeyshareID: keyshareID,
-			Message:           []byte("test message to sign"),
+			Message:           sighash.MustParseHex("746573742d6d6573736167652d666f722d7369676e696e672d6a6f622d7465737473"[:64]),
 			VerifyingKey:      &pubKey,
 			UserCommitment:    &commitment,
 			AdaptorPublicKey:  nil,
@@ -347,7 +348,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: uuid.New(),
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0101010101010101010101010101010101010101010101010101010101010101"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 			}
@@ -370,7 +371,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0202020202020202020202020202020202020202020202020202020202020202"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 			}
@@ -391,7 +392,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0202020202020202020202020202020202020202020202020202020202020202"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 			}
@@ -422,7 +423,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0202020202020202020202020202020202020202020202020202020202020202"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 			}
@@ -481,14 +482,14 @@ func TestSignFrostInternal(t *testing.T) {
 				{
 					JobID:             jobID1,
 					SigningKeyshareID: keyshareID1,
-					Message:           []byte("message 1"),
+					Message:           sighash.MustParseHex("1111111111111111111111111111111111111111111111111111111111111111"),
 					VerifyingKey:      &pubKey,
 					UserCommitment:    &commitment,
 				},
 				{
 					JobID:             jobID2,
 					SigningKeyshareID: keyshareID2,
-					Message:           []byte("message 2"),
+					Message:           sighash.MustParseHex("2222222222222222222222222222222222222222222222222222222222222222"),
 					VerifyingKey:      &pubKey,
 					UserCommitment:    &commitment,
 				},
@@ -523,7 +524,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    nil, // Test with nil user commitment
 				AdaptorPublicKey:  nil,
@@ -554,7 +555,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 				AdaptorPublicKey:  &pubKey,
@@ -593,7 +594,7 @@ func TestSignFrostInternal(t *testing.T) {
 			job := &helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0202020202020202020202020202020202020202020202020202020202020202"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 			}
@@ -637,7 +638,7 @@ func TestSignFrostInternal(t *testing.T) {
 		job := &helper.SigningJob{
 			JobID:             jobID,
 			SigningKeyshareID: keyshareID,
-			Message:           []byte("test message"),
+			Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
 			VerifyingKey:      &pubKey,
 			UserCommitment:    &commitment,
 		}
@@ -682,7 +683,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 			SigningJob: helper.SigningJob{
 				JobID:             jobID,
 				SigningKeyshareID: keyshareID,
-				Message:           []byte("test message"),
+				Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
 				VerifyingKey:      &pubKey,
 				UserCommitment:    &commitment,
 			},
@@ -735,7 +736,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 				SigningJob: helper.SigningJob{
 					JobID:             jobID,
 					SigningKeyshareID: uuid.New(),
-					Message:           []byte("test message"),
+					Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
 					VerifyingKey:      &pubKey,
 					UserCommitment:    &commitment,
 				},
@@ -759,7 +760,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 				SigningJob: helper.SigningJob{
 					JobID:             jobID,
 					SigningKeyshareID: uuid.New(),
-					Message:           []byte("test message"),
+					Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
 					VerifyingKey:      &pubKey,
 					UserCommitment:    &commitment,
 				},
@@ -792,7 +793,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 				SigningJob: helper.SigningJob{
 					JobID:             uuid.New(),
 					SigningKeyshareID: uuid.New(),
-					Message:           []byte("valid job"),
+					Message:           sighash.MustParseHex("0404040404040404040404040404040404040404040404040404040404040404"),
 					VerifyingKey:      &pubKey,
 					UserCommitment:    &commitment,
 				},
@@ -804,7 +805,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 				SigningJob: helper.SigningJob{
 					JobID:             uuid.New(),
 					SigningKeyshareID: uuid.New(),
-					Message:           []byte("malformed job"),
+					Message:           sighash.MustParseHex("0505050505050505050505050505050505050505050505050505050505050505"),
 					VerifyingKey:      &pubKey,
 					UserCommitment:    &commitment,
 				},

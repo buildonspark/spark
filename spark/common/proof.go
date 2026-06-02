@@ -6,15 +6,22 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common/hashstructure"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
-// ProofOfPossessionMessageHashForDepositAddress generates a hash of the proof of possession message for a deposit address.
-func ProofOfPossessionMessageHashForDepositAddress(userPubKey, operatorPubKey keys.Public, depositAddress []byte, hashVariant pb.HashVariant) []byte {
+// ProofOfPossessionMessageHashForDepositAddress generates the sighash that an operator FROST-signs to prove knowledge
+// of its secret share for a deposit address.
+func ProofOfPossessionMessageHashForDepositAddress(userPubKey, operatorPubKey keys.Public, depositAddress []byte, hashVariant pb.HashVariant) sighash.Hash {
+	var raw []byte
 	if hashVariant == pb.HashVariant_HASH_VARIANT_V2 {
-		return proofOfPossessionMessageHashForDepositAddressV2(userPubKey, operatorPubKey, depositAddress)
+		raw = proofOfPossessionMessageHashForDepositAddressV2(userPubKey, operatorPubKey, depositAddress)
+	} else {
+		raw = proofOfPossessionMessageHashForDepositAddressLegacy(userPubKey, operatorPubKey, depositAddress)
 	}
-	return proofOfPossessionMessageHashForDepositAddressLegacy(userPubKey, operatorPubKey, depositAddress)
+	// Both branches return sha256 hashes, which are always 32 bytes; Parse can't fail here.
+	h, _ := sighash.Parse(raw)
+	return h
 }
 
 func proofOfPossessionMessageHashForDepositAddressLegacy(userPubKey, operatorPubKey keys.Public, depositAddress []byte) []byte {

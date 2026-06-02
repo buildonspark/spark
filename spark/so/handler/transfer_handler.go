@@ -18,6 +18,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/common/uuids"
 	"github.com/lightsparkdev/spark/so/frost"
 	"go.uber.org/zap"
@@ -1158,7 +1159,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			return nil, err
 		}
 
-		var cpfpRefundTxSigHash []byte
+		var cpfpRefundTxSigHash sighash.Hash
 		if len(cpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			// Multi-input refund tx with connector tx provided (new coop exit flow)
 			// Use multi-input sighash for 2-input coop exit refund transactions
@@ -1173,11 +1174,11 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			}
 			prevOuts[connectorOutpoint] = connectorTxOut
 
-			cpfpRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(cpfpRefundTx, 0, prevOuts)
+			cpfpRefundTxSigHash, err = sighash.FromMultiPrevOutTx(cpfpRefundTx, 0, prevOuts)
 		} else {
 			// Single-input sighash (legacy flow):
 			// - Single-input refund tx
-			cpfpRefundTxSigHash, err = common.SigHashFromTx(cpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+			cpfpRefundTxSigHash, err = sighash.FromTx(cpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
 		}
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash from cpfp refund tx for leaf %s: %w", leaf.ID, err)
@@ -1222,7 +1223,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err := validateRefundInputCountForConnector(directRefundTx, connectorPrevOuts, "direct"); err != nil {
 				return nil, err
 			}
-			var directRefundTxSigHash []byte
+			var directRefundTxSigHash sighash.Hash
 			if len(directRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 				// Multi-input refund tx with connector tx provided (new coop exit flow)
 				// Use multi-input sighash for 2-input coop exit refund transactions
@@ -1237,11 +1238,12 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 				}
 				prevOuts[connectorOutpoint] = connectorTxOut
 
-				directRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directRefundTx, 0, prevOuts)
+				directRefundTxSigHash, err = sighash.FromMultiPrevOutTx(directRefundTx, 0, prevOuts)
 			} else {
 				// Single-input sighash (legacy flow):
 				// - Single-input refund tx
-				directRefundTxSigHash, err = common.SigHashFromTx(directRefundTx, 0, directLeafTx.TxOut[0])
+
+				directRefundTxSigHash, err = sighash.FromTx(directRefundTx, 0, directLeafTx.TxOut[0])
 			}
 			if err != nil {
 				return nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
@@ -1275,7 +1277,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err := validateRefundInputCountForConnector(directFromCpfpRefundTx, connectorPrevOuts, "direct-from-cpfp"); err != nil {
 				return nil, err
 			}
-			var directFromCpfpRefundTxSigHash []byte
+			var directFromCpfpRefundTxSigHash sighash.Hash
 			if len(directFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 				// Multi-input refund tx with connector tx provided (new coop exit flow)
 				// Use multi-input sighash for 2-input coop exit refund transactions
@@ -1290,11 +1292,12 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 				}
 				prevOuts[connectorOutpoint] = connectorTxOut
 
-				directFromCpfpRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directFromCpfpRefundTx, 0, prevOuts)
+				directFromCpfpRefundTxSigHash, err = sighash.FromMultiPrevOutTx(directFromCpfpRefundTx, 0, prevOuts)
 			} else {
 				// Single-input sighash (legacy flow):
 				// - Single-input refund tx
-				directFromCpfpRefundTxSigHash, err = common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+
+				directFromCpfpRefundTxSigHash, err = sighash.FromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
 			}
 			if err != nil {
 				return nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx for leaf %s: %w", leaf.ID, err)
@@ -1441,7 +1444,7 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, err
 		}
 
-		var refundTxSigHash []byte
+		var refundTxSigHash sighash.Hash
 		if len(refundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			leafTxHash := leafTx.TxHash()
 			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
@@ -1454,9 +1457,9 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			prevOuts[connectorOutpoint] = connectorTxOut
 
-			refundTxSigHash, err = common.SigHashFromMultiPrevOutTx(refundTx, 0, prevOuts)
+			refundTxSigHash, err = sighash.FromMultiPrevOutTx(refundTx, 0, prevOuts)
 		} else {
-			refundTxSigHash, err = common.SigHashFromTx(refundTx, 0, leafTx.TxOut[0])
+			refundTxSigHash, err = sighash.FromTx(refundTx, 0, leafTx.TxOut[0])
 		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from refund tx: %w", err)
@@ -1530,7 +1533,7 @@ func SignRefundsWithPregeneratedNonce(
 		if err := validateRefundInputCountForConnector(directRefundTx, connectorPrevOuts, "direct"); err != nil {
 			return nil, nil, nil, err
 		}
-		var directRefundTxSigHash []byte
+		var directRefundTxSigHash sighash.Hash
 		if len(directRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			directTxHash := directTx.TxHash()
 			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
@@ -1543,9 +1546,9 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			prevOuts[connectorOutpoint] = connectorTxOut
 
-			directRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directRefundTx, 0, prevOuts)
+			directRefundTxSigHash, err = sighash.FromMultiPrevOutTx(directRefundTx, 0, prevOuts)
 		} else {
-			directRefundTxSigHash, err = common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+			directRefundTxSigHash, err = sighash.FromTx(directRefundTx, 0, directTx.TxOut[0])
 		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
@@ -1611,7 +1614,7 @@ func SignRefundsWithPregeneratedNonce(
 			return nil, nil, nil, err
 		}
 
-		var directFromCpfpRefundTxSigHash []byte
+		var directFromCpfpRefundTxSigHash sighash.Hash
 		if len(directFromCpfpRefundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			leafTxHash := directFromCpfpLeafTx.TxHash()
 			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
@@ -1624,9 +1627,9 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			prevOuts[connectorOutpoint] = connectorTxOut
 
-			directFromCpfpRefundTxSigHash, err = common.SigHashFromMultiPrevOutTx(directFromCpfpRefundTx, 0, prevOuts)
+			directFromCpfpRefundTxSigHash, err = sighash.FromMultiPrevOutTx(directFromCpfpRefundTx, 0, prevOuts)
 		} else {
-			directFromCpfpRefundTxSigHash, err = common.SigHashFromTx(directFromCpfpRefundTx, 0, directFromCpfpLeafTx.TxOut[0])
+			directFromCpfpRefundTxSigHash, err = sighash.FromTx(directFromCpfpRefundTx, 0, directFromCpfpLeafTx.TxOut[0])
 		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
@@ -1753,7 +1756,7 @@ func AggregateSignatures(
 			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
 		}
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message,
+			Message:            signingResult.Message.Serialize(),
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
 			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -1777,7 +1780,7 @@ func AggregateSignatures(
 			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
 		}
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message,
+			Message:            signingResult.Message.Serialize(),
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
 			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -1805,7 +1808,7 @@ func AggregateSignatures(
 			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
 		}
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message,
+			Message:            signingResult.Message.Serialize(),
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
 			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -3989,7 +3992,7 @@ func (h *TransferHandler) claimTransferLegacy(ctx context.Context, req *pb.Claim
 
 		logger.Sugar().Infof("Aggregating cpfp frost signature for claim transfer leaf %s", leafID)
 		cpfpSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message,
+			Message:            signingResult.Message.Serialize(),
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
 			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -4015,7 +4018,7 @@ func (h *TransferHandler) claimTransferLegacy(ctx context.Context, req *pb.Claim
 			directUserJob := directUserRefundMap[leafID]
 			logger.Sugar().Infof("Aggregating direct frost signature for claim transfer leaf %s", leafID)
 			directSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-				Message:            directResult.Message,
+				Message:            directResult.Message.Serialize(),
 				SignatureShares:    directResult.SignatureShares,
 				PublicShares:       directResult.PublicKeys,
 				VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -4034,7 +4037,7 @@ func (h *TransferHandler) claimTransferLegacy(ctx context.Context, req *pb.Claim
 			directFromCpfpUserJob := directFromCpfpUserRefundMap[leafID]
 			logger.Sugar().Infof("Aggregating direct from cpfp frost signature for claim transfer leaf %s", leafID)
 			directFromCpfpSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-				Message:            directFromCpfpResult.Message,
+				Message:            directFromCpfpResult.Message.Serialize(),
 				SignatureShares:    directFromCpfpResult.SignatureShares,
 				PublicShares:       directFromCpfpResult.PublicKeys,
 				VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
@@ -4455,7 +4458,7 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 		if len(cpfpLeafTx.TxOut) == 0 {
 			return nil, fmt.Errorf("vout out of bounds for cpfp tx of leaf %s", job.LeafId)
 		}
-		refundTxSigHash, err := common.SigHashFromTx(rawRefundTx, 0, cpfpLeafTx.TxOut[0])
+		refundTxSigHash, err := sighash.FromTx(rawRefundTx, 0, cpfpLeafTx.TxOut[0])
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash for cpfp refund of leaf %s: %w", job.LeafId, err)
 		}
@@ -4508,7 +4511,7 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 		if len(directTx.TxOut) == 0 {
 			return nil, fmt.Errorf("vout out of bounds for direct tx of leaf %s", job.LeafId)
 		}
-		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		directRefundTxSigHash, err := sighash.FromTx(directRefundTx, 0, directTx.TxOut[0])
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash for direct refund of leaf %s: %w", job.LeafId, err)
 		}
@@ -4558,7 +4561,7 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 		if len(cpfpLeafTx.TxOut) == 0 {
 			return nil, fmt.Errorf("vout out of bounds for cpfp tx of leaf %s", job.LeafId)
 		}
-		directFromCpfpSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+		directFromCpfpSigHash, err := sighash.FromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash for direct from cpfp refund of leaf %s: %w", job.LeafId, err)
 		}

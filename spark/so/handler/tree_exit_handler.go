@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
@@ -163,7 +164,7 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 			value: root,
 		}
 
-		txSigHash, err := common.SigHashFromMultiPrevOutTx(tx, int(exitingTree.Vin), prevOuts)
+		txSigHash, err := sighash.FromMultiPrevOutTx(tx, int(exitingTree.Vin), prevOuts)
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash from tx: %w", err)
 		}

@@ -285,7 +285,7 @@ func marshalSigningJobHelper(job *helper.SigningJobWithPregeneratedNonce) (*pbin
 	}
 	return &pbinternal.SigningJob{
 		JobId:           job.JobID.String(),
-		Message:         job.Message,
+		Message:         job.Message.Serialize(),
 		KeyshareId:      job.SigningKeyshareID.String(),
 		VerifyingKey:    job.VerifyingKey.Serialize(),
 		Commitments:     commitments,
@@ -442,7 +442,7 @@ func aggregateSignature(
 	frostClient := pbfrost.NewFrostServiceClient(conn)
 
 	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            jobHelper.Message,
+		Message:            jobHelper.Message.Serialize(),
 		SignatureShares:    signatureShares,
 		PublicShares:       publicKeys,
 		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),

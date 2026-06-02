@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/db"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
@@ -121,7 +122,7 @@ func createStaticDepositRefundUserSignatureForTest(t *testing.T, utxo *ent.Utxo,
 
 	// Create sighash for user signature
 	onChainTxOut := wire.NewTxOut(int64(utxo.Amount), utxo.PkScript)
-	spendTxSigHash, err := common.SigHashFromTx(spendTx, 0, onChainTxOut)
+	spendTxSigHash, err := sighash.FromTx(spendTx, 0, onChainTxOut)
 	require.NoError(t, err, "unable to construct sig hash tx")
 
 	return createValidUserSignatureForTest(
@@ -131,7 +132,7 @@ func createStaticDepositRefundUserSignatureForTest(t *testing.T, utxo *ent.Utxo,
 		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		uint64(totalAmount),
-		spendTxSigHash,
+		spendTxSigHash.Serialize(),
 		ownerIdentityPrivKey,
 	)
 }
@@ -182,7 +183,7 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	onChainTxOut := wire.NewTxOut(int64(testUtxo.Amount), testUtxo.PkScript)
-	spendTxSigHash, err := common.SigHashFromTx(spendTx, 0, onChainTxOut)
+	spendTxSigHash, err := sighash.FromTx(spendTx, 0, onChainTxOut)
 	require.NoError(t, err)
 
 	totalAmount := int64(0)
@@ -197,7 +198,7 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		uint64(totalAmount),
-		spendTxSigHash,
+		spendTxSigHash.Serialize(),
 		ownerIdentityPrivKey,
 	)
 
@@ -734,7 +735,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxSpendingDifferentOutpoin
 		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		totalAmount,
-		spendTxSigHash,
+		spendTxSigHash.Serialize(),
 		ownerIdentityPrivKey,
 	)
 
@@ -758,7 +759,6 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxSpendingDifferentOutpoin
 		UserSignature: userSignatureToRefundUtxoA,
 	})
 
-	require.Error(t, err)
 	require.ErrorContains(t, err, "unexpected refund transaction structure")
 }
 
@@ -834,7 +834,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithMultipleInputs(t *te
 		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		totalAmount,
-		spendTxSigHash,
+		spendTxSigHash.Serialize(),
 		ownerIdentityPrivKey,
 	)
 
@@ -855,7 +855,6 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithMultipleInputs(t *te
 		UserSignature: userSignature,
 	})
 
-	require.Error(t, err)
 	require.ErrorContains(t, err, "unexpected refund transaction structure")
 }
 
@@ -913,7 +912,7 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithWrongSequence(t *tes
 		btcnetwork.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		totalAmount,
-		spendTxSigHash,
+		spendTxSigHash.Serialize(),
 		ownerIdentityPrivKey,
 	)
 
@@ -934,7 +933,6 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithWrongSequence(t *tes
 		UserSignature: userSignature,
 	})
 
-	require.Error(t, err)
 	require.ErrorContains(t, err, "unexpected refund transaction structure")
 }
 
@@ -1004,7 +1002,5 @@ func TestInitiateStaticDepositUtxoRefund_RejectsRefundTxWithZeroInputs(t *testin
 		UserSignature: userSignature,
 	})
 
-	require.Error(t, err)
-	// Zero-input transactions fail at parse time with a more specific error
 	require.ErrorContains(t, err, "failed to parse")
 }

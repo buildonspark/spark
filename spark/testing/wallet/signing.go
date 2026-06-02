@@ -7,6 +7,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/so/frost"
 
 	"github.com/btcsuite/btcd/wire"
@@ -109,7 +110,7 @@ func prepareFrostSigningJobsForDirectRefund(
 		}
 		refundTxs[i] = refundBuf.Bytes()
 
-		sighash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		txSig, err := sighash.FromTx(directRefundTx, 0, directTx.TxOut[0])
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
@@ -124,7 +125,7 @@ func prepareFrostSigningJobsForDirectRefund(
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
 			JobId:           leaf.Leaf.Id,
-			Message:         sighash,
+			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
 			Nonce:           signingNonceProto,
@@ -196,7 +197,7 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 		}
 		refundTxs[i] = refundBuf.Bytes()
 
-		sighash, err := common.SigHashFromTx(refundTx, 0, nodeTx.TxOut[0])
+		txSig, err := sighash.FromTx(refundTx, 0, nodeTx.TxOut[0])
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
@@ -211,7 +212,7 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
 			JobId:            leaf.Leaf.Id,
-			Message:          sighash,
+			Message:          txSig.Serialize(),
 			KeyPackage:       userKeyPackage,
 			VerifyingKey:     leaf.Leaf.VerifyingPublicKey,
 			Nonce:            signingNonceProto,
@@ -304,7 +305,7 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 		}
 		refundTxs[i] = serializedTx.Bytes()
 
-		sighash, err := common.SigHashFromTx(htlcTx, 0, nodeTx.TxOut[0])
+		txSig, err := sighash.FromTx(htlcTx, 0, nodeTx.TxOut[0])
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
@@ -319,7 +320,7 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
 			JobId:           leaf.Leaf.Id,
-			Message:         sighash,
+			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
 			Nonce:           signingNonceProto,
@@ -409,7 +410,7 @@ func SignTransactionWithFrost(
 		return nil, err
 	}
 
-	sighash, err := common.SigHashFromTx(tx, 0, prevTxOut)
+	txSig, err := sighash.FromTx(tx, 0, prevTxOut)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +421,7 @@ func SignTransactionWithFrost(
 	keyPackage := CreateUserKeyPackage(signingPrivateKey)
 	signingJob := &pbfrost.FrostSigningJob{
 		JobId:           uuid.NewString(),
-		Message:         sighash,
+		Message:         txSig.Serialize(),
 		KeyPackage:      keyPackage,
 		VerifyingKey:    verificationKey.Serialize(),
 		Nonce:           signingNonceProto,
@@ -437,7 +438,7 @@ func SignTransactionWithFrost(
 	}
 
 	aggResponse, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            sighash,
+		Message:            txSig.Serialize(),
 		SignatureShares:    signingResult.SignatureShares,
 		PublicShares:       signingResult.PublicKeys,
 		VerifyingKey:       verificationKey.Serialize(),

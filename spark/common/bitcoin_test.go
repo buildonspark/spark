@@ -8,6 +8,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/sighash"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
@@ -65,25 +66,6 @@ func TestTxFromRawTxHex(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSigHashFromTx(t *testing.T) {
-	prevTx, _ := TxFromRawTxHex("020000000001010cb9feccc0bdaac30304e469c50b4420c13c43d466e13813fcf42a73defd3f010000000000ffffffff018038010000000000225120d21e50e12ae122b4a5662c09b67cec7449c8182913bc06761e8b65f0fa2242f701400536f9b7542799f98739eeb6c6adaeb12d7bd418771bc5c6847f2abd19297bd466153600af26ccf0accb605c11ad667c842c5713832af4b7b11f1bcebe57745900000000")
-
-	tx := wire.NewMsgTx(2)
-	txIn := wire.NewTxIn(
-		&wire.OutPoint{Hash: prevTx.TxHash(), Index: 0},
-		nil,
-		nil,
-	)
-	tx.AddTxIn(txIn)
-
-	txOut := wire.NewTxOut(70_000, prevTx.TxOut[0].PkScript)
-	tx.AddTxOut(txOut)
-
-	sighash, _ := SigHashFromTx(tx, 0, prevTx.TxOut[0])
-
-	require.Equal(t, "8da5e7aa2b03491d7c2f4359ea4968dd58f69adf9af1a2c6881be0295591c293", hex.EncodeToString(sighash))
-}
-
 func TestVerifySignature(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
 	addr, err := P2TRAddressFromPublicKey(privKey.Public(), btcnetwork.Regtest)
@@ -107,13 +89,13 @@ func TestVerifySignature(t *testing.T) {
 	newTxOut := wire.NewTxOut(99_000, script)
 	debitTx.AddTxOut(newTxOut)
 
-	sighash, err := SigHashFromTx(debitTx, 0, creditTx.TxOut[0])
+	h, err := sighash.FromTx(debitTx, 0, creditTx.TxOut[0])
 	require.NoError(t, err)
 	// secp vs. schnorr.sign...?
 	taprootKey := txscript.TweakTaprootPrivKey(*privKey.ToBTCEC(), []byte{})
-	sig, err := schnorr.Sign(taprootKey, sighash)
+	sig, err := schnorr.Sign(taprootKey, h.Serialize())
 	require.NoError(t, err)
-	require.True(t, sig.Verify(sighash, taprootKey.PubKey()))
+	require.True(t, sig.Verify(h.Serialize(), taprootKey.PubKey()))
 	var debitTxBuf bytes.Buffer
 	err = debitTx.Serialize(&debitTxBuf)
 	require.NoError(t, err)
