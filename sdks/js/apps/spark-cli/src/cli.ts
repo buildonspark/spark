@@ -85,19 +85,6 @@ type QueryNodesNetwork = NonNullable<
   Parameters<SparkServiceClient["query_nodes"]>[0]["network"]
 >;
 
-type WalletInternals = {
-  config: {
-    getCoordinatorAddress(): string;
-    getElectrsUrl(): string;
-    getNetwork(): Network;
-    getNetworkProto(): QueryNodesNetwork;
-    getNetworkType(): NetworkType;
-  };
-  connectionManager: {
-    createSparkClient(coordinatorAddress: string): Promise<SparkServiceClient>;
-  };
-};
-
 type ElectrsTransaction = {
   txid: string;
   vin: {
@@ -114,11 +101,6 @@ type ElectrsTransaction = {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-// Fee-bump commands use SDK internals; keep this type in sync with IssuerSparkWallet.
-function getWalletInternals(wallet: IssuerSparkWallet): WalletInternals {
-  return wallet as unknown as WalletInternals;
 }
 
 // Helper function to create RIPEMD160(SHA256(data)) hash
@@ -2412,7 +2394,7 @@ async function runCLI() {
               tokenName: md.tokenName,
               tokenIdentifier: encodeBech32mTokenIdentifier({
                 tokenIdentifier: md.rawTokenIdentifier,
-                network: getWalletInternals(wallet).config.getNetworkType(),
+                network: wallet.getConfig().getNetworkType(),
               }),
             });
           }
@@ -2429,7 +2411,7 @@ async function runCLI() {
             console.log("Token Metadata:", {
               tokenIdentifier: encodeBech32mTokenIdentifier({
                 tokenIdentifier: md.rawTokenIdentifier,
-                network: getWalletInternals(wallet).config.getNetworkType(),
+                network: wallet.getConfig().getNetworkType(),
               }),
               tokenPublicKey: md.tokenPublicKey,
               tokenName: md.tokenName,
@@ -3201,17 +3183,13 @@ async function runCLI() {
             console.log(`Fee rate: ${feeRate} sat/vbyte`);
 
             // Get sparkClient from wallet's connection manager
-            const walletInternals = getWalletInternals(wallet);
-            const sparkClient =
-              await walletInternals.connectionManager.createSparkClient(
-                walletInternals.config.getCoordinatorAddress(),
-              );
+            const sparkClient = await wallet.createSparkClient();
 
             const feeBumpChains = await constructUnilateralExitFeeBumpPackages(
               nodeHexStrings,
               utxos,
               { satPerVbyte: feeRate },
-              walletInternals.config.getNetwork(),
+              wallet.getConfig().getNetwork(),
               sparkClient,
             );
 
@@ -3285,10 +3263,9 @@ async function runCLI() {
 
           try {
             // Get sparkClient from wallet's connection manager
-            const walletInternals = getWalletInternals(wallet);
             const sparkClient =
-              await walletInternals.connectionManager.createSparkClient(
-                walletInternals.config.getCoordinatorAddress(),
+              await wallet.getConnectionManager().createSparkClient(
+                wallet.getConfig().getCoordinatorAddress(),
               );
 
             const nodeIds = args;
@@ -3309,7 +3286,7 @@ async function runCLI() {
                     },
                   },
                   includeParents: true,
-                  network: walletInternals.config.getNetworkProto(),
+                  network: wallet.getConfig().getNetworkProto(),
                 });
 
                 const node = response.nodes[nodeId];
@@ -3667,8 +3644,7 @@ async function runCLI() {
             console.log(`✅ Fee rate: ${feeRate} sat/vbyte`);
             console.log("");
 
-            const walletInternals = getWalletInternals(wallet);
-            const electrsUrl = walletInternals.config.getElectrsUrl();
+            const electrsUrl = wallet.getConfig().getElectrsUrl();
 
             let privateKeyHex = "";
             const utxos: Utxo[] = [];
@@ -3687,7 +3663,7 @@ async function runCLI() {
               // Create a regtest P2WPKH address
               const regtestAddress = getP2WPKHAddressFromPublicKey(
                 publicKey,
-                walletInternals.config.getNetwork(),
+                wallet.getConfig().getNetwork(),
               );
 
               console.log(`Generated test wallet:`);
@@ -3841,15 +3817,15 @@ async function runCLI() {
 
             // Get sparkClient from wallet's connection manager
             const sparkClient =
-              await walletInternals.connectionManager.createSparkClient(
-                walletInternals.config.getCoordinatorAddress(),
+              await wallet.getConnectionManager().createSparkClient(
+                wallet.getConfig().getCoordinatorAddress(),
               );
 
             const feeBumpChains = await constructUnilateralExitFeeBumpPackages(
               hexStrings, // Use all selected leaves
               utxos,
               { satPerVbyte: feeRate },
-              walletInternals.config.getNetwork(),
+              wallet.getConfig().getNetwork(),
               sparkClient,
             );
 
@@ -3934,7 +3910,7 @@ async function runCLI() {
 
           const regtestAddress = getP2WPKHAddressFromPublicKey(
             publicKey,
-            getWalletInternals(wallet).config.getNetwork(),
+            wallet.getConfig().getNetwork(),
           );
 
           console.log(`Generated test wallet:`);
@@ -3959,7 +3935,7 @@ async function runCLI() {
           }
 
           const headers: Record<string, string> = {};
-          const electrsUrl = getWalletInternals(wallet).config.getElectrsUrl();
+          const electrsUrl = wallet.getConfig().getElectrsUrl();
 
           if (network === "REGTEST") {
             const auth = btoa(
