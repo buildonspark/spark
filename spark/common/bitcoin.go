@@ -85,8 +85,7 @@ func P2TRAddressFromPkScript(pkScript []byte, network btcnetwork.Network) (*stri
 		if err != nil {
 			return nil, err
 		}
-		p2trAddress := taprootAddress.String()
-		return &p2trAddress, nil
+		return new(taprootAddress.String()), nil
 	}
 
 	return nil, fmt.Errorf("not a Taproot address")

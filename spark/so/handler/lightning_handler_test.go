@@ -380,8 +380,7 @@ func TestQueryHTLCRejectsMalformedRequestFieldsWithInvalidArgument(t *testing.T)
 			name: "invalid status",
 			req: func() *pb.QueryHtlcRequest {
 				req := base()
-				badStatus := pb.PreimageRequestStatus(999)
-				req.Status = &badStatus
+				req.Status = new(pb.PreimageRequestStatus(999))
 				return req
 			}(),
 		},

@@ -163,8 +163,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if req.ConfirmationThreshold != nil && *req.ConfirmationThreshold == 0 {
 		return nil, fmt.Errorf("confirmation_threshold must be at least 1")
 	}
-	threshold := resolveConfirmationThreshold(req.ConfirmationThreshold, config, schemaNetwork)
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, &threshold)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, new(resolveConfirmationThreshold(req.ConfirmationThreshold, config, schemaNetwork)))
 	if err != nil {
 		return nil, err
 	}

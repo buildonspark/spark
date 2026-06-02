@@ -161,10 +161,9 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 		if err != nil {
 			return nil, err
 		}
-		idStr := output.ID.String()
 		ownedTokenOutputs = append(ownedTokenOutputs, &tokenpb.OutputWithPreviousTransactionData{
 			Output: &tokenpb.TokenOutput{
-				Id:                            &idStr,
+				Id:                            new(output.ID.String()),
 				OwnerPublicKey:                output.OwnerPublicKey.Serialize(),
 				RevocationCommitment:          output.WithdrawRevocationCommitment,
 				WithdrawBondSats:              &output.WithdrawBondSats,

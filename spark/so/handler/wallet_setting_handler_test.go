@@ -36,9 +36,8 @@ func TestUpdateWalletSetting_CreateNew(t *testing.T) {
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
 	// Test creating new wallet setting
-	privateEnabled := true
 	request := &pb.UpdateWalletSettingRequest{
-		PrivateEnabled: &privateEnabled,
+		PrivateEnabled: new(true),
 	}
 
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
@@ -88,9 +87,8 @@ func TestUpdateWalletSetting_UpdateExisting(t *testing.T) {
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
 	// Test updating existing wallet setting
-	privateEnabled := true
 	request := &pb.UpdateWalletSettingRequest{
-		PrivateEnabled: &privateEnabled,
+		PrivateEnabled: new(true),
 	}
 
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
@@ -157,9 +155,8 @@ func TestUpdateWalletSetting_NoSession(t *testing.T) {
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
 	// Test with no session context
-	privateEnabled := true
 	request := &pb.UpdateWalletSettingRequest{
-		PrivateEnabled: &privateEnabled,
+		PrivateEnabled: new(true),
 	}
 
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
@@ -616,9 +613,8 @@ func TestUpdateWalletSetting_UpdateBothFields(t *testing.T) {
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
 	// Test updating both private_enabled and master_identity_public_key
-	privateEnabled := true
 	request := &pb.UpdateWalletSettingRequest{
-		PrivateEnabled: &privateEnabled,
+		PrivateEnabled: new(true),
 		MasterIdentityPublicKey: &pb.UpdateWalletSettingRequest_SetMasterIdentityPublicKey{
 			SetMasterIdentityPublicKey: masterPubKey.Serialize(),
 		},

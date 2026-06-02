@@ -428,11 +428,8 @@ func TestInterpolatingPointPolynomialEquality(t *testing.T) {
 		{X: curve.ScalarFromInt(2), Y: curve.ScalarFromInt(200).Point()},
 	}
 
-	poly1 := NewInterpolatingPointPolynomial(evals)
-	poly2 := NewInterpolatingPointPolynomial(evals)
-
-	// Test equality
-	if !poly1.Equal(&poly2) {
+	poly1 := NewInterpolatingPointPolynomial(evals) // Test equality
+	if !poly1.Equal(new(NewInterpolatingPointPolynomial(evals))) {
 		t.Errorf("Identical polynomials should be equal")
 	}
 
@@ -447,10 +444,8 @@ func TestInterpolatingPointPolynomialEquality(t *testing.T) {
 		{X: curve.ScalarFromInt(2), Y: curve.ScalarFromInt(200).Point()},
 	}
 
-	poly3 := NewInterpolatingPointPolynomial(differentEvals)
-
 	// Test inequality
-	if poly1.Equal(&poly3) {
+	if poly1.Equal(new(NewInterpolatingPointPolynomial(differentEvals))) {
 		t.Errorf("Different polynomials should not be equal")
 	}
 
@@ -459,9 +454,7 @@ func TestInterpolatingPointPolynomialEquality(t *testing.T) {
 		{X: curve.ScalarFromInt(1), Y: curve.ScalarFromInt(100).Point()},
 	}
 
-	poly4 := NewInterpolatingPointPolynomial(shorterEvals)
-
-	if poly1.Equal(&poly4) {
+	if poly1.Equal(new(NewInterpolatingPointPolynomial(shorterEvals))) {
 		t.Errorf("Polynomials with different lengths should not be equal")
 	}
 }
@@ -488,13 +481,10 @@ func TestInterpolatingPointPolynomialWellDefined(t *testing.T) {
 		{X: curve.ScalarFromInt(9), Y: sourcePoly.Eval(curve.ScalarFromInt(9))},
 	}
 
-	poly1 := NewInterpolatingPointPolynomial(evals1)
-	poly2 := NewInterpolatingPointPolynomial(evals2)
-
-	// poly1ed := poly1.Encode().Decode()
+	poly1 := NewInterpolatingPointPolynomial(evals1) // poly1ed := poly1.Encode().Decode()
 	// poly2ed := poly2.Encode().Decode()
 
-	if !poly1.Equal(&poly2) {
+	if !poly1.Equal(new(NewInterpolatingPointPolynomial(evals2))) {
 		t.Errorf("Interpolating polynomial for two evals of the same polynomial don't match")
 	}
 }

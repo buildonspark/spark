@@ -20,9 +20,8 @@ func canBroadcastForSession(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	identityHex := session.IdentityPublicKey().ToHex()
 	k := knobs.GetKnobsService(ctx)
-	return k.GetValueTarget(knobs.KnobTokenBroadcastAllowedPubkeys, &identityHex, 0) > 0
+	return k.GetValueTarget(knobs.KnobTokenBroadcastAllowedPubkeys, new(session.IdentityPublicKey().ToHex()), 0) > 0
 }
 
 // enforceBroadcastPolicy checks whether the caller is allowed to broadcast a token transaction

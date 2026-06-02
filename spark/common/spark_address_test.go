@@ -14,7 +14,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -66,7 +65,7 @@ func TestEncodeDecodeSparkInvoiceSats(t *testing.T) {
 				Version:         1,
 				Id:              testUUID[:],
 				PaymentType:     satsPaymentOf(testSats),
-				Memo:            proto.String(testMemo),
+				Memo:            new(testMemo),
 				SenderPublicKey: testIDPubKey.Serialize(),
 				ExpiryTime:      timestamppb.New(testExpiryTime),
 			}
@@ -137,7 +136,7 @@ func TestEncodeSparkAddress_Errors(t *testing.T) {
 				Version:         1,
 				Id:              testUUID[:],
 				PaymentType:     satsPaymentOf(testSats),
-				Memo:            proto.String(testMemo),
+				Memo:            new(testMemo),
 				SenderPublicKey: senderPublicKey.Serialize(),
 				ExpiryTime:      timestamppb.New(testExpiryTime),
 			}
@@ -186,7 +185,7 @@ func TestEncodeDecodeSparkInvoiceTokens(t *testing.T) {
 				Version:         1,
 				Id:              testUUID[:],
 				PaymentType:     tokensPaymentOf(testTokenID, testTokenAmount),
-				Memo:            proto.String(testMemo),
+				Memo:            new(testMemo),
 				SenderPublicKey: testIDPubKey.Serialize(),
 				ExpiryTime:      timestamppb.New(testExpiryTime),
 			}
@@ -227,7 +226,7 @@ func TestDecodeKnownTokensSparkInvoice(t *testing.T) {
 				Version:         1,
 				Id:              expectedId,
 				PaymentType:     tokensPaymentOf(expectedTokenId, big.NewInt(1000).Bytes()),
-				Memo:            proto.String("testMemo"),
+				Memo:            new("testMemo"),
 				SenderPublicKey: expectedIdentityPubKey,
 				ExpiryTime:      timestamppb.New(time.Date(2025, time.September, 9, 18, 9, 48, 419000000, time.UTC)),
 			},
@@ -254,7 +253,7 @@ func TestDecodeKnownSatsSparkInvoice(t *testing.T) {
 				Version:         1,
 				Id:              expectedId,
 				PaymentType:     satsPaymentOf(1000),
-				Memo:            proto.String("testMemo"),
+				Memo:            new("testMemo"),
 				SenderPublicKey: expectedIdentityPubKey,
 				ExpiryTime:      timestamppb.New(time.Date(2025, time.September, 9, 18, 10, 9, 49000000, time.UTC)),
 			},
@@ -286,5 +285,5 @@ func tokensPaymentOf(tokenID, tokenAmount []byte) *pb.SparkInvoiceFields_TokensP
 	return &pb.SparkInvoiceFields_TokensPayment{TokensPayment: &pb.TokensPayment{TokenIdentifier: tokenID, Amount: tokenAmount}}
 }
 func satsPaymentOf(sats uint64) *pb.SparkInvoiceFields_SatsPayment {
-	return &pb.SparkInvoiceFields_SatsPayment{SatsPayment: &pb.SatsPayment{Amount: proto.Uint64(sats)}}
+	return &pb.SparkInvoiceFields_SatsPayment{SatsPayment: &pb.SatsPayment{Amount: new(sats)}}
 }

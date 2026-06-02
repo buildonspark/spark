@@ -245,14 +245,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     logging: LoggingService,
   ): ConnectionManager;
 
-  public getConfig(): WalletConfigService {
-    return this.config;
-  }
-
-  public getConnectionManager(): ConnectionManager {
-    return this.connectionManager;
-  }
-
   constructor(options?: ConfigOptions, signerArg?: SparkSigner) {
     super();
     const signer = signerArg || new DefaultSparkSigner();

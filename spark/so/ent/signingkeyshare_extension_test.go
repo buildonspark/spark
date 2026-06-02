@@ -27,9 +27,7 @@ func TestSigningKeyshareGetSecretShare_MainSecretPreferredWithoutEphemeral(t *te
 
 func TestSigningKeyshareGetSecretShare_ErrWhenEphemeralUnavailable(t *testing.T) {
 	ctx, tc := db.NewTestSQLiteContext(t)
-	version := int32(0)
-
-	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, &version)
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, new(int32(0)))
 	_, err := keyshare.GetSecretShare(ctx)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "ephemeral DB is unavailable")
@@ -69,8 +67,7 @@ func TestSigningKeyshareGetSecretShare_ErrWhenEphemeralVersionMissing(t *testing
 		_ = ephemeralClient.Close()
 	})
 
-	version := int32(7)
-	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, &version)
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, new(int32(7)))
 
 	ctxWithEphemeral := entephemeral.Inject(ctx, db.NewReadOnlyEphemeralSession(ctx, ephemeralClient))
 	_, err := keyshare.GetSecretShare(ctxWithEphemeral)
@@ -107,11 +104,8 @@ func TestPrepareSigningKeyshareCreateWithSecret_FallsBackToMainDBWhenEphemeralUn
 func TestUpdateSigningKeyshareWithRotatedSecret_FallsBackToMainDBWhenEphemeralUnavailable(t *testing.T) {
 	ctx, tc := db.NewTestSQLiteContext(t)
 
-	oldSecret := keys.MustParsePrivateKeyHex("fd9627ee6b0fd2f6a14833ea637f5f3af8d7e4f2a5ee5ec92fae13496f95da60")
 	newSecret := keys.MustParsePrivateKeyHex("ee5f45be26ef9a5fe3e29ea9d2cb4f1200519676ad958962f4f7dcae998f1a16")
-	version := int32(7)
-
-	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, &oldSecret, &version)
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, new(keys.MustParsePrivateKeyHex("fd9627ee6b0fd2f6a14833ea637f5f3af8d7e4f2a5ee5ec92fae13496f95da60")), new(int32(7)))
 	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(
 		ctx,
 		keyshare.ID,

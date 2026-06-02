@@ -210,17 +210,14 @@ func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorN
 
 	// Store the original replica count for restoration
 	if deployment.Spec.Replicas != nil {
-		originalReplicas := *deployment.Spec.Replicas
-		operator.originalReplicas = &originalReplicas
+		operator.originalReplicas = new(*deployment.Spec.Replicas)
 	} else {
 		// Default to 1 if replicas is nil
-		defaultReplicas := int32(1)
-		operator.originalReplicas = &defaultReplicas
+		operator.originalReplicas = new(int32(1))
 	}
 
 	// Scale down to 0 replicas
-	zeroReplicas := int32(0)
-	deployment.Spec.Replicas = &zeroReplicas
+	deployment.Spec.Replicas = new(int32(0))
 
 	// Update the deployment
 	_, err = s.client.AppsV1().Deployments(namespace).Update(ctx, deployment, metav1.UpdateOptions{})

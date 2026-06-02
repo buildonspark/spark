@@ -163,12 +163,11 @@ func TestFinalizeMintOrCreateTransaction(t *testing.T) {
 		)
 
 		// Create an expired SIGNED mint for 100 more — total 200, within 300
-		pastTime := time.Now().Add(-time.Hour)
 		tx, _ := setup.fixtures.CreateMintTransactionWithOpts(
 			freshTokenCreate,
 			entfixtures.OutputSpecs(big.NewInt(100)),
 			st.TokenTransactionStatusSigned,
-			&entfixtures.TokenTransactionOpts{ExpiryTime: &pastTime},
+			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(-time.Hour))},
 		)
 
 		txLoaded, err := setup.client.TokenTransaction.Query().
@@ -199,12 +198,11 @@ func TestFinalizeMintOrCreateTransaction(t *testing.T) {
 		)
 
 		// Create an expired SIGNED mint for 100 more — total 350, exceeds 300
-		pastTime := time.Now().Add(-time.Hour)
 		tx, _ := setup.fixtures.CreateMintTransactionWithOpts(
 			freshTokenCreate,
 			entfixtures.OutputSpecs(big.NewInt(100)),
 			st.TokenTransactionStatusSigned,
-			&entfixtures.TokenTransactionOpts{ExpiryTime: &pastTime},
+			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(-time.Hour))},
 		)
 
 		txLoaded, err := setup.client.TokenTransaction.Query().

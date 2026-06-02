@@ -226,16 +226,14 @@ func (h FixKeyshareHandler) createConfig(args FixKeyshareArgs) (*secretsharing.I
 		if err != nil {
 			return nil, fmt.Errorf("invalid operator id: %w", err)
 		}
-		alpha := curve.ScalarFromInt(operatorId + operatorIndexOffset)
-		alphas[identifier] = &alpha
+		alphas[identifier] = new(curve.ScalarFromInt(operatorId + operatorIndexOffset))
 	}
 
 	badOperatorId, err := operatorIndexFromID(args.badOperator.ID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid bad operator id: %w", err)
 	}
-	alpha := curve.ScalarFromInt(badOperatorId + operatorIndexOffset)
-	alphas[args.badOperator.Identifier] = &alpha
+	alphas[args.badOperator.Identifier] = new(curve.ScalarFromInt(badOperatorId + operatorIndexOffset))
 
 	if h.config.Threshold > math.MaxInt {
 		return nil, fmt.Errorf("config threshold value %d overflows int", h.config.Threshold)

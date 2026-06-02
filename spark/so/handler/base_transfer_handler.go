@@ -313,8 +313,6 @@ func validateSendLeafDirectRefundTxs(senderLeaf *ent.TreeNode, receiverDirectRef
 		Hash:  senderDirectTx.TxHash(),
 		Index: 0,
 	}
-	expectedReceiverDirectFromCpfpRefundOutPoint := senderRefundTx.TxIn[0].PreviousOutPoint
-
 	cpfpTimelock := bitcointransaction.GetTimelockFromSequence(senderRefundTx.TxIn[0].Sequence)
 
 	expectedReceiverDirectRefundTxSequence, err := bitcointransaction.ValidateSequence(cpfpTimelock, bitcointransaction.TxTypeRefundDirect, receiverDirectRefundTx.TxIn[0].Sequence)
@@ -329,7 +327,7 @@ func validateSendLeafDirectRefundTxs(senderLeaf *ent.TreeNode, receiverDirectRef
 	if err != nil {
 		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
 	}
-	if err := validateLeafRefundTxInputExact(receiverDirectFromCpfpRefundTx, expectedReceiverDirectFromCpfpRefundTxSequence, &expectedReceiverDirectFromCpfpRefundOutPoint, expectedInputCount); err != nil {
+	if err := validateLeafRefundTxInputExact(receiverDirectFromCpfpRefundTx, expectedReceiverDirectFromCpfpRefundTxSequence, new(senderRefundTx.TxIn[0].PreviousOutPoint), expectedInputCount); err != nil {
 		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
 	}
 
@@ -764,8 +762,7 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 	}
 	var expiry *time.Time
 	if decoded.ExpiryTime != nil && decoded.ExpiryTime.IsValid() {
-		t := decoded.ExpiryTime.AsTime()
-		expiry = &t
+		expiry = new(decoded.ExpiryTime.AsTime())
 	}
 	err = db.SparkInvoice.Create().
 		SetID(decoded.Id).

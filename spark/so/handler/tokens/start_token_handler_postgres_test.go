@@ -221,16 +221,14 @@ func TestStartTokenTransaction_RevealedExpiredTransactionBlocksNewTransaction(t 
 	_, mintOutputs := f.CreateMintTransaction(tokenCreate, entfixtures.OutputSpecs(big.NewInt(1000)), st.TokenTransactionStatusFinalized)
 	mintOutput := mintOutputs[0]
 
-	pastTimestamp := time.Now().Add(-2 * time.Hour)
-	validitySeconds := uint64(60)
 	competingTx, _ := f.CreateBalancedTransferTransactionWithOpts(
 		tokenCreate,
 		[]*ent.TokenOutput{mintOutput},
 		entfixtures.OutputSpecs(big.NewInt(1000)),
 		st.TokenTransactionStatusRevealed,
 		&entfixtures.BalancedTransferTransactionOpts{
-			ClientCreatedTimestamp:  &pastTimestamp,
-			ValidityDurationSeconds: &validitySeconds,
+			ClientCreatedTimestamp:  new(time.Now().Add(-2 * time.Hour)),
+			ValidityDurationSeconds: new(uint64(60)),
 		},
 	)
 
@@ -270,16 +268,14 @@ func TestStartTokenTransaction_FinalizedExpiredTransactionBlocksNewTransaction(t
 	_, mintOutputs := f.CreateMintTransaction(tokenCreate, entfixtures.OutputSpecs(big.NewInt(1000)), st.TokenTransactionStatusFinalized)
 	mintOutput := mintOutputs[0]
 
-	pastTimestamp := time.Now().Add(-2 * time.Hour)
-	validitySeconds := uint64(60)
 	competingTx, _ := f.CreateBalancedTransferTransactionWithOpts(
 		tokenCreate,
 		[]*ent.TokenOutput{mintOutput},
 		entfixtures.OutputSpecs(big.NewInt(1000)),
 		st.TokenTransactionStatusFinalized,
 		&entfixtures.BalancedTransferTransactionOpts{
-			ClientCreatedTimestamp:  &pastTimestamp,
-			ValidityDurationSeconds: &validitySeconds,
+			ClientCreatedTimestamp:  new(time.Now().Add(-2 * time.Hour)),
+			ValidityDurationSeconds: new(uint64(60)),
 		},
 	)
 
@@ -328,9 +324,6 @@ func buildV3TransferTransactionProto(
 
 	// expectedBondSats/expectedRelativeBlockLocktime are read from Lrc20Configs which
 	// is nil in TestConfig, so the zero values are expected by validation.
-	bondSats := cfg.Lrc20Configs["regtest"].WithdrawBondSats
-	relativeBlockLocktime := cfg.Lrc20Configs["regtest"].WithdrawRelativeBlockLocktime
-
 	return &tokenpb.TokenTransaction{
 		Version: 3,
 		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
@@ -348,8 +341,8 @@ func buildV3TransferTransactionProto(
 				OwnerPublicKey:                cfg.IdentityPublicKey().Serialize(),
 				TokenIdentifier:               tokenCreate.TokenIdentifier,
 				TokenAmount:                   amountBytes,
-				WithdrawBondSats:              &bondSats,
-				WithdrawRelativeBlockLocktime: &relativeBlockLocktime,
+				WithdrawBondSats:              new(cfg.Lrc20Configs["regtest"].WithdrawBondSats),
+				WithdrawRelativeBlockLocktime: new(cfg.Lrc20Configs["regtest"].WithdrawRelativeBlockLocktime),
 			},
 		},
 		SparkOperatorIdentityPublicKeys: operatorKeys,

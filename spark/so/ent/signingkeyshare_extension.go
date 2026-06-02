@@ -372,8 +372,7 @@ func (sk *SigningKeyshare) GetSecretShare(ctx context.Context) (*keys.Private, e
 
 	// Store a copy before taking its address so that callers holding the
 	// returned pointer cannot corrupt the cache via writes.
-	fetched := secret.SecretShare
-	sk.ExternalSecret = &fetched
+	sk.ExternalSecret = new(secret.SecretShare)
 	return sk.ExternalSecret, nil
 }
 
@@ -865,11 +864,10 @@ func sumOfSigningKeyshares(ctx context.Context, keyshares []*SigningKeyshare) (*
 		return nil, err
 	}
 
-	sumSecret := *firstSecret
 	sum := &SigningKeyshare{
 		ID:           keyshares[0].ID,
 		PublicKey:    keyshares[0].PublicKey,
-		SecretShare:  &sumSecret,
+		SecretShare:  new(*firstSecret),
 		PublicShares: make(map[string]keys.Public, len(keyshares[0].PublicShares)),
 	}
 	sum.SecretVersion = nil
@@ -880,8 +878,7 @@ func sumOfSigningKeyshares(ctx context.Context, keyshares []*SigningKeyshare) (*
 		if secretErr != nil {
 			return nil, secretErr
 		}
-		newSecret := sum.SecretShare.Add(*keyshareSecret)
-		sum.SecretShare = &newSecret
+		sum.SecretShare = new(sum.SecretShare.Add(*keyshareSecret))
 		sum.PublicKey = sum.PublicKey.Add(keyshare.PublicKey)
 
 		for shareID, publicShare := range sum.PublicShares {

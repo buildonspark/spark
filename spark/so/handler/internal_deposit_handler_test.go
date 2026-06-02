@@ -491,7 +491,6 @@ func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
 
 		nonExistentKeyshareID := uuid.New()
 		childRawTx := createTestTxBytesWithIndex(t, 500, 1)
-		rootNodeID := rootNode.Id
 		childNode := &pbinternal.TreeNode{
 			Id:                  uuid.NewString(),
 			Value:               500,
@@ -501,7 +500,7 @@ func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
 			RawTx:               childRawTx,
 			RawRefundTx:         childRawTx,
 			TreeId:              rootNode.TreeId,
-			ParentNodeId:        &rootNodeID,
+			ParentNodeId:        new(rootNode.Id),
 			SigningKeyshareId:   nonExistentKeyshareID.String(),
 			Vout:                1,
 		}
@@ -549,7 +548,6 @@ func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
 		require.NoError(t, err)
 
 		childRawTx := createTestTxBytesWithIndex(t, 500, 3)
-		nonExistentParentID := uuid.NewString()
 		childNode := &pbinternal.TreeNode{
 			Id:                  uuid.NewString(),
 			Value:               500,
@@ -559,7 +557,7 @@ func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
 			RawTx:               childRawTx,
 			RawRefundTx:         childRawTx,
 			TreeId:              rootNode.TreeId,
-			ParentNodeId:        &nonExistentParentID,
+			ParentNodeId:        new(uuid.NewString()),
 			SigningKeyshareId:   keyshare.ID.String(),
 			Vout:                3,
 		}

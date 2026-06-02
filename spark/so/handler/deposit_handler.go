@@ -1672,12 +1672,11 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 		return nil, nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 	}
 
-	nodeIDStr := depositAddress.NodeID.String()
 	return spendTxSigningResult, &pb.DepositAddressQueryResult{
 		DepositAddress:       depositAddress.Address,
 		UserSigningPublicKey: depositAddress.OwnerSigningPubkey.Serialize(),
 		VerifyingPublicKey:   verifyingKey.Serialize(),
-		LeafId:               &nodeIDStr,
+		LeafId:               new(depositAddress.NodeID.String()),
 	}, nil
 }
 

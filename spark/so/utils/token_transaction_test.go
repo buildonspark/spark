@@ -164,10 +164,6 @@ func TestHashTokenTransactionV0MintLegacyVector(t *testing.T) {
 		252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
 	}
 
-	leafID := "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436"
-	bondSats := uint64(10000)
-	locktime := uint64(100)
-
 	// Create the token transaction matching the JavaScript object
 	partialTokenTransaction := &legacypb.TokenTransaction{
 		TokenInputs: &legacypb.TokenTransaction_MintInput{
@@ -178,13 +174,13 @@ func TestHashTokenTransactionV0MintLegacyVector(t *testing.T) {
 		},
 		TokenOutputs: []*legacypb.TokenOutput{
 			{
-				Id:                            &leafID,
+				Id:                            new("db1a4e48-0fc5-4f6c-8a80-d9d6c561a436"),
 				OwnerPublicKey:                identityPubKey,
 				TokenPublicKey:                tokenPublicKey,
 				TokenAmount:                   []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232}, // 1000n in BE format
 				RevocationCommitment:          identityPubKey,
-				WithdrawBondSats:              &bondSats,
-				WithdrawRelativeBlockLocktime: &locktime,
+				WithdrawBondSats:              new(uint64(10000)),
+				WithdrawRelativeBlockLocktime: new(uint64(100)),
 			},
 		},
 		SparkOperatorIdentityPublicKeys: [][]byte{},
@@ -813,8 +809,7 @@ func TestHashTokenTransactionV1RequiredFields(t *testing.T) {
 			txType: "mint",
 			baseTx: baseMintTransaction,
 			modifyTx: func(tx *tokenpb.TokenTransaction) {
-				emptyString := ""
-				tx.TokenOutputs[0].Id = &emptyString
+				tx.TokenOutputs[0].Id = new("")
 			},
 			expectedErr: "token output ID at index 0 cannot be nil or empty",
 		},
@@ -1356,13 +1351,12 @@ func TestPartialHashChangesWhenExecuteBeforeIsSet(t *testing.T) {
 func TestFinalHashChangesWhenExecuteBeforeIsSet(t *testing.T) {
 	// execute_before is included in FinalTokenTransaction to prevent malleability —
 	// an attacker cannot change the deadline without invalidating operator signatures.
-	vds := uint64(300)
 	tx := &tokenpb.TokenTransaction{
 		Version:                         3,
 		SparkOperatorIdentityPublicKeys: [][]byte{bytes.Repeat([]byte{0x04}, 33)},
 		Network:                         pb.Network_REGTEST,
 		ClientCreatedTimestamp:          timestamppb.New(time.Unix(1000, 0)),
-		ValidityDurationSeconds:         &vds,
+		ValidityDurationSeconds:         new(uint64(300)),
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
 				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 33),
@@ -2416,21 +2410,21 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "valid execute_before within window",
-			executeBefore:          ptr(now.Add(100 * time.Second)),
+			executeBefore:          new(now.Add(100 * time.Second)),
 			clientCreatedTimestamp: now.Add(-10 * time.Second),
 			maxWindow:              maxWindow,
 			wantErr:                false,
 		},
 		{
 			name:                   "execute_before at max window boundary",
-			executeBefore:          ptr(now.Add(maxWindow)),
+			executeBefore:          new(now.Add(maxWindow)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
 			wantErr:                false,
 		},
 		{
 			name:                   "execute_before 1 microsecond past max window",
-			executeBefore:          ptr(now.Add(maxWindow + time.Microsecond)),
+			executeBefore:          new(now.Add(maxWindow + time.Microsecond)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
 			wantErr:                true,
@@ -2438,7 +2432,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "execute_before exceeds max window",
-			executeBefore:          ptr(now.Add(maxWindow + time.Second)),
+			executeBefore:          new(now.Add(maxWindow + time.Second)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
 			wantErr:                true,
@@ -2446,7 +2440,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "execute_before before client_created_timestamp",
-			executeBefore:          ptr(now.Add(-10 * time.Second)),
+			executeBefore:          new(now.Add(-10 * time.Second)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
 			wantErr:                true,
@@ -2454,7 +2448,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "execute_before equal to client_created_timestamp",
-			executeBefore:          ptr(now),
+			executeBefore:          new(now),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
 			wantErr:                true,
@@ -2462,14 +2456,14 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "execute_before 1 microsecond after client_created_timestamp",
-			executeBefore:          ptr(now.Add(100 * time.Second)),
+			executeBefore:          new(now.Add(100 * time.Second)),
 			clientCreatedTimestamp: now.Add(100*time.Second - time.Microsecond),
 			maxWindow:              maxWindow,
 			wantErr:                false,
 		},
 		{
 			name:                   "zero max window rejects any execute_before",
-			executeBefore:          ptr(now.Add(time.Microsecond)),
+			executeBefore:          new(now.Add(time.Microsecond)),
 			clientCreatedTimestamp: now,
 			maxWindow:              0,
 			wantErr:                true,
@@ -2477,7 +2471,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "execute_before has already passed",
-			executeBefore:          ptr(now.Add(-1 * time.Second)),
+			executeBefore:          new(now.Add(-1 * time.Second)),
 			clientCreatedTimestamp: now.Add(-10 * time.Second),
 			maxWindow:              maxWindow,
 			wantErr:                true,
@@ -2485,7 +2479,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 		},
 		{
 			name:                   "execute_before with sub-microsecond precision",
-			executeBefore:          ptr(now.Add(100*time.Second + 123*time.Nanosecond)),
+			executeBefore:          new(now.Add(100*time.Second + 123*time.Nanosecond)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
 			wantErr:                true,
@@ -2536,7 +2530,7 @@ func TestValidateFinalTokenTransaction_RevocationKeyCardinalityMismatch(t *testi
 		amount := make([]byte, 16)
 		amount[15] = 10
 		return &tokenpb.TokenOutput{
-			Id:                            proto.String(id),
+			Id:                            new(id),
 			OwnerPublicKey:                issuerPriv.Public().Serialize(),
 			TokenIdentifier:               tokenID,
 			TokenAmount:                   amount,
@@ -2616,7 +2610,7 @@ func TestValidateFinalTokenTransaction_RevocationKeyCardinalityMatch(t *testing.
 		amount := make([]byte, 16)
 		amount[15] = 10
 		return &tokenpb.TokenOutput{
-			Id:                            proto.String(fmt.Sprintf("output-%d", idx)),
+			Id:                            new(fmt.Sprintf("output-%d", idx)),
 			OwnerPublicKey:                issuerPriv.Public().Serialize(),
 			TokenIdentifier:               tokenID,
 			TokenAmount:                   amount,
@@ -2665,8 +2659,4 @@ func TestValidateFinalTokenTransaction_RevocationKeyCardinalityMatch(t *testing.
 
 	err = ValidateFinalTokenTransaction(tx, sigs, config)
 	require.NoError(t, err, "matching output and revocation key counts should succeed")
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }

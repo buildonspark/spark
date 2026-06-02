@@ -21,10 +21,9 @@ func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	timeout := 200 * time.Millisecond
 	task := BaseTaskSpec{
 		Name:    "Test",
-		Timeout: &timeout,
+		Timeout: new(200 * time.Millisecond),
 		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			select {
 			case <-time.After(10 * time.Second):
@@ -46,10 +45,9 @@ func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	timeout := 10 * time.Second
 	task := BaseTaskSpec{
 		Name:    "Test",
-		Timeout: &timeout,
+		Timeout: new(10 * time.Second),
 		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			select {
 			case <-time.After(200 * time.Millisecond):
@@ -71,10 +69,9 @@ func TestTimeoutMiddleware_TestContextCancelled(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	timeout := 10 * time.Second
 	task := BaseTaskSpec{
 		Name:    "Test",
-		Timeout: &timeout,
+		Timeout: new(10 * time.Second),
 		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			select {
 			case <-time.After(10 * time.Second):

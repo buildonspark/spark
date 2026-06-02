@@ -1542,14 +1542,11 @@ func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbsp
 func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
 	var expireTimeOverride *time.Time
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
-		t := time.Now().Add(LightningPaymentExpiryDuration)
-		expireTimeOverride = &t
+		expireTimeOverride = new(time.Now().Add(LightningPaymentExpiryDuration))
 	} else if req.TransferRequest != nil && req.TransferRequest.ExpiryTime != nil && !req.TransferRequest.ExpiryTime.AsTime().IsZero() {
-		t := req.TransferRequest.ExpiryTime.AsTime()
-		expireTimeOverride = &t
+		expireTimeOverride = new(req.TransferRequest.ExpiryTime.AsTime())
 	} else {
-		t := time.Now().Add(LightningReceiveExpiryDuration)
-		expireTimeOverride = &t
+		expireTimeOverride = new(time.Now().Add(LightningReceiveExpiryDuration))
 	}
 	return h.initiatePreimageSwap(ctx, req, true, expireTimeOverride)
 }
@@ -1557,11 +1554,9 @@ func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbsp
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
 	var expireTimeOverride *time.Time
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
-		t := time.Now().Add(LightningPaymentExpiryDuration)
-		expireTimeOverride = &t
+		expireTimeOverride = new(time.Now().Add(LightningPaymentExpiryDuration))
 	} else {
-		t := time.Now().Add(LightningReceiveExpiryDuration)
-		expireTimeOverride = &t
+		expireTimeOverride = new(time.Now().Add(LightningReceiveExpiryDuration))
 	}
 	return h.initiatePreimageSwap(ctx, req, false, expireTimeOverride)
 }

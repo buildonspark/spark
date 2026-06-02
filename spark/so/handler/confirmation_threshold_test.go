@@ -70,12 +70,11 @@ func TestRollbackUtxoSwap_HonorsRequestThreshold(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	one := uint32(1)
 	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
 		Txid:    utxo.Txid,
 		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
-	}, &one)
+	}, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, rollbackRequest.ConfirmationThreshold)
 	assert.Equal(t, uint32(1), *rollbackRequest.ConfirmationThreshold)
@@ -170,12 +169,11 @@ func TestUtxoSwapCompleted_HonorsRequestThreshold_FixedAmount(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	one := uint32(1)
 	completedRequest, err := CreateCompleteSwapForUtxoRequest(cfg, &pb.UTXO{
 		Txid:    utxo.Txid,
 		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
-	}, &one)
+	}, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, completedRequest.ConfirmationThreshold)
 	assert.Equal(t, uint32(1), *completedRequest.ConfirmationThreshold)
@@ -276,8 +274,7 @@ func TestCreateCompleteSwapForUtxoRequest_SetsThreshold(t *testing.T) {
 		Network: pb.Network_REGTEST,
 	}
 
-	one := uint32(1)
-	withThreshold, err := CreateCompleteSwapForUtxoRequest(cfg, utxo, &one)
+	withThreshold, err := CreateCompleteSwapForUtxoRequest(cfg, utxo, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, withThreshold.ConfirmationThreshold)
 	assert.Equal(t, uint32(1), *withThreshold.ConfirmationThreshold)
@@ -295,8 +292,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_SetsThreshold(t *te
 		Network: pb.Network_REGTEST,
 	}
 
-	one := uint32(1)
-	withThreshold, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), cfg, utxo, &one)
+	withThreshold, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), cfg, utxo, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, withThreshold.ConfirmationThreshold)
 	assert.Equal(t, uint32(1), *withThreshold.ConfirmationThreshold)

@@ -64,8 +64,7 @@ func createTestCoopExitAndConnectorOutputs(
 	exitTx, err := sparktesting.CreateTestCoopExitTransaction(outPoint, withdrawAddress, userAmountSats, sspIntermediateAddress, intermediateAmountSats)
 	require.NoError(t, err)
 
-	exitTxHash := exitTx.TxHash()
-	intermediateOutPoint := wire.NewOutPoint(&exitTxHash, 1)
+	intermediateOutPoint := wire.NewOutPoint(new(exitTx.TxHash()), 1)
 	var connectorP2trAddrs []string
 	for range leafCount + 1 {
 		connectorPrivKey := keys.GeneratePrivateKey()
@@ -80,8 +79,7 @@ func createTestCoopExitAndConnectorOutputs(
 
 	var connectorOutputs []*wire.OutPoint
 	for i := range connectorTx.TxOut[:len(connectorTx.TxOut)-1] {
-		txHash := connectorTx.TxHash()
-		connectorOutputs = append(connectorOutputs, wire.NewOutPoint(&txHash, uint32(i)))
+		connectorOutputs = append(connectorOutputs, wire.NewOutPoint(new(connectorTx.TxHash()), uint32(i)))
 	}
 	return exitTx, connectorTx, connectorOutputs
 }

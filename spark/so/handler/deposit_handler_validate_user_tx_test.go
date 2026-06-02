@@ -303,8 +303,7 @@ func TestValidateUserTxs_InvalidRootTxInput_Error(t *testing.T) {
 		Value:    100,
 		PkScript: randomScript,
 	})
-	newDepositTxHash := deposit.depositTx.TxHash()
-	newCpfpRootTx := newTestTx(depositTestSourceValue, spark.ZeroSequence, &newDepositTxHash, randomScript)
+	newCpfpRootTx := newTestTx(depositTestSourceValue, spark.ZeroSequence, new(deposit.depositTx.TxHash()), randomScript)
 	newCpfpRootTx.TxIn[0].PreviousOutPoint.Index = 1
 
 	req := &pb.StartDepositTreeCreationRequest{

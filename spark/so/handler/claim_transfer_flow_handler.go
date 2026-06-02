@@ -1670,13 +1670,12 @@ func buildClaimRefundSigningJob(
 		}
 		signingKeyshare = ks
 	}
-	verifyingKey := leaf.VerifyingPubkey
 	return &helper.SigningJobWithPregeneratedNonce{
 		SigningJob: helper.SigningJob{
 			JobID:             jobID,
 			SigningKeyshareID: signingKeyshare.ID,
 			Message:           sigHash,
-			VerifyingKey:      &verifyingKey,
+			VerifyingKey:      new(leaf.VerifyingPubkey),
 			UserCommitment:    &userCommitment,
 		},
 		Round1Packages: round1,

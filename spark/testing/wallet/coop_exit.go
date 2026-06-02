@@ -200,8 +200,7 @@ func signCoopExitRefunds(
 		var directRefundTxForJob *wire.MsgTx
 		if !isZeroNode && directRefundTx != nil {
 			directRefundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
-			directRefundNonce := frost.GenerateSigningNonce()
-			directRefundNoncePtr = &directRefundNonce
+			directRefundNoncePtr = new(frost.GenerateSigningNonce())
 			directRefundTxForJob = directRefundTx
 		}
 

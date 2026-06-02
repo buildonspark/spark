@@ -336,8 +336,7 @@ func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing
 		t.Run(fmt.Sprintf("timelock %d", timelock), func(t *testing.T) {
 			badLeaf, key := newTestLeafNode(t)
 			pkScript, _ := common.P2TRScriptFromPubKey(key)
-			nodeTxHash := badLeaf.RawTxid.Hash()
-			badRefundTx := newTestTx(testSourceValue, pkScript, timelock, &nodeTxHash)
+			badRefundTx := newTestTx(testSourceValue, pkScript, timelock, new(badLeaf.RawTxid.Hash()))
 			badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
 
 			err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, badLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)

@@ -1034,8 +1034,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 	// (older coordinators, or callers that don't track the threshold).
 	confirmationThreshold := req.ConfirmationThreshold
 	if confirmationThreshold == nil && utxoSwap.RequestType == st.UtxoSwapRequestTypeInstant {
-		threshold := uint32(1)
-		confirmationThreshold = &threshold
+		confirmationThreshold = new(uint32(1))
 	}
 	_, err = VerifiedTargetUtxoFromRequest(ctx, config, db, network, req.OnChainUtxo, confirmationThreshold)
 	if err != nil {

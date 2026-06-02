@@ -502,10 +502,7 @@ type cachedRDSTokenProvider struct {
 }
 
 func newCachedRDSTokenProvider(uri *url.URL) *cachedRDSTokenProvider {
-	uriCopy := *uri
-	return &cachedRDSTokenProvider{
-		uri: &uriCopy,
-	}
+	return &cachedRDSTokenProvider{uri: new(*uri)}
 }
 
 func (p *cachedRDSTokenProvider) Token(ctx context.Context) (string, error) {
@@ -837,8 +834,7 @@ func setGrpcDefaults(cfg *GRPCConfig) {
 		cfg.ServerKeepaliveMinTime = defaultGRPCServerKeepaliveMinTime
 	}
 	if cfg.ServerKeepalivePermitWithoutStream == nil {
-		v := defaultGRPCServerKeepalivePermitWithoutStream
-		cfg.ServerKeepalivePermitWithoutStream = &v
+		cfg.ServerKeepalivePermitWithoutStream = new(defaultGRPCServerKeepalivePermitWithoutStream)
 	}
 	if cfg.ServerUnaryHandlerTimeout == 0 {
 		cfg.ServerUnaryHandlerTimeout = defaultGRPCServerUnaryHandlerTimeout

@@ -329,8 +329,7 @@ func (f *Faucet) FeeBumpAndConfirmTx(tx *wire.MsgTx) error {
 		return err
 	}
 
-	txHash := tx.TxHash()
-	anchorOutPoint := wire.NewOutPoint(&txHash, uint32(len(tx.TxOut)-1))
+	anchorOutPoint := wire.NewOutPoint(new(tx.TxHash()), uint32(len(tx.TxOut)-1))
 
 	coin, err := f.Fund()
 	if err != nil {

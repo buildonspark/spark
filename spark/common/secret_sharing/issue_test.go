@@ -11,8 +11,7 @@ import (
 )
 
 func scalarPointerFromInt(n uint32) *curve.Scalar {
-	s := curve.ScalarFromInt(n)
-	return &s
+	return new(curve.ScalarFromInt(n))
 }
 
 // TestIssueProtocolFull tests the full issue protocol flow
@@ -45,8 +44,7 @@ func TestIssueProtocolFull(t *testing.T) {
 
 	establishedShares := make(map[PartyIndex]*curve.Scalar)
 	for partyIdx, shareArg := range establishedShareArgs {
-		share := sharingPoly.Eval(*shareArg)
-		establishedShares[partyIdx] = &share
+		establishedShares[partyIdx] = new(sharingPoly.Eval(*shareArg))
 	}
 
 	pubSharesInterpolatingPoly := polynomial.NewInterpolatingPointPolynomialFromPolynomial(pubSharingPoly)

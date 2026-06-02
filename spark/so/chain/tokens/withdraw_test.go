@@ -59,8 +59,7 @@ func (b *recordingBitcoinBroadcaster) SendRawTransaction(tx *wire.MsgTx, _ bool)
 	if b.err != nil {
 		return nil, b.err
 	}
-	txHash := tx.TxHash()
-	return &txHash, nil
+	return new(tx.TxHash()), nil
 }
 
 func buildWithdrawalScript(t *testing.T, sePubKey []byte, ownerSignature []byte, records []withdrawalRecord) []byte {

@@ -1,8 +1,8 @@
 [tools]
 atlas-community = "1.0.0"
 github-cli = "latest"
-go = "1.25.1"
-golangci-lint = "2.8.0"
+go = "1.26.3"
+golangci-lint = "2.12.2"
 gotestsum = "1.13.0"
 helm = "3.19.4"
 jq = "latest"

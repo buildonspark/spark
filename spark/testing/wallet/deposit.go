@@ -182,12 +182,11 @@ func GenerateStaticDepositAddress(
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	isStatic := true
 	depositResp, err := sparkClient.GenerateDepositAddress(ctx, &pb.GenerateDepositAddressRequest{
 		SigningPublicKey:  signingPubKey.Serialize(),
 		IdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		Network:           config.ProtoNetwork(),
-		IsStatic:          &isStatic,
+		IsStatic:          new(true),
 	})
 	if err != nil {
 		return nil, err
@@ -1509,8 +1508,7 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 	}
 	ctx := ContextWithToken(context.Background(), token)
 
-	leafID := uuid.New().String()
-	depositResp, err := GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	depositResp, err := GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.New().String()), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate deposit address: %w", err)
 	}

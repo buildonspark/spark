@@ -263,7 +263,6 @@ func TestRecoverFullRevocationSecretsAndFinalize_ReturnsNotReadyWhenThresholdNot
 	setup.handler.config.Token.RequireThresholdOperators = true
 	setup.handler.config.Threshold = 2
 
-	version := int32(0)
 	tx := &ent.TokenTransaction{
 		Edges: ent.TokenTransactionEdges{
 			SpentOutput: []*ent.TokenOutput{
@@ -271,7 +270,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_ReturnsNotReadyWhenThresholdNot
 					Edges: ent.TokenOutputEdges{
 						RevocationKeyshare: &ent.SigningKeyshare{
 							ID:            uuid.New(),
-							SecretVersion: &version,
+							SecretVersion: new(int32(0)),
 						},
 						TokenPartialRevocationSecretShares: []*ent.TokenPartialRevocationSecretShare{},
 					},

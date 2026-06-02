@@ -1265,18 +1265,15 @@ func TestValidSparkInvoiceTransfer(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	memoString := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
-	amountSats := &amountToSend
-	expiryTime := &tenMinutesFromNow
-	memo := &memoString
+	amountSats := new(uint64(amountSatsToSend))
+	expiryTime := new(time.Now().Add(10 * time.Minute))
+	memo := new("test memo")
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
@@ -1308,21 +1305,18 @@ func TestValidSparkInvoiceTransferEmptySenderPublicKey(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountSats := uint64(amountSatsToSend)
-	memo := "test memo"
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
 	emptySenderPublicKey := keys.Public{}
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
-		&amountSats,
-		&memo,
+		new(uint64(amountSatsToSend)),
+		new("test memo"),
 		emptySenderPublicKey,
-		&tenMinutesFromNow,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1347,8 +1341,6 @@ func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountSats := uint64(amountSatsToSend)
-	memo := "test memo"
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -1357,8 +1349,8 @@ func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
-		&amountSats,
-		&memo,
+		new(uint64(amountSatsToSend)),
+		new("test memo"),
 		senderPublicKey,
 		nil,
 	)
@@ -1385,20 +1377,17 @@ func TestValidSparkInvoiceTransferEmptyMemo(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountSats := uint64(amountSatsToSend)
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	network := btcnetwork.Regtest
-	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
-
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
-		&amountSats,
+		new(uint64(amountSatsToSend)),
 		nil,
 		senderPublicKey,
-		&tenMinutesFromNow,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1425,18 +1414,15 @@ func TestValidSparkInvoiceTransferEmptyAmount(t *testing.T) {
 	require.NoError(t, err)
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	memoString := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	network := btcnetwork.Regtest
-	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
-
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		nil,
-		&memoString,
+		new("test memo"),
 		senderPublicKey,
-		&tenMinutesFromNow,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1463,18 +1449,15 @@ func TestValidSparkInvoiceTransferEmptySignature(t *testing.T) {
 	require.NoError(t, err)
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	memoString := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	network := btcnetwork.Regtest
-	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
-
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		nil,
-		&memoString,
+		new("test memo"),
 		senderPublicKey,
-		&tenMinutesFromNow,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, nil)
@@ -1516,22 +1499,19 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedSender(t *testing.T
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	amountSats := &amountToSend
-	memo := "test memo"
+	amountSats := new(uint64(amountSatsToSend))
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
 	mismatchedSender := keys.MustGeneratePrivateKeyFromRand(rng)
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		amountSats,
-		&memo,
+		new("test memo"),
 		mismatchedSender.Public(),
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1550,22 +1530,19 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedReceiver(t *testing
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	amountSats := &amountToSend
-	memo := "test memo"
+	amountSats := new(uint64(amountSatsToSend))
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		amountSats,
-		&memo,
+		new("test memo"),
 		senderPublicKey,
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1590,22 +1567,18 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountLessThanSentAmou
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	memo := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
-
-	lessThanSentAmount := uint64(amountSatsToSend - 1)
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
-		&lessThanSentAmount,
-		&memo,
+		new(uint64(amountSatsToSend-1)),
+		new("test memo"),
 		senderPublicKey,
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1624,22 +1597,18 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountGreaterThanSentA
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	memo := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
-
-	greaterThanSentAmount := uint64(amountSatsToSend + 1)
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
-		&greaterThanSentAmount,
-		&memo,
+		new(uint64(amountSatsToSend+1)),
+		new("test memo"),
 		senderPublicKey,
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1658,22 +1627,19 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithExpiredInvoice(t *testing.T) 
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	amountSats := &amountToSend
-	memo := "test memo"
+	amountSats := new(uint64(amountSatsToSend))
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
 	network := btcnetwork.Regtest
 
-	expiryInThePast := time.Now().Add(-10 * time.Minute)
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		amountSats,
-		&memo,
+		new("test memo"),
 		senderPublicKey,
-		&expiryInThePast,
+		new(time.Now().Add(-10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1692,22 +1658,19 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvalidSignature(t *testing.T
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	amountSats := &amountToSend
-	memo := "test memo"
+	amountSats := new(uint64(amountSatsToSend))
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		amountSats,
-		&memo,
+		new("test memo"),
 		senderPublicKey,
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1727,22 +1690,19 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedNetwork(t *testing.
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	amountSats := &amountToSend
-	memo := "test memo"
+	amountSats := new(uint64(amountSatsToSend))
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	mismatchedNetwork := btcnetwork.Mainnet
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],
 		amountSats,
-		&memo,
+		new("test memo"),
 		senderPublicKey,
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, mismatchedNetwork, receiverPublicKey)
@@ -1761,14 +1721,11 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	amountSats := &amountToSend
-	memo := "test memo"
+	amountSats := new(uint64(amountSatsToSend))
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	expiryTime := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
 	amountBytes := new(big.Int).SetUint64(*amountSats).Bytes()
@@ -1776,9 +1733,9 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
 		invoiceUUID[:],
 		[]byte{},
 		amountBytes,
-		&memo,
+		new("test memo"),
 		senderPublicKey,
-		&expiryTime,
+		new(time.Now().Add(10*time.Minute)),
 	)
 
 	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
@@ -1898,18 +1855,15 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
-	amountToSend := uint64(amountSatsToSend)
-	memoString := "test memo"
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	senderPublicKey := senderPrivKey.Public()
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverPublicKey := receiverPrivKey.Public()
-	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
 	network := btcnetwork.Regtest
 
-	amountSats := &amountToSend
-	expiryTime := &tenMinutesFromNow
-	memo := &memoString
+	amountSats := new(uint64(amountSatsToSend))
+	expiryTime := new(time.Now().Add(10 * time.Minute))
+	memo := new("test memo")
 
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceUUID[:],

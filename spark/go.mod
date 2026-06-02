@@ -1,6 +1,6 @@
 module github.com/lightsparkdev/spark
 
-go 1.25.1
+go 1.26.3
 
 require google.golang.org/grpc v1.81.0
 

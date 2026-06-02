@@ -573,7 +573,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
 		BitcoindConfigs: map[string]so.BitcoindConfig{
 			"testnet": {
-				ProcessNodesForWatchtowers: func() *bool { b := true; return &b }(),
+				ProcessNodesForWatchtowers: func() *bool { ; return new(true) }(),
 			},
 		},
 		Lrc20Configs: map[string]so.Lrc20Config{

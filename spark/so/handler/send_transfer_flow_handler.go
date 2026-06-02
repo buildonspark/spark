@@ -770,13 +770,12 @@ func buildSigningJobForRefund(
 	if err != nil {
 		return nil, fmt.Errorf("unable to load signing keyshare for leaf %s: %w", leaf.ID, err)
 	}
-	verifyingKey := leaf.VerifyingPubkey
 	return &helper.SigningJobWithPregeneratedNonce{
 		SigningJob: helper.SigningJob{
 			JobID:             jobID,
 			SigningKeyshareID: signingKeyshare.ID,
 			Message:           sigHash,
-			VerifyingKey:      &verifyingKey,
+			VerifyingKey:      new(leaf.VerifyingPubkey),
 			UserCommitment:    &userCommitment,
 		},
 		Round1Packages: round1,

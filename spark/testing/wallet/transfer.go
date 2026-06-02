@@ -678,12 +678,11 @@ func StartSwapSignRefund(
 
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for _, leafKey := range leaves {
-		nonce := frost.GenerateSigningNonce()
 		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
 		leafDataMap[leafKey.Leaf.Id] = &LeafRefundSigningData{
 			SigningPrivKey:  leafKey.SigningPrivKey,
 			ReceivingPubKey: receiverIdentityPubKey,
-			Nonce:           &nonce,
+			Nonce:           new(frost.GenerateSigningNonce()),
 			Tx:              tx,
 			Vout:            int(leafKey.Leaf.Vout),
 		}
@@ -1345,12 +1344,11 @@ func ClaimTransferSignRefunds(
 ) ([]*pb.NodeSignatures, error) {
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for _, leafKey := range leafKeys {
-		nonce := frost.GenerateSigningNonce()
 		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
 		leafDataMap[leafKey.Leaf.Id] = &LeafRefundSigningData{
 			SigningPrivKey:  leafKey.NewSigningPrivKey,
 			ReceivingPubKey: leafKey.NewSigningPrivKey.Public(),
-			Nonce:           &nonce,
+			Nonce:           new(frost.GenerateSigningNonce()),
 			Tx:              tx,
 			Vout:            int(leafKey.Leaf.Vout),
 		}

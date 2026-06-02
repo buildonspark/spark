@@ -41,11 +41,8 @@ func LagrangeBasisAt(xs []curve.Scalar, i int, x curve.Scalar) (curve.Scalar, er
 		}
 
 		// (x - x_j) / (x_i - x_j)
-		num := x.Sub(xj)
-		den := xs[i].Sub(xj)
-
-		numProd.SetMul(&num)
-		denProd.SetMul(&den)
+		numProd.SetMul(new(x.Sub(xj)))
+		denProd.SetMul(new(xs[i].Sub(xj)))
 	}
 
 	denProdInv, err := denProd.InvNonConst()
@@ -74,9 +71,7 @@ func InterpolateScalar(evals []ScalarEval, x curve.Scalar) (curve.Scalar, error)
 
 		// y_i * L_i(x)
 		yI := eval.Y
-		term := yI.Mul(lagrangeI)
-
-		sum.SetAdd(&term)
+		sum.SetAdd(new(yI.Mul(lagrangeI)))
 	}
 
 	return sum, nil

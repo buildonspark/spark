@@ -359,13 +359,12 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		treeNodes, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).All(ctx)
 		if len(treeNodes) == 0 || ent.IsNotFound(err) {
 			verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(depositAddress.Edges.SigningKeyshare.PublicKey)
-			nodeIDStr := depositAddress.NodeID.String()
 			if utils.IsBitcoinAddressForNetwork(depositAddress.Address, network) {
 				unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
 					DepositAddress:       depositAddress.Address,
 					UserSigningPublicKey: depositAddress.OwnerSigningPubkey.Serialize(),
 					VerifyingPublicKey:   verifyingPublicKey.Serialize(),
-					LeafId:               &nodeIDStr,
+					LeafId:               new(depositAddress.NodeID.String()),
 				})
 			}
 		}
@@ -445,9 +444,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	return &pb.QueryStaticDepositAddressesResponse{DepositAddresses: staticDepositAddresses}, nil
 }
 
-func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depositAddress *ent.DepositAddress, hashVariant pb.HashVariant) (*pb.DepositAddressQueryResult, error) {
-	nodeIDStr := depositAddress.NodeID.String()
-	// Get local keyshare for the deposit address.
+func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depositAddress *ent.DepositAddress, hashVariant pb.HashVariant) (*pb.DepositAddressQueryResult, error) { // Get local keyshare for the deposit address.
 	keyshare, err := depositAddress.Edges.SigningKeyshareOrErr()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get keyshare for static deposit address: %w", err)
@@ -474,7 +471,7 @@ func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depo
 		DepositAddress:       depositAddress.Address,
 		UserSigningPublicKey: depositAddress.OwnerSigningPubkey.Serialize(),
 		VerifyingPublicKey:   verifyingPublicKey.Serialize(),
-		LeafId:               &nodeIDStr,
+		LeafId:               new(depositAddress.NodeID.String()),
 		ProofOfPossession:    proofOfPossession,
 	}, nil
 }

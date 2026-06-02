@@ -9,11 +9,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/lightsparkdev/spark/common/btcnetwork"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uint128"
@@ -1086,7 +1084,7 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 	tokenTransaction.Network = networkProto
 
 	if t.Version >= 3 {
-		tokenTransaction.ValidityDurationSeconds = proto.Uint64(t.ValidityDurationSeconds)
+		tokenTransaction.ValidityDurationSeconds = new(t.ValidityDurationSeconds)
 	}
 
 	if !t.ExecuteBefore.IsZero() {
@@ -1100,7 +1098,7 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 
 	for i, output := range sortedCreatedOutputs {
 		tokenTransaction.TokenOutputs[i] = &tokenpb.TokenOutput{
-			Id:                            proto.String(output.ID.String()),
+			Id:                            new(output.ID.String()),
 			OwnerPublicKey:                output.OwnerPublicKey.Serialize(),
 			RevocationCommitment:          output.WithdrawRevocationCommitment,
 			WithdrawBondSats:              &output.WithdrawBondSats,

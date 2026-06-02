@@ -1244,8 +1244,7 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 	}
 
 	for _, output := range remapTransferPb.TokenOutputs {
-		outputId := uuid.New().String()
-		output.Id = &outputId
+		output.Id = new(uuid.New().String())
 
 		revocationPrivKey := keys.GeneratePrivateKey()
 		output.RevocationCommitment = revocationPrivKey.Public().Serialize()

@@ -130,10 +130,8 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 			return nil, err
 		}
 
-		notifier := ent.NewBufferedNotifier(s.dbClient)
-
 		s.currentTx = tx
-		s.currentNotifications = &notifier
+		s.currentNotifications = new(ent.NewBufferedNotifier(s.dbClient))
 
 		tx.OnCommit(func(fn ent.Committer) ent.Committer {
 			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {

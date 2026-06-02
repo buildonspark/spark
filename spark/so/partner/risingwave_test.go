@@ -122,18 +122,16 @@ func TestRisingWaveClient_QueryTransactionVolumes_Postgres(t *testing.T) {
 	assert.Equal(t, int64(20000), byType["LIGHTNING_SEND"].VolumeSats)
 
 	// Query with network filter (MAINNET only) excludes REGTEST rows.
-	mainnet := "MAINNET"
 	rows, err = client.QueryTransactionVolumes(
-		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), []string{"TRANSFER"}, &mainnet,
+		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), []string{"TRANSFER"}, new("MAINNET"),
 	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, int64(80000), rows[0].VolumeSats)
 
 	// Query with network filter (REGTEST) returns only REGTEST rows.
-	regtest := "REGTEST"
 	rows, err = client.QueryTransactionVolumes(
-		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), nil, &regtest,
+		t.Context(), "partner-a", "label-1", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), nil, new("REGTEST"),
 	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)

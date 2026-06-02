@@ -259,7 +259,6 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		copy(newTokenIdentifier, output.TokenIdentifier)
 		version := uint32(1)
 		senderPublicKey := config.IdentityPrivateKey.Public()
-		memo := "Test memo"
 		network := config.Network
 		satsPayment := false
 
@@ -303,7 +302,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			SenderPublicKey:   senderPublicKey,
 			Amount:            amount,
 			ExpiryTime:        expiryTime,
-			Memo:              &memo,
+			Memo:              new("Test memo"),
 			TokenIdentifier:   newTokenIdentifier,
 			Network:           network,
 			SatsPayment:       satsPayment,

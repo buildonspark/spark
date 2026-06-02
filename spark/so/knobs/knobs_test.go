@@ -71,8 +71,7 @@ func TestKnobs(t *testing.T) {
 	testValues["test_knob@target_100"] = 100.0
 	k = NewFixedKnobs(testValues)
 
-	target100 := "target_100"
-	assert.True(t, k.RolloutUUIDTarget("test_knob", id, &target100, 0.0)) // 100% chance from target value
+	assert.True(t, k.RolloutUUIDTarget("test_knob", id, new("target_100"), 0.0)) // 100% chance from target value
 
 	// Test with different UUIDs to ensure deterministic behavior
 	id2 := uuid.New()
@@ -164,8 +163,7 @@ func TestKnobs_New(t *testing.T) {
 
 		// Values should be retrieved from provider
 		assert.InDelta(t, 100.0, knobs.GetValue("init_knob", 0.0), 0.001)
-		target1 := "target1"
-		assert.InDelta(t, 50.0, knobs.GetValueTarget("init_knob", &target1, 0.0), 0.001)
+		assert.InDelta(t, 50.0, knobs.GetValueTarget("init_knob", new("target1"), 0.0), 0.001)
 	})
 
 	t.Run("Provider error handling", func(t *testing.T) {

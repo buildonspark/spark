@@ -58,8 +58,7 @@ func (c *ConcurrencyGuard) TryAcquireMethod(method string) error {
 	methodLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &method, -1))
 	// Global limit is configured via the same knob, using the magic target "global".
 	// If unset, no global limit is enforced.
-	globalLimitTarget := string(c.globalLimitTargetName)
-	globalLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &globalLimitTarget, -1))
+	globalLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, new(string(c.globalLimitTargetName)), -1))
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

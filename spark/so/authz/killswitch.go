@@ -16,9 +16,8 @@ import (
 // IsWalletKillSwitched reports whether the given identity public key is
 // gated by the master wallet kill switch knob on this SO.
 func IsWalletKillSwitched(ctx context.Context, identityPublicKey keys.Public) bool {
-	pubkeyHex := identityPublicKey.ToHex()
 	return knobs.GetKnobsService(ctx).GetValueTarget(
-		knobs.KnobKillSwitchWallet, &pubkeyHex, 0,
+		knobs.KnobKillSwitchWallet, new(identityPublicKey.ToHex()), 0,
 	) > 0
 }
 

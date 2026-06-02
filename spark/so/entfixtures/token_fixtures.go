@@ -433,12 +433,11 @@ func (f *Fixtures) CreateTransferTransactionWithProto(
 
 	protoOutputs := make([]*tokenpb.TokenOutput, len(populatedSpecs))
 	for i, spec := range populatedSpecs {
-		outputID := spec.ID.String()
 		amountBytes := make([]byte, 16)
 		spec.Amount.FillBytes(amountBytes)
 
 		protoOutputs[i] = &tokenpb.TokenOutput{
-			Id:                            &outputID,
+			Id:                            new(spec.ID.String()),
 			TokenIdentifier:               tokenCreate.TokenIdentifier,
 			OwnerPublicKey:                spec.Owner.Serialize(),
 			TokenAmount:                   amountBytes,
@@ -461,7 +460,6 @@ func (f *Fixtures) CreateTransferTransactionWithProto(
 		operatorPubKeysBytes[i] = pk.Serialize()
 	}
 
-	validityDuration := uint64(3600)
 	tokenTxProto := &tokenpb.TokenTransaction{
 		Version: 3,
 		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
@@ -473,7 +471,7 @@ func (f *Fixtures) CreateTransferTransactionWithProto(
 		SparkOperatorIdentityPublicKeys: operatorPubKeysBytes,
 		Network:                         sparkpb.Network_REGTEST,
 		ClientCreatedTimestamp:          timestamppb.New(utils.ToMicrosecondPrecision(time.Now())),
-		ValidityDurationSeconds:         &validityDuration,
+		ValidityDurationSeconds:         new(uint64(3600)),
 	}
 
 	finalTxHash, err := utils.HashTokenTransaction(tokenTxProto, false)

@@ -53,11 +53,10 @@ func TestSumOfSigningKeyshares_SecretVersionComparison(t *testing.T) {
 		}
 	}
 
-	v0, v1 := int32(0), int32(1)
 	sum, err := sumOfSigningKeyshares(t.Context(), []*SigningKeyshare{
-		makeKeyshare(&v0),
+		makeKeyshare(new(int32(0))),
 		makeKeyshare(nil),
-		makeKeyshare(&v1),
+		makeKeyshare(new(int32(1))),
 	})
 	require.NoError(t, err)
 	require.Nil(t, sum.SecretVersion)

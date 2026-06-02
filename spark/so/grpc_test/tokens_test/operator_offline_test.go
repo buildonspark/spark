@@ -129,10 +129,9 @@ func TestTokenMintWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
 		// Truncate to microseconds to match server-required precision.
 		mintTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
 
-		executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
 		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
 			t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration,
-			wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+			wallet.BroadcastV3Options{ExecuteBefore: new(time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond))},
 		)
 		require.NoError(t, err)
 		requirePartialCommit(t, resp)
@@ -247,10 +246,9 @@ func TestTokenTransferWithExecuteBeforeRetryForwardsDeadline(t *testing.T) {
 		// Set CCT to 5 minutes ago — truncate to microseconds to match server-required precision.
 		transferTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
 
-		executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
 		resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
 			t.Context(), config, transferTx, []keys.Private{senderPrivKey}, wallet.DefaultValidityDuration,
-			wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+			wallet.BroadcastV3Options{ExecuteBefore: new(time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond))},
 		)
 		require.NoError(t, err)
 		requirePartialCommit(t, resp)

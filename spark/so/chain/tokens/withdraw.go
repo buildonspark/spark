@@ -132,12 +132,11 @@ func parseWithdrawalsFromBlock(ctx context.Context, txs []wire.MsgTx, blockHeigh
 			parsedTx.entity.ConfirmationHeight = blockHeight
 			parsedTx.entity.DetectedAt = time.Now()
 
-			txCopy := tx
 			withdrawals = append(withdrawals, parsedWithdrawal{
 				withdrawalTx:      parsedTx,
 				outputsToWithdraw: parsedOutputs,
 				txHash:            txHash,
-				tx:                &txCopy,
+				tx:                new(tx),
 				outputIdx:         txOutIdx,
 			})
 

@@ -112,23 +112,20 @@ func (tn *TreeNode) GetRefundTxTimeLock() (*uint32, error) {
 	if err != nil {
 		return nil, err
 	}
-	timelock := refundTx.TxIn[0].Sequence & 0xFFFF
-	return &timelock, nil
+	return new(refundTx.TxIn[0].Sequence & 0xFFFF), nil
 }
 
 func (tn *TreeNode) getParentNodeID(ctx context.Context) *string {
 	// Prefer already eager-loaded parent edge to avoid an extra DB query
 	if tn.Edges.Parent != nil {
-		parentNodeIDStr := tn.Edges.Parent.ID.String()
-		return &parentNodeIDStr
+		return new(tn.Edges.Parent.ID.String())
 	}
 	// Fallback to fetching only the parent ID (lighter than fetching full row)
 	id, err := tn.QueryParent().OnlyID(ctx)
 	if err != nil {
 		return nil
 	}
-	idStr := id.String()
-	return &idStr
+	return new(id.String())
 }
 
 // MarkNodeAsLocked marks the node as locked.

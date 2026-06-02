@@ -247,8 +247,7 @@ func collectDanglingSigningKeyshareSecretIDs(
 		}
 		secretIDsToDelete = append(secretIDsToDelete, batchDanglingIDs...)
 
-		lastCandidateID := candidates[len(candidates)-1].ID
-		lastSeenID = &lastCandidateID
+		lastSeenID = new(candidates[len(candidates)-1].ID)
 		if len(candidates) < queryLimit {
 			reachedEndOfAgedData = true
 			break

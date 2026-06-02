@@ -338,8 +338,7 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 
 	var ownerPrivKey *keys.Private
 	if params.SameOwner {
-		privKey := keys.GeneratePrivateKey()
-		ownerPrivKey = &privKey
+		ownerPrivKey = new(keys.GeneratePrivateKey())
 	}
 
 	for i := range numOutputs {
@@ -385,13 +384,11 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 
 	if version >= 3 {
 		// V3 requires validity duration to be set by the client in the partial transaction
-		mintTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
+		mintTokenTransaction.ValidityDurationSeconds = new(uint64(wallet.DefaultValidityDuration.Seconds()))
 		// V3 requires withdraw parameters to be provided in the partial outputs
 		for _, o := range mintTokenTransaction.TokenOutputs {
-			bond := uint64(withdrawalBondSatsInConfig)
-			lock := uint64(withdrawalRelativeBlockLocktimeInConfig)
-			o.WithdrawBondSats = &bond
-			o.WithdrawRelativeBlockLocktime = &lock
+			o.WithdrawBondSats = new(uint64(withdrawalBondSatsInConfig))
+			o.WithdrawRelativeBlockLocktime = new(uint64(withdrawalRelativeBlockLocktimeInConfig))
 		}
 		normalizeV3TokenTransaction(mintTokenTransaction)
 
@@ -475,12 +472,10 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 	}
 
 	if version >= 3 {
-		transferTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
+		transferTokenTransaction.ValidityDurationSeconds = new(uint64(wallet.DefaultValidityDuration.Seconds()))
 		for _, o := range transferTokenTransaction.TokenOutputs {
-			bond := uint64(withdrawalBondSatsInConfig)
-			lock := uint64(withdrawalRelativeBlockLocktimeInConfig)
-			o.WithdrawBondSats = &bond
-			o.WithdrawRelativeBlockLocktime = &lock
+			o.WithdrawBondSats = new(uint64(withdrawalBondSatsInConfig))
+			o.WithdrawRelativeBlockLocktime = new(uint64(withdrawalRelativeBlockLocktimeInConfig))
 		}
 		normalizeV3TokenTransaction(transferTokenTransaction)
 	}
@@ -622,7 +617,7 @@ func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig,
 	}
 	if version >= TokenTransactionVersion3 {
 		// V3 requires client-provided validity duration and sorted operator keys for deterministic hashing
-		createTokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(wallet.DefaultValidityDuration.Seconds()))
+		createTokenTransaction.ValidityDurationSeconds = new(uint64(wallet.DefaultValidityDuration.Seconds()))
 		normalizeV3TokenTransaction(createTokenTransaction)
 	}
 	return createTokenTransaction, nil

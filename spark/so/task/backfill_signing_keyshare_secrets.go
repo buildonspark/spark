@@ -139,8 +139,7 @@ func backfillSigningKeyshareSecretsBatch(ctx context.Context, batchSize int, aft
 		result.UpdatedCount += updated
 	}
 	if len(keyshares) > 0 {
-		last := keyshares[len(keyshares)-1].ID
-		result.LastID = &last
+		result.LastID = new(keyshares[len(keyshares)-1].ID)
 	}
 	return result, nil
 }

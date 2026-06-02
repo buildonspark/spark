@@ -185,8 +185,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 
 	if partial.ExecuteBefore != nil {
 		clientCreatedTs := metadata.GetClientCreatedTimestamp().AsTime()
-		executeBefore := partial.GetExecuteBefore().AsTime()
-		if err := utils.ValidateExecuteBefore(&executeBefore, clientCreatedTs, spark.TokenMaxExecuteBeforeWindow); err != nil {
+		if err := utils.ValidateExecuteBefore(new(partial.GetExecuteBefore().AsTime()), clientCreatedTs, spark.TokenMaxExecuteBeforeWindow); err != nil {
 			return nil, err
 		}
 	}

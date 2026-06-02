@@ -25,11 +25,9 @@ func createTestSatsInvoice(t *testing.T, ctx context.Context, tc *db.TestContext
 	senderKey := keys.GeneratePrivateKey().Public()
 	network := btcnetwork.Regtest
 	expiryTime := time.Now().Add(10 * time.Minute)
-	amountSats := uint64(1_000)
-
 	invoiceFields := common.CreateSatsSparkInvoiceFields(
 		invoiceID[:],
-		&amountSats,
+		new(uint64(1_000)),
 		nil,
 		senderKey,
 		&expiryTime,

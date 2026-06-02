@@ -6,7 +6,6 @@ import (
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	legacypb "github.com/lightsparkdev/spark/proto/spark_token_legacy"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -191,7 +190,7 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 
 	var validityDuration *uint64
 	if v := partial.TokenTransactionMetadata.GetValidityDurationSeconds(); v != 0 {
-		validityDuration = proto.Uint64(v)
+		validityDuration = new(v)
 	}
 
 	legacy := &tokenpb.TokenTransaction{
@@ -222,11 +221,11 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 		}
 		var withdrawBond *uint64
 		if v := partialOutput.GetWithdrawBondSats(); v != 0 {
-			withdrawBond = proto.Uint64(v)
+			withdrawBond = new(v)
 		}
 		var withdrawLocktime *uint64
 		if v := partialOutput.GetWithdrawRelativeBlockLocktime(); v != 0 {
-			withdrawLocktime = proto.Uint64(v)
+			withdrawLocktime = new(v)
 		}
 		legacy.TokenOutputs[i] = &tokenpb.TokenOutput{
 			OwnerPublicKey:                partialOutput.GetOwnerPublicKey(),
@@ -247,7 +246,7 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 
 	var validityDuration *uint64
 	if v := final.TokenTransactionMetadata.GetValidityDurationSeconds(); v != 0 {
-		validityDuration = proto.Uint64(v)
+		validityDuration = new(v)
 	}
 
 	legacy := &tokenpb.TokenTransaction{
@@ -279,11 +278,11 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 		} else {
 			var withdrawBond *uint64
 			if v := partialOutput.GetWithdrawBondSats(); v != 0 {
-				withdrawBond = proto.Uint64(v)
+				withdrawBond = new(v)
 			}
 			var withdrawLocktime *uint64
 			if v := partialOutput.GetWithdrawRelativeBlockLocktime(); v != 0 {
-				withdrawLocktime = proto.Uint64(v)
+				withdrawLocktime = new(v)
 			}
 			legacy.TokenOutputs[i] = &tokenpb.TokenOutput{
 				OwnerPublicKey:                partialOutput.GetOwnerPublicKey(),

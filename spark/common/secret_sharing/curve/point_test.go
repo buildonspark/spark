@@ -51,13 +51,11 @@ func assertPointEqualAfterSerializeParse(t *testing.T, p *Point) {
 }
 
 func TestPointSerializeParseIdentity(t *testing.T) {
-	idPt := IdentityPoint()
-	assertPointEqualAfterSerializeParse(t, &idPt)
+	assertPointEqualAfterSerializeParse(t, new(IdentityPoint()))
 }
 
 func TestPointSerializeParse(t *testing.T) {
-	p := ScalarFromInt(123).Point()
-	assertPointEqualAfterSerializeParse(t, &p)
+	assertPointEqualAfterSerializeParse(t, new(ScalarFromInt(123).Point()))
 }
 
 func TestPointParseTooShort(t *testing.T) {
@@ -128,13 +126,6 @@ func TestPointPublicKeyInterchange(t *testing.T) {
 	pPubKeyPoint := NewPointFromPublicKey(pPubKey)
 
 	assert.True(t, p.Equals(pPubKeyPoint), "converting a point to and from a public key should not change the original")
-}
-
-func TestPointIdentityCopiesDistinct(t *testing.T) {
-	idPt1 := IdentityPoint()
-	idPt2 := IdentityPoint()
-
-	assert.NotSame(t, &idPt1, &idPt2, "each identity point should have its own address")
 }
 
 func TestPointNeg(t *testing.T) {

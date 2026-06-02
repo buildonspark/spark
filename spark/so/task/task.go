@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -776,8 +777,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 							// Cron is filtered to RequestType==Instant, so the original
 							// threshold is always 1.
-							instantThreshold := uint32(1)
-							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, &instantThreshold)
+							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, new(uint32(1)))
 							if err != nil {
 								logger.Warn("Failed to create complete swap request for instant utxo swap", zap.Error(err))
 							} else {
@@ -1113,7 +1113,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 }
 
 func AllStartupTasks() []StartupTaskSpec {
-	entityDkgTaskTimeout := 5 * time.Minute
 	entityDkgRetryInterval := 10 * time.Second
 
 	return []StartupTaskSpec{
@@ -1219,7 +1218,7 @@ func AllStartupTasks() []StartupTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "maybe_reserve_entity_dkg",
 				RunInTestEnv: true,
-				Timeout:      &entityDkgTaskTimeout,
+				Timeout:      new(5 * time.Minute),
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					tx, err := ent.GetDbFromContext(ctx)
@@ -1374,9 +1373,8 @@ func (t *BaseTaskSpec) chainMiddleware(
 	// Apply the middleware to the task so that the last middleware is the inner most.
 	currTask := t
 
-	for i := len(middlewares) - 1; i >= 0; i-- {
-		innerTask := currTask
-		currTask = innerTask.wrapMiddleware(middlewares[i])
+	for _, innerTask := range slices.Backward(middlewares) {
+		currTask = currTask.wrapMiddleware(innerTask)
 	}
 
 	return currTask

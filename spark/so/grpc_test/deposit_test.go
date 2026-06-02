@@ -38,8 +38,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 	ctx := wallet.ContextWithToken(t.Context(), token)
 	pubKey := keys.MustParsePublicKeyHex("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
 
-	leafID := uuid.NewString()
-	resp, err := wallet.GenerateDepositAddress(ctx, config, pubKey, &leafID, false)
+	resp, err := wallet.GenerateDepositAddress(ctx, config, pubKey, new(uuid.NewString()), false)
 	require.NoError(t, err)
 	assert.False(t, resp.DepositAddress.IsStatic)
 
@@ -60,8 +59,7 @@ func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
 	ctx := wallet.ContextWithToken(t.Context(), token)
 	pubKey := keys.MustParsePublicKeyHex("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
 
-	invalidLeafID := "invalidLeafID"
-	_, err = wallet.GenerateDepositAddress(ctx, config, pubKey, &invalidLeafID, false)
+	_, err = wallet.GenerateDepositAddress(ctx, config, pubKey, new("invalidLeafID"), false)
 	require.ErrorContains(t, err, "value must be a valid UUID")
 }
 
@@ -78,8 +76,7 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 
 	for range 5 {
 		wg.Go(func() {
-			leafID := uuid.NewString()
-			resp, err := wallet.GenerateDepositAddress(ctx, config, pubKey, &leafID, false)
+			resp, err := wallet.GenerateDepositAddress(ctx, config, pubKey, new(uuid.NewString()), false)
 			if err != nil {
 				errChannel <- err
 				return
@@ -804,8 +801,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 			ctx := wallet.ContextWithToken(t.Context(), token)
 
 			privKey := keys.GeneratePrivateKey()
-			leafID := uuid.NewString()
-			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.NewString()), false)
 			if err != nil {
 				t.Fatalf("failed to generate deposit address: %v", err)
 			}
@@ -924,8 +920,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 			ctx := wallet.ContextWithToken(t.Context(), token)
 
 			privKey := keys.GeneratePrivateKey()
-			leafID := uuid.NewString()
-			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+			depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.NewString()), false)
 			if err != nil {
 				t.Fatalf("failed to generate deposit address: %v", err)
 			}
@@ -1259,8 +1254,7 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
 
 	for i := range handler.DefaultMaxUnusedDepositAddresses {
-		leafID := uuid.NewString()
-		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.NewString()), false)
 		if err != nil {
 			t.Fatalf("failed to generate deposit address %d: %v", i+1, err)
 		}
@@ -1292,8 +1286,7 @@ func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 	ctx := wallet.ContextWithToken(t.Context(), token)
 	privKey := keys.GeneratePrivateKey()
 	for i := range handler.DefaultMaxUnusedDepositAddresses {
-		leafID := uuid.NewString()
-		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.NewString()), false)
 		if err != nil {
 			t.Fatalf("failed to generate deposit address %d: %v", i+1, err)
 		}
@@ -1322,8 +1315,7 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 	ctx := wallet.ContextWithToken(t.Context(), token)
 
 	privKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.NewString()), false)
 	require.NoError(t, err)
 
 	client := sparktesting.GetBitcoinClient()
@@ -1407,8 +1399,7 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 	ctx := wallet.ContextWithToken(t.Context(), token)
 
 	privKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), new(uuid.NewString()), false)
 	require.NoError(t, err)
 
 	client := sparktesting.GetBitcoinClient()
@@ -1764,8 +1755,7 @@ func TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo(t *testing.T) {
 	ctx := wallet.ContextWithToken(t.Context(), token)
 
 	signingPrivKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, signingPrivKey.Public(), &leafID, false)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, signingPrivKey.Public(), new(uuid.NewString()), false)
 	require.NoError(t, err)
 	depositAddress := depositResp.DepositAddress.Address
 

@@ -1051,8 +1051,7 @@ func validateClientCreatedTimestamp(tokenTransaction *tokenpb.TokenTransaction) 
 	// This is a no-op when execute_before is nil.
 	var ebPtr *time.Time
 	if tokenTransaction.GetExecuteBefore() != nil {
-		eb := tokenTransaction.GetExecuteBefore().AsTime().UTC()
-		ebPtr = &eb
+		ebPtr = new(tokenTransaction.GetExecuteBefore().AsTime().UTC())
 	}
 	if err := utils.ValidateExecuteBefore(ebPtr, clientTimestamp, spark.TokenMaxExecuteBeforeWindow); err != nil {
 		return err

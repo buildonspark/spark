@@ -416,13 +416,12 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 
 func TestResolveConfirmationThreshold(t *testing.T) {
 	t.Run("uses_request_value", func(t *testing.T) {
-		requested := uint32(1)
 		config := &so.Config{
 			BitcoindConfigs: map[string]so.BitcoindConfig{
 				"regtest": {DepositConfirmationThreshold: 3},
 			},
 		}
-		result := resolveConfirmationThreshold(&requested, config, btcnetwork.Regtest)
+		result := resolveConfirmationThreshold(new(uint32(1)), config, btcnetwork.Regtest)
 		assert.Equal(t, uint32(1), result)
 	})
 
@@ -445,13 +444,12 @@ func TestResolveConfirmationThreshold(t *testing.T) {
 	})
 
 	t.Run("ignores_zero", func(t *testing.T) {
-		requested := uint32(0)
 		config := &so.Config{
 			BitcoindConfigs: map[string]so.BitcoindConfig{
 				"regtest": {DepositConfirmationThreshold: 5},
 			},
 		}
-		result := resolveConfirmationThreshold(&requested, config, btcnetwork.Regtest)
+		result := resolveConfirmationThreshold(new(uint32(0)), config, btcnetwork.Regtest)
 		assert.Equal(t, uint32(5), result)
 	})
 }
@@ -607,12 +605,11 @@ func TestGenerateDepositAddress(t *testing.T) {
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 		}
 
-		isStatic := true
 		req := &pb.GenerateDepositAddressRequest{
 			SigningPublicKey:  testSigningPubKey.Serialize(),
 			IdentityPublicKey: testIdentityPubKey.Serialize(),
 			Network:           pb.Network_MAINNET,
-			IsStatic:          &isStatic,
+			IsStatic:          new(true),
 		}
 
 		// Testing that the handler tries to create a new address
@@ -731,12 +728,11 @@ func TestGenerateDepositAddressBlocksUnusedAddress(t *testing.T) {
 		}
 
 		// Try to generate a new non-static deposit address for the same user and network
-		isStatic := false
 		req := &pb.GenerateDepositAddressRequest{
 			SigningPublicKey:  testSigningPubKey.Serialize(),
 			IdentityPublicKey: testIdentityPubKey.Serialize(),
 			Network:           pb.Network_REGTEST,
-			IsStatic:          &isStatic,
+			IsStatic:          new(false),
 		}
 
 		_, err = handler.GenerateDepositAddress(ctx, config, req)
@@ -782,12 +778,11 @@ func TestGenerateDepositAddressBlocksUnusedAddress(t *testing.T) {
 
 		// Try to generate a new non-static deposit address on MAINNET (should proceed)
 		// Note: This test verifies the query filters by network
-		isStatic := false
 		req := &pb.GenerateDepositAddressRequest{
 			SigningPublicKey:  diffNetSigningKey.Serialize(),
 			IdentityPublicKey: diffNetIdentityKey.Serialize(),
 			Network:           pb.Network_MAINNET,
-			IsStatic:          &isStatic,
+			IsStatic:          new(false),
 		}
 
 		// The test will fail at keyshare allocation, but importantly NOT at the unused address check
@@ -842,12 +837,11 @@ func TestGenerateDepositAddressBlocksUnusedAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to generate a new non-static deposit address (should proceed past unused check)
-		isStatic := false
 		req := &pb.GenerateDepositAddressRequest{
 			SigningPublicKey:  usedAddrSigningKey.Serialize(),
 			IdentityPublicKey: usedAddrIdentityKey.Serialize(),
 			Network:           pb.Network_REGTEST,
-			IsStatic:          &isStatic,
+			IsStatic:          new(false),
 		}
 
 		_, err = handler.GenerateDepositAddress(ctx, config, req)

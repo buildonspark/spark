@@ -56,7 +56,6 @@ func TestProvidePreimage_Consensus_HappyPath(t *testing.T) {
 
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
 	defer cleanUp(t, userConfig, paymentHash)
 
 	userLeafPrivKey := keys.GeneratePrivateKey()
@@ -77,7 +76,7 @@ func TestProvidePreimage_Consensus_HappyPath(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -131,7 +130,6 @@ func TestProvidePreimage_Consensus_WritesFlowExecutionRows(t *testing.T) {
 
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
 	defer cleanUp(t, userConfig, paymentHash)
 
 	userLeafPrivKey := keys.GeneratePrivateKey()
@@ -150,7 +148,7 @@ func TestProvidePreimage_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -228,7 +226,6 @@ func TestProvidePreimage_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
 	defer cleanUp(t, userConfig, paymentHash)
 
 	userLeafPrivKey := keys.GeneratePrivateKey()
@@ -247,7 +244,7 @@ func TestProvidePreimage_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,

@@ -667,8 +667,7 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 	}
 	var masterIdentityPubKey *keys.Public
 	if setMasterKey {
-		masterKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		masterIdentityPubKey = &masterKey
+		masterIdentityPubKey = new(keys.MustGeneratePrivateKeyFromRand(rng).Public())
 	}
 	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()

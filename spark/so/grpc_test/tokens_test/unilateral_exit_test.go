@@ -170,15 +170,13 @@ func validWithdrawal(t *testing.T, outputNum int) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), outputNum)
 	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
 
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")
@@ -220,15 +218,13 @@ func TestInvalidTokenUnilateralExit_InvalidOwnerSignature(t *testing.T) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 1)
 
 	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
 
 	invalidOwnerSignature := make([]byte, 64)
 
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, invalidOwnerSignature)
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), invalidOwnerSignature)
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")
@@ -262,15 +258,13 @@ func TestInvalidTokenUnilateralExit_InvalidOwner(t *testing.T) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, setupResult.OutputOwners[0].Public(), setupResult.IssuerPrivateKey.Public(), 3)
 	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
 
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")
@@ -307,8 +301,6 @@ func TestInvalidTokenUnilateralExit_DoubleSpend_PunishedWithdrawal(t *testing.T)
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 1)
 
 	transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
@@ -335,7 +327,7 @@ func TestInvalidTokenUnilateralExit_DoubleSpend_PunishedWithdrawal(t *testing.T)
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
 
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")
@@ -373,15 +365,13 @@ func TestInvalidTokenUnilateralExit_DoubleSpend_BlockedTransfer(t *testing.T) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 1)
 	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
 
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")
@@ -440,8 +430,6 @@ func TestPartiallyValidTokenUnilateralExit(t *testing.T) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 3)
 
 	// Transfer only output 0 - this reveals its revocation secret
@@ -470,7 +458,7 @@ func TestPartiallyValidTokenUnilateralExit(t *testing.T) {
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
 
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")
@@ -512,8 +500,6 @@ func TestJusticeTransaction_ConfirmedOnChain(t *testing.T) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 1)
 
 	// Transfer the token to reveal the revocation secret
@@ -542,7 +528,7 @@ func TestJusticeTransaction_ConfirmedOnChain(t *testing.T) {
 	require.NoError(t, err, "failed to compute owner's signature")
 
 	// Broadcast the invalid withdrawal (trying to withdraw already-spent output)
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	// Mine blocks to confirm the withdrawal tx and trigger justice tx
 	err = faucet.MineBlocks(6)
@@ -561,10 +547,8 @@ func TestJusticeTransaction_ConfirmedOnChain(t *testing.T) {
 
 	// Verify the justice tx output is now spendable (the SO claimed the funds)
 	// We check this by verifying the withdrawal output (vout 0) has been spent
-	justiceTxHash := justiceTx.JusticeTxHash.Hash()
-
 	// The justice tx should have one output (to the SO's address)
-	txOut, err := client.GetTxOut(&justiceTxHash, 0, false)
+	txOut, err := client.GetTxOut(new(justiceTx.JusticeTxHash.Hash()), 0, false)
 	require.NoError(t, err, "failed to get justice tx output")
 	require.NotNil(t, txOut, "justice tx output should exist (unspent)")
 	require.Positive(t, txOut.Confirmations, "justice tx should be confirmed")
@@ -598,8 +582,6 @@ func TestJusticeTransaction_MultiplePunishedOutputs(t *testing.T) {
 
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
-	seEntityPublicKey := entityDkgKey.Edges.SigningKeyshare.PublicKey
-
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 3)
 
 	// Transfer ALL 3 outputs to reveal revocation secrets for all of them
@@ -628,7 +610,7 @@ func TestJusticeTransaction_MultiplePunishedOutputs(t *testing.T) {
 	require.NoError(t, err, "failed to compute owner's signature")
 
 	// Try to withdraw all 3 (now spent) outputs
-	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, &seEntityPublicKey, ownerSignature.Serialize())
+	withdrawalTxid := broadcastWithdrawalTransaction(t, client, coin, tokenOutputsWithTxData, new(entityDkgKey.Edges.SigningKeyshare.PublicKey), ownerSignature.Serialize())
 
 	err = faucet.MineBlocks(6)
 	require.NoError(t, err, "failed to mine withdrawal tx")

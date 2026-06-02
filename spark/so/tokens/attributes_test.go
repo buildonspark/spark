@@ -31,10 +31,6 @@ func makeMinimalV3MintProto() *tokenpb.TokenTransaction {
 	tokenID := randomBytes(32)
 	amount := randomBytes(16)
 	revocation := randomBytes(33)
-	outputID := "test-output-id"
-	bondSats := uint64(1000)
-	locktime := uint64(144)
-
 	return &tokenpb.TokenTransaction{
 		Version: 3,
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
@@ -44,13 +40,13 @@ func makeMinimalV3MintProto() *tokenpb.TokenTransaction {
 			},
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{{
-			Id:                            &outputID,
+			Id:                            new("test-output-id"),
 			OwnerPublicKey:                owner.Public().Serialize(),
 			RevocationCommitment:          revocation,
 			TokenIdentifier:               tokenID,
 			TokenAmount:                   amount,
-			WithdrawBondSats:              &bondSats,
-			WithdrawRelativeBlockLocktime: &locktime,
+			WithdrawBondSats:              new(uint64(1000)),
+			WithdrawRelativeBlockLocktime: new(uint64(144)),
 		}},
 		SparkOperatorIdentityPublicKeys: [][]byte{operator.Public().Serialize()},
 		Network:                         sparkpb.Network_MAINNET,
@@ -92,18 +88,14 @@ func makeMinimalV3TransferProto(prevTxHash []byte, useTokenIdentifier bool) *tok
 	tokenID := randomBytes(32)
 	amount := randomBytes(16)
 	revocation := randomBytes(33)
-	outputID := "test-output-id"
-	bondSats := uint64(1000)
-	locktime := uint64(144)
-
 	out := &tokenpb.TokenOutput{
-		Id:                            &outputID,
+		Id:                            new("test-output-id"),
 		OwnerPublicKey:                receiver.Public().Serialize(),
 		RevocationCommitment:          revocation,
 		TokenAmount:                   amount,
 		TokenIdentifier:               tokenID,
-		WithdrawBondSats:              &bondSats,
-		WithdrawRelativeBlockLocktime: &locktime,
+		WithdrawBondSats:              new(uint64(1000)),
+		WithdrawRelativeBlockLocktime: new(uint64(144)),
 	}
 
 	return &tokenpb.TokenTransaction{

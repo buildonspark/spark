@@ -3,7 +3,6 @@ package protohash
 import (
 	"testing"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -456,41 +455,41 @@ func getKVDescriptor(t *testing.T) protoreflect.MessageDescriptor {
 	}
 
 	file := &descriptorpb.FileDescriptorProto{
-		Syntax:  proto.String("proto3"),
-		Name:    proto.String("test_kv.proto"),
-		Package: proto.String("protohash.test"),
+		Syntax:  new("proto3"),
+		Name:    new("test_kv.proto"),
+		Package: new("protohash.test"),
 		Dependency: []string{
 			"google/protobuf/struct.proto",
 		},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("KV"),
+				Name: new("KV"),
 				Field: []*descriptorpb.FieldDescriptorProto{
-					{Name: proto.String("int32"), Number: proto.Int32(1), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()},
-					{Name: proto.String("bool"), Number: proto.Int32(2), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum()},
-					{Name: proto.String("string"), Number: proto.Int32(3), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
-					{Name: proto.String("bytes"), Number: proto.Int32(4), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum()},
-					{Name: proto.String("value"), Number: proto.Int32(5), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: proto.String(".google.protobuf.Value")},
-					{Name: proto.String("double"), Number: proto.Int32(6), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()},
-					{Name: proto.String("strings"), Number: proto.Int32(7), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
-					{Name: proto.String("string_map"), Number: proto.Int32(8), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: proto.String("protohash.test.KV.StringMapEntry")},
-					{Name: proto.String("value_map"), Number: proto.Int32(9), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: proto.String("protohash.test.KV.ValueMapEntry")},
+					{Name: new("int32"), Number: new(int32(1)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum()},
+					{Name: new("bool"), Number: new(int32(2)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum()},
+					{Name: new("string"), Number: new(int32(3)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
+					{Name: new("bytes"), Number: new(int32(4)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum()},
+					{Name: new("value"), Number: new(int32(5)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: new(".google.protobuf.Value")},
+					{Name: new("double"), Number: new(int32(6)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()},
+					{Name: new("strings"), Number: new(int32(7)), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
+					{Name: new("string_map"), Number: new(int32(8)), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: new("protohash.test.KV.StringMapEntry")},
+					{Name: new("value_map"), Number: new(int32(9)), Label: descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: new("protohash.test.KV.ValueMapEntry")},
 				},
 				NestedType: []*descriptorpb.DescriptorProto{
 					{
-						Name:    proto.String("StringMapEntry"),
-						Options: &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)},
+						Name:    new("StringMapEntry"),
+						Options: &descriptorpb.MessageOptions{MapEntry: new(true)},
 						Field: []*descriptorpb.FieldDescriptorProto{
-							{Name: proto.String("key"), Number: proto.Int32(1), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
-							{Name: proto.String("value"), Number: proto.Int32(2), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
+							{Name: new("key"), Number: new(int32(1)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
+							{Name: new("value"), Number: new(int32(2)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
 						},
 					},
 					{
-						Name:    proto.String("ValueMapEntry"),
-						Options: &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)},
+						Name:    new("ValueMapEntry"),
+						Options: &descriptorpb.MessageOptions{MapEntry: new(true)},
 						Field: []*descriptorpb.FieldDescriptorProto{
-							{Name: proto.String("key"), Number: proto.Int32(1), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
-							{Name: proto.String("value"), Number: proto.Int32(2), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: proto.String(".google.protobuf.Value")},
+							{Name: new("key"), Number: new(int32(1)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()},
+							{Name: new("value"), Number: new(int32(2)), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), TypeName: new(".google.protobuf.Value")},
 						},
 					},
 				},

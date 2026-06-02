@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -92,7 +91,7 @@ func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				Id:                   proto.String(uuid.Must(uuid.NewV7()).String()),
+				Id:                   new(uuid.Must(uuid.NewV7()).String()),
 				OwnerPublicKey:       issuerPriv.Public().Serialize(),
 				TokenIdentifier:      tokenCreate.TokenIdentifier,
 				TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},

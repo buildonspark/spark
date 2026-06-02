@@ -157,7 +157,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 				},
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
-						Id:                   proto.String(uuid.Must(uuid.NewV7()).String()),
+						Id:                   new(uuid.Must(uuid.NewV7()).String()),
 						OwnerPublicKey:       issuerPriv.Public().Serialize(),
 						TokenIdentifier:      tokenCreate.TokenIdentifier,
 						TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},
@@ -277,7 +277,7 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				Id:                   proto.String(uuid.Must(uuid.NewV7()).String()),
+				Id:                   new(uuid.Must(uuid.NewV7()).String()),
 				OwnerPublicKey:       attackerPub.Serialize(),
 				TokenIdentifier:      tokenCreate.TokenIdentifier,
 				TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50}, // Mint 50 tokens
@@ -341,7 +341,7 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 	legitimateMintTx := proto.Clone(unauthorizedMintTx).(*tokenpb.TokenTransaction)
 	legitimateMintTx.GetMintInput().IssuerPublicKey = legitimateIssuerPub.Serialize()
 	legitimateMintTx.TokenOutputs[0].OwnerPublicKey = legitimateIssuerPub.Serialize()
-	legitimateMintTx.TokenOutputs[0].Id = proto.String(uuid.Must(uuid.NewV7()).String())
+	legitimateMintTx.TokenOutputs[0].Id = new(uuid.Must(uuid.NewV7()).String())
 
 	// Create keyshare for legitimate issuer
 	legitimateSecretShare := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -452,7 +452,7 @@ func TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization(t *
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				Id:                            proto.String(uuid.Must(uuid.NewV7()).String()),
+				Id:                            new(uuid.Must(uuid.NewV7()).String()),
 				OwnerPublicKey:                recipientPub.Serialize(),
 				TokenIdentifier:               tokenCreate.TokenIdentifier,
 				TokenAmount:                   transferAmountBytes,

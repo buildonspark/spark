@@ -205,10 +205,7 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 	require.NoError(t, err, "failed to create partner on coordinator")
 
 	amountSats := uint64(100)
-	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
-	// SSP creates a tree and initiates the preimage swap.
+	preimage, paymentHash := testPreimageHash(t, amountSats) // SSP creates a tree and initiates the preimage swap.
 	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, userLeafPrivKey, 12347)
@@ -227,7 +224,7 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 		leaves,
 		userConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -311,10 +308,7 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 	require.NoError(t, err, "failed to create partner on coordinator")
 
 	amountSats := uint64(100)
-	_, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
-	// User creates a tree to send from.
+	_, paymentHash := testPreimageHash(t, amountSats) // User creates a tree to send from.
 	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
@@ -337,7 +331,7 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		leaves,
 		receiverConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false, // REASON_SEND
 		amountSats,

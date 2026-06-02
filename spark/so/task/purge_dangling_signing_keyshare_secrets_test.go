@@ -28,8 +28,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesSupersededOldVersion(t *test
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
-	activeVersion := int32(2)
-	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, &activeVersion)
+	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, new(int32(2)))
 	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 1, now.Add(-20*time.Minute))
 	activeSecretID := createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 2, now.Add(-15*time.Minute))
 
@@ -51,8 +50,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_PreservesCurrentlyReferencedVersion
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
-	activeVersion := int32(5)
-	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, &activeVersion)
+	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, new(int32(5)))
 	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 4, now.Add(-30*time.Minute))
 	activeSecretID := createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 5, now.Add(-25*time.Minute))
 
@@ -76,8 +74,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_AllCandidatesAreActive_NoDeletes(t 
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
-	activeVersion := int32(7)
-	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, &activeVersion)
+	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, new(int32(7)))
 	activeSecretID := createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 7, now.Add(-20*time.Minute))
 
 	result, err := purgeDanglingSigningKeyshareSecretsBatch(ctx, cutoffID, purgeDanglingSigningKeyshareSecretsDefaultBatchSize, purgeDanglingSigningKeyshareSecretsDefaultMaxScanCount, nil)
@@ -181,8 +178,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesAgedUnreferencedRowsWhenMain
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
-	missingVersion := int32(9)
-	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, &missingVersion)
+	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, new(int32(9)))
 	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 1, now.Add(-20*time.Minute))
 	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 2, now.Add(-15*time.Minute))
 

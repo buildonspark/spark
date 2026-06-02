@@ -286,8 +286,6 @@ func TestSendLightningPayment(t *testing.T) {
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
@@ -310,7 +308,7 @@ func TestSendLightningPayment(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -368,8 +366,6 @@ func TestSendLightningPaymentV2(t *testing.T) {
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
@@ -392,7 +388,7 @@ func TestSendLightningPaymentV2(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -456,8 +452,6 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 	// User creates an invoice
 	amountSats := uint64(100)
 	_, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
@@ -480,7 +474,7 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -658,8 +652,6 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
@@ -681,7 +673,7 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 		leaves,
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -733,8 +725,6 @@ func TestQueryHTLCWithNoFilters(t *testing.T) {
 	// User creates an invoice
 	amountSats := uint64(100)
 	_, paymentHash := testPreimageHash(t, amountSats)
-	invoice := testInvoice
-
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
@@ -758,7 +748,7 @@ func TestQueryHTLCWithNoFilters(t *testing.T) {
 		leaves,
 		userConfig.IdentityPublicKey(),
 		paymentHash[:],
-		&invoice,
+		new(testInvoice),
 		feeSats,
 		false,
 		amountSats,
@@ -1007,8 +997,7 @@ func TestQueryHTLCWithStatusFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
 
-	status := spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE
-	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, &status, nil, nil)
+	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, new(spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE), nil, nil)
 	require.NoError(t, err, "failed to query htlcs")
 	require.Len(t, htlcs.PreimageRequests, 1)
 	require.Equal(t, paymentHash[:], htlcs.PreimageRequests[0].PaymentHash)
@@ -1016,8 +1005,7 @@ func TestQueryHTLCWithStatusFilter(t *testing.T) {
 	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs.PreimageRequests[0].Status)
 	require.Equal(t, int64(-1), htlcs.Offset)
 
-	status2 := spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED
-	htlcs2, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, &status2, nil, nil)
+	htlcs2, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, new(spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED), nil, nil)
 	require.NoError(t, err, "failed to query htlcs")
 	require.Empty(t, htlcs2.PreimageRequests)
 	require.Equal(t, int64(-1), htlcs2.Offset)
@@ -1174,14 +1162,11 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 
 	transferId := response.Transfer.Id
 
-	role := spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER
-	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, &role)
+	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, new(spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER))
 	require.NoError(t, err, "failed to query htlcs")
 	require.Empty(t, htlcs.PreimageRequests)
 
-	senderRole := spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER
-
-	htlcs2, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, &senderRole)
+	htlcs2, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, new(spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER))
 	require.NoError(t, err, "failed to query htlcs")
 	require.Len(t, htlcs2.PreimageRequests, 1)
 	require.Equal(t, paymentHash[:], htlcs2.PreimageRequests[0].PaymentHash)
@@ -1228,8 +1213,7 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.Status)
 
-	receiverAndSenderRole := spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER
-	htlcsReceiverAndSenderRole, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, &receiverAndSenderRole)
+	htlcsReceiverAndSenderRole, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, new(spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER))
 	require.NoError(t, err, "failed to query htlcs")
 	require.Len(t, htlcsReceiverAndSenderRole.PreimageRequests, 2)
 }

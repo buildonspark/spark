@@ -216,9 +216,7 @@ func (p IssueSender) Round2(payloadFrom map[PartyIndex]IssuePayload1) (Message[I
 		}
 
 		sArrow := payloadFrom[j].SArrow
-		term := sArrow.Mul(*lagrangeCoeff)
-
-		sIIssue.SetAdd(&term)
+		sIIssue.SetAdd(new(sArrow.Mul(*lagrangeCoeff)))
 	}
 
 	// (b) P_i sends (B, s_i^{n + 1}) to P_{n + 1}
@@ -270,8 +268,7 @@ func (p IssueReceiver) Round3(payloadFrom map[PartyIndex]IssuePayload2) (*IssueP
 			return nil, err
 		}
 
-		sIIssue := payloadFrom[i].SIIssue
-		term.SetMul(&sIIssue)
+		term.SetMul(new(payloadFrom[i].SIIssue))
 
 		sIssue.SetAdd(term)
 	}

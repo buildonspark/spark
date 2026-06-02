@@ -48,8 +48,7 @@ func TestWalletKillSwitch_BlocksMutationsAllowsReads(t *testing.T) {
 	)
 
 	// Sanity: with the kill switch off, walletA can generate an address.
-	leafIDPre := uuid.NewString()
-	_, err = wallet.GenerateDepositAddress(ctxA, configA, signingPubKey, &leafIDPre, false)
+	_, err = wallet.GenerateDepositAddress(ctxA, configA, signingPubKey, new(uuid.NewString()), false)
 	require.NoError(t, err, "walletA should be able to mutate before the kill switch is set")
 
 	// Activate the kill switch for walletA only. NewKnobController registers a
@@ -60,8 +59,7 @@ func TestWalletKillSwitch_BlocksMutationsAllowsReads(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mutation by walletA is now denied.
-	leafIDBlocked := uuid.NewString()
-	_, err = wallet.GenerateDepositAddress(ctxA, configA, signingPubKey, &leafIDBlocked, false)
+	_, err = wallet.GenerateDepositAddress(ctxA, configA, signingPubKey, new(uuid.NewString()), false)
 	require.Error(t, err, "walletA mutation should be blocked by the kill switch")
 	st, ok := status.FromError(err)
 	require.True(t, ok, "expected a gRPC status error, got %T: %v", err, err)
@@ -75,14 +73,12 @@ func TestWalletKillSwitch_BlocksMutationsAllowsReads(t *testing.T) {
 	require.NoError(t, err, "walletA read should NOT be blocked by the kill switch")
 
 	// walletB's mutation is unaffected — the kill switch is targeted.
-	leafIDB := uuid.NewString()
-	_, err = wallet.GenerateDepositAddress(ctxB, configB, signingPubKey, &leafIDB, false)
+	_, err = wallet.GenerateDepositAddress(ctxB, configB, signingPubKey, new(uuid.NewString()), false)
 	require.NoError(t, err, "walletB mutation should be unaffected by walletA's kill switch")
 
 	// Clear the kill switch and confirm walletA can mutate again.
 	err = kc.SetKnobWithTarget(t, knobs.KnobKillSwitchWallet, walletAHex, 0)
 	require.NoError(t, err)
-	leafIDPost := uuid.NewString()
-	_, err = wallet.GenerateDepositAddress(ctxA, configA, signingPubKey, &leafIDPost, false)
+	_, err = wallet.GenerateDepositAddress(ctxA, configA, signingPubKey, new(uuid.NewString()), false)
 	require.NoError(t, err, "walletA mutation should succeed after the kill switch is cleared")
 }

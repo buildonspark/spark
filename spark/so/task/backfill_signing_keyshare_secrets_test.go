@@ -102,8 +102,7 @@ func TestBackfillSigningKeyshareSecrets_MismatchedEphemeralSecretIsSkipped(t *te
 	// Mismatched row is created first so its UUIDv7 sorts ahead of the healthy row
 	// in the batch's ByID(asc) order — this is the head-of-line case the skip
 	// behavior is designed to handle.
-	mismatchedSecret := keys.GeneratePrivateKey()
-	mismatchedKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &mismatchedSecret, nil)
+	mismatchedKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
 	_, err := ephemeralClient.SigningKeyshareSecret.Create().
 		SetSigningKeyshareID(mismatchedKeyshare.ID).
 		SetVersion(backfillSigningKeyshareSecretVersion).
@@ -111,8 +110,7 @@ func TestBackfillSigningKeyshareSecrets_MismatchedEphemeralSecretIsSkipped(t *te
 		Save(ctx)
 	require.NoError(t, err)
 
-	healthySecret := keys.GeneratePrivateKey()
-	healthyKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &healthySecret, nil)
+	healthyKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
 
 	task := getBackfillSigningKeyshareSecretsTask(t)
 	err = task.RunOnce(ctx, cfg, mainClient, ephemeralClient, knobs.NewFixedKnobs(map[string]float64{
@@ -143,8 +141,7 @@ func TestBackfillSigningKeyshareSecrets_CursorAdvancesPastFullBatchOfSkippedRows
 	cfg := sparktesting.TestConfig(t)
 
 	for range 3 {
-		secret := keys.GeneratePrivateKey()
-		keyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &secret, nil)
+		keyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
 		_, err := ephemeralClient.SigningKeyshareSecret.Create().
 			SetSigningKeyshareID(keyshare.ID).
 			SetVersion(backfillSigningKeyshareSecretVersion).
@@ -152,8 +149,7 @@ func TestBackfillSigningKeyshareSecrets_CursorAdvancesPastFullBatchOfSkippedRows
 			Save(ctx)
 		require.NoError(t, err)
 	}
-	healthySecret := keys.GeneratePrivateKey()
-	healthyKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &healthySecret, nil)
+	healthyKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
 
 	task := getBackfillSigningKeyshareSecretsTask(t)
 	err := task.RunOnce(ctx, cfg, mainClient, ephemeralClient, knobs.NewFixedKnobs(map[string]float64{
@@ -206,8 +202,7 @@ func TestBackfillSigningKeyshareSecrets_SkipsRowsWithNoMainSecret(t *testing.T) 
 	ctx, mainClient, ephemeralClient := newBackfillSigningKeyshareSecretsContext(t)
 	cfg := sparktesting.TestConfig(t)
 	missingSecretKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, nil, nil)
-	validSecret := keys.GeneratePrivateKey()
-	validKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &validSecret, nil)
+	validKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
 
 	task := getBackfillSigningKeyshareSecretsTask(t)
 	err := task.RunOnce(ctx, cfg, mainClient, ephemeralClient, knobs.NewFixedKnobs(map[string]float64{
@@ -229,10 +224,8 @@ func TestBackfillSigningKeyshareSecrets_SkipsLockedRows(t *testing.T) {
 	t.Parallel()
 	ctx, mainClient, ephemeralClient := newBackfillSigningKeyshareSecretsContext(t)
 	cfg := sparktesting.TestConfig(t)
-	lockedSecret := keys.GeneratePrivateKey()
-	unlockedSecret := keys.GeneratePrivateKey()
-	lockedKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &lockedSecret, nil)
-	unlockedKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, &unlockedSecret, nil)
+	lockedKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
+	unlockedKeyshare := createBackfillSigningKeyshare(t, ctx, mainClient, new(keys.GeneratePrivateKey()), nil)
 
 	lockTx, err := mainClient.Tx(ctx)
 	require.NoError(t, err)

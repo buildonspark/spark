@@ -1069,16 +1069,13 @@ func TestRateLimiter(t *testing.T) {
 		}
 		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
 
-		method1Key := "/test.Service/Method1#1s"
-		method1Value := mockKnobs.GetValueTarget(knobs.KnobRateLimitLimit, &method1Key, 0)
+		method1Value := mockKnobs.GetValueTarget(knobs.KnobRateLimitLimit, new("/test.Service/Method1#1s"), 0)
 		assert.InDelta(t, 5.0, method1Value, 0.001, "Method1 should have custom limit of 5")
 
-		method2Key := "/test.Service/Method2#1s"
-		method2Value := mockKnobs.GetValueTarget(knobs.KnobRateLimitLimit, &method2Key, 0)
+		method2Value := mockKnobs.GetValueTarget(knobs.KnobRateLimitLimit, new("/test.Service/Method2#1s"), 0)
 		assert.InDelta(t, 1.0, method2Value, 0.001, "Method2 should have custom limit of 1")
 
-		defaultKey := "/test.Service/Default#1s"
-		methodDefaultValue := mockKnobs.GetValueTarget(knobs.KnobRateLimitLimit, &defaultKey, 2)
+		methodDefaultValue := mockKnobs.GetValueTarget(knobs.KnobRateLimitLimit, new("/test.Service/Default#1s"), 2)
 		assert.InDelta(t, 2.0, methodDefaultValue, 0.001, "Default method should use default argument of 2")
 	})
 	t.Run("tiers enforce limits and windowing via suffix", func(t *testing.T) {

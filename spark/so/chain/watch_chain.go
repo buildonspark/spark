@@ -437,8 +437,7 @@ func WatchChain(
 	if err != nil {
 		return err
 	}
-	connConfig := RPCClientConfig(bitcoindConfig)
-	bitcoinClient, err := rpcclient.New(&connConfig, nil)
+	bitcoinClient, err := rpcclient.New(new(RPCClientConfig(bitcoindConfig)), nil)
 	if err != nil {
 		return err
 	}
@@ -809,10 +808,9 @@ func handleBlock(
 		}
 	}
 
-	networkString := network.String()
 	// If marking exiting nodes is slow, it can be disabled by setting the knob to 0,
 	// but this should be done for a short period of time to avoid any potential double spends.
-	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobWatchChainMarkExitingNodesEnabled, &networkString, 1.0) > 0 {
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobWatchChainMarkExitingNodesEnabled, new(network.String()), 1.0) > 0 {
 		logger.Sugar().Infof("Started processing confirmed transactions for exiting tree nodes at height %d", blockHeight)
 		if err := tree.MarkExitingNodes(ctx, dbClient, confirmedTxHashSet, blockHeight); err != nil {
 			return fmt.Errorf("failed to mark exiting nodes: %w", err)

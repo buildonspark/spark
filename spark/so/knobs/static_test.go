@@ -38,7 +38,6 @@ func TestStaticValuesProviderWithKnobs(t *testing.T) {
 	require.NotNil(t, k)
 
 	assert.InDelta(t, 75.0, k.GetValue("my.knob", 0), 0.001)
-	target := "REGTEST"
-	assert.InDelta(t, 100.0, k.GetValueTarget("my.knob", &target, 0), 0.001)
+	assert.InDelta(t, 100.0, k.GetValueTarget("my.knob", new("REGTEST"), 0), 0.001)
 	assert.InDelta(t, 0.0, k.GetValue("unset.knob", 0), 0.001)
 }

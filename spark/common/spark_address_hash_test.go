@@ -42,8 +42,7 @@ func TestHashSparkInvoiceFields_TokensBasic(t *testing.T) {
 	require.Equal(t, h1, h2)
 
 	// Change memo -> different hash
-	memo2 := "memo-2"
-	f3 := CreateTokenSparkInvoiceFields(id, tokenIdentifier, amount, &memo2, senderPublicKey, &expiry)
+	f3 := CreateTokenSparkInvoiceFields(id, tokenIdentifier, amount, new("memo-2"), senderPublicKey, &expiry)
 	h3, err := HashSparkInvoiceFields(f3, network, receiverPublicKey)
 	require.NoError(t, err)
 	require.NotEqual(t, h1, h3)
@@ -67,8 +66,7 @@ func TestHashSparkInvoiceFields_SatsBasic(t *testing.T) {
 	require.Len(t, h1, 32)
 
 	// Change amount -> different hash
-	newsats := uint64(2000)
-	f2 := CreateSatsSparkInvoiceFields(id, &newsats, &memo, senderPublicKey, &expiry)
+	f2 := CreateSatsSparkInvoiceFields(id, new(uint64(2000)), &memo, senderPublicKey, &expiry)
 	h2, err := HashSparkInvoiceFields(f2, network, receiverPublicKey)
 	require.NoError(t, err)
 	require.NotEqual(t, h1, h2)
@@ -165,11 +163,10 @@ func TestVerifySparkAddressSignature_Valid(t *testing.T) {
 	pubKey := privKey.Public()
 	uid, err := uuid.NewV7()
 	require.NoError(t, err)
-	memo := "invoice-memo"
 	amount := big.NewInt(42).Bytes()
 	network := btcnetwork.Regtest
 
-	fields := CreateTokenSparkInvoiceFields(uid[:], make([]byte, 32), amount, &memo, pubKey, nil)
+	fields := CreateTokenSparkInvoiceFields(uid[:], make([]byte, 32), amount, new("invoice-memo"), pubKey, nil)
 	hash, err := HashSparkInvoiceFields(fields, network, pubKey)
 	require.NoError(t, err)
 
@@ -194,8 +191,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		network := btcnetwork.Regtest
 
 		uid, _ := uuid.NewV7()
-		memo := "m"
-		fields := CreateSatsSparkInvoiceFields(uid[:], nil, &memo, pubKey, nil)
+		fields := CreateSatsSparkInvoiceFields(uid[:], nil, new("m"), pubKey, nil)
 
 		addr := &pb.SparkAddress{IdentityPublicKey: pubKey.Serialize(), SparkInvoiceFields: fields}
 		err := VerifySparkAddressSignature(addr, network)
@@ -212,8 +208,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		network := btcnetwork.Regtest
 
 		uid, _ := uuid.NewV7()
-		memo := "m2"
-		fields := CreateSatsSparkInvoiceFields(uid[:], nil, &memo, receiverPublicKey, nil)
+		fields := CreateSatsSparkInvoiceFields(uid[:], nil, new("m2"), receiverPublicKey, nil)
 		hash, err := HashSparkInvoiceFields(fields, network, receiverPublicKey)
 		require.NoError(t, err)
 
@@ -237,8 +232,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 
 		uid, _ := uuid.NewV7()
 		id := uid[:]
-		memo := "original"
-		fields := CreateSatsSparkInvoiceFields(id, nil, &memo, pubKey, nil)
+		fields := CreateSatsSparkInvoiceFields(id, nil, new("original"), pubKey, nil)
 		hash, err := HashSparkInvoiceFields(fields, network, pubKey)
 		require.NoError(t, err)
 
@@ -246,8 +240,7 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 		require.NoError(t, err)
 
 		// mutate memo
-		memo2 := "tampered"
-		fields.Memo = &memo2
+		fields.Memo = new("tampered")
 
 		addr := &pb.SparkAddress{
 			IdentityPublicKey:  pubKey.Serialize(),
@@ -261,13 +254,12 @@ func TestVerifySparkAddressSignature_Errors(t *testing.T) {
 	t.Run("invalid public key bytes", func(t *testing.T) {
 		seededRand := rand.NewChaCha8([32]byte{})
 		uid, _ := uuid.NewV7()
-		memo := "x"
 		receiverPubKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 		senderPubKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 		identityPubKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 		network := btcnetwork.Regtest
 
-		fields := CreateSatsSparkInvoiceFields(uid[:], nil, &memo, senderPubKey, nil)
+		fields := CreateSatsSparkInvoiceFields(uid[:], nil, new("x"), senderPubKey, nil)
 		hash, err := HashSparkInvoiceFields(fields, network, receiverPubKey)
 		require.NoError(t, err)
 
@@ -292,10 +284,9 @@ func TestHashSparkInvoiceFieldsProducesKnownHash(t *testing.T) {
 	senderPublicKey := keys.MustParsePublicKeyHex("02b0e3203121de9df0bd7c2b3846100e25c63310392e05961d8042fa81906d6f2b")
 	uid := uuid.MustParse("0198b4ec-3d20-7e4b-b288-1107ecf64d49")
 	amount := big.NewInt(1000).Bytes()
-	memo := "memo"
 	expiry, err := time.Parse(time.RFC3339Nano, "2025-08-16T22:12:17.791Z")
 	require.NoError(t, err)
-	sparkInvoiceFields := CreateTokenSparkInvoiceFields(uid[:], tokenID, amount, &memo, senderPublicKey, &expiry)
+	sparkInvoiceFields := CreateTokenSparkInvoiceFields(uid[:], tokenID, amount, new("memo"), senderPublicKey, &expiry)
 	network := btcnetwork.Regtest
 
 	hash, err := HashSparkInvoiceFields(sparkInvoiceFields, network, receiverPublicKey)

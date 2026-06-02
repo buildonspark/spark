@@ -166,12 +166,11 @@ func TestValidateMintDoesNotExceedMaxSupply_FinalizedAndExpiredTransactions(t *t
 	t.Run("non-expired SIGNED transactions count toward supply", func(t *testing.T) {
 		tokenCreate := f.CreateTokenCreate(btcnetwork.Regtest, nil, maxSupply)
 
-		futureTime := time.Now().Add(time.Hour)
 		_, _ = f.CreateMintTransactionWithOpts(
 			tokenCreate,
 			entfixtures.OutputSpecs(maxSupply),
 			st.TokenTransactionStatusSigned,
-			&entfixtures.TokenTransactionOpts{ExpiryTime: &futureTime},
+			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(time.Hour))},
 		)
 
 		newMint, _ := f.CreateMintTransaction(

@@ -42,8 +42,7 @@ func TestAggregateKeyshares_ClearsSecretVersion(t *testing.T) {
 	version := int32(7)
 	first := createSigningKeyshareForAggregateTest(t, ctx, client, &version)
 	second := createSigningKeyshareForAggregateTest(t, ctx, client, &version)
-	targetVersion := int32(1)
-	target := createSigningKeyshareForAggregateTest(t, ctx, client, &targetVersion)
+	target := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(1)))
 
 	updated, err := ent.AggregateKeyshares(ctx, nil, []*ent.SigningKeyshare{first, second}, target.ID)
 	require.NoError(t, err)
@@ -69,8 +68,7 @@ func TestAggregateKeyshares_ClearsSecretVersionWhenSumVersionIsNil(t *testing.T)
 
 	first := createSigningKeyshareForAggregateTest(t, ctx, client, nil)
 	second := createSigningKeyshareForAggregateTest(t, ctx, client, nil)
-	targetVersion := int32(4)
-	target := createSigningKeyshareForAggregateTest(t, ctx, client, &targetVersion)
+	target := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(4)))
 
 	updated, err := ent.AggregateKeyshares(ctx, nil, []*ent.SigningKeyshare{first, second}, target.ID)
 	require.NoError(t, err)
@@ -94,12 +92,9 @@ func TestAggregateKeyshares_IgnoresInputSecretVersions(t *testing.T) {
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	firstVersion := int32(7)
-	secondVersion := int32(8)
-	first := createSigningKeyshareForAggregateTest(t, ctx, client, &firstVersion)
-	second := createSigningKeyshareForAggregateTest(t, ctx, client, &secondVersion)
-	targetVersion := int32(4)
-	target := createSigningKeyshareForAggregateTest(t, ctx, client, &targetVersion)
+	first := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(7)))
+	second := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(8)))
+	target := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(4)))
 
 	originalSecret := *target.SecretShare
 
@@ -126,17 +121,15 @@ func TestCalculateAndStoreLastKey_ClearsSecretVersion(t *testing.T) {
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	version := int32(9)
-	first := createSigningKeyshareForAggregateTest(t, ctx, client, &version)
+	first := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(9)))
 
 	lastSecret := keys.GeneratePrivateKey()
-	targetSecret := first.SecretShare.Add(lastSecret)
 	targetPublic := first.PublicKey.Add(lastSecret.Public())
 	targetPublicShares := map[string]keys.Public{
 		"op": first.PublicShares["op"].Add(lastSecret.Public()),
 	}
 	target := &ent.SigningKeyshare{
-		SecretShare:  &targetSecret,
+		SecretShare:  new(first.SecretShare.Add(lastSecret)),
 		PublicKey:    targetPublic,
 		PublicShares: targetPublicShares,
 		MinSigners:   1,

@@ -17,7 +17,6 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -259,8 +258,7 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 				return tx, []keys.Private{config.IdentityPrivateKey}
 			},
 			modifyTx: func(tx *tokenpb.TokenTransaction) {
-				bondSats := uint64(10000)
-				tx.TokenOutputs[0].WithdrawBondSats = &bondSats
+				tx.TokenOutputs[0].WithdrawBondSats = new(uint64(10000))
 			},
 			expectedErrorSubstr: "withdraw bond sats will be added by the SO",
 		},
@@ -273,8 +271,7 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 				return tx, []keys.Private{config.IdentityPrivateKey}
 			},
 			modifyTx: func(tx *tokenpb.TokenTransaction) {
-				id := uuid.NewString()
-				tx.TokenOutputs[0].Id = &id
+				tx.TokenOutputs[0].Id = new(uuid.NewString())
 			},
 			expectedErrorSubstr: "ID will be added by the SO",
 		},
@@ -325,10 +322,9 @@ func TestMintWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
 	// Truncate to microseconds to match server-required precision.
 	mintTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
 
-	executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
 	resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
 		t.Context(), config, mintTx, []keys.Private{tokenPrivKey}, wallet.DefaultValidityDuration,
-		wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+		wallet.BroadcastV3Options{ExecuteBefore: new(time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond))},
 	)
 	require.NoError(t, err, "mint with execute_before and old CCT should succeed")
 	require.NotNil(t, resp)
@@ -374,10 +370,9 @@ func TestTransferWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
 	// Set CCT to 5 minutes ago — truncate to microseconds to match server-required precision.
 	transferTx.ClientCreatedTimestamp = timestamppb.New(time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond))
 
-	executeBefore := time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond)
 	resp, err := wallet.BroadcastTokenTransactionV3WithResponse(
 		t.Context(), config, transferTx, []keys.Private{senderPrivKey}, wallet.DefaultValidityDuration,
-		wallet.BroadcastV3Options{ExecuteBefore: &executeBefore},
+		wallet.BroadcastV3Options{ExecuteBefore: new(time.Now().UTC().Add(1 * time.Hour).Truncate(time.Microsecond))},
 	)
 	require.NoError(t, err, "transfer with execute_before and old CCT should succeed")
 	require.NotNil(t, resp)
@@ -807,7 +802,7 @@ func TestBroadcastTokenTransactionV3ValidationRules(t *testing.T) {
 					Version:                         3,
 					Network:                         config.ProtoNetwork(),
 					SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
-					ValidityDurationSeconds:         proto.Uint64(180),
+					ValidityDurationSeconds:         new(uint64(180)),
 					TokenInputs: &tokenpb.TokenTransaction_TransferInput{
 						TransferInput: &tokenpb.TokenTransferInput{
 							OutputsToSpend: []*tokenpb.TokenOutputToSpend{

@@ -100,21 +100,20 @@ func preloadedTransfer(t *testing.T) (*ent.Transfer, keys.Public, keys.Public) {
 
 	receiver1 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv1Pub, Status: st.TransferReceiverStatusKeyTweaked}
 	receiver2 := &ent.TransferReceiver{ID: uuid.New(), IdentityPubkey: recv2Pub, Status: st.TransferReceiverStatusKeyTweaked}
-	recv1ID, recv2ID := receiver1.ID, receiver2.ID
 	senderID := uuid.New()
 	sender := &ent.TransferSender{ID: senderID, IdentityPubkey: senderPub}
 
 	transferLeaf1 := &ent.TransferLeaf{
 		ID:                   uuid.New(),
 		IntermediateRefundTx: refundTx,
-		TransferReceiverID:   &recv1ID,
+		TransferReceiverID:   new(receiver1.ID),
 		TransferSenderID:     &senderID,
 		Edges:                ent.TransferLeafEdges{Leaf: leaf1Node},
 	}
 	transferLeaf2 := &ent.TransferLeaf{
 		ID:                   uuid.New(),
 		IntermediateRefundTx: refundTx,
-		TransferReceiverID:   &recv2ID,
+		TransferReceiverID:   new(receiver2.ID),
 		TransferSenderID:     &senderID,
 		Edges:                ent.TransferLeafEdges{Leaf: leaf2Node},
 	}

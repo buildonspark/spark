@@ -93,13 +93,11 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	// Generate a new private key for Alice. In a real Wallet that key would be derived from
 	// a Signing key using derivation schema
 	aliceDepositPrivKey := keys.GeneratePrivateKey()
-	leafID := uuid.NewString()
-
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
 		aliceConfig,
 		aliceDepositPrivKey.Public(),
-		&leafID,
+		new(uuid.NewString()),
 		true,
 	)
 	require.NoError(t, err)

@@ -25,7 +25,6 @@ import (
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -394,7 +393,7 @@ func convertTokenTransactionToV3Request(
 	if tokenTransaction.ClientCreatedTimestamp == nil || tokenTransaction.ClientCreatedTimestamp.AsTime().IsZero() {
 		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC()))
 	}
-	tokenTransaction.ValidityDurationSeconds = proto.Uint64(uint64(validityDuration.Seconds()))
+	tokenTransaction.ValidityDurationSeconds = new(uint64(validityDuration.Seconds()))
 
 	if err := ensureV3WithdrawParameters(config, tokenTransaction); err != nil {
 		return nil, err
@@ -477,15 +476,13 @@ func ensureV3WithdrawParameters(config *TestWalletConfig, tokenTransaction *toke
 			continue
 		}
 		if output.WithdrawBondSats == nil {
-			bond := config.WithdrawBondSats
-			output.WithdrawBondSats = &bond
+			output.WithdrawBondSats = new(config.WithdrawBondSats)
 		} else if *output.WithdrawBondSats != config.WithdrawBondSats {
 			return fmt.Errorf("token output %d withdraw bond sats must equal configured value %d", i, config.WithdrawBondSats)
 		}
 
 		if output.WithdrawRelativeBlockLocktime == nil {
-			locktime := config.WithdrawRelativeBlockLocktime
-			output.WithdrawRelativeBlockLocktime = &locktime
+			output.WithdrawRelativeBlockLocktime = new(config.WithdrawRelativeBlockLocktime)
 		} else if *output.WithdrawRelativeBlockLocktime != config.WithdrawRelativeBlockLocktime {
 			return fmt.Errorf("token output %d withdraw relative block locktime must equal configured value %d", i, config.WithdrawRelativeBlockLocktime)
 		}

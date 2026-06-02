@@ -323,8 +323,7 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
 
 	createTestCommitment := func() *frost.SigningCommitment {
-		commitment := frost.GenerateSigningNonce().SigningCommitment()
-		return &commitment
+		return new(frost.GenerateSigningNonce().SigningCommitment())
 	}
 
 	tests := []struct {

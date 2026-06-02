@@ -11,7 +11,6 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/go-cmp/cmp"
@@ -46,11 +45,11 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 			input: &tokenpb.TokenTransaction{
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
-						Id:                            proto.String("output1"),
+						Id:                            new("output1"),
 						OwnerPublicKey:                ownerPubKey,
 						RevocationCommitment:          revocationCommitment,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenPublicKey:                tokenPubKey,
 						TokenAmount:                   tokenAmount,
 					},
@@ -67,11 +66,11 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 			want: &legacypb.TokenTransaction{
 				TokenOutputs: []*legacypb.TokenOutput{
 					{
-						Id:                            proto.String("output1"),
+						Id:                            new("output1"),
 						OwnerPublicKey:                ownerPubKey,
 						RevocationCommitment:          revocationCommitment,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenPublicKey:                tokenPubKey,
 						TokenAmount:                   tokenAmount,
 					},
@@ -91,11 +90,11 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 			input: &tokenpb.TokenTransaction{
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
-						Id:                            proto.String("output1"),
+						Id:                            new("output1"),
 						OwnerPublicKey:                ownerPubKey,
 						RevocationCommitment:          revocationCommitment,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenPublicKey:                tokenPubKey,
 						TokenAmount:                   tokenAmount,
 					},
@@ -112,11 +111,11 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 			want: &legacypb.TokenTransaction{
 				TokenOutputs: []*legacypb.TokenOutput{
 					{
-						Id:                            proto.String("output1"),
+						Id:                            new("output1"),
 						OwnerPublicKey:                ownerPubKey,
 						RevocationCommitment:          revocationCommitment,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenPublicKey:                tokenPubKey,
 						TokenAmount:                   tokenAmount,
 					},
@@ -136,11 +135,11 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 			input: &tokenpb.TokenTransaction{
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
-						Id:                            proto.String("output1"),
+						Id:                            new("output1"),
 						OwnerPublicKey:                ownerPubKey,
 						RevocationCommitment:          revocationCommitment,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenPublicKey:                tokenPubKey,
 						TokenAmount:                   tokenAmount,
 					},
@@ -165,11 +164,11 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 			want: &legacypb.TokenTransaction{
 				TokenOutputs: []*legacypb.TokenOutput{
 					{
-						Id:                            proto.String("output1"),
+						Id:                            new("output1"),
 						OwnerPublicKey:                ownerPubKey,
 						RevocationCommitment:          revocationCommitment,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenPublicKey:                tokenPubKey,
 						TokenAmount:                   tokenAmount,
 					},
@@ -402,7 +401,7 @@ func TestConvertPartialToV2TxShape(t *testing.T) {
 				SparkOperatorIdentityPublicKeys: [][]byte{op1Key, op2Key},
 				Network:                         pb.Network_MAINNET,
 				ClientCreatedTimestamp:          ts,
-				ValidityDurationSeconds:         proto.Uint64(42),
+				ValidityDurationSeconds:         new(uint64(42)),
 				TokenInputs: &tokenpb.TokenTransaction_MintInput{
 					MintInput: &tokenpb.TokenMintInput{
 						IssuerPublicKey: issuerPubKey,
@@ -411,8 +410,8 @@ func TestConvertPartialToV2TxShape(t *testing.T) {
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
 						OwnerPublicKey:                ownerPubKey,
-						WithdrawBondSats:              proto.Uint64(1000),
-						WithdrawRelativeBlockLocktime: proto.Uint64(100),
+						WithdrawBondSats:              new(uint64(1000)),
+						WithdrawRelativeBlockLocktime: new(uint64(100)),
 						TokenIdentifier:               []byte{9, 9, 9},
 						TokenAmount:                   tokenAmount,
 					},
@@ -579,7 +578,7 @@ func TestConvertFinalToV2TxShape(t *testing.T) {
 				Version:                 7,
 				ClientCreatedTimestamp:  ts,
 				Network:                 pb.Network_MAINNET,
-				ValidityDurationSeconds: proto.Uint64(600),
+				ValidityDurationSeconds: new(uint64(600)),
 				TokenInputs: &tokenpb.TokenTransaction_MintInput{
 					MintInput: &tokenpb.TokenMintInput{IssuerPublicKey: issuerPubKey},
 				},
@@ -662,7 +661,7 @@ func TestConvertV2TxShapeToFinal(t *testing.T) {
 			input: &tokenpb.TokenTransaction{
 				Version:                 5,
 				Network:                 pb.Network_MAINNET,
-				ValidityDurationSeconds: proto.Uint64(777),
+				ValidityDurationSeconds: new(uint64(777)),
 				TokenInputs: &tokenpb.TokenTransaction_CreateInput{
 					CreateInput: &tokenpb.TokenCreateInput{
 						IssuerPublicKey: issuerPubKey,
