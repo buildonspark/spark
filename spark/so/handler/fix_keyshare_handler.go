@@ -56,6 +56,12 @@ func (h *FixKeyshareHandler) parseRequest(ctx context.Context, badKeyshareId str
 	// Parse all the good operators.
 	goodOperators := make(map[string]*so.SigningOperator)
 	for _, identifier := range goodOperatorIdentifiers {
+		if identifier == badOperatorIdentifier {
+			return nil, fmt.Errorf("bad signing operator ID %s cannot also be listed as a good signing operator", identifier)
+		}
+		if _, exists := goodOperators[identifier]; exists {
+			return nil, fmt.Errorf("duplicate good signing operator ID: %s", identifier)
+		}
 		operator, ok := h.config.SigningOperatorMap[identifier]
 		if !ok {
 			return nil, fmt.Errorf("good signing operator ID is not a known signing operator: %s", identifier)
