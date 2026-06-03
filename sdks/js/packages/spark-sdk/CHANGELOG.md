@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.8.3
+
+### Patch Changes
+
+- 8459395: - Export HTLC transaction utilities from the SDK utils entrypoint.
+
 ## 0.8.2
 
 ### Patch Changes
