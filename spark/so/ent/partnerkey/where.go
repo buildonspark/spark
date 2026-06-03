@@ -82,6 +82,11 @@ func JwtPublicKey(v jwt.Public) predicate.PartnerKey {
 	return predicate.PartnerKey(sql.FieldEQ(FieldJwtPublicKey, v))
 }
 
+// BasicAuthSecretHash applies equality check predicate on the "basic_auth_secret_hash" field. It's identical to BasicAuthSecretHashEQ.
+func BasicAuthSecretHash(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldEQ(FieldBasicAuthSecretHash, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.PartnerKey {
 	return predicate.PartnerKey(sql.FieldEQ(FieldCreateTime, v))
@@ -330,6 +335,81 @@ func JwtPublicKeyLT(v jwt.Public) predicate.PartnerKey {
 // JwtPublicKeyLTE applies the LTE predicate on the "jwt_public_key" field.
 func JwtPublicKeyLTE(v jwt.Public) predicate.PartnerKey {
 	return predicate.PartnerKey(sql.FieldLTE(FieldJwtPublicKey, v))
+}
+
+// BasicAuthSecretHashEQ applies the EQ predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashEQ(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldEQ(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashNEQ applies the NEQ predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashNEQ(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldNEQ(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashIn applies the In predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashIn(vs ...string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldIn(FieldBasicAuthSecretHash, vs...))
+}
+
+// BasicAuthSecretHashNotIn applies the NotIn predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashNotIn(vs ...string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldNotIn(FieldBasicAuthSecretHash, vs...))
+}
+
+// BasicAuthSecretHashGT applies the GT predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashGT(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldGT(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashGTE applies the GTE predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashGTE(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldGTE(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashLT applies the LT predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashLT(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldLT(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashLTE applies the LTE predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashLTE(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldLTE(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashContains applies the Contains predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashContains(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldContains(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashHasPrefix applies the HasPrefix predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashHasPrefix(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldHasPrefix(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashHasSuffix applies the HasSuffix predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashHasSuffix(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldHasSuffix(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashIsNil applies the IsNil predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashIsNil() predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldIsNull(FieldBasicAuthSecretHash))
+}
+
+// BasicAuthSecretHashNotNil applies the NotNil predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashNotNil() predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldNotNull(FieldBasicAuthSecretHash))
+}
+
+// BasicAuthSecretHashEqualFold applies the EqualFold predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashEqualFold(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldEqualFold(FieldBasicAuthSecretHash, v))
+}
+
+// BasicAuthSecretHashContainsFold applies the ContainsFold predicate on the "basic_auth_secret_hash" field.
+func BasicAuthSecretHashContainsFold(v string) predicate.PartnerKey {
+	return predicate.PartnerKey(sql.FieldContainsFold(FieldBasicAuthSecretHash, v))
 }
 
 // HasPartners applies the HasEdge predicate on the "partners" edge.

@@ -72,6 +72,20 @@ func (pkc *PartnerKeyCreate) SetJwtPublicKey(j jwt.Public) *PartnerKeyCreate {
 	return pkc
 }
 
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (pkc *PartnerKeyCreate) SetBasicAuthSecretHash(s string) *PartnerKeyCreate {
+	pkc.mutation.SetBasicAuthSecretHash(s)
+	return pkc
+}
+
+// SetNillableBasicAuthSecretHash sets the "basic_auth_secret_hash" field if the given value is not nil.
+func (pkc *PartnerKeyCreate) SetNillableBasicAuthSecretHash(s *string) *PartnerKeyCreate {
+	if s != nil {
+		pkc.SetBasicAuthSecretHash(*s)
+	}
+	return pkc
+}
+
 // SetID sets the "id" field.
 func (pkc *PartnerKeyCreate) SetID(u uuid.UUID) *PartnerKeyCreate {
 	pkc.mutation.SetID(u)
@@ -177,6 +191,11 @@ func (pkc *PartnerKeyCreate) check() error {
 	if _, ok := pkc.mutation.JwtPublicKey(); !ok {
 		return &ValidationError{Name: "jwt_public_key", err: errors.New(`ent: missing required field "PartnerKey.jwt_public_key"`)}
 	}
+	if v, ok := pkc.mutation.BasicAuthSecretHash(); ok {
+		if err := partnerkey.BasicAuthSecretHashValidator(v); err != nil {
+			return &ValidationError{Name: "basic_auth_secret_hash", err: fmt.Errorf(`ent: validator failed for field "PartnerKey.basic_auth_secret_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -232,6 +251,10 @@ func (pkc *PartnerKeyCreate) createSpec() (*PartnerKey, *sqlgraph.CreateSpec) {
 	if value, ok := pkc.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partnerkey.FieldJwtPublicKey, field.TypeBytes, value)
 		_node.JwtPublicKey = value
+	}
+	if value, ok := pkc.mutation.BasicAuthSecretHash(); ok {
+		_spec.SetField(partnerkey.FieldBasicAuthSecretHash, field.TypeString, value)
+		_node.BasicAuthSecretHash = value
 	}
 	if nodes := pkc.mutation.PartnersIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -349,6 +372,24 @@ func (u *PartnerKeyUpsert) UpdateJwtPublicKey() *PartnerKeyUpsert {
 	return u
 }
 
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (u *PartnerKeyUpsert) SetBasicAuthSecretHash(v string) *PartnerKeyUpsert {
+	u.Set(partnerkey.FieldBasicAuthSecretHash, v)
+	return u
+}
+
+// UpdateBasicAuthSecretHash sets the "basic_auth_secret_hash" field to the value that was provided on create.
+func (u *PartnerKeyUpsert) UpdateBasicAuthSecretHash() *PartnerKeyUpsert {
+	u.SetExcluded(partnerkey.FieldBasicAuthSecretHash)
+	return u
+}
+
+// ClearBasicAuthSecretHash clears the value of the "basic_auth_secret_hash" field.
+func (u *PartnerKeyUpsert) ClearBasicAuthSecretHash() *PartnerKeyUpsert {
+	u.SetNull(partnerkey.FieldBasicAuthSecretHash)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -453,6 +494,27 @@ func (u *PartnerKeyUpsertOne) SetJwtPublicKey(v jwt.Public) *PartnerKeyUpsertOne
 func (u *PartnerKeyUpsertOne) UpdateJwtPublicKey() *PartnerKeyUpsertOne {
 	return u.Update(func(s *PartnerKeyUpsert) {
 		s.UpdateJwtPublicKey()
+	})
+}
+
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (u *PartnerKeyUpsertOne) SetBasicAuthSecretHash(v string) *PartnerKeyUpsertOne {
+	return u.Update(func(s *PartnerKeyUpsert) {
+		s.SetBasicAuthSecretHash(v)
+	})
+}
+
+// UpdateBasicAuthSecretHash sets the "basic_auth_secret_hash" field to the value that was provided on create.
+func (u *PartnerKeyUpsertOne) UpdateBasicAuthSecretHash() *PartnerKeyUpsertOne {
+	return u.Update(func(s *PartnerKeyUpsert) {
+		s.UpdateBasicAuthSecretHash()
+	})
+}
+
+// ClearBasicAuthSecretHash clears the value of the "basic_auth_secret_hash" field.
+func (u *PartnerKeyUpsertOne) ClearBasicAuthSecretHash() *PartnerKeyUpsertOne {
+	return u.Update(func(s *PartnerKeyUpsert) {
+		s.ClearBasicAuthSecretHash()
 	})
 }
 
@@ -727,6 +789,27 @@ func (u *PartnerKeyUpsertBulk) SetJwtPublicKey(v jwt.Public) *PartnerKeyUpsertBu
 func (u *PartnerKeyUpsertBulk) UpdateJwtPublicKey() *PartnerKeyUpsertBulk {
 	return u.Update(func(s *PartnerKeyUpsert) {
 		s.UpdateJwtPublicKey()
+	})
+}
+
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (u *PartnerKeyUpsertBulk) SetBasicAuthSecretHash(v string) *PartnerKeyUpsertBulk {
+	return u.Update(func(s *PartnerKeyUpsert) {
+		s.SetBasicAuthSecretHash(v)
+	})
+}
+
+// UpdateBasicAuthSecretHash sets the "basic_auth_secret_hash" field to the value that was provided on create.
+func (u *PartnerKeyUpsertBulk) UpdateBasicAuthSecretHash() *PartnerKeyUpsertBulk {
+	return u.Update(func(s *PartnerKeyUpsert) {
+		s.UpdateBasicAuthSecretHash()
+	})
+}
+
+// ClearBasicAuthSecretHash clears the value of the "basic_auth_secret_hash" field.
+func (u *PartnerKeyUpsertBulk) ClearBasicAuthSecretHash() *PartnerKeyUpsertBulk {
+	return u.Update(func(s *PartnerKeyUpsert) {
+		s.ClearBasicAuthSecretHash()
 	})
 }
 

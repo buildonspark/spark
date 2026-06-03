@@ -29,6 +29,8 @@ type PartnerKey struct {
 	PartnerName string `json:"partner_name,omitempty"`
 	// Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).
 	JwtPublicKey jwt.Public `json:"jwt_public_key,omitempty"`
+	// Argon2id hash (PHC-encoded) of the shared secret used to authenticate the partner via HTTP Basic Auth (base64(partner_id:secret)). The raw secret is never stored; the auth interceptor verifies the presented secret against this hash with a constant-time compare. Nullable: only set for partners that use the Basic Auth flow.
+	BasicAuthSecretHash string `json:"-"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PartnerKeyQuery when eager-loading is set.
 	Edges        PartnerKeyEdges `json:"edges"`
@@ -60,7 +62,7 @@ func (*PartnerKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case partnerkey.FieldJwtPublicKey:
 			values[i] = new(jwt.Public)
-		case partnerkey.FieldPartnerID, partnerkey.FieldPartnerName:
+		case partnerkey.FieldPartnerID, partnerkey.FieldPartnerName, partnerkey.FieldBasicAuthSecretHash:
 			values[i] = new(sql.NullString)
 		case partnerkey.FieldCreateTime, partnerkey.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -117,6 +119,12 @@ func (pk *PartnerKey) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				pk.JwtPublicKey = *value
 			}
+		case partnerkey.FieldBasicAuthSecretHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field basic_auth_secret_hash", values[i])
+			} else if value.Valid {
+				pk.BasicAuthSecretHash = value.String
+			}
 		default:
 			pk.selectValues.Set(columns[i], values[i])
 		}
@@ -172,6 +180,8 @@ func (pk *PartnerKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("jwt_public_key=")
 	builder.WriteString(fmt.Sprintf("%v", pk.JwtPublicKey))
+	builder.WriteString(", ")
+	builder.WriteString("basic_auth_secret_hash=<sensitive>")
 	builder.WriteByte(')')
 	return builder.String()
 }

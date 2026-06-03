@@ -455,6 +455,7 @@ var (
 		{Name: "partner_id", Type: field.TypeString, Unique: true, Size: 255},
 		{Name: "partner_name", Type: field.TypeString, Size: 255},
 		{Name: "jwt_public_key", Type: field.TypeBytes, Unique: true},
+		{Name: "basic_auth_secret_hash", Type: field.TypeString, Nullable: true, Size: 255},
 	}
 	// PartnerKeysTable holds the schema information for the "partner_keys" table.
 	PartnerKeysTable = &schema.Table{

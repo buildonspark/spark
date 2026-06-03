@@ -41,6 +41,13 @@ func (PartnerKey) Fields() []ent.Field {
 			Unique().
 			Comment("Compressed public key (34 bytes: 1-byte curve discriminator + 33-byte compressed key) used to verify partner JWTs. Supports both secp256k1 (ES256K) and P-256 (ES256).").
 			Annotations(entexample.Default("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3")),
+		field.String("basic_auth_secret_hash").
+			Optional().
+			NotEmpty().
+			Sensitive().
+			MaxLen(255).
+			Comment("Argon2id hash (PHC-encoded) of the shared secret used to authenticate the partner via HTTP Basic Auth (base64(partner_id:secret)). The raw secret is never stored; the auth interceptor verifies the presented secret against this hash with a constant-time compare. Nullable: only set for partners that use the Basic Auth flow.").
+			Annotations(entexample.Default("$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRzYWx0$RdescudvJCsgt3ub2b6dWRWJTmaaJObGabcde0123456")),
 	}
 }
 

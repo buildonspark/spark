@@ -25,6 +25,8 @@ const (
 	FieldPartnerName = "partner_name"
 	// FieldJwtPublicKey holds the string denoting the jwt_public_key field in the database.
 	FieldJwtPublicKey = "jwt_public_key"
+	// FieldBasicAuthSecretHash holds the string denoting the basic_auth_secret_hash field in the database.
+	FieldBasicAuthSecretHash = "basic_auth_secret_hash"
 	// EdgePartners holds the string denoting the partners edge name in mutations.
 	EdgePartners = "partners"
 	// Table holds the table name of the partnerkey in the database.
@@ -46,6 +48,7 @@ var Columns = []string{
 	FieldPartnerID,
 	FieldPartnerName,
 	FieldJwtPublicKey,
+	FieldBasicAuthSecretHash,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -69,6 +72,8 @@ var (
 	PartnerIDValidator func(string) error
 	// PartnerNameValidator is a validator for the "partner_name" field. It is called by the builders before save.
 	PartnerNameValidator func(string) error
+	// BasicAuthSecretHashValidator is a validator for the "basic_auth_secret_hash" field. It is called by the builders before save.
+	BasicAuthSecretHashValidator func(string) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -99,6 +104,11 @@ func ByPartnerID(opts ...sql.OrderTermOption) OrderOption {
 // ByPartnerName orders the results by the partner_name field.
 func ByPartnerName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPartnerName, opts...).ToFunc()
+}
+
+// ByBasicAuthSecretHash orders the results by the basic_auth_secret_hash field.
+func ByBasicAuthSecretHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBasicAuthSecretHash, opts...).ToFunc()
 }
 
 // ByPartnersCount orders the results by partners count.

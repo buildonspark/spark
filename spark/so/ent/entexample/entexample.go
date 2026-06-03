@@ -2185,9 +2185,10 @@ type PartnerKeyExample struct {
 	t      *testing.T
 
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
-	PartnerID    *string
-	PartnerName  *string
-	JwtPublicKey *jwt.Public
+	PartnerID           *string
+	PartnerName         *string
+	JwtPublicKey        *jwt.Public
+	BasicAuthSecretHash *string
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	Partners []*ent.Partner
@@ -2216,6 +2217,12 @@ func (pk *PartnerKeyExample) SetPartnerName(v string) *PartnerKeyExample {
 // SetJwtPublicKey sets the jwt_public_key field.
 func (pk *PartnerKeyExample) SetJwtPublicKey(v jwt.Public) *PartnerKeyExample {
 	pk.JwtPublicKey = &v
+	return pk
+}
+
+// SetBasicAuthSecretHash sets the basic_auth_secret_hash field.
+func (pk *PartnerKeyExample) SetBasicAuthSecretHash(v string) *PartnerKeyExample {
+	pk.BasicAuthSecretHash = &v
 	return pk
 }
 
@@ -2255,6 +2262,12 @@ func (pk *PartnerKeyExample) MustExec(ctx context.Context) *ent.PartnerKey {
 		// Use default from annotation
 		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
 	}
+	if pk.BasicAuthSecretHash != nil {
+		create.SetBasicAuthSecretHash(*pk.BasicAuthSecretHash)
+	} else {
+		// Use default from annotation
+		create.SetBasicAuthSecretHash("$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRzYWx0$RdescudvJCsgt3ub2b6dWRWJTmaaJObGabcde0123456")
+	}
 
 	// Handle edges
 	if len(pk.Partners) > 0 {
@@ -2293,6 +2306,12 @@ func (pk *PartnerKeyExample) Exec(ctx context.Context) (*ent.PartnerKey, error) 
 	} else {
 		// Use default from annotation
 		create.SetJwtPublicKey(jwt.MustParsePublicHex("0102112b5bc18676433c593f8b02127354b9db8de6070088c1646a3cd58a60b90be3"))
+	}
+	if pk.BasicAuthSecretHash != nil {
+		create.SetBasicAuthSecretHash(*pk.BasicAuthSecretHash)
+	} else {
+		// Use default from annotation
+		create.SetBasicAuthSecretHash("$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRzYWx0$RdescudvJCsgt3ub2b6dWRWJTmaaJObGabcde0123456")
 	}
 
 	// Handle edges

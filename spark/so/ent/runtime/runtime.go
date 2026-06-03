@@ -493,6 +493,24 @@ func init() {
 			return nil
 		}
 	}()
+	// partnerkeyDescBasicAuthSecretHash is the schema descriptor for basic_auth_secret_hash field.
+	partnerkeyDescBasicAuthSecretHash := partnerkeyFields[3].Descriptor()
+	// partnerkey.BasicAuthSecretHashValidator is a validator for the "basic_auth_secret_hash" field. It is called by the builders before save.
+	partnerkey.BasicAuthSecretHashValidator = func() func(string) error {
+		validators := partnerkeyDescBasicAuthSecretHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(basic_auth_secret_hash string) error {
+			for _, fn := range fns {
+				if err := fn(basic_auth_secret_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// partnerkeyDescID is the schema descriptor for id field.
 	partnerkeyDescID := partnerkeyMixinFields0[0].Descriptor()
 	// partnerkey.DefaultID holds the default value on creation for the id field.

@@ -11119,21 +11119,22 @@ func (m *PartnerMutation) ResetEdge(name string) error {
 // PartnerKeyMutation represents an operation that mutates the PartnerKey nodes in the graph.
 type PartnerKeyMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *uuid.UUID
-	create_time     *time.Time
-	update_time     *time.Time
-	partner_id      *string
-	partner_name    *string
-	jwt_public_key  *jwt.Public
-	clearedFields   map[string]struct{}
-	partners        map[uuid.UUID]struct{}
-	removedpartners map[uuid.UUID]struct{}
-	clearedpartners bool
-	done            bool
-	oldValue        func(context.Context) (*PartnerKey, error)
-	predicates      []predicate.PartnerKey
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	partner_id             *string
+	partner_name           *string
+	jwt_public_key         *jwt.Public
+	basic_auth_secret_hash *string
+	clearedFields          map[string]struct{}
+	partners               map[uuid.UUID]struct{}
+	removedpartners        map[uuid.UUID]struct{}
+	clearedpartners        bool
+	done                   bool
+	oldValue               func(context.Context) (*PartnerKey, error)
+	predicates             []predicate.PartnerKey
 }
 
 var _ ent.Mutation = (*PartnerKeyMutation)(nil)
@@ -11420,6 +11421,55 @@ func (m *PartnerKeyMutation) ResetJwtPublicKey() {
 	m.jwt_public_key = nil
 }
 
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (m *PartnerKeyMutation) SetBasicAuthSecretHash(s string) {
+	m.basic_auth_secret_hash = &s
+}
+
+// BasicAuthSecretHash returns the value of the "basic_auth_secret_hash" field in the mutation.
+func (m *PartnerKeyMutation) BasicAuthSecretHash() (r string, exists bool) {
+	v := m.basic_auth_secret_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBasicAuthSecretHash returns the old "basic_auth_secret_hash" field's value of the PartnerKey entity.
+// If the PartnerKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PartnerKeyMutation) OldBasicAuthSecretHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBasicAuthSecretHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBasicAuthSecretHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBasicAuthSecretHash: %w", err)
+	}
+	return oldValue.BasicAuthSecretHash, nil
+}
+
+// ClearBasicAuthSecretHash clears the value of the "basic_auth_secret_hash" field.
+func (m *PartnerKeyMutation) ClearBasicAuthSecretHash() {
+	m.basic_auth_secret_hash = nil
+	m.clearedFields[partnerkey.FieldBasicAuthSecretHash] = struct{}{}
+}
+
+// BasicAuthSecretHashCleared returns if the "basic_auth_secret_hash" field was cleared in this mutation.
+func (m *PartnerKeyMutation) BasicAuthSecretHashCleared() bool {
+	_, ok := m.clearedFields[partnerkey.FieldBasicAuthSecretHash]
+	return ok
+}
+
+// ResetBasicAuthSecretHash resets all changes to the "basic_auth_secret_hash" field.
+func (m *PartnerKeyMutation) ResetBasicAuthSecretHash() {
+	m.basic_auth_secret_hash = nil
+	delete(m.clearedFields, partnerkey.FieldBasicAuthSecretHash)
+}
+
 // AddPartnerIDs adds the "partners" edge to the Partner entity by ids.
 func (m *PartnerKeyMutation) AddPartnerIDs(ids ...uuid.UUID) {
 	if m.partners == nil {
@@ -11508,7 +11558,7 @@ func (m *PartnerKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PartnerKeyMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, partnerkey.FieldCreateTime)
 	}
@@ -11523,6 +11573,9 @@ func (m *PartnerKeyMutation) Fields() []string {
 	}
 	if m.jwt_public_key != nil {
 		fields = append(fields, partnerkey.FieldJwtPublicKey)
+	}
+	if m.basic_auth_secret_hash != nil {
+		fields = append(fields, partnerkey.FieldBasicAuthSecretHash)
 	}
 	return fields
 }
@@ -11542,6 +11595,8 @@ func (m *PartnerKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.PartnerName()
 	case partnerkey.FieldJwtPublicKey:
 		return m.JwtPublicKey()
+	case partnerkey.FieldBasicAuthSecretHash:
+		return m.BasicAuthSecretHash()
 	}
 	return nil, false
 }
@@ -11561,6 +11616,8 @@ func (m *PartnerKeyMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldPartnerName(ctx)
 	case partnerkey.FieldJwtPublicKey:
 		return m.OldJwtPublicKey(ctx)
+	case partnerkey.FieldBasicAuthSecretHash:
+		return m.OldBasicAuthSecretHash(ctx)
 	}
 	return nil, fmt.Errorf("unknown PartnerKey field %s", name)
 }
@@ -11605,6 +11662,13 @@ func (m *PartnerKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetJwtPublicKey(v)
 		return nil
+	case partnerkey.FieldBasicAuthSecretHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBasicAuthSecretHash(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PartnerKey field %s", name)
 }
@@ -11634,7 +11698,11 @@ func (m *PartnerKeyMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *PartnerKeyMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(partnerkey.FieldBasicAuthSecretHash) {
+		fields = append(fields, partnerkey.FieldBasicAuthSecretHash)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -11647,6 +11715,11 @@ func (m *PartnerKeyMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *PartnerKeyMutation) ClearField(name string) error {
+	switch name {
+	case partnerkey.FieldBasicAuthSecretHash:
+		m.ClearBasicAuthSecretHash()
+		return nil
+	}
 	return fmt.Errorf("unknown PartnerKey nullable field %s", name)
 }
 
@@ -11668,6 +11741,9 @@ func (m *PartnerKeyMutation) ResetField(name string) error {
 		return nil
 	case partnerkey.FieldJwtPublicKey:
 		m.ResetJwtPublicKey()
+		return nil
+	case partnerkey.FieldBasicAuthSecretHash:
+		m.ResetBasicAuthSecretHash()
 		return nil
 	}
 	return fmt.Errorf("unknown PartnerKey field %s", name)

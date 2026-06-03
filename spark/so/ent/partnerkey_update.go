@@ -80,6 +80,26 @@ func (pku *PartnerKeyUpdate) SetNillableJwtPublicKey(j *jwt.Public) *PartnerKeyU
 	return pku
 }
 
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (pku *PartnerKeyUpdate) SetBasicAuthSecretHash(s string) *PartnerKeyUpdate {
+	pku.mutation.SetBasicAuthSecretHash(s)
+	return pku
+}
+
+// SetNillableBasicAuthSecretHash sets the "basic_auth_secret_hash" field if the given value is not nil.
+func (pku *PartnerKeyUpdate) SetNillableBasicAuthSecretHash(s *string) *PartnerKeyUpdate {
+	if s != nil {
+		pku.SetBasicAuthSecretHash(*s)
+	}
+	return pku
+}
+
+// ClearBasicAuthSecretHash clears the value of the "basic_auth_secret_hash" field.
+func (pku *PartnerKeyUpdate) ClearBasicAuthSecretHash() *PartnerKeyUpdate {
+	pku.mutation.ClearBasicAuthSecretHash()
+	return pku
+}
+
 // AddPartnerIDs adds the "partners" edge to the Partner entity by IDs.
 func (pku *PartnerKeyUpdate) AddPartnerIDs(ids ...uuid.UUID) *PartnerKeyUpdate {
 	pku.mutation.AddPartnerIDs(ids...)
@@ -169,6 +189,11 @@ func (pku *PartnerKeyUpdate) check() error {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "PartnerKey.partner_name": %w`, err)}
 		}
 	}
+	if v, ok := pku.mutation.BasicAuthSecretHash(); ok {
+		if err := partnerkey.BasicAuthSecretHashValidator(v); err != nil {
+			return &ValidationError{Name: "basic_auth_secret_hash", err: fmt.Errorf(`ent: validator failed for field "PartnerKey.basic_auth_secret_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -201,6 +226,12 @@ func (pku *PartnerKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := pku.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partnerkey.FieldJwtPublicKey, field.TypeBytes, value)
+	}
+	if value, ok := pku.mutation.BasicAuthSecretHash(); ok {
+		_spec.SetField(partnerkey.FieldBasicAuthSecretHash, field.TypeString, value)
+	}
+	if pku.mutation.BasicAuthSecretHashCleared() {
+		_spec.ClearField(partnerkey.FieldBasicAuthSecretHash, field.TypeString)
 	}
 	if pku.mutation.PartnersCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -317,6 +348,26 @@ func (pkuo *PartnerKeyUpdateOne) SetNillableJwtPublicKey(j *jwt.Public) *Partner
 	return pkuo
 }
 
+// SetBasicAuthSecretHash sets the "basic_auth_secret_hash" field.
+func (pkuo *PartnerKeyUpdateOne) SetBasicAuthSecretHash(s string) *PartnerKeyUpdateOne {
+	pkuo.mutation.SetBasicAuthSecretHash(s)
+	return pkuo
+}
+
+// SetNillableBasicAuthSecretHash sets the "basic_auth_secret_hash" field if the given value is not nil.
+func (pkuo *PartnerKeyUpdateOne) SetNillableBasicAuthSecretHash(s *string) *PartnerKeyUpdateOne {
+	if s != nil {
+		pkuo.SetBasicAuthSecretHash(*s)
+	}
+	return pkuo
+}
+
+// ClearBasicAuthSecretHash clears the value of the "basic_auth_secret_hash" field.
+func (pkuo *PartnerKeyUpdateOne) ClearBasicAuthSecretHash() *PartnerKeyUpdateOne {
+	pkuo.mutation.ClearBasicAuthSecretHash()
+	return pkuo
+}
+
 // AddPartnerIDs adds the "partners" edge to the Partner entity by IDs.
 func (pkuo *PartnerKeyUpdateOne) AddPartnerIDs(ids ...uuid.UUID) *PartnerKeyUpdateOne {
 	pkuo.mutation.AddPartnerIDs(ids...)
@@ -419,6 +470,11 @@ func (pkuo *PartnerKeyUpdateOne) check() error {
 			return &ValidationError{Name: "partner_name", err: fmt.Errorf(`ent: validator failed for field "PartnerKey.partner_name": %w`, err)}
 		}
 	}
+	if v, ok := pkuo.mutation.BasicAuthSecretHash(); ok {
+		if err := partnerkey.BasicAuthSecretHashValidator(v); err != nil {
+			return &ValidationError{Name: "basic_auth_secret_hash", err: fmt.Errorf(`ent: validator failed for field "PartnerKey.basic_auth_secret_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -468,6 +524,12 @@ func (pkuo *PartnerKeyUpdateOne) sqlSave(ctx context.Context) (_node *PartnerKey
 	}
 	if value, ok := pkuo.mutation.JwtPublicKey(); ok {
 		_spec.SetField(partnerkey.FieldJwtPublicKey, field.TypeBytes, value)
+	}
+	if value, ok := pkuo.mutation.BasicAuthSecretHash(); ok {
+		_spec.SetField(partnerkey.FieldBasicAuthSecretHash, field.TypeString, value)
+	}
+	if pkuo.mutation.BasicAuthSecretHashCleared() {
+		_spec.ClearField(partnerkey.FieldBasicAuthSecretHash, field.TypeString)
 	}
 	if pkuo.mutation.PartnersCleared() {
 		edge := &sqlgraph.EdgeSpec{

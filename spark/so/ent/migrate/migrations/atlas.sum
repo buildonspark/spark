@@ -1,4 +1,4 @@
-h1:CmALsrkSBh/JveXs28AIZRGXAnIyMnX5JylJK26ctgM=
+h1:VcI+Fsh7hf9/VWY93FRymi7qXwvFwaWgfKOQpPtXnZs=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -167,3 +167,4 @@ h1:CmALsrkSBh/JveXs28AIZRGXAnIyMnX5JylJK26ctgM=
 20260519220626_add_receiver_initiated_partial_index.sql h1:3PJf4iT2neBfIcwp89IW9IVvQ96mJ7SlTyshOIKllLM=
 20260519221626_token_transaction_terminal_partial_hash_unique.sql h1:2PFKpF7r5P7PvAPmUJQWIzUP08LZUMgsdhXp7zHitKU=
 20260601201348_add_signing_keyshares_clearable_partial_index.sql h1:K2/Ej/Z54ecwlWG4TuKK8o7KVcGrpnUraHpSUhQf8Ro=
+20260603172550_add_partner_key_basic_auth_secret_hash.sql h1:Gh7hdqpLk9B9ZRXbvNrrivoSPdKqcCTbskDV0j8Ckeo=
