@@ -1061,6 +1061,13 @@ func (h *LightningHandler) GetPreimageShare(
 	directRefundSignatures map[string][]byte,
 	directFromCpfpRefundSignatures map[string][]byte,
 ) (preimageShareBytes []byte, retErr error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetTransfer() == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	}
+
 	spanOpt := lightningPaymentHashSpanOption(req.PaymentHash)
 	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.GetPreimageShare", spanOpt)
@@ -1538,6 +1545,10 @@ func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbsp
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	var expireTimeOverride *time.Time
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		expireTimeOverride = new(time.Now().Add(LightningPaymentExpiryDuration))
@@ -1550,6 +1561,10 @@ func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbsp
 }
 
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	var expireTimeOverride *time.Time
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		expireTimeOverride = new(time.Now().Add(LightningPaymentExpiryDuration))
@@ -1561,6 +1576,10 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspar
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+
 	flowStart := time.Now()
 	flowPath := lightningFlowPathUnknown
 	if req.Reason == pbspark.InitiatePreimageSwapRequest_REASON_SEND {

@@ -159,6 +159,34 @@ func TestLightningHandlersRejectNilRequests(t *testing.T) {
 			},
 		},
 		{
+			name: "InitiatePreimageSwap",
+			call: func() error {
+				_, err := handler.InitiatePreimageSwap(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "InitiatePreimageSwapV2",
+			call: func() error {
+				_, err := handler.InitiatePreimageSwapV2(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "InitiatePreimageSwapV3",
+			call: func() error {
+				_, err := handler.InitiatePreimageSwapV3(ctx, nil)
+				return err
+			},
+		},
+		{
+			name: "GetPreimageShare",
+			call: func() error {
+				_, err := handler.GetPreimageShare(ctx, nil, nil, nil, nil)
+				return err
+			},
+		},
+		{
 			name: "QueryUserSignedRefunds",
 			call: func() error {
 				_, err := handler.QueryUserSignedRefunds(ctx, nil)
@@ -207,6 +235,18 @@ func TestLightningHandlersRejectNilRequests(t *testing.T) {
 			require.ErrorContains(t, tt.call(), "request is required")
 		})
 	}
+}
+
+func TestGetPreimageShareRejectsMissingTransfer(t *testing.T) {
+	handler := NewLightningHandler(&so.Config{})
+	receiverIdentityPubKey := keys.GeneratePrivateKey().Public()
+
+	resp, err := handler.GetPreimageShare(t.Context(), &pb.InitiatePreimageSwapRequest{
+		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+	}, nil, nil, nil)
+
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "transfer is required")
 }
 
 func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {

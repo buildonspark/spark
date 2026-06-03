@@ -107,7 +107,7 @@ func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbs
 
 func (s *SparkInternalServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req.Request, req.CpfpRefundSignatures, req.DirectRefundSignatures, req.DirectFromCpfpRefundSignatures)
+	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req.GetRequest(), req.GetCpfpRefundSignatures(), req.GetDirectRefundSignatures(), req.GetDirectFromCpfpRefundSignatures())
 	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err
 }
 
