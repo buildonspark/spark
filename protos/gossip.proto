@@ -200,6 +200,7 @@ enum ConsensusOperationType {
     CONSENSUS_OPERATION_TYPE_SEND_TRANSFER = 4;
     CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER = 5;
     CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE = 6;
+    CONSENSUS_OPERATION_TYPE_COOP_EXIT = 7;
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.

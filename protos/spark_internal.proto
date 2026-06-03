@@ -693,6 +693,39 @@ message ClaimTransferRollbackRequest {
     bytes receiver_identity_public_key = 2;
 }
 
+// CoopExitPrepareRequest is the 2PC prepare payload for consensus cooperative
+// exit. Each SO validates the exit_txid<->connector_tx binding and the transfer
+// package, decrypts its slice of the key tweak package, persists the transfer +
+// transfer_leaf + cooperative_exit rows at SENDER_INITIATED (refund txs stored
+// unsigned, key tweaks stored but not applied — a pre-commit state the chain
+// watcher leaves untouched), and produces FROST signature shares over the
+// connector-spending refund transactions.
+message CoopExitPrepareRequest {
+    spark.CooperativeExitRequest original_request = 1;
+}
+
+// CoopExitCommitRequest is the 2PC commit payload built by the coordinator in
+// BuildCommitPayload. It carries the aggregated refund signatures per leaf so
+// every SO applies identical state during Commit. connector_tx is replicated
+// here because it is request-only (no ent column persists it) yet every SO's
+// Commit needs the connector prevouts to verify the multi-input refund
+// signatures. Reuses SendTransferLeafSignatures — coop exit aggregates the same
+// three refund variants. Commit applies the signatures and promotes the
+// transfer to SENDER_KEY_TWEAK_PENDING; key tweaks remain stored for the chain
+// watcher to apply after on-chain confirmation.
+message CoopExitCommitRequest {
+    string transfer_id = 1;
+    repeated SendTransferLeafSignatures leaf_signatures = 2;
+    bytes connector_tx = 3;
+}
+
+// CoopExitRollbackRequest is the 2PC rollback payload. SOs mark the transfer
+// RETURNED, unlock the leaves, and delete the cooperative_exit row so the chain
+// watcher no longer considers this exit pending.
+message CoopExitRollbackRequest {
+    string transfer_id = 1;
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).

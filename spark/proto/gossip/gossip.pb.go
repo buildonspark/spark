@@ -40,6 +40,7 @@ const (
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER         ConsensusOperationType = 4
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER        ConsensusOperationType = 5
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE      ConsensusOperationType = 6
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT             ConsensusOperationType = 7
 )
 
 // Enum value maps for ConsensusOperationType.
@@ -52,6 +53,7 @@ var (
 		4: "CONSENSUS_OPERATION_TYPE_SEND_TRANSFER",
 		5: "CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER",
 		6: "CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE",
+		7: "CONSENSUS_OPERATION_TYPE_COOP_EXIT",
 	}
 	ConsensusOperationType_value = map[string]int32{
 		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":           0,
@@ -61,6 +63,7 @@ var (
 		"CONSENSUS_OPERATION_TYPE_SEND_TRANSFER":         4,
 		"CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER":        5,
 		"CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE":      6,
+		"CONSENSUS_OPERATION_TYPE_COOP_EXIT":             7,
 	}
 )
 
@@ -1917,7 +1920,7 @@ const file_gossip_proto_rawDesc = "" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
-	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xda\x02\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\x82\x03\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
 	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +
@@ -1925,7 +1928,8 @@ const file_gossip_proto_rawDesc = "" +
 	"#CONSENSUS_OPERATION_TYPE_RENEW_LEAF\x10\x03\x12*\n" +
 	"&CONSENSUS_OPERATION_TYPE_SEND_TRANSFER\x10\x04\x12+\n" +
 	"'CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER\x10\x05\x12-\n" +
-	")CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE\x10\x062H\n" +
+	")CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE\x10\x06\x12&\n" +
+	"\"CONSENSUS_OPERATION_TYPE_COOP_EXIT\x10\a2H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
 

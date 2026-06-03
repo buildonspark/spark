@@ -10079,6 +10079,381 @@ var _ interface {
 	ErrorName() string
 } = ClaimTransferRollbackRequestValidationError{}
 
+// Validate checks the field values on CoopExitPrepareRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CoopExitPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CoopExitPrepareRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CoopExitPrepareRequestMultiError, or nil if none found.
+func (m *CoopExitPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CoopExitPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CoopExitPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CoopExitPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CoopExitPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CoopExitPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CoopExitPrepareRequestMultiError is an error wrapping multiple validation
+// errors returned by CoopExitPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CoopExitPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CoopExitPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CoopExitPrepareRequestMultiError) AllErrors() []error { return m }
+
+// CoopExitPrepareRequestValidationError is the validation error returned by
+// CoopExitPrepareRequest.Validate if the designated constraints aren't met.
+type CoopExitPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CoopExitPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CoopExitPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CoopExitPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CoopExitPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CoopExitPrepareRequestValidationError) ErrorName() string {
+	return "CoopExitPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CoopExitPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCoopExitPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CoopExitPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CoopExitPrepareRequestValidationError{}
+
+// Validate checks the field values on CoopExitCommitRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CoopExitCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CoopExitCommitRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CoopExitCommitRequestMultiError, or nil if none found.
+func (m *CoopExitCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CoopExitCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CoopExitCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CoopExitCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CoopExitCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for ConnectorTx
+
+	if len(errors) > 0 {
+		return CoopExitCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CoopExitCommitRequestMultiError is an error wrapping multiple validation
+// errors returned by CoopExitCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CoopExitCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CoopExitCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CoopExitCommitRequestMultiError) AllErrors() []error { return m }
+
+// CoopExitCommitRequestValidationError is the validation error returned by
+// CoopExitCommitRequest.Validate if the designated constraints aren't met.
+type CoopExitCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CoopExitCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CoopExitCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CoopExitCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CoopExitCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CoopExitCommitRequestValidationError) ErrorName() string {
+	return "CoopExitCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CoopExitCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCoopExitCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CoopExitCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CoopExitCommitRequestValidationError{}
+
+// Validate checks the field values on CoopExitRollbackRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CoopExitRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CoopExitRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CoopExitRollbackRequestMultiError, or nil if none found.
+func (m *CoopExitRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CoopExitRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	if len(errors) > 0 {
+		return CoopExitRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CoopExitRollbackRequestMultiError is an error wrapping multiple validation
+// errors returned by CoopExitRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CoopExitRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CoopExitRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CoopExitRollbackRequestMultiError) AllErrors() []error { return m }
+
+// CoopExitRollbackRequestValidationError is the validation error returned by
+// CoopExitRollbackRequest.Validate if the designated constraints aren't met.
+type CoopExitRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CoopExitRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CoopExitRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CoopExitRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CoopExitRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CoopExitRollbackRequestValidationError) ErrorName() string {
+	return "CoopExitRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CoopExitRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCoopExitRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CoopExitRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CoopExitRollbackRequestValidationError{}
+
 // Validate checks the field values on ConsensusPrepareRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
