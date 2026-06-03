@@ -217,7 +217,33 @@ const (
 	// no-op (preimage storage is intentionally irreversible; CommitSenderKeyTweaks
 	// only fires in Commit), so the sweep gap is benign here.
 	KnobUseConsensusProvidePreimage = "spark.so.use_consensus_provide_preimage"
-	KnobShutdownHodlInvoices        = "spark.so.shutdown_hodl_invoices"
+
+	// KnobUseConsensusCoopExit routes the TransferPackage (single-call) path of
+	// CooperativeExitV2 through the 2PC engine instead of the legacy
+	// syncCoopExitInit -> InitiateCooperativeExit fanout. Interpreted as binary
+	// (any non-zero value enables) — not a percentage rollout.
+	//
+	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
+	// CooperativeExitV2 entry point enforces this at request time and rejects
+	// requests if the reconciler is off. Without the reconciler, a coordinator
+	// crash between engine DbCommit and commit-gossip dispatch leaves
+	// participant FlowExecution rows IN_FLIGHT indefinitely.
+	//
+	// Unlike SEND_TRANSFER/CLAIM_TRANSFER, coop exit does NOT apply key tweaks in
+	// Commit: the chain watcher (tweakKeysForCoopExit) applies them only after the
+	// exit tx confirms on-chain. Prepare stores the key tweaks but leaves the
+	// transfer at SENDER_INITIATED (a status the watcher leaves untouched); Commit
+	// applies the refund signatures and promotes it to SENDER_KEY_TWEAK_PENDING.
+	//
+	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback for
+	// COOP_EXIT on the coordinator. Today the sweep only flips the FlowExecution
+	// row to ROLLED_BACK — it does not undo the coordinator-side createTransfer +
+	// CooperativeExit row, so a coordinator crash between engine DbCommit and
+	// markCommitted leaves the coordinator stranded while participants reconcile
+	// to RETURNED.
+	KnobUseConsensusCoopExit = "spark.so.use_consensus_coop_exit"
+
+	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
 	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"

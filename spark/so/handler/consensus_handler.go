@@ -42,6 +42,8 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 		return NewClaimTransferFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE:
 		return NewProvidePreimageFlowHandler(config), nil
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT:
+		return NewCoopExitFlowHandler(config), nil
 	default:
 		return nil, fmt.Errorf("unknown consensus operation type: %d", opType)
 	}

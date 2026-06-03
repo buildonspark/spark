@@ -9,16 +9,21 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -57,6 +62,18 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	}
 
 	if req.Transfer.TransferPackage != nil {
+		knobsService := knobs.GetKnobsService(ctx)
+		if knobsService.GetValue(knobs.KnobUseConsensusCoopExit, 0) > 0 {
+			// The engine commits coordinator-side domain state inside the request
+			// tx before commit-gossip dispatch; participants need the reconciler to
+			// resolve stale FlowExecution rows after a coordinator crash. Mirrors
+			// the guard on StartTransferV3.
+			if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
+				return nil, status.Errorf(codes.FailedPrecondition,
+					"KnobUseConsensusCoopExit requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route coop exit through the engine")
+			}
+			return h.cooperativeExitConsensus(ctx, req)
+		}
 		return h.cooperativeExitWithTransferPackage(ctx, req)
 	}
 
@@ -380,6 +397,35 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		Transfer:       transferProto,
 		SigningResults: nil,
 	}, nil
+}
+
+// cooperativeExitConsensus runs the TransferPackage coop-exit path through the
+// 2PC consensus engine. Mirrors startTransferV3Consensus: build the coordinator
+// flow, fetch the engine from context, and Execute across all operators. The
+// engine drives createTransfer + CooperativeExit row + FROST round-2 in Prepare,
+// aggregation in BuildCommitPayload, and the refund-signature application in
+// Commit on every SO. Key tweaks stay deferred to the chain watcher.
+func (h *CooperativeExitHandler) cooperativeExitConsensus(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
+	flow, err := buildCoopExitCoordinatorFlow(ctx, h.config, req)
+	if err != nil {
+		return nil, err
+	}
+	engine, err := consensus.GetEngine(ctx)
+	if err != nil {
+		return nil, err
+	}
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	if _, err := engine.Execute(ctx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT,
+		&selection,
+		flow,
+	); err != nil {
+		return nil, fmt.Errorf("consensus coop exit failed: %w", err)
+	}
+	if flow.response == nil {
+		return nil, fmt.Errorf("internal: consensus coop exit for %s succeeded but produced no response", req.Transfer.GetTransferId())
+	}
+	return flow.response, nil
 }
 
 func (h *TransferHandler) syncCoopExitInit(

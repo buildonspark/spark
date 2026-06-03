@@ -363,7 +363,7 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 		leafMap[leafID] = jobs.leaf
 
 		if jobs.cpfp != nil {
-			sig, sr, err := f.aggregateLeafSignature(ctx, frostClient, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
+			sig, sr, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
 			if err != nil {
 				return nil, fmt.Errorf("aggregate cpfp signature for leaf %s: %w", leafID, err)
 			}
@@ -371,7 +371,7 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 			cpfpSigningResultMap[leafID] = sr
 		}
 		if jobs.direct != nil {
-			sig, sr, err := f.aggregateLeafSignature(ctx, frostClient, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
+			sig, sr, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
 			if err != nil {
 				return nil, fmt.Errorf("aggregate direct signature for leaf %s: %w", leafID, err)
 			}
@@ -379,7 +379,7 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 			directSigningResultMap[leafID] = sr
 		}
 		if jobs.dfc != nil {
-			sig, sr, err := f.aggregateLeafSignature(ctx, frostClient, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
+			sig, sr, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
 			if err != nil {
 				return nil, fmt.Errorf("aggregate direct-from-cpfp signature for leaf %s: %w", leafID, err)
 			}
@@ -425,16 +425,20 @@ func (f *sendTransferCoordinatorFlow) RollbackPayload() proto.Message {
 
 // aggregateLeafSignature drives a single FROST AggregateFrost RPC for one job
 // and returns both the aggregated signature and a SigningResult mirroring
-// helper.GetSignaturesWithPregeneratedNonce's output shape.
-func (f *sendTransferCoordinatorFlow) aggregateLeafSignature(
+// helper.GetSignaturesWithPregeneratedNonce's output shape. Shared by the
+// send-transfer and coop-exit coordinator flows (both aggregate the same
+// cpfp/direct/direct-from-cpfp refund variants), so it takes config explicitly
+// rather than hanging off a flow type.
+func aggregateLeafSignature(
 	ctx context.Context,
+	config *so.Config,
 	frostClient pbfrost.FrostServiceClient,
 	job *helper.SigningJobWithPregeneratedNonce,
 	allShares map[string]map[string][]byte,
 	leaf *ent.TreeNode,
 	userSignatureShare []byte,
 ) ([]byte, *helper.SigningResult, error) {
-	keyPackage, err := ent.GetKeyPackage(ctx, f.config, job.SigningKeyshareID)
+	keyPackage, err := ent.GetKeyPackage(ctx, config, job.SigningKeyshareID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get key package: %w", err)
 	}
