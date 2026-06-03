@@ -500,7 +500,11 @@ func (h *LightningHandler) ValidateGetPreimageRequest(
 	reason pbspark.InitiatePreimageSwapRequest_Reason,
 	validateNodeOwnership bool,
 ) error {
-	return h.validateGetPreimageRequestWithFrostServiceClientFactory(ctx, &defaultFrostServiceClientConnection{}, paymentHash, cpfpTransactions, directTransactions, directFromCpfpTransactions, amount, destinationPubKey, feeSats, reason, validateNodeOwnership)
+	var invoiceAmountSats uint64
+	if amount != nil {
+		invoiceAmountSats = amount.ValueSats
+	}
+	return h.validateGetPreimageRequestWithFrostServiceClientFactory(ctx, &defaultFrostServiceClientConnection{}, paymentHash, cpfpTransactions, directTransactions, directFromCpfpTransactions, invoiceAmountSats, destinationPubKey, feeSats, reason, validateNodeOwnership)
 }
 
 func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFactory(
@@ -510,7 +514,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	cpfpTransactions []*pbspark.UserSignedTxSigningJob,
 	directTransactions []*pbspark.UserSignedTxSigningJob,
 	directFromCpfpTransactions []*pbspark.UserSignedTxSigningJob,
-	amount *pbspark.InvoiceAmount,
+	invoiceAmountSats uint64,
 	destinationPubKey keys.Public,
 	feeSats uint64,
 	reason pbspark.InitiatePreimageSwapRequest_Reason,
@@ -951,8 +955,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 
 		totalAmountSats -= feeSats
 	}
-	if amount.ValueSats != 0 && totalAmountSats < amount.ValueSats {
-		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmountSats))
+	if invoiceAmountSats != 0 && totalAmountSats < invoiceAmountSats {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid amount, expected: %d or more, got: %d", invoiceAmountSats, totalAmountSats))
 	}
 	return nil
 }

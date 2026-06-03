@@ -2056,7 +2056,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			[]*pb.UserSignedTxSigningJob{validTx},
 			[]*pb.UserSignedTxSigningJob{},
 			[]*pb.UserSignedTxSigningJob{},
-			&pb.InvoiceAmount{ValueSats: 1000},
+			1000,
 			wrongKey,
 			0,
 			pb.InitiatePreimageSwapRequest_REASON_SEND,
@@ -2185,7 +2185,7 @@ func TestValidateGetPreimageRequestRejectsDuplicateCpfpLeafBeforeAmountAggregati
 		[]*pb.UserSignedTxSigningJob{job, proto.Clone(job).(*pb.UserSignedTxSigningJob)},
 		nil,
 		nil,
-		&pb.InvoiceAmount{ValueSats: 1500},
+		1500,
 		destinationPubKey,
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
@@ -2288,7 +2288,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		[]*pb.UserSignedTxSigningJob{testTx}, // cpfp transactions with 500 sats (these contribute to totalAmount)
 		[]*pb.UserSignedTxSigningJob{},       // empty direct transactions
 		[]*pb.UserSignedTxSigningJob{},       // empty directFromCpfp transactions
-		&pb.InvoiceAmount{ValueSats: 1000},   // Expected 1000 sats but getting 500
+		1000,                                 // Expected 1000 sats but getting 500
 		validPubKey,
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
@@ -2299,6 +2299,96 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	code, reason := sparkerrors.CodeAndReasonFrom(err)
 	require.Equal(t, codes.InvalidArgument, code)
 	require.Equal(t, "OUT_OF_RANGE", reason)
+}
+
+func TestValidateGetPreimageRequestAllowsUnspecifiedInvoiceAmount(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{6})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHashBytes := sha256.Sum256([]byte("nil invoice amount"))
+	paymentHash := paymentHashBytes[:]
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": destinationPubKey}).
+		SetPublicKey(destinationPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440006")
+	outputScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+
+	parentTx, refundTx := createParentAndRefundTx(t, outputScript, 1000)
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(nodeID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetOwnerSigningPubkey(destinationPubKey).
+		SetRawTx(parentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	testTx := &pb.UserSignedTxSigningJob{
+		LeafId: nodeID.String(),
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"test": {
+					Hiding:  []byte("test_hiding"),
+					Binding: []byte("test_binding"),
+				},
+			},
+		},
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  []byte("test_nonce_hiding"),
+			Binding: []byte("test_nonce_binding"),
+		},
+		UserSignature: []byte("test_signature"),
+		RawTx:         refundTx,
+	}
+
+	require.NotPanics(t, func() {
+		err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+			ctx,
+			&mockFrostServiceClientConnection{},
+			paymentHash,
+			[]*pb.UserSignedTxSigningJob{testTx},
+			[]*pb.UserSignedTxSigningJob{},
+			[]*pb.UserSignedTxSigningJob{},
+			0,
+			destinationPubKey,
+			0,
+			pb.InitiatePreimageSwapRequest_REASON_SEND,
+			false,
+		)
+	})
+	require.NoError(t, err)
 }
 
 func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
@@ -2387,7 +2477,7 @@ func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
 		[]*pb.UserSignedTxSigningJob{testTx},
 		[]*pb.UserSignedTxSigningJob{},
 		[]*pb.UserSignedTxSigningJob{},
-		&pb.InvoiceAmount{ValueSats: 1000},
+		1000,
 		validPubKey,
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
@@ -2500,7 +2590,7 @@ func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *te
 			cpfpTransactions,
 			[]*pb.UserSignedTxSigningJob{},
 			[]*pb.UserSignedTxSigningJob{},
-			&pb.InvoiceAmount{ValueSats: 1},
+			1,
 			destinationPubKey,
 			0,
 			pb.InitiatePreimageSwapRequest_REASON_SEND,
