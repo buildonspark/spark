@@ -638,8 +638,19 @@ type InvoiceStatus int32
 const (
 	InvoiceStatus_NOT_FOUND InvoiceStatus = 0
 	InvoiceStatus_PENDING   InvoiceStatus = 1
+	// Payment for this id is complete and the stored invoice's money fields
+	// (receiver, payment kind, amount, token identifier) match the invoice
+	// you queried.
 	InvoiceStatus_FINALIZED InvoiceStatus = 2
 	InvoiceStatus_RETURNED  InvoiceStatus = 4
+	// A payment exists for this invoice id, but the money fields (receiver,
+	// payment kind, amount, token identifier) of the stored invoice may differ
+	// from the invoice you queried. Compare response.invoice to the invoice
+	// you queried and confirm it matches what you expect before relying on
+	// this result.
+	InvoiceStatus_MISMATCHED_INVOICE_FINALIZED InvoiceStatus = 5
+	InvoiceStatus_MISMATCHED_INVOICE_PENDING   InvoiceStatus = 6
+	InvoiceStatus_MISMATCHED_INVOICE_RETURNED  InvoiceStatus = 7
 )
 
 // Enum value maps for InvoiceStatus.
@@ -649,12 +660,18 @@ var (
 		1: "PENDING",
 		2: "FINALIZED",
 		4: "RETURNED",
+		5: "MISMATCHED_INVOICE_FINALIZED",
+		6: "MISMATCHED_INVOICE_PENDING",
+		7: "MISMATCHED_INVOICE_RETURNED",
 	}
 	InvoiceStatus_value = map[string]int32{
-		"NOT_FOUND": 0,
-		"PENDING":   1,
-		"FINALIZED": 2,
-		"RETURNED":  4,
+		"NOT_FOUND":                    0,
+		"PENDING":                      1,
+		"FINALIZED":                    2,
+		"RETURNED":                     4,
+		"MISMATCHED_INVOICE_FINALIZED": 5,
+		"MISMATCHED_INVOICE_PENDING":   6,
+		"MISMATCHED_INVOICE_RETURNED":  7,
 	}
 )
 
@@ -12864,12 +12881,15 @@ const file_spark_proto_rawDesc = "" +
 	"\x1aUTXO_SWAP_STATUS_CANCELLED\x10\x03*@\n" +
 	"\vHashVariant\x12\x1c\n" +
 	"\x18HASH_VARIANT_UNSPECIFIED\x10\x00\x12\x13\n" +
-	"\x0fHASH_VARIANT_V2\x10\x01*N\n" +
+	"\x0fHASH_VARIANT_V2\x10\x01*\xb1\x01\n" +
 	"\rInvoiceStatus\x12\r\n" +
 	"\tNOT_FOUND\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\r\n" +
 	"\tFINALIZED\x10\x02\x12\f\n" +
-	"\bRETURNED\x10\x04\"\x04\b\x03\x10\x03*\xc9\x03\n" +
+	"\bRETURNED\x10\x04\x12 \n" +
+	"\x1cMISMATCHED_INVOICE_FINALIZED\x10\x05\x12\x1e\n" +
+	"\x1aMISMATCHED_INVOICE_PENDING\x10\x06\x12\x1f\n" +
+	"\x1bMISMATCHED_INVOICE_RETURNED\x10\a\"\x04\b\x03\x10\x03*\xc9\x03\n" +
 	"\x0eTreeNodeStatus\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_CREATING\x10\x00\x12\x1e\n" +
 	"\x1aTREE_NODE_STATUS_AVAILABLE\x10\x01\x12%\n" +

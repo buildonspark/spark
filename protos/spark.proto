@@ -1578,8 +1578,19 @@ enum InvoiceStatus {
 
     NOT_FOUND = 0;
     PENDING = 1;
+    // Payment for this id is complete and the stored invoice's money fields
+    // (receiver, payment kind, amount, token identifier) match the invoice
+    // you queried.
     FINALIZED = 2;
     RETURNED = 4;
+    // A payment exists for this invoice id, but the money fields (receiver,
+    // payment kind, amount, token identifier) of the stored invoice may differ
+    // from the invoice you queried. Compare response.invoice to the invoice
+    // you queried and confirm it matches what you expect before relying on
+    // this result.
+    MISMATCHED_INVOICE_FINALIZED = 5;
+    MISMATCHED_INVOICE_PENDING = 6;
+    MISMATCHED_INVOICE_RETURNED = 7;
 }
 
 message InitiateSwapPrimaryTransferRequest {

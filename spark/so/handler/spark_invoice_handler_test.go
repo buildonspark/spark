@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -122,6 +123,240 @@ func repeatedUUIDBytes(t *testing.T) []byte {
 	out = append(out, id[:]...)
 	out = append(out, id[:]...)
 	return out
+}
+
+// buildSatsInvoiceStr encodes a sats invoice for the given id/receiver/amount
+// without persisting it. The sender key is randomized because it is not part of
+// the money-field comparison.
+func buildSatsInvoiceStr(t *testing.T, id uuid.UUID, receiver keys.Public, amount *uint64, memo *string) string {
+	t.Helper()
+	fields := common.CreateSatsSparkInvoiceFields(id[:], amount, memo, keys.GeneratePrivateKey().Public(), nil)
+	s, err := common.EncodeSparkAddress(receiver, btcnetwork.Regtest, fields)
+	require.NoError(t, err)
+	return s
+}
+
+func buildTokenInvoiceStr(t *testing.T, id uuid.UUID, receiver keys.Public, tokenIdentifier, amount []byte) string {
+	t.Helper()
+	fields := common.CreateTokenSparkInvoiceFields(id[:], tokenIdentifier, amount, nil, keys.GeneratePrivateKey().Public(), nil)
+	s, err := common.EncodeSparkAddress(receiver, btcnetwork.Regtest, fields)
+	require.NoError(t, err)
+	return s
+}
+
+func storeInvoiceRow(t *testing.T, ctx context.Context, tc *db.TestContext, id uuid.UUID, receiver keys.Public, invoiceStr string) {
+	t.Helper()
+	_, err := tc.Client.SparkInvoice.Create().
+		SetID(id).
+		SetSparkInvoice(invoiceStr).
+		SetReceiverPublicKey(receiver).
+		Save(ctx)
+	require.NoError(t, err)
+}
+
+func createTokenTxForInvoice(t *testing.T, ctx context.Context, tc *db.TestContext, invoiceID uuid.UUID, status st.TokenTransactionStatus, expiry time.Time) []byte {
+	t.Helper()
+	finalHash := repeatedUUIDBytes(t)
+	_, err := tc.Client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(repeatedUUIDBytes(t)).
+		SetFinalizedTokenTransactionHash(finalHash).
+		SetStatus(status).
+		SetExpiryTime(expiry).
+		AddSparkInvoiceIDs(invoiceID).
+		Save(ctx)
+	require.NoError(t, err)
+	return finalHash
+}
+
+func querySingleStatus(t *testing.T, ctx context.Context, config *so.Config, queried string) *sparkpb.InvoiceResponse {
+	t.Helper()
+	handler := NewSparkInvoiceHandler(config)
+	resp, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{queried},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.InvoiceStatuses, 1)
+	return resp.InvoiceStatuses[0]
+}
+
+// TestQuerySparkInvoicesAmountMismatch verifies that querying with an encoding
+// that shares the stored invoice's id but differs in sats amount yields the
+// MISMATCHED_INVOICE_* twin of the underlying payment state, while still
+// returning the stored canonical encoding and transfer details.
+func TestQuerySparkInvoicesAmountMismatch(t *testing.T) {
+	for _, tt := range []struct {
+		name           string
+		transferStatus st.TransferStatus
+		want           sparkpb.InvoiceStatus
+	}{
+		{"finalized", st.TransferStatusSenderKeyTweaked, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED},
+		{"pending", st.TransferStatusSenderInitiatedCoordinator, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_PENDING},
+		{"returned", st.TransferStatusReturned, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_RETURNED},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			config := sparktesting.TestConfig(t)
+			ctx, tc := db.ConnectToTestPostgres(t)
+
+			id := uuid.New()
+			receiver := keys.GeneratePrivateKey().Public()
+			storedAmount := uint64(1_000)
+			storedStr := buildSatsInvoiceStr(t, id, receiver, &storedAmount, nil)
+			storeInvoiceRow(t, ctx, tc, id, receiver, storedStr)
+			createTransferForInvoice(t, ctx, tc, id, tt.transferStatus)
+
+			queriedAmount := uint64(2_000)
+			queriedStr := buildSatsInvoiceStr(t, id, receiver, &queriedAmount, nil)
+
+			got := querySingleStatus(t, ctx, config, queriedStr)
+			require.Equal(t, tt.want, got.Status)
+			require.Equal(t, storedStr, got.Invoice, "mismatch response must keep the stored canonical encoding")
+			require.NotNil(t, got.GetSatsTransfer(), "mismatch response must keep transfer details")
+		})
+	}
+}
+
+// TestQuerySparkInvoicesReceiverMismatch verifies a differing receiver pubkey
+// (same id, same amount) is treated as a mismatch.
+func TestQuerySparkInvoicesReceiverMismatch(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	id := uuid.New()
+	storedReceiver := keys.GeneratePrivateKey().Public()
+	amount := uint64(1_000)
+	storedStr := buildSatsInvoiceStr(t, id, storedReceiver, &amount, nil)
+	storeInvoiceRow(t, ctx, tc, id, storedReceiver, storedStr)
+	createTransferForInvoice(t, ctx, tc, id, st.TransferStatusSenderKeyTweaked)
+
+	queriedStr := buildSatsInvoiceStr(t, id, keys.GeneratePrivateKey().Public(), &amount, nil)
+
+	got := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.Status)
+}
+
+// TestQuerySparkInvoicesOpenAmountMismatch verifies that an open-amount queried
+// encoding (amount unset) does not match a stored fixed-amount encoding.
+func TestQuerySparkInvoicesOpenAmountMismatch(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	id := uuid.New()
+	receiver := keys.GeneratePrivateKey().Public()
+	storedAmount := uint64(1_000)
+	storedStr := buildSatsInvoiceStr(t, id, receiver, &storedAmount, nil)
+	storeInvoiceRow(t, ctx, tc, id, receiver, storedStr)
+	createTransferForInvoice(t, ctx, tc, id, st.TransferStatusSenderKeyTweaked)
+
+	queriedStr := buildSatsInvoiceStr(t, id, receiver, nil, nil)
+
+	got := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.Status)
+}
+
+// TestQuerySparkInvoicesMatchingEncodingUnchanged verifies that querying with an
+// encoding whose money fields match the stored one leaves the status untouched,
+// even when an excluded field (memo) differs.
+func TestQuerySparkInvoicesMatchingEncodingUnchanged(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	id := uuid.New()
+	receiver := keys.GeneratePrivateKey().Public()
+	amount := uint64(1_000)
+	storedStr := buildSatsInvoiceStr(t, id, receiver, &amount, nil)
+	storeInvoiceRow(t, ctx, tc, id, receiver, storedStr)
+	createTransferForInvoice(t, ctx, tc, id, st.TransferStatusSenderKeyTweaked)
+
+	memo := "different memo"
+	queriedStr := buildSatsInvoiceStr(t, id, receiver, &amount, &memo)
+
+	got := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, got.Status,
+		"matching money fields must not be flagged even when memo differs")
+}
+
+// TestQuerySparkInvoicesTokenAmountMismatch verifies token money-field mismatch
+// detection for a finalized token transaction.
+func TestQuerySparkInvoicesTokenAmountMismatch(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	id := uuid.New()
+	receiver := keys.GeneratePrivateKey().Public()
+	tokenIdentifier := make([]byte, 32)
+	tokenIdentifier[31] = 1
+	storedStr := buildTokenInvoiceStr(t, id, receiver, tokenIdentifier, []byte{0x03, 0xe8})
+	storeInvoiceRow(t, ctx, tc, id, receiver, storedStr)
+	createTokenTxForInvoice(t, ctx, tc, id, st.TokenTransactionStatusFinalized, time.Now().Add(10*time.Minute))
+
+	queriedStr := buildTokenInvoiceStr(t, id, receiver, tokenIdentifier, []byte{0x07, 0xd0})
+
+	got := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.Status)
+}
+
+// TestQuerySparkInvoicesDuplicateIDMatchingAndMismatched verifies that a single
+// request containing two encodings of the same id is resolved per request
+// position: the matching encoding reports FINALIZED and the mismatched one
+// reports MISMATCHED_INVOICE_FINALIZED, regardless of order.
+func TestQuerySparkInvoicesDuplicateIDMatchingAndMismatched(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	id := uuid.New()
+	receiver := keys.GeneratePrivateKey().Public()
+	storedAmount := uint64(1_000)
+	matching := buildSatsInvoiceStr(t, id, receiver, &storedAmount, nil)
+	storeInvoiceRow(t, ctx, tc, id, receiver, matching)
+	createTransferForInvoice(t, ctx, tc, id, st.TransferStatusSenderKeyTweaked)
+
+	mismatchedAmount := uint64(2_000)
+	mismatched := buildSatsInvoiceStr(t, id, receiver, &mismatchedAmount, nil)
+
+	handler := NewSparkInvoiceHandler(config)
+
+	resp, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{matching, mismatched},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.InvoiceStatuses, 2)
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, resp.InvoiceStatuses[0].Status)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, resp.InvoiceStatuses[1].Status)
+
+	reversed, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{mismatched, matching},
+	})
+	require.NoError(t, err)
+	require.Len(t, reversed.InvoiceStatuses, 2)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, reversed.InvoiceStatuses[0].Status)
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, reversed.InvoiceStatuses[1].Status)
+}
+
+// TestQuerySparkInvoicesDuplicateIDBothNotFound verifies that two different
+// encodings of the same unpaid id each return NOT_FOUND echoing their own
+// encoding, rather than collapsing to a single last-wins entry.
+func TestQuerySparkInvoicesDuplicateIDBothNotFound(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	id := uuid.New()
+	receiver := keys.GeneratePrivateKey().Public()
+	amountA := uint64(1_000)
+	amountB := uint64(2_000)
+	encA := buildSatsInvoiceStr(t, id, receiver, &amountA, nil)
+	encB := buildSatsInvoiceStr(t, id, receiver, &amountB, nil)
+	require.NotEqual(t, encA, encB)
+
+	handler := NewSparkInvoiceHandler(config)
+	resp, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
+		Invoice: []string{encA, encB},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.InvoiceStatuses, 2)
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.InvoiceStatuses[0].Status)
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.InvoiceStatuses[1].Status)
+	require.Equal(t, encA, resp.InvoiceStatuses[0].Invoice)
+	require.Equal(t, encB, resp.InvoiceStatuses[1].Invoice)
 }
 
 // TestQuerySparkInvoicesReturnsPendingStatus verifies that an invoice attached to

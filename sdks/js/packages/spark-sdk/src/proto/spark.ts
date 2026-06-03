@@ -576,8 +576,23 @@ export function hashVariantToJSON(object: HashVariant): string {
 export enum InvoiceStatus {
   NOT_FOUND = 0,
   PENDING = 1,
+  /**
+   * FINALIZED - Payment for this id is complete and the stored invoice's money fields
+   * (receiver, payment kind, amount, token identifier) match the invoice
+   * you queried.
+   */
   FINALIZED = 2,
   RETURNED = 4,
+  /**
+   * MISMATCHED_INVOICE_FINALIZED - A payment exists for this invoice id, but the money fields (receiver,
+   * payment kind, amount, token identifier) of the stored invoice may differ
+   * from the invoice you queried. Compare response.invoice to the invoice
+   * you queried and confirm it matches what you expect before relying on
+   * this result.
+   */
+  MISMATCHED_INVOICE_FINALIZED = 5,
+  MISMATCHED_INVOICE_PENDING = 6,
+  MISMATCHED_INVOICE_RETURNED = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -595,6 +610,15 @@ export function invoiceStatusFromJSON(object: any): InvoiceStatus {
     case 4:
     case "RETURNED":
       return InvoiceStatus.RETURNED;
+    case 5:
+    case "MISMATCHED_INVOICE_FINALIZED":
+      return InvoiceStatus.MISMATCHED_INVOICE_FINALIZED;
+    case 6:
+    case "MISMATCHED_INVOICE_PENDING":
+      return InvoiceStatus.MISMATCHED_INVOICE_PENDING;
+    case 7:
+    case "MISMATCHED_INVOICE_RETURNED":
+      return InvoiceStatus.MISMATCHED_INVOICE_RETURNED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -612,6 +636,12 @@ export function invoiceStatusToJSON(object: InvoiceStatus): string {
       return "FINALIZED";
     case InvoiceStatus.RETURNED:
       return "RETURNED";
+    case InvoiceStatus.MISMATCHED_INVOICE_FINALIZED:
+      return "MISMATCHED_INVOICE_FINALIZED";
+    case InvoiceStatus.MISMATCHED_INVOICE_PENDING:
+      return "MISMATCHED_INVOICE_PENDING";
+    case InvoiceStatus.MISMATCHED_INVOICE_RETURNED:
+      return "MISMATCHED_INVOICE_RETURNED";
     case InvoiceStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

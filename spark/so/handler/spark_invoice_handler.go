@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -52,11 +53,19 @@ func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *spark
 	return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice strings provided"))
 }
 
+// invoiceEntry is one queried invoice in request order. Status is resolved per
+// entry rather than per id, so a batch containing multiple encodings of the same
+// id is compared and reported position by position instead of being collapsed.
+type invoiceEntry struct {
+	raw    string
+	parsed *common.ParsedSparkInvoice
+	id     uuid.UUID
+}
+
 func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context, req *sparkpb.QuerySparkInvoicesRequest, limit int) (*sparkpb.QuerySparkInvoicesResponse, error) {
 	ctx, span := tracer.Start(ctx, "SparkInvoiceHandler.querySparkInvoicesByRawInvoice")
 	defer span.End()
-	invoiceIDsInOrder := make([]uuid.UUID, 0, len(req.Invoice))
-	idToInvoiceMap := make(map[uuid.UUID]string)
+	entries := make([]invoiceEntry, 0, len(req.Invoice))
 	satsInvoiceIDs := make([]uuid.UUID, 0, len(req.Invoice))
 	tokenInvoiceIDs := make([]uuid.UUID, 0, len(req.Invoice))
 	for _, invoice := range req.Invoice {
@@ -64,8 +73,7 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid invoice: %w", err))
 		}
-		idToInvoiceMap[decoded.Id] = invoice
-		invoiceIDsInOrder = append(invoiceIDsInOrder, decoded.Id)
+		entries = append(entries, invoiceEntry{raw: invoice, parsed: decoded, id: decoded.Id})
 		switch decoded.Payment.Kind {
 		case common.PaymentKindSats:
 			satsInvoiceIDs = append(satsInvoiceIDs, decoded.Id)
@@ -131,7 +139,6 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 			return nil, err
 		}
 
-		notFoundOrReturnedInvoiceMap := mapSliceToSet(notFoundOrReturnedInvoiceIDs)
 		for _, invoice := range notFoundOrReturnedInvoices {
 			transferEdge := invoice.Edges.Transfer
 			tokenTransactionEdge := invoice.Edges.TokenTransaction
@@ -147,32 +154,79 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 				if err != nil {
 					return nil, err
 				}
-				delete(notFoundOrReturnedInvoiceMap, invoice.ID)
 			case len(tokenTransactionEdge) > 0:
 				invoiceResponseMap[invoice.ID], err = buildTokenInvoiceResponse(invoice, sparkpb.InvoiceStatus_RETURNED)
 				if err != nil {
 					return nil, err
 				}
-				delete(notFoundOrReturnedInvoiceMap, invoice.ID)
-			}
-		}
-		notFoundInvoiceIDs := setToSlice(notFoundOrReturnedInvoiceMap)
-		for _, invoiceID := range notFoundInvoiceIDs {
-			invoiceResponseMap[invoiceID] = &sparkpb.InvoiceResponse{
-				Invoice: idToInvoiceMap[invoiceID],
-				Status:  sparkpb.InvoiceStatus_NOT_FOUND,
 			}
 		}
 	}
 
-	invoiceResponseByRequestOrder := make([]*sparkpb.InvoiceResponse, 0, len(invoiceIDsInOrder))
-	for _, id := range invoiceIDsInOrder {
-		invoiceResponseByRequestOrder = append(invoiceResponseByRequestOrder, invoiceResponseMap[id])
+	// Resolve a response per request position, not per id. A payment is looked up
+	// by invoice id alone, but ids can be squatted: a batch may contain multiple
+	// encodings of the same id, and each must be compared against the stored
+	// invoice individually so a squatter's payment is never reported as the
+	// caller's.
+	invoiceResponseByRequestOrder := make([]*sparkpb.InvoiceResponse, 0, len(entries))
+	for _, entry := range entries {
+		base, ok := invoiceResponseMap[entry.id]
+		if !ok {
+			// No resolved payment for this id: NOT_FOUND, echoing this entry's own
+			// encoding so duplicate ids with different encodings are each preserved.
+			invoiceResponseByRequestOrder = append(invoiceResponseByRequestOrder, &sparkpb.InvoiceResponse{
+				Invoice: entry.raw,
+				Status:  sparkpb.InvoiceStatus_NOT_FOUND,
+			})
+			continue
+		}
+		// Clone so req.invoices sharing an id don't mutate invoiceResponseMap.
+		response := proto.Clone(base).(*sparkpb.InvoiceResponse)
+		if mismatchStatus, guarded := statusToMismatchedInvoiceStatus[response.Status]; guarded {
+			responseParsed, err := common.ParseSparkInvoice(response.Invoice)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse stored invoice %s: %w", entry.id, err)
+			}
+			if !invoiceMoneyFieldsMatch(entry.parsed, responseParsed) {
+				response.Status = mismatchStatus
+			}
+		}
+		invoiceResponseByRequestOrder = append(invoiceResponseByRequestOrder, response)
 	}
 
 	return &sparkpb.QuerySparkInvoicesResponse{
 		InvoiceStatuses: invoiceResponseByRequestOrder,
 	}, nil
+}
+
+// statusToMismatchedInvoiceStatus maps a resolved payment status to the status
+// reported when the queried encoding's money fields differ from the stored one.
+// Membership also gates which statuses are subject to the encoding check.
+var statusToMismatchedInvoiceStatus = map[sparkpb.InvoiceStatus]sparkpb.InvoiceStatus{
+	sparkpb.InvoiceStatus_FINALIZED: sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED,
+	sparkpb.InvoiceStatus_PENDING:   sparkpb.InvoiceStatus_MISMATCHED_INVOICE_PENDING,
+	sparkpb.InvoiceStatus_RETURNED:  sparkpb.InvoiceStatus_MISMATCHED_INVOICE_RETURNED,
+}
+
+// invoiceMoneyFieldsMatch reports whether two encodings sharing an id agree on
+// their money fields: receiver, payment kind, and the payment amounts/token
+// identifier. Unset and set values are distinct (open-amount != fixed-amount).
+// Non-money fields (memo, sender, expiry, signature) are intentionally ignored.
+func invoiceMoneyFieldsMatch(queried, stored *common.ParsedSparkInvoice) bool {
+	if !queried.ReceiverPublicKey.Equals(stored.ReceiverPublicKey) {
+		return false
+	}
+	if queried.Payment.Kind != stored.Payment.Kind {
+		return false
+	}
+	switch queried.Payment.Kind {
+	case common.PaymentKindSats:
+		return proto.Equal(queried.Payment.SatsPayment, stored.Payment.SatsPayment)
+	case common.PaymentKindTokens:
+		return proto.Equal(queried.Payment.TokensPayment, stored.Payment.TokensPayment)
+	default:
+		return false
+	}
 }
 
 func queryCompletedInvoices(ctx context.Context, satsInvoiceIDs []uuid.UUID, tokenInvoiceIDs []uuid.UUID, limit int) (completedInvoiceMap map[uuid.UUID]*sparkpb.InvoiceResponse, notFoundSatsInvoiceIDs []uuid.UUID, notFoundTokenInvoiceIDs []uuid.UUID, err error) {
