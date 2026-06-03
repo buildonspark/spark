@@ -142,15 +142,15 @@ func (h *ProvidePreimageFlowHandler) Commit(ctx context.Context, op proto.Messag
 // CommitSenderKeyTweaks only runs in Commit, so a rollback before commit
 // gossip is dispatched means no participant ever moved sender key tweaks.
 //
-// Known divergence (engine-level, not flow-specific): if the coordinator
-// crashes between engine.DbCommit and commit-gossip dispatch, the self-sweep
-// transitions the coordinator's FlowExecution row to ROLLED_BACK while the
-// underlying transfer is already SenderKeyTweaked. Participants then
-// reconcile to ROLLED_BACK on their FlowExecution rows. The transfer state
-// is the source of truth — see consensus/twopc.go's ErrCoordinatorRowPreempted
-// docstring ("recoverable only at the application level"). Fixing the
-// FlowExecution-row divergence requires runConsensusRollback to learn a
-// "rollback-but-actually-committed" return code, which is out of scope here.
+// No coordinator commit/rollback divergence (engine-level): the engine records
+// the COMMITTED decision in the request tx and commits it atomically with the
+// coordinator's domain work (the SenderKeyTweaked transition lands in the same
+// tx), so there is no durable state where the transfer is committed but the
+// FlowExecution row is still IN_FLIGHT for the self-sweep to roll back. A crash
+// before that atomic commit leaves the transfer untweaked and the row IN_FLIGHT
+// (sweep → ROLLED_BACK, consistent); a crash after it leaves the row COMMITTED
+// (reconciler drives participants forward, consistent). See SP-3195 and
+// consensus/twopc.go's ErrCoordinatorRowPreempted docstring.
 //
 // Accepts both the canonical ProvidePreimageRollbackRequest and the
 // ProvidePreimagePrepareRequest echoed back by the participant reconciler

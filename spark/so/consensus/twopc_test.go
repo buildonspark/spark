@@ -312,14 +312,16 @@ func TestExecute_WritesCoordinatorRow_RolledBackOnBuildCommitFailure(t *testing.
 	assert.True(t, proto.Equal(rollbackOp, payloadFromAnyBytes(t, *row.DecisionPayload)))
 }
 
-// --- CAS conflict tests (markCommitted vs. self-sweep race) ---
+// --- CAS conflict tests (recordCommitDecision vs. self-sweep race) ---
 
-// TestExecute_MarkCommitted_PreemptedByExternalRollback simulates the race
-// where the coordinator self-sweep transitions the row to ROLLED_BACK after
-// the engine started Execute but before it gets to markCommitted. The CAS
-// in markCommitted should detect the preemption, return
-// ErrCoordinatorRowPreempted, and Execute must not send commit gossip.
-func TestExecute_MarkCommitted_PreemptedByExternalRollback(t *testing.T) {
+// TestExecute_RecordCommitDecision_PreemptedByExternalRollback simulates the
+// race where the coordinator self-sweep transitions the row to ROLLED_BACK
+// after the engine started Execute but before it records its commit decision.
+// The CAS in recordCommitDecision detects the preemption: Execute must NOT
+// commit the request tx (so the coordinator's domain work is rolled back, not
+// stranded), must NOT send commit gossip, and instead dispatches rollback
+// gossip so both sides converge on rolled-back.
+func TestExecute_RecordCommitDecision_PreemptedByExternalRollback(t *testing.T) {
 	ctx, _, gs, client, config := newTestEngine(t)
 	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
 	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
@@ -338,19 +340,28 @@ func TestExecute_MarkCommitted_PreemptedByExternalRollback(t *testing.T) {
 	_, err := NewTwoPCEngine(config, gs, db.NewDefaultSessionFactory(client)).Execute(ctx, testOpType, selfSelection(t, config), preempt)
 	require.ErrorIs(t, err, ErrCoordinatorRowPreempted, "Execute must propagate the preemption")
 
-	// Row stays ROLLED_BACK — markCommitted's conditional UPDATE matched
+	// Clean up the dangling request tx the way the gRPC middleware does on an
+	// error return, so the assertion query below reads committed state.
+	_ = ent.DbRollback(ctx)
+
+	// Row stays ROLLED_BACK — recordCommitDecision's conditional UPDATE matched
 	// zero rows, leaving the sweep's transition intact.
 	rows, err := client.FlowExecution.Query().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, st.FlowExecutionStatusRolledBack, rows[0].Status,
-		"sweep-driven ROLLED_BACK must not be clobbered by markCommitted")
+		"sweep-driven ROLLED_BACK must not be clobbered by recordCommitDecision")
 
-	// No commit gossip sent — the engine bailed before reaching e.commit.
+	// No commit gossip, and rollback gossip dispatched so peers converge.
+	var sawRollback bool
 	for _, c := range gs.calls {
 		assert.Nil(t, c.msg.GetConsensusCommit(),
-			"no ConsensusCommit gossip must be sent after a markCommitted preemption")
+			"no ConsensusCommit gossip must be sent after a preemption")
+		if c.msg.GetConsensusRollback() != nil {
+			sawRollback = true
+		}
 	}
+	assert.True(t, sawRollback, "Execute must dispatch rollback gossip on preemption")
 }
 
 // TestMarkRolledBack_AlreadyRolledBack_IsNoOp confirms markRolledBack's CAS
@@ -375,8 +386,8 @@ func TestMarkRolledBack_AlreadyRolledBack_IsNoOp(t *testing.T) {
 
 // preemptingFlow simulates the coordinator self-sweep racing the engine: in
 // BuildCommitPayload it transitions the engine's coordinator row to
-// ROLLED_BACK out of band, so the engine's subsequent markCommitted hits
-// a CAS conflict.
+// ROLLED_BACK out of band, so the engine's subsequent recordCommitDecision
+// hits a CAS conflict.
 type preemptingFlow struct {
 	ctx          context.Context
 	client       *ent.Client
@@ -517,12 +528,16 @@ func TestExecute_UserCancelDuringBuildCommit_RowReachesRolledBackDurably(t *test
 		"rollback gossip must dispatch even though the request ctx was cancelled mid-flow")
 }
 
-func TestExecute_CoordinatorRowSurvivesRequestSessionRollback(t *testing.T) {
-	// This is the load-bearing assertion for the layer-1 fix: even if the
-	// caller's request transaction is rolled back after Execute returns
-	// (for any reason — handler-level error, panic recovery, etc.), the
-	// engine's coordinator row remains durable so participants reconciling
-	// against this SO get a real outcome via ConsensusQueryOutcome.
+func TestExecute_CommitDecisionDurablyCommittedOnSuccess(t *testing.T) {
+	// In the atomic-commit model, Execute writes the COMMITTED decision into
+	// the request transaction and commits it — together with the coordinator's
+	// domain work — via a single internal ent.DbCommit before returning on
+	// success. This asserts that the decision lands on disk durably: a
+	// session-less read through the bare client (no request tx in scope) sees
+	// the COMMITTED row and the commit payload, which is what lets participants
+	// reconcile to a real outcome via ConsensusQueryOutcome. Durability of the
+	// row across a request-tx rollback/cancellation mid-flow is covered
+	// separately by TestExecute_UserCancelDuringBuildCommit_RowReachesRolledBackDurably.
 	ctx, engine, gs, client, config := newTestEngine(t)
 	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
 
@@ -531,13 +546,9 @@ func TestExecute_CoordinatorRowSurvivesRequestSessionRollback(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, gs.calls, 1)
 
-	// Force the request session's tx to roll back, then re-read via the
-	// bare client to prove the row landed on disk independent of the
-	// session.
-	tx, err := ent.GetTxFromContext(ctx)
-	require.NoError(t, err)
-	require.NoError(t, tx.Rollback())
-
+	// Read through a session-less context so the row is fetched via the bare
+	// client alone — proving Execute's internal DbCommit already persisted it,
+	// with no open request tx required.
 	rows, err := client.FlowExecution.Query().All(parentlessCtx())
 	require.NoError(t, err)
 	require.Len(t, rows, 1)

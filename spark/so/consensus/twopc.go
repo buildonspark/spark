@@ -21,22 +21,24 @@ import (
 )
 
 // engineCleanupTimeout caps how long any single engine bookkeeping phase
-// (createCoordinatorRow, markCommitted/markRolledBack, commit/rollback
-// gossip dispatch) is allowed to run. Each call to inEngineSession derives
-// a fresh WithTimeout from this value, so a long Prepare or BuildCommitPayload
-// doesn't burn the cleanup-phase budget — the post-decision path always
-// gets the full window to drive participants to a terminal outcome,
-// regardless of how long the request-cancellable phases took.
+// (createCoordinatorRow, markRolledBack, commit/rollback gossip dispatch) is
+// allowed to run. Each call to inEngineSession derives a fresh WithTimeout from
+// this value, so a long Prepare or BuildCommitPayload doesn't burn the
+// cleanup-phase budget — the post-decision gossip path always gets the full
+// window to drive participants to a terminal outcome, regardless of how long
+// the request-cancellable phases took. (recordCommitDecision is the exception:
+// it rides the request tx, not an engine session.)
 const engineCleanupTimeout = 60 * time.Second
 
-// ErrCoordinatorRowPreempted is returned by markCommitted (and is the cause
-// surfaced by Execute when applicable) if the coordinator's FlowExecution
-// row has been transitioned out of IN_FLIGHT before the engine got to its
-// commit-time write. Most likely cause: SweepStaleCoordinatorFlows raced
-// the engine and presumed-aborted the row to ROLLED_BACK, in which case
-// proceeding to commit gossip would diverge the coordinator's recorded
-// outcome from what participants will see when they reconcile.
-var ErrCoordinatorRowPreempted = errors.New("coordinator FlowExecution row was preempted before markCommitted (likely swept to ROLLED_BACK by the self-sweep task)")
+// ErrCoordinatorRowPreempted is surfaced by Execute when the coordinator's
+// FlowExecution row was transitioned out of IN_FLIGHT (most likely
+// presumed-aborted to ROLLED_BACK by SweepStaleCoordinatorFlows) before the
+// engine recorded its commit decision. This is no longer a divergence: because
+// the decision is written in the request tx and committed atomically with the
+// coordinator's domain work, a preemption means the request tx is rolled back
+// and the coordinator converges with the participants on rolled-back. The
+// error signals that benign coordinated rollback to the caller.
+var ErrCoordinatorRowPreempted = errors.New("coordinator FlowExecution row was preempted before recording the commit decision (likely swept to ROLLED_BACK by the self-sweep task); request tx rolled back")
 
 // TwoPCEngine orchestrates consensus using two-phase commit.
 //
@@ -46,8 +48,10 @@ var ErrCoordinatorRowPreempted = errors.New("coordinator FlowExecution row was p
 //     passing the row's id as flow_execution_id so participants can create their own
 //     rows with the same id on their own databases.
 //  3. BuildCommitPayload: coordinator builds the commit payload from prepare results.
-//  4. Update the row to its terminal status (COMMITTED or ROLLED_BACK), overwriting
-//     decision_payload with commit bytes on success.
+//  4. On success, record the COMMITTED decision (overwriting decision_payload with
+//     the commit bytes) in the request tx and DbCommit it atomically with the
+//     coordinator's domain work; on failure/abort, transition the row to
+//     ROLLED_BACK in a detached engine session.
 //  5. Commit or Rollback: durable async delivery via gossip, carrying the row's id.
 //
 // Because decision_payload is written at row creation with the rollback bytes,
@@ -62,7 +66,7 @@ type TwoPCEngine struct {
 	config *so.Config
 	gossip GossipSender
 	// sessionFactory mints a db.Session per engine bookkeeping phase
-	// (createCoordinatorRow, markCommitted, markRolledBack, gossip
+	// (createCoordinatorRow, markRolledBack, gossip
 	// dispatch). The engine session is bound to a detached cleanup
 	// context so the session — and its transaction — survive a
 	// user-cancelled request. Sharing the SessionFactory abstraction
@@ -170,47 +174,58 @@ func (e *TwoPCEngine) Execute(
 		return nil, fmt.Errorf("build-commit failed: %w", err)
 	}
 
-	// Commit the coordinator's request transaction BEFORE telling
-	// participants to commit. FlowHandler.Prepare (and BuildCommitPayload
-	// for some flows) writes coordinator-side domain state through the
-	// request session — preimage_shares for StorePreimageShareV2,
-	// new tree nodes for FinalizeDepositTreeCreation, etc. If we
-	// dispatched commit gossip while that work was still uncommitted
-	// and the request tx subsequently failed to commit at handler
-	// return, participants would commit on the strength of the
-	// already-durable engine FlowExecution row (markCommitted fires
-	// next) while the coordinator's local domain state is rolled back.
-	// Mirrors the pre-refactor pattern in CreateCommitAndSendGossipMessage,
-	// which committed the request tx mid-function before gossip dispatch.
+	// Write the commit decision (COMMITTED + commit payload) into the
+	// coordinator's FlowExecution row through the REQUEST transaction —
+	// the same tx that holds the coordinator's domain work (FlowHandler.Prepare
+	// / BuildCommitPayload write coordinator-side domain state through the
+	// request session: preimage_shares for StorePreimageShareV2, new tree
+	// nodes for FinalizeDepositTreeCreation, sender/receiver key tweaks for
+	// transfers, etc.). Committing the decision and the domain work in one
+	// DbCommit makes them atomic, which is what eliminates the divergence:
+	// there is no durable state in which the domain is committed but the
+	// decision is still IN_FLIGHT, so a self-sweep firing concurrently can
+	// never strand a committed coordinator against rolled-back peers.
 	//
-	// On failure here we treat it as a build-commit failure: roll back
-	// the engine row and dispatch rollback gossip, so participants
-	// don't end up committed against a coordinator that lost its
-	// domain writes.
+	// The decision write is a conditional update (status = IN_FLIGHT). If a
+	// concurrent SweepStaleCoordinatorFlows already transitioned the row to
+	// ROLLED_BACK it matches zero rows (preempted): we must NOT commit the
+	// request tx — returning here lets the middleware roll it back, so the
+	// coordinator's domain work is discarded and both sides converge on
+	// rolled-back. The two writers serialize on the row lock, so exactly one
+	// of {decision UPDATE, sweep UPDATE} wins; either outcome is consistent.
+	//
+	// Trade-off: the decision now rides the request tx rather than a detached
+	// engine session, so a request-ctx cancellation before DbCommit rolls the
+	// whole flow back. That is intentional — recovery here is roll-back only;
+	// preserving a fully-prepared flow across a coordinator crash (roll-forward)
+	// is deliberately out of scope (see SP-3195).
+	preempted, err := e.recordCommitDecision(ctx, row, commitOp)
+	if err != nil {
+		logger.With(zap.Error(err)).Sugar().Infof(
+			"2PC commit: recording decision failed for op type %d, sending rollback", opType)
+		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
+		return nil, fmt.Errorf("failed to record commit decision: %w", err)
+	}
+	if preempted {
+		// The self-sweep transitioned the row to ROLLED_BACK before we
+		// recorded the decision. The request tx (with the coordinator's
+		// domain work) is left uncommitted and rolled back by the middleware,
+		// so the coordinator converges with the participants on rolled-back —
+		// a benign coordinated rollback, not a divergence. Dispatch rollback
+		// gossip so peers don't wait for the reconciler to drive them there.
+		logger.Sugar().Warnf(
+			"2PC commit: coordinator row preempted by sweep for op type %d, rolling back", opType)
+		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
+		return nil, fmt.Errorf("commit preempted: %w", ErrCoordinatorRowPreempted)
+	}
+
+	// Atomic point of no return: commits the coordinator's domain work and the
+	// COMMITTED decision together.
 	if commitErr := ent.DbCommit(ctx); commitErr != nil {
 		logger.With(zap.Error(commitErr)).Sugar().Infof(
 			"2PC commit: request tx commit failed for op type %d, sending rollback", opType)
 		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("request tx commit failed: %w", commitErr)
-	}
-
-	if err := e.markCommitted(detachedCtx, row, commitOp); err != nil {
-		// CAS conflict: the row was already transitioned out of
-		// IN_FLIGHT by some other path (most likely the self-sweep).
-		// Don't send commit gossip; the participants will resolve to
-		// the actually-recorded outcome via ConsensusQueryOutcome.
-		// NOTE: the request tx committed above, so coordinator's
-		// domain work persists. With the engine row eventually
-		// transitioned to ROLLED_BACK by the sweep, participants
-		// reconcile to ROLLED_BACK — a divergence (coordinator did
-		// the work, participants think rolled-back), but recoverable
-		// only at the application level.
-		if errors.Is(err, ErrCoordinatorRowPreempted) {
-			logger.With(zap.Error(err)).Sugar().Warnf(
-				"2PC commit: coordinator row preempted for op type %d, skipping commit gossip", opType)
-			return nil, fmt.Errorf("commit preempted: %w", err)
-		}
-		return nil, fmt.Errorf("failed to mark FlowExecution committed: %w", err)
 	}
 
 	logger.Sugar().Infof("2PC commit: sending gossip for op type %d to %d participants", opType, len(participants))
@@ -266,7 +281,7 @@ func (e *TwoPCEngine) inEngineSession(parentCtx context.Context, fn func(session
 	// Each engine bookkeeping phase gets a fresh engineCleanupTimeout
 	// window. Applying the timeout here (rather than once at Execute
 	// start) means a long Prepare or BuildCommitPayload doesn't burn
-	// the cleanup-phase budget — markCommitted/markRolledBack and
+	// the cleanup-phase budget — markRolledBack and
 	// commit/rollback gossip always run with the full window even if
 	// the user-cancellable phases ate up most of the request's
 	// surrounding deadline.
@@ -345,54 +360,47 @@ func (e *TwoPCEngine) createCoordinatorRow(
 	return row, nil
 }
 
-// markCommitted updates the coordinator row with the commit payload bytes and
-// the COMMITTED status. Called before commit gossip is sent so a late crash
-// leaves the row in COMMITTED state with the correct payload.
+// recordCommitDecision updates the coordinator row with the commit payload
+// bytes and the COMMITTED status using the REQUEST transaction (via the
+// ctx-bound client), so the decision commits atomically with the coordinator's
+// domain work at the caller's DbCommit. It does NOT commit on its own.
 //
-// Uses a conditional UPDATE (status=IN_FLIGHT) rather than UpdateOne so a
-// concurrent self-sweep that has already transitioned the row to
-// ROLLED_BACK is not silently overwritten. Returns
-// ErrCoordinatorRowPreempted when the CAS finds zero rows; the caller
-// must abort the commit gossip in that case so the coordinator's recorded
-// outcome stays consistent with what participants will see via
-// ConsensusQueryOutcome.
-func (e *TwoPCEngine) markCommitted(ctx context.Context, row *ent.FlowExecution, commitOp proto.Message) error {
+// Uses a conditional UPDATE (status=IN_FLIGHT) so a concurrent self-sweep that
+// has already transitioned the row to ROLLED_BACK is not silently overwritten;
+// the two UPDATEs serialize on the row lock. Returns preempted=true when the
+// CAS matches zero rows — the caller must then abort (not commit) the request
+// tx so the coordinator's domain work is rolled back and both sides converge
+// on rolled-back.
+func (e *TwoPCEngine) recordCommitDecision(ctx context.Context, row *ent.FlowExecution, commitOp proto.Message) (preempted bool, err error) {
 	commitBytes, err := marshalAny(commitOp)
 	if err != nil {
-		return fmt.Errorf("failed to marshal commit payload: %w", err)
+		return false, fmt.Errorf("failed to marshal commit payload: %w", err)
 	}
-	var rowsAffected int
-	if err := e.inEngineSession(ctx, func(sessionCtx context.Context) error {
-		client, err := ent.GetDbFromContext(sessionCtx)
-		if err != nil {
-			return err
-		}
-		var updErr error
-		rowsAffected, updErr = client.FlowExecution.Update().
-			Where(
-				flowexecution.ID(row.ID),
-				flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
-			).
-			SetStatus(st.FlowExecutionStatusCommitted).
-			SetDecisionPayload(commitBytes).
-			Save(sessionCtx)
-		return updErr
-	}); err != nil {
-		return err
+	client, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return false, err
 	}
-	if rowsAffected == 0 {
-		return ErrCoordinatorRowPreempted
+	rowsAffected, err := client.FlowExecution.Update().
+		Where(
+			flowexecution.ID(row.ID),
+			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
+		).
+		SetStatus(st.FlowExecutionStatusCommitted).
+		SetDecisionPayload(commitBytes).
+		Save(ctx)
+	if err != nil {
+		return false, err
 	}
-	return nil
+	return rowsAffected == 0, nil
 }
 
 // markRolledBack transitions the coordinator row to ROLLED_BACK.
 // decision_payload already contains the rollback bytes from row creation,
 // so no payload update is needed.
 //
-// Like markCommitted, uses a conditional UPDATE so a row that's already
+// Like recordCommitDecision, uses a conditional UPDATE so a row that's already
 // terminal (most likely already-rolled-back via the self-sweep) isn't
-// touched again. Unlike markCommitted, a CAS conflict here is benign:
+// touched again. Unlike the commit case, a CAS conflict here is benign:
 // the row is already in the rolled-back state we wanted, so the
 // zero-rows-affected case is silently treated as success.
 func (e *TwoPCEngine) markRolledBack(ctx context.Context, row *ent.FlowExecution) error {

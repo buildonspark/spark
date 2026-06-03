@@ -167,12 +167,12 @@ const (
 	// StartTransferV3 entry point enforces this at request time and rejects
 	// requests if the reconciler is off.
 	//
-	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback
-	// for SEND_TRANSFER on the coordinator. Today the sweep only flips the
-	// FlowExecution row to ROLLED_BACK — it doesn't undo coordinator-side
-	// domain writes (SENDER_KEY_TWEAKED + tweaked shares), so a coordinator
-	// crash between engine DbCommit and markCommitted leaves the coordinator
-	// stranded while participants reconcile to RETURNED.
+	// The sweep does not need to undo coordinator domain writes: the engine
+	// records the COMMITTED decision atomically with the coordinator's
+	// SENDER_KEY_TWEAKED write (single request-tx DbCommit), so a crash before
+	// that commit leaves the transfer untweaked with an IN_FLIGHT row (sweep →
+	// ROLLED_BACK, consistent) and a crash after it leaves a COMMITTED row the
+	// reconciler drives forward (SP-3195).
 	KnobUseConsensusTransfer = "spark.so.use_consensus_transfer"
 	// KnobUseConsensusClaim routes ClaimTransfer through the 2PC engine
 	// instead of the legacy settleReceiverKeyTweakWithClaimPackage + finalize
@@ -185,13 +185,12 @@ const (
 	// coordinator crash between engine DbCommit and commit-gossip dispatch
 	// leaves participant FlowExecution rows IN_FLIGHT indefinitely.
 	//
-	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback
-	// for CLAIM_TRANSFER on the coordinator. Today the sweep only flips the
-	// FlowExecution row to ROLLED_BACK — it doesn't undo coordinator-side
-	// domain writes (RECEIVER_KEY_TWEAK_LOCKED + persisted key tweak proofs),
-	// so a coordinator crash between engine DbCommit and markCommitted leaves
-	// the coordinator stranded at RKL/RKA while participants reconcile to
-	// ROLLED_BACK.
+	// The sweep does not need to undo coordinator domain writes: the engine
+	// records the COMMITTED decision atomically with the coordinator's
+	// RECEIVER_KEY_TWEAK_LOCKED / key-tweak writes (single request-tx DbCommit),
+	// so a crash before that commit rolls those writes back with an IN_FLIGHT
+	// row (sweep → ROLLED_BACK, consistent) and a crash after it leaves a
+	// COMMITTED row the reconciler drives forward (SP-3195).
 	KnobUseConsensusClaim = "spark.so.use_consensus_claim"
 	// KnobUseConsensusProvidePreimage routes LightningHandler.ProvidePreimage
 	// through the 2PC engine instead of the legacy fanout-RPC + SettleSenderKeyTweak

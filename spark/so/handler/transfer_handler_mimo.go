@@ -370,11 +370,16 @@ func (h *TransferHandler) startTransferV3Consensus(
 		&selection,
 		flow,
 	); err != nil {
-		// engine.Execute can fail two ways post-DbCommit: (a) markCommitted
-		// CAS conflict and (b) commit-gossip dispatch failure. Both mean the
-		// transfer is in fact committed and gossip retries from the persisted
-		// FlowExecution row; the on-call signal in the wrapped inner error
-		// distinguishes those cases from a true pre-commit failure.
+		// Two of engine.Execute's failure modes need distinguishing:
+		//   (a) commit-decision preempted by the self-sweep (ErrCoordinatorRowPreempted):
+		//       the request tx was rolled back, so the transfer is NOT committed and
+		//       both coordinator and participants converge on rolled-back. Safe to fail.
+		//   (b) commit-gossip dispatch failure (after the atomic DbCommit): the transfer
+		//       IS committed and gossip/the reconciler drive participants forward from
+		//       the persisted FlowExecution row.
+		// In both cases returning an error to the client is correct (the transfer is
+		// idempotent via Transfer.id); the wrapped inner error carries the distinction
+		// for the on-call signal.
 		return nil, fmt.Errorf("consensus send transfer failed: %w", err)
 	}
 
