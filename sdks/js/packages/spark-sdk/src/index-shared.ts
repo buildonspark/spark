@@ -28,7 +28,9 @@ export * from "./spark-readonly-client/types.js";
 export * from "./spark-wallet/types.js";
 
 export { type WalletConfigService } from "./services/config.js";
+export { SigningService } from "./services/signing.js";
 export { TokenTransactionService } from "./services/tokens/token-transactions.js";
+export { TransferService } from "./services/transfer.js";
 export {
   WalletConfig,
   createLocalSigningOperators,
