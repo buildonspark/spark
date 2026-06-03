@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/entephemeral"
+	"github.com/lightsparkdev/spark/so/entephemeral/predicate"
 	"github.com/lightsparkdev/spark/so/entephemeral/signingkeysharesecret"
 	"github.com/lightsparkdev/spark/so/knobs"
 )
@@ -234,7 +235,7 @@ func collectDanglingSigningKeyshareSecretIDs(
 		}
 
 		candidateCount += len(candidates)
-		batchDanglingIDs, err := getDanglingSigningKeyshareSecretIDs(ctx, mainDB, candidates)
+		batchDanglingIDs, err := getDanglingSigningKeyshareSecretIDs(ctx, mainDB, ephemeralDB, candidates)
 		if err != nil {
 			return nil, purgeDanglingSigningKeyshareSecretsCollectionResult{
 				CandidateCount: candidateCount,
@@ -267,6 +268,7 @@ func collectDanglingSigningKeyshareSecretIDs(
 func getDanglingSigningKeyshareSecretIDs(
 	ctx context.Context,
 	mainDB *ent.Client,
+	ephemeralDB *entephemeral.Client,
 	candidates []*entephemeral.SigningKeyshareSecret,
 ) ([]uuid.UUID, error) {
 	signingKeyshareIDSet := make(map[uuid.UUID]struct{}, len(candidates))
@@ -291,15 +293,71 @@ func getDanglingSigningKeyshareSecretIDs(
 		mainSigningKeysharesByID[sk.ID] = sk
 	}
 
+	currentSecretExistsByKeyshareID, err := getCurrentSigningKeyshareSecretExistence(ctx, ephemeralDB, mainSigningKeysharesByID)
+	if err != nil {
+		return nil, err
+	}
+	loggedMissingCurrent := make(map[uuid.UUID]struct{})
+
 	secretIDsToDelete := make([]uuid.UUID, 0, len(candidates))
 	for _, candidate := range candidates {
 		sk, ok := mainSigningKeysharesByID[candidate.SigningKeyshareID]
-		if !ok || sk.SecretVersion == nil || *sk.SecretVersion != candidate.Version {
+		if !ok || sk.SecretVersion == nil {
+			secretIDsToDelete = append(secretIDsToDelete, candidate.ID)
+			continue
+		}
+		if !currentSecretExistsByKeyshareID[candidate.SigningKeyshareID] {
+			if _, logged := loggedMissingCurrent[candidate.SigningKeyshareID]; !logged {
+				loggedMissingCurrent[candidate.SigningKeyshareID] = struct{}{}
+				recordSigningKeyshareSecretPurgeOutcome(ctx, "missing_current")
+				logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+					"purge_dangling_signing_keyshare_secrets: signing keyshare %s references missing current ephemeral version %d; preserving stale versions for manual/reconciliation repair",
+					candidate.SigningKeyshareID,
+					*sk.SecretVersion,
+				)
+			}
+			continue
+		}
+		if *sk.SecretVersion != candidate.Version {
 			secretIDsToDelete = append(secretIDsToDelete, candidate.ID)
 		}
 	}
 
 	return secretIDsToDelete, nil
+}
+
+func getCurrentSigningKeyshareSecretExistence(
+	ctx context.Context,
+	ephemeralDB *entephemeral.Client,
+	mainSigningKeysharesByID map[uuid.UUID]*ent.SigningKeyshare,
+) (map[uuid.UUID]bool, error) {
+	predicates := make([]predicate.SigningKeyshareSecret, 0, len(mainSigningKeysharesByID))
+	for signingKeyshareID, sk := range mainSigningKeysharesByID {
+		if sk.SecretVersion == nil {
+			continue
+		}
+		predicates = append(predicates, signingkeysharesecret.And(
+			signingkeysharesecret.SigningKeyshareIDEQ(signingKeyshareID),
+			signingkeysharesecret.VersionEQ(*sk.SecretVersion),
+		))
+	}
+	if len(predicates) == 0 {
+		return map[uuid.UUID]bool{}, nil
+	}
+
+	currentSecrets, err := ephemeralDB.SigningKeyshareSecret.Query().
+		Where(signingkeysharesecret.Or(predicates...)).
+		Select(signingkeysharesecret.FieldSigningKeyshareID).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query current signing keyshare secret versions: %w", err)
+	}
+
+	existsByKeyshareID := make(map[uuid.UUID]bool, len(currentSecrets))
+	for _, secret := range currentSecrets {
+		existsByKeyshareID[secret.SigningKeyshareID] = true
+	}
+	return existsByKeyshareID, nil
 }
 
 func purgeDanglingSigningKeyshareSecretsCursorKey(operatorIndex uint64) string {

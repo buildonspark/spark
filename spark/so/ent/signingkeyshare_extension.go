@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -41,11 +42,15 @@ import (
 // keys.
 const defaultMinAvailableKeys = 100_000
 
+const signingKeyshareSecretCleanupMainReadTimeout = 5 * time.Second
+
 var (
 	ErrSigningKeyshareSecretUnavailable        = errors.New("signing keyshare secret unavailable")
 	ErrSigningKeyshareSecretMissing            = errors.New("signing keyshare secret missing")
 	signingKeyshareSecretCleanupFailureCounter metric.Int64Counter
+	signingKeyshareSecretCleanupOutcomeCounter metric.Int64Counter
 	signingKeyshareSecretCleanupCounterInit    sync.Once
+	signingKeyshareSecretCleanupOutcomeInit    sync.Once
 )
 
 func getSigningKeyshareSecretCleanupFailureCounter() metric.Int64Counter {
@@ -66,6 +71,24 @@ func getSigningKeyshareSecretCleanupFailureCounter() metric.Int64Counter {
 	return signingKeyshareSecretCleanupFailureCounter
 }
 
+func getSigningKeyshareSecretCleanupOutcomeCounter() metric.Int64Counter {
+	signingKeyshareSecretCleanupOutcomeInit.Do(func() {
+		meter := otel.GetMeterProvider().Meter("spark.db.ent")
+		counter, err := meter.Int64Counter(
+			"spark_db_ent_signing_keyshare_secret_cleanup_outcomes_total",
+			metric.WithDescription("Total number of signing keyshare secret rotation cleanup outcomes"),
+			metric.WithUnit("{count}"),
+		)
+		if err != nil {
+			otel.Handle(err)
+			signingKeyshareSecretCleanupOutcomeCounter = noop.Int64Counter{}
+			return
+		}
+		signingKeyshareSecretCleanupOutcomeCounter = counter
+	})
+	return signingKeyshareSecretCleanupOutcomeCounter
+}
+
 func recordSigningKeyshareSecretCleanupFailure(
 	ctx context.Context,
 	stage string,
@@ -78,6 +101,14 @@ func recordSigningKeyshareSecretCleanupFailure(
 			attribute.String("stage", stage),
 			attribute.String("reason", reason),
 		),
+	)
+}
+
+func recordSigningKeyshareSecretCleanupOutcome(ctx context.Context, outcome string) {
+	getSigningKeyshareSecretCleanupOutcomeCounter().Add(
+		ctx,
+		1,
+		metric.WithAttributes(attribute.String("outcome", outcome)),
 	)
 }
 
@@ -103,7 +134,7 @@ func shouldDualWriteSigningKeyshareSecret(ctx context.Context) bool {
 	return knobService.RolloutRandom(knobs.KnobSoSigningKeyshareDualWriteSecret, 100)
 }
 
-func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKeyshareID uuid.UUID, version int32, reason string) {
+func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKeyshareID uuid.UUID, version int32, reason string) bool {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	ephemeralDB, err := entephemeral.GetDbFromContext(ctx)
@@ -115,7 +146,7 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 			version,
 			reason,
 		)
-		return
+		return false
 	}
 
 	ephemeralTx, err := ephemeralDB.Tx(ctx)
@@ -127,7 +158,7 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 			version,
 			reason,
 		)
-		return
+		return false
 	}
 	defer func() { _ = ephemeralTx.Rollback() }()
 
@@ -145,17 +176,16 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 			version,
 			reason,
 		)
-		return
+		return false
 	}
 	if affected == 0 {
-		recordSigningKeyshareSecretCleanupFailure(ctx, "delete_missing", reason)
-		logger.Sugar().Warnf(
-			"cleanup did not find signing keyshare %s version %d to delete (%s)",
+		logger.Sugar().Debugf(
+			"cleanup did not find signing keyshare %s version %d to delete (%s); treating as already deleted",
 			signingKeyshareID,
 			version,
 			reason,
 		)
-		return
+		return true
 	}
 
 	if err := ephemeralTx.Commit(); err != nil {
@@ -166,7 +196,75 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 			version,
 			reason,
 		)
+		return false
 	}
+	return true
+}
+
+func cleanupSigningKeyshareSecretRotationAfterMainOutcome(
+	ctx context.Context,
+	mainDB *Client,
+	signingKeyshareID uuid.UUID,
+	oldVersion *int32,
+	newVersion int32,
+	reason string,
+) {
+	logger := logging.GetLoggerFromContext(ctx)
+	if mainDB == nil {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
+		logger.Sugar().Warnf(
+			"skipping signing keyshare %s secret cleanup after %s because main DB is unavailable",
+			signingKeyshareID,
+			reason,
+		)
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), signingKeyshareSecretCleanupMainReadTimeout)
+	defer cancel()
+
+	keyshare, err := mainDB.SigningKeyshare.Query().
+		Where(signingkeyshare.IDEQ(signingKeyshareID)).
+		Select(signingkeyshare.FieldSecretVersion).
+		Only(readCtx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"skipping signing keyshare %s secret cleanup after %s because main state could not be read",
+			signingKeyshareID,
+			reason,
+		)
+		return
+	}
+
+	if keyshare.SecretVersion != nil && *keyshare.SecretVersion == newVersion {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_new")
+		if oldVersion != nil && !deleteSigningKeyshareSecretVersionBestEffort(ctx, signingKeyshareID, *oldVersion, reason+" delete old") {
+			recordSigningKeyshareSecretCleanupOutcome(ctx, "delete_old_failed")
+		}
+		return
+	}
+
+	recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_old_or_other")
+	if !deleteSigningKeyshareSecretVersionBestEffort(ctx, signingKeyshareID, newVersion, reason+" delete new") {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "delete_new_failed")
+	}
+}
+
+func nonTransactionalClientFromTx(tx *Tx) (*Client, error) {
+	// Ent transaction clients are backed by txDriver, whose drv field is the parent
+	// non-transactional driver. Cleanup needs that parent driver so it can re-read
+	// committed main state after the transaction finishes. If this generated invariant
+	// changes, callers fall back to preserving all eph versions.
+	txDriver, ok := tx.config.driver.(*txDriver)
+	if !ok {
+		return nil, fmt.Errorf("unexpected main tx driver type %T", tx.config.driver)
+	}
+
+	client := &Client{config: tx.config}
+	client.config.driver = txDriver.drv
+	client.init()
+	return client, nil
 }
 
 type signingKeyshareSecretRotation struct {
@@ -218,34 +316,66 @@ func prepareSigningKeyshareSecretRotation(ctx context.Context, signingKeyshareID
 
 	tx, err := GetTxFromContext(ctx)
 	if err != nil {
-		// If we cannot access the main transaction after creating the new secret version,
-		// delete the newly-created version to avoid dangling references.
-		deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx unavailable after ephemeral commit")
+		mainDB, mainDBErr := GetDbFromContext(ctx)
+		if mainDBErr != nil {
+			mainDB = nil
+		}
+		cleanupSigningKeyshareSecretRotationAfterMainOutcome(
+			cleanupCtx,
+			mainDB,
+			signingKeyshareID,
+			oldVersion,
+			newVersion,
+			"main tx unavailable after ephemeral commit",
+		)
 		return nil, err
+	}
+	mainDBForCleanup, err := nonTransactionalClientFromTx(tx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "main_read_failed")
+		logging.GetLoggerFromContext(cleanupCtx).With(zap.Error(err)).Sugar().Warnf(
+			"signing keyshare %s cleanup will preserve all versions because main DB client could not be prepared",
+			signingKeyshareID,
+		)
+		return &signingKeyshareSecretRotation{
+			newVersion:   &newVersion,
+			oldVersion:   oldVersion,
+			useEphemeral: true,
+		}, nil
 	}
 
 	tx.OnRollback(func(fn Rollbacker) Rollbacker {
 		return RollbackFunc(func(ctx context.Context, tx *Tx) error {
-			// Preserve rollback semantics from the wrapped hook while always attempting
-			// ephemeral cleanup to avoid leaking versions when the main tx aborts.
 			err := fn.Rollback(ctx, tx)
-			deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx rollback")
+			cleanupSigningKeyshareSecretRotationAfterMainOutcome(
+				cleanupCtx,
+				mainDBForCleanup,
+				signingKeyshareID,
+				oldVersion,
+				newVersion,
+				"main tx rollback",
+			)
 			return err
 		})
 	})
 
-	if oldVersion != nil {
-		oldVersionValue := *oldVersion
-		tx.OnCommit(func(fn Committer) Committer {
-			return CommitFunc(func(ctx context.Context, tx *Tx) error {
-				err := fn.Commit(ctx, tx)
-				if err == nil {
-					deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, oldVersionValue, "main tx commit")
-				}
-				return err
-			})
+	tx.OnCommit(func(fn Committer) Committer {
+		return CommitFunc(func(ctx context.Context, tx *Tx) error {
+			err := fn.Commit(ctx, tx)
+			if err == nil && oldVersion == nil {
+				return nil
+			}
+			cleanupSigningKeyshareSecretRotationAfterMainOutcome(
+				cleanupCtx,
+				mainDBForCleanup,
+				signingKeyshareID,
+				oldVersion,
+				newVersion,
+				"main tx commit",
+			)
+			return err
 		})
-	}
+	})
 
 	return &signingKeyshareSecretRotation{
 		newVersion:   &newVersion,

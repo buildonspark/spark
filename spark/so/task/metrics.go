@@ -38,6 +38,24 @@ var ephemeralDivergenceCounter = sync.OnceValue(func() metric.Int64Counter {
 	return c
 })
 
+var signingKeyshareSecretPurgeOutcomeCounter = sync.OnceValue(func() metric.Int64Counter {
+	c, err := otel.Meter("gocron").Int64Counter(
+		"spark_so_task_signing_keyshare_secret_purge_outcomes_total",
+		metric.WithDescription("Signing keyshare secret purge outcomes"),
+	)
+	if err != nil {
+		otel.Handle(err)
+	}
+	if c == nil {
+		return noop.Int64Counter{}
+	}
+	return c
+})
+
+func recordSigningKeyshareSecretPurgeOutcome(ctx context.Context, outcome string) {
+	signingKeyshareSecretPurgeOutcomeCounter().Add(ctx, 1, metric.WithAttributes(attribute.String("outcome", outcome)))
+}
+
 type Monitor struct {
 	taskCount    metric.Int64Counter
 	taskDuration metric.Float64Histogram

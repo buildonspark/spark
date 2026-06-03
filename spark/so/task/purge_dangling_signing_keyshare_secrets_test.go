@@ -172,26 +172,26 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesUnreferencedVersionAfterGrac
 	require.Equal(t, 0, count)
 }
 
-func TestPurgeDanglingSigningKeyshareSecrets_DeletesAgedUnreferencedRowsWhenMainPointsToMissingVersion(t *testing.T) {
+func TestPurgeDanglingSigningKeyshareSecrets_PreservesAgedRowsWhenMainPointsToMissingVersion(t *testing.T) {
 	t.Parallel()
 	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
 	keyshareID := createMainSigningKeyshare(t, ctx, mainClient, new(int32(9)))
-	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 1, now.Add(-20*time.Minute))
-	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 2, now.Add(-15*time.Minute))
+	staleSecretID1 := createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 1, now.Add(-20*time.Minute))
+	staleSecretID2 := createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, keyshareID, 2, now.Add(-15*time.Minute))
 
 	result, err := purgeDanglingSigningKeyshareSecretsBatch(ctx, cutoffID, purgeDanglingSigningKeyshareSecretsDefaultBatchSize, purgeDanglingSigningKeyshareSecretsDefaultMaxScanCount, nil)
 	require.NoError(t, err)
 	require.Equal(t, 2, result.CandidateCount)
-	require.Equal(t, 2, result.DeletedCount)
+	require.Equal(t, 0, result.DeletedCount)
 	require.False(t, result.FoundFullDeleteBatch)
 	require.Nil(t, result.NextCursor)
 
-	count, err := ephemeralClient.SigningKeyshareSecret.Query().Count(ctx)
+	existingIDs, err := ephemeralClient.SigningKeyshareSecret.Query().IDs(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 0, count)
+	require.ElementsMatch(t, []uuid.UUID{staleSecretID1, staleSecretID2}, existingIDs)
 }
 
 func TestPurgeDanglingSigningKeyshareSecrets_ScansPastActivePrefixToFindDanglingRows(t *testing.T) {

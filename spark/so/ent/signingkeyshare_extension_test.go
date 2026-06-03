@@ -2,6 +2,7 @@ package ent_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -371,6 +372,108 @@ func TestUpdateSigningKeyshareWithRotatedSecret_MainRollbackCleansUpNewEphemeral
 	oldVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, version)
 	require.NoError(t, err)
 	require.True(t, oldVersionSecret.SecretShare.Equals(oldSecret))
+}
+
+func TestUpdateSigningKeyshareWithRotatedSecret_MainCommitDeletesOldEphemeralVersion(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	oldSecret := keys.MustParsePrivateKeyHex("120f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f88")
+	newSecret := keys.MustParsePrivateKeyHex("3e3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2bff5")
+	version := int32(0)
+
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, &oldSecret, &version)
+	_, err := entephemeral.CreateSigningKeyshareSecretVersion(ctx, keyshare.ID, version, oldSecret)
+	require.NoError(t, err)
+
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(ctx, keyshare.ID, newSecret, nil)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, int32(1), *updated.SecretVersion)
+
+	mainTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, mainTx.Commit())
+
+	_, err = entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, version)
+	require.ErrorIs(t, err, entephemeral.ErrNoSecretVersion)
+
+	newVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, *updated.SecretVersion)
+	require.NoError(t, err)
+	require.True(t, newVersionSecret.SecretShare.Equals(newSecret))
+}
+
+func TestUpdateSigningKeyshareWithRotatedSecret_CommitErrorAfterMainCommitPreservesNewEphemeralVersion(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	oldSecret := keys.MustParsePrivateKeyHex("220f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f87")
+	newSecret := keys.MustParsePrivateKeyHex("4e3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2bff4")
+	version := int32(0)
+
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, &oldSecret, &version)
+	_, err := entephemeral.CreateSigningKeyshareSecretVersion(ctx, keyshare.ID, version, oldSecret)
+	require.NoError(t, err)
+
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(ctx, keyshare.ID, newSecret, nil)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, int32(1), *updated.SecretVersion)
+
+	mainTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	mainTx.OnCommit(func(fn ent.Committer) ent.Committer {
+		return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+			if err := fn.Commit(ctx, tx); err != nil {
+				return err
+			}
+			return fmt.Errorf("forced commit hook failure after main commit")
+		})
+	})
+
+	err = mainTx.Commit()
+	require.ErrorContains(t, err, "forced commit hook failure")
+	if tx := tc.Session.GetTxIfExists(); tx != nil {
+		_ = tx.Rollback()
+	}
+
+	_, err = entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, version)
+	require.ErrorIs(t, err, entephemeral.ErrNoSecretVersion)
+
+	newVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, *updated.SecretVersion)
+	require.NoError(t, err)
+	require.True(t, newVersionSecret.SecretShare.Equals(newSecret))
+}
+
+func TestUpdateSigningKeyshareWithRotatedSecret_MainReadFailureDeletesNothing(t *testing.T) {
+	mainCtx, tc := db.ConnectToTestPostgres(t)
+	ephemeralCtx := withPostgresEphemeralSession(t, t.Context(), tc)
+
+	oldSecret := keys.MustParsePrivateKeyHex("320f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f86")
+	newSecret := keys.MustParsePrivateKeyHex("5e3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2bff3")
+	version := int32(0)
+
+	keyshare := mustCreateSigningKeyshare(t, mainCtx, tc.Client, &oldSecret, &version)
+	_, err := entephemeral.CreateSigningKeyshareSecretVersion(ephemeralCtx, keyshare.ID, version, oldSecret)
+	require.NoError(t, err)
+	require.NoError(t, entephemeral.DbCommit(ephemeralCtx))
+
+	_, err = ent.UpdateSigningKeyshareWithRotatedSecret(ephemeralCtx, keyshare.ID, newSecret, nil)
+	require.Error(t, err)
+
+	oldVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ephemeralCtx, keyshare.ID, version)
+	require.NoError(t, err)
+	require.True(t, oldVersionSecret.SecretShare.Equals(oldSecret))
+
+	newVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ephemeralCtx, keyshare.ID, version+1)
+	require.NoError(t, err)
+	require.True(t, newVersionSecret.SecretShare.Equals(newSecret))
 }
 
 func withPostgresEphemeralSession(t *testing.T, ctx context.Context, tc *db.TestContext) context.Context {
