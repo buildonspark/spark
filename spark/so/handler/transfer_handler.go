@@ -885,6 +885,19 @@ func (h *TransferHandler) StartTransfer(ctx context.Context, req *pb.StartTransf
 }
 
 func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
+	knobsService := knobs.GetKnobsService(ctx)
+	// Only regular transfers carrying a TransferPackage can be expressed as a
+	// v3 send-transfer flow. The legacy leaves_to_send / swap / coop-exit shapes
+	// fall through to startTransferInternal regardless of the knob.
+	if knobsService.GetValue(knobs.KnobUseConsensusTransfer, 0) > 0 && req.GetTransferPackage() != nil {
+		// Same FlowExecution-reconciler precondition as StartTransferV3; see the
+		// rollout note on KnobUseConsensusTransfer.
+		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"KnobUseConsensusTransfer requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route v2 through the engine")
+		}
+		return h.startTransferV3Consensus(ctx, convertV2ToV3SendTransferRequest(req), req.GetSparkInvoice())
+	}
 	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true, nil)
 }
 
@@ -901,7 +914,7 @@ func (h *TransferHandler) StartTransferV3(ctx context.Context, req *pb.StartTran
 			return nil, status.Errorf(codes.FailedPrecondition,
 				"KnobUseConsensusTransfer requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route v3 through the engine")
 		}
-		return h.startTransferV3Consensus(ctx, req)
+		return h.startTransferV3Consensus(ctx, req, "")
 	}
 	return h.startTransferV3Internal(ctx, req)
 }

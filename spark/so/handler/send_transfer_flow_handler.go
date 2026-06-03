@@ -97,6 +97,23 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
 	}
 
+	// Spark-invoice transfers (only reachable when a v2 request routed through
+	// the engine carried one) are validated on every SO in Prepare, not just
+	// the coordinator as in the legacy path. createTransferV3 below persists
+	// the invoice + links it to the transfer.
+	if sparkInvoice := req.GetSparkInvoice(); sparkInvoice != "" {
+		if len(parsed.receivers) != 1 {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("spark invoice transfer requires exactly one receiver, got %d", len(parsed.receivers)))
+		}
+		leafIDsToSend, err := uuids.ParseSliceFunc(parsed.senderPkg.TransferPackage.GetLeavesToSend(), (*pb.UserSignedTxSigningJob).GetLeafId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse leaf ids for spark invoice validation: %w", err)
+		}
+		if err := validateSatsSparkInvoice(ctx, sparkInvoice, parsed.receivers[0], parsed.senderIDPK, leafIDsToSend, true); err != nil {
+			return nil, fmt.Errorf("failed to validate sats spark invoice %s for transfer %s: %w", sparkInvoice, parsed.transferID, err)
+		}
+	}
+
 	cpfpMap, directMap, dfcMap := loadLeafRefundMapsFromTransferPackage(parsed.senderPkg.TransferPackage)
 
 	// Two deliberate choices vs the legacy InitiateTransferV2 participant call:
@@ -121,6 +138,7 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		keyTweakMap,
 		TransferRoleParticipant,
 		true, /* requireDirectTx */
+		req.GetSparkInvoice(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer rows for %s: %w", parsed.transferID, err)
@@ -282,6 +300,11 @@ type sendTransferCoordinatorFlow struct {
 	parsed            parsedSendTransferRequest
 	signingJobsByLeaf map[string]*sendTransferLeafSigningJobs
 
+	// sparkInvoice is carried out-of-band from req because the public
+	// StartTransferV3Request has no invoice field; it is non-empty only when a
+	// StartTransferV2 request routed through the engine paid an invoice.
+	sparkInvoice string
+
 	// response is populated during BuildCommitPayload so the public
 	// StartTransferV3 handler can return it after engine.Execute completes.
 	response *pb.StartTransferResponse
@@ -291,7 +314,7 @@ var _ consensus.CoordinatorFlow = (*sendTransferCoordinatorFlow)(nil)
 
 // PrepareOp returns the prepare request sent to every SO (engine fans this out).
 func (f *sendTransferCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.SendTransferPrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.SendTransferPrepareRequest{OriginalRequest: f.req, SparkInvoice: f.sparkInvoice}
 }
 
 // BuildCommitPayload aggregates FROST shares from all SOs, applies the resulting
@@ -484,7 +507,7 @@ func (f *sendTransferCoordinatorFlow) aggregateLeafSignature(
 // signing-job helpers the coordinator needs during BuildCommitPayload's
 // aggregation. The coordinator's own DB writes (createTransferV3, FROST round-2)
 // happen inside engine.Execute via the engine-driven Prepare phase.
-func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request) (*sendTransferCoordinatorFlow, error) {
+func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request, sparkInvoice string) (*sendTransferCoordinatorFlow, error) {
 	parsed, err := parseSendTransferRequest(req)
 	if err != nil {
 		return nil, err
@@ -553,6 +576,7 @@ func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, re
 		req:                     req,
 		parsed:                  parsed,
 		signingJobsByLeaf:       jobsByLeaf,
+		sparkInvoice:            sparkInvoice,
 	}, nil
 }
 

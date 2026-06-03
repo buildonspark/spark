@@ -4291,8 +4291,14 @@ func (x *StorePreimageSharePrepareRequest) GetOriginalRequest() *spark.StorePrei
 type SendTransferPrepareRequest struct {
 	state           protoimpl.MessageState        `protogen:"open.v1"`
 	OriginalRequest *spark.StartTransferV3Request `protobuf:"bytes,1,opt,name=original_request,json=originalRequest,proto3" json:"original_request,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Optional spark invoice this transfer pays. Carried out-of-band from
+	// original_request because the public StartTransferV3Request has no
+	// invoice field; it is set only when a StartTransferV2 request routed
+	// through the consensus engine carried a spark_invoice. Every SO
+	// validates it in Prepare and persists it on the transfer.
+	SparkInvoice  string `protobuf:"bytes,2,opt,name=spark_invoice,json=sparkInvoice,proto3" json:"spark_invoice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SendTransferPrepareRequest) Reset() {
@@ -4330,6 +4336,13 @@ func (x *SendTransferPrepareRequest) GetOriginalRequest() *spark.StartTransferV3
 		return x.OriginalRequest
 	}
 	return nil
+}
+
+func (x *SendTransferPrepareRequest) GetSparkInvoice() string {
+	if x != nil {
+		return x.SparkInvoice
+	}
+	return ""
 }
 
 // SendTransferCommitRequest is the 2PC commit payload built by the coordinator
@@ -5538,9 +5551,10 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x19DepositTreePrepareRequest\x12T\n" +
 	"\x10original_request\x18\x01 \x01(\v2).spark.FinalizeDepositTreeCreationRequestR\x0foriginalRequest\"q\n" +
 	" StorePreimageSharePrepareRequest\x12M\n" +
-	"\x10original_request\x18\x01 \x01(\v2\".spark.StorePreimageShareV2RequestR\x0foriginalRequest\"f\n" +
+	"\x10original_request\x18\x01 \x01(\v2\".spark.StorePreimageShareV2RequestR\x0foriginalRequest\"\x8b\x01\n" +
 	"\x1aSendTransferPrepareRequest\x12H\n" +
-	"\x10original_request\x18\x01 \x01(\v2\x1d.spark.StartTransferV3RequestR\x0foriginalRequest\"\x91\x01\n" +
+	"\x10original_request\x18\x01 \x01(\v2\x1d.spark.StartTransferV3RequestR\x0foriginalRequest\x12#\n" +
+	"\rspark_invoice\x18\x02 \x01(\tR\fsparkInvoice\"\x91\x01\n" +
 	"\x19SendTransferCommitRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12S\n" +

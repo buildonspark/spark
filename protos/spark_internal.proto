@@ -617,6 +617,12 @@ message StorePreimageSharePrepareRequest {
 // over the refund transactions.
 message SendTransferPrepareRequest {
     spark.StartTransferV3Request original_request = 1;
+    // Optional spark invoice this transfer pays. Carried out-of-band from
+    // original_request because the public StartTransferV3Request has no
+    // invoice field; it is set only when a StartTransferV2 request routed
+    // through the consensus engine carried a spark_invoice. Every SO
+    // validates it in Prepare and persists it on the transfer.
+    string spark_invoice = 2;
 }
 
 // SendTransferCommitRequest is the 2PC commit payload built by the coordinator

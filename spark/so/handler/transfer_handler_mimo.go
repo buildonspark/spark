@@ -161,6 +161,7 @@ func (h *TransferHandler) startTransferV3Internal(
 		leafTweakMap,
 		TransferRoleCoordinator,
 		true, /* requireDirectTx */
+		"",   /* sparkInvoice: v3 request carries no invoice */
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, err)
@@ -242,6 +243,39 @@ func (h *TransferHandler) startTransferV3Internal(
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
 }
 
+// convertV2ToV3SendTransferRequest maps a v2 StartTransferRequest onto the v3
+// StartTransferV3Request shape consumed by the consensus engine. A v2 request
+// targets a single receiver for the whole transfer, so every leaf in the
+// transfer package is mapped to that one receiver. The caller must have
+// verified req.TransferPackage is non-nil. The spark_invoice (which v3 cannot
+// represent) is carried separately by the caller, not on the returned request.
+func convertV2ToV3SendTransferRequest(req *pb.StartTransferRequest) *pb.StartTransferV3Request {
+	pkg := req.GetTransferPackage()
+	receiver := req.GetReceiverIdentityPublicKey()
+	receiverMap := make(map[string][]byte)
+	for _, jobs := range [][]*pb.UserSignedTxSigningJob{
+		pkg.GetLeavesToSend(),
+		pkg.GetDirectLeavesToSend(),
+		pkg.GetDirectFromCpfpLeavesToSend(),
+	} {
+		for _, job := range jobs {
+			receiverMap[job.GetLeafId()] = receiver
+		}
+	}
+
+	return &pb.StartTransferV3Request{
+		TransferId: req.GetTransferId(),
+		ExpiryTime: req.GetExpiryTime(),
+		SenderPackages: []*pb.SenderTransferPackage{
+			{
+				OwnerIdentityPublicKey:     req.GetOwnerIdentityPublicKey(),
+				TransferPackage:            pkg,
+				ReceiverIdentityPublicKeys: receiverMap,
+			},
+		},
+	}
+}
+
 // startTransferV3Consensus runs the v3 send-transfer flow through the 2PC
 // consensus engine instead of the legacy syncTransferV3Init +
 // syncSettleSenderKeyTweaks fanout. Gated by KnobUseConsensusTransfer at the
@@ -253,9 +287,14 @@ func (h *TransferHandler) startTransferV3Internal(
 // (ValidateTransferPackage / createTransferV3 / transfer-size limit) lives
 // inside Prepare so it runs concurrently across all SOs rather than serially
 // on the coordinator first.
+//
+// sparkInvoice is carried separately from req because the public
+// StartTransferV3Request has no invoice field; it is non-empty only when a
+// StartTransferV2 request routed through the engine paid an invoice.
 func (h *TransferHandler) startTransferV3Consensus(
 	ctx context.Context,
 	req *pb.StartTransferV3Request,
+	sparkInvoice string,
 ) (*pb.StartTransferResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Consensus")
 	defer span.End()
@@ -317,7 +356,7 @@ func (h *TransferHandler) startTransferV3Consensus(
 	// rolls back, and the participant reconciler cleans up. Other consensus
 	// flows (renew_leaf) follow the same pattern.
 
-	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req)
+	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req, sparkInvoice)
 	if err != nil {
 		return nil, err
 	}

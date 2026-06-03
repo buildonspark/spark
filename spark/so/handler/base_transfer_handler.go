@@ -598,6 +598,7 @@ func (h *BaseTransferHandler) createTransferV3(
 	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
 	role TransferRole,
 	requireDirectTx bool,
+	sparkInvoice string,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferType := st.TransferTypeTransfer
 
@@ -685,6 +686,16 @@ func (h *BaseTransferHandler) createTransferV3(
 		SetExpiryTime(expiryTime).
 		SetType(transferType).
 		SetNetwork(network)
+
+	if len(sparkInvoice) > 0 {
+		invoiceID, err := createAndLockSparkInvoice(ctx, sparkInvoice)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to create and lock spark invoice: %w", err)
+		}
+		if invoiceID != uuid.Nil {
+			transferCreate = transferCreate.SetSparkInvoiceID(invoiceID)
+		}
+	}
 
 	transfer, err := transferCreate.Save(ctx)
 	if err != nil {

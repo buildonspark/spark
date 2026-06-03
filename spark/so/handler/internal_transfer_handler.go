@@ -645,6 +645,7 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 		keyTweakMap,
 		TransferRoleParticipant,
 		false,
+		"", /* sparkInvoice: v3 request carries no invoice */
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate transfer V2 for transfer id: %s: %w", transferID, err)

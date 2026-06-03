@@ -9156,6 +9156,8 @@ func (m *SendTransferPrepareRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for SparkInvoice
+
 	if len(errors) > 0 {
 		return SendTransferPrepareRequestMultiError(errors)
 	}
