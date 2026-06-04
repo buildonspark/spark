@@ -1568,7 +1568,7 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  private async prepareClaimPackage(
+  protected async prepareClaimPackage(
     transferId: string,
     leaves: LeafKeyTweak[],
   ) {
