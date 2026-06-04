@@ -86,6 +86,7 @@ const OWNED_STATUSES = new Set([
   LeafStatus.OUTGOING,
   LeafStatus.SWAP_PENDING,
 ]);
+const OPTIMIZATION_AVAILABILITY_WAIT_MS = 15_000;
 
 export type BalanceSnapshot = {
   available: number;
@@ -97,6 +98,8 @@ export type OnBalanceUpdate = (balance: BalanceSnapshot) => void;
 
 export default class LeafManager {
   private optimizationInProgress = false;
+  private optimizationLockedLeafIds: Set<string> = new Set();
+  private optimizationWaiters: Set<() => void> = new Set();
   private hasSynced = false;
   private leaves: Map<string, LeafRecord> = new Map();
 
@@ -422,6 +425,8 @@ export default class LeafManager {
       0,
     );
 
+    await this.waitForOptimizationIfAvailabilityMayRecover(totalTargetAmount);
+
     // Fast-path check without mutex — the real selection happens under lock in
     // selectLeavesWithSwap, which will fail safely if balance changed.
     const availableBalance = this.getAvailableBalance();
@@ -693,6 +698,8 @@ export default class LeafManager {
   public async executeWithAllLeaves<R>(
     executor: (leaves: TreeNode[]) => Promise<R>,
   ): Promise<R> {
+    await this.waitForOptimizationIfAllLeavesMayChange();
+
     // Lock → capture → unlock → execute → update (same pattern as selectLeavesWithSwap)
     // to avoid holding the mutex during network I/O which could deadlock with
     // stream event handlers that also acquire the mutex.
@@ -1007,12 +1014,108 @@ export default class LeafManager {
     return total;
   }
 
+  private getOptimizationLockedBalance(): number {
+    let total = 0;
+    for (const leafId of this.optimizationLockedLeafIds) {
+      const record = this.leaves.get(leafId);
+      if (record && OWNED_STATUSES.has(record.status)) {
+        total += record.treeNode.value;
+      }
+    }
+    return total;
+  }
+
   private getAvailableLeaves(): TreeNode[] {
     return this.getLeavesByStatus(LeafStatus.AVAILABLE);
   }
 
   public isOptimizing(): boolean {
     return this.optimizationInProgress;
+  }
+
+  private async waitForOptimizationIfAvailabilityMayRecover(
+    targetAmount: number,
+  ): Promise<void> {
+    while (true) {
+      const available = this.getAvailableBalance();
+      if (targetAmount <= available || !this.optimizationInProgress) {
+        return;
+      }
+
+      const optimizationLockedBalance = this.getOptimizationLockedBalance();
+      if (targetAmount > available + optimizationLockedBalance) {
+        return;
+      }
+
+      this.debug(
+        "selectLeavesAndExecute",
+        `waiting for optimization requested=${targetAmount} available=${available} optimizationLocked=${optimizationLockedBalance}`,
+      );
+      const progressed = await this.waitForOptimizationUpdate();
+      if (!progressed) {
+        this.debug(
+          "selectLeavesAndExecute",
+          `optimization wait timed out requested=${targetAmount} available=${this.getAvailableBalance()}`,
+        );
+        return;
+      }
+    }
+  }
+
+  private async waitForOptimizationIfAllLeavesMayChange(): Promise<void> {
+    if (
+      !this.optimizationInProgress ||
+      this.getOptimizationLockedBalance() === 0
+    ) {
+      return;
+    }
+
+    const optimizationLockedBalance = this.getOptimizationLockedBalance();
+    this.debug(
+      "executeWithAllLeaves",
+      `waiting for optimization available=${this.getAvailableBalance()} optimizationLocked=${optimizationLockedBalance}`,
+    );
+    while (
+      this.optimizationInProgress &&
+      this.getOptimizationLockedBalance() > 0
+    ) {
+      const progressed = await this.waitForOptimizationUpdate();
+      if (!progressed) return;
+    }
+  }
+
+  private async waitForOptimizationUpdate(): Promise<boolean> {
+    if (!this.optimizationInProgress) {
+      return true;
+    }
+
+    return await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (completed: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        this.optimizationWaiters.delete(onComplete);
+        resolve(completed);
+      };
+      const onComplete = () => finish(true);
+      const timeout = setTimeout(
+        () => finish(false),
+        OPTIMIZATION_AVAILABILITY_WAIT_MS,
+      );
+      (
+        timeout as ReturnType<typeof setTimeout> & { unref?: () => void }
+      ).unref?.();
+      this.optimizationWaiters.add(onComplete);
+    });
+  }
+
+  private notifyOptimizationWaiters(): void {
+    const waiters = [...this.optimizationWaiters];
+    this.optimizationWaiters.clear();
+    for (const waiter of waiters) {
+      waiter();
+    }
   }
 
   /** Read-only leaf selection for queries (fee quotes, etc). Does NOT lock leaves. */
@@ -1346,6 +1449,9 @@ export default class LeafManager {
           leavesToSend.map((l) => l.id),
           LeafStatus.LOCAL_LOCKED,
         );
+        for (const leaf of leavesToSend) {
+          this.optimizationLockedLeafIds.add(leaf.id);
+        }
       }
       outerRelease();
       outerRelease = undefined;
@@ -1391,6 +1497,9 @@ export default class LeafManager {
               `Swap ${i + 1} completed. SPENT ${totalValue} sats ids=[${swapLeafIds.join(",")}], received ${newLeaves.length} leaves (${newLeaves.reduce((acc, leaf) => acc + leaf.value, 0)} sats) ids=[${newLeaves.map((l) => l.id).join(",")}]`,
             );
             this.transition(swapLeafIds, LeafStatus.SPENT);
+            for (const id of swapLeafIds) {
+              this.optimizationLockedLeafIds.delete(id);
+            }
             for (const leaf of newLeaves) {
               this.leaves.set(leaf.id, {
                 treeNode: leaf,
@@ -1399,6 +1508,7 @@ export default class LeafManager {
               });
             }
             this.emitBalanceUpdate();
+            this.notifyOptimizationWaiters();
             this.logOptimizeLeaves(
               `Post-swap balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
             );
@@ -1439,11 +1549,13 @@ export default class LeafManager {
             );
             this.restoreLocalLockedToAvailable(ids);
           }
+          this.optimizationLockedLeafIds.clear();
           this.emitBalanceUpdate();
         }
         this.logOptimizeLeaves(
           `Optimization complete. Final balance: available=${this.getAvailableBalance()} owned=${this.getOwnedBalance()}`,
         );
+        this.notifyOptimizationWaiters();
       }
       outerRelease?.();
     }

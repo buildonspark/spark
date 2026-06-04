@@ -5226,18 +5226,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    const available = this.leafManager.getAvailableBalance();
-    if (amountSats > available) {
-      throw new SparkValidationError(
-        "Total target amount exceeds available balance",
-        {
-          field: "amountSats",
-          value: amountSats,
-          expected: `less than or equal to ${available}`,
-        },
-      );
-    }
-
     // selectLeavesAndExecute locks leaves and may trigger a swap if no exact
     // match exists. After getting the quote, we restore leaves to AVAILABLE
     // so they're not stuck as LOCAL_LOCKED.

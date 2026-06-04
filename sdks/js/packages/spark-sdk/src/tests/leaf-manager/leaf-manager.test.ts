@@ -267,6 +267,15 @@ function createTestableLeafManager(overrides?: {
   );
 }
 
+async function waitForCondition(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 500;
+  while (Date.now() < deadline) {
+    if (condition()) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("Condition was not met");
+}
+
 let nodeCounter = 0;
 function createMockTreeNode(overrides: Partial<TreeNode> = {}): TreeNode {
   nodeCounter++;
@@ -4523,6 +4532,56 @@ describe("LeafManager", () => {
       expect(lm.getLeafRecordPublic("a")?.status).toBe("OUTGOING");
       expect(lm.getLeafRecordPublic("b")?.status).toBe("AVAILABLE");
     });
+
+    it("waits for in-flight optimization before selecting all leaves", async () => {
+      let resolveSwap: ((leaves: TreeNode[]) => void) | undefined;
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              return await new Promise<TreeNode[]>((resolve) => {
+                resolveSwap = resolve;
+              });
+            },
+          ),
+        },
+      });
+
+      await lm.addLeaves(
+        Array.from({ length: 8 }, (_, i) =>
+          createMockTreeNode({ id: `all-opt-${i}`, value: 16 }),
+        ),
+      );
+
+      const optimizePromise = (async () => {
+        for await (const step of lm.optimizeLeaves(0)) {
+          void step;
+        }
+      })();
+      await waitForCondition(
+        () => lm.isOptimizing() && lm.getAvailableBalance() === 0,
+      );
+
+      let executorLeaves: TreeNode[] | undefined;
+      const executePromise = lm.executeWithAllLeaves(async (leaves) => {
+        executorLeaves = leaves;
+        await Promise.resolve();
+        return leaves.reduce((sum, leaf) => sum + leaf.value, 0);
+      });
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(executorLeaves).toBeUndefined();
+
+      resolveSwap!([createMockTreeNode({ id: "all-optimized", value: 128 })]);
+
+      await expect(optimizePromise).resolves.toBeUndefined();
+      await expect(executePromise).resolves.toBe(128);
+      expect(executorLeaves?.map((leaf) => leaf.id)).toEqual(["all-optimized"]);
+    });
   });
 
   describe("selectLeavesAndExecute", () => {
@@ -4555,6 +4614,62 @@ describe("LeafManager", () => {
           return "ok";
         }),
       ).rejects.toThrow("Total target amount exceeds available balance");
+    });
+
+    it("waits for in-flight optimization when locked leaves can cover the target", async () => {
+      let resolveSwap: ((leaves: TreeNode[]) => void) | undefined;
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              return await new Promise<TreeNode[]>((resolve) => {
+                resolveSwap = resolve;
+              });
+            },
+          ),
+        },
+      });
+
+      await lm.addLeaves(
+        Array.from({ length: 8 }, (_, i) =>
+          createMockTreeNode({ id: `opt-${i}`, value: 16 }),
+        ),
+      );
+
+      const optimizePromise = (async () => {
+        for await (const step of lm.optimizeLeaves(0)) {
+          void step;
+        }
+      })();
+      await waitForCondition(
+        () => lm.isOptimizing() && lm.getAvailableBalance() === 0,
+      );
+
+      let executorRan = false;
+      const selectPromise = lm.selectLeavesAndExecute(
+        [128],
+        async (selected) => {
+          executorRan = true;
+          await Promise.resolve();
+          expect(selected[0].reduce((sum, leaf) => sum + leaf.value, 0)).toBe(
+            128,
+          );
+          return "sent";
+        },
+      );
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(executorRan).toBe(false);
+
+      resolveSwap!([createMockTreeNode({ id: "optimized", value: 128 })]);
+
+      await expect(optimizePromise).resolves.toBeUndefined();
+      await expect(selectPromise).resolves.toBe("sent");
+      expect(executorRan).toBe(true);
     });
 
     it("selects exact-fit leaves and executes without swap", async () => {
