@@ -75,15 +75,28 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
+	var ownerSignaturesArr [][]byte
 	// V3+ does NOT require operator-specific owner signatures. The initial user signature on 'Start' is sufficient.
 	if tokenTransaction.Version < st.TokenTransactionVersionV3 {
 		for _, sig := range ownerSignatures {
-			if signature.GetEffectiveSingleSignature(sig) == nil {
+			// Multisig signatures are not supported pre-V3. Nil entries are rejected by validateOperatorSpecificOwnerSignatures.
+			if sig != nil && signature.GetEffectiveSingleSignature(sig) == nil {
 				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("multisig signatures are not supported for token transactions with version < V3"))
 			}
 		}
 		if err := validateOperatorSpecificOwnerSignatures(ctx, h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
 			return nil, err
+		}
+
+		// Order the signatures according to their index before updating the DB.
+		ownerSignatureMap := make(map[int][]byte, len(ownerSignatures))
+		for _, sig := range ownerSignatures {
+			inputIndex := int(sig.InputIndex)
+			ownerSignatureMap[inputIndex] = signature.GetEffectiveSingleSignature(sig)
+		}
+		ownerSignaturesArr = make([][]byte, len(ownerSignatureMap))
+		for i := 0; i < len(ownerSignatureMap); i++ {
+			ownerSignaturesArr[i] = ownerSignatureMap[i]
 		}
 	}
 
@@ -101,16 +114,6 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash)
 
-	// Order the signatures according to their index before updating the DB.
-	ownerSignatureMap := make(map[int][]byte, len(ownerSignatures))
-	for _, sig := range ownerSignatures {
-		inputIndex := int(sig.InputIndex)
-		ownerSignatureMap[inputIndex] = signature.GetEffectiveSingleSignature(sig)
-	}
-	ownerSignaturesArr := make([][]byte, len(ownerSignatureMap))
-	for i := 0; i < len(ownerSignatureMap); i++ {
-		ownerSignaturesArr[i] = ownerSignatureMap[i]
-	}
 	if err := ent.UpdateSignedTransaction(
 		ctx,
 		tokenTransaction,

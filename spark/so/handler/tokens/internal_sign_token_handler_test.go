@@ -410,3 +410,40 @@ func TestSignAndPersistTokenTransaction_RejectsMultisigForPreV3(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multisig signatures are not supported for token transactions with version < V3")
 }
+
+func TestSignAndPersistTokenTransaction_RejectsNilOwnerSignatureWithTransactionContext(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandler(t)
+	defer setup.cleanup()
+
+	tokenCreate := setup.fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+	testHash := hash32(0xE2)
+
+	setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(testHash).
+		SetFinalizedTokenTransactionHash(testHash).
+		SetStatus(st.TokenTransactionStatusStarted).
+		SetCreateID(tokenCreate.ID).
+		SaveX(setup.ctx)
+
+	tokenTx, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(testHash)).
+		WithCreate().
+		WithCreatedOutput().
+		WithSpentOutput().
+		WithMint().
+		Only(setup.ctx)
+	require.NoError(t, err)
+	assert.Less(t, tokenTx.Version, st.TokenTransactionVersionV3)
+
+	_, err = setup.handler.SignAndPersistTokenTransaction(
+		setup.ctx,
+		tokenTx,
+		nil,
+		testHash,
+		[]*tokenpb.SignatureWithIndex{nil},
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "owner signature at index 0 is required")
+	assert.Contains(t, err.Error(), tokenTx.ID.String())
+}

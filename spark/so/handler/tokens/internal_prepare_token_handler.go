@@ -324,7 +324,14 @@ func validateTransferOwnerSignatures(ctx context.Context, operatorIdentityPublic
 	signaturesByIndex := make([]*tokenpb.SignatureWithIndex, numInputs)
 
 	// Sort signatures according to index position
-	for _, sig := range ownerSignatures {
+	for i, sig := range ownerSignatures {
+		if sig == nil {
+			return tokens.FormatErrorWithTransactionEnt(
+				fmt.Sprintf("owner signature at index %d is required", i),
+				tokenTransaction,
+				sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner signature at index %d is required", i)),
+			)
+		}
 		index := int(sig.InputIndex)
 		if index < 0 || index >= numInputs {
 			return tokens.FormatErrorWithTransactionEnt(
@@ -379,6 +386,15 @@ func validateIssuerOwnerSignatures(ctx context.Context, operatorIdentityPublicKe
 			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 signature for mint/create, but got %d", len(ownerSignatures))))
 	}
 
+	sig := ownerSignatures[0]
+	if sig == nil {
+		return tokens.FormatErrorWithTransactionEnt(
+			"owner signature at index 0 is required",
+			tokenTransaction,
+			sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner signature at index 0 is required")),
+		)
+	}
+
 	var issuerPublicKey keys.Public
 	if tokenTransaction.Edges.Mint != nil {
 		tokenCreate, err := ent.GetTokenCreateByIdentifier(ctx, tokenTransaction.Edges.Mint.TokenIdentifier)
@@ -395,8 +411,6 @@ func validateIssuerOwnerSignatures(ctx context.Context, operatorIdentityPublicKe
 			"db consistency error",
 			tokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("neither mint nor create record found in db, but expected one for this transaction")))
 	}
-
-	sig := ownerSignatures[0]
 
 	// Compute the operator-specific payload hash
 	payloadHash, err := utils.HashOperatorSpecificPayload(finalTokenTransactionHash, operatorIdentityPublicKey)
