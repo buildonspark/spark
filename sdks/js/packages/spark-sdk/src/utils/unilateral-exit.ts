@@ -79,6 +79,7 @@ function getTreeNodeStatusString(status: TreeNodeStatus): string {
 const EXIT_CHAIN_STATUSES = new Set([
   getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE),
   getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_SPLITTED),
+  getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_SPLIT_LOCKED),
   getTreeNodeStatusString(TreeNodeStatus.TREE_NODE_STATUS_ON_CHAIN),
 ]);
 
