@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -12,19 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFixKeyshareParseRequest_FailsWhenMainSecretMissingAndEphemeralUnavailable(t *testing.T) {
-	ctx, tc := db.NewTestSQLiteContext(t)
-
-	badOperator := &so.SigningOperator{ID: 1, Identifier: "bad-operator"}
-	goodOperator := &so.SigningOperator{ID: 2, Identifier: "good-operator"}
-	config := &so.Config{
-		Threshold: 1,
-		SigningOperatorMap: map[string]*so.SigningOperator{
-			badOperator.Identifier:  badOperator,
-			goodOperator.Identifier: goodOperator,
-		},
-	}
-
+func newFixKeyshareTestKeyshare(t *testing.T, ctx context.Context, tc *db.TestContext, badOperator, goodOperator *so.SigningOperator) *ent.SigningKeyshare {
+	t.Helper()
 	publicKeySource := keys.MustParsePrivateKeyHex("e6d2b44c26c0c1b507fab0d5e66c388c5676c109b9ee41520ceba5b52e3a2a92")
 	version := int32(0)
 	keyshare, err := tc.Client.SigningKeyshare.Create().
@@ -40,9 +30,62 @@ func TestFixKeyshareParseRequest_FailsWhenMainSecretMissingAndEphemeralUnavailab
 		SetCoordinatorIndex(0).
 		Save(ctx)
 	require.NoError(t, err)
+	return keyshare
+}
+
+// Under SP-3249, the bad operator acts purely as the receiver and never reads
+// its own secret during the reshare, so parseRequest must not validate the
+// secret when this operator is the bad operator — that missing secret is
+// precisely the keyshare the fix flow exists to repair.
+func TestFixKeyshareParseRequest_BadOperatorSkipsSecretValidation(t *testing.T) {
+	ctx, tc := db.NewTestSQLiteContext(t)
+
+	badOperator := &so.SigningOperator{ID: 1, Identifier: "bad-operator"}
+	goodOperator := &so.SigningOperator{ID: 2, Identifier: "good-operator"}
+	config := &so.Config{
+		Identifier: badOperator.Identifier,
+		Threshold:  1,
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			badOperator.Identifier:  badOperator,
+			goodOperator.Identifier: goodOperator,
+		},
+	}
+
+	keyshare := newFixKeyshareTestKeyshare(t, ctx, tc, badOperator, goodOperator)
 
 	handler := NewFixKeyshareHandler(config)
-	_, err = handler.parseRequest(
+	args, err := handler.parseRequest(
+		ctx,
+		keyshare.ID.String(),
+		badOperator.Identifier,
+		[]string{goodOperator.Identifier},
+	)
+	require.NoError(t, err)
+	require.Equal(t, keyshare.ID, args.badKeyshare.ID)
+	require.Equal(t, badOperator.Identifier, args.badOperator.Identifier)
+}
+
+// A good operator (sender) does feed its own secret into the reshare, so
+// parseRequest must still surface an unavailable secret when this operator is
+// one of the good operators.
+func TestFixKeyshareParseRequest_GoodOperatorRequiresSecret(t *testing.T) {
+	ctx, tc := db.NewTestSQLiteContext(t)
+
+	badOperator := &so.SigningOperator{ID: 1, Identifier: "bad-operator"}
+	goodOperator := &so.SigningOperator{ID: 2, Identifier: "good-operator"}
+	config := &so.Config{
+		Identifier: goodOperator.Identifier,
+		Threshold:  1,
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			badOperator.Identifier:  badOperator,
+			goodOperator.Identifier: goodOperator,
+		},
+	}
+
+	keyshare := newFixKeyshareTestKeyshare(t, ctx, tc, badOperator, goodOperator)
+
+	handler := NewFixKeyshareHandler(config)
+	_, err := handler.parseRequest(
 		ctx,
 		keyshare.ID.String(),
 		badOperator.Identifier,

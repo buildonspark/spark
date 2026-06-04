@@ -85,10 +85,19 @@ func (h *FixKeyshareHandler) parseRequest(ctx context.Context, badKeyshareId str
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bad keyshare: %w", err)
 	}
-	// Pre-load the secret share into ExternalSecret cache; this also validates
-	// that the secret is accessible before starting the fix protocol.
-	if _, err := badKeyshare.GetSecretShare(ctx); err != nil {
-		return nil, fmt.Errorf("bad keyshare %s secret share unavailable: %w", badKeyshare.ID, err)
+	// Only the good operators (senders) feed their secret share into the reshare
+	// (see createSender). The bad operator acts purely as the receiver and never
+	// reads its own secret (createReceiver builds only a config), so validating it
+	// here would reject exactly the keyshares this flow exists to repair — the
+	// ones whose current secret version is missing on the bad operator. Scope the
+	// preload/validation to senders. See SP-3249.
+	if _, isGoodOperator := goodOperators[h.config.Identifier]; isGoodOperator {
+		// Pre-load the secret share into ExternalSecret cache so the subsequent
+		// createSender read hits the cache; this also validates that this sender's
+		// secret is accessible before starting the fix protocol.
+		if _, err := badKeyshare.GetSecretShare(ctx); err != nil {
+			return nil, fmt.Errorf("good operator %s secret share unavailable for keyshare %s: %w", h.config.Identifier, badKeyshare.ID, err)
+		}
 	}
 
 	args := FixKeyshareArgs{
