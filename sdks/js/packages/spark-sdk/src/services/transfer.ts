@@ -15,6 +15,7 @@ import { SignatureIntent } from "../proto/common.js";
 import {
   type ClaimLeafKeyTweak,
   ClaimLeafKeyTweaks,
+  type ClaimPackage,
   type ClaimTransferResponse,
   type ClaimTransferSignRefundsResponse,
   type CounterLeafSwapResponse,
@@ -1568,10 +1569,10 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  private async prepareClaimPackage(
+  protected async prepareClaimPackage(
     transferId: string,
     leaves: LeafKeyTweak[],
-  ) {
+  ): Promise<ClaimPackage> {
     // 1. Prepare key tweaks per SO
     const leavesTweaksMap = await this.prepareClaimLeavesKeyTweaks(leaves);
 
@@ -1647,7 +1648,7 @@ export class TransferService extends BaseTransferService {
     );
 
     // 7. Assemble and sign ClaimPackage
-    const claimPackage = {
+    const claimPackage: ClaimPackage = {
       leavesToClaim: cpfpLeafSigningJobs,
       keyTweakPackage,
       userSignature: new Uint8Array(),
