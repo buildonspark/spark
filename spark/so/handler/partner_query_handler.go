@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbpartner "github.com/lightsparkdev/spark/proto/spark_partner"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/partner"
 )
@@ -25,8 +26,8 @@ func NewPartnerQueryHandler(rwClient *partner.RisingWaveClient) *PartnerQueryHan
 // authenticated partner. Requires a valid partner JWT in the request context.
 func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	ctx context.Context,
-	req *pb.QuerySparkTransactionVolumesRequest,
-) (*pb.QuerySparkTransactionVolumesResponse, error) {
+	req *pbpartner.QuerySparkTransactionVolumesRequest,
+) (*pbpartner.QuerySparkTransactionVolumesResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(err)
 	}
@@ -95,10 +96,10 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 
 	var totalVolume int64
 	var totalCount int64
-	var txTypes []*pb.SparkTransactionVolume
+	var txTypes []*pbpartner.SparkTransactionVolume
 	for _, row := range rows {
 		protoType := mapTransactionTypeToProto(row.TransactionType)
-		txTypes = append(txTypes, &pb.SparkTransactionVolume{
+		txTypes = append(txTypes, &pbpartner.SparkTransactionVolume{
 			TransactionType:  protoType,
 			VolumeSats:       row.VolumeSats,
 			TransactionCount: row.TransactionCount,
@@ -107,7 +108,7 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 		totalCount += row.TransactionCount
 	}
 
-	return &pb.QuerySparkTransactionVolumesResponse{
+	return &pbpartner.QuerySparkTransactionVolumesResponse{
 		PartnerId:             pInfo.PartnerID,
 		Label:                 pInfo.Label,
 		StartDate:             req.StartDate,
@@ -118,17 +119,17 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	}, nil
 }
 
-func mapTransactionType(t pb.SparkTransactionType) string {
+func mapTransactionType(t pbpartner.SparkTransactionType) string {
 	switch t {
-	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER:
+	case pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER:
 		return "TRANSFER"
-	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND:
+	case pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND:
 		return "LIGHTNING_SEND"
-	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE:
+	case pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE:
 		return "LIGHTNING_RECEIVE"
-	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT:
+	case pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT:
 		return "COOPERATIVE_EXIT"
-	case pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT:
+	case pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT:
 		return "DEPOSIT"
 	default:
 		return ""
@@ -153,19 +154,19 @@ func mapNetwork(n pb.Network) string {
 	}
 }
 
-func mapTransactionTypeToProto(s string) pb.SparkTransactionType {
+func mapTransactionTypeToProto(s string) pbpartner.SparkTransactionType {
 	switch s {
 	case "TRANSFER":
-		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER
+		return pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER
 	case "LIGHTNING_SEND":
-		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND
+		return pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND
 	case "LIGHTNING_RECEIVE":
-		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE
+		return pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE
 	case "COOPERATIVE_EXIT":
-		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT
+		return pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT
 	case "DEPOSIT":
-		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT
+		return pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_DEPOSIT
 	default:
-		return pb.SparkTransactionType_SPARK_TRANSACTION_TYPE_UNSPECIFIED
+		return pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_UNSPECIFIED
 	}
 }

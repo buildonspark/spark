@@ -836,7 +836,7 @@ func main() {
 	serverOpts = append(serverOpts, grpc.Creds(creds))
 	grpcServer := grpc.NewServer(serverOpts...)
 
-	grpcCleanup, err := RegisterGrpcServers(
+	err = RegisterGrpcServers(
 		grpcServer,
 		args,
 		config,
@@ -850,7 +850,6 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
-	defer grpcCleanup()
 
 	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, ephemeralDbClient)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
