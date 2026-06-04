@@ -77,9 +77,6 @@ func (h *TransferHandler) startTransferV3Internal(
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
-	if req.GetExpiryTime() == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("expiry_time is required for transfer %s", transferID))
-	}
 
 	// Parse receivers from the leaf→receiver map.
 	leafReceiverMap := make(map[string]keys.Public)
