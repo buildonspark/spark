@@ -4672,6 +4672,106 @@ describe("LeafManager", () => {
       expect(executorRan).toBe(true);
     });
 
+    it("times out waiting for in-flight optimization and returns the normal insufficient balance error", async () => {
+      let resolveSwap: ((leaves: TreeNode[]) => void) | undefined;
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              return await new Promise<TreeNode[]>((resolve) => {
+                resolveSwap = resolve;
+              });
+            },
+          ),
+        },
+      });
+
+      await lm.addLeaves(
+        Array.from({ length: 8 }, (_, i) =>
+          createMockTreeNode({ id: `timeout-opt-${i}`, value: 16 }),
+        ),
+      );
+
+      const optimizePromise = (async () => {
+        for await (const step of lm.optimizeLeaves(0)) {
+          void step;
+        }
+      })();
+      await waitForCondition(
+        () => lm.isOptimizing() && lm.getAvailableBalance() === 0,
+      );
+
+      jest.useFakeTimers();
+      try {
+        const selectPromise = lm.selectLeavesAndExecute([128], async () => {
+          await Promise.resolve();
+          return "sent";
+        });
+        const expectTimeout = expect(selectPromise).rejects.toThrow(
+          "Total target amount exceeds available balance",
+        );
+
+        await jest.advanceTimersByTimeAsync(15_000);
+        await expectTimeout;
+      } finally {
+        jest.useRealTimers();
+        resolveSwap!([
+          createMockTreeNode({ id: "timeout-optimized", value: 128 }),
+        ]);
+        await optimizePromise;
+      }
+    });
+
+    it("does not wait for in-flight optimization when locked leaves cannot cover the target", async () => {
+      let resolveSwap: ((leaves: TreeNode[]) => void) | undefined;
+      const lm = createTestableLeafManager({
+        config: {
+          getOptimizationOptions: () => ({ multiplicity: 0 }),
+        },
+        swapService: {
+          requestLeavesSwap: jest.fn(
+            async (params: RequestLeavesSwapParams) => {
+              await params.onSwapInitiated?.();
+              return await new Promise<TreeNode[]>((resolve) => {
+                resolveSwap = resolve;
+              });
+            },
+          ),
+        },
+      });
+
+      await lm.addLeaves(
+        Array.from({ length: 8 }, (_, i) =>
+          createMockTreeNode({ id: `give-up-opt-${i}`, value: 16 }),
+        ),
+      );
+
+      const optimizePromise = (async () => {
+        for await (const step of lm.optimizeLeaves(0)) {
+          void step;
+        }
+      })();
+      await waitForCondition(
+        () => lm.isOptimizing() && lm.getAvailableBalance() === 0,
+      );
+
+      await expect(
+        lm.selectLeavesAndExecute([129], async () => {
+          await Promise.resolve();
+          return "sent";
+        }),
+      ).rejects.toThrow("Total target amount exceeds available balance");
+
+      resolveSwap!([
+        createMockTreeNode({ id: "give-up-optimized", value: 128 }),
+      ]);
+      await optimizePromise;
+    });
+
     it("selects exact-fit leaves and executes without swap", async () => {
       const lm = createTestableLeafManager();
       await lm.addLeaves([
