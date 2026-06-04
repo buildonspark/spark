@@ -151,11 +151,6 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			wantSub: "invalid transfer id",
 		},
 		{
-			name:    "missing expiry",
-			mutate:  func(r *pb.StartTransferV3Request) { r.ExpiryTime = nil },
-			wantSub: "expiry_time is required",
-		},
-		{
 			name: "invalid sender pubkey",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].OwnerIdentityPublicKey = []byte{0x00}

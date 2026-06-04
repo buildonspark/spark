@@ -619,9 +619,6 @@ func parseSendTransferRequest(req *pb.StartTransferV3Request) (parsedSendTransfe
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
-	if req.GetExpiryTime() == nil {
-		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("expiry_time is required for transfer %s", transferID))
-	}
 	senderIDPK, err := keys.ParsePublicKey(senderPkg.OwnerIdentityPublicKey)
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner identity public key: %w", err))
