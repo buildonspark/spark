@@ -261,7 +261,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 				return nil, tokens.FormatErrorWithTransactionEnt("frozen transfer cannot exchange revocation secrets", tokenTransaction, err)
 			}
 		}
-		if len(tokenTransaction.Edges.SpentOutput) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+		if !tokenTransactionSpentOutputsMatchFinalInputs(tokenTransaction, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
 			err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)
 			if err != nil {
 				return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and reassign spent output to transaction", tokenTransaction, err)
@@ -428,6 +428,41 @@ type TokenOutputHashVoutKey struct {
 	Vout   int
 }
 
+func tokenTransactionSpentOutputsMatchFinalInputs(tokenTransaction *ent.TokenTransaction, finalOutputsToSpend []*tokenpb.TokenOutputToSpend) bool {
+	if len(tokenTransaction.Edges.SpentOutput) != len(finalOutputsToSpend) {
+		return false
+	}
+
+	finalOutputs := make(map[TokenOutputHashVoutKey]struct{}, len(finalOutputsToSpend))
+	for _, outputToSpend := range finalOutputsToSpend {
+		if outputToSpend == nil {
+			return false
+		}
+		key := TokenOutputHashVoutKey{
+			TxHash: string(outputToSpend.GetPrevTokenTransactionHash()),
+			Vout:   int(outputToSpend.GetPrevTokenTransactionVout()),
+		}
+		if _, ok := finalOutputs[key]; ok {
+			return false
+		}
+		finalOutputs[key] = struct{}{}
+	}
+
+	for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
+		if spentOutput == nil {
+			return false
+		}
+		key := TokenOutputHashVoutKey{
+			TxHash: string(spentOutput.CreatedTransactionFinalizedHash),
+			Vout:   int(spentOutput.CreatedTransactionOutputVout),
+		}
+		if _, ok := finalOutputs[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (h *InternalSignTokenHandler) validateTransactionHashAndSpentOutputsInRequest(req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) error {
 	finalTokenTransaction := req.FinalTokenTransaction
 	finalTokenTransactionHash := req.FinalTokenTransactionHash
@@ -446,21 +481,53 @@ func (h *InternalSignTokenHandler) validateTransactionHashAndSpentOutputsInReque
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatch in number of outputs to spend: request has %d, transaction has %d", len(outputsToSpend), len(finalTokenTransactionOutputsToSpend)))
 	}
 
-	finalOutputsMap := make(map[TokenOutputHashVoutKey]struct{})
-	for _, output := range finalTokenTransactionOutputsToSpend {
+	finalOutputInputIndex := make(map[TokenOutputHashVoutKey]uint32, len(finalTokenTransactionOutputsToSpend))
+	for i, output := range finalTokenTransactionOutputsToSpend {
+		if output == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("final_token_transaction.transfer_input.outputs_to_spend[%d] is required", i))
+		}
 		key := TokenOutputHashVoutKey{
 			TxHash: string(output.GetPrevTokenTransactionHash()),
 			Vout:   int(output.GetPrevTokenTransactionVout()),
 		}
-		finalOutputsMap[key] = struct{}{}
+		if _, ok := finalOutputInputIndex[key]; ok {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate output in final transaction: hash %x vout %d", output.GetPrevTokenTransactionHash(), output.GetPrevTokenTransactionVout()))
+		}
+		finalOutputInputIndex[key] = uint32(i)
+	}
+
+	seenRequestOutputs := make(map[TokenOutputHashVoutKey]struct{}, len(outputsToSpend))
+	for i, outputFromRequest := range outputsToSpend {
+		if outputFromRequest == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("outputs_to_spend[%d] is required", i))
+		}
+		key := TokenOutputHashVoutKey{
+			TxHash: string(outputFromRequest.CreatedTokenTransactionHash),
+			Vout:   int(outputFromRequest.CreatedTokenTransactionVout),
+		}
+		if _, ok := seenRequestOutputs[key]; ok {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate output in request: hash %x vout %d", outputFromRequest.CreatedTokenTransactionHash, outputFromRequest.CreatedTokenTransactionVout))
+		}
+		seenRequestOutputs[key] = struct{}{}
 	}
 
 	for _, outputFromRequest := range outputsToSpend {
-		if _, ok := finalOutputsMap[TokenOutputHashVoutKey{
+		key := TokenOutputHashVoutKey{
 			TxHash: string(outputFromRequest.CreatedTokenTransactionHash),
 			Vout:   int(outputFromRequest.CreatedTokenTransactionVout),
-		}]; !ok {
+		}
+		expectedInputIndex, ok := finalOutputInputIndex[key]
+		if !ok {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("output from request (hash: %x, vout: %d) not found in final transaction", outputFromRequest.CreatedTokenTransactionHash, outputFromRequest.CreatedTokenTransactionVout))
+		}
+		if outputFromRequest.GetSpentTokenTransactionVout() != expectedInputIndex {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+				"spent token transaction vout mismatch for output hash %x vout %d: got %d, expected %d",
+				outputFromRequest.CreatedTokenTransactionHash,
+				outputFromRequest.CreatedTokenTransactionVout,
+				outputFromRequest.GetSpentTokenTransactionVout(),
+				expectedInputIndex,
+			))
 		}
 	}
 

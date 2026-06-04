@@ -3,7 +3,9 @@ package tokens
 import (
 	"bytes"
 	"context"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
@@ -13,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	multisigpb "github.com/lightsparkdev/spark/proto/multisig"
+	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	sparktokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so/db"
@@ -20,9 +23,11 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/entfixtures"
+	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type internalSignTokenTestSetup struct {
@@ -54,6 +59,167 @@ func setUpInternalSignTokenTestHandler(t *testing.T) *internalSignTokenTestSetup
 				t.Errorf("rollback failed: %v", rollbackErr)
 			}
 		},
+	}
+}
+
+func buildRevocationExchangeTransferTx(t *testing.T, outputsToSpend []*tokenpb.TokenOutputToSpend) (*tokenpb.TokenTransaction, []byte) {
+	t.Helper()
+
+	amount := make([]byte, 16)
+	big.NewInt(10).FillBytes(amount)
+	withdrawBondSats := uint64(0)
+	withdrawRelativeBlockLocktime := uint64(0)
+	outputID := uuid.NewString()
+	now := time.Now().UTC()
+
+	tx := &tokenpb.TokenTransaction{
+		Version: 1,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: outputsToSpend,
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{{
+			Id:                            &outputID,
+			OwnerPublicKey:                keys.GeneratePrivateKey().Public().Serialize(),
+			TokenAmount:                   amount,
+			RevocationCommitment:          keys.GeneratePrivateKey().Public().Serialize(),
+			WithdrawBondSats:              &withdrawBondSats,
+			WithdrawRelativeBlockLocktime: &withdrawRelativeBlockLocktime,
+		}},
+		SparkOperatorIdentityPublicKeys: [][]byte{keys.GeneratePrivateKey().Public().Serialize()},
+		Network:                         sparkpb.Network_REGTEST,
+		ClientCreatedTimestamp:          timestamppb.New(now),
+		ExpiryTime:                      timestamppb.New(now.Add(time.Hour)),
+	}
+
+	hash, err := utils.HashTokenTransaction(tx, false)
+	require.NoError(t, err)
+	return tx, hash
+}
+
+func outputToSpendForExchange(input *tokenpb.TokenOutputToSpend, spentInputIndex uint32) *sparktokeninternal.OutputToSpend {
+	return &sparktokeninternal.OutputToSpend{
+		CreatedTokenTransactionHash: input.GetPrevTokenTransactionHash(),
+		CreatedTokenTransactionVout: input.GetPrevTokenTransactionVout(),
+		SpentTokenTransactionVout:   spentInputIndex,
+		SpentOwnershipSignature:     hash32(0x99),
+	}
+}
+
+func TestExchangeRevocationSecretsSharesValidatesRequestOutputBinding(t *testing.T) {
+	setup := setUpInternalSignTokenTestHandler(t)
+	defer setup.cleanup()
+
+	persistTransferTransaction := func(hash []byte) {
+		setup.client.TokenTransaction.Create().
+			SetPartialTokenTransactionHash(hash).
+			SetFinalizedTokenTransactionHash(hash).
+			SetStatus(st.TokenTransactionStatusSigned).
+			SaveX(setup.ctx)
+	}
+	buildRequest := func(tx *tokenpb.TokenTransaction, hash []byte, outputsToSpend []*sparktokeninternal.OutputToSpend) *sparktokeninternal.ExchangeRevocationSecretsSharesRequest {
+		return &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
+			OperatorIdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
+			OperatorShares: []*sparktokeninternal.OperatorRevocationShares{{
+				OperatorIdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
+			}},
+			FinalTokenTransaction:     tx,
+			FinalTokenTransactionHash: hash,
+			OutputsToSpend:            outputsToSpend,
+		}
+	}
+
+	inputA := &tokenpb.TokenOutputToSpend{
+		PrevTokenTransactionHash: hash32(0xA1),
+		PrevTokenTransactionVout: 0,
+	}
+	inputB := &tokenpb.TokenOutputToSpend{
+		PrevTokenTransactionHash: hash32(0xB2),
+		PrevTokenTransactionVout: 1,
+	}
+	inputC := &tokenpb.TokenOutputToSpend{
+		PrevTokenTransactionHash: hash32(0xC3),
+		PrevTokenTransactionVout: 2,
+	}
+
+	t.Run("accepts exact set in any request order", func(t *testing.T) {
+		tx, hash := buildRevocationExchangeTransferTx(t, []*tokenpb.TokenOutputToSpend{inputA, inputB})
+		persistTransferTransaction(hash)
+		req := buildRequest(tx, hash, []*sparktokeninternal.OutputToSpend{
+			outputToSpendForExchange(inputB, 1),
+			outputToSpendForExchange(inputA, 0),
+		})
+
+		// A correctly bound request clears output validation and fails later in
+		// the flow, never on the output-binding check exercised here.
+		_, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, req)
+		require.Error(t, err)
+		require.NotContains(t, err.Error(), "failed to validate tx hash and spent outputs in request")
+	})
+
+	tests := []struct {
+		name           string
+		finalOutputs   []*tokenpb.TokenOutputToSpend
+		requestOutputs []*sparktokeninternal.OutputToSpend
+		errContains    string
+	}{
+		{
+			name:         "duplicate request output cannot omit another final input",
+			finalOutputs: []*tokenpb.TokenOutputToSpend{inputA, inputB},
+			requestOutputs: []*sparktokeninternal.OutputToSpend{
+				outputToSpendForExchange(inputA, 0),
+				outputToSpendForExchange(inputA, 0),
+			},
+			errContains: "duplicate output in request",
+		},
+		{
+			name:         "duplicate request output is reported before absent final input",
+			finalOutputs: []*tokenpb.TokenOutputToSpend{inputA, inputB},
+			requestOutputs: []*sparktokeninternal.OutputToSpend{
+				outputToSpendForExchange(inputC, 0),
+				outputToSpendForExchange(inputC, 1),
+			},
+			errContains: "duplicate output in request",
+		},
+		{
+			name:         "request output must be in final transaction",
+			finalOutputs: []*tokenpb.TokenOutputToSpend{inputA, inputB},
+			requestOutputs: []*sparktokeninternal.OutputToSpend{
+				outputToSpendForExchange(inputA, 0),
+				outputToSpendForExchange(inputC, 1),
+			},
+			errContains: "not found in final transaction",
+		},
+		{
+			name:         "spent input index must match final transaction position",
+			finalOutputs: []*tokenpb.TokenOutputToSpend{inputA, inputB},
+			requestOutputs: []*sparktokeninternal.OutputToSpend{
+				outputToSpendForExchange(inputA, 1),
+				outputToSpendForExchange(inputB, 1),
+			},
+			errContains: "spent token transaction vout mismatch",
+		},
+		{
+			name:         "final transaction cannot duplicate inputs",
+			finalOutputs: []*tokenpb.TokenOutputToSpend{inputA, inputA},
+			requestOutputs: []*sparktokeninternal.OutputToSpend{
+				outputToSpendForExchange(inputA, 0),
+				outputToSpendForExchange(inputA, 1),
+			},
+			errContains: "duplicate output in final transaction",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tx, hash := buildRevocationExchangeTransferTx(t, tc.finalOutputs)
+			persistTransferTransaction(hash)
+			req := buildRequest(tx, hash, tc.requestOutputs)
+
+			_, err := setup.handler.ExchangeRevocationSecretsShares(setup.ctx, req)
+			require.ErrorContains(t, err, tc.errContains)
+		})
 	}
 }
 
