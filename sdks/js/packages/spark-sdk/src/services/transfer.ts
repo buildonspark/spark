@@ -202,6 +202,8 @@ export class BaseTransferService {
   protected readonly signingService: SigningService;
   protected readonly logger: Logger;
 
+  protected destroyed = false;
+
   constructor(
     config: WalletConfigService,
     connectionManager: ConnectionManager,
@@ -213,6 +215,16 @@ export class BaseTransferService {
     this.connectionManager = connectionManager;
     this.signingService = signingService;
     this.logger = logging.logger(serviceName);
+  }
+
+  async cleanup() {
+    this.destroyed = true;
+  }
+
+  protected assertNotDestroyed(message: string): asserts this is { destroyed: false } {
+    if (this.destroyed) {
+      throw new SparkError(message);
+    }
   }
 
   async deliverTransferPackage(
@@ -2401,6 +2413,8 @@ export class TransferService extends BaseTransferService {
     const onError = async (
       context: RetryContext<TreeNode[], Transfer>,
     ): Promise<TreeNode[] | undefined> => {
+      this.assertNotDestroyed("Claim transfer process was interrupted due to cleanup");
+
       const error = context.error;
       if (
         error instanceof SparkRequestError &&
@@ -2427,6 +2441,8 @@ export class TransferService extends BaseTransferService {
     };
 
     const fetchData = async (context: RetryContext<TreeNode[], Transfer>) => {
+      this.assertNotDestroyed("Claim transfer process was interrupted due to cleanup");
+
       const transferToUse = context.data || transfer;
       const updatedTransfer = await this.queryPendingTransfers({
         transferIds: [transferToUse.id],
