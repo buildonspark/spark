@@ -536,6 +536,9 @@ enum CurrencyUnit {
   """Argentine Peso."""
   ARS
 
+  """Chinese Yuan."""
+  CNY
+
   """Tether"""
   USDT
 
