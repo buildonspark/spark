@@ -27,10 +27,6 @@ const (
 	ModeMax
 )
 
-const (
-	XForwardedForHeader = "x-forwarded-for"
-)
-
 func (m Mode) Valid() bool {
 	return m > ModeUnset && m < ModeMax
 }
@@ -42,12 +38,11 @@ type InterceptorConfig struct {
 	// An empty list disables the authorization check
 	AllowedIPs []string
 	Mode       Mode
-	// ProtectedServices is a list of gRPC service prefixes (e.g., "/spark_ssp.SparkSspInternalService")
-	// If empty, all services are protected when mode is AuthzModeEnforce
-	ProtectedServices []string
-	// Indicates the position in the x-forwarded-for header to look for the
-	// client IP address. Needed because different infrastructure and load
-	// balancer setups may place it differently.
+	// IsProtectedMethod decides whether a given full gRPC method name is subject to IP allowlisting. Production wires
+	// this to rpcpolicy.IsInternalOnly. When nil, all methods are treated as protected (when Mode is enforcing).
+	IsProtectedMethod func(fullMethod string) bool
+	// Indicates the position in the x-forwarded-for header to look for the client IP address. Needed because different
+	// infrastructure and load balancer setups may place it differently.
 	XffClientIpPosition int
 }
 
@@ -56,9 +51,7 @@ type Interceptor struct {
 }
 
 func NewAuthzInterceptor(config *InterceptorConfig) *Interceptor {
-	return &Interceptor{
-		config: config,
-	}
+	return &Interceptor{config: config}
 }
 
 func (i *Interceptor) UnaryServerInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -75,6 +68,15 @@ func (i *Interceptor) StreamServerInterceptor(srv any, ss grpc.ServerStream, inf
 	return handler(srv, ss)
 }
 
+// isMethodProtected returns true when this gRPC method should be subjected to IP allowlisting. When the predicate is
+// nil, the interceptor defaults to treating every method as protected.
+func (i *Interceptor) isMethodProtected(method string) bool {
+	if i.config.IsProtectedMethod == nil {
+		return true
+	}
+	return i.config.IsProtectedMethod(method)
+}
+
 func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -87,18 +89,8 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 		return nil
 	}
 
-	// Check if this method's service is protected
-	if len(i.config.ProtectedServices) > 0 {
-		protected := false
-		for _, prefix := range i.config.ProtectedServices {
-			if strings.HasPrefix(method, prefix) {
-				protected = true
-				break
-			}
-		}
-		if !protected {
-			return nil
-		}
+	if !i.isMethodProtected(method) {
+		return nil
 	}
 
 	var (
@@ -168,13 +160,11 @@ func WithAllowedIPs(ips []string) InterceptorConfigOption {
 	}
 }
 
-func WithProtectedServices(protectedServices []string) InterceptorConfigOption {
-	fullProtectedServicesNames := make([]string, len(protectedServices))
-	for i, service := range protectedServices {
-		fullProtectedServicesNames[i] = "/" + service + "/"
-	}
+// WithIsProtectedMethod configures the authz interceptor to consult a per-method predicate
+// (typically rpcpolicy.IsInternalOnly) to decide whether IP allowlisting applies. When unset, every method is treated as protected.
+func WithIsProtectedMethod(fn func(fullMethod string) bool) InterceptorConfigOption {
 	return func(config *InterceptorConfig) {
-		config.ProtectedServices = fullProtectedServicesNames
+		config.IsProtectedMethod = fn
 	}
 }
 
@@ -188,7 +178,6 @@ func NewAuthzConfig(opts ...InterceptorConfigOption) *InterceptorConfig {
 	config := &InterceptorConfig{
 		AllowedIPs:          []string{},
 		Mode:                ModeDisabled,
-		ProtectedServices:   []string{},
 		XffClientIpPosition: 0,
 	}
 

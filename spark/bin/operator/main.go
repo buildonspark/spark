@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -45,6 +46,7 @@ import (
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/partner"
+	"github.com/lightsparkdev/spark/so/rpcpolicy"
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	"github.com/lightsparkdev/spark/so/grpc/grpcutil"
@@ -781,7 +783,7 @@ func main() {
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),
-				authz.WithProtectedServices(GetProtectedServices()),
+				authz.WithIsProtectedMethod(rpcpolicy.IsInternalOnly),
 				authz.WithXffClientIpPosition(config.XffClientIpPosition),
 			)).UnaryServerInterceptor,
 			sparkgrpc.ValidationInterceptor(),
@@ -814,7 +816,7 @@ func main() {
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),
-				authz.WithProtectedServices(GetProtectedServices()),
+				authz.WithIsProtectedMethod(rpcpolicy.IsInternalOnly),
 				authz.WithXffClientIpPosition(config.XffClientIpPosition),
 			)).StreamServerInterceptor,
 			sparkgrpc.StreamValidationInterceptor(),
@@ -853,6 +855,12 @@ func main() {
 
 	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, ephemeralDbClient)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	// Fail-closed: every method registered on this server must have an rpcpolicy entry. Catches the case where a new
+	// RPC is added without declaring its auth policy.
+	if missing := registeredMethodsMissingPolicy(grpcServer); len(missing) > 0 {
+		logger.Sugar().Fatalf("gRPC methods registered without an rpcpolicy entry: %v", missing)
+	}
 
 	// Web compatibility layer
 	wrappedGrpcServer := grpcweb.WrapServer(grpcServer,
@@ -1103,4 +1111,20 @@ func operatorPoolConfigFromKnobs(knobsService knobs.Knobs, operatorID string) so
 		UsersPerConnectionCap: getInt(knobs.KnobGrpcClientPoolUsersPerConnectionCap, defaults.UsersPerConnectionCap),
 		ScaleConcurrency:      getInt(knobs.KnobGrpcClientPoolScaleConcurrency, defaults.ScaleConcurrency),
 	}
+}
+
+// registeredMethodsMissingPolicy returns the full names of any gRPC methods registered on the server that lack an
+// rpcpolicy entry. Used as a fail-closed startup guard so a new RPC can't be exposed without declaring its auth policy.
+func registeredMethodsMissingPolicy(srv *grpc.Server) []string {
+	var missing []string
+	for serviceName, info := range srv.GetServiceInfo() {
+		for _, m := range info.Methods {
+			full := "/" + serviceName + "/" + m.Name
+			if _, ok := rpcpolicy.LookUp(full); !ok {
+				missing = append(missing, full)
+			}
+		}
+	}
+	slices.Sort(missing)
+	return missing
 }

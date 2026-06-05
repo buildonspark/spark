@@ -43,6 +43,12 @@ func streamHandler(_ any, _ grpc.ServerStream) error {
 	return nil
 }
 
+// onlyProtectedTestService returns a predicate matching methods under ProtectedTestService. Mirrors what production
+// wires from rpcpolicy without pulling that dependency into this isolated unit test.
+func onlyProtectedTestService(method string) bool {
+	return strings.HasPrefix(method, "/"+ProtectedTestService+"/")
+}
+
 type contextToUse int
 
 const (
@@ -74,9 +80,8 @@ func TestAuthzInterceptor(t *testing.T) {
 		{
 			name: "warn allows all requests",
 			config: &InterceptorConfig{
-				AllowedIPs:        []string{},
-				Mode:              ModeWarn,
-				ProtectedServices: []string{},
+				AllowedIPs: []string{},
+				Mode:       ModeWarn,
 			},
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPAllowed1},
@@ -86,9 +91,8 @@ func TestAuthzInterceptor(t *testing.T) {
 		{
 			name: "enforce with empty allowlist disallows requests with x-forwarded-for header",
 			config: &InterceptorConfig{
-				AllowedIPs:        []string{},
-				Mode:              ModeEnforce,
-				ProtectedServices: []string{},
+				AllowedIPs: []string{},
+				Mode:       ModeEnforce,
 			},
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPAllowed1},
@@ -127,7 +131,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPAllowed1},
@@ -139,7 +143,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         UnprotectedTestMethod,
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -151,7 +155,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -165,7 +169,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         OtherServiceMethod,
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -177,7 +181,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         "/foo/test.ProtectedGrpcService/SomeMethodBar/SomeMethod",
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -189,7 +193,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPBadFormat}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPAllowed1},
@@ -201,7 +205,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -237,7 +241,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeLogOnly),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         ProtectedTestMethod,
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -249,7 +253,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeLogOnly),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 			),
 			fullMethod:         UnprotectedTestMethod,
 			forwardedFromAddrs: []string{TestIPDisallowed},
@@ -279,7 +283,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(1),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -292,7 +296,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(1),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -307,7 +311,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(2),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -320,7 +324,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(2),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -335,7 +339,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeLogOnly),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(1),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -348,7 +352,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeWarn),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(1),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -361,7 +365,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(5), // Position beyond available IPs
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -377,7 +381,7 @@ func TestAuthzInterceptor(t *testing.T) {
 			config: NewAuthzConfig(
 				WithMode(ModeEnforce),
 				WithAllowedIPs([]string{TestIPAllowed1}),
-				WithProtectedServices([]string{ProtectedTestService}),
+				WithIsProtectedMethod(onlyProtectedTestService),
 				WithXffClientIpPosition(1),
 			),
 			fullMethod:         ProtectedTestMethod,
@@ -446,16 +450,12 @@ func TestAuthzConfig(t *testing.T) {
 		configFn           func() *InterceptorConfig
 		expectedAllowedIPs []string
 		expectedMode       Mode
-		expectedServices   []string
 	}{
 		{
-			name: "DefaultAuthzConfig",
-			configFn: func() *InterceptorConfig {
-				return NewAuthzConfig()
-			},
+			name:               "DefaultAuthzConfig",
+			configFn:           func() *InterceptorConfig { return NewAuthzConfig() },
 			expectedAllowedIPs: []string{},
 			expectedMode:       ModeDisabled,
-			expectedServices:   []string{},
 		},
 		{
 			name: "NewAuthzConfig with IPs",
@@ -464,29 +464,12 @@ func TestAuthzConfig(t *testing.T) {
 			},
 			expectedAllowedIPs: []string{TestIPAllowed1, TestIPAllowed2},
 			expectedMode:       ModeEnforce,
-			expectedServices:   []string{},
 		},
 		{
-			name: "NewAuthzConfig with empty IPs",
-			configFn: func() *InterceptorConfig {
-				return NewAuthzConfig(WithMode(ModeEnforce))
-			},
+			name:               "NewAuthzConfig with empty IPs",
+			configFn:           func() *InterceptorConfig { return NewAuthzConfig(WithMode(ModeEnforce)) },
 			expectedAllowedIPs: []string{},
 			expectedMode:       ModeEnforce,
-			expectedServices:   []string{},
-		},
-		{
-			name: "NewAuthzConfigWithProtectedServices",
-			configFn: func() *InterceptorConfig {
-				return NewAuthzConfig(
-					WithMode(ModeEnforce),
-					WithAllowedIPs([]string{TestIPAllowed1}),
-					WithProtectedServices([]string{ProtectedTestService}),
-				)
-			},
-			expectedAllowedIPs: []string{TestIPAllowed1},
-			expectedMode:       ModeEnforce,
-			expectedServices:   []string{ProtectedTestService},
 		},
 		{
 			name: "NewAuthzConfig with LogOnly mode",
@@ -498,7 +481,6 @@ func TestAuthzConfig(t *testing.T) {
 			},
 			expectedAllowedIPs: []string{TestIPAllowed1, TestIPAllowed2},
 			expectedMode:       ModeLogOnly,
-			expectedServices:   []string{},
 		},
 	}
 
@@ -507,11 +489,15 @@ func TestAuthzConfig(t *testing.T) {
 			config := tt.configFn()
 			assert.Equal(t, tt.expectedAllowedIPs, config.AllowedIPs)
 			assert.Equal(t, tt.expectedMode, config.Mode)
-			for i, service := range tt.expectedServices {
-				assert.Equal(t, "/"+service+"/", config.ProtectedServices[i])
-			}
 		})
 	}
+
+	t.Run("WithIsProtectedMethod wires the predicate", func(t *testing.T) {
+		config := NewAuthzConfig(WithIsProtectedMethod(onlyProtectedTestService))
+		require.NotNil(t, config.IsProtectedMethod)
+		assert.True(t, config.IsProtectedMethod(ProtectedTestMethod))
+		assert.False(t, config.IsProtectedMethod(UnprotectedTestMethod))
+	})
 }
 
 type mockAddr struct {
