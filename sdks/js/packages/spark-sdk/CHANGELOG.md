@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.8.4
+
+### Patch Changes
+
+- 028de60: - Export the signing and transfer services from the main SDK entrypoint.
+  - Remove transaction-volume query definitions from the Spark service proto export.
+
 ## 0.8.3
 
 ### Patch Changes
