@@ -802,8 +802,6 @@ func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 		if exit.ConfirmationHeight != nil {
 			confirmedCount++
 			assert.Equal(t, blockHeight, *exit.ConfirmationHeight)
-			// Key tweaked height should still be nil (not enough blocks passed)
-			assert.Nil(t, exit.KeyTweakedHeight)
 			// Track which transfers were confirmed
 			require.NotNil(t, exit.Edges.Transfer)
 			confirmedTransferIDs[exit.Edges.Transfer.ID] = true

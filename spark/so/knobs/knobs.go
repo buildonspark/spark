@@ -102,7 +102,7 @@ const (
 	// both the watch-chain key-tweak advance and the receiver-claim
 	// finalization guard. Both call sites use this constant directly so they
 	// can never disagree.
-	CoopExitConfirmationThreshold = 6
+	CoopExitConfirmationThreshold = 1
 
 	// Cooperative Exit
 	// When enabled (> 0), rejects a coop-exit request unless
