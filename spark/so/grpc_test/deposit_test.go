@@ -1510,14 +1510,17 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	_, err = client.SendRawTransaction(signedDepositTx2, true)
 	require.NoError(t, err)
 
-	// Mine 3 blocks to meet confirmation threshold
+	// Mine blocks to confirm the deposits on-chain.
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = client.GenerateToAddress(3, randomAddress, nil)
 	require.NoError(t, err)
 
-	time.Sleep(3 * time.Second)
+	// Seed the confirmed UTXO rows directly rather than waiting on the chain
+	// watcher: its regtest poll interval matches the fixed sleep this replaces,
+	// so the watcher often hadn't recorded the UTXOs yet, making the test flaky.
+	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1, depositTx2)
 
 	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
 	require.NoError(t, err)
@@ -1704,15 +1707,16 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	_, err = client.SendRawTransaction(signedDepositTx1, true)
 	require.NoError(t, err)
 
-	// Mine blocks so the chain watcher confirms the small UTXO and sets
-	// depositAddress.AvailabilityConfirmedAt.
+	// Mine the small UTXO, then seed it as confirmed. This sets
+	// depositAddress.AvailabilityConfirmedAt and ConfirmationTxid deterministically,
+	// avoiding a race against the chain watcher with a fixed sleep.
 	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = client.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
 
-	time.Sleep(3 * time.Second)
+	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1)
 
 	// Step 2: Broadcast a large UTXO to the same address but do NOT mine it.
 	// It will be in the mempool only — not confirmed and not in the Utxo table.
@@ -1777,8 +1781,9 @@ func TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo(t *testing.T) {
 	_, err = bitcoinClient.GenerateToAddress(3, mineAddress, nil)
 	require.NoError(t, err)
 
-	// Wait for chain watcher to confirm the deposit.
-	time.Sleep(2 * time.Second)
+	// Seed the legitimate deposit as confirmed (sets ConfirmationTxid) instead of
+	// waiting on the chain watcher, which races a fixed sleep and is flaky.
+	seedConfirmedDepositUtxos(t, config, depositAddress, legitimateDepositTx)
 
 	// Step 3: Create a fabricated tx (never broadcast) with inflated value.
 	fakeOutPoint := &wire.OutPoint{Hash: [32]byte{0xDE, 0xAD, 0xBE, 0xEF}, Index: 0}
