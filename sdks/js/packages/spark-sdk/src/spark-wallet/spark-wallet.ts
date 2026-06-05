@@ -3302,7 +3302,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {Transfer} transfer - The transfer to claim
    * @returns {Promise<Object>} The claim result
    */
-  private async claimTransfer({
+  protected async claimTransfer({
     transfer,
     emit,
   }: {
