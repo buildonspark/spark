@@ -1520,7 +1520,7 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	// Seed the confirmed UTXO rows directly rather than waiting on the chain
 	// watcher: its regtest poll interval matches the fixed sleep this replaces,
 	// so the watcher often hadn't recorded the UTXOs yet, making the test flaky.
-	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1, depositTx2)
+	seedConfirmedDepositUtxos(t, config, depositResp.GetDepositAddress().GetAddress(), depositTx1, depositTx2)
 
 	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
@@ -1716,7 +1716,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	_, err = client.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
 
-	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1)
+	seedConfirmedDepositUtxos(t, config, depositResp.GetDepositAddress().GetAddress(), depositTx1)
 
 	// Step 2: Broadcast a large UTXO to the same address but do NOT mine it.
 	// It will be in the mempool only — not confirmed and not in the Utxo table.

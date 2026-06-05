@@ -144,7 +144,6 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_InitiateSwapPrimaryTransfer_FullMethodName:         {AuthMode: AuthSession},
 		pbspark.SparkService_UpdateWalletSetting_FullMethodName:                 {AuthMode: AuthSession},
 		pbspark.SparkService_QueryWalletSetting_FullMethodName:                  {AuthMode: AuthSession},
-		pbspark.SparkService_QuerySparkTransactionVolumes_FullMethodName:        {AuthMode: AuthSession},
 	}
 }
 
