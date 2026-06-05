@@ -161,7 +161,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		return nil, err
 	}
 
-	network, err := btcnetwork.FromProtoNetwork(metadata.Network)
+	network, err := btcnetwork.FromProtoNetwork(metadata.GetNetwork())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err))
 	}
@@ -183,7 +183,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
 	}
 
-	if partial.ExecuteBefore != nil {
+	if partial.GetExecuteBefore() != nil {
 		clientCreatedTs := metadata.GetClientCreatedTimestamp().AsTime()
 		if err := utils.ValidateExecuteBefore(new(partial.GetExecuteBefore().AsTime()), clientCreatedTs, spark.TokenMaxExecuteBeforeWindow); err != nil {
 			return nil, err
@@ -233,14 +233,14 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 		FinalTokenTransaction:      legacyTokenTx,
 		TokenTransactionSignatures: req.GetTokenTransactionOwnerSignatures(),
 		CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
-		ExecuteBefore:              partial.ExecuteBefore,
+		ExecuteBefore:              partial.GetExecuteBefore(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	signatures := make(operatorSignaturesMap)
-	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
+	signatures[h.config.Identifier] = localResp.GetSparkOperatorSignature()
 
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	fanoutResults, fanoutErr := helper.ExecuteTaskWithAllOperatorsWithAllResponses(ctx, h.config, &excludeSelf,
@@ -257,7 +257,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 				FinalTokenTransaction:      legacyTokenTx,
 				TokenTransactionSignatures: req.GetTokenTransactionOwnerSignatures(),
 				CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
-				ExecuteBefore:              partial.ExecuteBefore,
+				ExecuteBefore:              partial.GetExecuteBefore(),
 			})
 		},
 	)
@@ -284,7 +284,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	}
 
 	for opID, resp := range fanoutResults.Successes {
-		signatures[opID] = resp.SparkOperatorSignature
+		signatures[opID] = resp.GetSparkOperatorSignature()
 	}
 
 	// If any peer errored transiently, the coordinator is signed and committed locally;
@@ -402,7 +402,7 @@ func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
 	}
 
 	for opID, resp := range internalSignatures {
-		signatures[opID] = resp.SparkOperatorSignature
+		signatures[opID] = resp.GetSparkOperatorSignature()
 	}
 
 	// Handle finalization based on transaction type
@@ -467,9 +467,9 @@ func (h *BroadcastTokenHandler) constructFinalTokenTransaction(
 	}
 
 	final := &tokenpb.FinalTokenTransaction{
-		Version:                  partial.Version,
+		Version:                  partial.GetVersion(),
 		TokenTransactionMetadata: metadata,
-		ExecuteBefore:            partial.ExecuteBefore,
+		ExecuteBefore:            partial.GetExecuteBefore(),
 	}
 
 	if mint := partial.GetMintInput(); mint != nil {
@@ -482,16 +482,16 @@ func (h *BroadcastTokenHandler) constructFinalTokenTransaction(
 
 	numOutputs := 0
 	if partial.PartialTokenOutputs != nil {
-		numOutputs = len(partial.PartialTokenOutputs)
+		numOutputs = len(partial.GetPartialTokenOutputs())
 		final.FinalTokenOutputs = make([]*tokenpb.FinalTokenOutput, numOutputs)
-		for i, pOut := range partial.PartialTokenOutputs {
+		for i, pOut := range partial.GetPartialTokenOutputs() {
 			// Copy to avoid mutating the request proto.
 			pOutCopy := &tokenpb.PartialTokenOutput{
-				OwnerPublicKey:                pOut.OwnerPublicKey,
-				WithdrawBondSats:              pOut.WithdrawBondSats,
-				WithdrawRelativeBlockLocktime: pOut.WithdrawRelativeBlockLocktime,
-				TokenIdentifier:               pOut.TokenIdentifier,
-				TokenAmount:                   pOut.TokenAmount,
+				OwnerPublicKey:                pOut.GetOwnerPublicKey(),
+				WithdrawBondSats:              pOut.GetWithdrawBondSats(),
+				WithdrawRelativeBlockLocktime: pOut.GetWithdrawRelativeBlockLocktime(),
+				TokenIdentifier:               pOut.GetTokenIdentifier(),
+				TokenAmount:                   pOut.GetTokenAmount(),
 			}
 			final.FinalTokenOutputs[i] = &tokenpb.FinalTokenOutput{
 				PartialTokenOutput: pOutCopy,
@@ -526,17 +526,17 @@ func (h *BroadcastTokenHandler) constructFinalTokenTransaction(
 			return nil, nil, sparkerrors.InternalKeyshareError(fmt.Errorf("%s: %d needed, %d available", tokens.ErrNotEnoughUnusedKeyshares, numOutputs, len(keyshares)))
 		}
 
-		network, err := btcnetwork.FromProtoNetwork(final.TokenTransactionMetadata.Network)
+		network, err := btcnetwork.FromProtoNetwork(final.GetTokenTransactionMetadata().GetNetwork())
 		if err != nil {
 			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse network: %w", err))
 		}
 
 		lrc20Config := h.config.Lrc20Configs[strings.ToLower(network.String())]
 
-		for i, output := range final.FinalTokenOutputs {
+		for i, output := range final.GetFinalTokenOutputs() {
 			keyshareIDStrings[i] = keyshares[i].ID.String()
 			output.RevocationCommitment = keyshares[i].PublicKey.Serialize()
-			if output.PartialTokenOutput != nil {
+			if output.GetPartialTokenOutput() != nil {
 				output.PartialTokenOutput.WithdrawBondSats = lrc20Config.WithdrawBondSats
 				output.PartialTokenOutput.WithdrawRelativeBlockLocktime = lrc20Config.WithdrawRelativeBlockLocktime
 			}

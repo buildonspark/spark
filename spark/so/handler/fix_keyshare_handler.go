@@ -115,7 +115,7 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 	if req == nil {
 		return fmt.Errorf("fix keyshare request is required")
 	}
-	args, err := h.parseRequest(ctx, req.BadKeyshareId, req.BadOperatorId, req.GoodOperatorIds)
+	args, err := h.parseRequest(ctx, req.GetBadKeyshareId(), req.GetBadOperatorId(), req.GetGoodOperatorIds())
 	if err != nil {
 		return fmt.Errorf("fix keyshare error: %w", err)
 	}
@@ -141,9 +141,9 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 		defer conn.Close()
 
 		round1Request := pb.FixKeyshareRound1Request{
-			BadKeyshareId:   req.BadKeyshareId,
-			BadOperatorId:   req.BadOperatorId,
-			GoodOperatorIds: req.GoodOperatorIds,
+			BadKeyshareId:   req.GetBadKeyshareId(),
+			BadOperatorId:   req.GetBadOperatorId(),
+			GoodOperatorIds: req.GetGoodOperatorIds(),
 		}
 
 		client := pb.NewSparkInternalServiceClient(conn)
@@ -158,7 +158,7 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 	messages1To := make(map[secretsharing.PartyIndex][][]byte)
 
 	for _, response := range responses1 {
-		for _, msgBytes := range response.Message {
+		for _, msgBytes := range response.GetMessage() {
 			// Temporarily deserialize the message to find its intended recipient.
 			msg := secretsharing.Message[secretsharing.IssuePayload1]{}
 			err := json.Unmarshal(msgBytes, &msg)
@@ -184,9 +184,9 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 		defer conn.Close()
 
 		round2Request := pb.FixKeyshareRound2Request{
-			BadKeyshareId:   req.BadKeyshareId,
-			BadOperatorId:   req.BadOperatorId,
-			GoodOperatorIds: req.GoodOperatorIds,
+			BadKeyshareId:   req.GetBadKeyshareId(),
+			BadOperatorId:   req.GetBadOperatorId(),
+			GoodOperatorIds: req.GetGoodOperatorIds(),
 			Message:         messages1To[operator.Identifier],
 		}
 
@@ -202,7 +202,7 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 	messages2 := make([][]byte, 0)
 
 	for _, response := range responses2 {
-		messages2 = append(messages2, response.Message)
+		messages2 = append(messages2, response.GetMessage())
 	}
 
 	// === Round 3 ===
@@ -324,7 +324,7 @@ func (h FixKeyshareHandler) Round1(ctx context.Context, req *pb.FixKeyshareRound
 	if req == nil {
 		return nil, fmt.Errorf("fix keyshare round 1 request is required")
 	}
-	args, err := h.parseRequest(ctx, req.BadKeyshareId, req.BadOperatorId, req.GoodOperatorIds)
+	args, err := h.parseRequest(ctx, req.GetBadKeyshareId(), req.GetBadOperatorId(), req.GetGoodOperatorIds())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request: %w", err)
 	}
@@ -371,12 +371,12 @@ func (h FixKeyshareHandler) Round2(ctx context.Context, req *pb.FixKeyshareRound
 	if req == nil {
 		return nil, fmt.Errorf("fix keyshare round 2 request is required")
 	}
-	args, err := h.parseRequest(ctx, req.BadKeyshareId, req.BadOperatorId, req.GoodOperatorIds)
+	args, err := h.parseRequest(ctx, req.GetBadKeyshareId(), req.GetBadOperatorId(), req.GetGoodOperatorIds())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request: %w", err)
 	}
 
-	return h.coreRound2(ctx, args, req.Message)
+	return h.coreRound2(ctx, args, req.GetMessage())
 }
 
 func (h FixKeyshareHandler) coreRound2(ctx context.Context, args *FixKeyshareArgs, messages [][]byte) (*pb.FixKeyshareRound2Response, error) {

@@ -36,8 +36,8 @@ func GetOrCreateMultisigConfig(ctx context.Context, client *Client, protoConfig 
 
 	config, err := client.MultisigConfig.Create().
 		SetMultisigIdentifier(identifier).
-		SetNumSignersThreshold(protoConfig.Threshold).
-		SetNumSignersTotal(uint32(len(protoConfig.PublicKeys))).
+		SetNumSignersThreshold(protoConfig.GetThreshold()).
+		SetNumSignersTotal(uint32(len(protoConfig.GetPublicKeys()))).
 		Save(ctx)
 	if err != nil {
 		// Concurrent insert with same identifier: retry the lookup.
@@ -55,7 +55,7 @@ func GetOrCreateMultisigConfig(ctx context.Context, client *Client, protoConfig 
 		return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create multisig config: %w", err))
 	}
 
-	for _, pkBytes := range protoConfig.PublicKeys {
+	for _, pkBytes := range protoConfig.GetPublicKeys() {
 		pk, err := keys.ParsePublicKey(pkBytes)
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse public key: %w", err))

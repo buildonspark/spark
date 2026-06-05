@@ -1837,7 +1837,7 @@ func TestApplySignatures(t *testing.T) {
 			}}
 
 			_, map2, _ := loadInternalLeafRefundMaps(req)
-			_, err = applySignaturesToTransactionsAndVerify(ctx, map2, req.DirectRefundSignatures, true, tt.adaptorPublicKey)
+			_, err = applySignaturesToTransactionsAndVerify(ctx, map2, req.GetDirectRefundSignatures(), true, tt.adaptorPublicKey)
 
 			if tt.expectedError != "" {
 				require.ErrorContains(t, err, tt.expectedError)

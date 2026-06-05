@@ -28,11 +28,9 @@ export * from "./spark-readonly-client/types.js";
 export * from "./spark-wallet/types.js";
 
 export { type WalletConfigService } from "./services/config.js";
-export { default as LeafManager } from "./services/leaf-manager.js";
 export { SigningService } from "./services/signing.js";
-export { default as SwapService } from "./services/swap.js";
 export { TokenTransactionService } from "./services/tokens/token-transactions.js";
-export { type LeafKeyTweak, TransferService } from "./services/transfer.js";
+export { TransferService } from "./services/transfer.js";
 export {
   WalletConfig,
   createLocalSigningOperators,

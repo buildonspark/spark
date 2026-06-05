@@ -37,13 +37,13 @@ func buildBadCoopExitRequest(
 			OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
 			ReceiverIdentityPublicKey: receiverKey.Public().Serialize(),
 			LeavesToSend: []*sparkpb.LeafRefundTxSigningJob{{
-				LeafId: rootNode.Id,
+				LeafId: rootNode.GetId(),
 				RefundTxSigningJob: &sparkpb.SigningJob{
-					RawTx:            rootNode.RefundTx,
+					RawTx:            rootNode.GetRefundTx(),
 					SigningPublicKey: leafPrivKey.Public().Serialize(),
 				},
 				DirectFromCpfpRefundTxSigningJob: &sparkpb.SigningJob{
-					RawTx:            rootNode.RefundTx,
+					RawTx:            rootNode.GetRefundTx(),
 					SigningPublicKey: leafPrivKey.Public().Serialize(),
 				},
 			}},

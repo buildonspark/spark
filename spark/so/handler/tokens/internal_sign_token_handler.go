@@ -91,7 +91,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		// Order the signatures according to their index before updating the DB.
 		ownerSignatureMap := make(map[int][]byte, len(ownerSignatures))
 		for _, sig := range ownerSignatures {
-			inputIndex := int(sig.InputIndex)
+			inputIndex := int(sig.GetInputIndex())
 			ownerSignatureMap[inputIndex] = signature.GetEffectiveSingleSignature(sig)
 		}
 		ownerSignaturesArr = make([][]byte, len(ownerSignatureMap))
@@ -199,20 +199,20 @@ type operatorSharesMap map[keys.Public][]*pbtkinternal.RevocationSecretShare
 func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.Context, req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.ExchangeRevocationSecretsShares")
 	defer span.End()
-	ctx, logger := logging.WithRequestAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	ctx, logger := logging.WithRequestAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, req.GetFinalTokenTransaction())...)
 
-	reqPubKey, err := keys.ParsePublicKey(req.OperatorIdentityPublicKey)
+	reqPubKey, err := keys.ParsePublicKey(req.GetOperatorIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse request operator identity public key: %w", err))
 	}
 
 	reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
-	logger.Sugar().Infof("Received request to exchange revocation secret shares with operator %s for token txHash: %s", reqOperatorIdentifier, hex.EncodeToString(req.FinalTokenTransactionHash))
+	logger.Sugar().Infof("Received request to exchange revocation secret shares with operator %s for token txHash: %s", reqOperatorIdentifier, hex.EncodeToString(req.GetFinalTokenTransactionHash()))
 
 	// Verify the incoming operator signatures package
 	operatorSignatures := make(operatorSignaturesMap)
-	for _, sig := range req.OperatorTransactionSignatures {
-		sigOperatorIdentityPublicKey, err := keys.ParsePublicKey(sig.OperatorIdentityPublicKey)
+	for _, sig := range req.GetOperatorTransactionSignatures() {
+		sigOperatorIdentityPublicKey, err := keys.ParsePublicKey(sig.GetOperatorIdentityPublicKey())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse signature operator identity public key: %w", err)
 		}
@@ -225,14 +225,14 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	tokenTransaction, err := db.TokenTransaction.Query().
-		Where(tokentransaction.FinalizedTokenTransactionHashEQ(req.FinalTokenTransactionHash)).
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(req.GetFinalTokenTransactionHash())).
 		WithSpentOutput().
 		WithCreatedOutput().
 		WithMint().
 		WithCreate().
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load token transaction with txHash (%x) in ExchangeRevocationSecretsShares: %w", req.FinalTokenTransactionHash, err)
+		return nil, fmt.Errorf("failed to load token transaction with txHash (%x) in ExchangeRevocationSecretsShares: %w", req.GetFinalTokenTransactionHash(), err)
 	}
 
 	switch txType := tokenTransaction.InferTokenTransactionTypeEnt(); txType {
@@ -247,21 +247,21 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return &pbtkinternal.ExchangeRevocationSecretsSharesResponse{}, nil
 
 	case utils.TokenTransactionTypeTransfer:
-		if len(req.OperatorShares) == 0 {
+		if len(req.GetOperatorShares()) == 0 {
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no operator shares provided in request for transfer transaction"))
 		}
-		if req.FinalTokenTransaction == nil {
+		if req.GetFinalTokenTransaction() == nil {
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("final_token_transaction is required for transfer transactions"))
 		}
 		if err := h.validateTransactionHashAndSpentOutputsInRequest(req); err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate tx hash and spent outputs in request: %w", err))
 		}
 		if shouldEnforceFreezeForRevocationExchange(tokenTransaction.Status) {
-			if err := validateNoActiveFreezesForOutputsToSpend(ctx, req.OutputsToSpend); err != nil {
+			if err := validateNoActiveFreezesForOutputsToSpend(ctx, req.GetOutputsToSpend()); err != nil {
 				return nil, tokens.FormatErrorWithTransactionEnt("frozen transfer cannot exchange revocation secrets", tokenTransaction, err)
 			}
 		}
-		if !tokenTransactionSpentOutputsMatchFinalInputs(tokenTransaction, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+		if !tokenTransactionSpentOutputsMatchFinalInputs(tokenTransaction, req.GetFinalTokenTransaction().GetTransferInput().GetOutputsToSpend()) {
 			err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)
 			if err != nil {
 				return nil, tokens.FormatErrorWithTransactionEnt("failed to validate and reassign spent output to transaction", tokenTransaction, err)
@@ -284,11 +284,11 @@ func (h *InternalSignTokenHandler) exchangeTransferRevocationSecrets(
 	operatorSignatures operatorSignaturesMap,
 ) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
 	if tokenTransaction.Status == st.TokenTransactionStatusStarted {
-		lockedTx, lockErr := ent.FetchAndLockTokenTransactionDataByHash(ctx, req.FinalTokenTransactionHash)
+		lockedTx, lockErr := ent.FetchAndLockTokenTransactionDataByHash(ctx, req.GetFinalTokenTransactionHash())
 		if lockErr != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt("failed to refetch transaction with lock", tokenTransaction, lockErr)
 		}
-		if err := validateTokenTransactionForSigning(ctx, h.config, lockedTx, req.FinalTokenTransaction); err != nil {
+		if err := validateTokenTransactionForSigning(ctx, h.config, lockedTx, req.GetFinalTokenTransaction()); err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), lockedTx, err)
 		}
 		err := h.validateAndSignTransactionWithProvidedOwnSignature(ctx, lockedTx, operatorSignatures[h.config.Identifier])
@@ -297,11 +297,11 @@ func (h *InternalSignTokenHandler) exchangeTransferRevocationSecrets(
 		}
 	}
 
-	inputOperatorShareMap, err := buildInputOperatorShareMap(req.OperatorShares)
+	inputOperatorShareMap, err := buildInputOperatorShareMap(req.GetOperatorShares())
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to build input operator share map", tokenTransaction, err)
 	}
-	spentOutputs, finalized, err := h.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, req.FinalTokenTransactionHash)
+	spentOutputs, finalized, err := h.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, req.GetFinalTokenTransactionHash())
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to persist partial revocation secret shares", tokenTransaction, err)
 	}
@@ -351,8 +351,8 @@ func validateNoActiveFreezesForOutputsToSpend(ctx context.Context, outputsToSpen
 	outputPredicates := make([]predicate.TokenOutput, 0, len(outputsToSpend))
 	for _, outputToSpend := range outputsToSpend {
 		outputPredicates = append(outputPredicates, tokenoutput.And(
-			tokenoutput.CreatedTransactionFinalizedHashEQ(outputToSpend.CreatedTokenTransactionHash),
-			tokenoutput.CreatedTransactionOutputVoutEQ(int32(outputToSpend.CreatedTokenTransactionVout)),
+			tokenoutput.CreatedTransactionFinalizedHashEQ(outputToSpend.GetCreatedTokenTransactionHash()),
+			tokenoutput.CreatedTransactionOutputVoutEQ(int32(outputToSpend.GetCreatedTokenTransactionVout())),
 		))
 	}
 
@@ -464,9 +464,9 @@ func tokenTransactionSpentOutputsMatchFinalInputs(tokenTransaction *ent.TokenTra
 }
 
 func (h *InternalSignTokenHandler) validateTransactionHashAndSpentOutputsInRequest(req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) error {
-	finalTokenTransaction := req.FinalTokenTransaction
-	finalTokenTransactionHash := req.FinalTokenTransactionHash
-	outputsToSpend := req.OutputsToSpend
+	finalTokenTransaction := req.GetFinalTokenTransaction()
+	finalTokenTransactionHash := req.GetFinalTokenTransactionHash()
+	outputsToSpend := req.GetOutputsToSpend()
 
 	hash, err := utils.HashTokenTransaction(finalTokenTransaction, false)
 	if err != nil {
@@ -502,29 +502,29 @@ func (h *InternalSignTokenHandler) validateTransactionHashAndSpentOutputsInReque
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("outputs_to_spend[%d] is required", i))
 		}
 		key := TokenOutputHashVoutKey{
-			TxHash: string(outputFromRequest.CreatedTokenTransactionHash),
-			Vout:   int(outputFromRequest.CreatedTokenTransactionVout),
+			TxHash: string(outputFromRequest.GetCreatedTokenTransactionHash()),
+			Vout:   int(outputFromRequest.GetCreatedTokenTransactionVout()),
 		}
 		if _, ok := seenRequestOutputs[key]; ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate output in request: hash %x vout %d", outputFromRequest.CreatedTokenTransactionHash, outputFromRequest.CreatedTokenTransactionVout))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate output in request: hash %x vout %d", outputFromRequest.GetCreatedTokenTransactionHash(), outputFromRequest.GetCreatedTokenTransactionVout()))
 		}
 		seenRequestOutputs[key] = struct{}{}
 	}
 
 	for _, outputFromRequest := range outputsToSpend {
 		key := TokenOutputHashVoutKey{
-			TxHash: string(outputFromRequest.CreatedTokenTransactionHash),
-			Vout:   int(outputFromRequest.CreatedTokenTransactionVout),
+			TxHash: string(outputFromRequest.GetCreatedTokenTransactionHash()),
+			Vout:   int(outputFromRequest.GetCreatedTokenTransactionVout()),
 		}
 		expectedInputIndex, ok := finalOutputInputIndex[key]
 		if !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("output from request (hash: %x, vout: %d) not found in final transaction", outputFromRequest.CreatedTokenTransactionHash, outputFromRequest.CreatedTokenTransactionVout))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("output from request (hash: %x, vout: %d) not found in final transaction", outputFromRequest.GetCreatedTokenTransactionHash(), outputFromRequest.GetCreatedTokenTransactionVout()))
 		}
 		if outputFromRequest.GetSpentTokenTransactionVout() != expectedInputIndex {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 				"spent token transaction vout mismatch for output hash %x vout %d: got %d, expected %d",
-				outputFromRequest.CreatedTokenTransactionHash,
-				outputFromRequest.CreatedTokenTransactionVout,
+				outputFromRequest.GetCreatedTokenTransactionHash(),
+				outputFromRequest.GetCreatedTokenTransactionVout(),
 				outputFromRequest.GetSpentTokenTransactionVout(),
 				expectedInputIndex,
 			))
@@ -535,7 +535,7 @@ func (h *InternalSignTokenHandler) validateTransactionHashAndSpentOutputsInReque
 }
 
 func (h *InternalSignTokenHandler) reclaimOutputsSpentOnDifferentStartedTransaction(ctx context.Context, reclaimingTokenTransaction *ent.TokenTransaction, operatorSignatures operatorSignaturesMap, req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) error {
-	if err := h.verifyOperatorSignaturesAndThreshold(operatorSignatures, req.FinalTokenTransactionHash); err != nil {
+	if err := h.verifyOperatorSignaturesAndThreshold(operatorSignatures, req.GetFinalTokenTransactionHash()); err != nil {
 		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate operator signatures and threshold: %w", err))
 	}
 
@@ -545,12 +545,12 @@ func (h *InternalSignTokenHandler) reclaimOutputsSpentOnDifferentStartedTransact
 	}
 
 	var spentOutputPredicates []predicate.TokenOutput
-	for _, outputToSpend := range req.OutputsToSpend {
+	for _, outputToSpend := range req.GetOutputsToSpend() {
 		spentOutputPredicates = append(spentOutputPredicates,
 			tokenoutput.And(
-				tokenoutput.CreatedTransactionOutputVoutEQ(int32(outputToSpend.CreatedTokenTransactionVout)),
+				tokenoutput.CreatedTransactionOutputVoutEQ(int32(outputToSpend.GetCreatedTokenTransactionVout())),
 				tokenoutput.HasOutputCreatedTokenTransactionWith(
-					tokentransaction.FinalizedTokenTransactionHashEQ(outputToSpend.CreatedTokenTransactionHash),
+					tokentransaction.FinalizedTokenTransactionHashEQ(outputToSpend.GetCreatedTokenTransactionHash()),
 				),
 			),
 		)
@@ -583,15 +583,15 @@ func (h *InternalSignTokenHandler) reclaimOutputsSpentOnDifferentStartedTransact
 		remappedOutputMap[key] = o
 	}
 
-	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, true)
+	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.GetFinalTokenTransaction(), true)
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to hash token transaction: %w", err))
 	}
 
-	for _, spentOutput := range req.OutputsToSpend {
+	for _, spentOutput := range req.GetOutputsToSpend() {
 		key := TokenOutputHashVoutKey{
-			TxHash: string(spentOutput.CreatedTokenTransactionHash),
-			Vout:   int(spentOutput.CreatedTokenTransactionVout),
+			TxHash: string(spentOutput.GetCreatedTokenTransactionHash()),
+			Vout:   int(spentOutput.GetCreatedTokenTransactionVout()),
 		}
 		remappedOutput, ok := remappedOutputMap[key]
 		if !ok {
@@ -609,7 +609,7 @@ func (h *InternalSignTokenHandler) reclaimOutputsSpentOnDifferentStartedTransact
 			// 1. expired
 			// 2. unexpired but not preempted.
 			if !remappedOutputExpirationTime.IsZero() && now.Before(remappedOutputExpirationTime) {
-				if err := preemptOrRejectTransaction(ctx, req.FinalTokenTransaction, remappedOutput.Edges.OutputSpentTokenTransaction); err != nil {
+				if err := preemptOrRejectTransaction(ctx, req.GetFinalTokenTransaction(), remappedOutput.Edges.OutputSpentTokenTransaction); err != nil {
 					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("failed to reclaim token output from unexpired transaction: %x because it was preempted: %w",
 						remappedOutput.Edges.OutputSpentTokenTransaction.FinalizedTokenTransactionHash,
 						err))
@@ -626,14 +626,14 @@ func (h *InternalSignTokenHandler) reclaimOutputsSpentOnDifferentStartedTransact
 				return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("unsupported token transaction status for reclaim: %s", reclaimingTokenTransaction.Status))
 			}
 
-			if err := utils.ValidateOwnershipSignature(spentOutput.SpentOwnershipSignature, partialTokenTransactionHash, remappedOutput.OwnerPublicKey); err != nil {
+			if err := utils.ValidateOwnershipSignature(spentOutput.GetSpentOwnershipSignature(), partialTokenTransactionHash, remappedOutput.OwnerPublicKey); err != nil {
 				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate ownership signature: %w", err))
 			}
 
 			_, err = db.TokenOutput.UpdateOne(remappedOutput).
-				SetSpentTransactionInputVout(int32(spentOutput.SpentTokenTransactionVout)).
+				SetSpentTransactionInputVout(int32(spentOutput.GetSpentTokenTransactionVout())).
 				SetOutputSpentTokenTransactionID(reclaimingTokenTransaction.ID).
-				SetSpentOwnershipSignature(spentOutput.SpentOwnershipSignature).
+				SetSpentOwnershipSignature(spentOutput.GetSpentOwnershipSignature()).
 				SetStatus(updateOutputStatus).
 				ClearSpentOperatorSpecificOwnershipSignature(). // No way to regenerate this without client cooperation. Clear it.
 				Save(ctx)
@@ -1407,15 +1407,15 @@ func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocatio
 		if operatorShare == nil {
 			return nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("nil operator share found in buildInputOperatorShareMap"))
 		}
-		opIDPubKey, err := keys.ParsePublicKey(operatorShare.OperatorIdentityPublicKey)
+		opIDPubKey, err := keys.ParsePublicKey(operatorShare.GetOperatorIdentityPublicKey())
 		if err != nil {
 			return nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("failed to parse operator identity public key: %w", err))
 		}
-		for _, share := range operatorShare.Shares {
+		for _, share := range operatorShare.GetShares() {
 			if share == nil {
 				return nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("nil share found on operator share in buildInputOperatorShareMap"))
 			}
-			secretShare, err := keys.ParsePrivateKey(share.SecretShare)
+			secretShare, err := keys.ParsePrivateKey(share.GetSecretShare())
 			if err != nil {
 				return nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("failed to parse secret share: %w", err))
 			}

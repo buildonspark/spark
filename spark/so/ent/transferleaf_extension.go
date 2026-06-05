@@ -30,10 +30,10 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 		if err = proto.Unmarshal(t.KeyTweak, leafKeyTweak); err == nil {
 			keyTweakProof = leafKeyTweak.GetSecretShareTweak().GetProofs()[0]
 			if len(secretCipher) == 0 {
-				secretCipher = leafKeyTweak.SecretCipher
+				secretCipher = leafKeyTweak.GetSecretCipher()
 			}
 			if len(signature) == 0 {
-				signature = leafKeyTweak.Signature
+				signature = leafKeyTweak.GetSignature()
 			}
 		}
 	}

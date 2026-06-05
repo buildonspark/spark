@@ -52,8 +52,8 @@ func queryLeafByID(t *testing.T, config *wallet.TestWalletConfig, authToken stri
 		Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafID}}},
 	})
 	require.NoError(t, err)
-	require.Contains(t, resp.Nodes, leafID)
-	return resp.Nodes[leafID]
+	require.Contains(t, resp.GetNodes(), leafID)
+	return resp.GetNodes()[leafID]
 }
 
 func transferAndClaimSingleLeaf(
@@ -77,7 +77,7 @@ func transferAndClaimSingleLeaf(
 		receiverIdentityPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
-	require.NoError(t, err, "failed to send transfer for leaf %s", leaf.Id)
+	require.NoError(t, err, "failed to send transfer for leaf %s", leaf.GetId())
 
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverIdentityPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
@@ -87,18 +87,18 @@ func transferAndClaimSingleLeaf(
 	pendingTransfers, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
 	var receiverTransfer *pb.Transfer
-	for _, transfer := range pendingTransfers.Transfers {
-		if transfer.Id == senderTransfer.Id {
+	for _, transfer := range pendingTransfers.GetTransfers() {
+		if transfer.GetId() == senderTransfer.GetId() {
 			receiverTransfer = transfer
 			break
 		}
 	}
-	require.NotNil(t, receiverTransfer, "receiver should see pending transfer %s", senderTransfer.Id)
-	require.Len(t, receiverTransfer.Leaves, 1)
+	require.NotNil(t, receiverTransfer, "receiver should see pending transfer %s", senderTransfer.GetId())
+	require.Len(t, receiverTransfer.GetLeaves(), 1)
 
 	transferSecrets, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, transferSigningPrivKey, transferSecrets[leaf.Id])
+	require.Equal(t, transferSigningPrivKey, transferSecrets[leaf.GetId()])
 
 	claimedSigningPrivKey := keys.GeneratePrivateKey()
 	claimedNodes, err := wallet.ClaimTransfer(
@@ -106,15 +106,15 @@ func transferAndClaimSingleLeaf(
 		receiverTransfer,
 		receiverConfig,
 		[]wallet.LeafKeyTweak{{
-			Leaf:              receiverTransfer.Leaves[0].Leaf,
+			Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 			SigningPrivKey:    transferSigningPrivKey,
 			NewSigningPrivKey: claimedSigningPrivKey,
 		}},
 	)
-	require.NoError(t, err, "failed to claim transfer %s", senderTransfer.Id)
+	require.NoError(t, err, "failed to claim transfer %s", senderTransfer.GetId())
 	require.Len(t, claimedNodes, 1)
-	require.Equal(t, leaf.Id, claimedNodes[0].Id)
-	require.Equal(t, "AVAILABLE", claimedNodes[0].Status)
+	require.Equal(t, leaf.GetId(), claimedNodes[0].GetId())
+	require.Equal(t, "AVAILABLE", claimedNodes[0].GetStatus())
 
 	return receiverConfig, claimedNodes[0], claimedSigningPrivKey
 }
@@ -124,35 +124,35 @@ func TestRenewNodeZeroTimelock(t *testing.T) {
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", rootNode.Status)
+	require.Equal(t, "AVAILABLE", rootNode.GetStatus())
 
-	nodeTimelock := getTimelockFromTxBytes(t, rootNode.NodeTx)
-	refundTimelock := getTimelockFromTxBytes(t, rootNode.RefundTx)
+	nodeTimelock := getTimelockFromTxBytes(t, rootNode.GetNodeTx())
+	refundTimelock := getTimelockFromTxBytes(t, rootNode.GetRefundTx())
 	require.Equal(t, uint32(0), nodeTimelock, "fresh deposit should have node_tx timelock 0")
 	require.Equal(t, uint32(2000), refundTimelock, "fresh deposit should have refund_tx timelock 2000")
 
 	// Mock: reduce refund_tx timelock to 200 across all SOs
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
 
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), authToken)
 
 	// Re-query to get updated state
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 
 	renewedLeaf, err := wallet.RenewNodeZeroTimelock(ctx, config, leaf, leafPrivKey)
 	require.NoError(t, err)
 	require.NotNil(t, renewedLeaf)
 
-	renewedNodeTimelock := getTimelockFromTxBytes(t, renewedLeaf.NodeTx)
-	renewedRefundTimelock := getTimelockFromTxBytes(t, renewedLeaf.RefundTx)
+	renewedNodeTimelock := getTimelockFromTxBytes(t, renewedLeaf.GetNodeTx())
+	renewedRefundTimelock := getTimelockFromTxBytes(t, renewedLeaf.GetRefundTx())
 	require.Equal(t, uint32(0), renewedNodeTimelock, "renewed node_tx should have timelock 0")
 	require.Equal(t, uint32(2000), renewedRefundTimelock, "renewed refund_tx should have timelock 2000")
-	require.Equal(t, "AVAILABLE", renewedLeaf.Status)
+	require.Equal(t, "AVAILABLE", renewedLeaf.GetStatus())
 
-	queriedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.Id)
-	require.Equal(t, "AVAILABLE", queriedLeaf.Status)
+	queriedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.GetId())
+	require.Equal(t, "AVAILABLE", queriedLeaf.GetStatus())
 }
 
 func TestRenewNodeZeroTimelockAfterRepeatedTransfers(t *testing.T) {
@@ -160,11 +160,11 @@ func TestRenewNodeZeroTimelockAfterRepeatedTransfers(t *testing.T) {
 	signingPrivKey := keys.GeneratePrivateKey()
 	leaf, err := wallet.CreateNewTree(config, faucet, signingPrivKey, 100000)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", leaf.Status)
+	require.Equal(t, "AVAILABLE", leaf.GetStatus())
 
-	previousRefundTimelock := getTimelockFromTxBytes(t, leaf.RefundTx)
+	previousRefundTimelock := getTimelockFromTxBytes(t, leaf.GetRefundTx())
 	require.Equal(t, spark.InitialTimeLock, previousRefundTimelock)
-	require.Equal(t, uint32(spark.ZeroTimelock), getTimelockFromTxBytes(t, leaf.NodeTx))
+	require.Equal(t, uint32(spark.ZeroTimelock), getTimelockFromTxBytes(t, leaf.GetNodeTx()))
 
 	const maxTransfersToRenewThreshold = 25
 	transfers := 0
@@ -172,8 +172,8 @@ func TestRenewNodeZeroTimelockAfterRepeatedTransfers(t *testing.T) {
 		require.Less(t, transfers, maxTransfersToRenewThreshold, "refund timelock did not reach renew threshold")
 
 		config, leaf, signingPrivKey = transferAndClaimSingleLeaf(t, config, leaf, signingPrivKey)
-		refundTimelock := getTimelockFromTxBytes(t, leaf.RefundTx)
-		nodeTimelock := getTimelockFromTxBytes(t, leaf.NodeTx)
+		refundTimelock := getTimelockFromTxBytes(t, leaf.GetRefundTx())
+		nodeTimelock := getTimelockFromTxBytes(t, leaf.GetNodeTx())
 
 		require.Equal(t, uint32(spark.ZeroTimelock), nodeTimelock, "transfer chain should still use the zero-node renew path")
 		require.Less(t, refundTimelock, previousRefundTimelock, "each completed transfer must reduce the refund timelock")
@@ -186,17 +186,17 @@ func TestRenewNodeZeroTimelockAfterRepeatedTransfers(t *testing.T) {
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), authToken)
-	leaf = queryLeafByID(t, config, authToken, leaf.Id)
+	leaf = queryLeafByID(t, config, authToken, leaf.GetId())
 
 	renewedLeaf, err := wallet.RenewNodeZeroTimelock(ctx, config, leaf, signingPrivKey)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", renewedLeaf.Status)
-	require.Equal(t, uint32(spark.ZeroTimelock), getTimelockFromTxBytes(t, renewedLeaf.NodeTx))
-	require.Equal(t, spark.InitialTimeLock, getTimelockFromTxBytes(t, renewedLeaf.RefundTx))
+	require.Equal(t, "AVAILABLE", renewedLeaf.GetStatus())
+	require.Equal(t, uint32(spark.ZeroTimelock), getTimelockFromTxBytes(t, renewedLeaf.GetNodeTx()))
+	require.Equal(t, spark.InitialTimeLock, getTimelockFromTxBytes(t, renewedLeaf.GetRefundTx()))
 
 	_, postRenewLeaf, _ := transferAndClaimSingleLeaf(t, config, renewedLeaf, signingPrivKey)
-	require.Equal(t, "AVAILABLE", postRenewLeaf.Status)
-	require.Less(t, getTimelockFromTxBytes(t, postRenewLeaf.RefundTx), spark.InitialTimeLock)
+	require.Equal(t, "AVAILABLE", postRenewLeaf.GetStatus())
+	require.Less(t, getTimelockFromTxBytes(t, postRenewLeaf.GetRefundTx()), spark.InitialTimeLock)
 }
 
 func TestRenewNodeTimelock(t *testing.T) {
@@ -210,31 +210,31 @@ func TestRenewNodeTimelock(t *testing.T) {
 	ctx := wallet.ContextWithToken(t.Context(), authToken)
 
 	// Fresh deposit has no parent. First do renewNodeZeroTimelock to create one.
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 	leafAfterZeroRenew, err := wallet.RenewNodeZeroTimelock(ctx, config, leaf, leafPrivKey)
 	require.NoError(t, err)
 
 	// Now the leaf has a parent (the split node). Mock node_tx (currently 0) and refund_tx (currently 2000) both below the renewal threshold to trigger RenewNodeTimelock.
-	modifyNodeTimelockAllOperators(t, config, leafAfterZeroRenew.Id, timelockBelowRenewThreshold, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, leafAfterZeroRenew.GetId(), timelockBelowRenewThreshold, timelockBelowRenewThreshold)
 
-	queriedLeaf := queryLeafByID(t, config, authToken, leafAfterZeroRenew.Id)
+	queriedLeaf := queryLeafByID(t, config, authToken, leafAfterZeroRenew.GetId())
 	require.NotNil(t, queriedLeaf.ParentNodeId, "leaf should have a parent node after renewNodeZeroTimelock")
-	parentLeaf := queryLeafByID(t, config, authToken, *queriedLeaf.ParentNodeId)
+	parentLeaf := queryLeafByID(t, config, authToken, queriedLeaf.GetParentNodeId())
 	require.NotNil(t, parentLeaf)
 
 	renewedLeaf, err := wallet.RenewNodeTimelock(ctx, config, queriedLeaf, parentLeaf, leafPrivKey)
 	require.NoError(t, err)
 	require.NotNil(t, renewedLeaf)
 
-	renewedNodeTimelock := getTimelockFromTxBytes(t, renewedLeaf.NodeTx)
-	renewedRefundTimelock := getTimelockFromTxBytes(t, renewedLeaf.RefundTx)
+	renewedNodeTimelock := getTimelockFromTxBytes(t, renewedLeaf.GetNodeTx())
+	renewedRefundTimelock := getTimelockFromTxBytes(t, renewedLeaf.GetRefundTx())
 	require.Equal(t, uint32(2000), renewedNodeTimelock, "renewed node_tx should have timelock 2000")
 	require.Equal(t, uint32(2000), renewedRefundTimelock, "renewed refund_tx should have timelock 2000")
-	require.Equal(t, "AVAILABLE", renewedLeaf.Status)
+	require.Equal(t, "AVAILABLE", renewedLeaf.GetStatus())
 
-	queriedRenewedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.Id)
-	require.Equal(t, "AVAILABLE", queriedRenewedLeaf.Status)
+	queriedRenewedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.GetId())
+	require.Equal(t, "AVAILABLE", queriedRenewedLeaf.GetStatus())
 }
 
 func TestRenewRefundTimelock(t *testing.T) {
@@ -252,42 +252,42 @@ func TestRenewRefundTimelock(t *testing.T) {
 	// Use renewNodeZeroTimelock first to establish the pattern, then renewNodeTimelock to get node_tx = 2000.
 
 	// Mock refund to low, then renewNodeZeroTimelock
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 	renewedLeaf, err := wallet.RenewNodeZeroTimelock(ctx, config, leaf, leafPrivKey)
 	require.NoError(t, err)
 
 	// After renewNodeZeroTimelock: node_tx = 0, refund = 2000
 	// Mock both to <= 300 for renewNodeTimelock
-	modifyNodeTimelockAllOperators(t, config, renewedLeaf.Id, timelockBelowRenewThreshold, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, renewedLeaf.GetId(), timelockBelowRenewThreshold, timelockBelowRenewThreshold)
 
-	queriedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.Id)
+	queriedLeaf := queryLeafByID(t, config, authToken, renewedLeaf.GetId())
 	require.NotNil(t, queriedLeaf.ParentNodeId)
-	parentLeaf := queryLeafByID(t, config, authToken, *queriedLeaf.ParentNodeId)
+	parentLeaf := queryLeafByID(t, config, authToken, queriedLeaf.GetParentNodeId())
 
 	renewedLeaf2, err := wallet.RenewNodeTimelock(ctx, config, queriedLeaf, parentLeaf, leafPrivKey)
 	require.NoError(t, err)
 
 	// Now node_tx = 2000, refund_tx = 2000
 	// For renewRefundTimelock: need refund <= 300, node > 300
-	modifyNodeTimelockAllOperators(t, config, renewedLeaf2.Id, 2000, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, renewedLeaf2.GetId(), 2000, timelockBelowRenewThreshold)
 
-	queriedLeaf2 := queryLeafByID(t, config, authToken, renewedLeaf2.Id)
+	queriedLeaf2 := queryLeafByID(t, config, authToken, renewedLeaf2.GetId())
 	require.NotNil(t, queriedLeaf2.ParentNodeId)
-	parentLeaf2 := queryLeafByID(t, config, authToken, *queriedLeaf2.ParentNodeId)
+	parentLeaf2 := queryLeafByID(t, config, authToken, queriedLeaf2.GetParentNodeId())
 
 	renewedLeaf3, err := wallet.RenewRefundTimelock(ctx, config, queriedLeaf2, parentLeaf2, leafPrivKey)
 	require.NoError(t, err)
 	require.NotNil(t, renewedLeaf3)
 
-	renewedNodeTimelock := getTimelockFromTxBytes(t, renewedLeaf3.NodeTx)
-	renewedRefundTimelock := getTimelockFromTxBytes(t, renewedLeaf3.RefundTx)
+	renewedNodeTimelock := getTimelockFromTxBytes(t, renewedLeaf3.GetNodeTx())
+	renewedRefundTimelock := getTimelockFromTxBytes(t, renewedLeaf3.GetRefundTx())
 	require.Equal(t, uint32(1900), renewedNodeTimelock, "renewed node_tx should have timelock 1900 (decremented from 2000)")
 	require.Equal(t, uint32(2000), renewedRefundTimelock, "renewed refund_tx should have timelock 2000 (reset)")
-	require.Equal(t, "AVAILABLE", renewedLeaf3.Status)
+	require.Equal(t, "AVAILABLE", renewedLeaf3.GetStatus())
 
-	queriedRenewedLeaf := queryLeafByID(t, config, authToken, renewedLeaf3.Id)
-	require.Equal(t, "AVAILABLE", queriedRenewedLeaf.Status)
+	queriedRenewedLeaf := queryLeafByID(t, config, authToken, renewedLeaf3.GetId())
+	require.Equal(t, "AVAILABLE", queriedRenewedLeaf.GetStatus())
 }
 
 // queryLeafStatusOnAllOperators queries the node status on each SO individually.
@@ -305,8 +305,8 @@ func queryLeafStatusOnAllOperators(t *testing.T, config *wallet.TestWalletConfig
 				Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafID}}},
 			})
 			require.NoError(t, err)
-			if node, ok := resp.Nodes[leafID]; ok {
-				statuses[identifier] = node.Status
+			if node, ok := resp.GetNodes()[leafID]; ok {
+				statuses[identifier] = node.GetStatus()
 			}
 		}()
 	}
@@ -325,20 +325,20 @@ func TestRenewConsensusRollbackUnlocksAllOperators(t *testing.T) {
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", rootNode.Status)
+	require.Equal(t, "AVAILABLE", rootNode.GetStatus())
 
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 
 	// Verify all SOs show Available
-	statuses := queryLeafStatusOnAllOperators(t, config, authToken, rootNode.Id)
+	statuses := queryLeafStatusOnAllOperators(t, config, authToken, rootNode.GetId())
 	for id, status := range statuses {
 		assert.Equal(t, "AVAILABLE", status, "SO %s should be Available before renew", id)
 	}
 
 	// Mock: reduce refund_tx timelock to trigger renewal
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 
 	// Attempt a renew with a corrupt signing job to force a failure after prepare.
 	// Send an invalid RenewNodeZeroTimelockSigningJob with empty transactions.
@@ -349,7 +349,7 @@ func TestRenewConsensusRollbackUnlocksAllOperators(t *testing.T) {
 	sparkClient := pb.NewSparkServiceClient(conn)
 
 	_, renewErr := sparkClient.RenewLeaf(ctx, &pb.RenewLeafRequest{
-		LeafId: leaf.Id,
+		LeafId: leaf.GetId(),
 		SigningJobs: &pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob{
 			RenewNodeZeroTimelockSigningJob: &pb.RenewNodeZeroTimelockSigningJob{
 				// Empty/nil signing jobs — should fail during validation
@@ -359,7 +359,7 @@ func TestRenewConsensusRollbackUnlocksAllOperators(t *testing.T) {
 	require.Error(t, renewErr, "renew with invalid signing data should fail")
 
 	// Verify all SOs have the leaf back to Available (rollback worked)
-	statuses = queryLeafStatusOnAllOperators(t, config, authToken, rootNode.Id)
+	statuses = queryLeafStatusOnAllOperators(t, config, authToken, rootNode.GetId())
 	for id, status := range statuses {
 		assert.Equal(t, "AVAILABLE", status, "SO %s should be Available after failed renew (rollback)", id)
 	}

@@ -32,12 +32,12 @@ func QueryUserSignedRefunds(ctx context.Context, config *TestWalletConfig, payme
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user signed refunds: %w", err)
 	}
-	return response.UserSignedRefunds, nil
+	return response.GetUserSignedRefunds(), nil
 }
 
 func ValidateUserSignedRefund(userSignedRefund *pb.UserSignedRefund) (int64, error) {
 	// TODO: Validate the signed refund from user's public key
-	refundTx, err := common.TxFromRawTxBytes(userSignedRefund.RefundTx)
+	refundTx, err := common.TxFromRawTxBytes(userSignedRefund.GetRefundTx())
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse refund transaction: %w", err)
 	}
@@ -72,5 +72,5 @@ func ProvidePreimage(ctx context.Context, config *TestWalletConfig, preimage []b
 		return nil, fmt.Errorf("failed to provide preimage: %w", err)
 	}
 
-	return response.Transfer, nil
+	return response.GetTransfer(), nil
 }

@@ -88,13 +88,13 @@ func TestCoopExit_Consensus_HappyPath(t *testing.T) {
 		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err, "failed to start coop exit via consensus path")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus(),
 		"coop exit should be SENDER_KEY_TWEAK_PENDING after consensus path (key tweaks deferred to chain watcher)")
 
 	// Every SO must converge on SENDER_KEY_TWEAK_PENDING — the participant-side
 	// effect of the 2PC commit is only observable per-operator (mirrors the
 	// send-transfer consensus test).
-	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 	for _, i := range operatorIndicesFromConfig(config) {
 		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
@@ -127,18 +127,18 @@ func TestCoopExit_Consensus_HappyPath(t *testing.T) {
 	// confirms, promoting the transfer to SENDER_KEY_TWEAKED and surfacing it as
 	// a pending transfer to the receiver.
 	receiverTransfer := waitForPendingTransferToConfirm(sspCtx, t, sspConfig)
-	assert.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status)
-	assert.Equal(t, sparkpb.TransferType_COOPERATIVE_EXIT, receiverTransfer.Type)
+	assert.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus())
+	assert.Equal(t, sparkpb.TransferType_COOPERATIVE_EXIT, receiverTransfer.GetType())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	require.NoError(t, err)
 	assert.Len(t, leafPrivKeyMap, 1)
-	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey)
+	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.GetId()], sspConfig.IdentityPrivateKey)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              senderTransfer.Leaves[0].Leaf,
+		Leaf:              senderTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -151,7 +151,7 @@ func TestCoopExit_Consensus_HappyPath(t *testing.T) {
 		)
 		require.NoError(t, err)
 		for _, tr := range transfers {
-			if tr.Id == receiverTransfer.Id {
+			if tr.GetId() == receiverTransfer.GetId() {
 				currentTransfer = tr
 				break
 			}
@@ -216,7 +216,7 @@ func TestCoopExit_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus())
 
 	newRowsByOperator := make(map[int][]*ent.FlowExecution, len(operatorIndices))
 	for _, i := range operatorIndices {
@@ -290,7 +290,7 @@ func TestCoopExit_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err, "legacy single-call coop exit should still succeed with knob off")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus())
 
 	for _, i := range operatorIndices {
 		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])

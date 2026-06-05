@@ -128,19 +128,19 @@ func StartTokenTransaction(
 	}
 
 	// Validate the keyshare config matches our signing operators
-	if len(startResponse.KeyshareInfo.OwnerIdentifiers) != len(config.SigningOperators) {
+	if len(startResponse.GetKeyshareInfo().GetOwnerIdentifiers()) != len(config.SigningOperators) {
 		return nil, nil, fmt.Errorf(
 			"keyshare operator count (%d) does not match signing operator count (%d)",
-			len(startResponse.KeyshareInfo.OwnerIdentifiers),
+			len(startResponse.GetKeyshareInfo().GetOwnerIdentifiers()),
 			len(config.SigningOperators),
 		)
 	}
-	for _, operatorID := range startResponse.KeyshareInfo.OwnerIdentifiers {
+	for _, operatorID := range startResponse.GetKeyshareInfo().GetOwnerIdentifiers() {
 		if _, exists := config.SigningOperators[operatorID]; !exists {
 			return nil, nil, fmt.Errorf("keyshare operator %s not found in signing operator list", operatorID)
 		}
 	}
-	finalTxHash, err := utils.HashTokenTransaction(startResponse.FinalTokenTransaction, false)
+	finalTxHash, err := utils.HashTokenTransaction(startResponse.GetFinalTokenTransaction(), false)
 	if err != nil {
 		log.Printf("Error while hashing final token transaction: %v", err)
 		return nil, nil, err
@@ -196,7 +196,7 @@ func BroadcastTokenTransferWithValidityDuration(
 	validityDuration time.Duration,
 	ownerPrivateKeys []keys.Private,
 ) (*tokenpb.TokenTransaction, error) {
-	if tokenTransaction.Version >= 3 {
+	if tokenTransaction.GetVersion() >= 3 {
 		return BroadcastTokenTransactionV3(ctx, config, tokenTransaction, ownerPrivateKeys, validityDuration)
 	}
 	startResp, finalTxHash, err := StartTokenTransaction(
@@ -217,7 +217,7 @@ func BroadcastTokenTransferWithValidityDuration(
 	}
 
 	signReq := &tokenpb.CommitTransactionRequest{
-		FinalTokenTransaction:          startResp.FinalTokenTransaction,
+		FinalTokenTransaction:          startResp.GetFinalTokenTransaction(),
 		FinalTokenTransactionHash:      finalTxHash,
 		InputTtxoSignaturesPerOperator: operatorSignatures,
 		OwnerIdentityPublicKey:         config.IdentityPublicKey().Serialize(),
@@ -228,7 +228,7 @@ func BroadcastTokenTransferWithValidityDuration(
 		return nil, fmt.Errorf("failed to sign and commit transaction: %w", err)
 	}
 
-	return startResp.FinalTokenTransaction, nil
+	return startResp.GetFinalTokenTransaction(), nil
 }
 
 type SignTokenTransactionFromCoordinationParams struct {
@@ -255,7 +255,7 @@ func SignTokenTransactionFromCoordination(
 	}
 	var chosenOperatorSignatures *tokenpb.InputTtxoSignaturesPerOperator
 	for _, operatorSignatures := range operatorSignatures {
-		operatorKey, err := keys.ParsePublicKey(operatorSignatures.OperatorIdentityPublicKey)
+		operatorKey, err := keys.ParsePublicKey(operatorSignatures.GetOperatorIdentityPublicKey())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse operator identity public key: %w", err)
 		}
@@ -390,7 +390,7 @@ func convertTokenTransactionToV3Request(
 	// Set the version to 3 for the broadcast request (to avoid needing to do it upstream in every test)
 	tokenTransaction.Version = 3
 
-	if tokenTransaction.ClientCreatedTimestamp == nil || tokenTransaction.ClientCreatedTimestamp.AsTime().IsZero() {
+	if tokenTransaction.GetClientCreatedTimestamp() == nil || tokenTransaction.GetClientCreatedTimestamp().AsTime().IsZero() {
 		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(time.Now().UTC()))
 	}
 	tokenTransaction.ValidityDurationSeconds = new(uint64(validityDuration.Seconds()))
@@ -467,23 +467,23 @@ func ensureV3WithdrawParameters(config *TestWalletConfig, tokenTransaction *toke
 		return fmt.Errorf("wallet withdraw relative block locktime must be configured for v3 transactions")
 	}
 
-	if len(tokenTransaction.TokenOutputs) == 0 {
+	if len(tokenTransaction.GetTokenOutputs()) == 0 {
 		return nil
 	}
 
-	for i, output := range tokenTransaction.TokenOutputs {
+	for i, output := range tokenTransaction.GetTokenOutputs() {
 		if output == nil {
 			continue
 		}
 		if output.WithdrawBondSats == nil {
 			output.WithdrawBondSats = new(config.WithdrawBondSats)
-		} else if *output.WithdrawBondSats != config.WithdrawBondSats {
+		} else if output.GetWithdrawBondSats() != config.WithdrawBondSats {
 			return fmt.Errorf("token output %d withdraw bond sats must equal configured value %d", i, config.WithdrawBondSats)
 		}
 
 		if output.WithdrawRelativeBlockLocktime == nil {
 			output.WithdrawRelativeBlockLocktime = new(config.WithdrawRelativeBlockLocktime)
-		} else if *output.WithdrawRelativeBlockLocktime != config.WithdrawRelativeBlockLocktime {
+		} else if output.GetWithdrawRelativeBlockLocktime() != config.WithdrawRelativeBlockLocktime {
 			return fmt.Errorf("token output %d withdraw relative block locktime must equal configured value %d", i, config.WithdrawRelativeBlockLocktime)
 		}
 	}
@@ -916,7 +916,7 @@ func QueryTokenTransactions(
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode spark address: %w", err)
 		}
-		pubKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
+		pubKey, err := keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse identity public key from spark address: %w", err)
 		}

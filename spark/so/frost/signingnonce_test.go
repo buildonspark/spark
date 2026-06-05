@@ -218,8 +218,8 @@ func TestSigningNonce_MarshalProto(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, proto)
-	assert.Equal(t, nonce.binding.Serialize(), proto.Binding)
-	assert.Equal(t, nonce.hiding.Serialize(), proto.Hiding)
+	assert.Equal(t, nonce.binding.Serialize(), proto.GetBinding())
+	assert.Equal(t, nonce.hiding.Serialize(), proto.GetHiding())
 }
 
 func TestSigningNonce_UnmarshalProto(t *testing.T) {

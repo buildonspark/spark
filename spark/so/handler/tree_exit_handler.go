@@ -141,8 +141,8 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	prevOuts := make(map[wire.OutPoint]*wire.TxOut)
 	for index, txIn := range tx.TxIn {
 		prevOuts[txIn.PreviousOutPoint] = &wire.TxOut{
-			Value:    previousOutputs[index].Value,
-			PkScript: previousOutputs[index].PkScript,
+			Value:    previousOutputs[index].GetValue(),
+			PkScript: previousOutputs[index].GetPkScript(),
 		}
 	}
 
@@ -164,7 +164,7 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 			value: root,
 		}
 
-		txSigHash, err := sighash.FromMultiPrevOutTx(tx, int(exitingTree.Vin), prevOuts)
+		txSigHash, err := sighash.FromMultiPrevOutTx(tx, int(exitingTree.GetVin()), prevOuts)
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash from tx: %w", err)
 		}

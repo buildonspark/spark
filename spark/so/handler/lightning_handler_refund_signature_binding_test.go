@@ -32,7 +32,7 @@ func (m *messageCheckingFrostServiceClient) ValidateSignatureShare(
 	req *pbfrost.ValidateSignatureShareRequest,
 	_ ...grpc.CallOption,
 ) (*emptypb.Empty, error) {
-	if !bytes.Equal(req.Message, m.expectedMessage.Serialize()) {
+	if !bytes.Equal(req.GetMessage(), m.expectedMessage.Serialize()) {
 		return nil, status.Error(codes.InvalidArgument, "signature share does not match recomputed sighash")
 	}
 	return &emptypb.Empty{}, nil

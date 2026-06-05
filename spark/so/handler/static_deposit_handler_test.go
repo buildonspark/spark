@@ -390,13 +390,13 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 			require.NotNil(t, result)
 
 			// Verify the result structure
-			assert.NotNil(t, result.Signature)
-			assert.NotNil(t, result.CoordinatorPublicKey)
+			assert.NotNil(t, result.GetSignature())
+			assert.NotNil(t, result.GetCoordinatorPublicKey())
 
 			// Verify the UTXO data matches input
-			assert.Equal(t, tc.utxo.Txid, result.GetOnChainUtxo().GetTxid())
-			assert.Equal(t, tc.utxo.Vout, result.GetOnChainUtxo().GetVout())
-			assert.Equal(t, tc.utxo.Network, result.GetOnChainUtxo().GetNetwork())
+			assert.Equal(t, tc.utxo.GetTxid(), result.GetOnChainUtxo().GetTxid())
+			assert.Equal(t, tc.utxo.GetVout(), result.GetOnChainUtxo().GetVout())
+			assert.Equal(t, tc.utxo.GetNetwork(), result.GetOnChainUtxo().GetNetwork())
 
 			// Verify signature is valid
 			// First, recreate the expected message hash
@@ -406,7 +406,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 			expectedMessageHash, err := CreateUtxoSwapStatement(
 				UtxoSwapStatementTypeRollback,
 				hex.EncodeToString(result.GetOnChainUtxo().GetTxid()),
-				result.OnChainUtxo.Vout,
+				result.GetOnChainUtxo().GetVout(),
 				network,
 			)
 			require.NoError(t, err)
@@ -415,7 +415,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 			coordinatorPubKey, err := keys.ParsePublicKey(result.GetCoordinatorPublicKey())
 			require.NoError(t, err)
 			assert.Equal(t, config.IdentityPublicKey(), coordinatorPubKey)
-			err = common.VerifyECDSASignature(coordinatorPubKey, result.Signature, expectedMessageHash)
+			err = common.VerifyECDSASignature(coordinatorPubKey, result.GetSignature(), expectedMessageHash)
 			require.NoError(t, err, "Signature verification failed")
 		})
 	}

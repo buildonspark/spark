@@ -160,8 +160,8 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.Len(t, outputsResp.OutputsWithPreviousTransactionData, 1)
-		assert.Equal(t, mintOutput.ID.String(), outputsResp.OutputsWithPreviousTransactionData[0].Output.GetId())
+		require.Len(t, outputsResp.GetOutputsWithPreviousTransactionData(), 1)
+		assert.Equal(t, mintOutput.ID.String(), outputsResp.GetOutputsWithPreviousTransactionData()[0].GetOutput().GetId())
 	})
 }
 
@@ -201,24 +201,24 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 			resp, err := handler.QueryTokenOutputs(ctx, req)
 			require.NoError(t, err)
-			require.NotNil(t, resp.PageResponse)
+			require.NotNil(t, resp.GetPageResponse())
 
-			for _, output := range resp.OutputsWithPreviousTransactionData {
+			for _, output := range resp.GetOutputsWithPreviousTransactionData() {
 				all = append(all, output.GetOutput().GetId())
 			}
 
 			if page == 0 {
-				require.False(t, resp.PageResponse.HasPreviousPage)
+				require.False(t, resp.GetPageResponse().GetHasPreviousPage())
 			} else {
-				require.True(t, resp.PageResponse.HasPreviousPage)
+				require.True(t, resp.GetPageResponse().GetHasPreviousPage())
 			}
 
 			if page < 2 {
-				require.True(t, resp.PageResponse.HasNextPage)
-				require.NotEmpty(t, resp.PageResponse.NextCursor)
-				afterCursor = resp.PageResponse.NextCursor
+				require.True(t, resp.GetPageResponse().GetHasNextPage())
+				require.NotEmpty(t, resp.GetPageResponse().GetNextCursor())
+				afterCursor = resp.GetPageResponse().GetNextCursor()
 			} else {
-				require.False(t, resp.PageResponse.HasNextPage)
+				require.False(t, resp.GetPageResponse().GetHasNextPage())
 			}
 		}
 
@@ -236,10 +236,10 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
+		assert.Len(t, resp.GetOutputsWithPreviousTransactionData(), 7)
 
 		// Use the PageResponse.NextCursor from the response, which is properly encoded
-		beforeCursor := resp.PageResponse.NextCursor
+		beforeCursor := resp.GetPageResponse().GetNextCursor()
 		require.NotEmpty(t, beforeCursor)
 
 		// Backward pagination should return an error
@@ -262,12 +262,12 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 			// PageRequest not set, should use DefaultTokenOutputPageSize
 		})
 		require.NoError(t, err)
-		require.NotNil(t, resp.PageResponse)
+		require.NotNil(t, resp.GetPageResponse())
 
 		// Should get all 7 outputs since DefaultTokenOutputPageSize (500) > 7
-		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
-		assert.False(t, resp.PageResponse.HasNextPage)
-		assert.False(t, resp.PageResponse.HasPreviousPage)
+		assert.Len(t, resp.GetOutputsWithPreviousTransactionData(), 7)
+		assert.False(t, resp.GetPageResponse().GetHasNextPage())
+		assert.False(t, resp.GetPageResponse().GetHasPreviousPage())
 	})
 
 	t.Run("page size limit", func(t *testing.T) {
@@ -281,7 +281,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
+		assert.Len(t, resp.GetOutputsWithPreviousTransactionData(), 7)
 	})
 
 	t.Run("filter value limits", func(t *testing.T) {

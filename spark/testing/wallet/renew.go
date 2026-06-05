@@ -27,14 +27,14 @@ func RenewNodeZeroTimelock(
 ) (*pb.TreeNode, error) {
 	signingPubKey := signingPrivKey.Public()
 
-	leafNodeTx, err := common.TxFromRawTxBytes(leaf.NodeTx)
+	leafNodeTx, err := common.TxFromRawTxBytes(leaf.GetNodeTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse leaf node tx: %w", err)
 	}
 	leafAmount := leafNodeTx.TxOut[0].Value
 	leafNodeOutPoint := &wire.OutPoint{Hash: leafNodeTx.TxHash(), Index: 0}
 
-	verifyingKey, err := keys.ParsePublicKey(leaf.VerifyingPublicKey)
+	verifyingKey, err := keys.ParsePublicKey(leaf.GetVerifyingPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse verifying key: %w", err)
 	}
@@ -43,7 +43,7 @@ func RenewNodeZeroTimelock(
 		return nil, fmt.Errorf("failed to create node pkscript: %w", err)
 	}
 
-	ownerSigningPubKey, err := keys.ParsePublicKey(leaf.OwnerSigningPublicKey)
+	ownerSigningPubKey, err := keys.ParsePublicKey(leaf.GetOwnerSigningPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
 	}
@@ -114,7 +114,7 @@ func RenewNodeZeroTimelock(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	resp, err := sparkClient.RenewLeaf(ctx, &pb.RenewLeafRequest{
-		LeafId: leaf.Id,
+		LeafId: leaf.GetId(),
 		SigningJobs: &pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob{
 			RenewNodeZeroTimelockSigningJob: &pb.RenewNodeZeroTimelockSigningJob{
 				NodeTxSigningJob:                 userSignedJobs[0],
@@ -129,10 +129,10 @@ func RenewNodeZeroTimelock(
 	}
 
 	result := resp.GetRenewNodeZeroTimelockResult()
-	if result == nil || result.Node == nil {
+	if result == nil || result.GetNode() == nil {
 		return nil, fmt.Errorf("unexpected renew result type")
 	}
-	return result.Node, nil
+	return result.GetNode(), nil
 }
 
 // RenewNodeTimelock drives the full node+refund renewal protocol (Path 1).
@@ -146,14 +146,14 @@ func RenewNodeTimelock(
 ) (*pb.TreeNode, error) {
 	signingPubKey := signingPrivKey.Public()
 
-	parentTx, err := common.TxFromRawTxBytes(parentLeaf.NodeTx)
+	parentTx, err := common.TxFromRawTxBytes(parentLeaf.GetNodeTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent node tx: %w", err)
 	}
 	parentAmount := parentTx.TxOut[0].Value
 	parentOutPoint := &wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
 
-	verifyingKey, err := keys.ParsePublicKey(leaf.VerifyingPublicKey)
+	verifyingKey, err := keys.ParsePublicKey(leaf.GetVerifyingPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse verifying key: %w", err)
 	}
@@ -162,7 +162,7 @@ func RenewNodeTimelock(
 		return nil, fmt.Errorf("failed to create node pkscript: %w", err)
 	}
 
-	ownerSigningPubKey, err := keys.ParsePublicKey(leaf.OwnerSigningPublicKey)
+	ownerSigningPubKey, err := keys.ParsePublicKey(leaf.GetOwnerSigningPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
 	}
@@ -263,7 +263,7 @@ func RenewNodeTimelock(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	resp, err := sparkClient.RenewLeaf(ctx, &pb.RenewLeafRequest{
-		LeafId: leaf.Id,
+		LeafId: leaf.GetId(),
 		SigningJobs: &pb.RenewLeafRequest_RenewNodeTimelockSigningJob{
 			RenewNodeTimelockSigningJob: &pb.RenewNodeTimelockSigningJob{
 				SplitNodeTxSigningJob:            userSignedJobs[0],
@@ -281,10 +281,10 @@ func RenewNodeTimelock(
 	}
 
 	result := resp.GetRenewNodeTimelockResult()
-	if result == nil || result.Node == nil {
+	if result == nil || result.GetNode() == nil {
 		return nil, fmt.Errorf("unexpected renew result type")
 	}
-	return result.Node, nil
+	return result.GetNode(), nil
 }
 
 // RenewRefundTimelock drives the refund-only renewal protocol (Path 2).
@@ -298,14 +298,14 @@ func RenewRefundTimelock(
 ) (*pb.TreeNode, error) {
 	signingPubKey := signingPrivKey.Public()
 
-	parentTx, err := common.TxFromRawTxBytes(parentLeaf.NodeTx)
+	parentTx, err := common.TxFromRawTxBytes(parentLeaf.GetNodeTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent node tx: %w", err)
 	}
 	parentAmount := parentTx.TxOut[0].Value
 	parentOutPoint := &wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
 
-	leafNodeTx, err := common.TxFromRawTxBytes(leaf.NodeTx)
+	leafNodeTx, err := common.TxFromRawTxBytes(leaf.GetNodeTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse leaf node tx: %w", err)
 	}
@@ -316,7 +316,7 @@ func RenewRefundTimelock(
 		return nil, fmt.Errorf("failed to compute next sequence: %w", err)
 	}
 
-	verifyingKey, err := keys.ParsePublicKey(leaf.VerifyingPublicKey)
+	verifyingKey, err := keys.ParsePublicKey(leaf.GetVerifyingPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse verifying key: %w", err)
 	}
@@ -325,7 +325,7 @@ func RenewRefundTimelock(
 		return nil, fmt.Errorf("failed to create node pkscript: %w", err)
 	}
 
-	ownerSigningPubKey, err := keys.ParsePublicKey(leaf.OwnerSigningPublicKey)
+	ownerSigningPubKey, err := keys.ParsePublicKey(leaf.GetOwnerSigningPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
 	}
@@ -405,7 +405,7 @@ func RenewRefundTimelock(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	resp, err := sparkClient.RenewLeaf(ctx, &pb.RenewLeafRequest{
-		LeafId: leaf.Id,
+		LeafId: leaf.GetId(),
 		SigningJobs: &pb.RenewLeafRequest_RenewRefundTimelockSigningJob{
 			RenewRefundTimelockSigningJob: &pb.RenewRefundTimelockSigningJob{
 				NodeTxSigningJob:                 userSignedJobs[0],
@@ -421,10 +421,10 @@ func RenewRefundTimelock(
 	}
 
 	result := resp.GetRenewRefundTimelockResult()
-	if result == nil || result.Node == nil {
+	if result == nil || result.GetNode() == nil {
 		return nil, fmt.Errorf("unexpected renew result type")
 	}
-	return result.Node, nil
+	return result.GetNode(), nil
 }
 
 // signRenewTransactions handles the common FROST signing flow for all renewal paths.
@@ -449,8 +449,8 @@ func signRenewTransactions(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
 	}
-	if len(commitmentsResp.SigningCommitments) != len(prepared) {
-		return nil, fmt.Errorf("got %d commitments, expected %d", len(commitmentsResp.SigningCommitments), len(prepared))
+	if len(commitmentsResp.GetSigningCommitments()) != len(prepared) {
+		return nil, fmt.Errorf("got %d commitments, expected %d", len(commitmentsResp.GetSigningCommitments()), len(prepared))
 	}
 
 	userKeyPackage := CreateUserKeyPackage(signingPrivKey)
@@ -467,7 +467,7 @@ func signRenewTransactions(
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           p.nonce,
 			UserCommitments: p.commitment,
-			Commitments:     commitmentsResp.SigningCommitments[i].SigningNonceCommitments,
+			Commitments:     commitmentsResp.GetSigningCommitments()[i].GetSigningNonceCommitments(),
 		}
 	}
 
@@ -489,18 +489,18 @@ func signRenewTransactions(
 	signingPubKey := signingPrivKey.Public()
 	result := make([]*pb.UserSignedTxSigningJob, len(prepared))
 	for i, p := range prepared {
-		sig, ok := signingResp.Results[jobIDs[i]]
+		sig, ok := signingResp.GetResults()[jobIDs[i]]
 		if !ok || sig == nil {
-			returnedResults := slices.Collect(maps.Keys(signingResp.Results))
+			returnedResults := slices.Collect(maps.Keys(signingResp.GetResults()))
 			return nil, fmt.Errorf("signature for job %s not returned (returned: %s)", jobIDs[i], strings.Join(returnedResults, ","))
 		}
 		result[i] = &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
 			RawTx:                  p.rawTx,
 			SigningNonceCommitment: p.commitment,
-			UserSignature:          sig.SignatureShare,
+			UserSignature:          sig.GetSignatureShare(),
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[i].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[i].GetSigningNonceCommitments(),
 			},
 		}
 	}

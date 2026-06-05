@@ -85,7 +85,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		return nil, err
 	}
 
-	if len(req.NodeIds) > 0 && req.NodeIdCount != 0 {
+	if len(req.GetNodeIds()) > 0 && req.GetNodeIdCount() != 0 {
 		return nil, errors.InvalidArgumentMalformedField(errs.New("can provide node_ids or node_id_count, but not both"))
 	}
 
@@ -102,7 +102,7 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 	maxNodeIDs := int(knobsService.GetValue(knobs.KnobSoSigningCommitmentNodeLimit, DefaultMaxSigningCommitmentNodes))
 
 	maxSigningCommitmentCount := uint32(knobsService.GetValue(knobs.KnobSoSigningCommitmentCountLimit, DefaultMaxSigningCommitmentCount))
-	signingCommitmentCount := req.Count
+	signingCommitmentCount := req.GetCount()
 	if signingCommitmentCount == 0 {
 		signingCommitmentCount = 1
 	}
@@ -144,10 +144,10 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 
 		keyshareIDcount = uint32(len(nodes))
 	} else {
-		if req.NodeIdCount > uint32(maxNodeIDs) {
-			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("node ID count provided was %d, but the max is %d", req.NodeIdCount, maxNodeIDs))
+		if req.GetNodeIdCount() > uint32(maxNodeIDs) {
+			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("node ID count provided was %d, but the max is %d", req.GetNodeIdCount(), maxNodeIDs))
 		}
-		keyshareIDcount = req.NodeIdCount
+		keyshareIDcount = req.GetNodeIdCount()
 	}
 
 	if keyshareIDcount == 0 {

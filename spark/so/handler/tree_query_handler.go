@@ -63,7 +63,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		}
 	}
 
-	switch req.Source.(type) {
+	switch req.GetSource().(type) {
 	case *pb.QueryNodesRequest_OwnerIdentityPubkey:
 		if limit < 0 || offset < 0 {
 			return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("expect non-negative offset and limit"))
@@ -85,7 +85,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			}
 		}
 
-		if len(req.Statuses) == 0 {
+		if len(req.GetStatuses()) == 0 {
 			query = query.Where(treenode.StatusNotIn(st.TreeNodeStatusCreating, st.TreeNodeStatusSplitted))
 		}
 
@@ -119,9 +119,9 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("either owner identity pubkey or node ids to query must be provided"))
 	}
 
-	if len(req.Statuses) > 0 {
-		statuses := make([]st.TreeNodeStatus, len(req.Statuses))
-		for i, stat := range req.Statuses {
+	if len(req.GetStatuses()) > 0 {
+		statuses := make([]st.TreeNodeStatus, len(req.GetStatuses()))
+		for i, stat := range req.GetStatuses() {
 			var err error
 			statuses[i], err = ent.TreeNodeStatusSchema(stat)
 			if err != nil {
@@ -132,7 +132,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	}
 
 	// If parent chains are requested, eager-load parent of parent to reduce follow-up queries
-	if req.IncludeParents {
+	if req.GetIncludeParents() {
 		query = query.WithParent(func(q *ent.TreeNodeQuery) { q.WithParent() })
 	}
 
@@ -141,7 +141,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		return nil, err
 	}
 
-	if _, ok := req.Source.(*pb.QueryNodesRequest_NodeIds); ok && !isSSP {
+	if _, ok := req.GetSource().(*pb.QueryNodesRequest_NodeIds); ok && !isSSP {
 		nodes, err = filterNodesByWalletAccess(ctx, h.config, nodes)
 		if err != nil {
 			return nil, err
@@ -154,7 +154,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal node %s: %w", node.ID.String(), err)
 		}
-		if req.IncludeParents {
+		if req.GetIncludeParents() {
 			err := getAncestorChain(ctx, db, node, protoNodeMap, isSSP)
 			if err != nil {
 				return nil, err
@@ -332,18 +332,18 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		WithSigningKeyshare()
 
 	// Validate offset and limit
-	if req.Limit < 0 || req.Offset < 0 {
+	if req.GetLimit() < 0 || req.GetOffset() < 0 {
 		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("expect non-negative offset and limit"))
 	}
 
-	usePagination := req.Limit > 0 || req.Offset > 0
+	usePagination := req.GetLimit() > 0 || req.GetOffset() > 0
 	limit := 100
-	offset := int(req.Offset)
+	offset := int(req.GetOffset())
 
 	// If limit and offset are provided, update query to include them otherwise don't add limit and offset to maintain backwards compatibility
 	if usePagination {
-		if req.Limit > 0 && req.Limit < 100 {
-			limit = int(req.Limit)
+		if req.GetLimit() > 0 && req.GetLimit() < 100 {
+			limit = int(req.GetLimit())
 		}
 
 		query = query.Offset(offset).Limit(limit)

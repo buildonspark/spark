@@ -48,7 +48,7 @@ func SwapNodesForPreimage(
 	client := pb.NewSparkServiceClient(conn)
 	nodeIDs := make([]string, len(leaves))
 	for i, leaf := range leaves {
-		nodeIDs[i] = leaf.Leaf.Id
+		nodeIDs[i] = leaf.Leaf.GetId()
 	}
 
 	// For RECEIVE, we need 3 commitments per leaf (CPFP, direct-from-cpfp, direct)
@@ -100,9 +100,9 @@ func SwapNodesForPreimage(
 		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
 
 		// For RECEIVE, create P2TR refund txs with complete exit paths
-		cpfpSigningCommitments := signingCommitments.SigningCommitments[:len(leaves)]
-		directFromCpfpSigningCommitments := signingCommitments.SigningCommitments[len(leaves) : len(leaves)*2]
-		directSigningCommitments := signingCommitments.SigningCommitments[len(leaves)*2 : len(leaves)*3]
+		cpfpSigningCommitments := signingCommitments.GetSigningCommitments()[:len(leaves)]
+		directFromCpfpSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves) : len(leaves)*2]
+		directSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves)*2 : len(leaves)*3]
 
 		// 1. CPFP refund txs
 		cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
@@ -120,7 +120,7 @@ func SwapNodesForPreimage(
 		}
 
 		cpfpLeafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, cpfpRefundTxs, cpfpSigningResults.Results, cpfpUserCommitments, cpfpSigningCommitments)
+			leaves, cpfpRefundTxs, cpfpSigningResults.GetResults(), cpfpUserCommitments, cpfpSigningCommitments)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare CPFP leaf signing jobs: %w", err)
 		}
@@ -141,7 +141,7 @@ func SwapNodesForPreimage(
 		}
 
 		directFromCpfpLeafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, directFromCpfpRefundTxs, directFromCpfpSigningResults.Results, directFromCpfpUserCommitments, directFromCpfpSigningCommitments)
+			leaves, directFromCpfpRefundTxs, directFromCpfpSigningResults.GetResults(), directFromCpfpUserCommitments, directFromCpfpSigningCommitments)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare direct-from-cpfp leaf signing jobs: %w", err)
 		}
@@ -165,7 +165,7 @@ func SwapNodesForPreimage(
 			}
 
 			directLeafSigningJobs, err = prepareLeafSigningJobs(
-				leavesWithDirect, directRefundTxs, directSigningResults.Results, directUserCommitments, directSigningCommitments[:len(leavesWithDirect)])
+				leavesWithDirect, directRefundTxs, directSigningResults.GetResults(), directUserCommitments, directSigningCommitments[:len(leavesWithDirect)])
 			if err != nil {
 				return nil, fmt.Errorf("failed to prepare direct leaf signing jobs: %w", err)
 			}
@@ -183,7 +183,7 @@ func SwapNodesForPreimage(
 	} else {
 		// For SEND, only need CPFP refund txs
 		signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
-			leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey, keys.Public{})
+			leaves, signingCommitments.GetSigningCommitments(), receiverIdentityPubKey, keys.Public{})
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func SwapNodesForPreimage(
 		}
 
 		leafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, refundTxs, signingResults.Results, userCommitments, signingCommitments.SigningCommitments)
+			leaves, refundTxs, signingResults.GetResults(), userCommitments, signingCommitments.GetSigningCommitments())
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +311,7 @@ func SwapNodesForPreimageWithHTLC(
 	client := pb.NewSparkServiceClient(conn)
 	nodeIDs := make([]string, len(leaves))
 	for i, leaf := range leaves {
-		nodeIDs[i] = leaf.Leaf.Id
+		nodeIDs[i] = leaf.Leaf.GetId()
 	}
 	signingCommitments, err := client.GetSigningCommitments(tmpCtx, &pb.GetSigningCommitmentsRequest{
 		NodeIds: nodeIDs,
@@ -356,9 +356,9 @@ func SwapNodesForPreimageWithHTLC(
 		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
 
 		// For RECEIVE, create P2TR refund txs with complete exit paths
-		cpfpSigningCommitments := signingCommitments.SigningCommitments[:len(leaves)]
-		directFromCpfpSigningCommitments := signingCommitments.SigningCommitments[len(leaves) : len(leaves)*2]
-		directSigningCommitments := signingCommitments.SigningCommitments[len(leaves)*2 : len(leaves)*3]
+		cpfpSigningCommitments := signingCommitments.GetSigningCommitments()[:len(leaves)]
+		directFromCpfpSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves) : len(leaves)*2]
+		directSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves)*2 : len(leaves)*3]
 
 		// 1. CPFP refund txs
 		cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
@@ -376,7 +376,7 @@ func SwapNodesForPreimageWithHTLC(
 		}
 
 		cpfpLeafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, cpfpRefundTxs, cpfpSigningResults.Results, cpfpUserCommitments, cpfpSigningCommitments)
+			leaves, cpfpRefundTxs, cpfpSigningResults.GetResults(), cpfpUserCommitments, cpfpSigningCommitments)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare CPFP leaf signing jobs: %w", err)
 		}
@@ -397,7 +397,7 @@ func SwapNodesForPreimageWithHTLC(
 		}
 
 		directFromCpfpLeafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, directFromCpfpRefundTxs, directFromCpfpSigningResults.Results, directFromCpfpUserCommitments, directFromCpfpSigningCommitments)
+			leaves, directFromCpfpRefundTxs, directFromCpfpSigningResults.GetResults(), directFromCpfpUserCommitments, directFromCpfpSigningCommitments)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare direct-from-cpfp leaf signing jobs: %w", err)
 		}
@@ -421,7 +421,7 @@ func SwapNodesForPreimageWithHTLC(
 			}
 
 			directLeafSigningJobs, err = prepareLeafSigningJobs(
-				leavesWithDirect, directRefundTxs, directSigningResults.Results, directUserCommitments, directSigningCommitments[:len(leavesWithDirect)])
+				leavesWithDirect, directRefundTxs, directSigningResults.GetResults(), directUserCommitments, directSigningCommitments[:len(leavesWithDirect)])
 			if err != nil {
 				return nil, fmt.Errorf("failed to prepare direct leaf signing jobs: %w", err)
 			}
@@ -438,7 +438,7 @@ func SwapNodesForPreimageWithHTLC(
 		}
 	} else {
 		// For SEND, use HTLC transactions
-		originalRefundSigningCommitments := signingCommitments.SigningCommitments[:len(leaves)]
+		originalRefundSigningCommitments := signingCommitments.GetSigningCommitments()[:len(leaves)]
 		signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
 			leaves, originalRefundSigningCommitments, receiverIdentityPubKey, keys.Public{})
 		if err != nil {
@@ -454,12 +454,12 @@ func SwapNodesForPreimageWithHTLC(
 		}
 
 		leafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, refundTxs, signingResults.Results, userCommitments, originalRefundSigningCommitments)
+			leaves, refundTxs, signingResults.GetResults(), userCommitments, originalRefundSigningCommitments)
 		if err != nil {
 			return nil, err
 		}
 
-		htlcSigningCommitments := signingCommitments.SigningCommitments[len(leaves):]
+		htlcSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves):]
 		transfer, err = buildLightningHTLCTransfer(ctx, leaves, transferID, config, receiverIdentityPubKey, htlcSigningCommitments, paymentHash, signerConn, expireTime)
 		if err != nil {
 			return nil, fmt.Errorf("unable to build lightning htlc transfer: %w", err)
@@ -538,7 +538,7 @@ func buildLightningHTLCTransfer(
 	refundLeafSigningJobs, err := prepareLeafSigningJobs(
 		leaves,
 		refundTxs,
-		cpfpSigningResults.Results,
+		cpfpSigningResults.GetResults(),
 		refundUserCommitments,
 		cpfpRefundSigningCommitments,
 	)
@@ -571,7 +571,7 @@ func buildLightningHTLCTransfer(
 	directFromCpfpLeafSigningJobs, err := prepareLeafSigningJobs(
 		leaves,
 		directFromCpfpRefundTxs,
-		directFromCpfpSigningResults.Results,
+		directFromCpfpSigningResults.GetResults(),
 		directFromCpfpUserCommitments,
 		directFromCpfpRefundSigningCommitments,
 	)
@@ -593,7 +593,7 @@ func buildLightningHTLCTransfer(
 		directRefundLeafSigningJobs, err = prepareLeafSigningJobs(
 			leaves,
 			directRefundTxs,
-			directRefundSigningResults.Results,
+			directRefundSigningResults.GetResults(),
 			directRefundUserCommitments,
 			directRefundSigningCommitments,
 		)
@@ -652,7 +652,7 @@ func buildLightningHTLCTransfer(
 func filterLeavesWithDirectTx(leaves []LeafKeyTweak) []LeafKeyTweak {
 	var result []LeafKeyTweak
 	for _, leaf := range leaves {
-		if len(leaf.Leaf.DirectTx) > 0 {
+		if len(leaf.Leaf.GetDirectTx()) > 0 {
 			result = append(result, leaf)
 		}
 	}

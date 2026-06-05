@@ -102,7 +102,7 @@ func (s *SigningNonce) UnmarshalProto(proto *pbfrost.SigningNonce) error {
 	if proto == nil {
 		return errors.New("cannot unmarshal signing nonce: nil proto")
 	}
-	return s.unmarshalFromBytes(proto.Binding, proto.Hiding)
+	return s.unmarshalFromBytes(proto.GetBinding(), proto.GetHiding())
 }
 
 func (s *SigningNonce) unmarshalFromBytes(bindingBytes, hidingBytes []byte) error {

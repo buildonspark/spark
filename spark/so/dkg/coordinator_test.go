@@ -42,13 +42,13 @@ func (m *mockDKGServiceServer) RoundConfirmation(ctx context.Context, req *pbdkg
 		// All keys unavailable
 		return &pbdkg.RoundConfirmationResponse{
 			AvailableKeyIds:   []string{},
-			UnavailableKeyIds: req.KeyIds,
+			UnavailableKeyIds: req.GetKeyIds(),
 		}, nil
 	}
 
 	available := []string{}
 	unavailable := []string{}
-	for _, keyID := range req.KeyIds {
+	for _, keyID := range req.GetKeyIds() {
 		if m.availableKeys[keyID] {
 			available = append(available, keyID)
 		} else {

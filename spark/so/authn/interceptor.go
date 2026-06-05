@@ -137,7 +137,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context, requireAuth bool)
 		return ctx, nil
 	}
 
-	key, err := keys.ParsePublicKey(sessionInfo.PublicKey)
+	key, err := keys.ParsePublicKey(sessionInfo.GetPublicKey())
 	if err != nil {
 		if requireAuth {
 			return nil, errors.WrapErrorWithCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
@@ -150,7 +150,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context, requireAuth bool)
 	return context.WithValue(ctx, authnContextKey, &Context{
 		Session: &Session{
 			identityPublicKey:   key,
-			expirationTimestamp: sessionInfo.ExpirationTimestamp,
+			expirationTimestamp: sessionInfo.GetExpirationTimestamp(),
 		},
 	}), nil
 }

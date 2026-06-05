@@ -144,7 +144,7 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: request cannot be nil"))
 	}
 
-	_, err := keys.ParsePublicKey(req.PublicKey)
+	_, err := keys.ParsePublicKey(req.GetPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid public key format: %w", err))
 	}
@@ -157,7 +157,7 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 		Version:   currentChallengeVersion,
 		Timestamp: s.clock.Now().Unix(),
 		Nonce:     nonce,
-		PublicKey: req.PublicKey,
+		PublicKey: req.GetPublicKey(),
 	}
 
 	mac := s.computeChallengeHmac(challenge)
@@ -182,24 +182,24 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: request cannot be nil"))
 	}
 
-	if req.ProtectedChallenge == nil {
+	if req.GetProtectedChallenge() == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: protected challenge cannot be nil"))
 	}
 
-	if req.ProtectedChallenge.Challenge == nil {
+	if req.GetProtectedChallenge().GetChallenge() == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: challenge cannot be nil"))
 	}
 
-	if len(req.Signature) == 0 {
+	if len(req.GetSignature()) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: signature cannot be empty"))
 	}
 
-	pubKey, err := keys.ParsePublicKey(req.PublicKey)
+	pubKey, err := keys.ParsePublicKey(req.GetPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid public key format: %w", err))
 	}
 
-	challenge := req.ProtectedChallenge.Challenge
+	challenge := req.GetProtectedChallenge().GetChallenge()
 
 	if err := s.validateChallenge(ctx, challenge, req); err != nil {
 		return nil, fmt.Errorf("challenge validation failed: %w", err)
@@ -210,11 +210,11 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 		return nil, fmt.Errorf("internal error: failed to serialize challenge: %w", err)
 	}
 
-	if err := s.verifyChallengeHmac(challenge, req.ProtectedChallenge.ServerHmac); err != nil {
+	if err := s.verifyChallengeHmac(challenge, req.GetProtectedChallenge().GetServerHmac()); err != nil {
 		return nil, fmt.Errorf("challenge verification failed: %w", err)
 	}
 
-	if err := s.verifyClientSignature(challengeBytes, pubKey, req.Signature); err != nil {
+	if err := s.verifyClientSignature(challengeBytes, pubKey, req.GetSignature()); err != nil {
 		return nil, fmt.Errorf("signature verification failed: %w", err)
 	}
 
@@ -232,10 +232,10 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 // computeChallengeHmac computes the HMAC of the challenge using structured hashing.
 func (s *AuthnServer) computeChallengeHmac(challenge *pb.Challenge) []byte {
 	challengeBytes := hashstructure.NewHasher([]string{"spark", "authn", "challenge"}).
-		AddUint32(uint32(challenge.Version)).
-		AddUint64(uint64(challenge.Timestamp)).
-		AddBytes(challenge.Nonce).
-		AddBytes(challenge.PublicKey).
+		AddUint32(uint32(challenge.GetVersion())).
+		AddUint64(uint64(challenge.GetTimestamp())).
+		AddBytes(challenge.GetNonce()).
+		AddBytes(challenge.GetPublicKey()).
 		Hash()
 
 	h := hmac.New(sha256.New, s.challengeHmacKey)
@@ -244,33 +244,33 @@ func (s *AuthnServer) computeChallengeHmac(challenge *pb.Challenge) []byte {
 }
 
 func (s *AuthnServer) validateChallenge(ctx context.Context, challenge *pb.Challenge, req *pb.VerifyChallengeRequest) error {
-	if challenge.Version != currentChallengeVersion {
+	if challenge.GetVersion() != currentChallengeVersion {
 		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("%w: got version %d, want version %d",
 			ErrUnsupportedChallengeVersion,
-			challenge.Version,
+			challenge.GetVersion(),
 			currentChallengeVersion))
 	}
 
-	if req.ProtectedChallenge.Version != currentProtectionVersion {
+	if req.GetProtectedChallenge().GetVersion() != currentProtectionVersion {
 		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("%w: got version %d, want version %d",
 			ErrUnsupportedChallengeProtectionVersion,
-			req.ProtectedChallenge.Version,
+			req.GetProtectedChallenge().GetVersion(),
 			currentProtectionVersion))
 	}
 
-	challengeAge := s.clock.Now().Unix() + clockSkewSeconds - challenge.Timestamp
+	challengeAge := s.clock.Now().Unix() + clockSkewSeconds - challenge.GetTimestamp()
 	if challengeAge > int64(s.config.ChallengeTimeout.Seconds()) {
 		return sparkerrors.FailedPreconditionExpired(fmt.Errorf("%w: challenge expired %d seconds ago",
 			ErrChallengeExpired,
 			challengeAge-int64(s.config.ChallengeTimeout.Seconds())))
 	}
 
-	if !bytes.Equal(req.PublicKey, challenge.PublicKey) {
+	if !bytes.Equal(req.GetPublicKey(), challenge.GetPublicKey()) {
 		return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("%w: request public key does not match challenge public key",
 			ErrPublicKeyMismatch))
 	}
 
-	if err := s.nonceCache.markNonceUsed(ctx, challenge.Nonce); err != nil {
+	if err := s.nonceCache.markNonceUsed(ctx, challenge.GetNonce()); err != nil {
 		if errors.Is(err, ErrChallengeReused) {
 			return sparkerrors.FailedPreconditionReplay(fmt.Errorf("challenge reused: %w", err))
 		}

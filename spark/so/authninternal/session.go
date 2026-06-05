@@ -75,10 +75,10 @@ func NewSessionTokenCreatorVerifier(identityPrivateKey keys.Private, clock Clock
 // computeSessionHmac computes the HMAC of the session using structured hashing.
 func (stcv *SessionTokenCreatorVerifier) computeSessionHmac(session *pb.Session) []byte {
 	sessionBytes := hashstructure.NewHasher([]string{"spark", "authn", "internal", "session"}).
-		AddUint32(uint32(session.Version)).
-		AddUint64(uint64(session.ExpirationTimestamp)).
-		AddBytes(session.Nonce).
-		AddBytes(session.PublicKey).
+		AddUint32(uint32(session.GetVersion())).
+		AddUint64(uint64(session.GetExpirationTimestamp())).
+		AddBytes(session.GetNonce()).
+		AddBytes(session.GetPublicKey()).
 		Hash()
 
 	h := hmac.New(sha256.New, stcv.sessionHmacKey)
@@ -135,25 +135,25 @@ func (stcv *SessionTokenCreatorVerifier) VerifyToken(token string) (*pb.Session,
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	if protected.Version != currentSessionProtectionVersion {
-		return nil, fmt.Errorf("%w: %d", ErrUnsupportedProtectionVersion, protected.Version)
+	if protected.GetVersion() != currentSessionProtectionVersion {
+		return nil, fmt.Errorf("%w: %d", ErrUnsupportedProtectionVersion, protected.GetVersion())
 	}
-	if protected.Session == nil {
+	if protected.GetSession() == nil {
 		return nil, fmt.Errorf("invalid token: missing session")
 	}
-	if protected.Session.Version != currentSessionVersion {
-		return nil, fmt.Errorf("%w: %d", ErrUnsupportedSessionVersion, protected.Session.Version)
+	if protected.GetSession().GetVersion() != currentSessionVersion {
+		return nil, fmt.Errorf("%w: %d", ErrUnsupportedSessionVersion, protected.GetSession().GetVersion())
 	}
 
-	expectedMAC := stcv.computeSessionHmac(protected.Session)
+	expectedMAC := stcv.computeSessionHmac(protected.GetSession())
 
-	if !hmac.Equal(expectedMAC, protected.Hmac) {
+	if !hmac.Equal(expectedMAC, protected.GetHmac()) {
 		return nil, ErrInvalidTokenHmac
 	}
 
-	if stcv.clock.Now().Unix() > protected.Session.ExpirationTimestamp {
+	if stcv.clock.Now().Unix() > protected.GetSession().GetExpirationTimestamp() {
 		return nil, ErrTokenExpired
 	}
 
-	return protected.Session, nil
+	return protected.GetSession(), nil
 }

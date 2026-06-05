@@ -83,19 +83,19 @@ func TestProvidePreimage_Consensus_HappyPath(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
 	require.NoError(t, err)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err, "provide preimage should succeed through consensus path")
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status,
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus(),
 		"transfer should be SENDER_KEY_TWEAKED after consensus path ProvidePreimage")
-	assert.Equal(t, transfer.Id, receiverTransfer.Id)
+	assert.Equal(t, transfer.GetId(), receiverTransfer.GetId())
 
 	// Every SO must have a Transfer row in SENDER_KEY_TWEAKED with the same
 	// id. Without this, participants diverged from the coordinator.
-	transferUUID, err := uuid.Parse(transfer.Id)
+	transferUUID, err := uuid.Parse(transfer.GetId())
 	require.NoError(t, err)
 	for _, i := range operatorIndicesFromConfig(userConfig) {
 		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
@@ -154,7 +154,7 @@ func TestProvidePreimage_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		amountSats,
 	)
 	require.NoError(t, err)
-	_, err = wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	_, err = wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
 	require.NoError(t, err)
 
 	// Snapshot pre-provide flow_execution ids per operator so the assertion
@@ -250,7 +250,7 @@ func TestProvidePreimage_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 		amountSats,
 	)
 	require.NoError(t, err)
-	_, err = wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	_, err = wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
 	require.NoError(t, err)
 
 	preExistingIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
@@ -260,7 +260,7 @@ func TestProvidePreimage_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err, "legacy provide_preimage path should still succeed with knob off")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus())
 
 	for _, i := range operatorIndices {
 		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])

@@ -65,7 +65,7 @@ func TestClaimTransfer_Consensus_HappyPath(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 	leafReceiverMap := map[string]keys.Public{
-		rootNode.Id: receiverPrivKey.Public(),
+		rootNode.GetId(): receiverPrivKey.Public(),
 	}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
@@ -73,7 +73,7 @@ func TestClaimTransfer_Consensus_HappyPath(t *testing.T) {
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err, "failed to send V3 transfer")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
@@ -82,26 +82,26 @@ func TestClaimTransfer_Consensus_HappyPath(t *testing.T) {
 
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
-	require.Len(t, pending.Transfers, 1)
+	require.Len(t, pending.GetTransfers(), 1)
 
-	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.Transfers[0])
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pending.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}}
-	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.Transfers[0], receiverConfig, claimLeaves)
+	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
 	require.NoError(t, err, "claim should succeed through consensus path")
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.Status,
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus(),
 		"transfer should be COMPLETED after consensus path ClaimTransfer")
 
 	// Each SO must have a Transfer row in COMPLETED state with the same id.
 	// Without this, participants diverged from the coordinator.
-	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 	for _, i := range operatorIndicesFromConfig(senderConfig) {
 		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
@@ -143,7 +143,7 @@ func TestClaimTransfer_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
-	leafReceiverMap := map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()}
+	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
 
 	_, err = wallet.SendTransferV3WithKeyTweaks(
 		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
@@ -166,18 +166,18 @@ func TestClaimTransfer_Consensus_WritesFlowExecutionRows(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
-	require.Len(t, pending.Transfers, 1)
-	_, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.Transfers[0])
+	require.Len(t, pending.GetTransfers(), 1)
+	_, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.GetTransfers()[0])
 	require.NoError(t, err)
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pending.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}}
-	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.Transfers[0], receiverConfig, claimLeaves)
+	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
 	require.NoError(t, err)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus())
 
 	// Every operator must have written exactly one new CLAIM_TRANSFER
 	// FlowExecution row, all sharing the same id (the engine's executionID).
@@ -244,7 +244,7 @@ func TestClaimTransfer_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
-	leafReceiverMap := map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()}
+	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
 
 	_, err = wallet.SendTransferV3WithKeyTweaks(
 		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
@@ -263,18 +263,18 @@ func TestClaimTransfer_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
-	require.Len(t, pending.Transfers, 1)
-	_, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.Transfers[0])
+	require.Len(t, pending.GetTransfers(), 1)
+	_, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.GetTransfers()[0])
 	require.NoError(t, err)
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pending.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}}
-	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.Transfers[0], receiverConfig, claimLeaves)
+	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
 	require.NoError(t, err, "legacy claim path should still succeed with knob off")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus())
 
 	for _, i := range operatorIndices {
 		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])

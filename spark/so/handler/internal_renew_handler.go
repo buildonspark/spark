@@ -67,9 +67,9 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	}
 
 	// Validate extended leaf status before any database writes
-	extendedLeafID, err := uuid.Parse(req.Node.Id)
+	extendedLeafID, err := uuid.Parse(req.GetNode().GetId())
 	if err != nil {
-		return fmt.Errorf("failed to parse extended leaf id %v: %w", req.Node.Id, err)
+		return fmt.Errorf("failed to parse extended leaf id %v: %w", req.GetNode().GetId(), err)
 	}
 
 	extendedLeafNode, err := db.TreeNode.Query().Where(treenode.ID(extendedLeafID)).ForUpdate().Only(ctx)
@@ -100,7 +100,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	//      A leaf whose current timelock is well above that means another
 	//      renew-node has happened since this payload was generated; the
 	//      payload is stale and must not be applied.
-	if leafFieldsMatchNodeFinalize(extendedLeafNode, req.Node) {
+	if leafFieldsMatchNodeFinalize(extendedLeafNode, req.GetNode()) {
 		logger.Info("FinalizeRenewNodeTimelock: leaf already at target state, treating as idempotent",
 			zap.String("extended_leaf_id", extendedLeafID.String()))
 		return nil
@@ -110,16 +110,16 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	}
 
 	// Process the split node (newly created node) - first node
-	splitNode := req.SplitNode
-	splitNodeID, err := uuid.Parse(splitNode.Id)
+	splitNode := req.GetSplitNode()
+	splitNodeID, err := uuid.Parse(splitNode.GetId())
 	if err != nil {
-		return fmt.Errorf("failed to parse split node %s: %w", splitNode.Id, err)
+		return fmt.Errorf("failed to parse split node %s: %w", splitNode.GetId(), err)
 	}
-	splitTreeID, err := uuid.Parse(splitNode.TreeId)
+	splitTreeID, err := uuid.Parse(splitNode.GetTreeId())
 	if err != nil {
-		return fmt.Errorf("failed to parse split tree %s: %w", splitNode.Id, err)
+		return fmt.Errorf("failed to parse split tree %s: %w", splitNode.GetId(), err)
 	}
-	splitSigningKeyshareID, err := uuid.Parse(splitNode.SigningKeyshareId)
+	splitSigningKeyshareID, err := uuid.Parse(splitNode.GetSigningKeyshareId())
 	if err != nil {
 		return fmt.Errorf("failed to parse split signing keyshare id: %w", err)
 	}
@@ -161,12 +161,12 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		SetStatus(st.TreeNodeStatusSplitLocked).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
-		SetValue(splitNode.Value).
+		SetValue(splitNode.GetValue()).
 		SetVerifyingPubkey(verifyingPubKey).
 		SetSigningKeyshareID(splitSigningKeyshareID).
-		SetRawTx(splitNode.RawTx).
-		SetDirectTx(splitNode.DirectTx).
-		SetVout(int16(splitNode.Vout))
+		SetRawTx(splitNode.GetRawTx()).
+		SetDirectTx(splitNode.GetDirectTx()).
+		SetVout(int16(splitNode.GetVout()))
 	if splitParentID != uuid.Nil {
 		splitNodeMut.SetParentID(splitParentID)
 	}
@@ -184,13 +184,13 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	}
 	logger.Info("Created split node", zap.String("split_node_id", splitNodeID.String()))
 
-	extendedLeaf := req.Node
+	extendedLeaf := req.GetNode()
 	_, err = extendedLeafNode.Update().
-		SetRawTx(extendedLeaf.RawTx).
-		SetRawRefundTx(extendedLeaf.RawRefundTx).
-		SetDirectTx(extendedLeaf.DirectTx).
-		SetDirectRefundTx(extendedLeaf.DirectRefundTx).
-		SetDirectFromCpfpRefundTx(extendedLeaf.DirectFromCpfpRefundTx).
+		SetRawTx(extendedLeaf.GetRawTx()).
+		SetRawRefundTx(extendedLeaf.GetRawRefundTx()).
+		SetDirectTx(extendedLeaf.GetDirectTx()).
+		SetDirectRefundTx(extendedLeaf.GetDirectRefundTx()).
+		SetDirectFromCpfpRefundTx(extendedLeaf.GetDirectFromCpfpRefundTx()).
 		SetParentID(splitNodeID).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusAvailable).
@@ -209,11 +209,11 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 // Used to short-circuit legitimate gossip redeliveries before any side
 // effects.
 func leafFieldsMatchNodeFinalize(leafNode *ent.TreeNode, target *pbinternal.TreeNode) bool {
-	return bytes.Equal(leafNode.RawTx, target.RawTx) &&
-		bytes.Equal(leafNode.RawRefundTx, target.RawRefundTx) &&
-		bytes.Equal(leafNode.DirectTx, target.DirectTx) &&
-		bytes.Equal(leafNode.DirectRefundTx, target.DirectRefundTx) &&
-		bytes.Equal(leafNode.DirectFromCpfpRefundTx, target.DirectFromCpfpRefundTx)
+	return bytes.Equal(leafNode.RawTx, target.GetRawTx()) &&
+		bytes.Equal(leafNode.RawRefundTx, target.GetRawRefundTx()) &&
+		bytes.Equal(leafNode.DirectTx, target.GetDirectTx()) &&
+		bytes.Equal(leafNode.DirectRefundTx, target.GetDirectRefundTx()) &&
+		bytes.Equal(leafNode.DirectFromCpfpRefundTx, target.GetDirectFromCpfpRefundTx())
 }
 
 // checkNodeRenewPrecondition rejects a renew-node finalize whose target
@@ -268,7 +268,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 		return fmt.Errorf("leaf node %s must have status Available or RenewLocked, but has status %s", leafID, leafNode.Status)
 	}
 
-	leaf := req.Node
+	leaf := req.GetNode()
 
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -291,16 +291,16 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 			zap.String("leaf_id", leafID.String()))
 		return nil
 	}
-	if err := checkRefundTimelockMonotonicity(leafNode.RawTx, leaf.RawTx, leafID); err != nil {
+	if err := checkRefundTimelockMonotonicity(leafNode.RawTx, leaf.GetRawTx(), leafID); err != nil {
 		return err
 	}
 
 	_, err = leafNode.Update().
-		SetRawTx(leaf.RawTx).
-		SetRawRefundTx(leaf.RawRefundTx).
-		SetDirectTx(leaf.DirectTx).
-		SetDirectRefundTx(leaf.DirectRefundTx).
-		SetDirectFromCpfpRefundTx(leaf.DirectFromCpfpRefundTx).
+		SetRawTx(leaf.GetRawTx()).
+		SetRawRefundTx(leaf.GetRawRefundTx()).
+		SetDirectTx(leaf.GetDirectTx()).
+		SetDirectRefundTx(leaf.GetDirectRefundTx()).
+		SetDirectFromCpfpRefundTx(leaf.GetDirectFromCpfpRefundTx()).
 		SetStatus(st.TreeNodeStatusAvailable).
 		Save(ctx)
 	if err != nil {
@@ -315,11 +315,11 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 // finalize would write is already byte-identical on the leaf. Used to
 // short-circuit legitimate gossip redeliveries.
 func leafFieldsMatchRefundFinalize(leafNode *ent.TreeNode, target *pbinternal.TreeNode) bool {
-	return bytes.Equal(leafNode.RawTx, target.RawTx) &&
-		bytes.Equal(leafNode.RawRefundTx, target.RawRefundTx) &&
-		bytes.Equal(leafNode.DirectTx, target.DirectTx) &&
-		bytes.Equal(leafNode.DirectRefundTx, target.DirectRefundTx) &&
-		bytes.Equal(leafNode.DirectFromCpfpRefundTx, target.DirectFromCpfpRefundTx)
+	return bytes.Equal(leafNode.RawTx, target.GetRawTx()) &&
+		bytes.Equal(leafNode.RawRefundTx, target.GetRawRefundTx()) &&
+		bytes.Equal(leafNode.DirectTx, target.GetDirectTx()) &&
+		bytes.Equal(leafNode.DirectRefundTx, target.GetDirectRefundTx()) &&
+		bytes.Equal(leafNode.DirectFromCpfpRefundTx, target.GetDirectFromCpfpRefundTx())
 }
 
 // checkRefundTimelockMonotonicity verifies that the refund-finalize

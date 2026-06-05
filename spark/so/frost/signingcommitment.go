@@ -89,7 +89,7 @@ func (s *SigningCommitment) UnmarshalProto(proto *pbcommon.SigningCommitment) er
 	if proto == nil {
 		return errors.New("cannot unmarshal signing commitment: nil proto")
 	}
-	return s.unmarshalFromBytes(proto.Binding, proto.Hiding)
+	return s.unmarshalFromBytes(proto.GetBinding(), proto.GetHiding())
 }
 
 func (s *SigningCommitment) unmarshalFromBytes(bindingBytes, hidingBytes []byte) error {

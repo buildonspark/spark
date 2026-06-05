@@ -40,27 +40,27 @@ func validateSigningJobFields(job *pb.UserSignedTxSigningJob, jobName string) er
 		return status.Errorf(codes.InvalidArgument, "%s is required", jobName)
 	}
 
-	if len(job.SigningPublicKey) == 0 {
+	if len(job.GetSigningPublicKey()) == 0 {
 		return status.Errorf(codes.InvalidArgument, "%s.signing_public_key is required", jobName)
 	}
 
-	if len(job.RawTx) == 0 {
+	if len(job.GetRawTx()) == 0 {
 		return status.Errorf(codes.InvalidArgument, "%s.raw_tx is required", jobName)
 	}
 
-	if job.SigningNonceCommitment == nil {
+	if job.GetSigningNonceCommitment() == nil {
 		return status.Errorf(codes.InvalidArgument, "%s.signing_nonce_commitment is required", jobName)
 	}
 
-	if len(job.UserSignature) == 0 {
+	if len(job.GetUserSignature()) == 0 {
 		return status.Errorf(codes.InvalidArgument, "%s.user_signature is required", jobName)
 	}
 
-	if job.SigningCommitments == nil {
+	if job.GetSigningCommitments() == nil {
 		return status.Errorf(codes.InvalidArgument, "%s.signing_commitments is required", jobName)
 	}
 
-	if len(job.SigningCommitments.SigningCommitments) == 0 {
+	if len(job.GetSigningCommitments().GetSigningCommitments()) == 0 {
 		return status.Errorf(codes.InvalidArgument, "%s.signing_commitments.signing_commitments map is empty", jobName)
 	}
 
@@ -73,41 +73,41 @@ func validateFinalizeDepositTreeCreationRequest(
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is required")
 	}
-	if req.OnChainUtxo == nil {
+	if req.GetOnChainUtxo() == nil {
 		return status.Errorf(codes.InvalidArgument, "on_chain_utxo is required")
 	}
 
-	if err := validateSigningJobFields(req.RootTxSigningJob, "root_tx_signing_job"); err != nil {
+	if err := validateSigningJobFields(req.GetRootTxSigningJob(), "root_tx_signing_job"); err != nil {
 		return err
 	}
 
-	if err := validateSigningJobFields(req.RefundTxSigningJob, "refund_tx_signing_job"); err != nil {
+	if err := validateSigningJobFields(req.GetRefundTxSigningJob(), "refund_tx_signing_job"); err != nil {
 		return err
 	}
 
-	if err := validateSigningJobFields(req.DirectFromCpfpRefundTxSigningJob, "direct_from_cpfp_refund_tx_signing_job"); err != nil {
+	if err := validateSigningJobFields(req.GetDirectFromCpfpRefundTxSigningJob(), "direct_from_cpfp_refund_tx_signing_job"); err != nil {
 		return err
 	}
 
 	// Validate additional inputs match additional UTXOs count
 	const maxAdditionalUtxos = 10
-	if len(req.AdditionalOnChainUtxos) > maxAdditionalUtxos {
+	if len(req.GetAdditionalOnChainUtxos()) > maxAdditionalUtxos {
 		return status.Errorf(codes.InvalidArgument,
 			"too many additional UTXOs (%d), maximum is %d",
-			len(req.AdditionalOnChainUtxos), maxAdditionalUtxos)
+			len(req.GetAdditionalOnChainUtxos()), maxAdditionalUtxos)
 	}
-	if len(req.AdditionalOnChainUtxos) > 0 {
-		for i, additionalUtxo := range req.AdditionalOnChainUtxos {
+	if len(req.GetAdditionalOnChainUtxos()) > 0 {
+		for i, additionalUtxo := range req.GetAdditionalOnChainUtxos() {
 			if additionalUtxo == nil {
 				return status.Errorf(codes.InvalidArgument, "additional_on_chain_utxos[%d] is required", i)
 			}
 		}
-		if len(req.RootTxSigningJob.AdditionalInputs) != len(req.AdditionalOnChainUtxos) {
+		if len(req.GetRootTxSigningJob().GetAdditionalInputs()) != len(req.GetAdditionalOnChainUtxos()) {
 			return status.Errorf(codes.InvalidArgument,
 				"additional_inputs count (%d) must match additional_on_chain_utxos count (%d)",
-				len(req.RootTxSigningJob.AdditionalInputs), len(req.AdditionalOnChainUtxos))
+				len(req.GetRootTxSigningJob().GetAdditionalInputs()), len(req.GetAdditionalOnChainUtxos()))
 		}
-		for i, input := range req.RootTxSigningJob.AdditionalInputs {
+		for i, input := range req.GetRootTxSigningJob().GetAdditionalInputs() {
 			if err := validateInputSigningData(input, fmt.Sprintf("root_tx_signing_job.additional_inputs[%d]", i)); err != nil {
 				return err
 			}
@@ -123,13 +123,13 @@ func validateInputSigningData(input *pb.InputSigningData, fieldPath string) erro
 	if input == nil {
 		return status.Errorf(codes.InvalidArgument, "%s is required", fieldPath)
 	}
-	if input.SigningNonceCommitment == nil {
+	if input.GetSigningNonceCommitment() == nil {
 		return status.Errorf(codes.InvalidArgument, "%s.signing_nonce_commitment is required", fieldPath)
 	}
-	if len(input.UserSignature) == 0 {
+	if len(input.GetUserSignature()) == 0 {
 		return status.Errorf(codes.InvalidArgument, "%s.user_signature is required", fieldPath)
 	}
-	if input.SigningCommitments == nil || len(input.SigningCommitments.SigningCommitments) == 0 {
+	if input.GetSigningCommitments() == nil || len(input.GetSigningCommitments().GetSigningCommitments()) == 0 {
 		return status.Errorf(codes.InvalidArgument, "%s.signing_commitments is required", fieldPath)
 	}
 	return nil
@@ -140,7 +140,7 @@ func validateSigningJob(job *pb.UserSignedTxSigningJob, expectedPubKey keys.Publ
 	if job == nil {
 		return nil
 	}
-	pubKey, err := keys.ParsePublicKey(job.SigningPublicKey)
+	pubKey, err := keys.ParsePublicKey(job.GetSigningPublicKey())
 	if err != nil {
 		return fmt.Errorf("invalid %s signing public key: %w", jobName, err)
 	}
@@ -207,17 +207,17 @@ func loadAndValidateDepositAddress(
 	enforceUtxoConfirmation bool,
 ) (depositAddress *ent.DepositAddress, onChainTx *wire.MsgTx, onChainOutput *wire.TxOut, additionalUtxos []additionalUtxoData, err error) {
 	// Parse on-chain UTXO
-	onChainTx, err = common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
+	onChainTx, err = common.TxFromRawTxBytes(req.GetOnChainUtxo().GetRawTx())
 	if err != nil {
 		err = fmt.Errorf("invalid on-chain transaction: %w", err)
 		return
 	}
 
-	if int(req.OnChainUtxo.Vout) >= len(onChainTx.TxOut) {
+	if int(req.GetOnChainUtxo().GetVout()) >= len(onChainTx.TxOut) {
 		err = fmt.Errorf("utxo index out of bounds")
 		return
 	}
-	onChainOutput = onChainTx.TxOut[req.OnChainUtxo.Vout]
+	onChainOutput = onChainTx.TxOut[req.GetOnChainUtxo().GetVout()]
 
 	// Reject zero-value deposits: a zero-value UTXO cannot back a meaningful Spark leaf.
 	if onChainOutput.Value <= 0 {
@@ -234,30 +234,30 @@ func loadAndValidateDepositAddress(
 	// Parse and validate additional UTXOs
 	seenOutpoints := make(map[wire.OutPoint]bool)
 	primaryTxHash := onChainTx.TxHash()
-	seenOutpoints[wire.OutPoint{Hash: primaryTxHash, Index: req.OnChainUtxo.Vout}] = true
+	seenOutpoints[wire.OutPoint{Hash: primaryTxHash, Index: req.GetOnChainUtxo().GetVout()}] = true
 
-	for i, additionalUtxo := range req.AdditionalOnChainUtxos {
+	for i, additionalUtxo := range req.GetAdditionalOnChainUtxos() {
 		var addTx *wire.MsgTx
-		addTx, err = common.TxFromRawTxBytes(additionalUtxo.RawTx)
+		addTx, err = common.TxFromRawTxBytes(additionalUtxo.GetRawTx())
 		if err != nil {
 			err = fmt.Errorf("invalid additional on-chain transaction %d: %w", i, err)
 			return
 		}
-		if int(additionalUtxo.Vout) >= len(addTx.TxOut) {
+		if int(additionalUtxo.GetVout()) >= len(addTx.TxOut) {
 			err = fmt.Errorf("additional utxo %d: vout index out of bounds", i)
 			return
 		}
 
 		// Reject duplicate UTXOs to prevent value inflation
 		addTxHash := addTx.TxHash()
-		outpoint := wire.OutPoint{Hash: addTxHash, Index: additionalUtxo.Vout}
+		outpoint := wire.OutPoint{Hash: addTxHash, Index: additionalUtxo.GetVout()}
 		if seenOutpoints[outpoint] {
-			err = fmt.Errorf("duplicate utxo %s:%d", addTxHash.String(), additionalUtxo.Vout)
+			err = fmt.Errorf("duplicate utxo %s:%d", addTxHash.String(), additionalUtxo.GetVout())
 			return
 		}
 		seenOutpoints[outpoint] = true
 
-		addOutput := addTx.TxOut[additionalUtxo.Vout]
+		addOutput := addTx.TxOut[additionalUtxo.GetVout()]
 
 		// Reject zero-value additional UTXOs
 		if addOutput.Value <= 0 {
@@ -280,7 +280,7 @@ func loadAndValidateDepositAddress(
 		additionalUtxos = append(additionalUtxos, additionalUtxoData{
 			onChainTx:     addTx,
 			onChainOutput: addOutput,
-			vout:          additionalUtxo.Vout,
+			vout:          additionalUtxo.GetVout(),
 		})
 	}
 
@@ -317,7 +317,7 @@ func loadAndValidateDepositAddress(
 	}
 
 	// Validate signing public keys
-	rootSigningPubKey, err := keys.ParsePublicKey(req.RootTxSigningJob.SigningPublicKey)
+	rootSigningPubKey, err := keys.ParsePublicKey(req.GetRootTxSigningJob().GetSigningPublicKey())
 	if err != nil {
 		err = fmt.Errorf("invalid root tx signing public key: %w", err)
 		return
@@ -328,10 +328,10 @@ func loadAndValidateDepositAddress(
 	}
 
 	// Validate all signing jobs have matching public keys
-	if err = validateSigningJob(req.RefundTxSigningJob, rootSigningPubKey, "refund"); err != nil {
+	if err = validateSigningJob(req.GetRefundTxSigningJob(), rootSigningPubKey, "refund"); err != nil {
 		return
 	}
-	if err = validateSigningJob(req.DirectFromCpfpRefundTxSigningJob, rootSigningPubKey, "direct_from_cpfp_refund"); err != nil {
+	if err = validateSigningJob(req.GetDirectFromCpfpRefundTxSigningJob(), rootSigningPubKey, "direct_from_cpfp_refund"); err != nil {
 		return
 	}
 
@@ -356,7 +356,7 @@ func loadAndValidateDepositAddress(
 		allUtxos = append(allUtxos, utxoToVerify{
 			label: "primary",
 			txID:  onChainTx.TxID(),
-			vout:  req.OnChainUtxo.Vout,
+			vout:  req.GetOnChainUtxo().GetVout(),
 		})
 		for i, add := range additionalUtxos {
 			allUtxos = append(allUtxos, utxoToVerify{
@@ -408,7 +408,7 @@ func loadAndValidateDepositAddress(
 
 	// Cross-check the claimed UTXO value against the chain-watcher's Utxo table
 	// to prevent balance inflation from fabricated raw TX bytes.
-	if err = validateDepositUtxoValueAgainstChain(ctx, db, network, onChainTx, req.OnChainUtxo.Vout, onChainOutput); err != nil {
+	if err = validateDepositUtxoValueAgainstChain(ctx, db, network, onChainTx, req.GetOnChainUtxo().GetVout(), onChainOutput); err != nil {
 		return
 	}
 
@@ -425,11 +425,11 @@ func loadAndValidateDepositAddress(
 		combinedPublicKey := signingKeyShare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 		err = validateBitcoinTransactions(
 			ctx,
-			req.OnChainUtxo.RawTx,
-			req.OnChainUtxo.Vout,
-			req.RootTxSigningJob.RawTx,
-			req.RefundTxSigningJob.RawTx,
-			req.DirectFromCpfpRefundTxSigningJob.RawTx,
+			req.GetOnChainUtxo().GetRawTx(),
+			req.GetOnChainUtxo().GetVout(),
+			req.GetRootTxSigningJob().GetRawTx(),
+			req.GetRefundTxSigningJob().GetRawTx(),
+			req.GetDirectFromCpfpRefundTxSigningJob().GetRawTx(),
 			nil, // directRootTx - not used in FinalizeDepositTreeCreation
 			nil, // directRefundTx - not used in FinalizeDepositTreeCreation
 			combinedPublicKey,
@@ -447,7 +447,7 @@ func loadAndValidateDepositAddress(
 		cpfpTimelock := spark.InitialTimeLock + spark.TimeLockInterval
 		networkStr := network.String()
 		err = bitcointransaction.VerifyTransactionWithSource(
-			ctx, req.RefundTxSigningJob.RawTx, req.RootTxSigningJob.RawTx,
+			ctx, req.GetRefundTxSigningJob().GetRawTx(), req.GetRootTxSigningJob().GetRawTx(),
 			0, cpfpTimelock, bitcointransaction.TxTypeRefundCPFP,
 			depositAddress.OwnerSigningPubkey, networkStr,
 		)
@@ -456,7 +456,7 @@ func loadAndValidateDepositAddress(
 			return
 		}
 		err = bitcointransaction.VerifyTransactionWithSource(
-			ctx, req.DirectFromCpfpRefundTxSigningJob.RawTx, req.RootTxSigningJob.RawTx,
+			ctx, req.GetDirectFromCpfpRefundTxSigningJob().GetRawTx(), req.GetRootTxSigningJob().GetRawTx(),
 			0, cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP,
 			depositAddress.OwnerSigningPubkey, networkStr,
 		)
@@ -566,7 +566,7 @@ func prepareSigningJobs(
 	additionalUtxos []additionalUtxoData,
 ) (signingJobs []*helper.SigningJob, verifyingKey keys.Public, rootTxInputCount int, err error) {
 	// Parse and validate root transaction
-	cpfpRootTx, err := common.TxFromRawTxBytes(req.RootTxSigningJob.RawTx)
+	cpfpRootTx, err := common.TxFromRawTxBytes(req.GetRootTxSigningJob().GetRawTx())
 	if err != nil {
 		err = fmt.Errorf("invalid root transaction: %w", err)
 		return
@@ -574,19 +574,19 @@ func prepareSigningJobs(
 
 	isMultiInput := len(additionalUtxos) > 0
 	if isMultiInput {
-		if err = verifyMultiInputRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, onChainOutput, additionalUtxos); err != nil {
+		if err = verifyMultiInputRootTransaction(cpfpRootTx, onChainTx, req.GetOnChainUtxo().GetVout(), onChainOutput, additionalUtxos); err != nil {
 			err = fmt.Errorf("multi-input root transaction verification failed: %w", err)
 			return
 		}
 	} else {
-		if err = verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false); err != nil {
+		if err = verifyRootTransaction(cpfpRootTx, onChainTx, req.GetOnChainUtxo().GetVout(), false); err != nil {
 			err = fmt.Errorf("root transaction verification failed: %w", err)
 			return
 		}
 	}
 
 	// Parse and validate refund transaction
-	cpfpRefundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
+	cpfpRefundTx, err := common.TxFromRawTxBytes(req.GetRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		err = fmt.Errorf("invalid refund transaction: %w", err)
 		return
@@ -606,7 +606,7 @@ func prepareSigningJobs(
 		// Build prevOutputs map for multi-input sighash computation
 		prevOutputs := make(map[wire.OutPoint]*wire.TxOut)
 		primaryTxHash := onChainTx.TxHash()
-		prevOutputs[wire.OutPoint{Hash: primaryTxHash, Index: req.OnChainUtxo.Vout}] = onChainOutput
+		prevOutputs[wire.OutPoint{Hash: primaryTxHash, Index: req.GetOnChainUtxo().GetVout()}] = onChainOutput
 		for _, add := range additionalUtxos {
 			addHash := add.onChainTx.TxHash()
 			prevOutputs[wire.OutPoint{Hash: addHash, Index: add.vout}] = add.onChainOutput
@@ -623,14 +623,14 @@ func prepareSigningJobs(
 			var userCommitment frost.SigningCommitment
 			if i == 0 {
 				// Input 0 uses existing fields
-				if err = userCommitment.UnmarshalProto(req.RootTxSigningJob.SigningNonceCommitment); err != nil {
+				if err = userCommitment.UnmarshalProto(req.GetRootTxSigningJob().GetSigningNonceCommitment()); err != nil {
 					err = fmt.Errorf("invalid root tx signing commitment for input 0: %w", err)
 					return
 				}
 			} else {
 				// Inputs 1..N use additional_inputs
-				addInput := req.RootTxSigningJob.AdditionalInputs[i-1]
-				if err = userCommitment.UnmarshalProto(addInput.SigningNonceCommitment); err != nil {
+				addInput := req.GetRootTxSigningJob().GetAdditionalInputs()[i-1]
+				if err = userCommitment.UnmarshalProto(addInput.GetSigningNonceCommitment()); err != nil {
 					err = fmt.Errorf("invalid root tx signing commitment for input %d: %w", i, err)
 					return
 				}
@@ -654,7 +654,7 @@ func prepareSigningJobs(
 		}
 
 		userCpfpRootTxCommitment := frost.SigningCommitment{}
-		if err = userCpfpRootTxCommitment.UnmarshalProto(req.RootTxSigningJob.SigningNonceCommitment); err != nil {
+		if err = userCpfpRootTxCommitment.UnmarshalProto(req.GetRootTxSigningJob().GetSigningNonceCommitment()); err != nil {
 			err = fmt.Errorf("invalid root tx signing commitment: %w", err)
 			return
 		}
@@ -676,7 +676,7 @@ func prepareSigningJobs(
 	}
 
 	userCpfpRefundTxCommitment := frost.SigningCommitment{}
-	if err = userCpfpRefundTxCommitment.UnmarshalProto(req.RefundTxSigningJob.SigningNonceCommitment); err != nil {
+	if err = userCpfpRefundTxCommitment.UnmarshalProto(req.GetRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 		err = fmt.Errorf("invalid refund tx signing commitment: %w", err)
 		return
 	}
@@ -690,7 +690,7 @@ func prepareSigningJobs(
 	})
 
 	// DirectFromCpfpRefund tx signing job
-	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		err = fmt.Errorf("invalid direct from cpfp refund transaction: %w", err)
 		return
@@ -706,7 +706,7 @@ func prepareSigningJobs(
 	}
 
 	userDirectFromCpfpRefundTxCommitment := frost.SigningCommitment{}
-	if err = userDirectFromCpfpRefundTxCommitment.UnmarshalProto(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment); err != nil {
+	if err = userDirectFromCpfpRefundTxCommitment.UnmarshalProto(req.GetDirectFromCpfpRefundTxSigningJob().GetSigningNonceCommitment()); err != nil {
 		err = fmt.Errorf("invalid direct from cpfp refund tx signing commitment: %w", err)
 		return
 	}
@@ -752,14 +752,14 @@ func aggregateDepositSignatures(
 		var userCommitment *pbcommon.SigningCommitment
 		var userSignature []byte
 		if i == 0 {
-			commitments = req.RootTxSigningJob.SigningCommitments.SigningCommitments
-			userCommitment = req.RootTxSigningJob.SigningNonceCommitment
-			userSignature = req.RootTxSigningJob.UserSignature
+			commitments = req.GetRootTxSigningJob().GetSigningCommitments().GetSigningCommitments()
+			userCommitment = req.GetRootTxSigningJob().GetSigningNonceCommitment()
+			userSignature = req.GetRootTxSigningJob().GetUserSignature()
 		} else {
-			addInput := req.RootTxSigningJob.AdditionalInputs[i-1]
-			commitments = addInput.SigningCommitments.SigningCommitments
-			userCommitment = addInput.SigningNonceCommitment
-			userSignature = addInput.UserSignature
+			addInput := req.GetRootTxSigningJob().GetAdditionalInputs()[i-1]
+			commitments = addInput.GetSigningCommitments().GetSigningCommitments()
+			userCommitment = addInput.GetSigningNonceCommitment()
+			userSignature = addInput.GetUserSignature()
 		}
 
 		result, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
@@ -775,7 +775,7 @@ func aggregateDepositSignatures(
 		if err != nil {
 			return nil, fmt.Errorf("failed to aggregate root tx signature for input %d: %w", i, err)
 		}
-		signatures[i] = result.Signature
+		signatures[i] = result.GetSignature()
 	}
 
 	// Aggregate refund transaction signature
@@ -786,15 +786,15 @@ func aggregateDepositSignatures(
 		SignatureShares:    signingResults[refundIdx].SignatureShares,
 		PublicShares:       signingResults[refundIdx].PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        req.RefundTxSigningJob.SigningCommitments.SigningCommitments,
-		UserCommitments:    req.RefundTxSigningJob.SigningNonceCommitment,
+		Commitments:        req.GetRefundTxSigningJob().GetSigningCommitments().GetSigningCommitments(),
+		UserCommitments:    req.GetRefundTxSigningJob().GetSigningNonceCommitment(),
 		UserPublicKey:      rootSigningPubKey.Serialize(),
-		UserSignatureShare: req.RefundTxSigningJob.UserSignature,
+		UserSignatureShare: req.GetRefundTxSigningJob().GetUserSignature(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate refund tx signature: %w", err)
 	}
-	signatures[refundIdx] = refundSigResult.Signature
+	signatures[refundIdx] = refundSigResult.GetSignature()
 
 	// Aggregate DirectFromCpfpRefund signature
 	directIdx := rootTxInputCount + 1
@@ -804,15 +804,15 @@ func aggregateDepositSignatures(
 		SignatureShares:    signingResults[directIdx].SignatureShares,
 		PublicShares:       signingResults[directIdx].PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        req.DirectFromCpfpRefundTxSigningJob.SigningCommitments.SigningCommitments,
-		UserCommitments:    req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment,
+		Commitments:        req.GetDirectFromCpfpRefundTxSigningJob().GetSigningCommitments().GetSigningCommitments(),
+		UserCommitments:    req.GetDirectFromCpfpRefundTxSigningJob().GetSigningNonceCommitment(),
 		UserPublicKey:      rootSigningPubKey.Serialize(),
-		UserSignatureShare: req.DirectFromCpfpRefundTxSigningJob.UserSignature,
+		UserSignatureShare: req.GetDirectFromCpfpRefundTxSigningJob().GetUserSignature(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate direct from cpfp refund tx signature: %w", err)
 	}
-	signatures[directIdx] = directFromCpfpRefundSigResult.Signature
+	signatures[directIdx] = directFromCpfpRefundSigResult.GetSignature()
 
 	return signatures, nil
 }
@@ -825,7 +825,7 @@ func applySignaturesToTransactions(
 	rootTxInputCount int,
 ) (signedCpfpRootTx []byte, signedCpfpRefundTx []byte, signedDirectFromCpfpRefundTx []byte, err error) {
 	// Apply signatures to CPFP root transaction (one per input)
-	signedCpfpRootTx = req.RootTxSigningJob.RawTx
+	signedCpfpRootTx = req.GetRootTxSigningJob().GetRawTx()
 	for i := range rootTxInputCount {
 		signedCpfpRootTx, err = common.UpdateTxWithSignature(signedCpfpRootTx, i, signatures[i])
 		if err != nil {
@@ -836,7 +836,7 @@ func applySignaturesToTransactions(
 
 	// Apply signature to CPFP refund transaction
 	refundIdx := rootTxInputCount
-	signedCpfpRefundTx, err = common.UpdateTxWithSignature(req.RefundTxSigningJob.RawTx, 0, signatures[refundIdx])
+	signedCpfpRefundTx, err = common.UpdateTxWithSignature(req.GetRefundTxSigningJob().GetRawTx(), 0, signatures[refundIdx])
 	if err != nil {
 		err = fmt.Errorf("failed to apply signature to cpfp refund tx: %w", err)
 		return
@@ -844,7 +844,7 @@ func applySignaturesToTransactions(
 
 	// Apply signature to DirectFromCpfpRefund transaction
 	directIdx := rootTxInputCount + 1
-	signedDirectFromCpfpRefundTx, err = common.UpdateTxWithSignature(req.DirectFromCpfpRefundTxSigningJob.RawTx, 0, signatures[directIdx])
+	signedDirectFromCpfpRefundTx, err = common.UpdateTxWithSignature(req.GetDirectFromCpfpRefundTxSigningJob().GetRawTx(), 0, signatures[directIdx])
 	if err != nil {
 		err = fmt.Errorf("failed to apply signature to direct from cpfp refund tx: %w", err)
 		return
@@ -1082,9 +1082,9 @@ func convertToSigningJobsWithPregeneratedNonce(
 	for i := range rootTxInputCount {
 		var commitmentsMap map[string]*pbcommon.SigningCommitment
 		if i == 0 {
-			commitmentsMap = req.RootTxSigningJob.SigningCommitments.SigningCommitments
+			commitmentsMap = req.GetRootTxSigningJob().GetSigningCommitments().GetSigningCommitments()
 		} else {
-			commitmentsMap = req.RootTxSigningJob.AdditionalInputs[i-1].SigningCommitments.SigningCommitments
+			commitmentsMap = req.GetRootTxSigningJob().GetAdditionalInputs()[i-1].GetSigningCommitments().GetSigningCommitments()
 		}
 
 		commitments := make(map[string]frost.SigningCommitment)
@@ -1104,7 +1104,7 @@ func convertToSigningJobsWithPregeneratedNonce(
 	// Refund transaction (at index rootTxInputCount)
 	refundIdx := rootTxInputCount
 	refundCommitments := make(map[string]frost.SigningCommitment)
-	for key, commitment := range req.RefundTxSigningJob.SigningCommitments.SigningCommitments {
+	for key, commitment := range req.GetRefundTxSigningJob().GetSigningCommitments().GetSigningCommitments() {
 		obj := frost.SigningCommitment{}
 		if err := obj.UnmarshalProto(commitment); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal refund tx SE commitment for key %s: %w", key, err)
@@ -1119,7 +1119,7 @@ func convertToSigningJobsWithPregeneratedNonce(
 	// DirectFromCpfpRefund transaction (at index rootTxInputCount + 1)
 	directIdx := rootTxInputCount + 1
 	directFromCpfpRefundCommitments := make(map[string]frost.SigningCommitment)
-	for key, commitment := range req.DirectFromCpfpRefundTxSigningJob.SigningCommitments.SigningCommitments {
+	for key, commitment := range req.GetDirectFromCpfpRefundTxSigningJob().GetSigningCommitments().GetSigningCommitments() {
 		obj := frost.SigningCommitment{}
 		if err := obj.UnmarshalProto(commitment); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal direct from cpfp refund tx SE commitment for key %s: %w", key, err)

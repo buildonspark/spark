@@ -127,13 +127,13 @@ func testVerifyChallenge_ValidToken(t *testing.T, sigAlg signingAlgorithm) {
 	verifyResp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 
 	assert.NotNil(t, verifyResp)
-	assert.NotEmpty(t, verifyResp.SessionToken)
+	assert.NotEmpty(t, verifyResp.GetSessionToken())
 
 	authnInterceptor := authn.NewInterceptor(tokenVerifier)
 
 	// Make a request with the expired token
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(
-		"authorization", "Bearer "+verifyResp.SessionToken,
+		"authorization", "Bearer "+verifyResp.GetSessionToken(),
 	))
 	var capturedCtx context.Context
 	_, _ = authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ any) (any, error) {
@@ -163,7 +163,7 @@ func testVerifyChallenge_InvalidSignature(t *testing.T, sigAlg signingAlgorithm)
 	challengeResp, _ := createSignedChallenge(t, server, privKey, sigAlg)
 
 	wrongPrivKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
-	challengeBytes, _ := proto.Marshal(challengeResp.ProtectedChallenge.Challenge)
+	challengeBytes, _ := proto.Marshal(challengeResp.GetProtectedChallenge().GetChallenge())
 	hash := sha256.Sum256(challengeBytes)
 
 	var wrongSignatureBytes []byte
@@ -183,7 +183,7 @@ func testVerifyChallenge_InvalidSignature(t *testing.T, sigAlg signingAlgorithm)
 	resp, err := server.VerifyChallenge(
 		t.Context(),
 		&pb.VerifyChallengeRequest{
-			ProtectedChallenge: challengeResp.ProtectedChallenge,
+			ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 			Signature:          wrongSignatureBytes,
 			PublicKey:          pubKey.Serialize(),
 		},
@@ -208,7 +208,7 @@ func TestVerifyChallenge_ExpiredSessionToken_ReturnsError(t *testing.T) {
 
 	// Make a request with the expired token
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(
-		"authorization", "Bearer "+resp.SessionToken,
+		"authorization", "Bearer "+resp.GetSessionToken(),
 	))
 	handlerCalled := false
 	_, err := authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(hctx context.Context, _ any) (any, error) {
@@ -233,7 +233,7 @@ func TestVerifyChallenge_ExpiredChallenge(t *testing.T) {
 	resp, err := server.VerifyChallenge(
 		t.Context(),
 		&pb.VerifyChallengeRequest{
-			ProtectedChallenge: challengeResp.ProtectedChallenge,
+			ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 			Signature:          signature,
 			PublicKey:          privKey.Public().Serialize(),
 		},
@@ -252,7 +252,7 @@ func TestVerifyChallenge_TamperedToken(t *testing.T) {
 	challengeResp, signature := createSignedChallengeECDSA(t, server, privKey)
 	verifyResp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 
-	sessionToken := verifyResp.SessionToken
+	sessionToken := verifyResp.GetSessionToken()
 	protectedBytes, _ := base64.URLEncoding.DecodeString(sessionToken)
 
 	protected := &pbauthninternal.ProtectedSession{}
@@ -317,10 +317,10 @@ func TestVerifyChallenge_ReusedChallenge(t *testing.T) {
 
 	verifyResp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 	assert.NotNil(t, verifyResp)
-	assert.NotEmpty(t, verifyResp.SessionToken)
+	assert.NotEmpty(t, verifyResp.GetSessionToken())
 
 	_, err := server.VerifyChallenge(t.Context(), &pb.VerifyChallengeRequest{
-		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 		PublicKey:          privKey.Public().Serialize(),
 		Signature:          signature,
 	})
@@ -353,10 +353,10 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 
 	verifyResp := verifyChallenge(t, server, challengeResp, pubKey, signature)
 	assert.NotNil(t, verifyResp)
-	assert.NotEmpty(t, verifyResp.SessionToken)
+	assert.NotEmpty(t, verifyResp.GetSessionToken())
 
 	_, err = server.VerifyChallenge(t.Context(), &pb.VerifyChallengeRequest{
-		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 		PublicKey:          pubKey.Serialize(),
 		Signature:          signature,
 	})
@@ -368,7 +368,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	clock.Advance(shortTimeout + time.Second)
 
 	_, err = server.VerifyChallenge(t.Context(), &pb.VerifyChallengeRequest{
-		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 		PublicKey:          pubKey.Serialize(),
 		Signature:          signature,
 	})
@@ -386,7 +386,7 @@ func createSignedChallenge(t *testing.T, server *AuthnServer, privKey keys.Priva
 	})
 	require.NoError(t, err)
 
-	challengeBytes, err := proto.Marshal(challengeResp.ProtectedChallenge.Challenge)
+	challengeBytes, err := proto.Marshal(challengeResp.GetProtectedChallenge().GetChallenge())
 	require.NoError(t, err)
 
 	var signatureBytes []byte
@@ -415,7 +415,7 @@ func verifyChallenge(t *testing.T, server *AuthnServer, challengeResp *pb.GetCha
 	resp, err := server.VerifyChallenge(
 		t.Context(),
 		&pb.VerifyChallengeRequest{
-			ProtectedChallenge: challengeResp.ProtectedChallenge,
+			ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 			Signature:          signature,
 			PublicKey:          pubKey.Serialize(),
 		},

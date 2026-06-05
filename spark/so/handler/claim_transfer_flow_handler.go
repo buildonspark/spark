@@ -159,8 +159,8 @@ func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.Cl
 	if err != nil {
 		return nil, err
 	}
-	if len(leavesByID) != len(parsed.claimPackage.LeavesToClaim) {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", parsed.transferID, len(leavesByID), len(parsed.claimPackage.LeavesToClaim)))
+	if len(leavesByID) != len(parsed.claimPackage.GetLeavesToClaim()) {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", parsed.transferID, len(leavesByID), len(parsed.claimPackage.GetLeavesToClaim())))
 	}
 	if err := validateClaimPackageStructure(parsed.claimPackage); err != nil {
 		return nil, err
@@ -289,8 +289,8 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	if err != nil {
 		return nil, err
 	}
-	if len(leavesByID) != len(parsed.claimPackage.LeavesToClaim) {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", parsed.transferID, len(leavesByID), len(parsed.claimPackage.LeavesToClaim)))
+	if len(leavesByID) != len(parsed.claimPackage.GetLeavesToClaim()) {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("inconsistent leaves to claim for transfer %s: expected %d, got %d", parsed.transferID, len(leavesByID), len(parsed.claimPackage.GetLeavesToClaim())))
 	}
 	if err := validateClaimPackageStructure(parsed.claimPackage); err != nil {
 		return nil, err
@@ -318,7 +318,7 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	//     Commit.
 	applied := isCommittedClaim(ctx, transferEnt, receiver)
 
-	predictedOwnerByLeaf := make(map[string]keys.Public, len(parsed.claimPackage.LeavesToClaim))
+	predictedOwnerByLeaf := make(map[string]keys.Public, len(parsed.claimPackage.GetLeavesToClaim()))
 	// tweaksByLeaf is only needed on the pre-apply path (Phase-1 lock + in-memory
 	// FROST tweak folding); it stays nil when the tweak is already applied.
 	var tweaksByLeaf map[string]*pb.ClaimLeafKeyTweak
@@ -331,12 +331,12 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 		logging.GetLoggerFromContext(ctx).Sugar().Infof(
 			"claim transfer 2pc prepare: resuming already-applied claim for transfer %s (status %s) — signing refunds against the post-tweak owner without re-tweaking",
 			parsed.transferID, transferEnt.Status)
-		for _, job := range parsed.claimPackage.LeavesToClaim {
-			leaf, ok := leavesByID[job.LeafId]
+		for _, job := range parsed.claimPackage.GetLeavesToClaim() {
+			leaf, ok := leavesByID[job.GetLeafId()]
 			if !ok {
-				return nil, fmt.Errorf("claim references unknown leaf %s", job.LeafId)
+				return nil, fmt.Errorf("claim references unknown leaf %s", job.GetLeafId())
 			}
-			predictedOwnerByLeaf[job.LeafId] = leaf.OwnerSigningPubkey
+			predictedOwnerByLeaf[job.GetLeafId()] = leaf.OwnerSigningPubkey
 		}
 	} else {
 		// useStoredKeyTweaks: if Phase 1 (lock) already committed key tweaks on
@@ -358,17 +358,17 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 			if err != nil {
 				return nil, err
 			}
-			encryptedPackage = parsed.claimPackage.KeyTweakPackage
-			claimSignature = parsed.claimPackage.UserSignature
+			encryptedPackage = parsed.claimPackage.GetKeyTweakPackage()
+			claimSignature = parsed.claimPackage.GetUserSignature()
 		}
 		keyTweakProofs := make(map[string]*pb.SecretProof, len(tweaksByLeaf))
 		for leafID, leafTweak := range tweaksByLeaf {
-			keyTweakProofs[leafID] = &pb.SecretProof{Proofs: leafTweak.SecretShareTweak.Proofs}
+			keyTweakProofs[leafID] = &pb.SecretProof{Proofs: leafTweak.GetSecretShareTweak().GetProofs()}
 		}
 
-		userPublicKeys := make(map[string][]byte, len(parsed.claimPackage.LeavesToClaim))
-		for _, job := range parsed.claimPackage.LeavesToClaim {
-			userPublicKeys[job.LeafId] = job.SigningPublicKey
+		userPublicKeys := make(map[string][]byte, len(parsed.claimPackage.GetLeavesToClaim()))
+		for _, job := range parsed.claimPackage.GetLeavesToClaim() {
+			userPublicKeys[job.GetLeafId()] = job.GetSigningPublicKey()
 		}
 
 		// Phase-1 lock only: persist the encrypted tweak package + per-leaf
@@ -406,7 +406,7 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 			if !ok {
 				return nil, fmt.Errorf("claim tweak references unknown leaf %s", leafID)
 			}
-			pubKeyTweak, err := keys.ParsePublicKey(leafTweak.SecretShareTweak.Proofs[0])
+			pubKeyTweak, err := keys.ParsePublicKey(leafTweak.GetSecretShareTweak().GetProofs()[0])
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse public key tweak for leaf %s: %w", leafID, err)
 			}
@@ -492,9 +492,9 @@ func tweakedKeyPackagesForFrost(
 	keyshareIDs := make([]uuid.UUID, 0, len(jobs))
 	seen := make(map[uuid.UUID]struct{}, len(jobs))
 	for _, job := range jobs {
-		ksID, err := uuid.Parse(job.KeyshareId)
+		ksID, err := uuid.Parse(job.GetKeyshareId())
 		if err != nil {
-			return nil, fmt.Errorf("invalid keyshare id %s: %w", job.KeyshareId, err)
+			return nil, fmt.Errorf("invalid keyshare id %s: %w", job.GetKeyshareId(), err)
 		}
 		if _, dup := seen[ksID]; dup {
 			continue
@@ -521,9 +521,9 @@ func tweakedKeyPackagesForFrost(
 		}
 		tweaked, err := signing_handler.ApplyKeysharePackageTweak(
 			kp,
-			tweak.SecretShareTweak.SecretShare,
-			tweak.SecretShareTweak.Proofs[0],
-			tweak.PubkeySharesTweak,
+			tweak.GetSecretShareTweak().GetSecretShare(),
+			tweak.GetSecretShareTweak().GetProofs()[0],
+			tweak.GetPubkeySharesTweak(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("apply tweak for leaf %s: %w", leafID, err)
@@ -731,15 +731,15 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	finalizeHandler := NewFinalizeSignatureHandler(h.config)
 	for _, sig := range leafSignatures {
 		nodeSig := &pb.NodeSignatures{
-			NodeId:                          sig.LeafId,
+			NodeId:                          sig.GetLeafId(),
 			NodeTxSignature:                 []byte{},
 			DirectNodeTxSignature:           []byte{},
-			RefundTxSignature:               sig.RefundSignature,
-			DirectRefundTxSignature:         sig.DirectRefundSignature,
-			DirectFromCpfpRefundTxSignature: sig.DirectFromCpfpRefundSignature,
+			RefundTxSignature:               sig.GetRefundSignature(),
+			DirectRefundTxSignature:         sig.GetDirectRefundSignature(),
+			DirectFromCpfpRefundTxSignature: sig.GetDirectFromCpfpRefundSignature(),
 		}
 		if _, _, err := finalizeHandler.updateNode(ctx, nodeSig, pbcommon.SignatureIntent_TRANSFER, true); err != nil {
-			return fmt.Errorf("failed to update node %s during commit: %w", sig.LeafId, err)
+			return fmt.Errorf("failed to update node %s during commit: %w", sig.GetLeafId(), err)
 		}
 	}
 
@@ -850,15 +850,15 @@ func assertLeafSignaturesCover(ctx context.Context, transferEnt *ent.Transfer, r
 	}
 	payloadLeaves := make(map[string]struct{}, len(leafSignatures))
 	for _, sig := range leafSignatures {
-		if _, err := uuid.Parse(sig.LeafId); err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid leaf_id %q in commit payload: %w", sig.LeafId, err))
+		if _, err := uuid.Parse(sig.GetLeafId()); err != nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid leaf_id %q in commit payload: %w", sig.GetLeafId(), err))
 		}
-		if _, dup := payloadLeaves[sig.LeafId]; dup {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("commit payload has duplicate signature entry for leaf %s in transfer %s", sig.LeafId, transferEnt.ID))
+		if _, dup := payloadLeaves[sig.GetLeafId()]; dup {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("commit payload has duplicate signature entry for leaf %s in transfer %s", sig.GetLeafId(), transferEnt.ID))
 		}
-		payloadLeaves[sig.LeafId] = struct{}{}
+		payloadLeaves[sig.GetLeafId()] = struct{}{}
 		if len(sig.GetRefundSignature()) == 0 {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("commit payload has empty refund signature for leaf %s in transfer %s", sig.LeafId, transferEnt.ID))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("commit payload has empty refund signature for leaf %s in transfer %s", sig.GetLeafId(), transferEnt.ID))
 		}
 	}
 
@@ -1091,7 +1091,7 @@ func (f *claimTransferCoordinatorFlow) aggregateLeafSignature(
 	// sets, so filter from the actual contributors to this job's shares.
 	publicShares := make(map[string][]byte, len(shares))
 	for id := range shares {
-		share, ok := keyPackage.PublicShares[id]
+		share, ok := keyPackage.GetPublicShares()[id]
 		if !ok {
 			return nil, fmt.Errorf("missing public share for operator %s", id)
 		}
@@ -1126,7 +1126,7 @@ func (f *claimTransferCoordinatorFlow) aggregateLeafSignature(
 	if err != nil {
 		return nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
 	}
-	return resp.Signature, nil
+	return resp.GetSignature(), nil
 }
 
 // buildClaimTransferCoordinatorFlow pre-computes the per-leaf signing-job
@@ -1228,17 +1228,17 @@ func parseClaimTransferRequest(req *pb.ClaimTransferRequest) (parsedClaimTransfe
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
-	ownerIDPK, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	ownerIDPK, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner identity public key: %w", err))
 	}
-	if req.ClaimPackage == nil {
+	if req.GetClaimPackage() == nil {
 		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("claim_package is required"))
 	}
 	return parsedClaimTransferRequest{
 		transferID:   transferID,
 		ownerIDPK:    ownerIDPK,
-		claimPackage: req.ClaimPackage,
+		claimPackage: req.GetClaimPackage(),
 	}, nil
 }
 
@@ -1320,19 +1320,19 @@ func validateClaimStatus(transferID uuid.UUID, transferEnt *ent.Transfer, receiv
 // validateClaimPackageStructure enforces the structural invariants the legacy
 // ClaimTransfer entry point asserts.
 func validateClaimPackageStructure(pkg *pb.ClaimPackage) error {
-	if len(pkg.LeavesToClaim) == 0 {
+	if len(pkg.GetLeavesToClaim()) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("claim package leaves_to_claim is required and must be non-empty"))
 	}
-	if len(pkg.KeyTweakPackage) == 0 {
+	if len(pkg.GetKeyTweakPackage()) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("claim package key_tweak_package is required and must be non-empty"))
 	}
-	dfcLeafIDs := make(map[string]struct{}, len(pkg.DirectFromCpfpLeavesToClaim))
-	for _, job := range pkg.DirectFromCpfpLeavesToClaim {
-		dfcLeafIDs[job.LeafId] = struct{}{}
+	dfcLeafIDs := make(map[string]struct{}, len(pkg.GetDirectFromCpfpLeavesToClaim()))
+	for _, job := range pkg.GetDirectFromCpfpLeavesToClaim() {
+		dfcLeafIDs[job.GetLeafId()] = struct{}{}
 	}
-	for _, job := range pkg.LeavesToClaim {
-		if _, ok := dfcLeafIDs[job.LeafId]; !ok {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing direct from CPFP refund transaction for leaf %s", job.LeafId))
+	for _, job := range pkg.GetLeavesToClaim() {
+		if _, ok := dfcLeafIDs[job.GetLeafId()]; !ok {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing direct from CPFP refund transaction for leaf %s", job.GetLeafId()))
 		}
 	}
 	return nil
@@ -1349,14 +1349,14 @@ func validateClaimPackageStructure(pkg *pb.ClaimPackage) error {
 // "invalid secret share" or "inconsistent pubkey_shares_tweak" error that
 // the engine can't recover from cleanly.
 func validateClaimLeafKeyTweak(config *so.Config, leafTweak *pb.ClaimLeafKeyTweak) error {
-	if leafTweak.SecretShareTweak == nil {
-		return fmt.Errorf("missing secret share tweak for leaf %s", leafTweak.LeafId)
+	if leafTweak.GetSecretShareTweak() == nil {
+		return fmt.Errorf("missing secret share tweak for leaf %s", leafTweak.GetLeafId())
 	}
-	if len(leafTweak.SecretShareTweak.SecretShare) == 0 {
-		return fmt.Errorf("empty secret share for leaf %s", leafTweak.LeafId)
+	if len(leafTweak.GetSecretShareTweak().GetSecretShare()) == 0 {
+		return fmt.Errorf("empty secret share for leaf %s", leafTweak.GetLeafId())
 	}
-	if uint64(len(leafTweak.SecretShareTweak.Proofs)) != config.Threshold {
-		return fmt.Errorf("expected %d proofs for leaf %s, got %d", config.Threshold, leafTweak.LeafId, len(leafTweak.SecretShareTweak.Proofs))
+	if uint64(len(leafTweak.GetSecretShareTweak().GetProofs())) != config.Threshold {
+		return fmt.Errorf("expected %d proofs for leaf %s, got %d", config.Threshold, leafTweak.GetLeafId(), len(leafTweak.GetSecretShareTweak().GetProofs()))
 	}
 	if err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
@@ -1364,19 +1364,19 @@ func validateClaimLeafKeyTweak(config *so.Config, leafTweak *pb.ClaimLeafKeyTwea
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(config.Threshold),
 				Index:        big.NewInt(int64(config.Index + 1)),
-				Share:        new(big.Int).SetBytes(leafTweak.SecretShareTweak.SecretShare),
+				Share:        new(big.Int).SetBytes(leafTweak.GetSecretShareTweak().GetSecretShare()),
 			},
-			Proofs: leafTweak.SecretShareTweak.Proofs,
+			Proofs: leafTweak.GetSecretShareTweak().GetProofs(),
 		},
 	); err != nil {
-		return fmt.Errorf("invalid secret share tweak for leaf %s: %w", leafTweak.LeafId, err)
+		return fmt.Errorf("invalid secret share tweak for leaf %s: %w", leafTweak.GetLeafId(), err)
 	}
-	pubKeySharesTweak, err := keys.ParsePublicKeyMap(leafTweak.PubkeySharesTweak)
+	pubKeySharesTweak, err := keys.ParsePublicKeyMap(leafTweak.GetPubkeySharesTweak())
 	if err != nil {
-		return fmt.Errorf("unable to parse pubkey_shares_tweak for leaf %s: %w", leafTweak.LeafId, err)
+		return fmt.Errorf("unable to parse pubkey_shares_tweak for leaf %s: %w", leafTweak.GetLeafId(), err)
 	}
-	if err := helper.ValidatePubkeySharesTweak(config, leafTweak.SecretShareTweak.Proofs, pubKeySharesTweak); err != nil {
-		return fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", leafTweak.LeafId, err)
+	if err := helper.ValidatePubkeySharesTweak(config, leafTweak.GetSecretShareTweak().GetProofs(), pubKeySharesTweak); err != nil {
+		return fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", leafTweak.GetLeafId(), err)
 	}
 	return nil
 }
@@ -1392,7 +1392,7 @@ func decryptClaimKeyTweaks(config *so.Config, pkg *pb.ClaimPackage) (map[string]
 	if config.Threshold < 1 {
 		return nil, fmt.Errorf("invalid SO config: threshold must be >= 1, got %d", config.Threshold)
 	}
-	coordinatorCipher := pkg.KeyTweakPackage[config.Identifier]
+	coordinatorCipher := pkg.GetKeyTweakPackage()[config.Identifier]
 	if len(coordinatorCipher) == 0 {
 		return nil, fmt.Errorf("no encrypted claim key tweaks found for SO %s", config.Identifier)
 	}
@@ -1405,12 +1405,12 @@ func decryptClaimKeyTweaks(config *so.Config, pkg *pb.ClaimPackage) (map[string]
 	if err := proto.Unmarshal(decrypted, claimKeyTweaks); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal coordinator claim key tweaks: %w", err)
 	}
-	out := make(map[string]*pb.ClaimLeafKeyTweak, len(claimKeyTweaks.LeavesToReceive))
-	for _, leafTweak := range claimKeyTweaks.LeavesToReceive {
+	out := make(map[string]*pb.ClaimLeafKeyTweak, len(claimKeyTweaks.GetLeavesToReceive()))
+	for _, leafTweak := range claimKeyTweaks.GetLeavesToReceive() {
 		if err := validateClaimLeafKeyTweak(config, leafTweak); err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(err)
 		}
-		out[leafTweak.LeafId] = leafTweak
+		out[leafTweak.GetLeafId()] = leafTweak
 	}
 	return out, nil
 }
@@ -1439,7 +1439,7 @@ func decryptStoredClaimKeyTweaks(config *so.Config, transferLeaves []*ent.Transf
 		// LeafId on the stored proto echoes the original tree-node ID; tolerate
 		// a missing field by populating from the row before validation reports
 		// "for leaf <empty>".
-		if leafKeyTweak.LeafId == "" {
+		if leafKeyTweak.GetLeafId() == "" {
 			leafKeyTweak.LeafId = treeNodeID
 		}
 		if err := validateClaimLeafKeyTweak(config, leafKeyTweak); err != nil {
@@ -1576,39 +1576,39 @@ func buildClaimTransferAggregationJobs(
 	// updateNode as all-nil sigs.
 	out := make(map[string]*claimTransferLeafSigningJobs, len(pkg.GetLeavesToClaim()))
 	for _, req := range pkg.GetLeavesToClaim() {
-		leaf, ok := leafMap[req.LeafId]
+		leaf, ok := leafMap[req.GetLeafId()]
 		if !ok {
-			return nil, fmt.Errorf("cpfp leaf %s not found in leaf map", req.LeafId)
+			return nil, fmt.Errorf("cpfp leaf %s not found in leaf map", req.GetLeafId())
 		}
 		job, err := buildClaimRefundSigningJob(ctx, req, leaf, leaf.RawTx, claimTransferJobID(transferID, leaf.ID.String(), claimTxKindCPFP))
 		if err != nil {
-			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", req.LeafId, err)
+			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
 		}
-		out[req.LeafId] = &claimTransferLeafSigningJobs{leaf: leaf, cpfp: job, cpfpUserSig: req.UserSignature}
+		out[req.GetLeafId()] = &claimTransferLeafSigningJobs{leaf: leaf, cpfp: job, cpfpUserSig: req.GetUserSignature()}
 	}
 	for _, req := range pkg.GetDirectLeavesToClaim() {
-		entry, ok := out[req.LeafId]
+		entry, ok := out[req.GetLeafId()]
 		if !ok {
-			return nil, fmt.Errorf("direct leaf %s missing cpfp entry in claim package", req.LeafId)
+			return nil, fmt.Errorf("direct leaf %s missing cpfp entry in claim package", req.GetLeafId())
 		}
 		job, err := buildClaimRefundSigningJob(ctx, req, entry.leaf, entry.leaf.DirectTx, claimTransferJobID(transferID, entry.leaf.ID.String(), claimTxKindDirect))
 		if err != nil {
-			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", req.LeafId, err)
+			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", req.GetLeafId(), err)
 		}
 		entry.direct = job
-		entry.directUserSig = req.UserSignature
+		entry.directUserSig = req.GetUserSignature()
 	}
 	for _, req := range pkg.GetDirectFromCpfpLeavesToClaim() {
-		entry, ok := out[req.LeafId]
+		entry, ok := out[req.GetLeafId()]
 		if !ok {
-			return nil, fmt.Errorf("direct-from-cpfp leaf %s missing cpfp entry in claim package", req.LeafId)
+			return nil, fmt.Errorf("direct-from-cpfp leaf %s missing cpfp entry in claim package", req.GetLeafId())
 		}
 		job, err := buildClaimRefundSigningJob(ctx, req, entry.leaf, entry.leaf.RawTx, claimTransferJobID(transferID, entry.leaf.ID.String(), claimTxKindDirectFromCPFP))
 		if err != nil {
-			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", req.LeafId, err)
+			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
 		}
 		entry.dfc = job
-		entry.dfcUserSig = req.UserSignature
+		entry.dfcUserSig = req.GetUserSignature()
 	}
 	return out, nil
 }
@@ -1728,7 +1728,7 @@ func marshalClaimSigningJobsForFrost(transferID uuid.UUID, result *claimRefundSi
 func filterClaimJobsForThisOperator(jobs []*pbinternal.SigningJob, identifier string) []*pbinternal.SigningJob {
 	filtered := make([]*pbinternal.SigningJob, 0, len(jobs))
 	for _, job := range jobs {
-		if _, ok := job.Commitments[identifier]; ok {
+		if _, ok := job.GetCommitments()[identifier]; ok {
 			filtered = append(filtered, job)
 		}
 	}

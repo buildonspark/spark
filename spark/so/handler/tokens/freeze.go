@@ -81,7 +81,7 @@ func ValidateAndApplyFreeze(
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("freeze tokens payload validation failed: %w", err))
 	}
 
-	if err := ValidateTimestampMillis(freezePayload.IssuerProvidedTimestamp); err != nil {
+	if err := ValidateTimestampMillis(freezePayload.GetIssuerProvidedTimestamp()); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func applyGlobalPause(
 		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check for recent global thaw: %w", err))
 	}
 
-	idempotent, err := validateFreezeState(activePause, mostRecentThaw, freezePayload.ShouldUnfreeze, freezePayload.IssuerProvidedTimestamp)
+	idempotent, err := validateFreezeState(activePause, mostRecentThaw, freezePayload.GetShouldUnfreeze(), freezePayload.GetIssuerProvidedTimestamp())
 	if err != nil {
 		return nil, err
 	}
@@ -136,15 +136,15 @@ func applyGlobalPause(
 		return &FreezeResult{}, nil
 	}
 
-	if freezePayload.ShouldUnfreeze {
+	if freezePayload.GetShouldUnfreeze() {
 		if activePause == nil {
 			return nil, errors.InternalDataInconsistency(fmt.Errorf("expected active global pause but found none for token_create_id %s", tokenCreateEnt.ID))
 		}
-		if err := ent.ThawActiveFreeze(ctx, activePause.ID, freezePayload.IssuerProvidedTimestamp); err != nil {
+		if err := ent.ThawActiveFreeze(ctx, activePause.ID, freezePayload.GetIssuerProvidedTimestamp()); err != nil {
 			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToUpdateTokenFreeze, err))
 		}
 	} else {
-		if err := ent.ActivateGlobalPause(ctx, tokenCreateEnt.ID, issuerSignature, freezePayload.IssuerProvidedTimestamp); err != nil {
+		if err := ent.ActivateGlobalPause(ctx, tokenCreateEnt.ID, issuerSignature, freezePayload.GetIssuerProvidedTimestamp()); err != nil {
 			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToCreateTokenFreeze, err))
 		}
 	}
@@ -159,7 +159,7 @@ func applyPerOwnerFreeze(
 	issuerSignature []byte,
 	tokenCreateEnt *ent.TokenCreate,
 ) (*FreezeResult, error) {
-	ownerPubKey, err := keys.ParsePublicKey(freezePayload.OwnerPublicKey)
+	ownerPubKey, err := keys.ParsePublicKey(freezePayload.GetOwnerPublicKey())
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner public key: %w", err))
 	}
@@ -182,7 +182,7 @@ func applyPerOwnerFreeze(
 		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check for recent thaw: %w", err))
 	}
 
-	idempotent, err := validateFreezeState(activeFreeze, mostRecentThaw, freezePayload.ShouldUnfreeze, freezePayload.IssuerProvidedTimestamp)
+	idempotent, err := validateFreezeState(activeFreeze, mostRecentThaw, freezePayload.GetShouldUnfreeze(), freezePayload.GetIssuerProvidedTimestamp())
 	if err != nil {
 		return nil, err
 	}
@@ -190,15 +190,15 @@ func applyPerOwnerFreeze(
 		return buildFreezeResult(ctx, ownerPubKey, tokenCreateEnt)
 	}
 
-	if freezePayload.ShouldUnfreeze {
+	if freezePayload.GetShouldUnfreeze() {
 		if activeFreeze == nil {
 			return nil, errors.InternalDataInconsistency(fmt.Errorf("expected active freeze but found none for owner %x and token_create_id %s", freezePayload.GetOwnerPublicKey(), tokenCreateEnt.ID))
 		}
-		if err := ent.ThawActiveFreeze(ctx, activeFreeze.ID, freezePayload.IssuerProvidedTimestamp); err != nil {
+		if err := ent.ThawActiveFreeze(ctx, activeFreeze.ID, freezePayload.GetIssuerProvidedTimestamp()); err != nil {
 			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToUpdateTokenFreeze, err))
 		}
 	} else {
-		if err := ent.ActivateFreeze(ctx, ownerPubKey, tokenCreateEnt.ID, issuerSignature, freezePayload.IssuerProvidedTimestamp); err != nil {
+		if err := ent.ActivateFreeze(ctx, ownerPubKey, tokenCreateEnt.ID, issuerSignature, freezePayload.GetIssuerProvidedTimestamp()); err != nil {
 			return nil, errors.InternalDatabaseWriteError(fmt.Errorf("%s: %w", tokens.ErrFailedToCreateTokenFreeze, err))
 		}
 	}

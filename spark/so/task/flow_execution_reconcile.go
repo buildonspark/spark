@@ -331,13 +331,13 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 		return fmt.Errorf("ConsensusQueryOutcome for %s: %w", row.ID, err)
 	}
 
-	switch resp.Outcome {
+	switch resp.GetOutcome() {
 	case pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED:
 		if err := r.gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_ConsensusCommit{
 				ConsensusCommit: &pbgossip.GossipMessageConsensusCommit{
-					OpType:          pbgossip.ConsensusOperationType(resp.OpType),
-					Operation:       resp.DecisionPayload,
+					OpType:          pbgossip.ConsensusOperationType(resp.GetOpType()),
+					Operation:       resp.GetDecisionPayload(),
 					FlowExecutionId: row.ID.String(),
 				},
 			},
@@ -350,8 +350,8 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 		if err := r.gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_ConsensusRollback{
 				ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
-					OpType:          pbgossip.ConsensusOperationType(resp.OpType),
-					Operation:       resp.DecisionPayload,
+					OpType:          pbgossip.ConsensusOperationType(resp.GetOpType()),
+					Operation:       resp.GetDecisionPayload(),
 					FlowExecutionId: row.ID.String(),
 				},
 			},
@@ -396,7 +396,7 @@ func (r *participantReconciler) reconcileOne(ctx context.Context, row *ent.FlowE
 		r.recordReconciledOutcome(ctx, "unspecified")
 		return nil
 	default:
-		return fmt.Errorf("unexpected outcome %v for %s", resp.Outcome, row.ID)
+		return fmt.Errorf("unexpected outcome %v for %s", resp.GetOutcome(), row.ID)
 	}
 }
 

@@ -225,9 +225,9 @@ func buildAppliedClaimRequest(t *testing.T, ctx context.Context, client *ent.Cli
 		HashVariant:                 pb.HashVariant_HASH_VARIANT_V2,
 		UserSignature:               sig,
 		KeyTweakPackage:             keyTweakPackage,
-		LeavesToClaim:               []*pb.UserSignedTxSigningJob{userJob(refundJob.RefundTxSigningJob.RawTx)},
-		DirectLeavesToClaim:         []*pb.UserSignedTxSigningJob{userJob(refundJob.DirectRefundTxSigningJob.RawTx)},
-		DirectFromCpfpLeavesToClaim: []*pb.UserSignedTxSigningJob{userJob(refundJob.DirectFromCpfpRefundTxSigningJob.RawTx)},
+		LeavesToClaim:               []*pb.UserSignedTxSigningJob{userJob(refundJob.GetRefundTxSigningJob().GetRawTx())},
+		DirectLeavesToClaim:         []*pb.UserSignedTxSigningJob{userJob(refundJob.GetDirectRefundTxSigningJob().GetRawTx())},
+		DirectFromCpfpLeavesToClaim: []*pb.UserSignedTxSigningJob{userJob(refundJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())},
 	}
 	return &pbinternal.ClaimTransferPrepareRequest{
 		OriginalRequest: &pb.ClaimTransferRequest{

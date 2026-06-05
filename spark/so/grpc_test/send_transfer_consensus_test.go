@@ -73,7 +73,7 @@ func TestSendTransferV3_Consensus_HappyPath(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 	leafReceiverMap := map[string]keys.Public{
-		rootNode.Id: receiverPrivKey.Public(),
+		rootNode.GetId(): receiverPrivKey.Public(),
 	}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
@@ -81,12 +81,12 @@ func TestSendTransferV3_Consensus_HappyPath(t *testing.T) {
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err, "failed to send V3 transfer via consensus path")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus(),
 		"transfer should be SENDER_KEY_TWEAKED after consensus path StartTransferV3")
 
 	// Each SO must have a Transfer row in SENDER_KEY_TWEAKED state with the
 	// same id. Without this, participants diverged from the coordinator.
-	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 	for _, i := range operatorIndicesFromConfig(senderConfig) {
 		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
@@ -106,22 +106,22 @@ func TestSendTransferV3_Consensus_HappyPath(t *testing.T) {
 
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
-	require.Len(t, pending.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending.Transfers[0].Id)
+	require.Len(t, pending.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending.GetTransfers()[0].GetId())
 
-	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.Transfers[0])
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pending.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}}
-	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.Transfers[0], receiverConfig, claimLeaves)
+	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
 	require.NoError(t, err, "receiver claim should succeed against consensus-path transfer")
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.Status)
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus())
 }
 
 // TestSendTransferV3_Consensus_WritesFlowExecutionRows asserts that every
@@ -165,14 +165,14 @@ func TestSendTransferV3_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
-	leafReceiverMap := map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()}
+	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
 		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	// Every operator must have written exactly one new SEND_TRANSFER
 	// FlowExecution row, all sharing the same id (the engine's executionID).
@@ -242,14 +242,14 @@ func TestSendTransferV3_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
-	leafReceiverMap := map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()}
+	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
 		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err, "legacy v3 path should still succeed with knob off")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	for _, i := range operatorIndices {
 		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])

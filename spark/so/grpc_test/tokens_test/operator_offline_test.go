@@ -32,9 +32,9 @@ func enableInternalBroadcast(t *testing.T, kc *sparktesting.KnobController) {
 
 func requirePartialCommit(t *testing.T, resp *tokenpb.BroadcastTransactionResponse) {
 	t.Helper()
-	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
-	require.Len(t, resp.CommitProgress.CommittedOperatorPublicKeys, 1, "only coordinator should be committed")
-	require.Len(t, resp.CommitProgress.UncommittedOperatorPublicKeys, 2, "non-coordinator operators should be uncommitted")
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
+	require.Len(t, resp.GetCommitProgress().GetCommittedOperatorPublicKeys(), 1, "only coordinator should be committed")
+	require.Len(t, resp.GetCommitProgress().GetUncommittedOperatorPublicKeys(), 2, "non-coordinator operators should be uncommitted")
 }
 
 func triggerRetryTask(t *testing.T, config *wallet.TestWalletConfig) {

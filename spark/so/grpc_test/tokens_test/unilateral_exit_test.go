@@ -113,7 +113,7 @@ func assertAndReturnTokenOutputs(t *testing.T, config *wallet.TestWalletConfig, 
 		[]keys.Public{issuerPublicKey},
 	)
 	require.NoError(t, err, "failed to query token outputs")
-	require.Len(t, outputsResp.OutputsWithPreviousTransactionData, outputsNum)
+	require.Len(t, outputsResp.GetOutputsWithPreviousTransactionData(), outputsNum)
 
 	return outputsResp
 }
@@ -171,7 +171,7 @@ func validWithdrawal(t *testing.T, outputNum int) {
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), outputNum)
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
@@ -220,7 +220,7 @@ func TestInvalidTokenUnilateralExit_InvalidOwnerSignature(t *testing.T) {
 	require.NoError(t, err, "failed to query SE entity public key")
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 1)
 
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	invalidOwnerSignature := make([]byte, 64)
 
@@ -259,7 +259,7 @@ func TestInvalidTokenUnilateralExit_InvalidOwner(t *testing.T) {
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
 	outputsResp := assertAndReturnTokenOutputs(t, config, setupResult.OutputOwners[0].Public(), setupResult.IssuerPrivateKey.Public(), 3)
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
@@ -322,7 +322,7 @@ func TestInvalidTokenUnilateralExit_DoubleSpend_PunishedWithdrawal(t *testing.T)
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
@@ -366,7 +366,7 @@ func TestInvalidTokenUnilateralExit_DoubleSpend_BlockedTransfer(t *testing.T) {
 	entityDkgKey, err := ent.GetEntityDkgKey(t.Context(), entClient)
 	require.NoError(t, err, "failed to query SE entity public key")
 	outputsResp := assertAndReturnTokenOutputs(t, config, ownerPrivateKey.Public(), setupResult.IssuerPrivateKey.Public(), 1)
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
@@ -453,7 +453,7 @@ func TestPartiallyValidTokenUnilateralExit(t *testing.T) {
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 
 	// Try to withdraw all 3 original outputs (1 spent, 2 valid)
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
@@ -522,7 +522,7 @@ func TestJusticeTransaction_ConfirmedOnChain(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")
@@ -604,7 +604,7 @@ func TestJusticeTransaction_MultiplePunishedOutputs(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 
-	tokenOutputsWithTxData := outputsResp.OutputsWithPreviousTransactionData
+	tokenOutputsWithTxData := outputsResp.GetOutputsWithPreviousTransactionData()
 
 	ownerSignature, err := ComputeUnilateralExitOwnerSignature(tokenOutputsWithTxData, ownerPrivateKey)
 	require.NoError(t, err, "failed to compute owner's signature")

@@ -50,7 +50,12 @@ func (h *WalletSettingHandler) UpdateWalletSetting(ctx context.Context, request 
 		return nil, status.Error(codes.InvalidArgument, "at least one field must be provided for update")
 	}
 
-	walletSetting, err := h.UpdateWalletSettingInternal(ctx, identityPubKey, request.PrivateEnabled, request)
+	var privateEnabled *bool
+	if request.PrivateEnabled != nil {
+		value := request.GetPrivateEnabled()
+		privateEnabled = &value
+	}
+	walletSetting, err := h.UpdateWalletSettingInternal(ctx, identityPubKey, privateEnabled, request)
 	if err != nil {
 		logger.Error("failed to update wallet setting", zap.Error(err))
 		return nil, fmt.Errorf("failed to update wallet setting: %w", err)

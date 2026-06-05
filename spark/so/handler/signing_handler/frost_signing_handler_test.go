@@ -66,13 +66,13 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 			// Verify response
 			require.NoError(t, err)
 			assert.NotNil(t, resp)
-			assert.Len(t, resp.SigningCommitments, int(tt.count))
+			assert.Len(t, resp.GetSigningCommitments(), int(tt.count))
 
 			// Verify each commitment
-			for i, commitment := range resp.SigningCommitments {
+			for i, commitment := range resp.GetSigningCommitments() {
 				assert.NotNil(t, commitment, "Commitment %d should not be nil", i)
-				assert.Len(t, commitment.Binding, 33, "Commitment %d binding should be 33 bytes (compressed public key)", i)
-				assert.Len(t, commitment.Hiding, 33, "Commitment %d hiding should be 33 bytes (compressed public key)", i)
+				assert.Len(t, commitment.GetBinding(), 33, "Commitment %d binding should be 33 bytes (compressed public key)", i)
+				assert.Len(t, commitment.GetHiding(), 33, "Commitment %d hiding should be 33 bytes (compressed public key)", i)
 			}
 
 			// Verify that nonces were stored in database
@@ -102,13 +102,13 @@ func TestFrostSigningHandler_GenerateRandomNonces_UniqueCommitments(t *testing.T
 	const count = 10
 	resp, err := handler.GenerateRandomNonces(ctx, count)
 	require.NoError(t, err)
-	assert.Len(t, resp.SigningCommitments, count)
+	assert.Len(t, resp.GetSigningCommitments(), count)
 
 	// Verify that all commitments are unique
 	commitmentMap := make(map[string]bool)
-	for i, commitment := range resp.SigningCommitments {
+	for i, commitment := range resp.GetSigningCommitments() {
 		// Create a unique key for each commitment by combining binding and hiding
-		key := string(commitment.Binding) + string(commitment.Hiding)
+		key := string(commitment.GetBinding()) + string(commitment.GetHiding())
 		assert.NotContains(t, commitmentMap, key, "Commitment %d should be unique", i)
 		commitmentMap[key] = true
 	}
@@ -366,8 +366,8 @@ func TestRetryFingerprintBindsSigningJobInputs(t *testing.T) {
 		{
 			name: "operator identifier",
 			mutate: func(job *pb.SigningJob) {
-				job.Commitments["operator-c"] = job.Commitments["operator-b"]
-				delete(job.Commitments, "operator-b")
+				job.Commitments["operator-c"] = job.GetCommitments()["operator-b"]
+				delete(job.GetCommitments(), "operator-b")
 			},
 		},
 		{

@@ -112,23 +112,23 @@ func callValidateBitcoinTransactions(
 	networkString string,
 ) error {
 	var directRootTxRaw, directRefundTxRaw []byte
-	if req.DirectRootTxSigningJob != nil {
-		directRootTxRaw = req.DirectRootTxSigningJob.RawTx
+	if req.GetDirectRootTxSigningJob() != nil {
+		directRootTxRaw = req.GetDirectRootTxSigningJob().GetRawTx()
 	}
-	if req.DirectRefundTxSigningJob != nil {
-		directRefundTxRaw = req.DirectRefundTxSigningJob.RawTx
+	if req.GetDirectRefundTxSigningJob() != nil {
+		directRefundTxRaw = req.GetDirectRefundTxSigningJob().GetRawTx()
 	}
 	var directFromCpfpRefundTxRaw []byte
-	if req.DirectFromCpfpRefundTxSigningJob != nil {
-		directFromCpfpRefundTxRaw = req.DirectFromCpfpRefundTxSigningJob.RawTx
+	if req.GetDirectFromCpfpRefundTxSigningJob() != nil {
+		directFromCpfpRefundTxRaw = req.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()
 	}
 
 	return validateBitcoinTransactions(
 		ctx,
-		req.OnChainUtxo.RawTx,
-		req.OnChainUtxo.Vout,
-		req.RootTxSigningJob.RawTx,
-		req.RefundTxSigningJob.RawTx,
+		req.GetOnChainUtxo().GetRawTx(),
+		req.GetOnChainUtxo().GetVout(),
+		req.GetRootTxSigningJob().GetRawTx(),
+		req.GetRefundTxSigningJob().GetRawTx(),
 		directFromCpfpRefundTxRaw,
 		directRootTxRaw,
 		directRefundTxRaw,

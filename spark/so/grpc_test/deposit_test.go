@@ -40,16 +40,16 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 	resp, err := wallet.GenerateDepositAddress(ctx, config, pubKey, new(uuid.NewString()), false)
 	require.NoError(t, err)
-	assert.False(t, resp.DepositAddress.IsStatic)
+	assert.False(t, resp.GetDepositAddress().GetIsStatic())
 
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err)
 
-	require.Len(t, unusedDepositAddresses.DepositAddresses, 1)
-	unusedAddress := unusedDepositAddresses.DepositAddresses[0]
-	assert.Equal(t, resp.DepositAddress.Address, unusedAddress.DepositAddress)
-	assert.Equal(t, pubKey.Serialize(), unusedAddress.UserSigningPublicKey)
-	assert.Equal(t, resp.DepositAddress.VerifyingKey, unusedAddress.VerifyingPublicKey)
+	require.Len(t, unusedDepositAddresses.GetDepositAddresses(), 1)
+	unusedAddress := unusedDepositAddresses.GetDepositAddresses()[0]
+	assert.Equal(t, resp.GetDepositAddress().GetAddress(), unusedAddress.GetDepositAddress())
+	assert.Equal(t, pubKey.Serialize(), unusedAddress.GetUserSigningPublicKey())
+	assert.Equal(t, resp.GetDepositAddress().GetVerifyingKey(), unusedAddress.GetVerifyingPublicKey())
 }
 
 func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
@@ -81,12 +81,12 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 				errChannel <- err
 				return
 			}
-			if resp.DepositAddress.Address == "" {
+			if resp.GetDepositAddress().GetAddress() == "" {
 				errChannel <- fmt.Errorf("deposit address is empty")
 				return
 			}
 
-			resultChannel <- resp.DepositAddress.Address
+			resultChannel <- resp.GetDepositAddress().GetAddress()
 		})
 	}
 
@@ -114,29 +114,29 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 	pubKey := keys.MustParsePublicKeyHex("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
 	resp, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.True(t, resp.DepositAddress.IsStatic)
+	assert.True(t, resp.GetDepositAddress().GetIsStatic())
 
 	// Static deposit addresses should not be returned by QueryUnusedDepositAddresses
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err)
-	assert.Empty(t, unusedDepositAddresses.DepositAddresses)
+	assert.Empty(t, unusedDepositAddresses.GetDepositAddresses())
 
 	queryStaticDepositAddresses, err := wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 1)
-	assert.Equal(t, resp.DepositAddress.Address, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 1)
+	assert.Equal(t, resp.GetDepositAddress().GetAddress(), queryStaticDepositAddresses.GetDepositAddresses()[0].GetDepositAddress())
 
 	// Generating a new static deposit address should not return an error
 	resp2, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
 	require.NoError(t, err)
-	require.Equal(t, resp.DepositAddress.Address, resp2.DepositAddress.Address)
-	require.Len(t, resp2.DepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
+	require.Equal(t, resp.GetDepositAddress().GetAddress(), resp2.GetDepositAddress().GetAddress())
+	require.Len(t, resp2.GetDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
 
 	// No new address should be created
 	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 1)
-	assert.Equal(t, resp.DepositAddress.Address, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 1)
+	assert.Equal(t, resp.GetDepositAddress().GetAddress(), queryStaticDepositAddresses.GetDepositAddresses()[0].GetDepositAddress())
 }
 
 func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
@@ -149,29 +149,29 @@ func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	resp1, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
 	require.NoError(t, err)
-	require.Len(t, resp1.DepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
+	require.Len(t, resp1.GetDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
 
 	// Static deposit addresses should not be returned by QueryUnusedDepositAddresses
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err)
-	assert.Empty(t, unusedDepositAddresses.DepositAddresses)
+	assert.Empty(t, unusedDepositAddresses.GetDepositAddresses())
 
 	queryStaticDepositAddresses, err := wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 1)
-	assert.Equal(t, resp1.DepositAddress.Address, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 1)
+	assert.Equal(t, resp1.GetDepositAddress().GetAddress(), queryStaticDepositAddresses.GetDepositAddresses()[0].GetDepositAddress())
 
 	// Generating a new static deposit address should not return an error
 	resp2, err := wallet.GenerateStaticDepositAddressDedicatedEndpoint(ctx, config, pubKey)
 	require.NoError(t, err)
-	require.Equal(t, resp1.DepositAddress.Address, resp2.DepositAddress.Address)
-	require.Len(t, resp2.DepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
+	require.Equal(t, resp1.GetDepositAddress().GetAddress(), resp2.GetDepositAddress().GetAddress())
+	require.Len(t, resp2.GetDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
 
 	// No new address should be created
 	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 1)
-	assert.Equal(t, resp2.DepositAddress.Address, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 1)
+	assert.Equal(t, resp2.GetDepositAddress().GetAddress(), queryStaticDepositAddresses.GetDepositAddresses()[0].GetDepositAddress())
 }
 
 func TestRotateStaticDepositAddress(t *testing.T) {
@@ -185,48 +185,48 @@ func TestRotateStaticDepositAddress(t *testing.T) {
 	// First, generate a static deposit address
 	initialResp, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.True(t, initialResp.DepositAddress.IsStatic)
-	initialAddress := initialResp.DepositAddress.Address
+	assert.True(t, initialResp.GetDepositAddress().GetIsStatic())
+	initialAddress := initialResp.GetDepositAddress().GetAddress()
 
 	// Query to verify there is one static deposit address
 	queryStaticDepositAddresses, err := wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 1)
-	assert.Equal(t, initialAddress, queryStaticDepositAddresses.DepositAddresses[0].DepositAddress)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 1)
+	assert.Equal(t, initialAddress, queryStaticDepositAddresses.GetDepositAddresses()[0].GetDepositAddress())
 
 	// Rotate the static deposit address
 	rotateResp, err := wallet.RotateStaticDepositAddress(ctx, config, pubKey)
 	require.NoError(t, err)
 
 	// Verify the new address is different from the archived address
-	assert.NotEqual(t, rotateResp.NewDepositAddress.Address, rotateResp.ArchivedDepositAddress.Address)
+	assert.NotEqual(t, rotateResp.GetNewDepositAddress().GetAddress(), rotateResp.GetArchivedDepositAddress().GetAddress())
 
 	// Verify the archived address matches the initial address
-	assert.Equal(t, initialAddress, rotateResp.ArchivedDepositAddress.Address)
+	assert.Equal(t, initialAddress, rotateResp.GetArchivedDepositAddress().GetAddress())
 
 	// Verify both addresses are marked as static
-	assert.True(t, rotateResp.NewDepositAddress.IsStatic)
-	assert.True(t, rotateResp.ArchivedDepositAddress.IsStatic)
+	assert.True(t, rotateResp.GetNewDepositAddress().GetIsStatic())
+	assert.True(t, rotateResp.GetArchivedDepositAddress().GetIsStatic())
 
 	// Verify proofs are present for both addresses
-	require.NotNil(t, rotateResp.NewDepositAddress.DepositAddressProof)
-	require.Len(t, rotateResp.NewDepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
-	require.NotNil(t, rotateResp.ArchivedDepositAddress.DepositAddressProof)
-	require.Len(t, rotateResp.ArchivedDepositAddress.DepositAddressProof.AddressSignatures, len(config.SigningOperators))
+	require.NotNil(t, rotateResp.GetNewDepositAddress().GetDepositAddressProof())
+	require.Len(t, rotateResp.GetNewDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
+	require.NotNil(t, rotateResp.GetArchivedDepositAddress().GetDepositAddressProof())
+	require.Len(t, rotateResp.GetArchivedDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
 
 	// Query static deposit addresses again - should now have 2 addresses (new default + archived)
 	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 2)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 2)
 
 	// Verify the new default address is in the list
 	foundNewAddress := false
 	foundArchivedAddress := false
-	for _, addr := range queryStaticDepositAddresses.DepositAddresses {
-		if addr.DepositAddress == rotateResp.NewDepositAddress.Address {
+	for _, addr := range queryStaticDepositAddresses.GetDepositAddresses() {
+		if addr.GetDepositAddress() == rotateResp.GetNewDepositAddress().GetAddress() {
 			foundNewAddress = true
 		}
-		if addr.DepositAddress == rotateResp.ArchivedDepositAddress.Address {
+		if addr.GetDepositAddress() == rotateResp.GetArchivedDepositAddress().GetAddress() {
 			foundArchivedAddress = true
 		}
 	}
@@ -236,12 +236,12 @@ func TestRotateStaticDepositAddress(t *testing.T) {
 	// Calling GenerateStaticDepositAddress again should return the new rotated address, not create another one
 	resp2, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Equal(t, rotateResp.NewDepositAddress.Address, resp2.DepositAddress.Address)
+	assert.Equal(t, rotateResp.GetNewDepositAddress().GetAddress(), resp2.GetDepositAddress().GetAddress())
 
 	// Verify no additional addresses were created
 	queryStaticDepositAddresses, err = wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
 	require.NoError(t, err)
-	assert.Len(t, queryStaticDepositAddresses.DepositAddresses, 2)
+	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 2)
 }
 
 func TestRotateStaticDepositAddressWithoutExistingAddress(t *testing.T) {
@@ -278,15 +278,15 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err)
-	require.Len(t, unusedDepositAddresses.DepositAddresses, 1)
-	require.Equal(t, leafID, unusedDepositAddresses.DepositAddresses[0].GetLeafId())
+	require.Len(t, unusedDepositAddresses.GetDepositAddresses(), 1)
+	require.Equal(t, leafID, unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId())
 
 	client := sparktesting.GetBitcoinClient()
 
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 	require.NoError(t, err, "failed to create deposit tx")
 	vout := 0
 
@@ -304,19 +304,19 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 	resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
-	require.Len(t, resp.Nodes, 1)
+	require.Len(t, resp.GetNodes(), 1)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.GetNodes()[0])
 	require.NoError(t, err)
-	assert.Equal(t, rootNode.Id, leafID)
-	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+	assert.Equal(t, rootNode.GetId(), leafID)
+	assert.Equal(t, rootNode.GetStatus(), string(st.TreeNodeStatusAvailable))
 
 	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err, "failed to query unused deposit addresses")
@@ -341,15 +341,15 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err)
-	require.Len(t, unusedDepositAddresses.DepositAddresses, 1)
-	require.Equal(t, leafID, unusedDepositAddresses.DepositAddresses[0].GetLeafId())
+	require.Len(t, unusedDepositAddresses.GetDepositAddresses(), 1)
+	require.Equal(t, leafID, unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId())
 
 	client := sparktesting.GetBitcoinClient()
 
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 	require.NoError(t, err, "failed to create deposit tx")
 	vout := 0
 
@@ -367,24 +367,24 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 	resp, err := wallet.CreateTreeRootWithFinalizeDepositTreeCreation(ctx, config, privKey, verifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
 
-	require.NotNil(t, resp.RootNode)
+	require.NotNil(t, resp.GetRootNode())
 
-	require.Nil(t, resp.RootNode.ParentNodeId, "must be a root node")
-	require.Equal(t, resp.RootNode.Id, leafID)
-	require.Equal(t, uint64(100_000), resp.RootNode.Value)
+	require.Nil(t, resp.GetRootNode().ParentNodeId, "must be a root node")
+	require.Equal(t, resp.GetRootNode().GetId(), leafID)
+	require.Equal(t, uint64(100_000), resp.GetRootNode().GetValue())
 	require.True(t,
-		resp.RootNode.Status == string(st.TreeNodeStatusCreating) ||
-			resp.RootNode.Status == string(st.TreeNodeStatusAvailable),
-		"status should be CREATING or AVAILABLE depending on confirmation, got %s", resp.RootNode.Status)
+		resp.GetRootNode().GetStatus() == string(st.TreeNodeStatusCreating) ||
+			resp.GetRootNode().GetStatus() == string(st.TreeNodeStatusAvailable),
+		"status should be CREATING or AVAILABLE depending on confirmation, got %s", resp.GetRootNode().GetStatus())
 
-	tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
+	tx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetNodeTx())
 	require.NoError(t, err)
 	require.Len(t, tx.TxIn, 1)
 	require.NotNil(t, tx.TxIn[0])
@@ -399,7 +399,7 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	err = common.VerifySignatureSingleInput(tx, 0, depositPrevOut)
 	require.NoError(t, err, "NodeTx signature should be valid")
 
-	refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
+	refundTx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetRefundTx())
 	require.NoError(t, err)
 	require.Len(t, refundTx.TxIn, 1)
 	require.NotNil(t, refundTx.TxIn[0])
@@ -414,7 +414,7 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	err = common.VerifySignatureSingleInput(refundTx, 0, nodeTxPrevOut)
 	require.NoError(t, err, "RefundTx signature should be valid")
 
-	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
+	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetDirectFromCpfpRefundTx())
 	require.NoError(t, err)
 	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
 	require.NotNil(t, directFromCpfpRefundTx.TxIn[0])
@@ -430,10 +430,10 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	require.NoError(t, err, "failed to generate to address")
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.RootNode)
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.GetRootNode())
 	require.NoError(t, err)
-	assert.Equal(t, rootNode.Id, leafID)
-	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+	assert.Equal(t, rootNode.GetId(), leafID)
+	assert.Equal(t, rootNode.GetStatus(), string(st.TreeNodeStatusAvailable))
 
 	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
 	require.NoError(t, err, "failed to query unused deposit addresses")
@@ -471,12 +471,12 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 				t.Fatalf("failed to query unused deposit addresses: %v", err)
 			}
 
-			if len(unusedDepositAddresses.DepositAddresses) != 1 {
-				t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+			if len(unusedDepositAddresses.GetDepositAddresses()) != 1 {
+				t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.GetDepositAddresses()))
 			}
 
-			if *unusedDepositAddresses.DepositAddresses[0].LeafId != leafID {
-				t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
+			if unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId() != leafID {
+				t.Fatalf("expected leaf id to be %s, got %s", leafID, unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId())
 			}
 
 			client := sparktesting.GetBitcoinClient()
@@ -484,7 +484,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 			coin, err := faucet.Fund()
 			require.NoError(t, err)
 
-			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 			if err != nil {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
@@ -527,7 +527,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 			// flip a bit in the pk script to simulate an unknown address
 			depositTx.TxOut[0].PkScript[30] = depositTx.TxOut[0].PkScript[30] ^ 1
 
-			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
 			_, err = tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
 			require.Error(t, err)
@@ -567,7 +567,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 			coin, err := faucet.Fund()
 			require.NoError(t, err)
 
-			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 			if err != nil {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
@@ -607,7 +607,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 
 			time.Sleep(100 * time.Millisecond)
 
-			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
 			nodes, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
 			if err != nil {
@@ -615,7 +615,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 			}
 
 			for _, node := range nodes {
-				require.NoError(t, uuid.Validate(node.Id))
+				require.NoError(t, uuid.Validate(node.GetId()))
 			}
 		})
 	}
@@ -650,7 +650,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 			coin, err := faucet.Fund()
 			require.NoError(t, err)
 
-			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 			if err != nil {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
@@ -693,7 +693,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 			resultChannel := make(chan []*pb.TreeNode, 2)
 			errChannel := make(chan error, 2)
 
-			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
 			for range 2 {
 				go func() {
@@ -717,7 +717,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 					nodes = r
 					respCount++
 					for _, node := range r {
-						treeNodeCounts[node.Id]++
+						treeNodeCounts[node.GetId()]++
 					}
 				case e := <-errChannel:
 					err = e
@@ -759,8 +759,8 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 			for _, node := range nodes {
 				rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, node)
 				require.NoError(t, err)
-				assert.Equal(t, rootNode.Id, leafID)
-				assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+				assert.Equal(t, rootNode.GetId(), leafID)
+				assert.Equal(t, rootNode.GetStatus(), string(st.TreeNodeStatusAvailable))
 			}
 
 			unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
@@ -768,8 +768,8 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 				t.Fatalf("failed to query unused deposit addresses: %v", err)
 			}
 
-			if len(unusedDepositAddresses.DepositAddresses) != 0 {
-				t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+			if len(unusedDepositAddresses.GetDepositAddresses()) != 0 {
+				t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.GetDepositAddresses()))
 			}
 		})
 	}
@@ -806,7 +806,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 				t.Fatalf("failed to generate deposit address: %v", err)
 			}
 
-			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 			if err != nil {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
@@ -826,7 +826,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 				t.Fatalf("failed to deserilize deposit tx: %v", err)
 			}
 
-			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
 			nodes, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
 			if err != nil {
@@ -925,7 +925,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 				t.Fatalf("failed to generate deposit address: %v", err)
 			}
 
-			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 			if err != nil {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
@@ -945,7 +945,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 				t.Fatalf("failed to deserilize deposit tx: %v", err)
 			}
 
-			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
 			nodes, err := tc.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
 			if err != nil {
@@ -1022,12 +1022,12 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
-	if len(unusedDepositAddresses.DepositAddresses) != 1 {
-		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+	if len(unusedDepositAddresses.GetDepositAddresses()) != 1 {
+		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.GetDepositAddresses()))
 	}
 
-	if *unusedDepositAddresses.DepositAddresses[0].LeafId != leafID {
-		t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
+	if unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId() != leafID {
+		t.Fatalf("expected leaf id to be %s, got %s", leafID, unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId())
 	}
 
 	client := sparktesting.GetBitcoinClient()
@@ -1035,7 +1035,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -1076,7 +1076,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 	// Call CreateTreeRoot twice in a row
 	_, err = wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, true)
@@ -1088,21 +1088,21 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
-	require.Len(t, resp.Nodes, 1)
+	require.Len(t, resp.GetNodes(), 1)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.GetNodes()[0])
 	require.NoError(t, err)
-	assert.Equal(t, rootNode.Id, leafID)
-	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+	assert.Equal(t, rootNode.GetId(), leafID)
+	assert.Equal(t, rootNode.GetStatus(), string(st.TreeNodeStatusAvailable))
 
 	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
 	if err != nil {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
-	if len(unusedDepositAddresses.DepositAddresses) != 0 {
-		t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+	if len(unusedDepositAddresses.GetDepositAddresses()) != 0 {
+		t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.GetDepositAddresses()))
 	}
 }
 
@@ -1153,12 +1153,12 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 				t.Fatalf("failed to query unused deposit addresses: %v", err)
 			}
 
-			if len(unusedDepositAddresses.DepositAddresses) != 1 {
-				t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+			if len(unusedDepositAddresses.GetDepositAddresses()) != 1 {
+				t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.GetDepositAddresses()))
 			}
 
-			if unusedDepositAddresses.DepositAddresses[0].GetLeafId() != leafID {
-				t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
+			if unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId() != leafID {
+				t.Fatalf("expected leaf id to be %s, got %s", leafID, unusedDepositAddresses.GetDepositAddresses()[0].GetLeafId())
 			}
 
 			client := sparktesting.GetBitcoinClient()
@@ -1166,7 +1166,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 			coin, err := faucet.Fund()
 			require.NoError(t, err)
 
-			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+			depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 			if err != nil {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
@@ -1208,7 +1208,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 
 			time.Sleep(100 * time.Millisecond)
 
-			verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
 			nodes, err := tc.flow.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
 			require.NoError(t, err, "failed to create tree root")
@@ -1221,12 +1221,12 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 			sparkClient := pb.NewSparkServiceClient(conn)
 			rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, nodes[0])
 			require.NoError(t, err)
-			assert.Equal(t, rootNode.Id, leafID)
-			assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
+			assert.Equal(t, rootNode.GetId(), leafID)
+			assert.Equal(t, rootNode.GetStatus(), string(st.TreeNodeStatusAvailable))
 
 			unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
 			require.NoError(t, err, "failed to query unused deposit addresses")
-			require.Empty(t, unusedDepositAddresses.DepositAddresses, "expected no unused deposit addresses")
+			require.Empty(t, unusedDepositAddresses.GetDepositAddresses(), "expected no unused deposit addresses")
 
 			_, err = tc.flow.CreateRoot(ctx, config, privKey, verifyingKey, depositTx, vout)
 			require.Error(t, err, "expected error upon double claim")
@@ -1265,8 +1265,8 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
-	if len(unusedDepositAddresses.DepositAddresses) != handler.DefaultMaxUnusedDepositAddresses {
-		t.Fatalf("expected %d unused deposit addresses, got %d", handler.DefaultMaxUnusedDepositAddresses, len(unusedDepositAddresses.DepositAddresses))
+	if len(unusedDepositAddresses.GetDepositAddresses()) != handler.DefaultMaxUnusedDepositAddresses {
+		t.Fatalf("expected %d unused deposit addresses, got %d", handler.DefaultMaxUnusedDepositAddresses, len(unusedDepositAddresses.GetDepositAddresses()))
 	}
 }
 
@@ -1297,8 +1297,8 @@ func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
-	if len(unusedDepositAddresses.DepositAddresses) != handler.DefaultMaxUnusedDepositAddresses {
-		t.Fatalf("expected %d unused deposit addresses, got %d", handler.DefaultMaxUnusedDepositAddresses, len(unusedDepositAddresses.DepositAddresses))
+	if len(unusedDepositAddresses.GetDepositAddresses()) != handler.DefaultMaxUnusedDepositAddresses {
+		t.Fatalf("expected %d unused deposit addresses, got %d", handler.DefaultMaxUnusedDepositAddresses, len(unusedDepositAddresses.GetDepositAddresses()))
 	}
 }
 
@@ -1322,7 +1322,7 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 	require.NoError(t, err)
 	vout := 0
 	var depositTxSerial bytes.Buffer
@@ -1406,7 +1406,7 @@ func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), 100_000)
 	require.NoError(t, err)
 	vout := 0
 	var depositTxSerial bytes.Buffer
@@ -1494,7 +1494,7 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	// Fund two separate UTXOs to the same deposit address
 	coin1, err := faucet.Fund()
 	require.NoError(t, err)
-	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.DepositAddress.Address, 60_000)
+	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.GetDepositAddress().GetAddress(), 60_000)
 	require.NoError(t, err)
 	signedDepositTx1, err := sparktesting.SignFaucetCoin(depositTx1, coin1.TxOut, coin1.Key)
 	require.NoError(t, err)
@@ -1503,7 +1503,7 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 
 	coin2, err := faucet.Fund()
 	require.NoError(t, err)
-	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.DepositAddress.Address, 40_000)
+	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.GetDepositAddress().GetAddress(), 40_000)
 	require.NoError(t, err)
 	signedDepositTx2, err := sparktesting.SignFaucetCoin(depositTx2, coin2.TxOut, coin2.Key)
 	require.NoError(t, err)
@@ -1522,7 +1522,7 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	// so the watcher often hadn't recorded the UTXOs yet, making the test flaky.
 	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1, depositTx2)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 
 	utxos := []wallet.DepositUTXO{
@@ -1533,14 +1533,14 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	resp, err := wallet.CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(ctx, config, privKey, verifyingKey, utxos)
 	require.NoError(t, err, "multi-UTXO FinalizeDepositTreeCreation should succeed")
 
-	require.NotNil(t, resp.RootNode)
-	require.Nil(t, resp.RootNode.ParentNodeId)
-	require.Equal(t, leafID, resp.RootNode.Id)
-	require.Equal(t, uint64(100_000), resp.RootNode.Value)
-	require.Equal(t, string(st.TreeNodeStatusAvailable), resp.RootNode.Status)
+	require.NotNil(t, resp.GetRootNode())
+	require.Nil(t, resp.GetRootNode().ParentNodeId)
+	require.Equal(t, leafID, resp.GetRootNode().GetId())
+	require.Equal(t, uint64(100_000), resp.GetRootNode().GetValue())
+	require.Equal(t, string(st.TreeNodeStatusAvailable), resp.GetRootNode().GetStatus())
 
 	// Verify root tx has 2 inputs (multi-UTXO) and 2 outputs
-	tx, err := common.TxFromRawTxBytes(resp.RootNode.NodeTx)
+	tx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetNodeTx())
 	require.NoError(t, err)
 	require.Len(t, tx.TxIn, 2)
 	require.Len(t, tx.TxOut, 2)
@@ -1554,7 +1554,7 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	require.NoError(t, err, "root tx multi-input signatures should be valid")
 
 	// Verify refund tx signature is valid
-	refundTx, err := common.TxFromRawTxBytes(resp.RootNode.RefundTx)
+	refundTx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetRefundTx())
 	require.NoError(t, err)
 	require.Len(t, refundTx.TxIn, 1)
 	require.Len(t, refundTx.TxIn[0].Witness, 1)
@@ -1566,7 +1566,7 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	require.NoError(t, err, "refund tx signature should be valid")
 
 	// Verify directFromCpfpRefund tx signature is valid
-	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.RootNode.DirectFromCpfpRefundTx)
+	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetDirectFromCpfpRefundTx())
 	require.NoError(t, err)
 	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
 	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
@@ -1637,7 +1637,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 	// Fund two separate UTXOs to the same deposit address
 	coin1, err := faucet.Fund()
 	require.NoError(t, err)
-	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.DepositAddress.Address, 60_000)
+	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.GetDepositAddress().GetAddress(), 60_000)
 	require.NoError(t, err)
 	signedDepositTx1, err := sparktesting.SignFaucetCoin(depositTx1, coin1.TxOut, coin1.Key)
 	require.NoError(t, err)
@@ -1646,7 +1646,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 
 	coin2, err := faucet.Fund()
 	require.NoError(t, err)
-	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.DepositAddress.Address, 40_000)
+	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.GetDepositAddress().GetAddress(), 40_000)
 	require.NoError(t, err)
 	signedDepositTx2, err := sparktesting.SignFaucetCoin(depositTx2, coin2.TxOut, coin2.Key)
 	require.NoError(t, err)
@@ -1661,9 +1661,9 @@ func TestFinalizeDepositTreeCreationMultiUtxoWrongInputOrder(t *testing.T) {
 	_, err = client.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
 
-	seedConfirmedDepositUtxos(t, config, depositResp.DepositAddress.Address, depositTx1, depositTx2)
+	seedConfirmedDepositUtxos(t, config, depositResp.GetDepositAddress().GetAddress(), depositTx1, depositTx2)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 
 	// Build a root tx with SWAPPED input order: depositTx2 first (should be depositTx1 since
@@ -1700,7 +1700,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	// This will cause the chain watcher to set depositAddress.AvailabilityConfirmedAt.
 	coin1, err := faucet.Fund()
 	require.NoError(t, err)
-	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.DepositAddress.Address, 10_000)
+	depositTx1, err := sparktesting.CreateTestDepositTransaction(coin1.OutPoint, depositResp.GetDepositAddress().GetAddress(), 10_000)
 	require.NoError(t, err)
 	signedDepositTx1, err := sparktesting.SignFaucetCoin(depositTx1, coin1.TxOut, coin1.Key)
 	require.NoError(t, err)
@@ -1722,7 +1722,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	// It will be in the mempool only — not confirmed and not in the Utxo table.
 	coin2, err := faucet.Fund()
 	require.NoError(t, err)
-	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.DepositAddress.Address, 90_000)
+	depositTx2, err := sparktesting.CreateTestDepositTransaction(coin2.OutPoint, depositResp.GetDepositAddress().GetAddress(), 90_000)
 	require.NoError(t, err)
 	signedDepositTx2, err := sparktesting.SignFaucetCoin(depositTx2, coin2.TxOut, coin2.Key)
 	require.NoError(t, err)
@@ -1730,7 +1730,7 @@ func TestFinalizeDepositTreeCreationMultiUtxoRejectsUnconfirmedPrimary(t *testin
 	require.NoError(t, err)
 	// Intentionally NOT mining — depositTx2 stays unconfirmed.
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 
 	// Step 3: Attempt multi-UTXO finalization with the unconfirmed large UTXO as primary.
@@ -1761,7 +1761,7 @@ func TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo(t *testing.T) {
 	signingPrivKey := keys.GeneratePrivateKey()
 	depositResp, err := wallet.GenerateDepositAddress(ctx, config, signingPrivKey.Public(), new(uuid.NewString()), false)
 	require.NoError(t, err)
-	depositAddress := depositResp.DepositAddress.Address
+	depositAddress := depositResp.GetDepositAddress().GetAddress()
 
 	// Step 2: Send a small legitimate deposit and mine it.
 	coin, err := faucet.Fund()
@@ -1791,7 +1791,7 @@ func TestFinalizeDepositTreeCreation_RejectsFabricatedUtxo(t *testing.T) {
 	fabricatedDepositTx, err := sparktesting.CreateTestDepositTransaction(fakeOutPoint, depositAddress, fabricatedAmount)
 	require.NoError(t, err)
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 
 	// Step 4: FinalizeDepositTreeCreation should reject the fabricated tx.
@@ -1827,7 +1827,7 @@ func TestStartDepositTreeCreationDoesNotReusePendingRootAcrossDeposits(t *testin
 	require.NoError(t, err)
 	deposit2, err := wallet.GenerateDepositAddress(ctx, config, userSigningKey.Public(), &leafID2, false)
 	require.NoError(t, err)
-	require.NotEqual(t, deposit1.DepositAddress.Address, deposit2.DepositAddress.Address)
+	require.NotEqual(t, deposit1.GetDepositAddress().GetAddress(), deposit2.GetDepositAddress().GetAddress())
 
 	client := sparktesting.GetBitcoinClient()
 	const amount = 100_000
@@ -1844,8 +1844,8 @@ func TestStartDepositTreeCreationDoesNotReusePendingRootAcrossDeposits(t *testin
 		return depositTx
 	}
 
-	depositTx1 := fundAndMine(deposit1.DepositAddress.Address)
-	depositTx2 := fundAndMine(deposit2.DepositAddress.Address)
+	depositTx1 := fundAndMine(deposit1.GetDepositAddress().GetAddress())
+	depositTx2 := fundAndMine(deposit2.GetDepositAddress().GetAddress())
 	require.NotEqual(t, depositTx1.TxHash(), depositTx2.TxHash())
 
 	// Confirm both deposits.
@@ -1856,9 +1856,9 @@ func TestStartDepositTreeCreationDoesNotReusePendingRootAcrossDeposits(t *testin
 	require.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 
-	verifyingKey1, err := keys.ParsePublicKey(deposit1.DepositAddress.VerifyingKey)
+	verifyingKey1, err := keys.ParsePublicKey(deposit1.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
-	verifyingKey2, err := keys.ParsePublicKey(deposit2.DepositAddress.VerifyingKey)
+	verifyingKey2, err := keys.ParsePublicKey(deposit2.GetDepositAddress().GetVerifyingKey())
 	require.NoError(t, err)
 	require.NotEqual(t, verifyingKey1, verifyingKey2, "separate deposit addresses must use separate SO keyshares")
 
@@ -1870,18 +1870,18 @@ func TestStartDepositTreeCreationDoesNotReusePendingRootAcrossDeposits(t *testin
 	// Previously, this call would reuse the first root and return leafID1.
 	resp, err := wallet.CreateTreeRoot(ctx, config, userSigningKey, verifyingKey2, depositTx2, 0, false)
 	require.NoError(t, err)
-	require.Len(t, resp.Nodes, 1)
-	assert.Equal(t, leafID2, resp.Nodes[0].Id, "second deposit must get its own root node")
-	assert.NotEqual(t, leafID1, resp.Nodes[0].Id)
+	require.Len(t, resp.GetNodes(), 1)
+	assert.Equal(t, leafID2, resp.GetNodes()[0].GetId(), "second deposit must get its own root node")
+	assert.NotEqual(t, leafID1, resp.GetNodes()[0].GetId())
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.GetNodes()[0])
 	require.NoError(t, err)
-	assert.Equal(t, leafID2, rootNode.Id)
-	assert.EqualValues(t, st.TreeNodeStatusAvailable, rootNode.Status)
+	assert.Equal(t, leafID2, rootNode.GetId())
+	assert.EqualValues(t, st.TreeNodeStatusAvailable, rootNode.GetStatus())
 
 	// The second root's node tx must spend the second deposit, not the first.
-	rootTx, err := common.TxFromRawTxBytes(rootNode.NodeTx)
+	rootTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
 	require.NoError(t, err)
 	require.NotEmpty(t, rootTx.TxIn)
 	assert.Equal(t, depositTx2.TxHash(), rootTx.TxIn[0].PreviousOutPoint.Hash)

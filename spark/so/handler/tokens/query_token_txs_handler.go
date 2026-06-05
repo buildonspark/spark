@@ -606,10 +606,10 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 
 	if req.GetByTxHash() != nil {
 		return &queryParams{
-			tokenTransactionHashes: req.GetByTxHash().TokenTransactionHashes,
+			tokenTransactionHashes: req.GetByTxHash().GetTokenTransactionHashes(),
 			order:                  req.GetOrder(),
 			limit:                  limit,
-			offset:                 req.Offset,
+			offset:                 req.GetOffset(),
 		}, nil
 	}
 
@@ -625,14 +625,14 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 		}
 
 		params := &queryParams{
-			outputIDs:        req.GetByFilters().OutputIds,
+			outputIDs:        req.GetByFilters().GetOutputIds(),
 			ownerPublicKeys:  ownerPubKeys,
 			issuerPublicKeys: issuerPubKeys,
-			tokenIdentifiers: req.GetByFilters().TokenIdentifiers,
+			tokenIdentifiers: req.GetByFilters().GetTokenIdentifiers(),
 			isByFiltersQuery: true,
 			order:            req.GetOrder(),
 			limit:            limit,
-			offset:           req.Offset,
+			offset:           req.GetOffset(),
 		}
 
 		if pageRequest := req.GetByFilters().GetPageRequest(); pageRequest != nil {
@@ -676,13 +676,13 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 	}
 
 	return &queryParams{
-		outputIDs:              req.OutputIds,
+		outputIDs:              req.GetOutputIds(),
 		ownerPublicKeys:        ownerPubKeys,
 		issuerPublicKeys:       issuerPubKeys,
 		tokenIdentifiers:       req.GetTokenIdentifiers(),
 		tokenTransactionHashes: req.GetTokenTransactionHashes(),
 		order:                  req.GetOrder(),
 		limit:                  limit,
-		offset:                 req.Offset,
+		offset:                 req.GetOffset(),
 	}, nil
 }

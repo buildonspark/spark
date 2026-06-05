@@ -49,9 +49,9 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 		handler := NewGossipHandler(h.config)
 		err = handler.HandleGossipMessage(ctx, message, true)
 		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s after full delivery failed with error: %v", message.MessageId, err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s after full delivery failed with error: %v", message.GetMessageId(), err)
 			if status.Code(err) == codes.AlreadyExists {
-				logger.Sugar().Infof("Gossip message %s already processed (AlreadyExists), treating as success", message.MessageId)
+				logger.Sugar().Infof("Gossip message %s already processed (AlreadyExists), treating as success", message.GetMessageId())
 				return gossip, nil
 			}
 			if status.Code(err) == codes.Unavailable ||
@@ -62,11 +62,11 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 			}
 			if sparkdb.IsRetriableSQLStateError(err) {
 				logger.Warn("retriable SQL error in gossip handling, should investigate root cause",
-					zap.String("message_id", message.MessageId),
+					zap.String("message_id", message.GetMessageId()),
 					zap.Error(err))
 				return nil, err
 			}
-			logger.Sugar().Warnf("Non-retriable error for gossip message %s, not retrying: %v", message.MessageId, err)
+			logger.Sugar().Warnf("Non-retriable error for gossip message %s, not retrying: %v", message.GetMessageId(), err)
 		}
 	}
 	return gossip, nil

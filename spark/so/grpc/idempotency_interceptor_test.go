@@ -63,7 +63,7 @@ func TestIdempotencyInterceptor_CacheHit(t *testing.T) {
 	structResp2, ok := resp2.(*structpb.Struct)
 	require.True(t, ok)
 	assert.EqualExportedValues(t, structResp1, structResp2)
-	assert.Equal(t, "bar", structResp2.Fields["foo"].GetStringValue())
+	assert.Equal(t, "bar", structResp2.GetFields()["foo"].GetStringValue())
 }
 
 func TestIdempotencyInterceptor_CacheMissSuccessfulStore(t *testing.T) {
@@ -87,7 +87,7 @@ func TestIdempotencyInterceptor_CacheMissSuccessfulStore(t *testing.T) {
 	// Does the response look good?
 	structResp, ok := resp.(*structpb.Struct)
 	require.True(t, ok)
-	assert.Equal(t, "bar", structResp.Fields["foo"].GetStringValue())
+	assert.Equal(t, "bar", structResp.GetFields()["foo"].GetStringValue())
 
 	// Does the DB record look good?
 	storedKey, err := tx.IdempotencyKey.Query().
@@ -322,8 +322,8 @@ func TestIdempotencyInterceptor_DifferentIdentitiesSeparateCaches(t *testing.T) 
 	require.True(t, ok)
 	structB, ok := respB.(*structpb.Struct)
 	require.True(t, ok)
-	assert.Equal(t, "A", structA.Fields["user"].GetStringValue())
-	assert.Equal(t, "B", structB.Fields["user"].GetStringValue())
+	assert.Equal(t, "A", structA.GetFields()["user"].GetStringValue())
+	assert.Equal(t, "B", structB.GetFields()["user"].GetStringValue())
 }
 
 func TestIdempotencyInterceptor_SameIdentityCacheHit(t *testing.T) {
@@ -351,7 +351,7 @@ func TestIdempotencyInterceptor_SameIdentityCacheHit(t *testing.T) {
 
 	structResp, ok := resp2.(*structpb.Struct)
 	require.True(t, ok)
-	assert.Equal(t, "A", structResp.Fields["user"].GetStringValue())
+	assert.Equal(t, "A", structResp.GetFields()["user"].GetStringValue())
 }
 
 func TestIdempotencyInterceptor_NoIdentitySharesCache(t *testing.T) {
@@ -404,7 +404,7 @@ func TestIdempotencyInterceptor_IdentityDoesNotMatchNoIdentity(t *testing.T) {
 
 	structResp, ok := resp2.(*structpb.Struct)
 	require.True(t, ok)
-	assert.Equal(t, "user", structResp.Fields["from"].GetStringValue())
+	assert.Equal(t, "user", structResp.GetFields()["from"].GetStringValue())
 }
 
 func callInterceptor(_ *testing.T, ctx context.Context, key string, methodName string, handler grpc.UnaryHandler) (any, error) {

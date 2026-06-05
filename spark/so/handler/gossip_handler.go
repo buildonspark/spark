@@ -82,13 +82,13 @@ func NewGossipHandler(config *so.Config) *GossipHandler {
 // Returns nil for non-retryable errors to prevent the gossip system from retrying failed operations.
 func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *pbgossip.GossipMessage, forCoordinator bool) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Handling gossip message with ID %s", gossipMessage.MessageId)
+	logger.Sugar().Infof("Handling gossip message with ID %s", gossipMessage.GetMessageId())
 
 	messageType := getGossipMessageType(gossipMessage)
 
 	startTime := time.Now()
 	var err error
-	switch gossipMessage.Message.(type) {
+	switch gossipMessage.GetMessage().(type) {
 	case *pbgossip.GossipMessage_CancelTransfer:
 		cancelTransfer := gossipMessage.GetCancelTransfer()
 		err = h.handleCancelTransferGossipMessage(ctx, cancelTransfer)
@@ -135,9 +135,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		settleSwapKeyTweak := gossipMessage.GetSettleSwapKeyTweak()
 		err = h.handleSettleSwapKeyTweakGossipMessage(ctx, settleSwapKeyTweak)
 	case *pbgossip.GossipMessage_FinalizeRefreshTimelock:
-		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
+		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.GetMessage())
 	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
-		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
+		err = fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.GetMessage())
 	case *pbgossip.GossipMessage_ArchiveStaticDepositAddress:
 		archiveStaticDepositAddress := gossipMessage.GetArchiveStaticDepositAddress()
 		err = h.handleArchiveStaticDepositAddressGossipMessage(ctx, archiveStaticDepositAddress, forCoordinator)
@@ -150,24 +150,24 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		if !forCoordinator {
 			commit := gossipMessage.GetConsensusCommit()
 			var op proto.Message
-			if op, err = commit.Operation.UnmarshalNew(); err == nil {
-				err = dispatchConsensusCommit(ctx, h.config, commit.OpType, commit.FlowExecutionId, op)
+			if op, err = commit.GetOperation().UnmarshalNew(); err == nil {
+				err = dispatchConsensusCommit(ctx, h.config, commit.GetOpType(), commit.GetFlowExecutionId(), op)
 			}
 		}
 	case *pbgossip.GossipMessage_ConsensusRollback:
 		if !forCoordinator {
 			rollback := gossipMessage.GetConsensusRollback()
 			var op proto.Message
-			if op, err = rollback.Operation.UnmarshalNew(); err == nil {
-				err = dispatchConsensusRollback(ctx, h.config, rollback.OpType, rollback.FlowExecutionId, op)
+			if op, err = rollback.GetOperation().UnmarshalNew(); err == nil {
+				err = dispatchConsensusRollback(ctx, h.config, rollback.GetOpType(), rollback.GetFlowExecutionId(), op)
 			}
 		}
 	default:
-		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
+		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.GetMessage())
 	}
 
 	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s of type %s failed with error: %v", gossipMessage.MessageId, messageType, err)
+		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s of type %s failed with error: %v", gossipMessage.GetMessageId(), messageType, err)
 	}
 
 	// Record metrics
@@ -187,7 +187,7 @@ func getGossipMessageType(msg *pbgossip.GossipMessage) string {
 		return "unknown"
 	}
 	// Return the raw protobuf type name, e.g., "*gossip.GossipMessage_CancelTransfer"
-	return fmt.Sprintf("%T", msg.Message)
+	return fmt.Sprintf("%T", msg.GetMessage())
 }
 
 func (h *GossipHandler) handleCancelTransferGossipMessage(ctx context.Context, cancelTransfer *pbgossip.GossipMessageCancelTransfer) error {
@@ -214,7 +214,7 @@ func (h *GossipHandler) handleSettleSenderKeyTweakGossipMessage(ctx context.Cont
 	if err != nil {
 		return fmt.Errorf("failed to settle sender key tweak: invalid transfer ID: %s: %w", settleSenderKeyTweak.GetTransferId(), err)
 	}
-	_, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, settleSenderKeyTweak.SenderKeyTweakProofs)
+	_, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, settleSenderKeyTweak.GetSenderKeyTweakProofs())
 	if err != nil {
 		logger := logging.GetLoggerFromContext(ctx)
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", transferID)
@@ -245,7 +245,7 @@ func (h *GossipHandler) handleRollbackTransfer(ctx context.Context, req *pbgossi
 
 func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip.GossipMessageMarkTreesExited) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Handling mark trees exited gossip message for trees %+q", req.TreeIds)
+	logger.Sugar().Infof("Handling mark trees exited gossip message for trees %+q", req.GetTreeIds())
 
 	treeIDs, err := uuids.ParseSlice(req.GetTreeIds())
 	if err != nil {
@@ -269,7 +269,7 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 
 	treeExitHandler := newTreeExitHandler(h.config)
 	if markErr := treeExitHandler.markTreesExited(ctx, trees); markErr != nil {
-		logger.With(zap.Error(markErr)).Sugar().Errorf("Failed to mark trees %+q exited", req.TreeIds)
+		logger.With(zap.Error(markErr)).Sugar().Errorf("Failed to mark trees %+q exited", req.GetTreeIds())
 		return markErr
 	}
 	return err
@@ -277,7 +277,7 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 
 func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, req *pbgossip.GossipMessageDepositCleanup) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Handling deposit cleanup gossip message for tree %s", req.TreeId)
+	logger.Sugar().Infof("Handling deposit cleanup gossip message for tree %s", req.GetTreeId())
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -346,7 +346,7 @@ func (h *GossipHandler) handleFinalizeTreeCreationGossipMessage(ctx context.Cont
 	}
 
 	depositHandler := NewInternalDepositHandler(h.config)
-	err := depositHandler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: finalizeNodeSignatures.InternalNodes, Network: finalizeNodeSignatures.ProtoNetwork})
+	err := depositHandler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: finalizeNodeSignatures.GetInternalNodes(), Network: finalizeNodeSignatures.GetProtoNetwork()})
 	if err != nil {
 		logger.Error("Failed to finalize tree creation", zap.Error(err))
 	}
@@ -361,7 +361,7 @@ func (h *GossipHandler) handleFinalizeTransferGossipMessage(ctx context.Context,
 		return nil
 	}
 	transferHandler := NewInternalTransferHandler(h.config)
-	err := transferHandler.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: finalizeNodeSignatures.TransferId, Nodes: finalizeNodeSignatures.InternalNodes, Timestamp: finalizeNodeSignatures.CompletionTimestamp})
+	err := transferHandler.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: finalizeNodeSignatures.GetTransferId(), Nodes: finalizeNodeSignatures.GetInternalNodes(), Timestamp: finalizeNodeSignatures.GetCompletionTimestamp()})
 	if err != nil {
 		logger.Error("Failed to finalize transfer", zap.Error(err))
 	}
@@ -378,8 +378,8 @@ func (h *GossipHandler) handleFinalizeNodeTimelockGossipMessage(ctx context.Cont
 
 	renewLeafHandler := NewInternalRenewLeafHandler(h.config)
 	err := renewLeafHandler.FinalizeRenewNodeTimelock(ctx, &pbinternal.FinalizeRenewNodeTimelockRequest{
-		SplitNode: finalizeRenewNodeTimelock.SplitNode,
-		Node:      finalizeRenewNodeTimelock.Node,
+		SplitNode: finalizeRenewNodeTimelock.GetSplitNode(),
+		Node:      finalizeRenewNodeTimelock.GetNode(),
 	})
 	if err != nil {
 		logger.Error("Failed to finalize renew node timelock", zap.Error(err))
@@ -397,7 +397,7 @@ func (h *GossipHandler) handleFinalizeRefundTimelockGossipMessage(ctx context.Co
 
 	renewLeafHandler := NewInternalRenewLeafHandler(h.config)
 	err := renewLeafHandler.FinalizeRenewRefundTimelock(ctx, &pbinternal.FinalizeRenewRefundTimelockRequest{
-		Node: finalizeRenewRefundTimelock.Node,
+		Node: finalizeRenewRefundTimelock.GetNode(),
 	})
 	if err != nil {
 		logger.Error("Failed to finalize renew refund timelock", zap.Error(err))
@@ -411,9 +411,9 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 
 	depositHandler := NewInternalDepositHandler(h.config)
 	_, err := depositHandler.RollbackUtxoSwap(ctx, h.config, &pbinternal.RollbackUtxoSwapRequest{
-		OnChainUtxo:           rollbackUtxoSwap.OnChainUtxo,
-		Signature:             rollbackUtxoSwap.Signature,
-		CoordinatorPublicKey:  rollbackUtxoSwap.CoordinatorPublicKey,
+		OnChainUtxo:           rollbackUtxoSwap.GetOnChainUtxo(),
+		Signature:             rollbackUtxoSwap.GetSignature(),
+		CoordinatorPublicKey:  rollbackUtxoSwap.GetCoordinatorPublicKey(),
 		ConfirmationThreshold: rollbackUtxoSwap.ConfirmationThreshold,
 	})
 	if err != nil {
@@ -431,11 +431,11 @@ func (h *GossipHandler) handleRollbackInstantUtxoSwapGossipMessage(ctx context.C
 
 	depositHandler := NewInternalDepositHandler(h.config)
 	_, err := depositHandler.RollbackInstantUtxoSwap(ctx, h.config, &pbinternal.RollbackInstantUtxoSwapRequest{
-		OnChainUtxo:          rollbackInstantUtxoSwap.OnChainUtxo,
-		Signature:            rollbackInstantUtxoSwap.Signature,
-		CoordinatorPublicKey: rollbackInstantUtxoSwap.CoordinatorPublicKey,
-		RollbackFromStatuses: rollbackInstantUtxoSwap.RollbackFromStatuses,
-		RollbackToStatus:     rollbackInstantUtxoSwap.RollbackToStatus,
+		OnChainUtxo:          rollbackInstantUtxoSwap.GetOnChainUtxo(),
+		Signature:            rollbackInstantUtxoSwap.GetSignature(),
+		CoordinatorPublicKey: rollbackInstantUtxoSwap.GetCoordinatorPublicKey(),
+		RollbackFromStatuses: rollbackInstantUtxoSwap.GetRollbackFromStatuses(),
+		RollbackToStatus:     rollbackInstantUtxoSwap.GetRollbackToStatus(),
 	})
 	if err != nil {
 		if ent.IsNotFound(err) || status.Code(err) == codes.NotFound {
@@ -454,9 +454,9 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 		return nil
 	}
 
-	calculatedHash := sha256.Sum256(gossip.Preimage)
-	if !bytes.Equal(calculatedHash[:], gossip.PaymentHash) {
-		err := fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.PaymentHash)
+	calculatedHash := sha256.Sum256(gossip.GetPreimage())
+	if !bytes.Equal(calculatedHash[:], gossip.GetPaymentHash()) {
+		err := fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.GetPaymentHash())
 		logger.Error(err.Error())
 		return err
 	}
@@ -467,16 +467,16 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 		return err
 	}
 
-	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.PaymentHash)).ForUpdate().All(ctx)
+	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.GetPaymentHash())).ForUpdate().All(ctx)
 	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get preimage request for %x", gossip.PaymentHash)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get preimage request for %x", gossip.GetPaymentHash())
 		return err
 	}
 
 	for _, preimageRequest := range preimageRequests {
-		_, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx)
+		_, err = preimageRequest.Update().SetPreimage(gossip.GetPreimage()).Save(ctx)
 		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to update preimage request for %x", gossip.PaymentHash)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to update preimage request for %x", gossip.GetPaymentHash())
 			return err
 		}
 	}
@@ -491,9 +491,9 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Handling preimage swap gossip message")
 
-	calculatedHash := sha256.Sum256(gossip.Preimage)
-	if !bytes.Equal(calculatedHash[:], gossip.PaymentHash) {
-		return fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.PaymentHash)
+	calculatedHash := sha256.Sum256(gossip.GetPreimage())
+	if !bytes.Equal(calculatedHash[:], gossip.GetPaymentHash()) {
+		return fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.GetPaymentHash())
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -501,27 +501,27 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 		return fmt.Errorf("failed to get db context: %w", err)
 	}
 
-	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.PaymentHash)).ForUpdate().All(ctx)
+	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.GetPaymentHash())).ForUpdate().All(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get preimage requests for %x: %w", gossip.PaymentHash, err)
+		return fmt.Errorf("failed to get preimage requests for %x: %w", gossip.GetPaymentHash(), err)
 	}
 	for _, preimageRequest := range preimageRequests {
-		update := preimageRequest.Update().SetPreimage(gossip.Preimage)
+		update := preimageRequest.Update().SetPreimage(gossip.GetPreimage())
 		if preimageRequest.Status == st.PreimageRequestStatusWaitingForPreimage {
 			update = update.SetStatus(st.PreimageRequestStatusPreimageShared)
 		}
 		if _, err = update.Save(ctx); err != nil {
-			return fmt.Errorf("failed to update preimage request for %x: %w", gossip.PaymentHash, err)
+			return fmt.Errorf("failed to update preimage request for %x: %w", gossip.GetPaymentHash(), err)
 		}
 	}
 
-	if gossip.TransferId != "" {
+	if gossip.GetTransferId() != "" {
 		transferHandler := NewBaseTransferHandler(h.config)
-		transferID, err := uuid.Parse(gossip.TransferId)
+		transferID, err := uuid.Parse(gossip.GetTransferId())
 		if err != nil {
-			return fmt.Errorf("invalid transfer ID in preimage swap gossip: %s: %w", gossip.TransferId, err)
+			return fmt.Errorf("invalid transfer ID in preimage swap gossip: %s: %w", gossip.GetTransferId(), err)
 		}
-		if _, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, gossip.SenderKeyTweakProofs); err != nil {
+		if _, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, gossip.GetSenderKeyTweakProofs()); err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", transferID)
 			return err
 		}
@@ -560,7 +560,12 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 	logger.Sugar().Infof("Handling wallet setting update gossip message for identity public key %s", ownerIdentityPubKey)
 
 	walletSettingHandler := NewWalletSettingHandler(h.config)
-	_, err = walletSettingHandler.UpdateWalletSettingInternal(ctx, ownerIdentityPubKey, updateWalletSetting.PrivateEnabled, updateWalletSetting)
+	var privateEnabled *bool
+	if updateWalletSetting.PrivateEnabled != nil {
+		value := updateWalletSetting.GetPrivateEnabled()
+		privateEnabled = &value
+	}
+	_, err = walletSettingHandler.UpdateWalletSettingInternal(ctx, ownerIdentityPubKey, privateEnabled, updateWalletSetting)
 	if err != nil {
 		logger.Error("failed to update wallet setting from gossip message", zap.Error(err))
 		return err
@@ -578,44 +583,44 @@ func (h *GossipHandler) handleArchiveStaticDepositAddressGossipMessage(ctx conte
 	}
 
 	// Parse coordinator public key
-	coordinatorPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.GetCoordinatorPublicKey())
 	if err != nil {
 		logger.Error("failed to parse coordinator public key", zap.Error(err))
 		return fmt.Errorf("failed to parse coordinator public key: %w", err)
 	}
 
 	// Parse owner identity public key
-	ownerIDPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.OwnerIdentityPublicKey)
+	ownerIDPubKey, err := keys.ParsePublicKey(archiveStaticDepositAddress.GetOwnerIdentityPublicKey())
 	if err != nil {
 		logger.Error("failed to parse owner identity public key", zap.Error(err))
 		return fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 
-	network, err := btcnetwork.FromProtoNetwork(archiveStaticDepositAddress.Network)
+	network, err := btcnetwork.FromProtoNetwork(archiveStaticDepositAddress.GetNetwork())
 	if err != nil {
 		logger.Error("failed to parse network", zap.Error(err))
 		return fmt.Errorf("failed to parse network: %w", err)
 	}
 
-	messageHash, err := CreateArchiveStaticDepositAddressStatement(ownerIDPubKey, network, archiveStaticDepositAddress.Address)
+	messageHash, err := CreateArchiveStaticDepositAddressStatement(ownerIDPubKey, network, archiveStaticDepositAddress.GetAddress())
 	if err != nil {
 		logger.Error("failed to create archive statement", zap.Error(err))
 		return fmt.Errorf("failed to create archive statement: %w", err)
 	}
 
-	if err := common.VerifyECDSASignature(coordinatorPubKey, archiveStaticDepositAddress.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, archiveStaticDepositAddress.GetSignature(), messageHash); err != nil {
 		logger.Error("failed to verify coordinator signature", zap.Error(err))
 		return fmt.Errorf("failed to verify coordinator signature: %w", err)
 	}
 
 	staticDepositHandler := NewStaticDepositInternalHandler(h.config)
-	err = staticDepositHandler.ArchiveStaticDepositAddress(ctx, archiveStaticDepositAddress.OwnerIdentityPublicKey, archiveStaticDepositAddress.Network, archiveStaticDepositAddress.Address)
+	err = staticDepositHandler.ArchiveStaticDepositAddress(ctx, archiveStaticDepositAddress.GetOwnerIdentityPublicKey(), archiveStaticDepositAddress.GetNetwork(), archiveStaticDepositAddress.GetAddress())
 	if err != nil {
 		logger.Sugar().Errorf("failed to archive static deposit address from gossip message: %w", err)
 		return err
 	}
 
-	logger.Sugar().Infof("Successfully archived static deposit address %s from gossip message for identity public key %x", archiveStaticDepositAddress.Address, ownerIDPubKey.Serialize())
+	logger.Sugar().Infof("Successfully archived static deposit address %s from gossip message for identity public key %x", archiveStaticDepositAddress.GetAddress(), ownerIDPubKey.Serialize())
 	return nil
 }
 
@@ -653,9 +658,9 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 	}
 
 	// Collect all node IDs and lock them before updating.
-	nodeIDs := make([]uuid.UUID, 0, len(msg.Nodes))
-	for _, node := range msg.Nodes {
-		nodeID, err := uuid.Parse(node.Id)
+	nodeIDs := make([]uuid.UUID, 0, len(msg.GetNodes()))
+	for _, node := range msg.GetNodes() {
+		nodeID, err := uuid.Parse(node.GetId())
 		if err != nil {
 			return fmt.Errorf("invalid node id in gossip: %w", err)
 		}
@@ -669,39 +674,39 @@ func (h *GossipHandler) handleFinalizeTreeNodeGossipMessage(
 		return fmt.Errorf("failed to lock nodes for gossip update: %w", err)
 	}
 
-	for _, node := range msg.Nodes {
-		nodeID, _ := uuid.Parse(node.Id)
+	for _, node := range msg.GetNodes() {
+		nodeID, _ := uuid.Parse(node.GetId())
 
 		update := db.TreeNode.UpdateOneID(nodeID).
-			SetRawTx(node.RawTx)
+			SetRawTx(node.GetRawTx())
 
 		// A leaf node has refund txs; only leaf nodes get status set to AVAILABLE.
-		isLeaf := len(node.RawRefundTx) > 0
+		isLeaf := len(node.GetRawRefundTx()) > 0
 		if isLeaf {
-			update.SetRawRefundTx(node.RawRefundTx).
+			update.SetRawRefundTx(node.GetRawRefundTx()).
 				SetStatus(st.TreeNodeStatusAvailable)
 		} else {
 			update.ClearRawRefundTx()
 		}
-		if len(node.DirectTx) > 0 {
-			update.SetDirectTx(node.DirectTx)
+		if len(node.GetDirectTx()) > 0 {
+			update.SetDirectTx(node.GetDirectTx())
 		} else {
 			update.ClearDirectTx()
 		}
-		if len(node.DirectRefundTx) > 0 {
-			update.SetDirectRefundTx(node.DirectRefundTx)
+		if len(node.GetDirectRefundTx()) > 0 {
+			update.SetDirectRefundTx(node.GetDirectRefundTx())
 		} else {
 			update.ClearDirectRefundTx()
 		}
-		if len(node.DirectFromCpfpRefundTx) > 0 {
-			update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+		if len(node.GetDirectFromCpfpRefundTx()) > 0 {
+			update.SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
 		} else {
 			update.ClearDirectFromCpfpRefundTx()
 		}
 
 		_, err = update.Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update node %s from gossip: %w", node.Id, err)
+			return fmt.Errorf("failed to update node %s from gossip: %w", node.GetId(), err)
 		}
 	}
 

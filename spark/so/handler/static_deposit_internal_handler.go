@@ -87,25 +87,25 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if reqWithSignature == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	req := reqWithSignature.Request
+	req := reqWithSignature.GetRequest()
 	if req == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if req.OnChainUtxo == nil {
+	if req.GetOnChainUtxo() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}
-	if req.Transfer == nil {
+	if req.GetTransfer() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
-	if req.Transfer.TransferPackage == nil {
+	if req.GetTransfer().GetTransferPackage() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
-	if req.SpendTxSigningJob == nil {
+	if req.GetSpendTxSigningJob() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("spend_tx_signing_job is required"))
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Start CreateStaticDepositUtxoSwap request for on-chain utxo %x", req.OnChainUtxo.Txid)
+	logger.Sugar().Infof("Start CreateStaticDepositUtxoSwap request for on-chain utxo %x", req.GetOnChainUtxo().GetTxid())
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
@@ -120,14 +120,14 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	// cancel on this utxo swap.
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(reqWithSignature.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(reqWithSignature.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse coordinator public key: %w", err)
 	}
@@ -143,7 +143,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.GetSignature(), messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating a swap: %w", err)
 	}
 
@@ -155,15 +155,17 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
-	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	if req.ConfirmationThreshold != nil && *req.ConfirmationThreshold == 0 {
+	confirmationThreshold := req.ConfirmationThreshold
+	if confirmationThreshold != nil && *confirmationThreshold == 0 {
 		return nil, fmt.Errorf("confirmation_threshold must be at least 1")
 	}
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, new(resolveConfirmationThreshold(req.ConfirmationThreshold, config, schemaNetwork)))
+	threshold := resolveConfirmationThreshold(confirmationThreshold, config, schemaNetwork)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.GetOnChainUtxo(), &threshold)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +178,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if utxoSwap != nil {
 		logger.Sugar().Infof(
 			"Utxo swap %x:%d is already registered (request type %s)",
-			req.OnChainUtxo.Txid,
-			req.OnChainUtxo.Vout,
+			req.GetOnChainUtxo().GetTxid(),
+			req.GetOnChainUtxo().GetVout(),
 			utxoSwap.RequestType,
 		)
 		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
@@ -191,7 +193,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if !depositAddress.IsStatic {
 		return nil, fmt.Errorf("unable to claim a deposit to a non-static address: %w", err)
 	}
-	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transfer receiver public key: %w", err)
 	}
@@ -201,7 +203,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 
 	// Validate that the deposit key provided by the user matches what's in the DB.
 	// SSP should generate the deposit public key from a deposit secret key provided by the customer.
-	spendTXSigningPubKey, err := keys.ParsePublicKey(req.SpendTxSigningJob.SigningPublicKey)
+	spendTXSigningPubKey, err := keys.ParsePublicKey(req.GetSpendTxSigningJob().GetSigningPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse spend signing public key: %w", err)
 	}
@@ -210,15 +212,15 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	}
 
 	// Validate general transfer signatures and leaves
-	if err = validateTransfer(req.Transfer); err != nil {
+	if err = validateTransfer(req.GetTransfer()); err != nil {
 		return nil, fmt.Errorf("transfer validation failed: %w", err)
 	}
 
 	transferHandler := NewBaseTransferHandler(h.config)
 
-	quoteSigningBytes := req.SspSignature
+	quoteSigningBytes := req.GetSspSignature()
 
-	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
@@ -226,13 +228,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
-	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey, false); err != nil {
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIDPubKey, false); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 
 	leafRefundMap := make(map[string][]byte)
-	for _, leaf := range req.Transfer.TransferPackage.LeavesToSend {
-		leafRefundMap[leaf.LeafId] = leaf.RawTx
+	for _, leaf := range req.GetTransfer().GetTransferPackage().GetLeavesToSend() {
+		leafRefundMap[leaf.GetLeafId()] = leaf.GetRawTx()
 	}
 
 	// Validate user signature, receiver identitypubkey and amount in transfer
@@ -248,7 +250,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
 	}
 	totalAmount := getTotalTransferValue(leaves)
-	if err = validateUserSignature(reqTransferReceiverIdentityPubKey, req.UserSignature, req.SspSignature, pb.UtxoSwapRequestType_Fixed, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
+	if err = validateUserSignature(reqTransferReceiverIdentityPubKey, req.GetUserSignature(), req.GetSspSignature(), pb.UtxoSwapRequestType_Fixed, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.GetHashVariant()); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
@@ -282,7 +284,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetSspSignature(quoteSigningBytes).
 		SetSspIdentityPublicKey(reqTransferOwnerIDPubKey).
 		// authorization from a user to claim this utxo after fulfilling the quote
-		SetUserSignature(req.UserSignature).
+		SetUserSignature(req.GetUserSignature()).
 		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		SetRequestedTransferID(transferID).
@@ -311,23 +313,23 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	if reqWithSignature == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if reqWithSignature.Request == nil {
+	if reqWithSignature.GetRequest() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	req := reqWithSignature.Request
+	req := reqWithSignature.GetRequest()
 
-	if req.OnChainUtxo == nil {
+	if req.GetOnChainUtxo() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}
-	if req.Transfer == nil {
+	if req.GetTransfer() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
-	if req.Transfer.TransferPackage == nil {
+	if req.GetTransfer().GetTransferPackage() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Start CreateInstantStaticDepositUtxoSwap request for on-chain utxo %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Start CreateInstantStaticDepositUtxoSwap request for on-chain utxo %x:%d", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout())
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
@@ -337,38 +339,38 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("network %s not supported", network)
 	}
 
-	if req.ValueSats <= 0 || req.CreditAmountSats < 0 || req.SecondaryCreditAmountSats < 0 {
+	if req.GetValueSats() <= 0 || req.GetCreditAmountSats() < 0 || req.GetSecondaryCreditAmountSats() < 0 {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("amounts must be non-negative and value_sats must be positive"))
 	}
 
-	totalCreditAmount := req.CreditAmountSats
-	if req.SecondaryCreditAmountSats > 0 {
-		totalCreditAmount += req.SecondaryCreditAmountSats
+	totalCreditAmount := req.GetCreditAmountSats()
+	if req.GetSecondaryCreditAmountSats() > 0 {
+		totalCreditAmount += req.GetSecondaryCreditAmountSats()
 	}
 
-	if totalCreditAmount > reqWithSignature.Request.ValueSats {
+	if totalCreditAmount > reqWithSignature.GetRequest().GetValueSats() {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("total credit_amount_sats (%d) exceeds value_sats (%d)",
-			totalCreditAmount, reqWithSignature.Request.ValueSats))
+			totalCreditAmount, reqWithSignature.GetRequest().GetValueSats()))
 	}
 
-	if req.SecondaryCreditAmountSats == 0 && req.RequestedSecondaryTransferId != "" {
+	if req.GetSecondaryCreditAmountSats() == 0 && req.GetRequestedSecondaryTransferId() != "" {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("requested_secondary_transfer_id provided without secondary_credit_amount_sats"))
 	}
-	if req.SecondaryCreditAmountSats > 0 && req.RequestedSecondaryTransferId == "" {
+	if req.GetSecondaryCreditAmountSats() > 0 && req.GetRequestedSecondaryTransferId() == "" {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("secondary_credit_amount_sats provided without requested_secondary_transfer_id"))
 	}
 
 	// Verify CoordinatorPublicKey is correct.
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(reqWithSignature.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(reqWithSignature.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse coordinator public key: %w", err)
 	}
@@ -384,7 +386,7 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.GetSignature(), messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating instant swap: %w", err)
 	}
 
@@ -393,12 +395,12 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.GetTransfer().GetTransferId(), err)
 	}
 
-	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 	transferHandler := NewBaseTransferHandler(h.config)
-	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey, false); err != nil {
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIDPubKey, false); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 
@@ -407,13 +409,13 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
 
-	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transfer receiver public key: %w", err)
 	}
 
 	// Check that the deposit address is static and belongs to the receiver of the transfer
-	reqDepositAddress := req.DestinationAddress
+	reqDepositAddress := req.GetDestinationAddress()
 	depositAddress, err := db.DepositAddress.Query().
 		Where(
 			depositaddress.Address(reqDepositAddress),
@@ -429,13 +431,13 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	}
 
 	// Validate general transfer signatures and leaves
-	if err = validateTransfer(req.Transfer); err != nil {
+	if err = validateTransfer(req.GetTransfer()); err != nil {
 		return nil, fmt.Errorf("transfer validation failed: %w", err)
 	}
 
 	leafRefundMap := make(map[string][]byte)
-	for _, leaf := range req.Transfer.TransferPackage.LeavesToSend {
-		leafRefundMap[leaf.LeafId] = leaf.RawTx
+	for _, leaf := range req.GetTransfer().GetTransferPackage().GetLeavesToSend() {
+		leafRefundMap[leaf.GetLeafId()] = leaf.GetRawTx()
 	}
 
 	// Load leaves and compute total transfer value
@@ -447,36 +449,36 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("no leaves found")
 	}
 	totalAmount := getTotalTransferValue(leaves)
-	if totalAmount != uint64(req.CreditAmountSats) {
-		return nil, fmt.Errorf("instant static deposit total leaf amount %d does not match credit_amount_sats %d", totalAmount, req.CreditAmountSats)
+	if totalAmount != uint64(req.GetCreditAmountSats()) {
+		return nil, fmt.Errorf("instant static deposit total leaf amount %d does not match credit_amount_sats %d", totalAmount, req.GetCreditAmountSats())
 	}
 
 	// Validate user signature
 	if err = validateInstantUserSignature(
 		reqTransferReceiverIdentityPubKey,
-		req.UserSignature,
-		req.SspSignature,
+		req.GetUserSignature(),
+		req.GetSspSignature(),
 		network,
 		totalAmount,
-		uint64(req.SecondaryCreditAmountSats),
-		req.DestinationAddress,
-		uint64(req.ValueSats),
+		uint64(req.GetSecondaryCreditAmountSats()),
+		req.GetDestinationAddress(),
+		uint64(req.GetValueSats()),
 	); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
 	// A sanity check to ensure that the total amount is not greater than the utxo value.
-	if totalAmount > uint64(req.ValueSats) {
-		return nil, fmt.Errorf("instant static deposit claim total amount %d is greater than sats value %d", totalAmount, req.ValueSats)
+	if totalAmount > uint64(req.GetValueSats()) {
+		return nil, fmt.Errorf("instant static deposit claim total amount %d is greater than sats value %d", totalAmount, req.GetValueSats())
 	}
 
 	logger.Sugar().Infof(
 		"Creating instant UTXO swap record (transfer id %s, txid %x, vout %d, credit amount %d, secondary credit amount %d, deposit address %s)",
 		transferID,
-		req.OnChainUtxo.Txid,
-		req.OnChainUtxo.Vout,
-		req.CreditAmountSats,
-		req.SecondaryCreditAmountSats,
+		req.GetOnChainUtxo().GetTxid(),
+		req.GetOnChainUtxo().GetVout(),
+		req.GetCreditAmountSats(),
+		req.GetSecondaryCreditAmountSats(),
 		depositAddress.Address,
 	)
 
@@ -484,21 +486,21 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	utxoSwapCreate := db.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetRequestType(st.UtxoSwapRequestTypeInstant).
-		SetUtxoValueSats(uint64(req.ValueSats)).
-		SetCreditAmountSats(uint64(req.CreditAmountSats)).
-		SetSspSignature(req.SspSignature).
+		SetUtxoValueSats(uint64(req.GetValueSats())).
+		SetCreditAmountSats(uint64(req.GetCreditAmountSats())).
+		SetSspSignature(req.GetSspSignature()).
 		SetSspIdentityPublicKey(reqTransferOwnerIDPubKey).
-		SetUserSignature(req.UserSignature).
+		SetUserSignature(req.GetUserSignature()).
 		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		SetRequestedTransferID(transferID)
 
-	if req.SecondaryCreditAmountSats > 0 {
-		utxoSwapCreate = utxoSwapCreate.SetSecondaryCreditAmountSats(uint64(req.SecondaryCreditAmountSats))
+	if req.GetSecondaryCreditAmountSats() > 0 {
+		utxoSwapCreate = utxoSwapCreate.SetSecondaryCreditAmountSats(uint64(req.GetSecondaryCreditAmountSats()))
 	}
 
-	if req.RequestedSecondaryTransferId != "" {
-		secondaryTransferID, err := uuid.Parse(req.RequestedSecondaryTransferId)
+	if req.GetRequestedSecondaryTransferId() != "" {
+		secondaryTransferID, err := uuid.Parse(req.GetRequestedSecondaryTransferId())
 		if err != nil {
 			return nil, fmt.Errorf("invalid requested_secondary_transfer_id: %w", err)
 		}
@@ -513,7 +515,7 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("unable to store instant utxo swap: %w", err)
 	}
 
-	logger.Sugar().Infof("Created instant utxo swap %s for %x:%d", utxoSwap.ID, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Created instant utxo swap %s for %x:%d", utxoSwap.ID, req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout())
 
 	// Add the utxo swap to the deposit address
 	if err = addUtxoSwapToDepositAddress(ctx, db, depositAddress.ID, utxoSwap); err != nil {
@@ -534,10 +536,10 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 	if req == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if req.OnChainUtxo == nil {
+	if req.GetOnChainUtxo() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}
-	transferID, err := uuid.Parse(req.TransferId)
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return nil, fmt.Errorf("invalid transfer_id: %w", err)
 	}
@@ -549,14 +551,14 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse coordinator public key: %w", err)
 	}
@@ -572,7 +574,7 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.GetSignature(), messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for saving utxo: %w", err)
 	}
 
@@ -581,7 +583,7 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
 
-	targetUtxo, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, db, network, req.OnChainUtxo, 1)
+	targetUtxo, err := VerifiedTargetUtxoFromRequestWithThreshold(ctx, db, network, req.GetOnChainUtxo(), 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify on-chain utxo: %w", err)
 	}
@@ -634,19 +636,19 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	if reqWithSignature == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	req := reqWithSignature.Request
+	req := reqWithSignature.GetRequest()
 	if req == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if req.OnChainUtxo == nil {
+	if req.GetOnChainUtxo() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}
-	if req.RefundTxSigningJob == nil {
+	if req.GetRefundTxSigningJob() == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund_tx_signing_job is required"))
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Start CreateStaticDepositUtxoRefund request for on-chain utxo %x", req.OnChainUtxo.Txid)
+	logger.Sugar().Infof("Start CreateStaticDepositUtxoRefund request for on-chain utxo %x", req.GetOnChainUtxo().GetTxid())
 
 	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
@@ -659,14 +661,14 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	// Verify CoordinatorPublicKey is correct.
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCreated,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create create utxo swap request statement: %w", err)
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(reqWithSignature.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(reqWithSignature.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse coordinator public key: %w", err)
 	}
@@ -681,7 +683,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.GetSignature(), messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating a swap: %w", err)
 	}
 
@@ -692,12 +694,12 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
 	}
-	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
 		return nil, err
 	}
 	// Validate the on-chain UTXO
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, nil)
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.GetOnChainUtxo(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -711,13 +713,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to claim a deposit to a non-static address: %w", err)
 	}
 
-	spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.RefundTxSigningJob.RawTx)
+	spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.GetRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
 	}
 
 	// Validate the provided refund tx
-	if err := validateStaticDepositRefundTx(targetUtxo, req.RefundTxSigningJob.GetRawTx()); err != nil {
+	if err := validateStaticDepositRefundTx(targetUtxo, req.GetRefundTxSigningJob().GetRawTx()); err != nil {
 		return nil, err
 	}
 
@@ -727,11 +729,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
 	if utxoSwap != nil {
-		logger.Sugar().Infof("Utxo swap is already registered for %x:%d (request type %s)", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, utxoSwap.Status)
+		logger.Sugar().Infof("Utxo swap is already registered for %x:%d (request type %s)", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), utxoSwap.Status)
 		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
-	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.HashVariant); err != nil {
+	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.GetUserSignature(), spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, network, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.GetHashVariant()); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
@@ -863,16 +865,16 @@ func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context,
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	transferID, err := uuid.Parse(req.TransferId)
+	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
 
-	messageHash, err := CreateLinkUtxoSwapTransferStatement(req.TransferId)
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(req.GetTransferId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create link transfer statement: %w", err)
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
 	}
@@ -888,7 +890,7 @@ func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context,
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.GetSignature(), messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
@@ -903,7 +905,7 @@ func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context,
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find utxo swap for transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("unable to find utxo swap for transfer %s: %w", req.GetTransferId(), err)
 	}
 
 	transfer, needUpdate, err := GetTransferFromUtxoSwap(ctx, utxoSwapRecord)
@@ -916,6 +918,6 @@ func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context,
 		}
 	}
 
-	logger.Sugar().Infof("Linked transfer %s to utxo swap %s", req.TransferId, utxoSwapRecord.ID)
+	logger.Sugar().Infof("Linked transfer %s to utxo swap %s", req.GetTransferId(), utxoSwapRecord.ID)
 	return &pbinternal.LinkUtxoSwapTransferResponse{}, nil
 }

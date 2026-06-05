@@ -17,25 +17,25 @@ func ValidateAndComputeMultisigIdentifier(config *pb.MultisigConfig) ([]byte, er
 	if config == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("config cannot be nil"))
 	}
-	if len(config.PublicKeys) < 2 {
+	if len(config.GetPublicKeys()) < 2 {
 		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("config must have at least two public keys"))
 	}
-	if config.Threshold == 0 {
+	if config.GetThreshold() == 0 {
 		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("threshold must be at least 1"))
 	}
-	if config.Threshold > uint32(len(config.PublicKeys)) {
-		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("threshold (%d) cannot exceed number of keys (%d)", config.Threshold, len(config.PublicKeys)))
+	if config.GetThreshold() > uint32(len(config.GetPublicKeys())) {
+		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("threshold (%d) cannot exceed number of keys (%d)", config.GetThreshold(), len(config.GetPublicKeys())))
 	}
-	if config.Version != 0 {
-		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported version: %d (only version 0 is supported)", config.Version))
+	if config.GetVersion() != 0 {
+		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported version: %d (only version 0 is supported)", config.GetVersion()))
 	}
 
-	for i, pk := range config.PublicKeys {
+	for i, pk := range config.GetPublicKeys() {
 		if len(pk) != 33 {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("public key must be 33 bytes, got %d", len(pk)))
 		}
 		if i > 0 {
-			cmp := bytes.Compare(config.PublicKeys[i-1], pk)
+			cmp := bytes.Compare(config.GetPublicKeys()[i-1], pk)
 			if cmp == 0 {
 				return nil, sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate public key"))
 			}
@@ -54,12 +54,12 @@ func NormalizeMultisigConfig(config *pb.MultisigConfig) *pb.MultisigConfig {
 	if config == nil {
 		return nil
 	}
-	sorted := make([][]byte, len(config.PublicKeys))
-	copy(sorted, config.PublicKeys)
+	sorted := make([][]byte, len(config.GetPublicKeys()))
+	copy(sorted, config.GetPublicKeys())
 	sortKeys(sorted)
 	return &pb.MultisigConfig{
-		Version:    config.Version,
-		Threshold:  config.Threshold,
+		Version:    config.GetVersion(),
+		Threshold:  config.GetThreshold(),
 		PublicKeys: sorted,
 	}
 }

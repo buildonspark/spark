@@ -253,10 +253,10 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 
 	rng := rand.NewChaCha8([32]byte{})
 	var invoiceAttachments []*tokenpb.InvoiceAttachment
-	for _, output := range transferTransaction.TokenOutputs {
+	for _, output := range transferTransaction.GetTokenOutputs() {
 		receiverPublicKey, _ := keys.ParsePublicKey(output.GetOwnerPublicKey())
-		newTokenIdentifier := make([]byte, len(output.TokenIdentifier))
-		copy(newTokenIdentifier, output.TokenIdentifier)
+		newTokenIdentifier := make([]byte, len(output.GetTokenIdentifier()))
+		copy(newTokenIdentifier, output.GetTokenIdentifier())
 		version := uint32(1)
 		senderPublicKey := config.IdentityPrivateKey.Public()
 		network := config.Network
@@ -265,7 +265,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		var amount *uint64
 		if !emptyInvoiceAmount {
 			amount = new(uint64)
-			amountToEncode := binary.BigEndian.Uint64(output.TokenAmount[8:])
+			amountToEncode := binary.BigEndian.Uint64(output.GetTokenAmount()[8:])
 			if invoiceAmountGreaterThanCreatedOutputs {
 				amountToEncode += 2
 			} else if invoiceAmountLessThanCreatedOutputs {
@@ -481,10 +481,10 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		queryTokenTransactionParams,
 	)
 	require.NoError(t, err, "failed to query token transactions")
-	require.Len(t, tokenTransactionResponse.TokenTransactionsWithStatus, 1, "expected 1 token transaction")
+	require.Len(t, tokenTransactionResponse.GetTokenTransactionsWithStatus(), 1, "expected 1 token transaction")
 	// match the length of the outputs since we create one spark invoice per output in batch testing
-	expectedLen := len(transferTransaction.TokenOutputs)
-	require.Len(t, tokenTransactionResponse.TokenTransactionsWithStatus[0].TokenTransaction.GetInvoiceAttachments(), expectedLen, "expected same number of outputs")
+	expectedLen := len(transferTransaction.GetTokenOutputs())
+	require.Len(t, tokenTransactionResponse.GetTokenTransactionsWithStatus()[0].GetTokenTransaction().GetInvoiceAttachments(), expectedLen, "expected same number of outputs")
 
 	invoicesToQuery := make([]string, 0, len(invoiceAttachments))
 	for _, invoiceAttachment := range invoiceAttachments {
@@ -496,15 +496,15 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		invoicesToQuery,
 	)
 	require.NoError(t, err, "failed to query spark invoices")
-	require.Len(t, invoiceResponse.InvoiceStatuses, len(invoicesToQuery))
-	for i, invoiceResponse := range invoiceResponse.InvoiceStatuses {
-		assert.Equal(t, invoiceResponse.Invoice, invoicesToQuery[i])
-		assert.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.Status)
+	require.Len(t, invoiceResponse.GetInvoiceStatuses(), len(invoicesToQuery))
+	for i, invoiceResponse := range invoiceResponse.GetInvoiceStatuses() {
+		assert.Equal(t, invoiceResponse.GetInvoice(), invoicesToQuery[i])
+		assert.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.GetStatus())
 		assert.EqualExportedValues(t, &sparkpb.InvoiceResponse_TokenTransfer{
 			TokenTransfer: &sparkpb.TokenTransfer{
 				FinalTokenTransactionHash: finalTxHash,
 			},
-		}, invoiceResponse.TransferType)
+		}, invoiceResponse.GetTransferType())
 	}
 }
 

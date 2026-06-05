@@ -33,19 +33,19 @@ func validateQueryTokenMetadataRequest(req *tokenpb.QueryTokenMetadataRequest) e
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
-	if len(req.TokenIdentifiers) == 0 && len(req.IssuerPublicKeys) == 0 {
+	if len(req.GetTokenIdentifiers()) == 0 && len(req.GetIssuerPublicKeys()) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("must provide at least one token identifier or issuer public key"))
 	}
 
-	if len(req.TokenIdentifiers) > MaxTokenMetadataFilterValues {
+	if len(req.GetTokenIdentifiers()) > MaxTokenMetadataFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), MaxTokenMetadataFilterValues),
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.GetTokenIdentifiers()), MaxTokenMetadataFilterValues),
 		)
 	}
 
-	if len(req.IssuerPublicKeys) > MaxTokenMetadataFilterValues {
+	if len(req.GetIssuerPublicKeys()) > MaxTokenMetadataFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), MaxTokenMetadataFilterValues),
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.GetIssuerPublicKeys()), MaxTokenMetadataFilterValues),
 		)
 	}
 
@@ -78,11 +78,11 @@ func (h *QueryTokenMetadataHandler) QueryTokenMetadata(ctx context.Context, req 
 	}
 
 	var conditions []predicate.TokenCreate
-	if len(req.TokenIdentifiers) > 0 {
-		conditions = append(conditions, tokencreate.TokenIdentifierIn(req.TokenIdentifiers...))
+	if len(req.GetTokenIdentifiers()) > 0 {
+		conditions = append(conditions, tokencreate.TokenIdentifierIn(req.GetTokenIdentifiers()...))
 	}
 
-	issuerPubKeys, err := keys.ParsePublicKeys(req.IssuerPublicKeys)
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
 	}

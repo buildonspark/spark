@@ -226,69 +226,69 @@ func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRe
 	}
 
 	if req.GetByTxHash() != nil {
-		if len(req.GetByTxHash().TokenTransactionHashes) > maxTokenTransactionHashValues {
+		if len(req.GetByTxHash().GetTokenTransactionHashes()) > maxTokenTransactionHashValues {
 			return sparkerrors.InvalidArgumentOutOfRange(
-				fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.GetByTxHash().TokenTransactionHashes), maxTokenTransactionHashValues),
+				fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.GetByTxHash().GetTokenTransactionHashes()), maxTokenTransactionHashValues),
 			)
 		}
 		return nil
 	}
 
 	if req.GetByFilters() != nil {
-		if len(req.GetByFilters().OutputIds) > maxTokenTransactionFilterValues {
+		if len(req.GetByFilters().GetOutputIds()) > maxTokenTransactionFilterValues {
 			return sparkerrors.InvalidArgumentOutOfRange(
-				fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.GetByFilters().OutputIds), maxTokenTransactionFilterValues),
+				fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.GetByFilters().GetOutputIds()), maxTokenTransactionFilterValues),
 			)
 		}
 
-		if len(req.GetByFilters().OwnerPublicKeys) > maxTokenTransactionFilterValues {
+		if len(req.GetByFilters().GetOwnerPublicKeys()) > maxTokenTransactionFilterValues {
 			return sparkerrors.InvalidArgumentOutOfRange(
-				fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.GetByFilters().OwnerPublicKeys), maxTokenTransactionFilterValues),
+				fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.GetByFilters().GetOwnerPublicKeys()), maxTokenTransactionFilterValues),
 			)
 		}
 
-		if len(req.GetByFilters().IssuerPublicKeys) > maxTokenTransactionFilterValues {
+		if len(req.GetByFilters().GetIssuerPublicKeys()) > maxTokenTransactionFilterValues {
 			return sparkerrors.InvalidArgumentOutOfRange(
-				fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.GetByFilters().IssuerPublicKeys), maxTokenTransactionFilterValues),
+				fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.GetByFilters().GetIssuerPublicKeys()), maxTokenTransactionFilterValues),
 			)
 		}
 
-		if len(req.GetByFilters().TokenIdentifiers) > maxTokenTransactionFilterValues {
+		if len(req.GetByFilters().GetTokenIdentifiers()) > maxTokenTransactionFilterValues {
 			return sparkerrors.InvalidArgumentOutOfRange(
-				fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.GetByFilters().TokenIdentifiers), maxTokenTransactionFilterValues),
+				fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.GetByFilters().GetTokenIdentifiers()), maxTokenTransactionFilterValues),
 			)
 		}
 
 		return nil
 	}
 
-	if len(req.OutputIds) > maxTokenTransactionFilterValues {
+	if len(req.GetOutputIds()) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.OutputIds), maxTokenTransactionFilterValues),
+			fmt.Errorf("too many output ids in filter: got %d, max %d", len(req.GetOutputIds()), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.OwnerPublicKeys) > maxTokenTransactionFilterValues {
+	if len(req.GetOwnerPublicKeys()) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), maxTokenTransactionFilterValues),
+			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.GetOwnerPublicKeys()), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.IssuerPublicKeys) > maxTokenTransactionFilterValues {
+	if len(req.GetIssuerPublicKeys()) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), maxTokenTransactionFilterValues),
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.GetIssuerPublicKeys()), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.TokenIdentifiers) > maxTokenTransactionFilterValues {
+	if len(req.GetTokenIdentifiers()) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), maxTokenTransactionFilterValues),
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.GetTokenIdentifiers()), maxTokenTransactionFilterValues),
 		)
 	}
 
-	if len(req.TokenTransactionHashes) > maxTokenTransactionFilterValues {
+	if len(req.GetTokenTransactionHashes()) > maxTokenTransactionFilterValues {
 		return sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.TokenTransactionHashes), maxTokenTransactionFilterValues),
+			fmt.Errorf("too many token transaction hashes in filter: got %d, max %d", len(req.GetTokenTransactionHashes()), maxTokenTransactionFilterValues),
 		)
 	}
 

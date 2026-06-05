@@ -136,7 +136,7 @@ func TestTokenTransferPreemption(t *testing.T) {
 				require.NotNil(t, nonCoordinatorOperator, "expected a non-coordinator operator")
 				_, err := wallet.SignTokenTransactionFromCoordination(t.Context(), config2, wallet.SignTokenTransactionFromCoordinationParams{
 					Operator:         nonCoordinatorOperator,
-					TokenTransaction: resp1.FinalTokenTransaction,
+					TokenTransaction: resp1.GetFinalTokenTransaction(),
 					FinalTxHash:      resp1Hash,
 					OwnerPrivateKeys: []keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 				})

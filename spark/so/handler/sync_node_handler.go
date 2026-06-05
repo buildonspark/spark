@@ -32,13 +32,13 @@ func NewSyncNodeHandler(soConfig *so.Config) SyncNodeHandler {
 }
 
 func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeRequest) error {
-	if len(req.NodeIds) == 0 || len(req.NodeIds) > 100 {
-		return fmt.Errorf("invalid node ids: %v", req.NodeIds)
+	if len(req.GetNodeIds()) == 0 || len(req.GetNodeIds()) > 100 {
+		return fmt.Errorf("invalid node ids: %v", req.GetNodeIds())
 	}
 
-	operator, ok := h.config.SigningOperatorMap[req.OperatorId]
+	operator, ok := h.config.SigningOperatorMap[req.GetOperatorId()]
 	if !ok {
-		return fmt.Errorf("operator %s not found", req.OperatorId)
+		return fmt.Errorf("operator %s not found", req.GetOperatorId())
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -68,7 +68,7 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 	resp, err := client.QueryNodes(ctx, &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_NodeIds{
 			NodeIds: &pb.TreeNodeIds{
-				NodeIds: req.NodeIds,
+				NodeIds: req.GetNodeIds(),
 			},
 		},
 		IncludeParents: false,
@@ -77,13 +77,13 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		return fmt.Errorf("failed to query nodes: %w", err)
 	}
 
-	if len(resp.Nodes) != len(req.NodeIds) {
-		return fmt.Errorf("expected %d nodes, got %d", len(req.NodeIds), len(resp.Nodes))
+	if len(resp.GetNodes()) != len(req.GetNodeIds()) {
+		return fmt.Errorf("expected %d nodes, got %d", len(req.GetNodeIds()), len(resp.GetNodes()))
 	}
 
 	goodNodeIDMap := make(map[string]*pb.TreeNode)
-	for _, node := range resp.Nodes {
-		goodNodeIDMap[node.Id] = node
+	for _, node := range resp.GetNodes() {
+		goodNodeIDMap[node.GetId()] = node
 	}
 
 	// Create a map of existing node UUIDs for quick lookup
@@ -103,8 +103,8 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		_, exists := existingNodeMap[nodeUUID]
 		if !exists {
 			// Validate status before creating
-			if node.Status != "SPLITTED" && node.Status != "SPLIT_LOCKED" {
-				return fmt.Errorf("cannot create node %s with status %s: only SPLITTED or SPLIT_LOCKED nodes can be created during sync", node.Id, node.Status)
+			if node.GetStatus() != "SPLITTED" && node.GetStatus() != "SPLIT_LOCKED" {
+				return fmt.Errorf("cannot create node %s with status %s: only SPLITTED or SPLIT_LOCKED nodes can be created during sync", node.GetId(), node.GetStatus())
 			}
 
 			// Node doesn't exist locally - create it
@@ -137,32 +137,32 @@ func (h *SyncNodeHandler) updateExistingNode(ctx context.Context, existingNode *
 	mut := existingNode.Update()
 
 	// Check and update RawTx if changed
-	if string(existingNode.RawTx) != string(node.NodeTx) {
-		mut.SetRawTx(node.NodeTx)
+	if string(existingNode.RawTx) != string(node.GetNodeTx()) {
+		mut.SetRawTx(node.GetNodeTx())
 		logger.Info("updated field RawTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update RawRefundTx if changed
-	if string(existingNode.RawRefundTx) != string(node.RefundTx) {
-		mut.SetRawRefundTx(node.RefundTx)
+	if string(existingNode.RawRefundTx) != string(node.GetRefundTx()) {
+		mut.SetRawRefundTx(node.GetRefundTx())
 		logger.Info("updated field RawRefundTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update DirectTx if changed
-	if string(existingNode.DirectTx) != string(node.DirectTx) {
-		mut.SetDirectTx(node.DirectTx)
+	if string(existingNode.DirectTx) != string(node.GetDirectTx()) {
+		mut.SetDirectTx(node.GetDirectTx())
 		logger.Info("updated field DirectTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update DirectRefundTx if changed
-	if string(existingNode.DirectRefundTx) != string(node.DirectRefundTx) {
-		mut.SetDirectRefundTx(node.DirectRefundTx)
+	if string(existingNode.DirectRefundTx) != string(node.GetDirectRefundTx()) {
+		mut.SetDirectRefundTx(node.GetDirectRefundTx())
 		logger.Info("updated field DirectRefundTx", zap.Stringer("node_id", nodeUUID))
 	}
 
 	// Check and update DirectFromCpfpRefundTx if changed
-	if string(existingNode.DirectFromCpfpRefundTx) != string(node.DirectFromCpfpRefundTx) {
-		mut.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+	if string(existingNode.DirectFromCpfpRefundTx) != string(node.GetDirectFromCpfpRefundTx()) {
+		mut.SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
 		logger.Info("updated field DirectFromCpfpRefundTx", zap.Stringer("node_id", nodeUUID))
 	}
 
@@ -201,49 +201,49 @@ func (h *SyncNodeHandler) updateExistingNode(ctx context.Context, existingNode *
 
 func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Client, node *pb.TreeNode, nodeUUID uuid.UUID) error {
 	// Get the Tree entity
-	treeUUID, err := uuid.Parse(node.TreeId)
+	treeUUID, err := uuid.Parse(node.GetTreeId())
 	if err != nil {
-		return fmt.Errorf("unable to parse tree id %s: %w", node.TreeId, err)
+		return fmt.Errorf("unable to parse tree id %s: %w", node.GetTreeId(), err)
 	}
 	tree, err := db.Tree.Get(ctx, treeUUID)
 	if err != nil {
-		return fmt.Errorf("unable to get tree %s for node %s: %w", node.TreeId, node.Id, err)
+		return fmt.Errorf("unable to get tree %s for node %s: %w", node.GetTreeId(), node.GetId(), err)
 	}
 
 	// Get the SigningKeyshare entity - assume it's included in the response
-	if node.SigningKeyshare == nil {
-		return fmt.Errorf("signing keyshare not included for node %s", node.Id)
+	if node.GetSigningKeyshare() == nil {
+		return fmt.Errorf("signing keyshare not included for node %s", node.GetId())
 	}
 
 	// Query for existing keyshare by public key
-	keysharePublicKey, err := keys.ParsePublicKey(node.SigningKeyshare.PublicKey)
+	keysharePublicKey, err := keys.ParsePublicKey(node.GetSigningKeyshare().GetPublicKey())
 	if err != nil {
-		return fmt.Errorf("unable to parse keyshare public key for node %s: %w", node.Id, err)
+		return fmt.Errorf("unable to parse keyshare public key for node %s: %w", node.GetId(), err)
 	}
 
 	signingKeyshareEnt, err := db.SigningKeyshare.Query().
 		Where(signingkeyshare.PublicKeyEQ(keysharePublicKey)).
 		Only(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to find signing keyshare for node %s: %w", node.Id, err)
+		return fmt.Errorf("unable to find signing keyshare for node %s: %w", node.GetId(), err)
 	}
 
 	// Parse public keys
-	verifyingPubkey, err := keys.ParsePublicKey(node.VerifyingPublicKey)
+	verifyingPubkey, err := keys.ParsePublicKey(node.GetVerifyingPublicKey())
 	if err != nil {
-		return fmt.Errorf("unable to parse verifying public key for node %s: %w", node.Id, err)
+		return fmt.Errorf("unable to parse verifying public key for node %s: %w", node.GetId(), err)
 	}
-	ownerIdentityPubkey, err := keys.ParsePublicKey(node.OwnerIdentityPublicKey)
+	ownerIdentityPubkey, err := keys.ParsePublicKey(node.GetOwnerIdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("unable to parse owner identity public key for node %s: %w", node.Id, err)
+		return fmt.Errorf("unable to parse owner identity public key for node %s: %w", node.GetId(), err)
 	}
-	ownerSigningPubkey, err := keys.ParsePublicKey(node.OwnerSigningPublicKey)
+	ownerSigningPubkey, err := keys.ParsePublicKey(node.GetOwnerSigningPublicKey())
 	if err != nil {
-		return fmt.Errorf("unable to parse owner signing public key for node %s: %w", node.Id, err)
+		return fmt.Errorf("unable to parse owner signing public key for node %s: %w", node.GetId(), err)
 	}
 
 	// Convert status
-	status := st.TreeNodeStatus(node.Status)
+	status := st.TreeNodeStatus(node.GetStatus())
 
 	// Create the node
 	createBuilder := db.TreeNode.Create().
@@ -251,16 +251,16 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 		SetTree(tree).
 		SetNetwork(tree.Network).
 		SetStatus(status).
-		SetValue(node.Value).
+		SetValue(node.GetValue()).
 		SetVerifyingPubkey(verifyingPubkey).
 		SetOwnerIdentityPubkey(ownerIdentityPubkey).
 		SetOwnerSigningPubkey(ownerSigningPubkey).
 		SetSigningKeyshare(signingKeyshareEnt).
-		SetRawTx(node.NodeTx).
-		SetVout(int16(node.Vout))
+		SetRawTx(node.GetNodeTx()).
+		SetVout(int16(node.GetVout()))
 
 	if node.DirectTx != nil {
-		createBuilder.SetDirectTx(node.DirectTx)
+		createBuilder.SetDirectTx(node.GetDirectTx())
 	}
 
 	// Set parent if exists, with FK validation
@@ -294,7 +294,7 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 	case errs.Is(err, stdsql.ErrNoRows):
 		logger.Debug("skipped creating node that was concurrently created", zap.Stringer("nodeId", nodeUUID))
 	default:
-		return fmt.Errorf("unable to create node %s: %w", node.Id, err)
+		return fmt.Errorf("unable to create node %s: %w", node.GetId(), err)
 	}
 
 	return nil

@@ -75,8 +75,8 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	if err != nil {
 		return fmt.Errorf("failed to query transfer leaves for transfer id: %s. with status: %s and error: %w", transferID, transfer.Status, err)
 	}
-	if len(transferNodes) != len(req.Nodes) {
-		return fmt.Errorf("transfer nodes count mismatch. transfer id: %s. with status: %s. transfer nodes count: %d. request nodes count: %d", transferID, transfer.Status, len(transferNodes), len(req.Nodes))
+	if len(transferNodes) != len(req.GetNodes()) {
+		return fmt.Errorf("transfer nodes count mismatch. transfer id: %s. with status: %s. transfer nodes count: %d. request nodes count: %d", transferID, transfer.Status, len(transferNodes), len(req.GetNodes()))
 	}
 	transferNodeIDs := make(map[uuid.UUID]struct{})
 	for _, node := range transferNodes {
@@ -84,11 +84,11 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	}
 
 	transferAlreadyCompleted := transfer.Status == st.TransferStatusCompleted
-	requestNodesByID := make(map[uuid.UUID]*pbinternal.TreeNode, len(req.Nodes))
-	for _, node := range req.Nodes {
-		nodeID, err := uuid.Parse(node.Id)
+	requestNodesByID := make(map[uuid.UUID]*pbinternal.TreeNode, len(req.GetNodes()))
+	for _, node := range req.GetNodes() {
+		nodeID, err := uuid.Parse(node.GetId())
 		if err != nil {
-			return fmt.Errorf("failed to parse node uuid. transfer id: %s. with status: %s. node id: %s", transferID, transfer.Status, node.Id)
+			return fmt.Errorf("failed to parse node uuid. transfer id: %s. with status: %s. node id: %s", transferID, transfer.Status, node.GetId())
 		}
 		if _, ok := transferNodeIDs[nodeID]; !ok {
 			return fmt.Errorf("node not found in transfer. transfer id: %s. with status: %s. node id: %s", transferID, transfer.Status, nodeID)
@@ -114,7 +114,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			// DirectRefundTx, DirectFromCpfpRefundTx) are re-signed on each
 			// transfer and use compareAndVerifyTxs to accept different-but-valid
 			// FROST signatures from separate signing sessions.
-			rawTxMatch, err := compareTxs(dbNode.RawTx, node.RawTx)
+			rawTxMatch, err := compareTxs(dbNode.RawTx, node.GetRawTx())
 			if err != nil {
 				return fmt.Errorf("failed to compare raw txs: %w", err)
 			}
@@ -139,15 +139,15 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 				directNodeTxOut = directNodeTx.TxOut[0]
 			}
 
-			rawRefundTxMatch, err := compareAndVerifyTxs(dbNode.RawRefundTx, node.RawRefundTx, nodeRawTx.TxOut[0])
+			rawRefundTxMatch, err := compareAndVerifyTxs(dbNode.RawRefundTx, node.GetRawRefundTx(), nodeRawTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare raw refund txs for node %s: %w", nodeID, err)
 			}
-			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.DirectRefundTx, directNodeTxOut)
+			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.GetDirectRefundTx(), directNodeTxOut)
 			if err != nil {
 				return fmt.Errorf("failed to compare direct refund txs: %w", err)
 			}
-			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx, nodeRawTx.TxOut[0])
+			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.GetDirectFromCpfpRefundTx(), nodeRawTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare direct from cpfp refund txs: %w", err)
 			}
@@ -159,15 +159,15 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			// Synchronize any non-nil tx fields.
 			update := dbNode.Update()
 
-			update.SetRawTx(node.RawTx) // RawTx is required field, can't be nil
+			update.SetRawTx(node.GetRawTx()) // RawTx is required field, can't be nil
 			if node.RawRefundTx != nil {
-				update.SetRawRefundTx(node.RawRefundTx)
+				update.SetRawRefundTx(node.GetRawRefundTx())
 			}
 
 			// The old direct transactions don't apply to the new owner,
 			// so overwrite them even if new direct transactions aren't provided.
-			update.SetDirectRefundTx(node.DirectRefundTx)
-			update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+			update.SetDirectRefundTx(node.GetDirectRefundTx())
+			update.SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
 			update.SetStatus(st.TreeNodeStatusAvailable)
 
 			if _, err = update.Save(ctx); err != nil {
@@ -175,10 +175,10 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			}
 		} else {
 			_, err = dbNode.Update().
-				SetRawTx(node.RawTx).
-				SetRawRefundTx(node.RawRefundTx).
-				SetDirectRefundTx(node.DirectRefundTx).
-				SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx).
+				SetRawTx(node.GetRawTx()).
+				SetRawRefundTx(node.GetRawRefundTx()).
+				SetDirectRefundTx(node.GetDirectRefundTx()).
+				SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx()).
 				SetStatus(st.TreeNodeStatusAvailable).
 				Save(ctx)
 			if err != nil {
@@ -188,13 +188,13 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	}
 
 	if !transferAlreadyCompleted {
-		_, err = transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(req.Timestamp.AsTime()).Save(ctx)
+		_, err = transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(req.GetTimestamp().AsTime()).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update transfer status to completed for transfer id: %s. with status: %s and error: %w", transferID, transfer.Status, err)
 		}
 	}
 
-	if err := syncReceiversToTerminalStatus(ctx, transfer.ID, st.TransferStatusCompleted, req.Timestamp.AsTime()); err != nil {
+	if err := syncReceiversToTerminalStatus(ctx, transfer.ID, st.TransferStatusCompleted, req.GetTimestamp().AsTime()); err != nil {
 		return fmt.Errorf("failed to sync receiver statuses for transfer %s: %w", transferID, err)
 	}
 
@@ -256,7 +256,7 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 			if pendingCount == 0 {
 				_, err = transfer.Update().
 					SetStatus(st.TransferStatusCompleted).
-					SetCompletionTime(req.CompletionTimestamp.AsTime()).
+					SetCompletionTime(req.GetCompletionTimestamp().AsTime()).
 					Save(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to mark transfer completed for %s: %w", transferID, err)
@@ -281,9 +281,9 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("failed to query receiver leaves for transfer %s: %w", transferID, err)
 	}
-	if len(receiverLeaves) != len(req.InternalNodes) {
+	if len(receiverLeaves) != len(req.GetInternalNodes()) {
 		return fmt.Errorf("node count mismatch for receiver in transfer %s: db has %d, gossip has %d",
-			transferID, len(receiverLeaves), len(req.InternalNodes))
+			transferID, len(receiverLeaves), len(req.GetInternalNodes()))
 	}
 
 	receiverLeafIDs := make(map[uuid.UUID]struct{})
@@ -291,10 +291,10 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		receiverLeafIDs[leaf.ID] = struct{}{}
 	}
 
-	for _, node := range req.InternalNodes {
-		nodeID, err := uuid.Parse(node.Id)
+	for _, node := range req.GetInternalNodes() {
+		nodeID, err := uuid.Parse(node.GetId())
 		if err != nil {
-			return fmt.Errorf("failed to parse node id %s: %w", node.Id, err)
+			return fmt.Errorf("failed to parse node id %s: %w", node.GetId(), err)
 		}
 		if _, ok := receiverLeafIDs[nodeID]; !ok {
 			return fmt.Errorf("node %s not in receiver's leaves (or duplicate) for transfer %s", nodeID, transferID)
@@ -316,7 +316,7 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 			// DirectRefundTx, DirectFromCpfpRefundTx) are re-signed on each
 			// transfer and use compareAndVerifyTxs to accept different-but-valid
 			// FROST signatures from separate signing sessions.
-			rawTxMatch, err := compareTxs(dbNode.RawTx, node.RawTx)
+			rawTxMatch, err := compareTxs(dbNode.RawTx, node.GetRawTx())
 			if err != nil {
 				return fmt.Errorf("failed to compare raw txs for node %s: %w", nodeID, err)
 			}
@@ -341,15 +341,15 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 				directNodeTxOut = directNodeTx.TxOut[0]
 			}
 
-			rawRefundTxMatch, err := compareAndVerifyTxs(dbNode.RawRefundTx, node.RawRefundTx, nodeRawTx.TxOut[0])
+			rawRefundTxMatch, err := compareAndVerifyTxs(dbNode.RawRefundTx, node.GetRawRefundTx(), nodeRawTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare raw refund txs for node %s: %w", nodeID, err)
 			}
-			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.DirectRefundTx, directNodeTxOut)
+			directRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectRefundTx, node.GetDirectRefundTx(), directNodeTxOut)
 			if err != nil {
 				return fmt.Errorf("failed to compare direct refund txs for node %s: %w", nodeID, err)
 			}
-			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.DirectFromCpfpRefundTx, nodeRawTx.TxOut[0])
+			directFromCpfpRefundTxMatch, err := compareAndVerifyTxs(dbNode.DirectFromCpfpRefundTx, node.GetDirectFromCpfpRefundTx(), nodeRawTx.TxOut[0])
 			if err != nil {
 				return fmt.Errorf("failed to compare direct from cpfp refund txs for node %s: %w", nodeID, err)
 			}
@@ -360,22 +360,22 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 
 			// Synchronize any non-nil tx fields.
 			update := dbNode.Update()
-			update.SetRawTx(node.RawTx)
+			update.SetRawTx(node.GetRawTx())
 			if node.RawRefundTx != nil {
-				update.SetRawRefundTx(node.RawRefundTx)
+				update.SetRawRefundTx(node.GetRawRefundTx())
 			}
-			update.SetDirectRefundTx(node.DirectRefundTx)
-			update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+			update.SetDirectRefundTx(node.GetDirectRefundTx())
+			update.SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
 			update.SetStatus(st.TreeNodeStatusAvailable)
 			if _, err = update.Save(ctx); err != nil {
 				return fmt.Errorf("failed to update tree node %s: %w", nodeID, err)
 			}
 		} else {
 			_, err = dbNode.Update().
-				SetRawTx(node.RawTx).
-				SetRawRefundTx(node.RawRefundTx).
-				SetDirectRefundTx(node.DirectRefundTx).
-				SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx).
+				SetRawTx(node.GetRawTx()).
+				SetRawRefundTx(node.GetRawRefundTx()).
+				SetDirectRefundTx(node.GetDirectRefundTx()).
+				SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx()).
 				SetStatus(st.TreeNodeStatusAvailable).
 				Save(ctx)
 			if err != nil {
@@ -386,18 +386,18 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 
 	if receiver.Status == st.TransferReceiverStatusCompleted {
 		// Idempotency: receiver already completed. Node data was verified above.
-		if !receiver.CompletionTime.Equal(req.CompletionTimestamp.AsTime()) {
+		if !receiver.CompletionTime.Equal(req.GetCompletionTimestamp().AsTime()) {
 			logger.With(
 				zap.String("transfer_id", transferID.String()),
 				zap.String("receiver_id", receiver.ID.String()),
 				zap.Time("existing_completion_time", receiver.CompletionTime),
-				zap.Time("gossip_completion_time", req.CompletionTimestamp.AsTime()),
+				zap.Time("gossip_completion_time", req.GetCompletionTimestamp().AsTime()),
 			).Warn("receiver already completed with different timestamp, accepting idempotently")
 		}
 	} else {
 		_, err = receiver.Update().
 			SetStatus(st.TransferReceiverStatusCompleted).
-			SetCompletionTime(req.CompletionTimestamp.AsTime()).
+			SetCompletionTime(req.GetCompletionTimestamp().AsTime()).
 			Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to mark receiver completed for transfer %s: %w", transferID, err)
@@ -414,7 +414,7 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 	if pendingCount == 0 && transfer.Status != st.TransferStatusCompleted {
 		_, err = transfer.Update().
 			SetStatus(st.TransferStatusCompleted).
-			SetCompletionTime(req.CompletionTimestamp.AsTime()).
+			SetCompletionTime(req.GetCompletionTimestamp().AsTime()).
 			Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to mark transfer completed for %s: %w", transferID, err)
@@ -434,9 +434,9 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	if err != nil {
 		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
 	}
-	transferType, err := ent.TransferTypeSchema(req.Type)
+	transferType, err := ent.TransferTypeSchema(req.GetType())
 	if err != nil {
-		return fmt.Errorf("failed to parse transfer type during initiate transfer for transfer id: %s with req.Type: %s and error: %w", transferID, req.Type, err)
+		return fmt.Errorf("failed to parse transfer type during initiate transfer for transfer id: %s with req.Type: %s and error: %w", transferID, req.GetType(), err)
 	}
 
 	senderIdentityPubKey, err := keys.ParsePublicKey(req.GetSenderIdentityPublicKey())
@@ -450,8 +450,8 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 
 	// Validate the transfer package and the decrypted key tweak proofs if the package is present
 	var keyTweakMap map[string]*pb.SendLeafKeyTweak
-	if req.TransferPackage != nil {
-		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, senderIdentityPubKey, !transferType.IsSwap())
+	if req.GetTransferPackage() != nil {
+		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIdentityPubKey, !transferType.IsSwap())
 		if err != nil {
 			return err
 		}
@@ -459,27 +459,27 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer package produced no key tweaks for transfer %s", transferID))
 		}
 
-		if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
+		if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.GetSenderKeyTweakProofs()); err != nil {
 			return err
 		}
 	}
-	if req.TransferPackage == nil {
-		if err := validateInternalInitiateTransferLeaves(req.Leaves); err != nil {
+	if req.GetTransferPackage() == nil {
+		if err := validateInternalInitiateTransferLeaves(req.GetLeaves()); err != nil {
 			return err
 		}
 	}
 
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(req)
 
-	if len(req.SparkInvoice) > 0 {
+	if len(req.GetSparkInvoice()) > 0 {
 		leafIDs, err := uuids.ParseSliceFunc(req.GetTransferPackage().GetLeavesToSend(), (*pb.UserSignedTxSigningJob).GetLeafId)
 		if err != nil {
 			return fmt.Errorf("failed to parse leaf id: %w", err)
 		}
 
-		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, receiverIdentityPubKey, senderIdentityPubKey, leafIDs, false)
+		err = validateSatsSparkInvoice(ctx, req.GetSparkInvoice(), receiverIdentityPubKey, senderIdentityPubKey, leafIDs, false)
 		if err != nil {
-			return fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, transferID, err)
+			return fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.GetSparkInvoice(), transferID, err)
 		}
 	}
 
@@ -487,7 +487,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	var primaryTransferId uuid.UUID
 	if req.GetPrimaryTransferId() != "" {
 		if primaryTransferId, err = uuid.Parse(req.GetPrimaryTransferId()); err != nil {
-			return fmt.Errorf("unable to parse primary transfer uuid for transfer id %s: %w", req.TransferId, err)
+			return fmt.Errorf("unable to parse primary transfer uuid for transfer id %s: %w", req.GetTransferId(), err)
 		}
 	}
 
@@ -496,11 +496,11 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	// it will validate that the adaptor public keys are provided and then call this generic rpc.
 	// Here we just check if the adaptor public keys are provided and if they are
 	// we assume that Swap V3 flow is used and we need to verify adaptor signatures.
-	if req.AdaptorPublicKeys == nil {
+	if req.GetAdaptorPublicKeys() == nil {
 		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = applyRefundSignatures(
-			ctx, req.TransferId,
+			ctx, req.GetTransferId(),
 			cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap,
-			req.RefundSignatures, req.DirectRefundSignatures, req.DirectFromCpfpRefundSignatures,
+			req.GetRefundSignatures(), req.GetDirectRefundSignatures(), req.GetDirectFromCpfpRefundSignatures(),
 		)
 		if err != nil {
 			return err
@@ -515,24 +515,24 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		if err != nil {
 			return fmt.Errorf("failed to parse cpfp adaptor public key %s: %w", adaptorPubKeys.GetAdaptorPublicKey(), err)
 		}
-		cpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, cpfpLeafRefundMap, req.RefundSignatures, false, cpfpAdaptorPublicKey)
+		cpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, cpfpLeafRefundMap, req.GetRefundSignatures(), false, cpfpAdaptorPublicKey)
 		if err != nil {
 			return fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s and error: %w", transferID, err)
 		}
 		if req.DirectRefundSignatures != nil && req.DirectFromCpfpRefundSignatures != nil {
 			directAdaptorPublicKey, err := keys.ParsePublicKey(adaptorPubKeys.GetDirectAdaptorPublicKey())
 			if err != nil {
-				return fmt.Errorf("failed to parse direct adaptor public key %s: %w", req.AdaptorPublicKeys.DirectAdaptorPublicKey, err)
+				return fmt.Errorf("failed to parse direct adaptor public key %s: %w", req.GetAdaptorPublicKeys().GetDirectAdaptorPublicKey(), err)
 			}
-			directFromCpfpAdaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.DirectFromCpfpAdaptorPublicKey)
+			directFromCpfpAdaptorPublicKey, err := keys.ParsePublicKey(req.GetAdaptorPublicKeys().GetDirectFromCpfpAdaptorPublicKey())
 			if err != nil {
-				return fmt.Errorf("failed to parse direct from cpfp adaptor public key %s: %w", req.AdaptorPublicKeys.DirectFromCpfpAdaptorPublicKey, err)
+				return fmt.Errorf("failed to parse direct from cpfp adaptor public key %s: %w", req.GetAdaptorPublicKeys().GetDirectFromCpfpAdaptorPublicKey(), err)
 			}
-			directLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directLeafRefundMap, req.DirectRefundSignatures, true, directAdaptorPublicKey)
+			directLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directLeafRefundMap, req.GetDirectRefundSignatures(), true, directAdaptorPublicKey)
 			if err != nil {
 				return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", transferID, err)
 			}
-			directFromCpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, req.DirectFromCpfpRefundSignatures, false, directFromCpfpAdaptorPublicKey)
+			directFromCpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, req.GetDirectFromCpfpRefundSignatures(), false, directFromCpfpAdaptorPublicKey)
 			if err != nil {
 				return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", transferID, err)
 			}
@@ -542,9 +542,9 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	_, _, err = h.createTransfer(
 		ctx,
 		transferID,
-		req.TransferPackage,
+		req.GetTransferPackage(),
 		transferType,
-		req.ExpiryTime.AsTime(),
+		req.GetExpiryTime().AsTime(),
 		senderIdentityPubKey,
 		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
@@ -553,7 +553,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		keyTweakMap,
 		TransferRoleParticipant,
 		false,
-		req.SparkInvoice,
+		req.GetSparkInvoice(),
 		primaryTransferId,
 		nil,
 	)
@@ -566,10 +566,10 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 // InitiateTransferV2 handles multi-receiver transfers from the coordinator SO.
 // MVP: single sender package only.
 func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *pbinternal.InitiateTransferV2Request) error {
-	if len(req.SenderPackages) != 1 {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
+	if len(req.GetSenderPackages()) != 1 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
 	}
-	senderPkg := req.SenderPackages[0]
+	senderPkg := req.GetSenderPackages()[0]
 
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {
@@ -584,7 +584,7 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 	// Parse receivers from the leaf→receiver map.
 	leafReceiverMap := make(map[string]keys.Public)
 	receiverSet := make(map[string]keys.Public)
-	for leafID, receiverBytes := range senderPkg.ReceiverIdentityPublicKeys {
+	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
 		recvPK, err := keys.ParsePublicKey(receiverBytes)
 		if err != nil {
 			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
@@ -604,27 +604,27 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 	})
 
 	// Validate required transfer package and decrypted key tweaks
-	if senderPkg.TransferPackage == nil {
+	if senderPkg.GetTransferPackage() == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.TransferPackage, senderIdentityPubKey, true)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.GetTransferPackage(), senderIdentityPubKey, true)
 	if err != nil {
 		return err
 	}
 	if keyTweakMap == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer package produced no key tweaks for transfer %s", transferID))
 	}
-	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
+	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.GetSenderKeyTweakProofs()); err != nil {
 		return err
 	}
 
-	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.TransferPackage)
+	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.GetTransferPackage())
 
 	// Apply refund signatures to transactions and verify.
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = applyRefundSignatures(
-		ctx, req.TransferId,
+		ctx, req.GetTransferId(),
 		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap,
-		senderPkg.RefundSignatures, senderPkg.DirectRefundSignatures, senderPkg.DirectFromCpfpRefundSignatures,
+		senderPkg.GetRefundSignatures(), senderPkg.GetDirectRefundSignatures(), senderPkg.GetDirectFromCpfpRefundSignatures(),
 	)
 	if err != nil {
 		return err
@@ -634,8 +634,8 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 	_, _, err = h.createTransferV3(
 		ctx,
 		transferID,
-		senderPkg.TransferPackage,
-		req.ExpiryTime.AsTime(),
+		senderPkg.GetTransferPackage(),
+		req.GetExpiryTime().AsTime(),
 		senderIdentityPubKey,
 		receivers,
 		leafReceiverMap,
@@ -657,10 +657,10 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if req == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if req.TransferPackage == nil {
+	if req.GetTransferPackage() == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
-	senderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
+	senderIDPubKey, err := keys.ParsePublicKey(req.GetSenderIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse sender identity public key: %w", err)
 	}
@@ -668,20 +668,20 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if err != nil {
 		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
 	}
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.TransferPackage, senderIDPubKey, false)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIDPubKey, false)
 	if err != nil {
 		return err
 	}
 
 	// Cross-SO consistency: the coordinator's plaintext proofs must match what we decrypted
 	// from our own ECIES blob, ensuring every SO's encrypted share comes from the same polynomial.
-	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.SenderKeyTweakProofs); err != nil {
+	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.GetSenderKeyTweakProofs()); err != nil {
 		return err
 	}
 
 	leafRefundMap := make(map[string][]byte)
-	for _, leaf := range req.TransferPackage.LeavesToSend {
-		leafRefundMap[leaf.LeafId] = leaf.RawTx
+	for _, leaf := range req.GetTransferPackage().GetLeavesToSend() {
+		leafRefundMap[leaf.GetLeafId()] = leaf.GetRawTx()
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -718,7 +718,7 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak for leaf %s: %w", leaf.ID, err)
 		}
-		_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.Signature).SetSecretCipher(leafTweak.SecretCipher).Save(ctx)
+		_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.GetSignature()).SetSecretCipher(leafTweak.GetSecretCipher()).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update transfer leaf %s for leaf %s: %w", transferLeaf.ID, leaf.ID, err)
 		}
@@ -849,16 +849,16 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 	if req == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	transferReq := req.Transfer
+	transferReq := req.GetTransfer()
 	if transferReq == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
 
-	senderIDPubKey, err := keys.ParsePublicKey(transferReq.SenderIdentityPublicKey)
+	senderIDPubKey, err := keys.ParsePublicKey(transferReq.GetSenderIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse sender identity public key: %w", err)
 	}
-	receiverIDPubKey, err := keys.ParsePublicKey(transferReq.ReceiverIdentityPublicKey)
+	receiverIDPubKey, err := keys.ParsePublicKey(transferReq.GetReceiverIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse receiver identity public key: %w", err)
 	}
@@ -869,24 +869,24 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 
 	// Validate exit_txid <-> connector_tx binding before any leaf or chain
 	// work. See parseAndValidateCoopExitTxid.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, transferReq.TransferId, req.ExitTxid, req.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(ctx, transferReq.GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
 	if err != nil {
 		return err
 	}
 
 	var keyTweakMap map[string]*pb.SendLeafKeyTweak
-	if transferReq.TransferPackage != nil {
-		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.TransferPackage, senderIDPubKey, true)
+	if transferReq.GetTransferPackage() != nil {
+		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.GetTransferPackage(), senderIDPubKey, true)
 		if err != nil {
 			return err
 		}
-	} else if err := validateInternalInitiateTransferLeaves(transferReq.Leaves); err != nil {
+	} else if err := validateInternalInitiateTransferLeaves(transferReq.GetLeaves()); err != nil {
 		return err
 	}
 
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadInternalLeafRefundMaps(transferReq)
 
-	if transferReq.TransferPackage != nil {
+	if transferReq.GetTransferPackage() != nil {
 		// Validate required fields for the coop exit single-call path.
 		if transferReq.RefundSignatures == nil {
 			return fmt.Errorf("refund_signatures is required for cooperative exit with transfer package")
@@ -920,28 +920,28 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		}
 
 		// Verify aggregated refund signatures with connector-aware sighash
-		cpfpLeafRefundMap, err = applySignaturesToCoopExitTransactionsAndVerify(ctx, cpfpLeafRefundMap, transferReq.RefundSignatures, false, req.GetConnectorTx())
+		cpfpLeafRefundMap, err = applySignaturesToCoopExitTransactionsAndVerify(ctx, cpfpLeafRefundMap, transferReq.GetRefundSignatures(), false, req.GetConnectorTx())
 		if err != nil {
-			return fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s and error: %w", transferReq.TransferId, err)
+			return fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s and error: %w", transferReq.GetTransferId(), err)
 		}
-		if len(transferReq.DirectRefundSignatures) > 0 {
-			directLeafRefundMap, err = applySignaturesToCoopExitTransactionsAndVerify(ctx, directLeafRefundMap, transferReq.DirectRefundSignatures, true, req.GetConnectorTx())
+		if len(transferReq.GetDirectRefundSignatures()) > 0 {
+			directLeafRefundMap, err = applySignaturesToCoopExitTransactionsAndVerify(ctx, directLeafRefundMap, transferReq.GetDirectRefundSignatures(), true, req.GetConnectorTx())
 			if err != nil {
-				return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", transferReq.TransferId, err)
+				return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", transferReq.GetTransferId(), err)
 			}
 		}
-		directFromCpfpLeafRefundMap, err = applySignaturesToCoopExitTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, transferReq.DirectFromCpfpRefundSignatures, false, req.GetConnectorTx())
+		directFromCpfpLeafRefundMap, err = applySignaturesToCoopExitTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, transferReq.GetDirectFromCpfpRefundSignatures(), false, req.GetConnectorTx())
 		if err != nil {
-			return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", transferReq.TransferId, err)
+			return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", transferReq.GetTransferId(), err)
 		}
 	}
 
 	transfer, _, err := h.createTransfer(
 		ctx,
 		transferID,
-		transferReq.TransferPackage,
+		transferReq.GetTransferPackage(),
 		st.TransferTypeCooperativeExit,
-		transferReq.ExpiryTime.AsTime(),
+		transferReq.GetExpiryTime().AsTime(),
 		senderIDPubKey,
 		receiverIDPubKey,
 		cpfpLeafRefundMap,
@@ -958,9 +958,9 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		return fmt.Errorf("failed to initiate cooperative exit for transfer id: %s and error: %w", transferID, err)
 	}
 
-	exitID, err := uuid.Parse(req.ExitId)
+	exitID, err := uuid.Parse(req.GetExitId())
 	if err != nil {
-		return fmt.Errorf("failed to parse exit id for cooperative exit. transfer id: %s. exit id: %s and error: %w", transferID, req.ExitId, err)
+		return fmt.Errorf("failed to parse exit id for cooperative exit. transfer id: %s. exit id: %s and error: %w", transferID, req.GetExitId(), err)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -975,7 +975,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		SetExitTxid(exitTxid).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create cooperative exit in db for transfer id: %s. exit id: %s and error: %w", transferID, req.ExitId, err)
+		return fmt.Errorf("failed to create cooperative exit in db for transfer id: %s. exit id: %s and error: %w", transferID, req.GetExitId(), err)
 	}
 	return err
 }
@@ -1089,7 +1089,7 @@ func (h *InternalTransferHandler) SettleSenderKeyTweak(ctx context.Context, req 
 	if err != nil {
 		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
 	}
-	switch req.Action {
+	switch req.GetAction() {
 	case pbinternal.SettleKeyTweakAction_NONE:
 		return fmt.Errorf("no action to settle sender key tweak")
 	case pbinternal.SettleKeyTweakAction_COMMIT:

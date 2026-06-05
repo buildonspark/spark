@@ -56,7 +56,7 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 
 		rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
 		require.NoError(t, err, "failed to create new tree")
-		expectedNodeIDs = append(expectedNodeIDs, rootNode.Id)
+		expectedNodeIDs = append(expectedNodeIDs, rootNode.GetId())
 
 		newLeafPrivKey := keys.GeneratePrivateKey()
 
@@ -85,11 +85,11 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 		case event := <-events:
 			require.NotNil(t, event)
 			require.NotNil(t, event.GetReceiverTransfer())
-			transfer := event.GetReceiverTransfer().Transfer
+			transfer := event.GetReceiverTransfer().GetTransfer()
 			require.NotNil(t, transfer)
-			require.Len(t, transfer.Leaves, 1)
+			require.Len(t, transfer.GetLeaves(), 1)
 
-			nodeID := transfer.Leaves[0].Leaf.Id
+			nodeID := transfer.GetLeaves()[0].GetLeaf().GetId()
 			require.Contains(t, expectedNodeIDs, nodeID)
 			require.NotContains(t, receivedNodeIDs, nodeID, "Received duplicate event")
 			receivedNodeIDs[nodeID] = true
@@ -133,7 +133,7 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 	case event := <-events:
 		require.NotNil(t, event)
 		require.NotNil(t, event.GetDeposit())
-		require.Equal(t, rootNode.Id, event.GetDeposit().Deposit.Id)
+		require.Equal(t, rootNode.GetId(), event.GetDeposit().GetDeposit().GetId())
 	case err := <-errors:
 		t.Fatalf("stream error: %v", err)
 	case <-time.After(5 * time.Second):
@@ -237,11 +237,11 @@ func TestMultipleSubscriptions(t *testing.T) {
 	case ev := <-events1:
 		require.NotNil(t, ev)
 		require.NotNil(t, ev.GetReceiverTransfer())
-		require.Equal(t, rootNode.Id, ev.GetReceiverTransfer().Transfer.Leaves[0].Leaf.Id)
+		require.Equal(t, rootNode.GetId(), ev.GetReceiverTransfer().GetTransfer().GetLeaves()[0].GetLeaf().GetId())
 	case event := <-events2:
 		require.NotNil(t, event)
 		require.NotNil(t, event.GetReceiverTransfer())
-		require.Equal(t, rootNode.Id, event.GetReceiverTransfer().Transfer.Leaves[0].Leaf.Id)
+		require.Equal(t, rootNode.GetId(), event.GetReceiverTransfer().GetTransfer().GetLeaves()[0].GetLeaf().GetId())
 	case <-time.After(5 * time.Second):
 		t.Fatal("no event received on stream2")
 	}

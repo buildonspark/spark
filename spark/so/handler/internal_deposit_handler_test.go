@@ -440,7 +440,7 @@ func TestFinalizeTreeCreation_Idempotency(t *testing.T) {
 		dbTX, err := ent.GetDbFromContext(ctx)
 		require.NoError(t, err)
 
-		nodeID, err := uuid.Parse(node.Id)
+		nodeID, err := uuid.Parse(node.GetId())
 		require.NoError(t, err)
 		exists, err := dbTX.TreeNode.Query().Where(treenode.IDEQ(nodeID)).Exist(ctx)
 		require.NoError(t, err)
@@ -499,8 +499,8 @@ func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
 			OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
 			RawTx:               childRawTx,
 			RawRefundTx:         childRawTx,
-			TreeId:              rootNode.TreeId,
-			ParentNodeId:        new(rootNode.Id),
+			TreeId:              rootNode.GetTreeId(),
+			ParentNodeId:        new(rootNode.GetId()),
 			SigningKeyshareId:   nonExistentKeyshareID.String(),
 			Vout:                1,
 		}
@@ -556,7 +556,7 @@ func TestFinalizeTreeCreation_FKValidation(t *testing.T) {
 			OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
 			RawTx:               childRawTx,
 			RawRefundTx:         childRawTx,
-			TreeId:              rootNode.TreeId,
+			TreeId:              rootNode.GetTreeId(),
 			ParentNodeId:        new(uuid.NewString()),
 			SigningKeyshareId:   keyshare.ID.String(),
 			Vout:                3,

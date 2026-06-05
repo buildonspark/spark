@@ -190,7 +190,7 @@ func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T)
 				[]keys.Public{tokenPrivKey.Public()},
 			)
 			require.NoError(t, err, "failed to query token outputs")
-			require.Len(t, correctNetworkResponse.OutputsWithPreviousTransactionData, 1, "expected one outputs when using the correct network")
+			require.Len(t, correctNetworkResponse.GetOutputsWithPreviousTransactionData(), 1, "expected one outputs when using the correct network")
 
 			wrongNetworkConfig := userOneConfig
 			wrongNetworkConfig.Network = btcnetwork.Mainnet
@@ -202,7 +202,7 @@ func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T)
 				[]keys.Public{tokenPrivKey.Public()},
 			)
 			require.NoError(t, err, "failed to query token outputs")
-			require.Empty(t, wrongNetworkResponse.OutputsWithPreviousTransactionData, "expected no outputs when using a different network")
+			require.Empty(t, wrongNetworkResponse.GetOutputsWithPreviousTransactionData(), "expected no outputs when using a different network")
 		})
 	}
 }
@@ -328,7 +328,7 @@ func TestMintWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
 	)
 	require.NoError(t, err, "mint with execute_before and old CCT should succeed")
 	require.NotNil(t, resp)
-	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
 }
 
 func TestTransferWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
@@ -376,7 +376,7 @@ func TestTransferWithExecuteBeforeAndOldCCTSucceeds(t *testing.T) {
 	)
 	require.NoError(t, err, "transfer with execute_before and old CCT should succeed")
 	require.NotNil(t, resp)
-	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
 }
 
 func TestMintWithOldCCTAndNoExecuteBeforeFails(t *testing.T) {
@@ -458,11 +458,11 @@ func TestTokenMintUsesCorrectIssuerPublicKey(t *testing.T) {
 		// Query the token metadata to get the issuer public key as stored in the SO's TokenCreate record.
 		resp, err := wallet.QueryTokenMetadata(t.Context(), config, nil, []keys.Public{issuerPrivKey.Public()})
 		require.NoError(t, err, "failed to query token metadata")
-		require.Len(t, resp.TokenMetadata, 1, "expected exactly one token")
-		require.Equal(t, issuerPrivKey.Public().Serialize(), resp.TokenMetadata[0].IssuerPublicKey,
+		require.Len(t, resp.GetTokenMetadata(), 1, "expected exactly one token")
+		require.Equal(t, issuerPrivKey.Public().Serialize(), resp.GetTokenMetadata()[0].GetIssuerPublicKey(),
 			"issuer public key in token metadata should match the key used to create the token")
 
-		tokenIdentifier := resp.TokenMetadata[0].TokenIdentifier
+		tokenIdentifier := resp.GetTokenMetadata()[0].GetTokenIdentifier()
 
 		mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
 			TokenIdentityPubKey: issuerPrivKey.Public(),
@@ -681,7 +681,7 @@ func TestTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 			[]keys.Public{tokenPrivKey.Public()},
 		)
 		require.NoError(t, err, "failed to get owned token outputs")
-		require.Len(t, tokenOutputsResponse.OutputsWithPreviousTransactionData, 1, "expected 1 consolidated output")
+		require.Len(t, tokenOutputsResponse.GetOutputsWithPreviousTransactionData(), 1, "expected 1 consolidated output")
 	})
 }
 
@@ -709,7 +709,7 @@ func TestBroadcastTokenTransactionV3ValidationRules(t *testing.T) {
 		{
 			name: "out_of_order_operator_keys_rejected",
 			mutatePartial: func(partial *tokenpb.PartialTokenTransaction) {
-				reversedKeys := slices.Clone(partial.TokenTransactionMetadata.GetSparkOperatorIdentityPublicKeys())
+				reversedKeys := slices.Clone(partial.GetTokenTransactionMetadata().GetSparkOperatorIdentityPublicKeys())
 				slices.Reverse(reversedKeys)
 				partial.TokenTransactionMetadata.SparkOperatorIdentityPublicKeys = reversedKeys
 			},
@@ -718,7 +718,7 @@ func TestBroadcastTokenTransactionV3ValidationRules(t *testing.T) {
 		{
 			name: "out_of_order_invoice_attachments_rejected",
 			mutatePartial: func(partial *tokenpb.PartialTokenTransaction) {
-				reversedInvoices := slices.Clone(partial.TokenTransactionMetadata.GetInvoiceAttachments())
+				reversedInvoices := slices.Clone(partial.GetTokenTransactionMetadata().GetInvoiceAttachments())
 				slices.Reverse(reversedInvoices)
 				partial.TokenTransactionMetadata.InvoiceAttachments = reversedInvoices
 			},
@@ -744,7 +744,7 @@ func TestBroadcastTokenTransactionV3ValidationRules(t *testing.T) {
 		{
 			name: "duplicate_operator_keys_rejected",
 			mutatePartial: func(partial *tokenpb.PartialTokenTransaction) {
-				keys := partial.TokenTransactionMetadata.GetSparkOperatorIdentityPublicKeys()
+				keys := partial.GetTokenTransactionMetadata().GetSparkOperatorIdentityPublicKeys()
 				if len(keys) > 0 {
 					partial.TokenTransactionMetadata.SparkOperatorIdentityPublicKeys = append(keys, keys[0])
 				}
@@ -754,7 +754,7 @@ func TestBroadcastTokenTransactionV3ValidationRules(t *testing.T) {
 		{
 			name: "duplicate_invoice_strings_rejected",
 			mutatePartial: func(partial *tokenpb.PartialTokenTransaction) {
-				invoices := partial.TokenTransactionMetadata.GetInvoiceAttachments()
+				invoices := partial.GetTokenTransactionMetadata().GetInvoiceAttachments()
 				if len(invoices) > 0 {
 					duplicate := &tokenpb.InvoiceAttachment{
 						SparkInvoice: invoices[0].GetSparkInvoice(),

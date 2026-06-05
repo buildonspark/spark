@@ -721,17 +721,17 @@ func TestClaimTransferSignRefunds_RejectsChangedRefundTxAfterRefundSigned(t *tes
 	defer func() { _ = gripmock.Clear() }()
 
 	leaf := leaves[0]
-	job := req.SigningJobs[0]
+	job := req.GetSigningJobs()[0]
 	_, err := leaf.Update().
-		SetRawRefundTx(job.RefundTxSigningJob.RawTx).
-		SetDirectRefundTx(job.DirectRefundTxSigningJob.RawTx).
-		SetDirectFromCpfpRefundTx(job.DirectFromCpfpRefundTxSigningJob.RawTx).
+		SetRawRefundTx(job.GetRefundTxSigningJob().GetRawTx()).
+		SetDirectRefundTx(job.GetDirectRefundTxSigningJob().GetRawTx()).
+		SetDirectFromCpfpRefundTx(job.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()).
 		Save(ctx)
 	require.NoError(t, err)
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
 	require.NoError(t, err)
 
-	job.RefundTxSigningJob.RawTx = append(append([]byte(nil), job.RefundTxSigningJob.RawTx...), 0x01)
+	job.RefundTxSigningJob.RawTx = append(append([]byte(nil), job.GetRefundTxSigningJob().GetRawTx()...), 0x01)
 
 	_, err = handler.ClaimTransferSignRefunds(ctx, req)
 	require.ErrorContains(t, err, "must not change refund transaction")

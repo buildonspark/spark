@@ -83,13 +83,13 @@ func TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing
 
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pending.Transfers, 1)
-	receiverTransfer := pending.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pending.GetTransfers(), 1)
+	receiverTransfer := pending.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaf := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -100,11 +100,11 @@ func TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing
 	// without the "invalid status SENDER_KEY_TWEAKED" race seen in prod.
 	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
 	require.NoError(t, err, "ClaimTransferV2 must succeed under the new atomic settle flow")
-	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.Status.String())
-	require.Len(t, claimedTransfer.Leaves, 1)
+	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.GetStatus().String())
+	require.Len(t, claimedTransfer.GetLeaves(), 1)
 
 	// Verify keyshare consistency across SOs for the claimed leaf.
-	leafID, err := uuid.Parse(claimLeaf.Leaf.Id)
+	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
 	require.NoError(t, err)
 
 	keysharesByOperatorID := readKeyshareFromAllOperators(t, receiverConfig, leafID)
@@ -240,12 +240,12 @@ func TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds(t *testing.T) {
 
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pending.Transfers, 1)
-	receiverTransfer := pending.Transfers[0]
+	require.Len(t, pending.GetTransfers(), 1)
+	receiverTransfer := pending.GetTransfers()[0]
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaf := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -258,7 +258,7 @@ func TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds(t *testing.T) {
 	coordinator := receiverConfig.SigningOperators[receiverConfig.CoordinatorIdentifier]
 	stageEarlyCommittedKeyTweakOnOperator(
 		t, coordinator,
-		senderTransfer.Id, claimLeaf.Leaf.Id,
+		senderTransfer.GetId(), claimLeaf.Leaf.GetId(),
 		stagedTweaks[receiverConfig.CoordinatorIdentifier],
 	)
 
@@ -279,11 +279,11 @@ func TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds(t *testing.T) {
 	// the same wedged-RKT state and fail with the same rollback error.
 	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
 	require.NoError(t, err, "post-rollback retry with fresh polynomial must succeed — attempt 3 succeeding is the observable signal that attempt 2's ROLLBACK cleared the stranded RKT state")
-	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.Status.String())
+	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.GetStatus().String())
 
 	// Cluster keyshare view must be internally consistent after recovery
 	// (same invariant as TestClaimTransferV2_SettleAtomicity_*).
-	leafID, err := uuid.Parse(claimLeaf.Leaf.Id)
+	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
 	require.NoError(t, err)
 	keysharesByOperatorID := readKeyshareFromAllOperators(t, receiverConfig, leafID)
 	require.NotEmpty(t, keysharesByOperatorID)
@@ -359,12 +359,12 @@ func TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL(t *testing.T
 
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pending.Transfers, 1)
-	receiverTransfer := pending.Transfers[0]
+	require.Len(t, pending.GetTransfers(), 1)
+	receiverTransfer := pending.GetTransfers()[0]
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaf := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -387,7 +387,7 @@ func TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL(t *testing.T
 	require.NotNil(t, stagedPeer, "test cluster must have at least one non-coordinator peer")
 	stagePeerLockedAtRKL(
 		t, stagedPeer,
-		senderTransfer.Id, claimLeaf.Leaf.Id,
+		senderTransfer.GetId(), claimLeaf.Leaf.GetId(),
 		stagedTweaks[stagedPeer.Identifier],
 	)
 
@@ -450,7 +450,7 @@ func buildClaimLeafTweaksAcrossOperators(
 		secretShareBytes := make([]byte, 32)
 		share.Share.FillBytes(secretShareBytes)
 		result[identifier] = &sparkpb.ClaimLeafKeyTweak{
-			LeafId: leaf.Leaf.Id,
+			LeafId: leaf.Leaf.GetId(),
 			SecretShareTweak: &sparkpb.SecretShare{
 				SecretShare: secretShareBytes,
 				Proofs:      share.Proofs,

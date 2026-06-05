@@ -506,8 +506,8 @@ func DefaultPrepareTask(ctx context.Context, operator *so.SigningOperator, opTyp
 	if err != nil {
 		return nil, err
 	}
-	if resp.Result == nil {
+	if resp.GetResult() == nil {
 		return nil, nil
 	}
-	return resp.Result.UnmarshalNew()
+	return resp.GetResult().UnmarshalNew()
 }

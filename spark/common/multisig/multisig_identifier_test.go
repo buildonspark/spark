@@ -243,9 +243,9 @@ func TestNormalizeMultisigConfig_SortsKeys(t *testing.T) {
 
 	normalized := NormalizeMultisigConfig(config)
 
-	require.Negative(t, bytes.Compare(normalized.PublicKeys[0], normalized.PublicKeys[1]))
-	require.Equal(t, config.Version, normalized.Version)
-	require.Equal(t, config.Threshold, normalized.Threshold)
+	require.Negative(t, bytes.Compare(normalized.GetPublicKeys()[0], normalized.GetPublicKeys()[1]))
+	require.Equal(t, config.GetVersion(), normalized.GetVersion())
+	require.Equal(t, config.GetThreshold(), normalized.GetThreshold())
 }
 
 func TestNormalizeMultisigConfig_DoesNotMutateOriginal(t *testing.T) {
@@ -258,8 +258,8 @@ func TestNormalizeMultisigConfig_DoesNotMutateOriginal(t *testing.T) {
 
 	_ = NormalizeMultisigConfig(config)
 
-	require.True(t, bytes.Equal(config.PublicKeys[0], testPubKey2))
-	require.True(t, bytes.Equal(config.PublicKeys[1], testPubKey1))
+	require.True(t, bytes.Equal(config.GetPublicKeys()[0], testPubKey2))
+	require.True(t, bytes.Equal(config.GetPublicKeys()[1], testPubKey1))
 }
 
 func TestNormalizeMultisigConfig_NilInput(t *testing.T) {

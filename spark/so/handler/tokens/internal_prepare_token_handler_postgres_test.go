@@ -172,7 +172,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			require.NoError(t, err)
 			txProto.Network = pbNet
 			for _, op := range handler.config.GetSigningOperatorList() {
-				txProto.SparkOperatorIdentityPublicKeys = append(txProto.SparkOperatorIdentityPublicKeys, op.PublicKey)
+				txProto.SparkOperatorIdentityPublicKeys = append(txProto.SparkOperatorIdentityPublicKeys, op.GetPublicKey())
 			}
 			netCommon, err := btcnetwork.FromProtoNetwork(pbNet)
 			require.NoError(t, err)
@@ -196,7 +196,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 				FinalTokenTransaction:      txProto,
 				TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: sig}},
 				KeyshareIds:                []string{ks.ID.String()},
-				CoordinatorPublicKey:       firstOperator.PublicKey,
+				CoordinatorPublicKey:       firstOperator.GetPublicKey(),
 			}
 
 			_, err = handler.PrepareTokenTransactionInternal(ctx, req)
@@ -293,7 +293,7 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 	unauthorizedMintTx.Network = pbNet
 
 	for _, op := range cfg.GetSigningOperatorList() {
-		unauthorizedMintTx.SparkOperatorIdentityPublicKeys = append(unauthorizedMintTx.SparkOperatorIdentityPublicKeys, op.PublicKey)
+		unauthorizedMintTx.SparkOperatorIdentityPublicKeys = append(unauthorizedMintTx.SparkOperatorIdentityPublicKeys, op.GetPublicKey())
 	}
 
 	netCommon, err := btcnetwork.FromProtoNetwork(pbNet)
@@ -321,7 +321,7 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 		FinalTokenTransaction:      unauthorizedMintTx,
 		TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: attackerSig}},
 		KeyshareIds:                []string{ks.ID.String()},
-		CoordinatorPublicKey:       firstOperator.PublicKey,
+		CoordinatorPublicKey:       firstOperator.GetPublicKey(),
 	}
 
 	// Execute and verify rejection
@@ -366,7 +366,7 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 		FinalTokenTransaction:      legitimateMintTx,
 		TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: legitimateSig}},
 		KeyshareIds:                []string{legitimateKs.ID.String()},
-		CoordinatorPublicKey:       firstOperator.PublicKey,
+		CoordinatorPublicKey:       firstOperator.GetPublicKey(),
 	}
 
 	_, err = handler.PrepareTokenTransactionInternal(ctx, legitimateReq)
@@ -467,7 +467,7 @@ func TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization(t *
 		SparkOperatorIdentityPublicKeys: nil, // populated below
 	}
 	for _, op := range cfg.GetSigningOperatorList() {
-		txProto.SparkOperatorIdentityPublicKeys = append(txProto.SparkOperatorIdentityPublicKeys, op.PublicKey)
+		txProto.SparkOperatorIdentityPublicKeys = append(txProto.SparkOperatorIdentityPublicKeys, op.GetPublicKey())
 	}
 
 	// Sign the PARTIAL hash with each owner key.
@@ -499,7 +499,7 @@ func TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization(t *
 		FinalTokenTransaction:      txProto,
 		TokenTransactionSignatures: signaturesOutOfOrder,
 		KeyshareIds:                []string{ks.ID.String()},
-		CoordinatorPublicKey:       firstOperator.PublicKey,
+		CoordinatorPublicKey:       firstOperator.GetPublicKey(),
 	}
 
 	// The handler should accept the request (validation uses InputIndex correctly).

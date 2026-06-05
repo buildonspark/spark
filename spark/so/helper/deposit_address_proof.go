@@ -54,7 +54,7 @@ func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config,
 		if err != nil {
 			return nil, err
 		}
-		signatures[i] = signature.Signature
+		signatures[i] = signature.GetSignature()
 	}
 	return signatures, nil
 }

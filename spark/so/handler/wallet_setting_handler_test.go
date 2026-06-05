@@ -43,10 +43,10 @@ func TestUpdateWalletSetting_CreateNew(t *testing.T) {
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.True(t, resp.WalletSetting.PrivateEnabled)
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.True(t, resp.GetWalletSetting().GetPrivateEnabled())
 
 	// Verify it was saved to database
 	database, err := ent.GetDbFromContext(ctx)
@@ -94,10 +94,10 @@ func TestUpdateWalletSetting_UpdateExisting(t *testing.T) {
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.True(t, resp.WalletSetting.PrivateEnabled)
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.True(t, resp.GetWalletSetting().GetPrivateEnabled())
 
 	// Verify it was updated in database
 	updatedSetting, err := database.WalletSetting.
@@ -396,11 +396,11 @@ func TestQueryWalletSetting_Existing(t *testing.T) {
 	resp, err := walletSettingHandler.QueryWalletSetting(ctx, &pb.QueryWalletSettingRequest{})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.True(t, resp.WalletSetting.PrivateEnabled)
-	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.True(t, resp.GetWalletSetting().GetPrivateEnabled())
+	assert.Equal(t, masterPubKey.Serialize(), resp.GetWalletSetting().GetMasterIdentityPublicKey())
 }
 
 func TestQueryWalletSetting_NotExisting(t *testing.T) {
@@ -417,11 +417,11 @@ func TestQueryWalletSetting_NotExisting(t *testing.T) {
 	resp, err := walletSettingHandler.QueryWalletSetting(ctx, &pb.QueryWalletSettingRequest{})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.False(t, resp.WalletSetting.PrivateEnabled)        // default value from schema
-	assert.Nil(t, resp.WalletSetting.MasterIdentityPublicKey) // nil by default
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.False(t, resp.GetWalletSetting().GetPrivateEnabled())        // default value from schema
+	assert.Nil(t, resp.GetWalletSetting().GetMasterIdentityPublicKey()) // nil by default
 
 	// Verify it was saved to database
 	database, err := ent.GetDbFromContext(ctx)
@@ -460,9 +460,9 @@ func TestUpdateWalletSetting_SetMasterIdentityPublicKey_CreateNew(t *testing.T) 
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+	require.NotNil(t, resp.GetWalletSetting())
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.Equal(t, masterPubKey.Serialize(), resp.GetWalletSetting().GetMasterIdentityPublicKey())
 
 	// Verify it was saved to database
 	database, err := ent.GetDbFromContext(ctx)
@@ -515,10 +515,10 @@ func TestUpdateWalletSetting_SetMasterIdentityPublicKey_UpdateExisting(t *testin
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.Equal(t, masterPubKey.Serialize(), resp.GetWalletSetting().GetMasterIdentityPublicKey())
 
 	// Verify it was updated in database
 	updatedSetting, err := database.WalletSetting.
@@ -570,10 +570,10 @@ func TestUpdateWalletSetting_ClearMasterIdentityPublicKey(t *testing.T) {
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.Nil(t, resp.WalletSetting.MasterIdentityPublicKey)
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.Nil(t, resp.GetWalletSetting().GetMasterIdentityPublicKey())
 
 	// Verify it was cleared in database
 	updatedSetting, err := database.WalletSetting.
@@ -623,11 +623,11 @@ func TestUpdateWalletSetting_UpdateBothFields(t *testing.T) {
 	resp, err := walletSettingHandler.UpdateWalletSetting(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.WalletSetting)
+	require.NotNil(t, resp.GetWalletSetting())
 
-	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
-	assert.True(t, resp.WalletSetting.PrivateEnabled)
-	assert.Equal(t, masterPubKey.Serialize(), resp.WalletSetting.MasterIdentityPublicKey)
+	assert.Equal(t, identityPubKey.Serialize(), resp.GetWalletSetting().GetOwnerIdentityPublicKey())
+	assert.True(t, resp.GetWalletSetting().GetPrivateEnabled())
+	assert.Equal(t, masterPubKey.Serialize(), resp.GetWalletSetting().GetMasterIdentityPublicKey())
 
 	// Verify both fields were updated in database
 	updatedSetting, err := database.WalletSetting.

@@ -92,7 +92,7 @@ func waitForPendingTransferToConfirm(
 	pendingTransfer, err := wallet.QueryPendingTransfers(ctx, config)
 	require.NoError(t, err)
 	startTime := time.Now()
-	for len(pendingTransfer.Transfers) == 0 {
+	for len(pendingTransfer.GetTransfers()) == 0 {
 		if time.Since(startTime) > 10*time.Second {
 			t.Fatalf("timed out waiting for key to be tweaked from tx confirmation")
 		}
@@ -100,7 +100,7 @@ func waitForPendingTransferToConfirm(
 		pendingTransfer, err = wallet.QueryPendingTransfers(ctx, config)
 		require.NoError(t, err)
 	}
-	return pendingTransfer.Transfers[0]
+	return pendingTransfer.GetTransfers()[0]
 }
 
 func TestCoopExitBasic(t *testing.T) {
@@ -137,7 +137,7 @@ func TestCoopExitBasic(t *testing.T) {
 		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus())
 
 	// SSP signs exit tx and broadcasts
 	signedExitTx, err := sparktesting.SignFaucetCoin(exitTx, coin.TxOut, coin.Key)
@@ -164,21 +164,21 @@ func TestCoopExitBasic(t *testing.T) {
 	sspCtx := wallet.ContextWithToken(t.Context(), sspToken)
 
 	receiverTransfer := waitForPendingTransferToConfirm(sspCtx, t, sspConfig)
-	assert.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status)
-	assert.Equal(t, sparkpb.TransferType_COOPERATIVE_EXIT, receiverTransfer.Type)
+	assert.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus())
+	assert.Equal(t, sparkpb.TransferType_COOPERATIVE_EXIT, receiverTransfer.GetType())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	require.NoError(t, err)
 	assert.Len(t, leafPrivKeyMap, 1)
-	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey)
+	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.GetId()], sspConfig.IdentityPrivateKey)
 
 	// Claim leaf. This requires a loop because sometimes there are
 	// delays in processing blocks, and after the tx initially confirms,
 	// the SO will still reject a claim until the tx has enough confirmations.
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              senderTransfer.Leaves[0].Leaf,
+		Leaf:              senderTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -192,7 +192,7 @@ func TestCoopExitBasic(t *testing.T) {
 		)
 		require.NoError(t, err)
 		for _, tr := range transfers {
-			if tr.Id == receiverTransfer.Id {
+			if tr.GetId() == receiverTransfer.GetId() {
 				currentTransfer = tr
 				break
 			}
@@ -334,12 +334,12 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus())
 
 	// Prepare for claim
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              senderTransfer.Leaves[0].Leaf,
+		Leaf:              senderTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -397,7 +397,7 @@ func TestCoopExitSingleCall(t *testing.T) {
 		connectorTxBuf.Bytes(),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus())
 
 	// SSP signs exit tx and broadcasts
 	signedExitTx, err := sparktesting.SignFaucetCoin(exitTx, coin.TxOut, coin.Key)
@@ -421,19 +421,19 @@ func TestCoopExitSingleCall(t *testing.T) {
 	sspCtx := wallet.ContextWithToken(t.Context(), sspToken)
 
 	receiverTransfer := waitForPendingTransferToConfirm(sspCtx, t, sspConfig)
-	assert.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status)
-	assert.Equal(t, sparkpb.TransferType_COOPERATIVE_EXIT, receiverTransfer.Type)
+	assert.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus())
+	assert.Equal(t, sparkpb.TransferType_COOPERATIVE_EXIT, receiverTransfer.GetType())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	require.NoError(t, err)
 	assert.Len(t, leafPrivKeyMap, 1)
-	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey)
+	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.GetId()], sspConfig.IdentityPrivateKey)
 
 	// Claim leaf
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              senderTransfer.Leaves[0].Leaf,
+		Leaf:              senderTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -446,7 +446,7 @@ func TestCoopExitSingleCall(t *testing.T) {
 		)
 		require.NoError(t, err)
 		for _, tr := range transfers {
-			if tr.Id == receiverTransfer.Id {
+			if tr.GetId() == receiverTransfer.GetId() {
 				currentTransfer = tr
 				break
 			}
@@ -554,11 +554,11 @@ func TestCoopExitFailureToSync(t *testing.T) {
 			require.NoError(t, err, "query transfers on %s", id)
 
 			// Check only new transfers that weren't present before this test for their status
-			for _, tr := range resp.Transfers {
-				if tr.Type == sparkpb.TransferType_COOPERATIVE_EXIT {
+			for _, tr := range resp.GetTransfers() {
+				if tr.GetType() == sparkpb.TransferType_COOPERATIVE_EXIT {
 					// This is a new transfer created during this test - it should have correct status
-					if tr.Status != sparkpb.TransferStatus_TRANSFER_STATUS_RETURNED {
-						t.Fatalf("operator %s has new transfer %s with wrong status (want RETURNED/EXPIRED/COMPLETED) got %s", id, tr.Id, tr.Status)
+					if tr.GetStatus() != sparkpb.TransferStatus_TRANSFER_STATUS_RETURNED {
+						t.Fatalf("operator %s has new transfer %s with wrong status (want RETURNED/EXPIRED/COMPLETED) got %s", id, tr.GetId(), tr.GetStatus())
 					}
 				}
 			}

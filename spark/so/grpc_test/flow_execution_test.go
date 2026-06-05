@@ -77,15 +77,15 @@ func TestFlowExecution_RenewLeafConsensus_WritesRowsOnCoordinatorAndParticipants
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", rootNode.Status)
+	require.Equal(t, "AVAILABLE", rootNode.GetStatus())
 
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
 
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), authToken)
 
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 	renewed, err := wallet.RenewNodeZeroTimelock(ctx, config, leaf, leafPrivKey)
 	require.NoError(t, err)
 	require.NotNil(t, renewed)
@@ -421,14 +421,14 @@ func TestFlowExecution_RenewLeafConsensus_RequestCancellation_RowsTerminal(t *te
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", rootNode.Status)
+	require.Equal(t, "AVAILABLE", rootNode.GetStatus())
 
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
 
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	parentCtx := wallet.ContextWithToken(t.Context(), authToken)
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 
 	// 75ms is shorter than the typical end-to-end renew latency (p50
 	// ~110ms in production) but long enough that createCoordinatorRow
@@ -570,11 +570,11 @@ func TestFlowExecution_RenewLeafConsensus_RequestCancellation_LeafStateConsisten
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100000)
 	require.NoError(t, err)
-	require.Equal(t, "AVAILABLE", rootNode.Status)
-	leafUUID, err := uuid.Parse(rootNode.Id)
+	require.Equal(t, "AVAILABLE", rootNode.GetStatus())
+	leafUUID, err := uuid.Parse(rootNode.GetId())
 	require.NoError(t, err)
 
-	modifyNodeTimelockAllOperators(t, config, rootNode.Id, 0, timelockBelowRenewThreshold)
+	modifyNodeTimelockAllOperators(t, config, rootNode.GetId(), 0, timelockBelowRenewThreshold)
 
 	// Snapshot the leaf's parent id on every operator BEFORE the renew —
 	// this is the signal we use to distinguish committed-renew (parent
@@ -596,7 +596,7 @@ func TestFlowExecution_RenewLeafConsensus_RequestCancellation_LeafStateConsisten
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	parentCtx := wallet.ContextWithToken(t.Context(), authToken)
-	leaf := queryLeafByID(t, config, authToken, rootNode.Id)
+	leaf := queryLeafByID(t, config, authToken, rootNode.GetId())
 
 	// Tight timeout designed to land cancellation inside Execute. Either
 	// outcome (commit-races-past-cancel or cancel-lands-mid-flight) is a

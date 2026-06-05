@@ -13,14 +13,14 @@ import (
 // GetTransferPackageSigningPayload returns the signing payload for a transfer package.
 // The payload is a hash of the transfer ID and the encrypted payload sorted by key.
 func GetTransferPackageSigningPayload(transferID uuid.UUID, transferPackage *pb.TransferPackage) []byte {
-	if transferPackage.HashVariant == pb.HashVariant_HASH_VARIANT_V2 {
+	if transferPackage.GetHashVariant() == pb.HashVariant_HASH_VARIANT_V2 {
 		return getTransferPackageSigningPayloadV2(transferID, transferPackage)
 	}
 	return getTransferPackageSigningPayloadLegacy(transferID, transferPackage)
 }
 
 func getTransferPackageSigningPayloadLegacy(transferID uuid.UUID, transferPackage *pb.TransferPackage) []byte {
-	encryptedPayload := transferPackage.KeyTweakPackage
+	encryptedPayload := transferPackage.GetKeyTweakPackage()
 	// Create a slice to hold the sorted key-value pairs
 	type keyValuePair struct {
 		key   string
@@ -51,7 +51,7 @@ func getTransferPackageSigningPayloadLegacy(transferID uuid.UUID, transferPackag
 func getTransferPackageSigningPayloadV2(transferID uuid.UUID, transferPackage *pb.TransferPackage) []byte {
 	return hashstructure.NewHasher([]string{"spark", "transfer", "signing payload"}).
 		AddBytes(transferID[:]).
-		AddMapStringToBytes(transferPackage.KeyTweakPackage).
+		AddMapStringToBytes(transferPackage.GetKeyTweakPackage()).
 		Hash()
 }
 

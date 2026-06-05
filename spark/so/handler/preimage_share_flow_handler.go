@@ -50,7 +50,7 @@ func (h *PreimageShareFlowHandler) Prepare(ctx context.Context, op proto.Message
 		return nil, fmt.Errorf("unexpected operation type %T for preimage share prepare", op)
 	}
 
-	origReq := req.OriginalRequest
+	origReq := req.GetOriginalRequest()
 	if origReq == nil {
 		return nil, fmt.Errorf("original_request is required")
 	}
@@ -115,7 +115,7 @@ func (f *preimageShareCoordinatorFlow) RollbackPayload() proto.Message {
 // validatePreimageShare decrypts and validates a preimage share without writing
 // to DB. Returns the decrypted SecretShare for writePreimageShare to persist.
 func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Request) (*pb.SecretShare, error) {
-	ciphertext, ok := req.EncryptedPreimageShares[config.Identifier]
+	ciphertext, ok := req.GetEncryptedPreimageShares()[config.Identifier]
 	if !ok {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no encrypted preimage share found for SO %s", config.Identifier))
 	}
@@ -131,12 +131,12 @@ func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Reques
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to unmarshal preimage share: %w", err))
 	}
 
-	if len(secretShare.Proofs) == 0 {
+	if len(secretShare.GetProofs()) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("preimage share proofs is empty"))
 	}
 
-	if uint64(req.Threshold) != config.Threshold {
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("threshold mismatch: expected %d, got %d", config.Threshold, req.Threshold))
+	if uint64(req.GetThreshold()) != config.Threshold {
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("threshold mismatch: expected %d, got %d", config.Threshold, req.GetThreshold()))
 	}
 
 	err = secretsharing.ValidateShare(
@@ -145,16 +145,16 @@ func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Reques
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(config.Threshold),
 				Index:        big.NewInt(int64(config.Index + 1)),
-				Share:        new(big.Int).SetBytes(secretShare.SecretShare),
+				Share:        new(big.Int).SetBytes(secretShare.GetSecretShare()),
 			},
-			Proofs: secretShare.Proofs,
+			Proofs: secretShare.GetProofs(),
 		},
 	)
 	if err != nil {
 		return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate share: %w", err))
 	}
 
-	bolt11, err := decodepay.Decodepay(req.InvoiceString)
+	bolt11, err := decodepay.Decodepay(req.GetInvoiceString())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode invoice: %w", err))
 	}
@@ -164,7 +164,7 @@ func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Reques
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode payment hash: %w", err))
 	}
 
-	if !bytes.Equal(paymentHash, req.PaymentHash) {
+	if !bytes.Equal(paymentHash, req.GetPaymentHash()) {
 		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("payment hash mismatch"))
 	}
 
@@ -178,7 +178,7 @@ func writePreimageShare(ctx context.Context, req *pb.StorePreimageShareV2Request
 		return fmt.Errorf("failed to get db from context: %w", err)
 	}
 
-	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+	userIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse user identity public key: %w", err))
 	}
@@ -193,10 +193,10 @@ func writePreimageShare(ctx context.Context, req *pb.StorePreimageShareV2Request
 	}
 
 	err = tx.PreimageShare.Create().
-		SetPaymentHash(req.PaymentHash).
-		SetPreimageShare(secretShare.SecretShare).
-		SetThreshold(int32(req.Threshold)).
-		SetInvoiceString(req.InvoiceString).
+		SetPaymentHash(req.GetPaymentHash()).
+		SetPreimageShare(secretShare.GetSecretShare()).
+		SetThreshold(int32(req.GetThreshold())).
+		SetInvoiceString(req.GetInvoiceString()).
 		SetOwnerIdentityPubkey(userIdentityPubKey).
 		OnConflictColumns(preimageshare.FieldPaymentHash).
 		DoNothing().

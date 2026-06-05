@@ -99,16 +99,16 @@ func NewBaseTransferHandler(config *so.Config) BaseTransferHandler {
 // refund maps from a TransferPackage. Returns three maps keyed by leaf ID.
 func loadLeafRefundMapsFromTransferPackage(pkg *pbspark.TransferPackage) (cpfp, direct, directFromCpfp map[string][]byte) {
 	cpfp = make(map[string][]byte)
-	for _, leaf := range pkg.LeavesToSend {
-		cpfp[leaf.LeafId] = leaf.RawTx
+	for _, leaf := range pkg.GetLeavesToSend() {
+		cpfp[leaf.GetLeafId()] = leaf.GetRawTx()
 	}
 	direct = make(map[string][]byte)
-	for _, leaf := range pkg.DirectLeavesToSend {
-		direct[leaf.LeafId] = leaf.RawTx
+	for _, leaf := range pkg.GetDirectLeavesToSend() {
+		direct[leaf.GetLeafId()] = leaf.GetRawTx()
 	}
 	directFromCpfp = make(map[string][]byte)
-	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
-		directFromCpfp[leaf.LeafId] = leaf.RawTx
+	for _, leaf := range pkg.GetDirectFromCpfpLeavesToSend() {
+		directFromCpfp[leaf.GetLeafId()] = leaf.GetRawTx()
 	}
 	return cpfp, direct, directFromCpfp
 }
@@ -117,19 +117,19 @@ func loadLeafRefundMapsFromTransferPackage(pkg *pbspark.TransferPackage) (cpfp, 
 // delegating to loadLeafRefundMapsFromTransferPackage when a TransferPackage
 // is present and falling back to the legacy LeavesToSend field otherwise.
 func loadLeafRefundMaps(req *pbspark.StartTransferRequest) (cpfp, direct, directFromCpfp map[string][]byte) {
-	if req.TransferPackage != nil {
-		return loadLeafRefundMapsFromTransferPackage(req.TransferPackage)
+	if req.GetTransferPackage() != nil {
+		return loadLeafRefundMapsFromTransferPackage(req.GetTransferPackage())
 	}
 	cpfp = make(map[string][]byte)
 	direct = make(map[string][]byte)
 	directFromCpfp = make(map[string][]byte)
-	for _, leaf := range req.LeavesToSend {
-		cpfp[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
-		if leaf.DirectRefundTxSigningJob != nil {
-			direct[leaf.LeafId] = leaf.DirectRefundTxSigningJob.RawTx
+	for _, leaf := range req.GetLeavesToSend() {
+		cpfp[leaf.GetLeafId()] = leaf.GetRefundTxSigningJob().GetRawTx()
+		if leaf.GetDirectRefundTxSigningJob() != nil {
+			direct[leaf.GetLeafId()] = leaf.GetDirectRefundTxSigningJob().GetRawTx()
 		}
-		if leaf.DirectFromCpfpRefundTxSigningJob != nil {
-			directFromCpfp[leaf.LeafId] = leaf.DirectFromCpfpRefundTxSigningJob.RawTx
+		if leaf.GetDirectFromCpfpRefundTxSigningJob() != nil {
+			directFromCpfp[leaf.GetLeafId()] = leaf.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()
 		}
 	}
 	return cpfp, direct, directFromCpfp
@@ -140,7 +140,7 @@ func validateLegacyLeafRefundTxSigningJobs(leaves []*pbspark.LeafRefundTxSigning
 		if leaf == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d] is required", i))
 		}
-		if leaf.RefundTxSigningJob == nil {
+		if leaf.GetRefundTxSigningJob() == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d].refund_tx_signing_job is required", i))
 		}
 	}
@@ -151,16 +151,16 @@ func validateLegacyLeafRefundTxSigningJobs(leaves []*pbspark.LeafRefundTxSigning
 // delegating to loadLeafRefundMapsFromTransferPackage when a TransferPackage
 // is present and falling back to the legacy Leaves field otherwise.
 func loadInternalLeafRefundMaps(req *pbinternal.InitiateTransferRequest) (cpfp, direct, directFromCpfp map[string][]byte) {
-	if req.TransferPackage != nil {
-		return loadLeafRefundMapsFromTransferPackage(req.TransferPackage)
+	if req.GetTransferPackage() != nil {
+		return loadLeafRefundMapsFromTransferPackage(req.GetTransferPackage())
 	}
 	cpfp = make(map[string][]byte)
 	direct = make(map[string][]byte)
 	directFromCpfp = make(map[string][]byte)
-	for _, leaf := range req.Leaves {
-		cpfp[leaf.LeafId] = leaf.RawRefundTx
-		direct[leaf.LeafId] = leaf.DirectRefundTx
-		directFromCpfp[leaf.LeafId] = leaf.DirectFromCpfpRefundTx
+	for _, leaf := range req.GetLeaves() {
+		cpfp[leaf.GetLeafId()] = leaf.GetRawRefundTx()
+		direct[leaf.GetLeafId()] = leaf.GetDirectRefundTx()
+		directFromCpfp[leaf.GetLeafId()] = leaf.GetDirectFromCpfpRefundTx()
 	}
 	return cpfp, direct, directFromCpfp
 }
@@ -1145,7 +1145,7 @@ func lockLeaves(ctx context.Context, db *ent.Client, leaves []*ent.TreeNode) ([]
 
 // If open this function in spark.proto, need to take TransferStatusSenderKeyTweakPending out from the allowed status list for TransferTypePreimageSwap.
 func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.CancelTransferRequest) (*pbspark.CancelTransferResponse, error) {
-	reqSenderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
+	reqSenderIDPubKey, err := keys.ParsePublicKey(req.GetSenderIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse sender identity public key: %w", err)
 	}
@@ -1585,7 +1585,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		return nil, nil
 	}
 
-	if len(pkg.KeyTweakPackage) == 0 {
+	if len(pkg.GetKeyTweakPackage()) == 0 {
 		return nil, fmt.Errorf("key tweak package is empty")
 	}
 	// Get the transfer limit from knobs if available
@@ -1601,21 +1601,21 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	// Input size and count validation - prevent resource exhaustion
-	if len(pkg.LeavesToSend) > transferLimit {
-		return nil, fmt.Errorf("too many leaves to send: %d (max: %d)", len(pkg.LeavesToSend), transferLimit)
+	if len(pkg.GetLeavesToSend()) > transferLimit {
+		return nil, fmt.Errorf("too many leaves to send: %d (max: %d)", len(pkg.GetLeavesToSend()), transferLimit)
 	}
 
-	if len(pkg.DirectLeavesToSend) > transferLimit {
-		return nil, fmt.Errorf("too many direct leaves to send: %d (max: %d)", len(pkg.DirectLeavesToSend), transferLimit)
+	if len(pkg.GetDirectLeavesToSend()) > transferLimit {
+		return nil, fmt.Errorf("too many direct leaves to send: %d (max: %d)", len(pkg.GetDirectLeavesToSend()), transferLimit)
 	}
 
-	if len(pkg.DirectFromCpfpLeavesToSend) > transferLimit {
-		return nil, fmt.Errorf("too many direct from cpfp leaves to send: %d (max: %d)", len(pkg.DirectFromCpfpLeavesToSend), transferLimit)
+	if len(pkg.GetDirectFromCpfpLeavesToSend()) > transferLimit {
+		return nil, fmt.Errorf("too many direct from cpfp leaves to send: %d (max: %d)", len(pkg.GetDirectFromCpfpLeavesToSend()), transferLimit)
 	}
 
 	// Validate key tweak package size
 	totalSize := 0
-	for _, ciphertext := range pkg.KeyTweakPackage {
+	for _, ciphertext := range pkg.GetKeyTweakPackage() {
 		totalSize += len(ciphertext)
 	}
 	if totalSize > MaxKeyTweakPackageSize {
@@ -1623,14 +1623,14 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	// Validate leaf IDs and check for duplicates/orphans/mismatches across lists.
-	leavesToSendIDs := make(map[string]struct{}, len(pkg.LeavesToSend))
-	for i, leaf := range pkg.LeavesToSend {
+	leavesToSendIDs := make(map[string]struct{}, len(pkg.GetLeavesToSend()))
+	for i, leaf := range pkg.GetLeavesToSend() {
 		if leaf == nil {
 			return nil, fmt.Errorf("leaves_to_send[%d] is required", i)
 		}
-		parsed, err := uuid.Parse(leaf.LeafId)
+		parsed, err := uuid.Parse(leaf.GetLeafId())
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.LeafId, err)
+			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.GetLeafId(), err)
 		}
 		leafID := parsed.String()
 		if _, exists := leavesToSendIDs[leafID]; exists {
@@ -1639,18 +1639,18 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		leavesToSendIDs[leafID] = struct{}{}
 	}
 
-	directLeafIDs := make(map[string]struct{}, len(pkg.DirectLeavesToSend))
-	for i, leaf := range pkg.DirectLeavesToSend {
+	directLeafIDs := make(map[string]struct{}, len(pkg.GetDirectLeavesToSend()))
+	for i, leaf := range pkg.GetDirectLeavesToSend() {
 		if leaf == nil {
 			return nil, fmt.Errorf("direct_leaves_to_send[%d] is required", i)
 		}
-		parsed, err := uuid.Parse(leaf.LeafId)
+		parsed, err := uuid.Parse(leaf.GetLeafId())
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
+			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.GetLeafId(), err)
 		}
 		leafID := parsed.String()
 		if _, ok := leavesToSendIDs[leafID]; !ok {
-			return nil, fmt.Errorf("orphan leaf in DirectLeavesToSend with ID %s not found in LeavesToSend", leaf.LeafId)
+			return nil, fmt.Errorf("orphan leaf in DirectLeavesToSend with ID %s not found in LeavesToSend", leaf.GetLeafId())
 		}
 		if _, exists := directLeafIDs[leafID]; exists {
 			return nil, fmt.Errorf("duplicate leaf id in DirectLeavesToSend: %s", leafID)
@@ -1659,24 +1659,24 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	if requireDirectFromCpfpLeaves {
-		if len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
-			return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
+		if len(pkg.GetLeavesToSend()) != len(pkg.GetDirectFromCpfpLeavesToSend()) {
+			return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.GetLeavesToSend()), len(pkg.GetDirectFromCpfpLeavesToSend()))
 		}
-	} else if len(pkg.DirectFromCpfpLeavesToSend) > 0 && len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
-		return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend))
+	} else if len(pkg.GetDirectFromCpfpLeavesToSend()) > 0 && len(pkg.GetLeavesToSend()) != len(pkg.GetDirectFromCpfpLeavesToSend()) {
+		return nil, fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.GetLeavesToSend()), len(pkg.GetDirectFromCpfpLeavesToSend()))
 	}
-	directFromCpfpLeafIDs := make(map[string]struct{}, len(pkg.DirectFromCpfpLeavesToSend))
-	for i, leaf := range pkg.DirectFromCpfpLeavesToSend {
+	directFromCpfpLeafIDs := make(map[string]struct{}, len(pkg.GetDirectFromCpfpLeavesToSend()))
+	for i, leaf := range pkg.GetDirectFromCpfpLeavesToSend() {
 		if leaf == nil {
 			return nil, fmt.Errorf("direct_from_cpfp_leaves_to_send[%d] is required", i)
 		}
-		parsed, err := uuid.Parse(leaf.LeafId)
+		parsed, err := uuid.Parse(leaf.GetLeafId())
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
+			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.GetLeafId(), err)
 		}
 		leafID := parsed.String()
 		if _, ok := leavesToSendIDs[leafID]; !ok {
-			return nil, fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s not in LeavesToSend", leaf.LeafId)
+			return nil, fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s not in LeavesToSend", leaf.GetLeafId())
 		}
 		if _, exists := directFromCpfpLeafIDs[leafID]; exists {
 			return nil, fmt.Errorf("duplicate leaf id in DirectFromCpfpLeavesToSend: %s", leafID)
@@ -1685,16 +1685,16 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	// Signature validation - prevent replay/DoS
-	if len(pkg.UserSignature) == 0 {
+	if len(pkg.GetUserSignature()) == 0 {
 		return nil, fmt.Errorf("user signature cannot be empty")
 	}
 
-	if len(pkg.UserSignature) > MaxSignatureSize {
-		return nil, fmt.Errorf("user signature too large: %d bytes (max: %d)", len(pkg.UserSignature), MaxSignatureSize)
+	if len(pkg.GetUserSignature()) > MaxSignatureSize {
+		return nil, fmt.Errorf("user signature too large: %d bytes (max: %d)", len(pkg.GetUserSignature()), MaxSignatureSize)
 	}
 
 	// Decrypt the key tweaks
-	leafTweaksCipherText := pkg.KeyTweakPackage[h.config.Identifier]
+	leafTweaksCipherText := pkg.GetKeyTweakPackage()[h.config.Identifier]
 	if leafTweaksCipherText == nil {
 		return nil, fmt.Errorf("no key tweaks found for SO %s", h.config.Identifier)
 	}
@@ -1721,7 +1721,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	// Memory usage validation - prevent OOM
-	totalLeafCount := len(leafTweaks.LeavesToSend)
+	totalLeafCount := len(leafTweaks.GetLeavesToSend())
 	if totalLeafCount > transferLimit {
 		return nil, fmt.Errorf("too many leaves in key tweaks: %d (max: %d)", totalLeafCount, transferLimit)
 	}
@@ -1737,11 +1737,11 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	}
 
 	leafTweaksMap := make(map[string]*pbspark.SendLeafKeyTweak)
-	for _, leafTweak := range leafTweaks.LeavesToSend {
+	for _, leafTweak := range leafTweaks.GetLeavesToSend() {
 		// Validate leaf ID in key tweaks
-		parsedLeafID, err := uuid.Parse(leafTweak.LeafId)
+		parsedLeafID, err := uuid.Parse(leafTweak.GetLeafId())
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse key tweaks leaf_id as a uuid %s: %w", leafTweak.LeafId, err)
+			return nil, fmt.Errorf("unable to parse key tweaks leaf_id as a uuid %s: %w", leafTweak.GetLeafId(), err)
 		}
 		leafID := parsedLeafID.String()
 		if _, exists := leafTweaksMap[leafID]; exists {
@@ -1749,18 +1749,18 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		}
 
 		// Validate secret share size
-		if len(leafTweak.SecretShareTweak.SecretShare) > MaxSecretShareSize {
-			return nil, fmt.Errorf("secret share too large: %d bytes (max: %d)", len(leafTweak.SecretShareTweak.SecretShare), MaxSecretShareSize)
+		if len(leafTweak.GetSecretShareTweak().GetSecretShare()) > MaxSecretShareSize {
+			return nil, fmt.Errorf("secret share too large: %d bytes (max: %d)", len(leafTweak.GetSecretShareTweak().GetSecretShare()), MaxSecretShareSize)
 		}
 
 		// Validate proofs count
-		if len(leafTweak.SecretShareTweak.Proofs) > maxProofsCount {
-			return nil, fmt.Errorf("too many proofs: %d (max: %d)", len(leafTweak.SecretShareTweak.Proofs), maxProofsCount)
+		if len(leafTweak.GetSecretShareTweak().GetProofs()) > maxProofsCount {
+			return nil, fmt.Errorf("too many proofs: %d (max: %d)", len(leafTweak.GetSecretShareTweak().GetProofs()), maxProofsCount)
 		}
 
 		// Validate pubkey shares count
-		if len(leafTweak.PubkeySharesTweak) > maxPubkeySharesTweakCount {
-			return nil, fmt.Errorf("too many pubkey shares: %d (max: %d)", len(leafTweak.PubkeySharesTweak), maxPubkeySharesTweakCount)
+		if len(leafTweak.GetPubkeySharesTweak()) > maxPubkeySharesTweakCount {
+			return nil, fmt.Errorf("too many pubkey shares: %d (max: %d)", len(leafTweak.GetPubkeySharesTweak()), maxPubkeySharesTweakCount)
 		}
 
 		leafTweaksMap[leafID] = leafTweak
@@ -1780,12 +1780,12 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 
 	payloadToVerify := common.GetTransferPackageSigningPayload(transferID, pkg)
 
-	if err := common.VerifyECDSASignature(senderIdentityPubKey, pkg.UserSignature, payloadToVerify); err != nil {
+	if err := common.VerifyECDSASignature(senderIdentityPubKey, pkg.GetUserSignature(), payloadToVerify); err != nil {
 		return nil, fmt.Errorf("unable to verify user signature: %w", err)
 	}
 
 	for _, leafTweak := range leafTweaksMap {
-		shareInt := new(big.Int).SetBytes(leafTweak.SecretShareTweak.SecretShare)
+		shareInt := new(big.Int).SetBytes(leafTweak.GetSecretShareTweak().GetSecretShare())
 		err := secretsharing.ValidateShare(
 			&secretsharing.VerifiableSecretShare{
 				SecretShare: secretsharing.SecretShare{
@@ -1794,7 +1794,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 					Index:        big.NewInt(int64(h.config.Index + 1)),
 					Share:        shareInt,
 				},
-				Proofs: leafTweak.SecretShareTweak.Proofs,
+				Proofs: leafTweak.GetSecretShareTweak().GetProofs(),
 			},
 		)
 		if err != nil {
@@ -1803,23 +1803,23 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		// Verify every PubkeySharesTweak entry matches the polynomial commitment derived from
 		// the supplied Proofs at each operator's share index.
 		for soID, operator := range h.config.SigningOperatorMap {
-			pubkeyTweakBytes, ok := leafTweak.PubkeySharesTweak[soID]
+			pubkeyTweakBytes, ok := leafTweak.GetPubkeySharesTweak()[soID]
 			if !ok {
-				return nil, fmt.Errorf("pubkey share tweak missing for operator %s in leaf %s", soID, leafTweak.LeafId)
+				return nil, fmt.Errorf("pubkey share tweak missing for operator %s in leaf %s", soID, leafTweak.GetLeafId())
 			}
 			if _, err := keys.ParsePublicKey(pubkeyTweakBytes); err != nil {
-				return nil, fmt.Errorf("unable to parse pubkey share tweak for operator %s leaf %s: %w", soID, leafTweak.LeafId, err)
+				return nil, fmt.Errorf("unable to parse pubkey share tweak for operator %s leaf %s: %w", soID, leafTweak.GetLeafId(), err)
 			}
 			expectedPub, err := secretsharing.EvaluatePolynomialCommitment(
-				leafTweak.SecretShareTweak.Proofs,
+				leafTweak.GetSecretShareTweak().GetProofs(),
 				big.NewInt(int64(operator.ID+1)),
 				secp256k1.S256().N,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("unable to evaluate polynomial commitment for operator %s leaf %s: %w", soID, leafTweak.LeafId, err)
+				return nil, fmt.Errorf("unable to evaluate polynomial commitment for operator %s leaf %s: %w", soID, leafTweak.GetLeafId(), err)
 			}
 			if !bytes.Equal(expectedPub.Serialize(), pubkeyTweakBytes) {
-				return nil, fmt.Errorf("pubkey share tweak for operator %s does not match polynomial commitment for leaf %s", soID, leafTweak.LeafId)
+				return nil, fmt.Errorf("pubkey share tweak for operator %s does not match polynomial commitment for leaf %s", soID, leafTweak.GetLeafId())
 			}
 		}
 	}
@@ -2343,11 +2343,11 @@ func validateLeaves_transfer(
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.LeavesToSend))
-	for _, leaf := range pkg.LeavesToSend {
-		parsed, err := uuid.Parse(leaf.LeafId)
+	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.GetLeavesToSend()))
+	for _, leaf := range pkg.GetLeavesToSend() {
+		parsed, err := uuid.Parse(leaf.GetLeafId())
 		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.GetLeafId(), err))
 		}
 		leafID := parsed.String()
 		if _, exists := leavesToSendByID[leafID]; exists {
@@ -2356,15 +2356,15 @@ func validateLeaves_transfer(
 		leavesToSendByID[leafID] = leaf
 	}
 
-	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.DirectLeavesToSend))
-	for _, leaf := range pkg.DirectLeavesToSend {
-		parsed, err := uuid.Parse(leaf.LeafId)
+	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.GetDirectLeavesToSend()))
+	for _, leaf := range pkg.GetDirectLeavesToSend() {
+		parsed, err := uuid.Parse(leaf.GetLeafId())
 		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.GetLeafId(), err))
 		}
 		directLeafID := parsed.String()
 		if _, ok := leavesToSendByID[directLeafID]; !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.LeafId))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.GetLeafId()))
 		}
 		if _, exists := directLeavesByID[directLeafID]; exists {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", directLeafID))
@@ -2372,19 +2372,19 @@ func validateLeaves_transfer(
 		directLeavesByID[directLeafID] = leaf
 	}
 
-	if len(pkg.LeavesToSend) != len(pkg.DirectFromCpfpLeavesToSend) {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.LeavesToSend), len(pkg.DirectFromCpfpLeavesToSend)))
+	if len(pkg.GetLeavesToSend()) != len(pkg.GetDirectFromCpfpLeavesToSend()) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.GetLeavesToSend()), len(pkg.GetDirectFromCpfpLeavesToSend())))
 	}
 
-	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.DirectFromCpfpLeavesToSend))
-	for _, leaf := range pkg.DirectFromCpfpLeavesToSend {
-		parsed, err := uuid.Parse(leaf.LeafId)
+	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.GetDirectFromCpfpLeavesToSend()))
+	for _, leaf := range pkg.GetDirectFromCpfpLeavesToSend() {
+		parsed, err := uuid.Parse(leaf.GetLeafId())
 		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.LeafId, err))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.GetLeafId(), err))
 		}
 		directFromCpfpLeafID := parsed.String()
 		if _, ok := leavesToSendByID[directFromCpfpLeafID]; !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.LeafId))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.GetLeafId()))
 		}
 		if _, exists := directFromCpfpLeavesByID[directFromCpfpLeafID]; exists {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID))
@@ -2560,7 +2560,7 @@ func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]*pbspark.SendLeafKey
 	}
 
 	for leafID, leafTweak := range keyTweakMap {
-		if leafTweak.SecretShareTweak == nil {
+		if leafTweak.GetSecretShareTweak() == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", leafID))
 		}
 		proof, ok := senderKeyTweakProofs[leafID]
@@ -2570,7 +2570,7 @@ func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]*pbspark.SendLeafKey
 		if proof == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender key tweak proof value is nil for leaf %s", leafID))
 		}
-		if !slices.EqualFunc(proof.Proofs, leafTweak.SecretShareTweak.Proofs, bytes.Equal) {
+		if !slices.EqualFunc(proof.GetProofs(), leafTweak.GetSecretShareTweak().GetProofs(), bytes.Equal) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof mismatch for leaf %s", leafID))
 		}
 	}
@@ -2594,19 +2594,19 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
-		if keyTweakProto.SecretShareTweak == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", keyTweakProto.LeafId))
+		if keyTweakProto.GetSecretShareTweak() == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", keyTweakProto.GetLeafId()))
 		}
 
-		keyTweakProof, ok := senderKeyTweakProofs[keyTweakProto.LeafId]
+		keyTweakProof, ok := senderKeyTweakProofs[keyTweakProto.GetLeafId()]
 		if !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("key tweak proof not found for leaf: %s", keyTweakProto.LeafId))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("key tweak proof not found for leaf: %s", keyTweakProto.GetLeafId()))
 		}
 		if keyTweakProof == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("key tweak proof value is nil for leaf: %s", keyTweakProto.LeafId))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("key tweak proof value is nil for leaf: %s", keyTweakProto.GetLeafId()))
 		}
 
-		if !slices.EqualFunc(keyTweakProof.Proofs, keyTweakProto.SecretShareTweak.Proofs, bytes.Equal) {
+		if !slices.EqualFunc(keyTweakProof.GetProofs(), keyTweakProto.GetSecretShareTweak().GetProofs(), bytes.Equal) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof mismatch"))
 		}
 	}
@@ -2702,8 +2702,8 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		}
 		_, err = leaf.Update().
 			SetKeyTweak(nil).
-			SetSecretCipher(keyTweak.SecretCipher).
-			SetSignature(keyTweak.Signature).
+			SetSecretCipher(keyTweak.GetSecretCipher()).
+			SetSignature(keyTweak.GetSignature()).
 			Save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update leaf key tweak: %w", err)

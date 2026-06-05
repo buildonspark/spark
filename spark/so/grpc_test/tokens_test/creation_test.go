@@ -23,23 +23,23 @@ func queryAndVerifyTokenMetadata(t *testing.T, config *wallet.TestWalletConfig, 
 	require.NoError(t, err, "failed to query token metadata by issuer public key")
 
 	require.NotNil(t, resp1)
-	require.Len(t, resp1.TokenMetadata, 1)
+	require.Len(t, resp1.GetTokenMetadata(), 1)
 
-	metadata1 := resp1.TokenMetadata[0]
+	metadata1 := resp1.GetTokenMetadata()[0]
 	verifyTokenMetadata(t, metadata1, params, "issuer public key query")
 
 	// Test 2: Query by token identifier (using the one from the first query)
-	tokenIdentifier := metadata1.TokenIdentifier
+	tokenIdentifier := metadata1.GetTokenIdentifier()
 	resp2, err := wallet.QueryTokenMetadata(t.Context(), config, [][]byte{tokenIdentifier}, nil)
 	require.NoError(t, err, "failed to query token metadata by token identifier")
 	require.NotNil(t, resp2, "token metadata response should not be nil")
-	require.Len(t, resp2.TokenMetadata, 1)
+	require.Len(t, resp2.GetTokenMetadata(), 1)
 
-	metadata2 := resp2.TokenMetadata[0]
+	metadata2 := resp2.GetTokenMetadata()[0]
 	verifyTokenMetadata(t, metadata2, params, "token identifier query")
 
 	// Verify the token identifiers match
-	require.Equal(t, metadata1.TokenIdentifier, metadata2.TokenIdentifier, "token identifier should be identical across queries")
+	require.Equal(t, metadata1.GetTokenIdentifier(), metadata2.GetTokenIdentifier(), "token identifier should be identical across queries")
 }
 
 func TestQueryTokenMetadataWithNoParams(t *testing.T) {
@@ -121,7 +121,7 @@ func TestQueryTokenMetadataMixedParams(t *testing.T) {
 		[]keys.Public{l1TokenIssuerPubKey},
 	)
 	require.NoError(t, err, "failed to query token metadata with mixed parameters")
-	require.Len(t, mixedResp.TokenMetadata, 2)
+	require.Len(t, mixedResp.GetTokenMetadata(), 2)
 
 	var foundNativeToken, foundL1Token bool
 	l1TokenParams := sparkTokenCreationTestParams{
@@ -131,11 +131,11 @@ func TestQueryTokenMetadataMixedParams(t *testing.T) {
 		maxSupply:        testTokenMaxSupply,
 	}
 
-	for _, metadata := range mixedResp.TokenMetadata {
-		if bytes.Equal(metadata.TokenIdentifier, nativeTokenIdentifier) {
+	for _, metadata := range mixedResp.GetTokenMetadata() {
+		if bytes.Equal(metadata.GetTokenIdentifier(), nativeTokenIdentifier) {
 			foundNativeToken = true
 			verifyTokenMetadata(t, metadata, nativeTokenParams, "mixed query - native token")
-		} else if issuerPubKey, err := keys.ParsePublicKey(metadata.IssuerPublicKey); err == nil && issuerPubKey.Equals(l1TokenIssuerPubKey) {
+		} else if issuerPubKey, err := keys.ParsePublicKey(metadata.GetIssuerPublicKey()); err == nil && issuerPubKey.Equals(l1TokenIssuerPubKey) {
 			foundL1Token = true
 			verifyTokenMetadata(t, metadata, l1TokenParams, "mixed query - L1 token")
 		}

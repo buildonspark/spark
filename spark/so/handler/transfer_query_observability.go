@@ -167,7 +167,7 @@ func logQueryTransfersInvocation(ctx context.Context, queryPath string, filter *
 	if filter != nil {
 		participantType := "none"
 		var participantPubkeyHash string
-		switch p := filter.Participant.(type) {
+		switch p := filter.GetParticipant().(type) {
 		case *pb.TransferFilter_ReceiverIdentityPublicKey:
 			participantType = "receiver"
 			participantPubkeyHash = shortPubkeyHash(p.ReceiverIdentityPublicKey)

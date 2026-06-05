@@ -15,44 +15,44 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*le
 		return nil, fmt.Errorf("input token transaction cannot be nil")
 	}
 
-	tokenOutputs := make([]*legacypb.TokenOutput, len(tokenTx.TokenOutputs))
-	for i, o := range tokenTx.TokenOutputs {
+	tokenOutputs := make([]*legacypb.TokenOutput, len(tokenTx.GetTokenOutputs()))
+	for i, o := range tokenTx.GetTokenOutputs() {
 		if o == nil {
 			return nil, fmt.Errorf("token output %d is nil", i)
 		}
 		tokenOutputs[i] = &legacypb.TokenOutput{
 			Id:                            o.Id,
-			OwnerPublicKey:                o.OwnerPublicKey,
-			RevocationCommitment:          o.RevocationCommitment,
+			OwnerPublicKey:                o.GetOwnerPublicKey(),
+			RevocationCommitment:          o.GetRevocationCommitment(),
 			WithdrawBondSats:              o.WithdrawBondSats,
 			WithdrawRelativeBlockLocktime: o.WithdrawRelativeBlockLocktime,
-			TokenPublicKey:                o.TokenPublicKey,
-			TokenIdentifier:               o.TokenIdentifier,
-			TokenAmount:                   o.TokenAmount,
+			TokenPublicKey:                o.GetTokenPublicKey(),
+			TokenIdentifier:               o.GetTokenIdentifier(),
+			TokenAmount:                   o.GetTokenAmount(),
 		}
 	}
 
 	transaction := &legacypb.TokenTransaction{
 		TokenOutputs:                    tokenOutputs,
-		SparkOperatorIdentityPublicKeys: tokenTx.SparkOperatorIdentityPublicKeys,
-		Network:                         tokenTx.Network,
+		SparkOperatorIdentityPublicKeys: tokenTx.GetSparkOperatorIdentityPublicKeys(),
+		Network:                         tokenTx.GetNetwork(),
 		// Note: ExpiryTime and Version fields are omitted as they do not exist in legacypb.TokenTransaction.
 	}
 
-	switch x := tokenTx.TokenInputs.(type) {
+	switch x := tokenTx.GetTokenInputs().(type) {
 	case *tokenpb.TokenTransaction_CreateInput:
 		if x.CreateInput == nil {
 			return nil, fmt.Errorf("create_input is nil")
 		}
 		transaction.TokenInputs = &legacypb.TokenTransaction_CreateInput{
 			CreateInput: &legacypb.TokenCreateInput{
-				IssuerPublicKey:         x.CreateInput.IssuerPublicKey,
-				TokenName:               x.CreateInput.TokenName,
-				TokenTicker:             x.CreateInput.TokenTicker,
-				Decimals:                x.CreateInput.Decimals,
-				MaxSupply:               x.CreateInput.MaxSupply,
-				IsFreezable:             x.CreateInput.IsFreezable,
-				CreationEntityPublicKey: x.CreateInput.CreationEntityPublicKey,
+				IssuerPublicKey:         x.CreateInput.GetIssuerPublicKey(),
+				TokenName:               x.CreateInput.GetTokenName(),
+				TokenTicker:             x.CreateInput.GetTokenTicker(),
+				Decimals:                x.CreateInput.GetDecimals(),
+				MaxSupply:               x.CreateInput.GetMaxSupply(),
+				IsFreezable:             x.CreateInput.GetIsFreezable(),
+				CreationEntityPublicKey: x.CreateInput.GetCreationEntityPublicKey(),
 			},
 		}
 	case *tokenpb.TokenTransaction_MintInput:
@@ -60,13 +60,13 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*le
 			return nil, fmt.Errorf("mint_input is nil")
 		}
 		var issuerProvidedTimestamp uint64
-		if tokenTx.ClientCreatedTimestamp != nil {
-			issuerProvidedTimestamp = uint64(tokenTx.ClientCreatedTimestamp.AsTime().UnixMilli())
+		if tokenTx.GetClientCreatedTimestamp() != nil {
+			issuerProvidedTimestamp = uint64(tokenTx.GetClientCreatedTimestamp().AsTime().UnixMilli())
 		}
 		transaction.TokenInputs = &legacypb.TokenTransaction_MintInput{
 			MintInput: &legacypb.TokenMintInput{
-				IssuerPublicKey:         x.MintInput.IssuerPublicKey,
-				TokenIdentifier:         x.MintInput.TokenIdentifier,
+				IssuerPublicKey:         x.MintInput.GetIssuerPublicKey(),
+				TokenIdentifier:         x.MintInput.GetTokenIdentifier(),
 				IssuerProvidedTimestamp: issuerProvidedTimestamp,
 			},
 		}
@@ -74,14 +74,14 @@ func SparkTokenTransactionFromTokenProto(tokenTx *tokenpb.TokenTransaction) (*le
 		if x.TransferInput == nil {
 			return nil, fmt.Errorf("transfer_input is nil")
 		}
-		outputsToSpend := make([]*legacypb.TokenOutputToSpend, len(x.TransferInput.OutputsToSpend))
-		for i, o := range x.TransferInput.OutputsToSpend {
+		outputsToSpend := make([]*legacypb.TokenOutputToSpend, len(x.TransferInput.GetOutputsToSpend()))
+		for i, o := range x.TransferInput.GetOutputsToSpend() {
 			if o == nil {
 				return nil, fmt.Errorf("transfer output to spend %d is nil", i)
 			}
 			outputsToSpend[i] = &legacypb.TokenOutputToSpend{
-				PrevTokenTransactionHash: o.PrevTokenTransactionHash,
-				PrevTokenTransactionVout: o.PrevTokenTransactionVout,
+				PrevTokenTransactionHash: o.GetPrevTokenTransactionHash(),
+				PrevTokenTransactionVout: o.GetPrevTokenTransactionVout(),
 			}
 		}
 		transaction.TokenInputs = &legacypb.TokenTransaction_TransferInput{
@@ -102,44 +102,44 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *legacypb.TokenTransaction) (*t
 		return nil, fmt.Errorf("input spark token transaction cannot be nil")
 	}
 
-	tokenOutputs := make([]*tokenpb.TokenOutput, len(sparkTx.TokenOutputs))
-	for i, o := range sparkTx.TokenOutputs {
+	tokenOutputs := make([]*tokenpb.TokenOutput, len(sparkTx.GetTokenOutputs()))
+	for i, o := range sparkTx.GetTokenOutputs() {
 		if o == nil {
 			return nil, fmt.Errorf("token output %d is nil", i)
 		}
 		tokenOutputs[i] = &tokenpb.TokenOutput{
 			Id:                            o.Id,
-			OwnerPublicKey:                o.OwnerPublicKey,
-			RevocationCommitment:          o.RevocationCommitment,
+			OwnerPublicKey:                o.GetOwnerPublicKey(),
+			RevocationCommitment:          o.GetRevocationCommitment(),
 			WithdrawBondSats:              o.WithdrawBondSats,
 			WithdrawRelativeBlockLocktime: o.WithdrawRelativeBlockLocktime,
-			TokenPublicKey:                o.TokenPublicKey,
-			TokenIdentifier:               o.TokenIdentifier,
-			TokenAmount:                   o.TokenAmount,
+			TokenPublicKey:                o.GetTokenPublicKey(),
+			TokenIdentifier:               o.GetTokenIdentifier(),
+			TokenAmount:                   o.GetTokenAmount(),
 		}
 	}
 
 	tokenTx := &tokenpb.TokenTransaction{
 		Version:                         0,
 		TokenOutputs:                    tokenOutputs,
-		SparkOperatorIdentityPublicKeys: sparkTx.SparkOperatorIdentityPublicKeys,
-		Network:                         sparkTx.Network,
+		SparkOperatorIdentityPublicKeys: sparkTx.GetSparkOperatorIdentityPublicKeys(),
+		Network:                         sparkTx.GetNetwork(),
 	}
 
-	switch x := sparkTx.TokenInputs.(type) {
+	switch x := sparkTx.GetTokenInputs().(type) {
 	case *legacypb.TokenTransaction_CreateInput:
 		if x.CreateInput == nil {
 			return nil, fmt.Errorf("create_input is nil")
 		}
 		tokenTx.TokenInputs = &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
-				IssuerPublicKey:         x.CreateInput.IssuerPublicKey,
-				TokenName:               x.CreateInput.TokenName,
-				TokenTicker:             x.CreateInput.TokenTicker,
-				Decimals:                x.CreateInput.Decimals,
-				MaxSupply:               x.CreateInput.MaxSupply,
-				IsFreezable:             x.CreateInput.IsFreezable,
-				CreationEntityPublicKey: x.CreateInput.CreationEntityPublicKey,
+				IssuerPublicKey:         x.CreateInput.GetIssuerPublicKey(),
+				TokenName:               x.CreateInput.GetTokenName(),
+				TokenTicker:             x.CreateInput.GetTokenTicker(),
+				Decimals:                x.CreateInput.GetDecimals(),
+				MaxSupply:               x.CreateInput.GetMaxSupply(),
+				IsFreezable:             x.CreateInput.GetIsFreezable(),
+				CreationEntityPublicKey: x.CreateInput.GetCreationEntityPublicKey(),
 			},
 		}
 	case *legacypb.TokenTransaction_MintInput:
@@ -147,13 +147,13 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *legacypb.TokenTransaction) (*t
 			return nil, fmt.Errorf("mint_input is nil")
 		}
 		var clientCreatedTimestamp *timestamppb.Timestamp
-		if x.MintInput.IssuerProvidedTimestamp != 0 {
-			clientCreatedTimestamp = timestamppb.New(time.UnixMilli(int64(x.MintInput.IssuerProvidedTimestamp)))
+		if x.MintInput.GetIssuerProvidedTimestamp() != 0 {
+			clientCreatedTimestamp = timestamppb.New(time.UnixMilli(int64(x.MintInput.GetIssuerProvidedTimestamp())))
 		}
 		tokenTx.TokenInputs = &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
-				IssuerPublicKey: x.MintInput.IssuerPublicKey,
-				TokenIdentifier: x.MintInput.TokenIdentifier,
+				IssuerPublicKey: x.MintInput.GetIssuerPublicKey(),
+				TokenIdentifier: x.MintInput.GetTokenIdentifier(),
 			},
 		}
 		tokenTx.ClientCreatedTimestamp = clientCreatedTimestamp
@@ -161,14 +161,14 @@ func TokenProtoFromSparkTokenTransaction(sparkTx *legacypb.TokenTransaction) (*t
 		if x.TransferInput == nil {
 			return nil, fmt.Errorf("transfer_input is nil")
 		}
-		outputsToSpend := make([]*tokenpb.TokenOutputToSpend, len(x.TransferInput.OutputsToSpend))
-		for i, o := range x.TransferInput.OutputsToSpend {
+		outputsToSpend := make([]*tokenpb.TokenOutputToSpend, len(x.TransferInput.GetOutputsToSpend()))
+		for i, o := range x.TransferInput.GetOutputsToSpend() {
 			if o == nil {
 				return nil, fmt.Errorf("transfer output to spend %d is nil", i)
 			}
 			outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
-				PrevTokenTransactionHash: o.PrevTokenTransactionHash,
-				PrevTokenTransactionVout: o.PrevTokenTransactionVout,
+				PrevTokenTransactionHash: o.GetPrevTokenTransactionHash(),
+				PrevTokenTransactionVout: o.GetPrevTokenTransactionVout(),
 			}
 		}
 		tokenTx.TokenInputs = &tokenpb.TokenTransaction_TransferInput{
@@ -189,21 +189,21 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 	}
 
 	var validityDuration *uint64
-	if v := partial.TokenTransactionMetadata.GetValidityDurationSeconds(); v != 0 {
+	if v := partial.GetTokenTransactionMetadata().GetValidityDurationSeconds(); v != 0 {
 		validityDuration = new(v)
 	}
 
 	legacy := &tokenpb.TokenTransaction{
 		Version:                         partial.GetVersion(),
-		SparkOperatorIdentityPublicKeys: partial.TokenTransactionMetadata.GetSparkOperatorIdentityPublicKeys(),
-		Network:                         partial.TokenTransactionMetadata.GetNetwork(),
-		ClientCreatedTimestamp:          partial.TokenTransactionMetadata.GetClientCreatedTimestamp(),
-		InvoiceAttachments:              partial.TokenTransactionMetadata.GetInvoiceAttachments(),
+		SparkOperatorIdentityPublicKeys: partial.GetTokenTransactionMetadata().GetSparkOperatorIdentityPublicKeys(),
+		Network:                         partial.GetTokenTransactionMetadata().GetNetwork(),
+		ClientCreatedTimestamp:          partial.GetTokenTransactionMetadata().GetClientCreatedTimestamp(),
+		InvoiceAttachments:              partial.GetTokenTransactionMetadata().GetInvoiceAttachments(),
 		ValidityDurationSeconds:         validityDuration,
 		ExecuteBefore:                   partial.GetExecuteBefore(),
 	}
 
-	switch input := partial.TokenInputs.(type) {
+	switch input := partial.GetTokenInputs().(type) {
 	case *tokenpb.PartialTokenTransaction_MintInput:
 		legacy.TokenInputs = &tokenpb.TokenTransaction_MintInput{MintInput: input.MintInput}
 	case *tokenpb.PartialTokenTransaction_TransferInput:
@@ -214,8 +214,8 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 		return nil, fmt.Errorf("unknown token input type: %T", input)
 	}
 
-	legacy.TokenOutputs = make([]*tokenpb.TokenOutput, len(partial.PartialTokenOutputs))
-	for i, partialOutput := range partial.PartialTokenOutputs {
+	legacy.TokenOutputs = make([]*tokenpb.TokenOutput, len(partial.GetPartialTokenOutputs()))
+	for i, partialOutput := range partial.GetPartialTokenOutputs() {
 		if partialOutput == nil {
 			return nil, fmt.Errorf("partial token output %d is nil", i)
 		}
@@ -231,7 +231,7 @@ func ConvertPartialToV2TxShape(partial *tokenpb.PartialTokenTransaction) (*token
 			OwnerPublicKey:                partialOutput.GetOwnerPublicKey(),
 			WithdrawBondSats:              withdrawBond,
 			WithdrawRelativeBlockLocktime: withdrawLocktime,
-			TokenIdentifier:               partialOutput.TokenIdentifier,
+			TokenIdentifier:               partialOutput.GetTokenIdentifier(),
 			TokenAmount:                   partialOutput.GetTokenAmount(),
 		}
 	}
@@ -245,21 +245,21 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 	}
 
 	var validityDuration *uint64
-	if v := final.TokenTransactionMetadata.GetValidityDurationSeconds(); v != 0 {
+	if v := final.GetTokenTransactionMetadata().GetValidityDurationSeconds(); v != 0 {
 		validityDuration = new(v)
 	}
 
 	legacy := &tokenpb.TokenTransaction{
 		Version:                         final.GetVersion(),
-		SparkOperatorIdentityPublicKeys: final.TokenTransactionMetadata.GetSparkOperatorIdentityPublicKeys(),
-		Network:                         final.TokenTransactionMetadata.GetNetwork(),
-		ClientCreatedTimestamp:          final.TokenTransactionMetadata.GetClientCreatedTimestamp(),
-		InvoiceAttachments:              final.TokenTransactionMetadata.GetInvoiceAttachments(),
+		SparkOperatorIdentityPublicKeys: final.GetTokenTransactionMetadata().GetSparkOperatorIdentityPublicKeys(),
+		Network:                         final.GetTokenTransactionMetadata().GetNetwork(),
+		ClientCreatedTimestamp:          final.GetTokenTransactionMetadata().GetClientCreatedTimestamp(),
+		InvoiceAttachments:              final.GetTokenTransactionMetadata().GetInvoiceAttachments(),
 		ValidityDurationSeconds:         validityDuration,
 		ExecuteBefore:                   final.GetExecuteBefore(),
 	}
 
-	switch input := final.TokenInputs.(type) {
+	switch input := final.GetTokenInputs().(type) {
 	case *tokenpb.FinalTokenTransaction_MintInput:
 		legacy.TokenInputs = &tokenpb.TokenTransaction_MintInput{MintInput: input.MintInput}
 	case *tokenpb.FinalTokenTransaction_TransferInput:
@@ -270,8 +270,8 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 		return nil, fmt.Errorf("unknown token input type: %T", input)
 	}
 
-	legacy.TokenOutputs = make([]*tokenpb.TokenOutput, len(final.FinalTokenOutputs))
-	for i, finalOutput := range final.FinalTokenOutputs {
+	legacy.TokenOutputs = make([]*tokenpb.TokenOutput, len(final.GetFinalTokenOutputs()))
+	for i, finalOutput := range final.GetFinalTokenOutputs() {
 		partialOutput := finalOutput.GetPartialTokenOutput()
 		if partialOutput == nil {
 			legacy.TokenOutputs[i] = &tokenpb.TokenOutput{}
@@ -288,7 +288,7 @@ func ConvertFinalToV2TxShape(final *tokenpb.FinalTokenTransaction) (*tokenpb.Tok
 				OwnerPublicKey:                partialOutput.GetOwnerPublicKey(),
 				WithdrawBondSats:              withdrawBond,
 				WithdrawRelativeBlockLocktime: withdrawLocktime,
-				TokenIdentifier:               partialOutput.TokenIdentifier,
+				TokenIdentifier:               partialOutput.GetTokenIdentifier(),
 				TokenAmount:                   partialOutput.GetTokenAmount(),
 				RevocationCommitment:          finalOutput.GetRevocationCommitment(),
 			}
@@ -336,7 +336,7 @@ func ConvertV2TxShapeToPartial(legacy *tokenpb.TokenTransaction) (*tokenpb.Parti
 	}
 
 	// Map inputs while erasing SO-filled fields for partials
-	switch input := legacy.TokenInputs.(type) {
+	switch input := legacy.GetTokenInputs().(type) {
 	case *tokenpb.TokenTransaction_MintInput:
 		partial.TokenInputs = &tokenpb.PartialTokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
@@ -373,19 +373,19 @@ func ConvertV2TxShapeToPartial(legacy *tokenpb.TokenTransaction) (*tokenpb.Parti
 
 	// Map outputs to PartialTokenOutput, erasing SO-filled fields (id, revocation, etc.)
 	if legacy.TokenOutputs != nil {
-		partial.PartialTokenOutputs = make([]*tokenpb.PartialTokenOutput, len(legacy.TokenOutputs))
-		for i, o := range legacy.TokenOutputs {
+		partial.PartialTokenOutputs = make([]*tokenpb.PartialTokenOutput, len(legacy.GetTokenOutputs()))
+		for i, o := range legacy.GetTokenOutputs() {
 			if o == nil {
 				partial.PartialTokenOutputs[i] = nil
 				continue
 			}
 			var withdrawBond uint64
 			if o.WithdrawBondSats != nil {
-				withdrawBond = *o.WithdrawBondSats
+				withdrawBond = o.GetWithdrawBondSats()
 			}
 			var withdrawLocktime uint64
 			if o.WithdrawRelativeBlockLocktime != nil {
-				withdrawLocktime = *o.WithdrawRelativeBlockLocktime
+				withdrawLocktime = o.GetWithdrawRelativeBlockLocktime()
 			}
 			partial.PartialTokenOutputs[i] = &tokenpb.PartialTokenOutput{
 				OwnerPublicKey:                o.GetOwnerPublicKey(),
@@ -417,7 +417,7 @@ func ConvertV2TxShapeToFinal(legacy *tokenpb.TokenTransaction) (*tokenpb.FinalTo
 		ExecuteBefore: legacy.GetExecuteBefore(),
 	}
 
-	switch input := legacy.TokenInputs.(type) {
+	switch input := legacy.GetTokenInputs().(type) {
 	case *tokenpb.TokenTransaction_MintInput:
 		final.TokenInputs = &tokenpb.FinalTokenTransaction_MintInput{MintInput: input.MintInput}
 	case *tokenpb.TokenTransaction_TransferInput:

@@ -38,7 +38,7 @@ func NewServer(frostConnection *grpc.ClientConn, config *so.Config) *Server {
 }
 
 func (s *Server) StartDkg(ctx context.Context, req *pbdkg.StartDkgRequest) (*emptypb.Empty, error) {
-	if err := GenerateKeys(ctx, s.config, uint64(req.Count)); err != nil {
+	if err := GenerateKeys(ctx, s.config, uint64(req.GetCount())); err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
@@ -47,31 +47,31 @@ func (s *Server) StartDkg(ctx context.Context, req *pbdkg.StartDkgRequest) (*emp
 // InitiateDkg initiates the DKG protocol.
 // It will be called by the coordinator. It will start the DKG round 1 and deliver the round 1 package to the coordinator.
 func (s *Server) InitiateDkg(ctx context.Context, req *pbdkg.InitiateDkgRequest) (*pbdkg.InitiateDkgResponse, error) {
-	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners, req.MinSigners, req.CoordinatorIndex); err != nil {
+	if err := s.state.InitiateDkg(req.GetRequestId(), req.GetMaxSigners(), req.GetMinSigners(), req.GetCoordinatorIndex()); err != nil {
 		return nil, err
 	}
 
 	frostClient := pbfrost.NewFrostServiceClient(s.frostConnection)
 	round1Response, err := frostClient.DkgRound1(ctx, &pbfrost.DkgRound1Request{
-		RequestId:  req.RequestId,
+		RequestId:  req.GetRequestId(),
 		Identifier: s.config.Identifier,
-		MaxSigners: req.MaxSigners,
-		MinSigners: req.MinSigners,
-		KeyCount:   req.KeyCount,
+		MaxSigners: req.GetMaxSigners(),
+		MinSigners: req.GetMinSigners(),
+		KeyCount:   req.GetKeyCount(),
 	})
 	if err != nil {
-		s.state.RemoveState(req.RequestId)
+		s.state.RemoveState(req.GetRequestId())
 		return nil, err
 	}
 
-	if err := s.state.ProvideRound1Package(req.RequestId, round1Response.Round1Packages); err != nil {
-		s.state.RemoveState(req.RequestId)
+	if err := s.state.ProvideRound1Package(req.GetRequestId(), round1Response.GetRound1Packages()); err != nil {
+		s.state.RemoveState(req.GetRequestId())
 		return nil, err
 	}
 
 	return &pbdkg.InitiateDkgResponse{
 		Identifier:    s.config.Identifier,
-		Round1Package: round1Response.Round1Packages,
+		Round1Package: round1Response.GetRound1Packages(),
 	}, nil
 }
 
@@ -80,12 +80,12 @@ func (s *Server) InitiateDkg(ctx context.Context, req *pbdkg.InitiateDkgRequest)
 // The packages will be signed with this operator's identity key and sent the signature back to the coordinator.
 // It is used as a confirmation that the operator has received the round 1 packages.
 func (s *Server) Round1Packages(_ context.Context, req *pbdkg.Round1PackagesRequest) (*pbdkg.Round1PackagesResponse, error) {
-	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
-	for i, p := range req.Round1Packages {
-		round1Packages[i] = p.Packages
+	round1Packages := make([]map[string][]byte, len(req.GetRound1Packages()))
+	for i, p := range req.GetRound1Packages() {
+		round1Packages[i] = p.GetPackages()
 	}
 
-	if err := s.state.ReceivedRound1Packages(req.RequestId, s.config.Identifier, round1Packages); err != nil {
+	if err := s.state.ReceivedRound1Packages(req.GetRequestId(), s.config.Identifier, round1Packages); err != nil {
 		return nil, err
 	}
 
@@ -104,11 +104,11 @@ func (s *Server) RoundConfirmation(ctx context.Context, req *pbdkg.RoundConfirma
 	if err != nil {
 		return nil, err
 	}
-	if len(req.KeyIds) == 0 {
+	if len(req.GetKeyIds()) == 0 {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("no key IDs to confirm"))
 	}
-	if len(req.KeyIds) > 5000 {
-		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many key IDs to confirm: %d", len(req.KeyIds)))
+	if len(req.GetKeyIds()) > 5000 {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many key IDs to confirm: %d", len(req.GetKeyIds())))
 	}
 	ids, err := uuids.ParseSlice(req.GetKeyIds())
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *Server) RoundConfirmation(ctx context.Context, req *pbdkg.RoundConfirma
 // It will be called by the coordinator. This function will validate the round 1 signatures of all other operators to make sure everyone receives the same round 1 packages.
 // Then it will start the DKG round 2, and distribute the round 2 package to the corresponding operators.
 func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1SignatureRequest) (*pbdkg.Round1SignatureResponse, error) {
-	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.SigningOperatorMap)
+	validationFailures, err := s.state.ReceivedRound1Signature(req.GetRequestId(), s.config.Identifier, req.GetRound1Signatures(), s.config.SigningOperatorMap)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 		}, nil
 	}
 
-	state, err := s.state.GetState(req.RequestId)
+	state, err := s.state.GetState(req.GetRequestId())
 	if err != nil {
 		return nil, err
 	}
@@ -176,17 +176,17 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 
 	frostClient := pbfrost.NewFrostServiceClient(s.frostConnection)
 	round2Response, err := frostClient.DkgRound2(ctx, &pbfrost.DkgRound2Request{
-		RequestId:          req.RequestId,
+		RequestId:          req.GetRequestId(),
 		Round1PackagesMaps: round1PackagesMaps,
 	})
 	if err != nil {
-		s.state.RemoveState(req.RequestId)
+		s.state.RemoveState(req.GetRequestId())
 		return nil, err
 	}
 
 	var wg sync.WaitGroup
 	// Distribute the round 2 package to all participants
-	for identifier := range round2Response.Round2Packages[0].Packages {
+	for identifier := range round2Response.GetRound2Packages()[0].GetPackages() {
 		wg.Add(1)
 		go func(identifier string) {
 			operator := s.config.SigningOperatorMap[identifier]
@@ -199,15 +199,15 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 
 			client := pbdkg.NewDKGServiceClient(connection)
 
-			round2Packages := make([][]byte, len(round2Response.Round2Packages))
-			for i, p := range round2Response.Round2Packages {
-				round2Packages[i] = p.Packages[identifier]
+			round2Packages := make([][]byte, len(round2Response.GetRound2Packages()))
+			for i, p := range round2Response.GetRound2Packages() {
+				round2Packages[i] = p.GetPackages()[identifier]
 			}
 
 			round2Signature := signRound2Packages(s.config.IdentityPrivateKey, round2Packages)
 
 			_, err = client.Round2Packages(ctx, &pbdkg.Round2PackagesRequest{
-				RequestId:       req.RequestId,
+				RequestId:       req.GetRequestId(),
 				Identifier:      s.config.Identifier,
 				Round2Packages:  round2Packages,
 				Round2Signature: round2Signature,
@@ -220,7 +220,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 
 	wg.Wait()
 
-	if err := s.state.ProceedToRound3(ctx, req.RequestId, s.frostConnection, s.config); err != nil {
+	if err := s.state.ProceedToRound3(ctx, req.GetRequestId(), s.frostConnection, s.config); err != nil {
 		return nil, err
 	}
 
@@ -232,15 +232,15 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 // Round2Packages receives the round 2 packages from other operators.
 // Once all operators have sent their round 2 packages, it will start the DKG round 3 and store the key shares in the database.
 func (s *Server) Round2Packages(ctx context.Context, req *pbdkg.Round2PackagesRequest) (*pbdkg.Round2PackagesResponse, error) {
-	if req.Identifier == s.config.Identifier {
+	if req.GetIdentifier() == s.config.Identifier {
 		return &pbdkg.Round2PackagesResponse{}, nil
 	}
 
-	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, s.frostConnection, s.config); err != nil {
+	if err := s.state.ReceivedRound2Packages(req.GetRequestId(), req.GetIdentifier(), req.GetRound2Packages(), req.GetRound2Signature(), s.frostConnection, s.config); err != nil {
 		return nil, err
 	}
 
-	if err := s.state.ProceedToRound3(ctx, req.RequestId, s.frostConnection, s.config); err != nil {
+	if err := s.state.ProceedToRound3(ctx, req.GetRequestId(), s.frostConnection, s.config); err != nil {
 		return nil, err
 	}
 

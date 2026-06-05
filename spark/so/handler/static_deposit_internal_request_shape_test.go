@@ -155,8 +155,8 @@ func TestStaticDepositInternalHandlersRejectMalformedRequestShapeWithoutPanic(t 
 				}
 				messageHash, err := CreateUtxoSwapStatement(
 					UtxoSwapStatementTypeCreated,
-					hex.EncodeToString(onChainUtxo.Txid),
-					onChainUtxo.Vout,
+					hex.EncodeToString(onChainUtxo.GetTxid()),
+					onChainUtxo.GetVout(),
 					btcnetwork.Regtest,
 				)
 				require.NoError(t, err)

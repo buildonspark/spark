@@ -46,11 +46,11 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if req.Transfer == nil {
+	if req.GetTransfer() == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
 
-	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer owner identity public key: %w", err))
 	}
@@ -61,7 +61,7 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	if req.Transfer.TransferPackage != nil {
+	if req.GetTransfer().GetTransferPackage() != nil {
 		knobsService := knobs.GetKnobsService(ctx)
 		if knobsService.GetValue(knobs.KnobUseConsensusCoopExit, 0) > 0 {
 			// The engine commits coordinator-side domain state inside the request
@@ -82,34 +82,34 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	cpfpLeafRefundMap := make(map[string][]byte)
 	directLeafRefundMap := make(map[string][]byte)
 	directFromCpfpLeafRefundMap := make(map[string][]byte)
-	if len(req.Transfer.LeavesToSend) == 0 {
+	if len(req.GetTransfer().GetLeavesToSend()) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one leaf to send is required"))
 	}
-	for _, job := range req.Transfer.LeavesToSend {
+	for _, job := range req.GetTransfer().GetLeavesToSend() {
 		if job == nil {
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf refund tx signing job is required"))
 		}
-		if job.RefundTxSigningJob == nil {
-			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required for leaf %s", job.LeafId))
+		if job.GetRefundTxSigningJob() == nil {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required for leaf %s", job.GetLeafId()))
 		}
-		cpfpLeafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
-		if job.DirectRefundTxSigningJob != nil {
-			directLeafRefundMap[job.LeafId] = job.DirectRefundTxSigningJob.RawTx
+		cpfpLeafRefundMap[job.GetLeafId()] = job.GetRefundTxSigningJob().GetRawTx()
+		if job.GetDirectRefundTxSigningJob() != nil {
+			directLeafRefundMap[job.GetLeafId()] = job.GetDirectRefundTxSigningJob().GetRawTx()
 		}
-		if job.DirectFromCpfpRefundTxSigningJob == nil {
+		if job.GetDirectFromCpfpRefundTxSigningJob() == nil {
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version"))
 		}
-		directFromCpfpLeafRefundMap[job.LeafId] = job.DirectFromCpfpRefundTxSigningJob.RawTx
+		directFromCpfpLeafRefundMap[job.GetLeafId()] = job.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()
 	}
 
-	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer receiver identity public key: %w", err))
 	}
 
 	// Validate exit_txid <-> connector_tx binding before any DB write, leaf
 	// lookup, or FROST work. See parseAndValidateCoopExitTxid.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.Transfer.TransferId, req.ExitTxid, req.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
 	if err != nil {
 		return nil, err
 	}
@@ -119,9 +119,9 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
 
-	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
+	transferUUID, err := uuid.Parse(req.GetTransfer().GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.GetTransfer().GetTransferId(), err)
 	}
 	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferUUID)
 	if err != nil {
@@ -150,7 +150,7 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		transferUUID,
 		nil,
 		st.TransferTypeCooperativeExit,
-		req.Transfer.ExpiryTime.AsTime(),
+		req.GetTransfer().GetExpiryTime().AsTime(),
 		reqTransferOwnerIdentityPubKey,
 		reqTransferReceiverIdentityPubKey,
 		cpfpLeafRefundMap,
@@ -164,17 +164,17 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		req.GetConnectorTx(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transfer %s: %w", req.Transfer.TransferId, err)
+		return nil, fmt.Errorf("failed to create transfer %s: %w", req.GetTransfer().GetTransferId(), err)
 	}
 
-	exitUUID, err := uuid.Parse(req.ExitId)
+	exitUUID, err := uuid.Parse(req.GetExitId())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.ExitId, err)
+		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.GetExitId(), err)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
+		return nil, fmt.Errorf("failed to get or create current tx for transfer id %s exit txid %x: %w", req.GetTransfer().GetTransferId(), req.GetExitTxid(), err)
 	}
 
 	// exit_txid was already parsed + validated above.
@@ -185,27 +185,27 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		// ConfirmationHeight is nil since the transaction is not confirmed yet.
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.ExitId, exitTxid.String(), err)
+		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.GetExitId(), exitTxid.String(), err)
 	}
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal transfer for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
+		return nil, fmt.Errorf("failed to marshal transfer for transfer id %s exit id %s: %w", req.GetTransfer().GetTransferId(), req.GetExitId(), err)
 	}
 
 	if len(req.GetConnectorTx()) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector tx required for cooperative exit validation. Please upgrade to the latest SDK version"))
 	}
 
-	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, keys.Public{}, keys.Public{}, keys.Public{}, req.GetConnectorTx())
+	signingResults, err := signRefunds(ctx, h.config, req.GetTransfer(), leafMap, keys.Public{}, keys.Public{}, keys.Public{}, req.GetConnectorTx())
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign refund transactions for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
+		return nil, fmt.Errorf("failed to sign refund transactions for transfer id %s exit id %s: %w", req.GetTransfer().GetTransferId(), req.GetExitId(), err)
 	}
 
 	cancelGossip = true
 	err = transferHandler.syncCoopExitInit(ctx, req, nil, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sync transfer init for transfer id %s exit id %s: %w", req.Transfer.TransferId, req.ExitId, err)
+		return nil, fmt.Errorf("failed to sync transfer init for transfer id %s exit id %s: %w", req.GetTransfer().GetTransferId(), req.GetExitId(), err)
 	}
 
 	// After this point, the coop exit sync is considered successful.
@@ -248,25 +248,25 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	logger := logging.GetLoggerFromContext(ctx)
 	transferHandler := NewTransferHandler(h.config)
 
-	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer owner identity public key: %w", err))
 	}
 
-	transferID, err := uuid.Parse(req.Transfer.TransferId)
+	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.GetTransfer().GetTransferId(), err)
 	}
 
 	// Validate exit_txid <-> connector_tx binding before any expensive work
 	// (transfer-package validation, leaf lookup, DB writes). See
 	// parseAndValidateCoopExitTxid.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.Transfer.TransferId, req.ExitTxid, req.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
 	if err != nil {
 		return nil, err
 	}
 
-	leafTweakMap, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.Transfer.TransferPackage, reqTransferOwnerIdentityPubKey, true)
+	leafTweakMap, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIdentityPubKey, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for coop exit %s: %w", transferID, err)
 	}
@@ -275,9 +275,9 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit. Please upgrade to the latest SDK version"))
 	}
 
-	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMaps(req.Transfer)
+	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMaps(req.GetTransfer())
 
-	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse transfer receiver identity public key: %w", err))
 	}
@@ -293,7 +293,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		transferID,
 		nil,
 		st.TransferTypeCooperativeExit,
-		req.Transfer.ExpiryTime.AsTime(),
+		req.GetTransfer().GetExpiryTime().AsTime(),
 		reqTransferOwnerIdentityPubKey,
 		reqTransferReceiverIdentityPubKey,
 		leafCpfpRefundMap,
@@ -315,14 +315,14 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	}
 
 	// Create cooperative exit record. exit_txid was already parsed + validated.
-	exitUUID, err := uuid.Parse(req.ExitId)
+	exitUUID, err := uuid.Parse(req.GetExitId())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.ExitId, err)
+		return nil, fmt.Errorf("unable to parse exit_id %x: %w", req.GetExitId(), err)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get db for transfer id %s exit txid %x: %w", req.Transfer.TransferId, req.ExitTxid, err)
+		return nil, fmt.Errorf("failed to get db for transfer id %s exit txid %x: %w", req.GetTransfer().GetTransferId(), req.GetExitTxid(), err)
 	}
 	_, err = db.CooperativeExit.Create().
 		SetID(exitUUID).
@@ -330,12 +330,12 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		SetExitTxid(exitTxid).
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.ExitId, exitTxid.String(), err)
+		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.GetExitId(), exitTxid.String(), err)
 	}
 
 	// Sign refunds with pregenerated nonces, aggregate, and update leaves.
 	refundSignatures, err := transferHandler.signAggregateAndUpdateRefunds(
-		ctx, transfer, req.Transfer.GetTransferId(), req.Transfer.TransferPackage, leafMap,
+		ctx, transfer, req.GetTransfer().GetTransferId(), req.GetTransfer().GetTransferPackage(), leafMap,
 		keys.Public{}, keys.Public{}, keys.Public{}, req.GetConnectorTx(),
 	)
 	if err != nil {
@@ -423,7 +423,7 @@ func (h *CooperativeExitHandler) cooperativeExitConsensus(ctx context.Context, r
 		return nil, fmt.Errorf("consensus coop exit failed: %w", err)
 	}
 	if flow.response == nil {
-		return nil, fmt.Errorf("internal: consensus coop exit for %s succeeded but produced no response", req.Transfer.GetTransferId())
+		return nil, fmt.Errorf("internal: consensus coop exit for %s succeeded but produced no response", req.GetTransfer().GetTransferId())
 	}
 	return flow.response, nil
 }
@@ -435,34 +435,34 @@ func (h *TransferHandler) syncCoopExitInit(
 	directRefundSignatures map[string][]byte,
 	directFromCpfpRefundSignatures map[string][]byte,
 ) error {
-	transfer := req.Transfer
+	transfer := req.GetTransfer()
 
 	initTransferRequest := &pbinternal.InitiateTransferRequest{
-		TransferId:                transfer.TransferId,
-		SenderIdentityPublicKey:   transfer.OwnerIdentityPublicKey,
-		ReceiverIdentityPublicKey: transfer.ReceiverIdentityPublicKey,
-		ExpiryTime:                transfer.ExpiryTime,
+		TransferId:                transfer.GetTransferId(),
+		SenderIdentityPublicKey:   transfer.GetOwnerIdentityPublicKey(),
+		ReceiverIdentityPublicKey: transfer.GetReceiverIdentityPublicKey(),
+		ExpiryTime:                transfer.GetExpiryTime(),
 	}
 
-	if transfer.TransferPackage != nil {
-		initTransferRequest.TransferPackage = transfer.TransferPackage
+	if transfer.GetTransferPackage() != nil {
+		initTransferRequest.TransferPackage = transfer.GetTransferPackage()
 		initTransferRequest.RefundSignatures = cpfpRefundSignatures
 		initTransferRequest.DirectRefundSignatures = directRefundSignatures
 		initTransferRequest.DirectFromCpfpRefundSignatures = directFromCpfpRefundSignatures
 	} else {
 		var leaves []*pbinternal.InitiateTransferLeaf
-		for _, leaf := range transfer.LeavesToSend {
+		for _, leaf := range transfer.GetLeavesToSend() {
 			var directRefundTx []byte
 			var directFromCpfpRefundTx []byte
-			if leaf.DirectRefundTxSigningJob != nil {
-				directRefundTx = leaf.DirectRefundTxSigningJob.RawTx
+			if leaf.GetDirectRefundTxSigningJob() != nil {
+				directRefundTx = leaf.GetDirectRefundTxSigningJob().GetRawTx()
 			}
-			if leaf.DirectFromCpfpRefundTxSigningJob != nil {
-				directFromCpfpRefundTx = leaf.DirectFromCpfpRefundTxSigningJob.RawTx
+			if leaf.GetDirectFromCpfpRefundTxSigningJob() != nil {
+				directFromCpfpRefundTx = leaf.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()
 			}
 			leaves = append(leaves, &pbinternal.InitiateTransferLeaf{
-				LeafId:                 leaf.LeafId,
-				RawRefundTx:            leaf.RefundTxSigningJob.RawTx,
+				LeafId:                 leaf.GetLeafId(),
+				RawRefundTx:            leaf.GetRefundTxSigningJob().GetRawTx(),
 				DirectRefundTx:         directRefundTx,
 				DirectFromCpfpRefundTx: directFromCpfpRefundTx,
 			})
@@ -472,8 +472,8 @@ func (h *TransferHandler) syncCoopExitInit(
 
 	coopExitRequest := &pbinternal.InitiateCooperativeExitRequest{
 		Transfer:    initTransferRequest,
-		ExitId:      req.ExitId,
-		ExitTxid:    req.ExitTxid,
+		ExitId:      req.GetExitId(),
+		ExitTxid:    req.GetExitTxid(),
 		ConnectorTx: req.GetConnectorTx(),
 	}
 	selection := helper.OperatorSelection{

@@ -101,8 +101,8 @@ func TestBroadcastTokenTransaction_Phase2_MintWithSingleSignatureOneof(t *testin
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
-	assert.NotNil(t, resp.FinalTokenTransaction)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+	assert.NotNil(t, resp.GetFinalTokenTransaction())
 }
 
 func TestBroadcastTokenTransaction_Phase2_TransferWithSingleSignatureOneof(t *testing.T) {
@@ -125,8 +125,8 @@ func TestBroadcastTokenTransaction_Phase2_TransferWithSingleSignatureOneof(t *te
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
-	assert.NotNil(t, resp.FinalTokenTransaction)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
+	assert.NotNil(t, resp.GetFinalTokenTransaction())
 }
 
 func TestBroadcastTokenTransaction_Phase2_TransferRejectsMultisigSignature(t *testing.T) {

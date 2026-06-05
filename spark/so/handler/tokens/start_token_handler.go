@@ -47,7 +47,7 @@ func NewStartTokenTransactionHandler(config *so.Config) *StartTokenTransactionHa
 
 // StartTokenTransaction verifies the token outputs, verifies any attached spark invoices, reserves the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context, req *tokenpb.StartTransactionRequest) (*tokenpb.StartTransactionResponse, error) {
-	ctx, span := GetTracer().Start(ctx, "StartTokenTransactionHandler.StartTokenTransaction", GetProtoTokenTransactionTraceAttributes(ctx, req.PartialTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "StartTokenTransactionHandler.StartTokenTransaction", GetProtoTokenTransactionTraceAttributes(ctx, req.GetPartialTokenTransaction()))
 	defer span.End()
 	logger := logging.GetLoggerFromContext(ctx)
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
@@ -55,34 +55,34 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := enforceBroadcastPolicy(ctx, h.config, idPubKey); err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.GetPartialTokenTransaction(), err)
 	}
 
-	network, err := btcnetwork.FromProtoNetwork(req.PartialTokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.GetPartialTokenTransaction().GetNetwork())
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.PartialTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
+		return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.GetPartialTokenTransaction(), sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
 	}
 	expectedBondSats := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawBondSats
 	expectedRelativeBlockLocktime := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawRelativeBlockLocktime
 	if err := utils.ValidatePartialTokenTransaction(
 		ctx,
-		req.PartialTokenTransaction,
-		req.PartialTokenTransactionOwnerSignatures,
+		req.GetPartialTokenTransaction(),
+		req.GetPartialTokenTransactionOwnerSignatures(),
 		h.config.GetSigningOperatorList(),
 		h.config.SupportedNetworks,
 		expectedBondSats,
 		expectedRelativeBlockLocktime,
 	); err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrInvalidPartialTokenTransaction, req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrInvalidPartialTokenTransaction, req.GetPartialTokenTransaction(), err)
 	}
 
-	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.PartialTokenTransaction, true)
+	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.GetPartialTokenTransaction(), true)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to hash partial token transaction", req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto("failed to hash partial token transaction", req.GetPartialTokenTransaction(), err)
 	}
 	previouslyCreatedTokenTransaction, err := ent.FetchPartialTokenTransactionData(ctx, partialTokenTransactionHash)
 	if err != nil && !ent.IsNotFound(err) {
-		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToFetchPartialTransaction, req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToFetchPartialTransaction, req.GetPartialTokenTransaction(), err)
 	}
 
 	// Check that the previous created transaction was found and that it is still in the started state.
@@ -97,7 +97,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		if coordinatorPubKey.Equals(h.config.IdentityPublicKey()) && previouslyCreatedTokenTransaction.Status == st.TokenTransactionStatusStarted {
 			logger.Info("Found existing token transaction in started state with matching coordinator")
 			return h.regenerateStartResponseForDuplicateRequest(ctx, previouslyCreatedTokenTransaction)
-		} else if req.PartialTokenTransaction.Version >= 3 {
+		} else if req.GetPartialTokenTransaction().GetVersion() >= 3 {
 			// In V3+, prevent identical partial token transactions from being saved to the DB to ensure data integrity.
 			// Clients may increment their client created timestamp on explicit retries for failed requests to bypass this
 			// restriction when retrying a legitimately failed or expired request.
@@ -106,21 +106,21 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 				zap.String("prev_tx_coordinator_pubkey", coordinatorPubKey.String()),
 				zap.String("prev_tx_status", fmt.Sprintf("%v", previouslyCreatedTokenTransaction.Status)),
 			)
-			return nil, sparkerrors.AlreadyExistsDuplicateOperation(tokens.FormatErrorWithTransactionProto(tokens.ErrTransactionAlreadyBroadcasted, req.PartialTokenTransaction, err))
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(tokens.FormatErrorWithTransactionProto(tokens.ErrTransactionAlreadyBroadcasted, req.GetPartialTokenTransaction(), err))
 		}
 	}
 
-	if err := preemptOrRejectTransactions(ctx, req.PartialTokenTransaction); err != nil {
+	if err := preemptOrRejectTransactions(ctx, req.GetPartialTokenTransaction()); err != nil {
 		return nil, err
 	}
 
-	if req.PartialTokenTransaction.Version >= 2 && len(req.PartialTokenTransaction.InvoiceAttachments) > 0 {
-		if err := validateSparkInvoicesForTransaction(ctx, req.PartialTokenTransaction); err != nil {
+	if req.GetPartialTokenTransaction().GetVersion() >= 2 && len(req.GetPartialTokenTransaction().GetInvoiceAttachments()) > 0 {
+		if err := validateSparkInvoicesForTransaction(ctx, req.GetPartialTokenTransaction()); err != nil {
 			return nil, err
 		}
 	}
 
-	finalTokenTransaction, keyshareIDStrings, err := h.constructFinalTokenTransaction(ctx, req.PartialTokenTransaction, time.Duration(req.GetValidityDurationSeconds())*time.Second)
+	finalTokenTransaction, keyshareIDStrings, err := h.constructFinalTokenTransaction(ctx, req.GetPartialTokenTransaction(), time.Duration(req.GetValidityDurationSeconds())*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -135,13 +135,13 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		return nil, callPrepareTokenTransactionInternal(ctx,
 			operator,
 			finalTokenTransaction,
-			req.PartialTokenTransactionOwnerSignatures,
+			req.GetPartialTokenTransactionOwnerSignatures(),
 			keyshareIDStrings,
 			h.config.IdentityPublicKey(),
 		)
 	})
 	if err != nil {
-		formattedError := tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithNonCoordinator, req.PartialTokenTransaction, err)
+		formattedError := tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithNonCoordinator, req.GetPartialTokenTransaction(), err)
 		return nil, sparkerrors.WrapErrorWithReasonPrefix(formattedError, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
@@ -151,16 +151,16 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	_, err = h.prepareHandler.PrepareTokenTransactionInternal(ctx, &tokeninternalpb.PrepareTransactionRequest{
 		KeyshareIds:                keyshareIDStrings,
 		FinalTokenTransaction:      finalTokenTransaction,
-		TokenTransactionSignatures: req.PartialTokenTransactionOwnerSignatures,
+		TokenTransactionSignatures: req.GetPartialTokenTransactionOwnerSignatures(),
 		CoordinatorPublicKey:       h.config.IdentityPublicKey().Serialize(),
 	})
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithCoordinator, req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithCoordinator, req.GetPartialTokenTransaction(), err)
 	}
 
 	keyshareInfo, err := getStartTokenTransactionKeyshareInfo(h.config)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetKeyshareInfo, req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetKeyshareInfo, req.GetPartialTokenTransaction(), err)
 	}
 
 	return &tokenpb.StartTransactionResponse{
@@ -349,8 +349,8 @@ func preemptOrRejectTransaction(
 	}
 
 	// Compare client timestamps if both transactions have them
-	if newTransaction.ClientCreatedTimestamp != nil && !existingTransaction.ClientCreatedTimestamp.IsZero() {
-		newTimestamp := newTransaction.ClientCreatedTimestamp.AsTime()
+	if newTransaction.GetClientCreatedTimestamp() != nil && !existingTransaction.ClientCreatedTimestamp.IsZero() {
+		newTimestamp := newTransaction.GetClientCreatedTimestamp().AsTime()
 		existingTimestamp := existingTransaction.ClientCreatedTimestamp
 
 		if newTimestamp.Before(existingTimestamp) {
@@ -414,7 +414,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 	if partialTokenTransaction.InvoiceAttachments != nil {
 		now := time.Now().UTC()
 		minInvoiceExpiration := time.Time{}
-		for _, attachment := range partialTokenTransaction.InvoiceAttachments {
+		for _, attachment := range partialTokenTransaction.GetInvoiceAttachments() {
 			invoice := attachment.GetSparkInvoice()
 			parsedInvoice, err := common.ParseSparkInvoice(invoice)
 			if err != nil {
@@ -430,7 +430,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 				}
 			}
 		}
-		if !minInvoiceExpiration.IsZero() && minInvoiceExpiration.Before(finalTokenTransaction.ExpiryTime.AsTime()) {
+		if !minInvoiceExpiration.IsZero() && minInvoiceExpiration.Before(finalTokenTransaction.GetExpiryTime().AsTime()) {
 			finalTokenTransaction.ExpiryTime = timestamppb.New(minInvoiceExpiration)
 		}
 	}
@@ -441,7 +441,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 		return nil, nil, tokens.FormatErrorWithTransactionProto("failed to infer token transaction type", partialTokenTransaction, err)
 	}
 
-	numOutputs := len(partialTokenTransaction.TokenOutputs)
+	numOutputs := len(partialTokenTransaction.GetTokenOutputs())
 	keyshareIDStrings := make([]string, numOutputs)
 
 	switch txType {
@@ -475,7 +475,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 				keyshareIDs[i] = keyshare.ID
 				keyshareIDStrings[i] = keyshare.ID.String()
 			}
-			network, err := btcnetwork.FromProtoNetwork(partialTokenTransaction.Network)
+			network, err := btcnetwork.FromProtoNetwork(partialTokenTransaction.GetNetwork())
 			if err != nil {
 				return nil, nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetNetworkFromProto, partialTokenTransaction, err)
 			}
@@ -483,7 +483,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 			lrc20Config := h.config.Lrc20Configs[strings.ToLower(network.String())]
 
 			// Fill revocation commitments and withdrawal bond/locktime for each output.
-			for i, output := range finalTokenTransaction.TokenOutputs {
+			for i, output := range finalTokenTransaction.GetTokenOutputs() {
 				id, err := uuid.NewV7()
 				if err != nil {
 					return nil, nil, err

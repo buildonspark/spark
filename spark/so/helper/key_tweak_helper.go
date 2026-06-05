@@ -86,35 +86,35 @@ func TweakLeafKeyUpdate(ctx context.Context, config *so.Config, leaf *ent.TreeNo
 	// Tweak keyshare
 	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
 	if err != nil || keyshare == nil {
-		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %w", req.LeafId, err)
+		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %w", req.GetLeafId(), err)
 	}
 	keyshareID := keyshare.ID.String()
 
-	if req.SecretShareTweak == nil {
-		return nil, fmt.Errorf("secret share tweak is not provided for leaf %s", req.LeafId)
+	if req.GetSecretShareTweak() == nil {
+		return nil, fmt.Errorf("secret share tweak is not provided for leaf %s", req.GetLeafId())
 	}
 
-	if len(req.SecretShareTweak.Proofs) == 0 {
-		return nil, fmt.Errorf("no proofs provided for secret share tweak for leaf %s", req.LeafId)
+	if len(req.GetSecretShareTweak().GetProofs()) == 0 {
+		return nil, fmt.Errorf("no proofs provided for secret share tweak for leaf %s", req.GetLeafId())
 	}
-	secretShare, err := keys.ParsePrivateKey(req.SecretShareTweak.SecretShare)
+	secretShare, err := keys.ParsePrivateKey(req.GetSecretShareTweak().GetSecretShare())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse secret share: %w", err)
 	}
-	pubKeyTweak, err := keys.ParsePublicKey(req.SecretShareTweak.Proofs[0])
+	pubKeyTweak, err := keys.ParsePublicKey(req.GetSecretShareTweak().GetProofs()[0])
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse public key: %w", err)
 	}
-	pubKeySharesTweak, err := keys.ParsePublicKeyMap(req.PubkeySharesTweak)
+	pubKeySharesTweak, err := keys.ParsePublicKeyMap(req.GetPubkeySharesTweak())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse public key shares tweaks: %w", err)
 	}
-	if err := ValidatePubkeySharesTweak(config, req.SecretShareTweak.Proofs, pubKeySharesTweak); err != nil {
-		return nil, fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", req.LeafId, err)
+	if err := ValidatePubkeySharesTweak(config, req.GetSecretShareTweak().GetProofs(), pubKeySharesTweak); err != nil {
+		return nil, fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", req.GetLeafId(), err)
 	}
 	keyshare, err = keyshare.TweakKeyShare(ctx, secretShare, pubKeyTweak, pubKeySharesTweak)
 	if err != nil || keyshare == nil {
-		return nil, fmt.Errorf("unable to tweak keyshare %s for leaf %s: %w", keyshareID, req.LeafId, err)
+		return nil, fmt.Errorf("unable to tweak keyshare %s for leaf %s: %w", keyshareID, req.GetLeafId(), err)
 	}
 
 	signingPubkey := leaf.VerifyingPubkey.Sub(keyshare.PublicKey)

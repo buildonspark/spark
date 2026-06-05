@@ -289,7 +289,7 @@ func (s *SparkServer) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequ
 }
 
 func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.SparkService_SubscribeToEventsServer) error {
-	idPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("invalid identity public key: %w", err)
 	}
@@ -340,7 +340,7 @@ func (s *SparkServer) InitiateSwapPrimaryTransfer(ctx context.Context, req *pb.I
 	if err != nil {
 		return nil, err
 	}
-	return &pb.InitiateSwapPrimaryTransferResponse{Transfer: res.Transfer, SigningResults: res.SigningResults}, nil
+	return &pb.InitiateSwapPrimaryTransferResponse{Transfer: res.GetTransfer(), SigningResults: res.GetSigningResults()}, nil
 }
 
 func (s *SparkServer) UpdateWalletSetting(ctx context.Context, req *pb.UpdateWalletSettingRequest) (*pb.UpdateWalletSettingResponse, error) {

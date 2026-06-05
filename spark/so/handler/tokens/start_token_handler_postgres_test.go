@@ -141,10 +141,10 @@ func TestStartTokenTransaction_DuplicateV3StartedSameCoordinatorReturnsRegenerat
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.FinalTokenTransaction)
-	require.NotNil(t, resp.KeyshareInfo)
-	require.NotEmpty(t, resp.KeyshareInfo.OwnerIdentifiers)
-	require.Equal(t, uint32(cfg.Threshold), resp.KeyshareInfo.Threshold)
+	require.NotNil(t, resp.GetFinalTokenTransaction())
+	require.NotNil(t, resp.GetKeyshareInfo())
+	require.NotEmpty(t, resp.GetKeyshareInfo().GetOwnerIdentifiers())
+	require.Equal(t, uint32(cfg.Threshold), resp.GetKeyshareInfo().GetThreshold())
 }
 
 func TestStartTokenTransaction_DuplicateV3SignedSameCoordinatorRejects(t *testing.T) {

@@ -152,7 +152,7 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 	// disabled knob.
 	require.NoError(t, err, "InitiatePreimageSwapV2 should succeed even when settle RPC is disabled")
 	require.NotNil(t, response)
-	assert.Equal(t, transferID.String(), response.Transfer.Id)
+	assert.Equal(t, transferID.String(), response.GetTransfer().GetId())
 
 	network, err := sspConfig.Network.ToProtoNetwork()
 	require.NoError(t, err)
@@ -176,10 +176,10 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 	require.NoError(t, err, "ProvidePreimage should succeed after settle is re-enabled")
 	assert.Equal(t,
 		spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
-		receiverTransfer.Status,
+		receiverTransfer.GetStatus(),
 		"transfer should reach SENDER_KEY_TWEAKED after recovery",
 	)
-	assert.Equal(t, transferID.String(), receiverTransfer.Id)
+	assert.Equal(t, transferID.String(), receiverTransfer.GetId())
 
 	// Verify all operators converged to the same settled state.
 	assertTransferOnAllOperators(t, sspConfig, transferID.String(), network, []spark.TransferStatus{
@@ -218,10 +218,10 @@ func assertTransferOnAllOperators(
 		require.NoError(t, err, "failed to query transfers from operator %s", identifier)
 
 		var found bool
-		for _, transfer := range queryResp.Transfers {
-			if transfer.Id == transferID {
+		for _, transfer := range queryResp.GetTransfers() {
+			if transfer.GetId() == transferID {
 				found = true
-				assert.Contains(t, expectedStatuses, transfer.Status,
+				assert.Contains(t, expectedStatuses, transfer.GetStatus(),
 					"operator %s has unexpected transfer status", identifier,
 				)
 				break

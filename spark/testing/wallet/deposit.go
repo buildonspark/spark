@@ -60,7 +60,7 @@ var CreateRootFlows = []CreateRootFlow{
 			if err != nil {
 				return nil, err
 			}
-			return res.Nodes, nil
+			return res.GetNodes(), nil
 		},
 	},
 	{
@@ -76,7 +76,7 @@ var CreateRootFlows = []CreateRootFlow{
 			if err != nil {
 				return nil, err
 			}
-			return []*pb.TreeNode{res.RootNode}, nil
+			return []*pb.TreeNode{res.GetRootNode()}, nil
 		},
 	},
 }
@@ -94,13 +94,13 @@ func validateDepositAddress(config *TestWalletConfig, address *pb.Address, signi
 	if address.DepositAddressProof.ProofOfPossessionSignature == nil {
 		return fmt.Errorf("proof of possession signature is nil")
 	}
-	verifyingKey, err := keys.ParsePublicKey(address.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(address.GetVerifyingKey())
 	if err != nil {
 		return err
 	}
 	operatorPubKey := verifyingKey.Sub(signingPubKey)
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(config.IdentityPublicKey(), operatorPubKey, []byte(address.Address), pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
-	sig, err := schnorr.ParseSignature(address.DepositAddressProof.ProofOfPossessionSignature)
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(config.IdentityPublicKey(), operatorPubKey, []byte(address.GetAddress()), pb.HashVariant_HASH_VARIANT_UNSPECIFIED)
+	sig, err := schnorr.ParseSignature(address.GetDepositAddressProof().GetProofOfPossessionSignature())
 	if err != nil {
 		return err
 	}
@@ -116,13 +116,13 @@ func validateDepositAddress(config *TestWalletConfig, address *pb.Address, signi
 		return fmt.Errorf("address signatures is nil")
 	}
 
-	addrHash := sha256.Sum256([]byte(address.Address))
+	addrHash := sha256.Sum256([]byte(address.GetAddress()))
 	for _, operator := range config.SigningOperators {
 		if operator.Identifier == config.CoordinatorIdentifier && !verifyCoordinatorProof {
 			continue
 		}
 
-		operatorSig, ok := address.DepositAddressProof.AddressSignatures[operator.Identifier]
+		operatorSig, ok := address.GetDepositAddressProof().GetAddressSignatures()[operator.Identifier]
 		if !ok {
 			return fmt.Errorf("address signature for operator %s is nil", operator.Identifier)
 		}
@@ -165,7 +165,7 @@ func GenerateDepositAddress(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubkey, false); err != nil {
+	if err := validateDepositAddress(config, depositResp.GetDepositAddress(), signingPubkey, false); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
@@ -192,7 +192,7 @@ func GenerateStaticDepositAddress(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubKey, false); err != nil {
+	if err := validateDepositAddress(config, depositResp.GetDepositAddress(), signingPubKey, false); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
@@ -218,7 +218,7 @@ func GenerateStaticDepositAddressDedicatedEndpoint(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubKey, true); err != nil {
+	if err := validateDepositAddress(config, depositResp.GetDepositAddress(), signingPubKey, true); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
@@ -244,11 +244,11 @@ func RotateStaticDepositAddress(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, rotateResp.NewDepositAddress, signingPubKey, true); err != nil {
+	if err := validateDepositAddress(config, rotateResp.GetNewDepositAddress(), signingPubKey, true); err != nil {
 		return nil, err
 	}
-	if rotateResp.ArchivedDepositAddress != nil {
-		if err := validateDepositAddress(config, rotateResp.ArchivedDepositAddress, signingPubKey, true); err != nil {
+	if rotateResp.GetArchivedDepositAddress() != nil {
+		if err := validateDepositAddress(config, rotateResp.GetArchivedDepositAddress(), signingPubKey, true); err != nil {
 			return nil, err
 		}
 	}
@@ -286,14 +286,14 @@ func QueryUnusedDepositAddresses(
 		}
 
 		// Collect results from this page
-		allAddresses = append(allAddresses, response.DepositAddresses...)
+		allAddresses = append(allAddresses, response.GetDepositAddresses()...)
 
 		// Check if there are more results
-		if response.Offset == -1 {
+		if response.GetOffset() == -1 {
 			break // No more results
 		}
 
-		offset = response.Offset
+		offset = response.GetOffset()
 	}
 
 	return &pb.QueryUnusedDepositAddressesResponse{
@@ -324,11 +324,11 @@ func QueryStaticDepositAddresses(
 	if err != nil {
 		return nil, err
 	}
-	for _, address := range addresses.DepositAddresses {
+	for _, address := range addresses.GetDepositAddresses() {
 		if err := validateDepositAddress(config, &pb.Address{
-			Address:             address.DepositAddress,
-			VerifyingKey:        address.VerifyingPublicKey,
-			DepositAddressProof: address.ProofOfPossession,
+			Address:             address.GetDepositAddress(),
+			VerifyingKey:        address.GetVerifyingPublicKey(),
+			DepositAddressProof: address.GetProofOfPossession(),
 		}, signingPubKey, true); err != nil {
 			return nil, err
 		}
@@ -459,7 +459,7 @@ func CreateTreeRoot(
 		return nil, nil
 	}
 
-	rootNodeVerifyingKey, err := keys.ParsePublicKey(treeResponse.RootNodeSignatureShares.VerifyingKey)
+	rootNodeVerifyingKey, err := keys.ParsePublicKey(treeResponse.GetRootNodeSignatureShares().GetVerifyingKey())
 	if err != nil {
 		return nil, err
 	}
@@ -479,25 +479,25 @@ func CreateTreeRoot(
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared.nonce,
-			Commitments:     treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
+			Commitments:     treeResponse.GetRootNodeSignatureShares().GetNodeTxSigningResult().GetSigningNonceCommitments(),
 			UserCommitments: rootPrepared.commitment,
 		},
 		{
 			JobId:           refundJobID,
 			Message:         refundPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
-			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
+			VerifyingKey:    treeResponse.GetRootNodeSignatureShares().GetVerifyingKey(),
 			Nonce:           refundPrepared.nonce,
-			Commitments:     treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
+			Commitments:     treeResponse.GetRootNodeSignatureShares().GetRefundTxSigningResult().GetSigningNonceCommitments(),
 			UserCommitments: refundPrepared.commitment,
 		},
 		{
 			JobId:           directFromCpfpRefundJobID,
 			Message:         directFromCpfpRefundPrepared.sighash.Serialize(),
 			KeyPackage:      userKeyPackage,
-			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
+			VerifyingKey:    treeResponse.GetRootNodeSignatureShares().GetVerifyingKey(),
 			Nonce:           directFromCpfpRefundPrepared.nonce,
-			Commitments:     treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SigningNonceCommitments,
+			Commitments:     treeResponse.GetRootNodeSignatureShares().GetDirectFromCpfpRefundTxSigningResult().GetSigningNonceCommitments(),
 			UserCommitments: directFromCpfpRefundPrepared.commitment,
 		},
 	}
@@ -520,13 +520,13 @@ func CreateTreeRoot(
 
 	rootSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
 		Message:            rootPrepared.sighash.Serialize(),
-		SignatureShares:    treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SignatureShares,
-		PublicShares:       treeResponse.RootNodeSignatureShares.NodeTxSigningResult.PublicKeys,
+		SignatureShares:    treeResponse.GetRootNodeSignatureShares().GetNodeTxSigningResult().GetSignatureShares(),
+		PublicShares:       treeResponse.GetRootNodeSignatureShares().GetNodeTxSigningResult().GetPublicKeys(),
 		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
+		Commitments:        treeResponse.GetRootNodeSignatureShares().GetNodeTxSigningResult().GetSigningNonceCommitments(),
 		UserCommitments:    rootPrepared.commitment,
 		UserPublicKey:      signingPubKey.Serialize(),
-		UserSignatureShare: userSignatures.Results[nodeJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[nodeJobID].GetSignatureShare(),
 	})
 	if err != nil {
 		return nil, err
@@ -534,13 +534,13 @@ func CreateTreeRoot(
 
 	refundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
 		Message:            refundPrepared.sighash.Serialize(),
-		SignatureShares:    treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SignatureShares,
-		PublicShares:       treeResponse.RootNodeSignatureShares.RefundTxSigningResult.PublicKeys,
+		SignatureShares:    treeResponse.GetRootNodeSignatureShares().GetRefundTxSigningResult().GetSignatureShares(),
+		PublicShares:       treeResponse.GetRootNodeSignatureShares().GetRefundTxSigningResult().GetPublicKeys(),
 		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
+		Commitments:        treeResponse.GetRootNodeSignatureShares().GetRefundTxSigningResult().GetSigningNonceCommitments(),
 		UserCommitments:    refundPrepared.commitment,
 		UserPublicKey:      signingPubKey.Serialize(),
-		UserSignatureShare: userSignatures.Results[refundJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[refundJobID].GetSignatureShare(),
 	})
 	if err != nil {
 		return nil, err
@@ -548,13 +548,13 @@ func CreateTreeRoot(
 
 	directFromCpfpRefundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
 		Message:            directFromCpfpRefundPrepared.sighash.Serialize(),
-		SignatureShares:    treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SignatureShares,
-		PublicShares:       treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.PublicKeys,
+		SignatureShares:    treeResponse.GetRootNodeSignatureShares().GetDirectFromCpfpRefundTxSigningResult().GetSignatureShares(),
+		PublicShares:       treeResponse.GetRootNodeSignatureShares().GetDirectFromCpfpRefundTxSigningResult().GetPublicKeys(),
 		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SigningNonceCommitments,
+		Commitments:        treeResponse.GetRootNodeSignatureShares().GetDirectFromCpfpRefundTxSigningResult().GetSigningNonceCommitments(),
 		UserCommitments:    directFromCpfpRefundPrepared.commitment,
 		UserPublicKey:      signingPubKey.Serialize(),
-		UserSignatureShare: userSignatures.Results[directFromCpfpRefundJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[directFromCpfpRefundJobID].GetSignatureShare(),
 	})
 	if err != nil {
 		return nil, err
@@ -564,10 +564,10 @@ func CreateTreeRoot(
 		Intent: pbcommon.SignatureIntent_CREATION,
 		NodeSignatures: []*pb.NodeSignatures{
 			{
-				NodeId:                          treeResponse.RootNodeSignatureShares.NodeId,
-				NodeTxSignature:                 rootSignature.Signature,
-				RefundTxSignature:               refundSignature.Signature,
-				DirectFromCpfpRefundTxSignature: directFromCpfpRefundSignature.Signature,
+				NodeId:                          treeResponse.GetRootNodeSignatureShares().GetNodeId(),
+				NodeTxSignature:                 rootSignature.GetSignature(),
+				RefundTxSignature:               refundSignature.GetSignature(),
+				DirectFromCpfpRefundTxSignature: directFromCpfpRefundSignature.GetSignature(),
 			},
 		},
 	})
@@ -647,8 +647,8 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 		return nil, fmt.Errorf("failed to get SE commitments: %w", err)
 	}
 
-	if len(commitmentsResp.SigningCommitments) != 3 {
-		return nil, fmt.Errorf("got %d commitments, expected 3", len(commitmentsResp.SigningCommitments))
+	if len(commitmentsResp.GetSigningCommitments()) != 3 {
+		return nil, fmt.Errorf("got %d commitments, expected 3", len(commitmentsResp.GetSigningCommitments()))
 	}
 
 	// Step 2: Generate user signature shares using SE commitments
@@ -665,7 +665,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared.nonce,
 			UserCommitments: rootPrepared.commitment,
-			Commitments:     commitmentsResp.SigningCommitments[0].SigningNonceCommitments,
+			Commitments:     commitmentsResp.GetSigningCommitments()[0].GetSigningNonceCommitments(),
 		},
 		{
 			JobId:           refundJobID,
@@ -674,7 +674,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           refundPrepared.nonce,
 			UserCommitments: refundPrepared.commitment,
-			Commitments:     commitmentsResp.SigningCommitments[1].SigningNonceCommitments,
+			Commitments:     commitmentsResp.GetSigningCommitments()[1].GetSigningNonceCommitments(),
 		},
 		{
 			JobId:           directFromCpfpRefundJobID,
@@ -683,7 +683,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           directFromCpfpRefundPrepared.nonce,
 			UserCommitments: directFromCpfpRefundPrepared.commitment,
-			Commitments:     commitmentsResp.SigningCommitments[2].SigningNonceCommitments,
+			Commitments:     commitmentsResp.GetSigningCommitments()[2].GetSigningNonceCommitments(),
 		},
 	}
 
@@ -703,19 +703,19 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 		return nil, err
 	}
 
-	nodeSignature, ok := userSignatures.Results[nodeJobID]
+	nodeSignature, ok := userSignatures.GetResults()[nodeJobID]
 	if !ok || nodeSignature == nil {
-		returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+		returnedResults := slices.Collect(maps.Keys(userSignatures.GetResults()))
 		return nil, fmt.Errorf("node signature (%s) not returned from frost (returned %s)", nodeJobID, strings.Join(returnedResults, ","))
 	}
-	refundSignature, ok := userSignatures.Results[refundJobID]
+	refundSignature, ok := userSignatures.GetResults()[refundJobID]
 	if !ok || refundSignature == nil {
-		returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+		returnedResults := slices.Collect(maps.Keys(userSignatures.GetResults()))
 		return nil, fmt.Errorf("refund signature (%s) not returned from frost (returned %s)", refundJobID, strings.Join(returnedResults, ","))
 	}
-	cpfpRefundSignature, ok := userSignatures.Results[directFromCpfpRefundJobID]
+	cpfpRefundSignature, ok := userSignatures.GetResults()[directFromCpfpRefundJobID]
 	if !ok || cpfpRefundSignature == nil {
-		returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+		returnedResults := slices.Collect(maps.Keys(userSignatures.GetResults()))
 		return nil, fmt.Errorf("cpfp refund signature (%s) not returned from frost (returned %s)", directFromCpfpRefundJobID, strings.Join(returnedResults, ","))
 	}
 
@@ -729,29 +729,29 @@ func CreateTreeRootWithFinalizeDepositTreeCreation(
 		},
 		RootTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  rootPrepared.signingJob.RawTx,
-			SigningNonceCommitment: rootPrepared.signingJob.SigningNonceCommitment,
-			UserSignature:          nodeSignature.SignatureShare,
+			RawTx:                  rootPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: rootPrepared.signingJob.GetSigningNonceCommitment(),
+			UserSignature:          nodeSignature.GetSignatureShare(),
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[0].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[0].GetSigningNonceCommitments(),
 			},
 		},
 		RefundTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  refundPrepared.signingJob.RawTx,
-			SigningNonceCommitment: refundPrepared.signingJob.SigningNonceCommitment,
-			UserSignature:          refundSignature.SignatureShare,
+			RawTx:                  refundPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: refundPrepared.signingJob.GetSigningNonceCommitment(),
+			UserSignature:          refundSignature.GetSignatureShare(),
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[1].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[1].GetSigningNonceCommitments(),
 			},
 		},
 		DirectFromCpfpRefundTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  directFromCpfpRefundPrepared.signingJob.RawTx,
-			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.SigningNonceCommitment,
-			UserSignature:          cpfpRefundSignature.SignatureShare,
+			RawTx:                  directFromCpfpRefundPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.GetSigningNonceCommitment(),
+			UserSignature:          cpfpRefundSignature.GetSignatureShare(),
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[2].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[2].GetSigningNonceCommitments(),
 			},
 		},
 	})
@@ -912,8 +912,8 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get SE commitments: %w", err)
 	}
-	if len(commitmentsResp.SigningCommitments) != int(totalCommitments) {
-		return nil, fmt.Errorf("got %d commitments, expected %d", len(commitmentsResp.SigningCommitments), totalCommitments)
+	if len(commitmentsResp.GetSigningCommitments()) != int(totalCommitments) {
+		return nil, fmt.Errorf("got %d commitments, expected %d", len(commitmentsResp.GetSigningCommitments()), totalCommitments)
 	}
 
 	// Build FROST signing jobs
@@ -930,7 +930,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared[i].nonce,
 			UserCommitments: rootPrepared[i].commitment,
-			Commitments:     commitmentsResp.SigningCommitments[i].SigningNonceCommitments,
+			Commitments:     commitmentsResp.GetSigningCommitments()[i].GetSigningNonceCommitments(),
 		})
 	}
 
@@ -944,7 +944,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           refundPrepared.nonce,
 		UserCommitments: refundPrepared.commitment,
-		Commitments:     commitmentsResp.SigningCommitments[refundIdx].SigningNonceCommitments,
+		Commitments:     commitmentsResp.GetSigningCommitments()[refundIdx].GetSigningNonceCommitments(),
 	})
 
 	// DirectFromCpfpRefund job
@@ -957,7 +957,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           directFromCpfpRefundPrepared.nonce,
 		UserCommitments: directFromCpfpRefundPrepared.commitment,
-		Commitments:     commitmentsResp.SigningCommitments[directIdx].SigningNonceCommitments,
+		Commitments:     commitmentsResp.GetSigningCommitments()[directIdx].GetSigningNonceCommitments(),
 	})
 
 	frostConn, err := config.NewFrostGRPCConnection()
@@ -978,12 +978,12 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 	// Extract signatures
 	sigs := make([][]byte, rootTxInputCount+2)
 	for i, jobID := range jobIDs {
-		sig, ok := userSignatures.Results[jobID]
+		sig, ok := userSignatures.GetResults()[jobID]
 		if !ok || sig == nil {
-			returnedResults := slices.Collect(maps.Keys(userSignatures.Results))
+			returnedResults := slices.Collect(maps.Keys(userSignatures.GetResults()))
 			return nil, fmt.Errorf("signature for job %s (index %d) not returned from frost (returned %s)", jobID, i, strings.Join(returnedResults, ","))
 		}
-		sigs[i] = sig.SignatureShare
+		sigs[i] = sig.GetSignatureShare()
 	}
 
 	// Build additional UTXO protos and additional input signing data
@@ -1003,7 +1003,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 			SigningNonceCommitment: rootPrepared[i].commitment,
 			UserSignature:          sigs[i],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[i].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[i].GetSigningNonceCommitments(),
 			},
 		}
 	}
@@ -1023,26 +1023,26 @@ func CreateTreeRootWithFinalizeDepositTreeCreationMultiUtxo(
 			SigningNonceCommitment: rootPrepared[0].commitment,
 			UserSignature:          sigs[0],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[0].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[0].GetSigningNonceCommitments(),
 			},
 			AdditionalInputs: additionalInputs,
 		},
 		RefundTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  refundPrepared.signingJob.RawTx,
-			SigningNonceCommitment: refundPrepared.signingJob.SigningNonceCommitment,
+			RawTx:                  refundPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: refundPrepared.signingJob.GetSigningNonceCommitment(),
 			UserSignature:          sigs[refundIdx],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[refundIdx].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[refundIdx].GetSigningNonceCommitments(),
 			},
 		},
 		DirectFromCpfpRefundTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  directFromCpfpRefundPrepared.signingJob.RawTx,
-			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.SigningNonceCommitment,
+			RawTx:                  directFromCpfpRefundPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.GetSigningNonceCommitment(),
 			UserSignature:          sigs[directIdx],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[directIdx].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[directIdx].GetSigningNonceCommitments(),
 			},
 		},
 	})
@@ -1166,7 +1166,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 			VerifyingKey:    verifyingKey.Serialize(),
 			Nonce:           rootPrepared[i].nonce,
 			UserCommitments: rootPrepared[i].commitment,
-			Commitments:     commitmentsResp.SigningCommitments[i].SigningNonceCommitments,
+			Commitments:     commitmentsResp.GetSigningCommitments()[i].GetSigningNonceCommitments(),
 		})
 	}
 
@@ -1178,7 +1178,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           refundPrepared.nonce,
 		UserCommitments: refundPrepared.commitment,
-		Commitments:     commitmentsResp.SigningCommitments[2].SigningNonceCommitments,
+		Commitments:     commitmentsResp.GetSigningCommitments()[2].GetSigningNonceCommitments(),
 	})
 
 	jobIDs[3] = uuid.NewString()
@@ -1189,7 +1189,7 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 		VerifyingKey:    verifyingKey.Serialize(),
 		Nonce:           directFromCpfpRefundPrepared.nonce,
 		UserCommitments: directFromCpfpRefundPrepared.commitment,
-		Commitments:     commitmentsResp.SigningCommitments[3].SigningNonceCommitments,
+		Commitments:     commitmentsResp.GetSigningCommitments()[3].GetSigningNonceCommitments(),
 	})
 
 	frostConn, err := config.NewFrostGRPCConnection()
@@ -1209,11 +1209,11 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 
 	sigs := make([][]byte, 4)
 	for i, jobID := range jobIDs {
-		sig, ok := userSignatures.Results[jobID]
+		sig, ok := userSignatures.GetResults()[jobID]
 		if !ok || sig == nil {
 			return nil, fmt.Errorf("signature for job %s (index %d) not returned", jobID, i)
 		}
-		sigs[i] = sig.SignatureShare
+		sigs[i] = sig.GetSignatureShare()
 	}
 
 	// Serialize additional deposit tx
@@ -1245,34 +1245,34 @@ func CreateTreeRootWithFinalizeDepositTreeCreationWrongOrder(
 			SigningNonceCommitment: rootPrepared[0].commitment,
 			UserSignature:          sigs[0],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[0].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[0].GetSigningNonceCommitments(),
 			},
 			AdditionalInputs: []*pb.InputSigningData{
 				{
 					SigningNonceCommitment: rootPrepared[1].commitment,
 					UserSignature:          sigs[1],
 					SigningCommitments: &pb.SigningCommitments{
-						SigningCommitments: commitmentsResp.SigningCommitments[1].SigningNonceCommitments,
+						SigningCommitments: commitmentsResp.GetSigningCommitments()[1].GetSigningNonceCommitments(),
 					},
 				},
 			},
 		},
 		RefundTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  refundPrepared.signingJob.RawTx,
-			SigningNonceCommitment: refundPrepared.signingJob.SigningNonceCommitment,
+			RawTx:                  refundPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: refundPrepared.signingJob.GetSigningNonceCommitment(),
 			UserSignature:          sigs[2],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[2].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[2].GetSigningNonceCommitments(),
 			},
 		},
 		DirectFromCpfpRefundTxSigningJob: &pb.UserSignedTxSigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
-			RawTx:                  directFromCpfpRefundPrepared.signingJob.RawTx,
-			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.SigningNonceCommitment,
+			RawTx:                  directFromCpfpRefundPrepared.signingJob.GetRawTx(),
+			SigningNonceCommitment: directFromCpfpRefundPrepared.signingJob.GetSigningNonceCommitment(),
 			UserSignature:          sigs[3],
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: commitmentsResp.SigningCommitments[3].SigningNonceCommitments,
+				SigningCommitments: commitmentsResp.GetSigningCommitments()[3].GetSigningNonceCommitments(),
 			},
 		},
 	})
@@ -1390,16 +1390,16 @@ func RefundStaticDeposit(
 		PublicShares: map[string][]byte{
 			frostUserIdentifier: params.DepositAddressSecretKey.Public().Serialize(),
 		},
-		PublicKey:  swapResponse.DepositAddress.VerifyingPublicKey,
+		PublicKey:  swapResponse.GetDepositAddress().GetVerifyingPublicKey(),
 		MinSigners: 1,
 	}
-	operatorCommitments := swapResponse.RefundTxSigningResult.SigningNonceCommitments
+	operatorCommitments := swapResponse.GetRefundTxSigningResult().GetSigningNonceCommitments()
 	userJobID := uuid.NewString()
 	userSigningJobs := []*pbfrost.FrostSigningJob{{
 		JobId:           userJobID,
 		Message:         spendTxSighash.Serialize(),
 		KeyPackage:      &userKeyPackage,
-		VerifyingKey:    swapResponse.DepositAddress.VerifyingPublicKey,
+		VerifyingKey:    swapResponse.GetDepositAddress().GetVerifyingPublicKey(),
 		Nonce:           userNonceProto,
 		Commitments:     operatorCommitments,
 		UserCommitments: userCommitmentProto,
@@ -1423,25 +1423,25 @@ func RefundStaticDeposit(
 
 	signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            spendTxSighash.Serialize(),
-		SignatureShares:    swapResponse.RefundTxSigningResult.SignatureShares,
-		PublicShares:       swapResponse.RefundTxSigningResult.PublicKeys,
-		VerifyingKey:       swapResponse.DepositAddress.VerifyingPublicKey,
+		SignatureShares:    swapResponse.GetRefundTxSigningResult().GetSignatureShares(),
+		PublicShares:       swapResponse.GetRefundTxSigningResult().GetPublicKeys(),
+		VerifyingKey:       swapResponse.GetDepositAddress().GetVerifyingPublicKey(),
 		Commitments:        operatorCommitments,
 		UserCommitments:    userCommitmentProto,
 		UserPublicKey:      params.DepositAddressSecretKey.Public().Serialize(),
-		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[userJobID].GetSignatureShare(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate frost: %w", err)
 	}
 
 	// Verify signature using go lib.
-	sig, err := schnorr.ParseSignature(signatureResult.Signature)
+	sig, err := schnorr.ParseSignature(signatureResult.GetSignature())
 	if err != nil {
 		return nil, err
 	}
 
-	pubKey, err := keys.ParsePublicKey(swapResponse.DepositAddress.VerifyingPublicKey)
+	pubKey, err := keys.ParsePublicKey(swapResponse.GetDepositAddress().GetVerifyingPublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -1451,7 +1451,7 @@ func RefundStaticDeposit(
 	if !verified {
 		return nil, fmt.Errorf("signature verification failed")
 	}
-	params.SpendTx.TxIn[0].Witness = wire.TxWitness{signatureResult.Signature}
+	params.SpendTx.TxIn[0].Witness = wire.TxWitness{signatureResult.GetSignature()}
 
 	return params.SpendTx, nil
 }
@@ -1487,7 +1487,7 @@ func QueryNodes(
 		return nil, fmt.Errorf("failed to query unused deposit addresses at offset %d: %w", offset, err)
 	}
 
-	return response.Nodes, nil
+	return response.GetNodes(), nil
 }
 
 // CreateNewTree creates a new Tree
@@ -1514,13 +1514,13 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 		return nil, fmt.Errorf("failed to generate deposit address: %w", err)
 	}
 
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, amountSats)
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.GetDepositAddress().GetAddress(), amountSats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deposit tx: %w", err)
 	}
 	vout := 0
 
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse verifying key: %w", err)
 	}
@@ -1528,7 +1528,7 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tree: %w", err)
 	}
-	if len(resp.Nodes) == 0 {
+	if len(resp.GetNodes()) == 0 {
 		return nil, fmt.Errorf("no nodes found after creating tree")
 	}
 
@@ -1557,26 +1557,26 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 
 	// Wait until the deposited leaf is available
 	sparkClient := pb.NewSparkServiceClient(conn)
-	return WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	return WaitForPendingDepositNode(ctx, sparkClient, resp.GetNodes()[0])
 }
 
 func WaitForPendingDepositNode(ctx context.Context, sparkClient pb.SparkServiceClient, node *pb.TreeNode) (*pb.TreeNode, error) {
 	startTime := time.Now()
-	for node.Status != string(st.TreeNodeStatusAvailable) {
+	for node.GetStatus() != string(st.TreeNodeStatusAvailable) {
 		if time.Since(startTime) >= DepositTimeout {
 			return nil, fmt.Errorf("timed out waiting for node to be available")
 		}
 		time.Sleep(DepositPollInterval)
 		nodesResp, err := sparkClient.QueryNodes(ctx, &pb.QueryNodesRequest{
-			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{node.Id}}},
+			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{node.GetId()}}},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to query nodes: %w", err)
 		}
-		if len(nodesResp.Nodes) != 1 {
-			return nil, fmt.Errorf("expected 1 node, got %d", len(nodesResp.Nodes))
+		if len(nodesResp.GetNodes()) != 1 {
+			return nil, fmt.Errorf("expected 1 node, got %d", len(nodesResp.GetNodes()))
 		}
-		node = nodesResp.Nodes[node.Id]
+		node = nodesResp.GetNodes()[node.GetId()]
 	}
 	return node, nil
 }

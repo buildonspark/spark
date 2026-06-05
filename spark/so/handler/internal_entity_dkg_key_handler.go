@@ -26,13 +26,13 @@ func NewEntityDkgKeyHandler(config *so.Config) *EntityDkgKeyHandler {
 // ReserveEntityDkgKey reserves an entity DKG key for the given entity
 func (h *EntityDkgKeyHandler) ReserveEntityDkgKey(ctx context.Context, req *pbinternal.ReserveEntityDkgKeyRequest) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Attempting to reserve entity DKG key %s", req.KeyshareId)
+	logger.Sugar().Infof("Attempting to reserve entity DKG key %s", req.GetKeyshareId())
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	dkgKeyUUID, err := uuid.Parse(req.KeyshareId)
+	dkgKeyUUID, err := uuid.Parse(req.GetKeyshareId())
 	if err != nil {
 		return fmt.Errorf("invalid DKG key ID format: %w", err)
 	}

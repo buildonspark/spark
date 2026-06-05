@@ -133,8 +133,8 @@ func assertOutputNotSpendable(t *testing.T, ctx context.Context, config *so.Conf
 	require.NoError(t, err)
 
 	// Verify the specific output is NOT in the response
-	for _, output := range resp.OutputsWithPreviousTransactionData {
-		if bytes.Equal(output.PreviousTransactionHash, sparkTxHash) {
+	for _, output := range resp.GetOutputsWithPreviousTransactionData() {
+		if bytes.Equal(output.GetPreviousTransactionHash(), sparkTxHash) {
 			t.Errorf("Output with sparkTxHash %x should not appear in spendable outputs after withdrawal", sparkTxHash)
 		}
 	}
@@ -153,8 +153,8 @@ func assertOutputStillSpendable(t *testing.T, ctx context.Context, config *so.Co
 
 	// Verify the specific output IS in the response
 	found := false
-	for _, output := range resp.OutputsWithPreviousTransactionData {
-		if bytes.Equal(output.PreviousTransactionHash, sparkTxHash) {
+	for _, output := range resp.GetOutputsWithPreviousTransactionData() {
+		if bytes.Equal(output.GetPreviousTransactionHash(), sparkTxHash) {
 			found = true
 			break
 		}

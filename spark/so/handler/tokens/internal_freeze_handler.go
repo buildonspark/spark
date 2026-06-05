@@ -22,7 +22,7 @@ func (h *InternalFreezeTokenHandler) InternalFreezeTokens(
 	ctx context.Context,
 	req *tokeninternalpb.InternalFreezeTokensRequest,
 ) (*tokeninternalpb.InternalFreezeTokensResponse, error) {
-	result, err := ValidateAndApplyFreeze(ctx, h.config, req.FreezeTokensPayload, req.IssuerSignature)
+	result, err := ValidateAndApplyFreeze(ctx, h.config, req.GetFreezeTokensPayload(), req.GetIssuerSignature())
 	if err != nil {
 		return nil, err
 	}

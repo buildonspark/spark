@@ -259,7 +259,7 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 				dbTX, err := ent.GetDbFromContext(ctx)
 				require.NoError(t, err)
 
-				tx, err := common.TxFromRawTxBytes(tt.utxo.RawTx)
+				tx, err := common.TxFromRawTxBytes(tt.utxo.GetRawTx())
 				require.NoError(t, err)
 
 				txHash := tx.TxHash()
@@ -1296,8 +1296,8 @@ func TestCreatePrepareTreeAddressNodeFromAddressNode(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
-				assert.Equal(t, tt.node.UserPublicKey, result.UserPublicKey)
-				assert.Len(t, result.Children, len(tt.node.Children))
+				assert.Equal(t, tt.node.GetUserPublicKey(), result.GetUserPublicKey())
+				assert.Len(t, result.GetChildren(), len(tt.node.GetChildren()))
 			}
 		})
 	}
@@ -1428,7 +1428,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 				if tt.parentNodeOutput != nil {
 					// Verify the status was updated correctly
-					nodeID, err := uuid.Parse(tt.parentNodeOutput.NodeId)
+					nodeID, err := uuid.Parse(tt.parentNodeOutput.GetNodeId())
 					require.NoError(t, err)
 
 					updatedNode, err := dbTX.TreeNode.Get(ctx, nodeID)
@@ -1460,9 +1460,9 @@ func TestCreateTestHelpers(t *testing.T) {
 		utxo := createTestUTXO(rawTx, vout)
 
 		assert.NotNil(t, utxo)
-		assert.Equal(t, rawTx, utxo.RawTx)
-		assert.Equal(t, vout, utxo.Vout)
-		assert.Equal(t, pb.Network_REGTEST, utxo.Network)
+		assert.Equal(t, rawTx, utxo.GetRawTx())
+		assert.Equal(t, vout, utxo.GetVout())
+		assert.Equal(t, pb.Network_REGTEST, utxo.GetNetwork())
 	})
 }
 

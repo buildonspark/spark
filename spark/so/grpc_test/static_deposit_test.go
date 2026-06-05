@@ -116,7 +116,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 
 	unsignedDepositTx, err := sparktesting.CreateTestDepositTransactionManyOutputs(
 		coin.OutPoint,
-		[]string{randomAddress.String(), depositResp.DepositAddress.Address},
+		[]string{randomAddress.String(), depositResp.GetDepositAddress().GetAddress()},
 		int64(depositAmount),
 	)
 	require.NoError(t, err)

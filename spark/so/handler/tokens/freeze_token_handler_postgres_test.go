@@ -195,8 +195,8 @@ func TestFreezeTokens_SuccessWhenFreezable(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Empty(t, resp.ImpactedTokenOutputs)
-	assert.Equal(t, big.NewInt(0).Bytes(), resp.ImpactedTokenAmount)
+	assert.Empty(t, resp.GetImpactedTokenOutputs())
+	assert.Equal(t, big.NewInt(0).Bytes(), resp.GetImpactedTokenAmount())
 }
 
 func TestFreezeTokens_FailsWhenNotFreezable(t *testing.T) {
@@ -452,9 +452,9 @@ func TestFreezeTokens_CoordinatedFreezeAllSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.FreezeProgress)
+	require.NotNil(t, resp.GetFreezeProgress())
 	// Self + 2 mock operators = 3 total applied
-	assert.Len(t, resp.FreezeProgress.AppliedOperatorPublicKeys, 3)
+	assert.Len(t, resp.GetFreezeProgress().GetAppliedOperatorPublicKeys(), 3)
 }
 
 func TestFreezeTokens_CoordinatedFreezeAllOthersFailed(t *testing.T) {
@@ -469,9 +469,9 @@ func TestFreezeTokens_CoordinatedFreezeAllOthersFailed(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.FreezeProgress)
+	require.NotNil(t, resp.GetFreezeProgress())
 	// Only self applied successfully
-	assert.Len(t, resp.FreezeProgress.AppliedOperatorPublicKeys, 1)
+	assert.Len(t, resp.GetFreezeProgress().GetAppliedOperatorPublicKeys(), 1)
 }
 
 func TestFreezeTokens_CoordinatedFreezePartialSuccess(t *testing.T) {
@@ -486,9 +486,9 @@ func TestFreezeTokens_CoordinatedFreezePartialSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.FreezeProgress)
+	require.NotNil(t, resp.GetFreezeProgress())
 	// Self + 1 mock operator applied successfully
-	assert.Len(t, resp.FreezeProgress.AppliedOperatorPublicKeys, 2)
+	assert.Len(t, resp.GetFreezeProgress().GetAppliedOperatorPublicKeys(), 2)
 }
 
 // --- Global Pause Tests ---
@@ -527,7 +527,7 @@ func TestGlobalPause_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Empty(t, resp.ImpactedTokenOutputs)
+	assert.Empty(t, resp.GetImpactedTokenOutputs())
 }
 
 func TestGlobalUnpause_Success(t *testing.T) {
@@ -768,5 +768,5 @@ func TestFreezeTokens_CoordinatedFreezeDisabled(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	// No freeze progress when coordinated freeze is disabled
-	assert.Nil(t, resp.FreezeProgress)
+	assert.Nil(t, resp.GetFreezeProgress())
 }

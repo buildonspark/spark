@@ -140,7 +140,7 @@ func signCoopExitRefunds(
 			return nil, nil, fmt.Errorf("leaf at index %d has nil RefundTx field", i)
 		}
 
-		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetRefundTx())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
@@ -150,7 +150,7 @@ func signCoopExitRefunds(
 		}
 		nodeOutPoint := &currentRefundTx.TxIn[0].PreviousOutPoint
 
-		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetNodeTx())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse node tx: %w", err)
 		}
@@ -164,9 +164,9 @@ func signCoopExitRefunds(
 		var directTx *wire.MsgTx
 		var directOutPoint *wire.OutPoint
 		var directAmountSats int64
-		if len(leaf.Leaf.DirectTx) > 0 {
+		if len(leaf.Leaf.GetDirectTx()) > 0 {
 			var err error
-			directTx, err = common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+			directTx, err = common.TxFromRawTxBytes(leaf.Leaf.GetDirectTx())
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
 			}
@@ -206,7 +206,7 @@ func signCoopExitRefunds(
 		}
 
 		signingJob, err := createCoopExitRefundTransactionSigningJob(
-			leaf.Leaf.Id,
+			leaf.Leaf.GetId(),
 			leaf.SigningPrivKey.Public(),
 			refundNonce,
 			cpfpRefundTx,
@@ -229,14 +229,14 @@ func signCoopExitRefunds(
 			DirectFromCpfpRefundTx:    directFromCpfpRefundTx,
 			DirectFromCpfpRefundNonce: &directFromCpfpNonce,
 			Tx:                        nodeTx,
-			Vout:                      int(leaf.Leaf.Vout),
+			Vout:                      int(leaf.Leaf.GetVout()),
 			ConnectorPrevOutput:       connectorPrevOutput,
 		}
 		if !isZeroNode && directRefundTx != nil {
 			leafData.DirectRefundTx = directRefundTx
 			leafData.DirectRefundNonce = directRefundNoncePtr
 		}
-		leafDataMap[leaf.Leaf.Id] = leafData
+		leafDataMap[leaf.Leaf.GetId()] = leafData
 	}
 
 	sparkConn, err := config.NewCoordinatorGRPCConnection()
@@ -273,17 +273,17 @@ func signCoopExitRefunds(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %w", err)
 	}
-	signatures, err := SignRefunds(config, leafDataMap, response.SigningResults, keys.Public{})
+	signatures, err := SignRefunds(config, leafDataMap, response.GetSigningResults(), keys.Public{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign refund transactions: %w", err)
 	}
 
 	signaturesMap := make(map[string][]byte)
 	for _, signature := range signatures {
-		signaturesMap[signature.NodeId] = signature.RefundTxSignature
+		signaturesMap[signature.GetNodeId()] = signature.GetRefundTxSignature()
 	}
 
-	return response.Transfer, signaturesMap, nil
+	return response.GetTransfer(), signaturesMap, nil
 }
 
 // GetConnectorRefundSignaturesV2WithTransferPackage performs a single-call cooperative exit
@@ -337,7 +337,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 	const maxRefundTxsPerLeaf = 3
 	nodes := make([]string, len(leaves))
 	for i, leaf := range leaves {
-		nodes[i] = leaf.Leaf.Id
+		nodes[i] = leaf.Leaf.GetId()
 	}
 	signingCommitments, err := sparkClient.GetSigningCommitments(tmpCtx, &pb.GetSigningCommitmentsRequest{
 		NodeIds: nodes,
@@ -346,7 +346,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
 	}
-	commitmentsByLeafID := extractCommitmentsByLeaf(leaves, signingCommitments.SigningCommitments)
+	commitmentsByLeafID := extractCommitmentsByLeaf(leaves, signingCommitments.GetSigningCommitments())
 
 	signerConn, err := config.NewFrostGRPCConnection()
 	if err != nil {
@@ -378,7 +378,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 			return nil, fmt.Errorf("leaf at index %d has nil Leaf or RefundTx", i)
 		}
 
-		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetRefundTx())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
@@ -388,7 +388,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 		}
 		nodeOutPoint := &currentRefundTx.TxIn[0].PreviousOutPoint
 
-		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetNodeTx())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse node tx: %w", err)
 		}
@@ -402,8 +402,8 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 		var directTx *wire.MsgTx
 		var directOutPoint *wire.OutPoint
 		var directAmountSats int64
-		if len(leaf.Leaf.DirectTx) > 0 {
-			directTx, err = common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+		if len(leaf.Leaf.GetDirectTx()) > 0 {
+			directTx, err = common.TxFromRawTxBytes(leaf.Leaf.GetDirectTx())
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse direct tx: %w", err)
 			}
@@ -452,7 +452,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 	// Sign CPFP refund txs (user side) with multi-input sighash
 	cpfpCommitments := make([]*pb.RequestedSigningCommitments, len(cpfpLeaves))
 	for i, leaf := range cpfpLeaves {
-		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][0]
+		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.GetId()][0]
 	}
 	cpfpLeafSigningJobs, err := signCoopExitUserRefunds(
 		tmpCtx, signerClient, cpfpLeaves, cpfpRefundTxs, cpfpNodeTxs,
@@ -465,7 +465,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 	// Sign DirectFromCpfp refund txs (user side) with multi-input sighash
 	directFromCpfpCommitments := make([]*pb.RequestedSigningCommitments, len(directFromCpfpLeaves))
 	for i, leaf := range directFromCpfpLeaves {
-		directFromCpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][2]
+		directFromCpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.GetId()][2]
 	}
 	directFromCpfpLeafSigningJobs, err := signCoopExitUserRefunds(
 		tmpCtx, signerClient, directFromCpfpLeaves, directFromCpfpRefundTxs,
@@ -480,7 +480,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 	if len(directLeaves) > 0 {
 		directCommitments := make([]*pb.RequestedSigningCommitments, len(directLeaves))
 		for i, leaf := range directLeaves {
-			directCommitments[i] = commitmentsByLeafID[leaf.Leaf.Id][1]
+			directCommitments[i] = commitmentsByLeafID[leaf.Leaf.GetId()][1]
 		}
 		directLeafSigningJobs, err = signCoopExitUserRefundsForDirect(
 			tmpCtx, signerClient, directLeaves, directRefundTxs, directNodeTxs,
@@ -543,7 +543,7 @@ func GetConnectorRefundSignaturesV2WithTransferPackage(
 		return nil, fmt.Errorf("failed to initiate cooperative exit: %w", err)
 	}
 
-	return response.Transfer, nil
+	return response.GetTransfer(), nil
 }
 
 // signCoopExitUserRefunds creates user-side FROST signing jobs for coop exit refund txs
@@ -589,12 +589,12 @@ func signCoopExitUserRefunds(
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:           leaf.Leaf.Id,
+			JobId:           leaf.Leaf.GetId(),
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
-			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
+			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
 			Nonce:           signingNonceProto,
-			Commitments:     signingCommitments[i].SigningNonceCommitments,
+			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
 			UserCommitments: userCommitmentProto,
 		})
 	}
@@ -607,7 +607,7 @@ func signCoopExitUserRefunds(
 		return nil, fmt.Errorf("failed to sign frost: %w", err)
 	}
 
-	return prepareLeafSigningJobs(leaves, rawRefundTxs, signingResults.Results, userCommitments, signingCommitments)
+	return prepareLeafSigningJobs(leaves, rawRefundTxs, signingResults.GetResults(), userCommitments, signingCommitments)
 }
 
 // signCoopExitUserRefundsForDirect creates user-side FROST signing jobs for direct refund txs.
@@ -653,12 +653,12 @@ func signCoopExitUserRefundsForDirect(
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:           leaf.Leaf.Id,
+			JobId:           leaf.Leaf.GetId(),
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
-			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
+			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
 			Nonce:           signingNonceProto,
-			Commitments:     signingCommitments[i].SigningNonceCommitments,
+			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
 			UserCommitments: userCommitmentProto,
 		})
 	}
@@ -671,5 +671,5 @@ func signCoopExitUserRefundsForDirect(
 		return nil, fmt.Errorf("failed to sign frost: %w", err)
 	}
 
-	return prepareLeafSigningJobs(leaves, rawRefundTxs, signingResults.Results, userCommitments, signingCommitments)
+	return prepareLeafSigningJobs(leaves, rawRefundTxs, signingResults.GetResults(), userCommitments, signingCommitments)
 }

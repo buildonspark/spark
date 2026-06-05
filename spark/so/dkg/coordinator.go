@@ -58,13 +58,13 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 		if err != nil {
 			return fmt.Errorf("failed to initiate DKG with signing operator %s: %w", identifier, err)
 		}
-		for i, p := range round1Response.Round1Package {
+		for i, p := range round1Response.GetRound1Package() {
 			if round1Packages[i] == nil {
 				round1Packages[i] = &pbcommon.PackageMap{
 					Packages: make(map[string][]byte),
 				}
 			}
-			round1Packages[i].Packages[round1Response.Identifier] = p
+			round1Packages[i].Packages[round1Response.GetIdentifier()] = p
 		}
 	}
 
@@ -80,7 +80,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 		if err != nil {
 			return fmt.Errorf("failed to get round 1 signatures from signing operator %s: %w", identifier, err)
 		}
-		round1Signatures[round1SignatureResponse.Identifier] = round1SignatureResponse.Round1Signature
+		round1Signatures[round1SignatureResponse.GetIdentifier()] = round1SignatureResponse.GetRound1Signature()
 	}
 
 	wg := sync.WaitGroup{}
@@ -98,8 +98,8 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 				return
 			}
 
-			if len(round1SignatureResponse.ValidationFailures) > 0 {
-				logger.Sugar().Warnf("round 1 signature delivery to signing operator %s returned %d validation failures", identifier, len(round1SignatureResponse.ValidationFailures))
+			if len(round1SignatureResponse.GetValidationFailures()) > 0 {
+				logger.Sugar().Warnf("round 1 signature delivery to signing operator %s returned %d validation failures", identifier, len(round1SignatureResponse.GetValidationFailures()))
 				return
 			}
 		})
@@ -170,7 +170,7 @@ func ConfirmAndMarkAvailableKeys(ctx context.Context, config *so.Config, keyIDs 
 			// RPC error - all keys unavailable for this operator
 			return keyIDsStr, nil
 		}
-		return resp.UnavailableKeyIds, nil
+		return resp.GetUnavailableKeyIds(), nil
 	})
 
 	missingPerKey := make(map[string][]string) // keyID -> list of operator identifiers

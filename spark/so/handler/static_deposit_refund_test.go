@@ -555,8 +555,8 @@ func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwa
 	resp, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req)
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
-	assert.NotNil(t, resp.RefundTxSigningResult)
-	assert.NotEmpty(t, resp.DepositAddress)
+	assert.NotNil(t, resp.GetRefundTxSigningResult())
+	assert.NotEmpty(t, resp.GetDepositAddress())
 
 	// Commit tx before checking the result
 	entTx, err := ent.GetTxFromContext(ctx)
@@ -663,9 +663,9 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	require.NoError(t, err)
 	assert.NotNil(t, resp2.GetRefundTxSigningResult())
 
-	spendTx1, err := common.TxFromRawTxBytes(req1.RefundTxSigningJob.RawTx)
+	spendTx1, err := common.TxFromRawTxBytes(req1.GetRefundTxSigningJob().GetRawTx())
 	require.NoError(t, err)
-	spendTx2, err := common.TxFromRawTxBytes(req2.RefundTxSigningJob.RawTx)
+	spendTx2, err := common.TxFromRawTxBytes(req2.GetRefundTxSigningJob().GetRawTx())
 	require.NoError(t, err)
 
 	// Verify we're signing different transactions

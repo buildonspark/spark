@@ -60,17 +60,17 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest, requireDirectTx bool) (*pb.FinalizeNodeSignaturesResponse, error) {
-	if req.Intent == pbcommon.SignatureIntent_REFRESH || req.Intent == pbcommon.SignatureIntent_EXTEND {
-		return nil, fmt.Errorf("operation has been deprecated: %s", req.Intent)
+	if req.GetIntent() == pbcommon.SignatureIntent_REFRESH || req.GetIntent() == pbcommon.SignatureIntent_EXTEND {
+		return nil, fmt.Errorf("operation has been deprecated: %s", req.GetIntent())
 	}
 
-	if len(req.NodeSignatures) > maxFinalizeNodeSignatures {
+	if len(req.GetNodeSignatures()) > maxFinalizeNodeSignatures {
 		return nil, sparkerrors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many node signatures in request: got %d, max %d", len(req.NodeSignatures), maxFinalizeNodeSignatures),
+			fmt.Errorf("too many node signatures in request: got %d, max %d", len(req.GetNodeSignatures()), maxFinalizeNodeSignatures),
 		)
 	}
 
-	if len(req.NodeSignatures) == 0 {
+	if len(req.GetNodeSignatures()) == 0 {
 		return &pb.FinalizeNodeSignaturesResponse{Nodes: []*pb.TreeNode{}}, nil
 	}
 
@@ -87,10 +87,10 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	// For CREATION intent, verify ALL nodes belong to the same tree before processing.
 	// This prevents attacks where nodes from different trees (built from different
 	// outputs of the same transaction) are submitted together to bypass validation.
-	if req.Intent == pbcommon.SignatureIntent_CREATION {
-		nodeIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
-		for _, nodeSignatures := range req.NodeSignatures {
-			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+	if req.GetIntent() == pbcommon.SignatureIntent_CREATION {
+		nodeIDs := make([]uuid.UUID, 0, len(req.GetNodeSignatures()))
+		for _, nodeSignatures := range req.GetNodeSignatures() {
+			nodeID, err := uuid.Parse(nodeSignatures.GetNodeId())
 			if err != nil {
 				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err))
 			}
@@ -114,8 +114,8 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		}
 
 		if nodeTree.Status == st.TreeStatusPending {
-			for _, nodeSignatures := range req.NodeSignatures {
-				nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+			for _, nodeSignatures := range req.GetNodeSignatures() {
+				nodeID, err := uuid.Parse(nodeSignatures.GetNodeId())
 				if err != nil {
 					return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err))
 				}
@@ -163,7 +163,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	}
 
 	var transfer *ent.Transfer
-	if req.Intent == pbcommon.SignatureIntent_TRANSFER {
+	if req.GetIntent() == pbcommon.SignatureIntent_TRANSFER {
 		transfer, err = o.verifyAndUpdateTransfer(ctx, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to verify and update transfer for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
@@ -172,8 +172,8 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 
 	var nodes []*pb.TreeNode
 	var internalNodes []*pbinternal.TreeNode
-	for _, nodeSignatures := range req.NodeSignatures {
-		node, internalNode, err := o.updateNode(ctx, nodeSignatures, req.Intent, requireDirectTx)
+	for _, nodeSignatures := range req.GetNodeSignatures() {
+		node, internalNode, err := o.updateNode(ctx, nodeSignatures, req.GetIntent(), requireDirectTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
@@ -190,9 +190,9 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	sendGossipHandler := NewSendGossipHandler(o.config)
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Sending finalize node signatures gossip message (intent: %s)", req.Intent)
+	logger.Sugar().Infof("Sending finalize node signatures gossip message (intent: %s)", req.GetIntent())
 
-	switch req.Intent {
+	switch req.GetIntent() {
 	case pbcommon.SignatureIntent_CREATION:
 		protoNetwork, err := nodeTree.Network.ToProtoNetwork()
 		if err != nil {
@@ -231,7 +231,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 			return nil, fmt.Errorf("unable to create and send gossip message: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("invalid intent %s", req.Intent)
+		return nil, fmt.Errorf("invalid intent %s", req.GetIntent())
 	}
 	return &pb.FinalizeNodeSignaturesResponse{Nodes: nodes}, nil
 }
@@ -241,9 +241,9 @@ func (o *FinalizeSignatureHandler) validateNodeOwnership(ctx context.Context, re
 		return nil
 	}
 
-	nodeIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
-	for _, nodeSignatures := range req.NodeSignatures {
-		nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+	nodeIDs := make([]uuid.UUID, 0, len(req.GetNodeSignatures()))
+	for _, nodeSignatures := range req.GetNodeSignatures() {
+		nodeID, err := uuid.Parse(nodeSignatures.GetNodeId())
 		if err != nil {
 			return fmt.Errorf("invalid node id in request: %w", err)
 		}
@@ -373,10 +373,10 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 	}
 
 	// Extract leaf IDs from node signatures, rejecting duplicates.
-	leafIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
-	leafIDsSeen := make(map[uuid.UUID]struct{}, len(req.NodeSignatures))
-	for _, nodeSignatures := range req.NodeSignatures {
-		leafID, err := uuid.Parse(nodeSignatures.NodeId)
+	leafIDs := make([]uuid.UUID, 0, len(req.GetNodeSignatures()))
+	leafIDsSeen := make(map[uuid.UUID]struct{}, len(req.GetNodeSignatures()))
+	for _, nodeSignatures := range req.GetNodeSignatures() {
+		leafID, err := uuid.Parse(nodeSignatures.GetNodeId())
 		if err != nil {
 			return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
@@ -490,7 +490,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+	nodeID, err := uuid.Parse(nodeSignatures.GetNodeId())
 	if err != nil {
 		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 	}
@@ -537,16 +537,16 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	var directNodeTxBytes []byte
 
 	if intent == pbcommon.SignatureIntent_CREATION {
-		cpfpNodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
+		cpfpNodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.GetNodeTxSignature())
 		if err != nil {
 			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update cpfp tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 		}
-		if len(node.DirectTx) > 0 && len(nodeSignatures.DirectNodeTxSignature) > 0 {
-			directNodeTxBytes, err = common.UpdateTxWithSignature(node.DirectTx, 0, nodeSignatures.DirectNodeTxSignature)
+		if len(node.DirectTx) > 0 && len(nodeSignatures.GetDirectNodeTxSignature()) > 0 {
+			directNodeTxBytes, err = common.UpdateTxWithSignature(node.DirectTx, 0, nodeSignatures.GetDirectNodeTxSignature())
 			if err != nil {
 				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update direct tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
-		} else if len(nodeSignatures.DirectNodeTxSignature) == 0 && requireDirectTx && len(node.DirectTx) > 0 {
+		} else if len(nodeSignatures.GetDirectNodeTxSignature()) == 0 && requireDirectTx && len(node.DirectTx) > 0 {
 			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version"))
 		}
 		// Node may not have parent if it is the root node
@@ -600,8 +600,8 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	var cpfpRefundTxBytes []byte
 	var directRefundTxBytes []byte
 	var directFromCpfpRefundTxBytes []byte
-	if len(nodeSignatures.RefundTxSignature) > 0 {
-		cpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.RefundTxSignature)
+	if len(nodeSignatures.GetRefundTxSignature()) > 0 {
+		cpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.GetRefundTxSignature())
 		if err != nil {
 			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 		}
@@ -621,8 +621,8 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if err != nil {
 			return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify cpfprefund tx signature: %w", err))
 		}
-		if len(nodeSignatures.DirectRefundTxSignature) > 0 {
-			directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.DirectRefundTxSignature)
+		if len(nodeSignatures.GetDirectRefundTxSignature()) > 0 {
+			directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.GetDirectRefundTxSignature())
 			if err != nil {
 				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
@@ -651,8 +651,8 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 				return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version"))
 			}
 		}
-		if len(nodeSignatures.DirectFromCpfpRefundTxSignature) > 0 {
-			directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.DirectFromCpfpRefundTxSignature)
+		if len(nodeSignatures.GetDirectFromCpfpRefundTxSignature()) > 0 {
+			directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.GetDirectFromCpfpRefundTxSignature())
 			if err != nil {
 				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}

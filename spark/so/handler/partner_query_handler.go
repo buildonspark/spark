@@ -39,13 +39,13 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 		)
 	}
 
-	start, err := time.Parse(time.DateOnly, req.StartDate)
+	start, err := time.Parse(time.DateOnly, req.GetStartDate())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(
 			fmt.Errorf("start_date must be YYYY-MM-DD: %w", err),
 		)
 	}
-	end, err := time.Parse(time.DateOnly, req.EndDate)
+	end, err := time.Parse(time.DateOnly, req.GetEndDate())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(
 			fmt.Errorf("end_date must be YYYY-MM-DD: %w", err),
@@ -64,7 +64,7 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	}
 
 	var txTypeFilter []string
-	for _, t := range req.TransactionTypes {
+	for _, t := range req.GetTransactionTypes() {
 		mapped := mapTransactionType(t)
 		if mapped == "" {
 			return nil, sparkerrors.InvalidArgumentMalformedField(
@@ -76,10 +76,10 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 
 	var networkFilter *string
 	if req.Network != nil {
-		mapped := mapNetwork(*req.Network)
+		mapped := mapNetwork(req.GetNetwork())
 		if mapped == "" {
 			return nil, sparkerrors.InvalidArgumentMalformedField(
-				fmt.Errorf("invalid network: %s", req.Network.String()),
+				fmt.Errorf("invalid network: %s", req.GetNetwork().String()),
 			)
 		}
 		networkFilter = &mapped
@@ -111,8 +111,8 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	return &pbpartner.QuerySparkTransactionVolumesResponse{
 		PartnerId:             pInfo.PartnerID,
 		Label:                 pInfo.Label,
-		StartDate:             req.StartDate,
-		EndDate:               req.EndDate,
+		StartDate:             req.GetStartDate(),
+		EndDate:               req.GetEndDate(),
 		TransactionTypes:      txTypes,
 		TotalVolumeSats:       totalVolume,
 		TotalTransactionCount: totalCount,

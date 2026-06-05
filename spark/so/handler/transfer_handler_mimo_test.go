@@ -533,16 +533,16 @@ func TestClaimTransferRejectsExistingMultiReceiverWhenMimoReadDisabled(t *testin
 		OwnerIdentityPublicKey: receiverA.Serialize(),
 		ClaimPackage: &pb.ClaimPackage{
 			LeavesToClaim: []*pb.UserSignedTxSigningJob{
-				{LeafId: leafJobs[0].LeafId},
-				{LeafId: leafJobs[1].LeafId},
+				{LeafId: leafJobs[0].GetLeafId()},
+				{LeafId: leafJobs[1].GetLeafId()},
 			},
 			DirectLeavesToClaim: []*pb.UserSignedTxSigningJob{
-				{LeafId: leafJobs[0].LeafId},
-				{LeafId: leafJobs[1].LeafId},
+				{LeafId: leafJobs[0].GetLeafId()},
+				{LeafId: leafJobs[1].GetLeafId()},
 			},
 			DirectFromCpfpLeavesToClaim: []*pb.UserSignedTxSigningJob{
-				{LeafId: leafJobs[0].LeafId},
-				{LeafId: leafJobs[1].LeafId},
+				{LeafId: leafJobs[0].GetLeafId()},
+				{LeafId: leafJobs[1].GetLeafId()},
 			},
 			KeyTweakPackage: map[string][]byte{"so1": []byte("data")},
 			HashVariant:     pb.HashVariant_HASH_VARIANT_V2,
@@ -995,10 +995,10 @@ func TestBuildFinalizeGossipMessage(t *testing.T) {
 		inner := msg.GetFinalizeTransferReceiver()
 		require.NotNil(t, inner, "expected FinalizeTransferReceiver message")
 		assert.Nil(t, msg.GetFinalizeTransfer(), "should not contain legacy FinalizeTransfer")
-		assert.Equal(t, transferID.String(), inner.TransferId)
-		assert.Equal(t, receiverPubKey.Serialize(), inner.ReceiverIdentityPublicKey)
-		assert.Equal(t, nodes, inner.InternalNodes)
-		assert.True(t, proto.Equal(ts, inner.CompletionTimestamp))
+		assert.Equal(t, transferID.String(), inner.GetTransferId())
+		assert.Equal(t, receiverPubKey.Serialize(), inner.GetReceiverIdentityPublicKey())
+		assert.Equal(t, nodes, inner.GetInternalNodes())
+		assert.True(t, proto.Equal(ts, inner.GetCompletionTimestamp()))
 	})
 
 	t.Run("MIMO disabled: legacy FinalizeTransfer", func(t *testing.T) {
@@ -1006,9 +1006,9 @@ func TestBuildFinalizeGossipMessage(t *testing.T) {
 		inner := msg.GetFinalizeTransfer()
 		require.NotNil(t, inner, "expected FinalizeTransfer message")
 		assert.Nil(t, msg.GetFinalizeTransferReceiver(), "should not contain FinalizeTransferReceiver")
-		assert.Equal(t, transferID.String(), inner.TransferId)
-		assert.Equal(t, nodes, inner.InternalNodes)
-		assert.True(t, proto.Equal(ts, inner.CompletionTimestamp))
+		assert.Equal(t, transferID.String(), inner.GetTransferId())
+		assert.Equal(t, nodes, inner.GetInternalNodes())
+		assert.True(t, proto.Equal(ts, inner.GetCompletionTimestamp()))
 	})
 }
 

@@ -63,9 +63,9 @@ func TestQueryTokenOutputs_SpentSignedReturnsPendingOutbound(t *testing.T) {
 		Network:         sparkpb.Network_REGTEST,
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.OutputsWithPreviousTransactionData, 1)
+	require.Len(t, resp.GetOutputsWithPreviousTransactionData(), 1)
 
-	returnedOutput := resp.OutputsWithPreviousTransactionData[0].Output
+	returnedOutput := resp.GetOutputsWithPreviousTransactionData()[0].GetOutput()
 	assert.Equal(t,
 		tokenpb.TokenOutputStatus_TOKEN_OUTPUT_STATUS_PENDING_OUTBOUND,
 		returnedOutput.GetStatus(),
@@ -116,9 +116,9 @@ func TestQueryTokenOutputs_SpentSignedExpiredReturnsAvailable(t *testing.T) {
 		Network:         sparkpb.Network_REGTEST,
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.OutputsWithPreviousTransactionData, 1)
+	require.Len(t, resp.GetOutputsWithPreviousTransactionData(), 1)
 
-	returnedOutput := resp.OutputsWithPreviousTransactionData[0].Output
+	returnedOutput := resp.GetOutputsWithPreviousTransactionData()[0].GetOutput()
 	assert.Equal(t,
 		tokenpb.TokenOutputStatus_TOKEN_OUTPUT_STATUS_AVAILABLE,
 		returnedOutput.GetStatus(),

@@ -957,7 +957,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	for _, operator := range config.SigningOperators {
 		var foundOperatorSignatures *tokenpb.InputTtxoSignaturesPerOperator
 		for _, sig := range operatorSignatures {
-			sigOperatorIDPubKey, err := keys.ParsePublicKey(sig.OperatorIdentityPublicKey)
+			sigOperatorIDPubKey, err := keys.ParsePublicKey(sig.GetOperatorIdentityPublicKey())
 			require.NoError(t, err)
 			if sigOperatorIDPubKey.Equals(operator.IdentityPublicKey) {
 				foundOperatorSignatures = sig
@@ -971,7 +971,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 			config,
 			wallet.SignTokenTransactionFromCoordinationParams{
 				Operator:         operator,
-				TokenTransaction: startResp.FinalTokenTransaction,
+				TokenTransaction: startResp.GetFinalTokenTransaction(),
 				FinalTxHash:      finalTxHash,
 				OwnerPrivateKeys: []keys.Private{owner1PrivKey, owner2PrivKey},
 			},
@@ -979,7 +979,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 		require.NoError(t, err, "failed to sign with operator %s", operator.Identifier)
 		require.NotNil(t, signResp)
 
-		allOperatorSignatures[operator.Identifier] = signResp.SparkOperatorSignature
+		allOperatorSignatures[operator.Identifier] = signResp.GetSparkOperatorSignature()
 	}
 
 	require.NoError(t, err, "failed to query token outputs before transaction")
@@ -989,7 +989,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	revocationShares, err := wallet.PrepareRevocationSharesFromCoordinator(
 		t.Context(),
 		config,
-		startResp.FinalTokenTransaction,
+		startResp.GetFinalTokenTransaction(),
 	)
 	require.NoError(t, err, "failed to prepare revocation shares for testing")
 
@@ -1000,7 +1000,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 		t.Context(),
 		config,
 		wallet.ExchangeRevocationSecretsParams{
-			FinalTokenTransaction: startResp.FinalTokenTransaction,
+			FinalTokenTransaction: startResp.GetFinalTokenTransaction(),
 			FinalTxHash:           finalTxHash,
 			AllOperatorSignatures: allOperatorSignatures,
 			RevocationShares:      revocationShares,
@@ -1228,7 +1228,7 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 	remapTransferPb, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, senderWalletConfig, tokenTransactionParams{
 		TokenIdentityPubKey:            senderWalletConfig.IdentityPrivateKey.Public(),
 		TokenIdentifier:                tokenIdentifier,
-		FinalIssueTokenTransactionHash: outputsToSpend[0].PrevTokenTransactionHash,
+		FinalIssueTokenTransactionHash: outputsToSpend[0].GetPrevTokenTransactionHash(),
 		NumOutputs:                     1,
 		OutputAmounts:                  []uint64{testTransferOutput1Amount},
 		ClientCreatedTimestamp:         remapTimestamp,
@@ -1243,7 +1243,7 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 		},
 	}
 
-	for _, output := range remapTransferPb.TokenOutputs {
+	for _, output := range remapTransferPb.GetTokenOutputs() {
 		output.Id = new(uuid.New().String())
 
 		revocationPrivKey := keys.GeneratePrivateKey()
@@ -1277,14 +1277,14 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 		SetUpdateTime(now.Add(-25 * time.Minute)).
 		SetExpiryTime(expiryTime).
 		SetClientCreatedTimestamp(remapTimestamp).
-		SetVersion(st.TokenTransactionVersion(remapTransferPb.Version)).
+		SetVersion(st.TokenTransactionVersion(remapTransferPb.GetVersion())).
 		SetCoordinatorPublicKey(nonCoordinatorConfig.IdentityPublicKey()).
 		Save(ctx)
 	require.NoError(t, err, "failed to create remap transaction entity")
 
 	if remapTransferPb.ValidityDurationSeconds != nil {
 		_, err = nonCoordEntClient.TokenTransaction.UpdateOne(remapTxEnt).
-			SetValidityDurationSeconds(*remapTransferPb.ValidityDurationSeconds).
+			SetValidityDurationSeconds(remapTransferPb.GetValidityDurationSeconds()).
 			Save(ctx)
 		require.NoError(t, err, "failed to set validity duration")
 	}
@@ -1294,8 +1294,8 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 		Only(ctx)
 	require.NoError(t, err, "failed to get token create from non-coordinator")
 
-	for i, protoOutput := range remapTransferPb.TokenOutputs {
-		ownerPubKey, err := keys.ParsePublicKey(protoOutput.OwnerPublicKey)
+	for i, protoOutput := range remapTransferPb.GetTokenOutputs() {
+		ownerPubKey, err := keys.ParsePublicKey(protoOutput.GetOwnerPublicKey())
 		require.NoError(t, err, "failed to parse owner public key")
 
 		secretShare := keys.GeneratePrivateKey()
@@ -1314,9 +1314,9 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 		require.NoError(t, err, "failed to create keyshare")
 
 		_, err = nonCoordEntClient.TokenOutput.Create().
-			SetTokenIdentifier(protoOutput.TokenIdentifier).
+			SetTokenIdentifier(protoOutput.GetTokenIdentifier()).
 			SetOwnerPublicKey(ownerPubKey).
-			SetTokenAmount(protoOutput.TokenAmount).
+			SetTokenAmount(protoOutput.GetTokenAmount()).
 			SetCreatedTransactionFinalizedHash(finalHash).
 			SetCreatedTransactionOutputVout(int32(i)).
 			SetStatus(createdOutputStatus).
@@ -1324,7 +1324,7 @@ func createRemapTransactionSpendingSameOutputsOnNonCoordinator(
 			SetWithdrawBondSats(1000000).
 			SetTokenCreate(tokenCreate).
 			SetWithdrawRelativeBlockLocktime(1000).
-			SetWithdrawRevocationCommitment(protoOutput.RevocationCommitment).
+			SetWithdrawRevocationCommitment(protoOutput.GetRevocationCommitment()).
 			SetRevocationKeyshare(keyshare).
 			Save(ctx)
 		require.NoError(t, err, "failed to create created token outputs for remap transaction")

@@ -76,5 +76,5 @@ func TestQueryTokenMetadataReturnsEmptyForUnknownTokenIdentifier(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.Empty(t, resp.TokenMetadata)
+	require.Empty(t, resp.GetTokenMetadata())
 }

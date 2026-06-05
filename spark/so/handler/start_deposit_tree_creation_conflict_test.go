@@ -114,7 +114,7 @@ func TestStartDepositTreeCreationRejectsDistinctRootTxForSameDepositUTXO(t *test
 	reqA := buildRequest(nil)
 	respA, err := depositHandler.StartDepositTreeCreation(ctx, cfg, reqA)
 	require.NoError(t, err)
-	require.NotNil(t, respA.RootNodeSignatureShares.GetNodeTxSigningResult())
+	require.NotNil(t, respA.GetRootNodeSignatureShares().GetNodeTxSigningResult())
 
 	root, err := dbTx.TreeNode.Query().Only(ctx)
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestStartDepositTreeCreationRejectsDistinctRootTxForSameDepositUTXO(t *test
 	reqC := buildRequest(func(rootTx *wire.MsgTx) {
 		rootTx.TxIn[0].Sequence = spark.ZeroSequence | 0x00010000
 	})
-	require.False(t, bytes.Equal(reqA.RootTxSigningJob.RawTx, reqC.RootTxSigningJob.RawTx))
+	require.False(t, bytes.Equal(reqA.GetRootTxSigningJob().GetRawTx(), reqC.GetRootTxSigningJob().GetRawTx()))
 
 	_, err = depositHandler.StartDepositTreeCreation(ctx, cfg, reqC)
 	require.Error(t, err)
@@ -142,5 +142,5 @@ func TestStartDepositTreeCreationRejectsDistinctRootTxForSameDepositUTXO(t *test
 	roots, err := dbTx.TreeNode.Query().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, roots, 1)
-	require.True(t, bytes.Equal(reqA.RootTxSigningJob.RawTx, roots[0].RawTx))
+	require.True(t, bytes.Equal(reqA.GetRootTxSigningJob().GetRawTx(), roots[0].RawTx))
 }

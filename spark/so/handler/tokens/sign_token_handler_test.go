@@ -71,7 +71,7 @@ func (s *mockSparkTokenInternalServiceServer) SignTokenTransactionFromCoordinati
 		// Block until test allows us to respond
 		<-s.blockSign
 	}
-	signature := ecdsa.Sign(s.privKey.ToBTCEC(), req.FinalTokenTransactionHash)
+	signature := ecdsa.Sign(s.privKey.ToBTCEC(), req.GetFinalTokenTransactionHash())
 	return &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
 		SparkOperatorSignature: signature.Serialize(),
 	}, nil
@@ -231,9 +231,9 @@ func createCreateTokenTransactionProto(t *testing.T, setup *testSetupCommon) (*t
 // setupDBCreateTokenTransactionInternalSignFailedScenario sets up the database entities for a create token transaction
 func setupDBCreateTokenTransactionInternalSignFailedScenario(t *testing.T, setup *testSetupCommon, tokenTxProto *tokenpb.TokenTransaction, partialTxHash, finalTxHash, tokenIdentifier []byte) {
 	coordinatorSignature := ecdsa.Sign(setup.coordinatorPrivKey.ToBTCEC(), finalTxHash)
-	createInput, ok := tokenTxProto.TokenInputs.(*tokenpb.TokenTransaction_CreateInput)
+	createInput, ok := tokenTxProto.GetTokenInputs().(*tokenpb.TokenTransaction_CreateInput)
 	require.True(t, ok, "invalid tokenTxProto.TokenInputs: %v", tokenTxProto)
-	creationEntityPubKey, err := keys.ParsePublicKey(createInput.CreateInput.CreationEntityPublicKey)
+	creationEntityPubKey, err := keys.ParsePublicKey(createInput.CreateInput.GetCreationEntityPublicKey())
 	require.NoError(t, err)
 	tokenCreate, err := setup.sessionCtx.Client.TokenCreate.Create().
 		SetTokenName(testTokenName).
@@ -254,9 +254,9 @@ func setupDBCreateTokenTransactionInternalSignFailedScenario(t *testing.T, setup
 		SetStatus(schematype.TokenTransactionStatusSigned).
 		SetCreateID(tokenCreate.ID).
 		SetVersion(schematype.TokenTransactionVersionV1).
-		SetClientCreatedTimestamp(tokenTxProto.ClientCreatedTimestamp.AsTime()).
+		SetClientCreatedTimestamp(tokenTxProto.GetClientCreatedTimestamp().AsTime()).
 		SetOperatorSignature(coordinatorSignature.Serialize()).
-		SetExpiryTime(tokenTxProto.ExpiryTime.AsTime()).
+		SetExpiryTime(tokenTxProto.GetExpiryTime().AsTime()).
 		Save(setup.ctx)
 	require.NoError(t, err)
 }
@@ -372,9 +372,9 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetFinalizedTokenTransactionHash(finalTxHash).
 		SetStatus(schematype.TokenTransactionStatusSigned).
 		SetVersion(schematype.TokenTransactionVersionV1).
-		SetClientCreatedTimestamp(tokenTxProto.ClientCreatedTimestamp.AsTime()).
+		SetClientCreatedTimestamp(tokenTxProto.GetClientCreatedTimestamp().AsTime()).
 		SetOperatorSignature(coordinatorSignature.Serialize()).
-		SetExpiryTime(tokenTxProto.ExpiryTime.AsTime()).
+		SetExpiryTime(tokenTxProto.GetExpiryTime().AsTime()).
 		Save(setup.ctx)
 	require.NoError(t, err)
 
@@ -496,8 +496,8 @@ func TestCommitTransaction_CreateTransaction_Retry_AfterInternalSignFailed(t *te
 
 	// Assert that the sign step went through and returned a finalized status.
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
-	assert.Equal(t, tokenIdentifier, resp.TokenIdentifier)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+	assert.Equal(t, tokenIdentifier, resp.GetTokenIdentifier())
 
 	// Verify the status in the DB is in "Signed".
 	queriedDbTx, err := setup.sessionCtx.Client.TokenTransaction.Query().Only(setup.ctx)
@@ -523,8 +523,8 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalSignFailed(t *
 
 	// Assert that the sign step went through and returned a processing status.
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
-	assert.Empty(t, resp.TokenIdentifier)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
+	assert.Empty(t, resp.GetTokenIdentifier())
 
 	// Verify the status in the DB is "Revealed".
 	queriedDbTx, err := setup.sessionCtx.Client.TokenTransaction.Query().
@@ -552,27 +552,27 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalFinalizeFailed
 	resp, err := setup.handler.CommitTransaction(setup.ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
-	require.NotNil(t, resp.CommitProgress)
-	assert.Equal(t, setup.coordinatorPubKey.Serialize(), resp.CommitProgress.CommittedOperatorPublicKeys[0])
-	assert.Equal(t, setup.mockOperatorPubKey.Serialize(), resp.CommitProgress.UncommittedOperatorPublicKeys[0])
-	assert.Empty(t, resp.TokenIdentifier)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
+	require.NotNil(t, resp.GetCommitProgress())
+	assert.Equal(t, setup.coordinatorPubKey.Serialize(), resp.GetCommitProgress().GetCommittedOperatorPublicKeys()[0])
+	assert.Equal(t, setup.mockOperatorPubKey.Serialize(), resp.GetCommitProgress().GetUncommittedOperatorPublicKeys()[0])
+	assert.Empty(t, resp.GetTokenIdentifier())
 
 	// Call CommitTransaction again to test retrying in the reveal state - should return early with COMMIT_PROCESSING
 	resp2, err := setup.handler.CommitTransaction(setup.ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp2)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp2.CommitStatus)
-	assert.Empty(t, resp2.TokenIdentifier)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp2.GetCommitStatus())
+	assert.Empty(t, resp2.GetTokenIdentifier())
 
 	// Validate CommitProgress shows correct operator statuses
-	require.NotNil(t, resp2.CommitProgress)
+	require.NotNil(t, resp2.GetCommitProgress())
 	// Verify coordinator is in committed operators list
-	require.Len(t, resp2.CommitProgress.CommittedOperatorPublicKeys, 1)
-	assert.Equal(t, setup.coordinatorPubKey.Serialize(), resp2.CommitProgress.CommittedOperatorPublicKeys[0])
+	require.Len(t, resp2.GetCommitProgress().GetCommittedOperatorPublicKeys(), 1)
+	assert.Equal(t, setup.coordinatorPubKey.Serialize(), resp2.GetCommitProgress().GetCommittedOperatorPublicKeys()[0])
 	// Verify mock operator is in uncommitted operators list
-	require.Len(t, resp2.CommitProgress.UncommittedOperatorPublicKeys, 1)
-	assert.Equal(t, setup.mockOperatorPubKey.Serialize(), resp2.CommitProgress.UncommittedOperatorPublicKeys[0])
+	require.Len(t, resp2.GetCommitProgress().GetUncommittedOperatorPublicKeys(), 1)
+	assert.Equal(t, setup.mockOperatorPubKey.Serialize(), resp2.GetCommitProgress().GetUncommittedOperatorPublicKeys()[0])
 	// Verify the status in the DB is "Revealed".
 	queriedDbTx, err := setup.sessionCtx.Client.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHash(finalTxHash)).
@@ -608,8 +608,8 @@ func TestCommitTransaction_TransferTransactionSimulateRace_ControlSucceedsWithVa
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	// For transfer, we expect processing state in this test harness
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
-	assert.Empty(t, resp.TokenIdentifier)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
+	assert.Empty(t, resp.GetTokenIdentifier())
 }
 
 func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputStatusFinalized(t *testing.T) {
@@ -676,8 +676,8 @@ func TestConcurrentCreateCommit_IndependentResponses(t *testing.T) {
 
 	for i, resp := range responses {
 		expected := fmt.Sprintf("token-%d", i)
-		assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
-		assert.Equal(t, expected, string(resp.TokenIdentifier),
+		assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+		assert.Equal(t, expected, string(resp.GetTokenIdentifier()),
 			"goroutine %d got wrong TokenIdentifier (indicates shared mutable state)", i)
 	}
 }
@@ -708,8 +708,8 @@ func TestMintResponse_NoTokenIdentifier(t *testing.T) {
 	}()
 	wg.Wait()
 
-	assert.Equal(t, []byte("some-token-id"), createResp.TokenIdentifier)
-	assert.Nil(t, mintResp.TokenIdentifier,
+	assert.Equal(t, []byte("some-token-id"), createResp.GetTokenIdentifier())
+	assert.Nil(t, mintResp.GetTokenIdentifier(),
 		"Mint response should not have TokenIdentifier (was shared state bug)")
 }
 

@@ -368,12 +368,12 @@ func buildProvidePreimageCoordinatorFlow(
 		if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
-		if keyTweakProto.SecretShareTweak == nil {
+		if keyTweakProto.GetSecretShareTweak() == nil {
 			return nil, sparkerrors.InvalidArgumentMissingField(
-				fmt.Errorf("secret share tweak missing for leaf %s", keyTweakProto.LeafId))
+				fmt.Errorf("secret share tweak missing for leaf %s", keyTweakProto.GetLeafId()))
 		}
-		proofs[keyTweakProto.LeafId] = &pbspark.SecretProof{
-			Proofs: keyTweakProto.SecretShareTweak.Proofs,
+		proofs[keyTweakProto.GetLeafId()] = &pbspark.SecretProof{
+			Proofs: keyTweakProto.GetSecretShareTweak().GetProofs(),
 		}
 	}
 

@@ -41,13 +41,13 @@ func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *spark
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
-	if len(req.Invoice) > 0 {
-		if len(req.Invoice) > maxSparkInvoiceLimit {
+	if len(req.GetInvoice()) > 0 {
+		if len(req.GetInvoice()) > maxSparkInvoiceLimit {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("too many invoice strings provided"))
 		}
 		// This is an explicit lookup path: the caller-provided invoice list is the
 		// response boundary, while limit/offset only apply to paginated list APIs.
-		return h.querySparkInvoicesByRawInvoice(ctx, req, len(req.Invoice))
+		return h.querySparkInvoicesByRawInvoice(ctx, req, len(req.GetInvoice()))
 	}
 
 	return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice strings provided"))
@@ -65,10 +65,10 @@ type invoiceEntry struct {
 func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context, req *sparkpb.QuerySparkInvoicesRequest, limit int) (*sparkpb.QuerySparkInvoicesResponse, error) {
 	ctx, span := tracer.Start(ctx, "SparkInvoiceHandler.querySparkInvoicesByRawInvoice")
 	defer span.End()
-	entries := make([]invoiceEntry, 0, len(req.Invoice))
-	satsInvoiceIDs := make([]uuid.UUID, 0, len(req.Invoice))
-	tokenInvoiceIDs := make([]uuid.UUID, 0, len(req.Invoice))
-	for _, invoice := range req.Invoice {
+	entries := make([]invoiceEntry, 0, len(req.GetInvoice()))
+	satsInvoiceIDs := make([]uuid.UUID, 0, len(req.GetInvoice()))
+	tokenInvoiceIDs := make([]uuid.UUID, 0, len(req.GetInvoice()))
+	for _, invoice := range req.GetInvoice() {
 		decoded, err := common.ParseSparkInvoice(invoice)
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid invoice: %w", err))
@@ -182,8 +182,8 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 		}
 		// Clone so req.invoices sharing an id don't mutate invoiceResponseMap.
 		response := proto.Clone(base).(*sparkpb.InvoiceResponse)
-		if mismatchStatus, guarded := statusToMismatchedInvoiceStatus[response.Status]; guarded {
-			responseParsed, err := common.ParseSparkInvoice(response.Invoice)
+		if mismatchStatus, guarded := statusToMismatchedInvoiceStatus[response.GetStatus()]; guarded {
+			responseParsed, err := common.ParseSparkInvoice(response.GetInvoice())
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse stored invoice %s: %w", entry.id, err)
 			}

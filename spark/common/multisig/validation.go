@@ -27,7 +27,7 @@ func ValidateMultisigSignatures(config *pb.MultisigConfig, message []byte, sigSe
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signature set cannot be nil"))
 	}
 
-	if sigSet.MultisigConfig == nil {
+	if sigSet.GetMultisigConfig() == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("signature set must contain multisig config"))
 	}
 
@@ -35,7 +35,7 @@ func ValidateMultisigSignatures(config *pb.MultisigConfig, message []byte, sigSe
 	if err != nil {
 		return fmt.Errorf("invalid multisig config: %w", err)
 	}
-	sigSetID, err := ValidateAndComputeMultisigIdentifier(sigSet.MultisigConfig)
+	sigSetID, err := ValidateAndComputeMultisigIdentifier(sigSet.GetMultisigConfig())
 	if err != nil {
 		return fmt.Errorf("invalid multisig config in signature set: %w", err)
 	}
@@ -43,29 +43,29 @@ func ValidateMultisigSignatures(config *pb.MultisigConfig, message []byte, sigSe
 		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("multisig config mismatch"))
 	}
 
-	seen := make(map[string]bool, len(sigSet.Signatures))
+	seen := make(map[string]bool, len(sigSet.GetSignatures()))
 
-	for _, sig := range sigSet.Signatures {
-		pubKeyHex := hex.EncodeToString(sig.PublicKey)
+	for _, sig := range sigSet.GetSignatures() {
+		pubKeyHex := hex.EncodeToString(sig.GetPublicKey())
 		if seen[pubKeyHex] {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate signature from %s", pubKeyHex))
 		}
 		seen[pubKeyHex] = true
 
-		if !slices.ContainsFunc(config.PublicKeys, func(pk []byte) bool {
-			return bytes.Equal(pk, sig.PublicKey)
+		if !slices.ContainsFunc(config.GetPublicKeys(), func(pk []byte) bool {
+			return bytes.Equal(pk, sig.GetPublicKey())
 		}) {
 			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("signer %s is not a member of the multisig", pubKeyHex))
 		}
 
-		if err := verifySignature(sig.PublicKey, message, sig.Signature); err != nil {
+		if err := verifySignature(sig.GetPublicKey(), message, sig.GetSignature()); err != nil {
 			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid signature from %s: %w", pubKeyHex, err))
 		}
 	}
 
-	if uint32(len(sigSet.Signatures)) < config.Threshold {
+	if uint32(len(sigSet.GetSignatures())) < config.GetThreshold() {
 		return sparkerrors.FailedPreconditionBadSignature(
-			fmt.Errorf("threshold not met: got %d valid signatures, need %d", len(sigSet.Signatures), config.Threshold),
+			fmt.Errorf("threshold not met: got %d valid signatures, need %d", len(sigSet.GetSignatures()), config.GetThreshold()),
 		)
 	}
 

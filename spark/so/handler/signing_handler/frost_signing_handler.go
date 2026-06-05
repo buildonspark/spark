@@ -65,15 +65,15 @@ func (h *FrostSigningHandler) FrostRound1(ctx context.Context, req *pb.FrostRoun
 	}
 
 	var totalCount uint64
-	if req.RandomNonceCount > 0 {
-		totalCount = uint64(req.RandomNonceCount)
+	if req.GetRandomNonceCount() > 0 {
+		totalCount = uint64(req.GetRandomNonceCount())
 	} else {
-		count := req.Count
+		count := req.GetCount()
 		if count == 0 {
 			count = 1
 		}
 
-		keyshareCount := uint64(len(req.KeyshareIds))
+		keyshareCount := uint64(len(req.GetKeyshareIds()))
 		if uint64(count) > maxFrostRound1Nonces || keyshareCount > maxFrostRound1Nonces {
 			return nil, status.Error(codes.InvalidArgument, "too many nonces requested in one request, please split into multiple requests")
 		}
@@ -147,17 +147,17 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 	}
 
 	// Fetch nonces in one call.
-	commitments := make([]frost.SigningCommitment, len(req.SigningJobs))
-	seenCommitments := make(map[frost.SigningCommitment]int, len(req.SigningJobs))
-	for i, job := range req.SigningJobs {
+	commitments := make([]frost.SigningCommitment, len(req.GetSigningJobs()))
+	seenCommitments := make(map[frost.SigningCommitment]int, len(req.GetSigningJobs()))
+	for i, job := range req.GetSigningJobs() {
 		commitments[i] = frost.SigningCommitment{}
-		err = commitments[i].UnmarshalProto(job.Commitments[h.config.Identifier])
+		err = commitments[i].UnmarshalProto(job.GetCommitments()[h.config.Identifier])
 		if err != nil {
 			return nil, err
 		}
 		if prevIndex, ok := seenCommitments[commitments[i]]; ok {
 			commitmentHex := hex.EncodeToString(commitments[i].MarshalBinary())
-			return nil, fmt.Errorf("duplicate signing nonce commitment %s in request (jobs[%d]=%q, jobs[%d]=%q)", commitmentHex, prevIndex, req.SigningJobs[prevIndex].JobId, i, job.JobId)
+			return nil, fmt.Errorf("duplicate signing nonce commitment %s in request (jobs[%d]=%q, jobs[%d]=%q)", commitmentHex, prevIndex, req.GetSigningJobs()[prevIndex].GetJobId(), i, job.GetJobId())
 		}
 		seenCommitments[commitments[i]] = i
 	}
@@ -170,9 +170,9 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 	bulkUpdates := make(map[frost.SigningCommitment][]byte)
 
 	// First pass: validate all nonces and collect updates
-	for _, job := range req.SigningJobs {
+	for _, job := range req.GetSigningJobs() {
 		commitment := frost.SigningCommitment{}
-		err = commitment.UnmarshalProto(job.Commitments[h.config.Identifier])
+		err = commitment.UnmarshalProto(job.GetCommitments()[h.config.Identifier])
 		if err != nil {
 			return nil, err
 		}
@@ -202,13 +202,13 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 	}
 
 	// Second pass: build signing job protos
-	for _, job := range req.SigningJobs {
-		keyshareID, err := uuid.Parse(job.KeyshareId)
+	for _, job := range req.GetSigningJobs() {
+		keyshareID, err := uuid.Parse(job.GetKeyshareId())
 		if err != nil {
 			return nil, err
 		}
 		commitment := frost.SigningCommitment{}
-		if err := commitment.UnmarshalProto(job.Commitments[h.config.Identifier]); err != nil {
+		if err := commitment.UnmarshalProto(job.GetCommitments()[h.config.Identifier]); err != nil {
 			return nil, err
 		}
 
@@ -218,14 +218,14 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 
 		keyPackage := keyPackages[keyshareID]
 		signingJobProto := &pbfrost.FrostSigningJob{
-			JobId:            job.JobId,
-			Message:          job.Message,
+			JobId:            job.GetJobId(),
+			Message:          job.GetMessage(),
 			KeyPackage:       keyPackage,
-			VerifyingKey:     job.VerifyingKey,
+			VerifyingKey:     job.GetVerifyingKey(),
 			Nonce:            nonceProto,
-			Commitments:      job.Commitments,
-			UserCommitments:  job.UserCommitments,
-			AdaptorPublicKey: job.AdaptorPublicKey,
+			Commitments:      job.GetCommitments(),
+			UserCommitments:  job.GetUserCommitments(),
+			AdaptorPublicKey: job.GetAdaptorPublicKey(),
 		}
 		signingJobProtos = append(signingJobProtos, signingJobProto)
 	}
@@ -246,32 +246,32 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 		return nil, err
 	}
 
-	return &pb.FrostRound2Response{Results: round2Response.Results}, nil
+	return &pb.FrostRound2Response{Results: round2Response.GetResults()}, nil
 }
 
 func retryFingerprint(job *pb.SigningJob) []byte {
 	hashState := sha256.New()
 
-	writeBytesCollisionResistant(hashState, job.Message)
+	writeBytesCollisionResistant(hashState, job.GetMessage())
 
-	writeBytesCollisionResistant(hashState, job.VerifyingKey)
+	writeBytesCollisionResistant(hashState, job.GetVerifyingKey())
 
-	writeBytesCollisionResistant(hashState, job.AdaptorPublicKey)
+	writeBytesCollisionResistant(hashState, job.GetAdaptorPublicKey())
 
-	if job.UserCommitments != nil {
-		writeBytesCollisionResistant(hashState, job.UserCommitments.Hiding)
-		writeBytesCollisionResistant(hashState, job.UserCommitments.Binding)
+	if job.GetUserCommitments() != nil {
+		writeBytesCollisionResistant(hashState, job.GetUserCommitments().GetHiding())
+		writeBytesCollisionResistant(hashState, job.GetUserCommitments().GetBinding())
 	}
 
-	hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(len(job.Commitments))))
+	hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(len(job.GetCommitments()))))
 
-	for _, operatorIdentifier := range slices.Sorted(maps.Keys(job.Commitments)) {
+	for _, operatorIdentifier := range slices.Sorted(maps.Keys(job.GetCommitments())) {
 		writeBytesCollisionResistant(hashState, []byte(operatorIdentifier))
 
-		com := job.Commitments[operatorIdentifier]
+		com := job.GetCommitments()[operatorIdentifier]
 		if com != nil {
-			writeBytesCollisionResistant(hashState, com.Hiding)
-			writeBytesCollisionResistant(hashState, com.Binding)
+			writeBytesCollisionResistant(hashState, com.GetHiding())
+			writeBytesCollisionResistant(hashState, com.GetBinding())
 		}
 	}
 
@@ -305,11 +305,11 @@ func ApplyKeysharePackageTweak(kp *pbfrost.KeyPackage, secretShareTweak []byte, 
 	if len(publicKeyTweak) == 0 {
 		return nil, fmt.Errorf("missing public_key_tweak")
 	}
-	if len(publicSharesTweak) != len(kp.PublicShares) {
-		return nil, fmt.Errorf("public_shares_tweak has %d entries, expected %d to match key package", len(publicSharesTweak), len(kp.PublicShares))
+	if len(publicSharesTweak) != len(kp.GetPublicShares()) {
+		return nil, fmt.Errorf("public_shares_tweak has %d entries, expected %d to match key package", len(publicSharesTweak), len(kp.GetPublicShares()))
 	}
 
-	secretShare, err := keys.ParsePrivateKey(kp.SecretShare)
+	secretShare, err := keys.ParsePrivateKey(kp.GetSecretShare())
 	if err != nil {
 		return nil, fmt.Errorf("parse secret_share: %w", err)
 	}
@@ -319,7 +319,7 @@ func ApplyKeysharePackageTweak(kp *pbfrost.KeyPackage, secretShareTweak []byte, 
 	}
 	newSecretShare := secretShare.Add(shareTweak)
 
-	publicKey, err := keys.ParsePublicKey(kp.PublicKey)
+	publicKey, err := keys.ParsePublicKey(kp.GetPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("parse public_key: %w", err)
 	}
@@ -329,8 +329,8 @@ func ApplyKeysharePackageTweak(kp *pbfrost.KeyPackage, secretShareTweak []byte, 
 	}
 	newPublicKey := publicKey.Add(pubKeyTweak)
 
-	newPublicShares := make(map[string][]byte, len(kp.PublicShares))
-	for id, oldShareBytes := range kp.PublicShares {
+	newPublicShares := make(map[string][]byte, len(kp.GetPublicShares()))
+	for id, oldShareBytes := range kp.GetPublicShares() {
 		shareTweakBytes, ok := publicSharesTweak[id]
 		if !ok {
 			return nil, fmt.Errorf("public_shares_tweak missing entry for operator %s", id)
@@ -347,10 +347,10 @@ func ApplyKeysharePackageTweak(kp *pbfrost.KeyPackage, secretShareTweak []byte, 
 	}
 
 	return &pbfrost.KeyPackage{
-		Identifier:   kp.Identifier,
+		Identifier:   kp.GetIdentifier(),
 		SecretShare:  newSecretShare.Serialize(),
 		PublicShares: newPublicShares,
 		PublicKey:    newPublicKey.Serialize(),
-		MinSigners:   kp.MinSigners,
+		MinSigners:   kp.GetMinSigners(),
 	}, nil
 }

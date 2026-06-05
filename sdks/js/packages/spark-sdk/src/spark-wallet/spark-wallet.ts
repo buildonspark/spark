@@ -3155,7 +3155,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @returns {Promise<TransferWithInvoiceOutcome[]>} The outcomes of the transfers
    * @private
    */
-  protected async transferWithInvoice(
+  private async transferWithInvoice(
     params: TransferWithInvoiceParams[],
   ): Promise<TransferWithInvoiceOutcome[]> {
     const amountSatsArray: number[] = [];
@@ -3302,7 +3302,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {Transfer} transfer - The transfer to claim
    * @returns {Promise<Object>} The claim result
    */
-  protected async claimTransfer({
+  private async claimTransfer({
     transfer,
     emit,
   }: {

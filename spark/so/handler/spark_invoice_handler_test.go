@@ -175,8 +175,8 @@ func querySingleStatus(t *testing.T, ctx context.Context, config *so.Config, que
 		Invoice: []string{queried},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 1)
-	return resp.InvoiceStatuses[0]
+	require.Len(t, resp.GetInvoiceStatuses(), 1)
+	return resp.GetInvoiceStatuses()[0]
 }
 
 // TestQuerySparkInvoicesAmountMismatch verifies that querying with an encoding
@@ -208,8 +208,8 @@ func TestQuerySparkInvoicesAmountMismatch(t *testing.T) {
 			queriedStr := buildSatsInvoiceStr(t, id, receiver, &queriedAmount, nil)
 
 			got := querySingleStatus(t, ctx, config, queriedStr)
-			require.Equal(t, tt.want, got.Status)
-			require.Equal(t, storedStr, got.Invoice, "mismatch response must keep the stored canonical encoding")
+			require.Equal(t, tt.want, got.GetStatus())
+			require.Equal(t, storedStr, got.GetInvoice(), "mismatch response must keep the stored canonical encoding")
 			require.NotNil(t, got.GetSatsTransfer(), "mismatch response must keep transfer details")
 		})
 	}
@@ -231,7 +231,7 @@ func TestQuerySparkInvoicesReceiverMismatch(t *testing.T) {
 	queriedStr := buildSatsInvoiceStr(t, id, keys.GeneratePrivateKey().Public(), &amount, nil)
 
 	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.Status)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.GetStatus())
 }
 
 // TestQuerySparkInvoicesOpenAmountMismatch verifies that an open-amount queried
@@ -250,7 +250,7 @@ func TestQuerySparkInvoicesOpenAmountMismatch(t *testing.T) {
 	queriedStr := buildSatsInvoiceStr(t, id, receiver, nil, nil)
 
 	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.Status)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.GetStatus())
 }
 
 // TestQuerySparkInvoicesMatchingEncodingUnchanged verifies that querying with an
@@ -271,7 +271,7 @@ func TestQuerySparkInvoicesMatchingEncodingUnchanged(t *testing.T) {
 	queriedStr := buildSatsInvoiceStr(t, id, receiver, &amount, &memo)
 
 	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, got.Status,
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, got.GetStatus(),
 		"matching money fields must not be flagged even when memo differs")
 }
 
@@ -292,7 +292,7 @@ func TestQuerySparkInvoicesTokenAmountMismatch(t *testing.T) {
 	queriedStr := buildTokenInvoiceStr(t, id, receiver, tokenIdentifier, []byte{0x07, 0xd0})
 
 	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.Status)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.GetStatus())
 }
 
 // TestQuerySparkInvoicesDuplicateIDMatchingAndMismatched verifies that a single
@@ -319,17 +319,17 @@ func TestQuerySparkInvoicesDuplicateIDMatchingAndMismatched(t *testing.T) {
 		Invoice: []string{matching, mismatched},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 2)
-	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, resp.InvoiceStatuses[0].Status)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, resp.InvoiceStatuses[1].Status)
+	require.Len(t, resp.GetInvoiceStatuses(), 2)
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, resp.GetInvoiceStatuses()[0].GetStatus())
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, resp.GetInvoiceStatuses()[1].GetStatus())
 
 	reversed, err := handler.QuerySparkInvoices(ctx, &sparkpb.QuerySparkInvoicesRequest{
 		Invoice: []string{mismatched, matching},
 	})
 	require.NoError(t, err)
-	require.Len(t, reversed.InvoiceStatuses, 2)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, reversed.InvoiceStatuses[0].Status)
-	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, reversed.InvoiceStatuses[1].Status)
+	require.Len(t, reversed.GetInvoiceStatuses(), 2)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, reversed.GetInvoiceStatuses()[0].GetStatus())
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, reversed.GetInvoiceStatuses()[1].GetStatus())
 }
 
 // TestQuerySparkInvoicesDuplicateIDBothNotFound verifies that two different
@@ -352,11 +352,11 @@ func TestQuerySparkInvoicesDuplicateIDBothNotFound(t *testing.T) {
 		Invoice: []string{encA, encB},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 2)
-	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.InvoiceStatuses[0].Status)
-	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.InvoiceStatuses[1].Status)
-	require.Equal(t, encA, resp.InvoiceStatuses[0].Invoice)
-	require.Equal(t, encB, resp.InvoiceStatuses[1].Invoice)
+	require.Len(t, resp.GetInvoiceStatuses(), 2)
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.GetInvoiceStatuses()[0].GetStatus())
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.GetInvoiceStatuses()[1].GetStatus())
+	require.Equal(t, encA, resp.GetInvoiceStatuses()[0].GetInvoice())
+	require.Equal(t, encB, resp.GetInvoiceStatuses()[1].GetInvoice())
 }
 
 // TestQuerySparkInvoicesReturnsPendingStatus verifies that an invoice attached to
@@ -378,10 +378,10 @@ func TestQuerySparkInvoicesReturnsPendingStatus(t *testing.T) {
 		Invoice: []string{invoiceStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 1)
-	require.Equal(t, sparkpb.InvoiceStatus_PENDING, resp.InvoiceStatuses[0].Status,
+	require.Len(t, resp.GetInvoiceStatuses(), 1)
+	require.Equal(t, sparkpb.InvoiceStatus_PENDING, resp.GetInvoiceStatuses()[0].GetStatus(),
 		"expected PENDING for SenderInitiatedCoordinator transfer, got %s",
-		resp.InvoiceStatuses[0].Status)
+		resp.GetInvoiceStatuses()[0].GetStatus())
 }
 
 func TestQuerySparkInvoicesRejectsNilRequest(t *testing.T) {
@@ -415,10 +415,10 @@ func TestQuerySparkInvoicesReturnsNotFoundForStoredInvoiceWithoutPaymentEdge(t *
 		Invoice: []string{invoiceStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 1)
-	require.Equal(t, invoiceStr, resp.InvoiceStatuses[0].Invoice)
-	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.InvoiceStatuses[0].Status)
-	require.Nil(t, resp.InvoiceStatuses[0].GetTransferType())
+	require.Len(t, resp.GetInvoiceStatuses(), 1)
+	require.Equal(t, invoiceStr, resp.GetInvoiceStatuses()[0].GetInvoice())
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, resp.GetInvoiceStatuses()[0].GetStatus())
+	require.Nil(t, resp.GetInvoiceStatuses()[0].GetTransferType())
 }
 
 func TestQuerySparkInvoicesReturnsTokenInvoiceStatuses(t *testing.T) {
@@ -433,19 +433,19 @@ func TestQuerySparkInvoicesReturnsTokenInvoiceStatuses(t *testing.T) {
 		Invoice: []string{returnedStr, pendingStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 2)
+	require.Len(t, resp.GetInvoiceStatuses(), 2)
 
 	byInvoice := make(map[string]*sparkpb.InvoiceResponse, 2)
-	for _, invoiceStatus := range resp.InvoiceStatuses {
-		byInvoice[invoiceStatus.Invoice] = invoiceStatus
+	for _, invoiceStatus := range resp.GetInvoiceStatuses() {
+		byInvoice[invoiceStatus.GetInvoice()] = invoiceStatus
 	}
 
 	require.Contains(t, byInvoice, returnedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, byInvoice[returnedStr].Status)
+	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, byInvoice[returnedStr].GetStatus())
 	require.Equal(t, returnedFinalHash, byInvoice[returnedStr].GetTokenTransfer().GetFinalTokenTransactionHash())
 
 	require.Contains(t, byInvoice, pendingStr)
-	require.Equal(t, sparkpb.InvoiceStatus_PENDING, byInvoice[pendingStr].Status)
+	require.Equal(t, sparkpb.InvoiceStatus_PENDING, byInvoice[pendingStr].GetStatus())
 	require.Equal(t, pendingFinalHash, byInvoice[pendingStr].GetTokenTransfer().GetFinalTokenTransactionHash())
 }
 
@@ -464,11 +464,11 @@ func TestQuerySparkInvoicesLimitDoesNotMisclassifyExplicitInvoiceList(t *testing
 		Invoice: []string{firstStr, secondStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 2)
+	require.Len(t, resp.GetInvoiceStatuses(), 2)
 
 	byInvoice := make(map[string]sparkpb.InvoiceStatus, 2)
-	for _, invoiceStatus := range resp.InvoiceStatuses {
-		byInvoice[invoiceStatus.Invoice] = invoiceStatus.Status
+	for _, invoiceStatus := range resp.GetInvoiceStatuses() {
+		byInvoice[invoiceStatus.GetInvoice()] = invoiceStatus.GetStatus()
 	}
 	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, byInvoice[firstStr])
 	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, byInvoice[secondStr])
@@ -506,10 +506,10 @@ func TestQuerySparkInvoicesReturnsPendingStatusForKeyTweakPending(t *testing.T) 
 		Invoice: []string{invoiceStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 1)
-	require.Equal(t, sparkpb.InvoiceStatus_PENDING, resp.InvoiceStatuses[0].Status,
+	require.Len(t, resp.GetInvoiceStatuses(), 1)
+	require.Equal(t, sparkpb.InvoiceStatus_PENDING, resp.GetInvoiceStatuses()[0].GetStatus(),
 		"expected PENDING for SenderKeyTweakPending transfer, got %s",
-		resp.InvoiceStatuses[0].Status)
+		resp.GetInvoiceStatuses()[0].GetStatus())
 }
 
 // TestQuerySparkInvoicesReturnsReturnedStatus verifies that an invoice with an
@@ -534,10 +534,10 @@ func TestQuerySparkInvoicesReturnsReturnedStatus(t *testing.T) {
 		Invoice: []string{invoiceStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 1)
-	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, resp.InvoiceStatuses[0].Status,
+	require.Len(t, resp.GetInvoiceStatuses(), 1)
+	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, resp.GetInvoiceStatuses()[0].GetStatus(),
 		"expected RETURNED for a returned transfer, got %s",
-		resp.InvoiceStatuses[0].Status)
+		resp.GetInvoiceStatuses()[0].GetStatus())
 }
 
 // TestQuerySparkInvoicesReturnsReturnedStatusForExpiredTransfer checks that an
@@ -554,10 +554,10 @@ func TestQuerySparkInvoicesReturnsReturnedStatusForExpiredTransfer(t *testing.T)
 		Invoice: []string{invoiceStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 1)
-	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, resp.InvoiceStatuses[0].Status,
+	require.Len(t, resp.GetInvoiceStatuses(), 1)
+	require.Equal(t, sparkpb.InvoiceStatus_RETURNED, resp.GetInvoiceStatuses()[0].GetStatus(),
 		"expected RETURNED for an expired transfer, got %s",
-		resp.InvoiceStatuses[0].Status)
+		resp.GetInvoiceStatuses()[0].GetStatus())
 }
 
 // TestQuerySparkInvoicesDistinguishesPendingAndFinalized ensures that a single
@@ -579,11 +579,11 @@ func TestQuerySparkInvoicesDistinguishesPendingAndFinalized(t *testing.T) {
 		Invoice: []string{pendingStr, finalizedStr},
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.InvoiceStatuses, 2)
+	require.Len(t, resp.GetInvoiceStatuses(), 2)
 
 	statusByInvoice := make(map[string]sparkpb.InvoiceStatus, 2)
-	for _, s := range resp.InvoiceStatuses {
-		statusByInvoice[s.Invoice] = s.Status
+	for _, s := range resp.GetInvoiceStatuses() {
+		statusByInvoice[s.GetInvoice()] = s.GetStatus()
 	}
 	require.Equal(t, sparkpb.InvoiceStatus_PENDING, statusByInvoice[pendingStr],
 		"pending invoice should be PENDING")

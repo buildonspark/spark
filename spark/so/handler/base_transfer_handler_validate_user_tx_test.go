@@ -269,7 +269,7 @@ func validateAndConstructBitcoinTransactionsForTest(
 
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMaps(req)
 
-	refundDestPubkey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
+	refundDestPubkey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	require.NoError(t, err)
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -671,7 +671,7 @@ func TestValidateUserTxs_Package_MismatchedCounts_Error(t *testing.T) {
 
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientCpfpTx(t, leaf, refundDest)}
 	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: leaf.node.ID.String(), RawTx: makeClientDirectFromCpfpTx(t, leaf, refundDest)}
-	orphan := &pb.UserSignedTxSigningJob{LeafId: uuid.New().String(), RawTx: directFromCpfp.RawTx}
+	orphan := &pb.UserSignedTxSigningJob{LeafId: uuid.New().String(), RawTx: directFromCpfp.GetRawTx()}
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),
@@ -693,7 +693,7 @@ func TestValidateUserTxs_Package_UnknownLeafIDs_Error(t *testing.T) {
 
 	refundDest := keys.GeneratePrivateKey().Public()
 	cpfp := &pb.UserSignedTxSigningJob{LeafId: uuid.New().String(), RawTx: []byte{0x00}} // invalid but we won't reach validation
-	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: cpfp.LeafId, RawTx: []byte{0x00}}
+	directFromCpfp := &pb.UserSignedTxSigningJob{LeafId: cpfp.GetLeafId(), RawTx: []byte{0x00}}
 
 	req := &pb.StartTransferRequest{
 		ReceiverIdentityPublicKey: refundDest.Serialize(),

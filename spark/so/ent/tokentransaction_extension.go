@@ -117,7 +117,7 @@ func createTransactionEntities(
 	}
 
 	var network btcnetwork.Network
-	if err := network.UnmarshalProto(tokenTransaction.Network); err != nil {
+	if err := network.UnmarshalProto(tokenTransaction.GetNetwork()); err != nil {
 		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to unmarshal network: %w", err))
 	}
 
@@ -142,7 +142,7 @@ func createTransactionEntities(
 	switch tokenTransactionType {
 	case utils.TokenTransactionTypeCreate:
 		createInput := tokenTransaction.GetCreateInput()
-		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.Network)
+		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.GetNetwork())
 		if err != nil {
 			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to create token metadata: %w", err))
 		}
@@ -180,7 +180,7 @@ func createTransactionEntities(
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(txStatus).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
-			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
+			SetVersion(st.TokenTransactionVersion(tokenTransaction.GetVersion())).
 			SetCreateID(tokenCreateEnt.ID)
 		if mode == createTransactionEntitiesModeSigned {
 			txBuilder = txBuilder.SetOperatorSignature(operatorSignature)
@@ -202,7 +202,7 @@ func createTransactionEntities(
 			SetIssuerPublicKey(issuerPubKey).
 			SetIssuerSignature(signature.GetEffectiveSingleSignature(signaturesWithIndex[0])).
 			// TODO CNT-376: remove timestamp field from MintInput and use TokenTransaction.ClientCreatedTimestamp instead
-			SetWalletProvidedTimestamp(uint64(tokenTransaction.ClientCreatedTimestamp.AsTime().UnixMilli())).
+			SetWalletProvidedTimestamp(uint64(tokenTransaction.GetClientCreatedTimestamp().AsTime().UnixMilli())).
 			SetTokenIdentifier(tokenTransaction.GetMintInput().GetTokenIdentifier()).
 			Save(ctx)
 		if err != nil {
@@ -213,7 +213,7 @@ func createTransactionEntities(
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(txStatus).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
-			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
+			SetVersion(st.TokenTransactionVersion(tokenTransaction.GetVersion())).
 			SetMintID(tokenMintEnt.ID)
 		if mode == createTransactionEntitiesModeSigned {
 			txMintBuilder = txMintBuilder.SetOperatorSignature(operatorSignature)
@@ -239,7 +239,7 @@ func createTransactionEntities(
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(txStatus).
 			SetCoordinatorPublicKey(coordinatorPublicKey).
-			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version))
+			SetVersion(st.TokenTransactionVersion(tokenTransaction.GetVersion()))
 		if mode == createTransactionEntitiesModeSigned {
 			txTransferBuilder = txTransferBuilder.SetOperatorSignature(operatorSignature)
 		}
@@ -272,7 +272,7 @@ func createTransactionEntities(
 	default:
 		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
-	if tokenTransaction.Version >= 2 && tokenTransaction.GetInvoiceAttachments() != nil {
+	if tokenTransaction.GetVersion() >= 2 && tokenTransaction.GetInvoiceAttachments() != nil {
 		sparkInvoiceIDs, sparkInvoicesToCreate, err := prepareSparkInvoiceCreates(ctx, tokenTransaction, tokenTransactionEnt)
 		if err != nil {
 			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to prepare spark invoices: %w", err))
@@ -315,14 +315,14 @@ func createTransactionEntities(
 	tokenIdentifierMap := make(map[string]struct{})
 	tokenPublicKeyMap := make(map[string]struct{})
 
-	for _, output := range tokenTransaction.TokenOutputs {
+	for _, output := range tokenTransaction.GetTokenOutputs() {
 		if output.TokenIdentifier != nil {
-			key := string(output.TokenIdentifier)
+			key := string(output.GetTokenIdentifier())
 			if _, exists := tokenIdentifierMap[key]; !exists {
-				tokenIdentifiersToFetch = append(tokenIdentifiersToFetch, output.TokenIdentifier)
+				tokenIdentifiersToFetch = append(tokenIdentifiersToFetch, output.GetTokenIdentifier())
 				tokenIdentifierMap[key] = struct{}{}
 			}
-		} else if len(output.TokenPublicKey) != 0 {
+		} else if len(output.GetTokenPublicKey()) != 0 {
 			tokenPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
 			if err != nil {
 				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key: %w", err))
@@ -366,8 +366,8 @@ func createTransactionEntities(
 	}
 
 	// Now create outputs using the fetched TokenCreate entities
-	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.TokenOutputs))
-	for outputIndex, output := range tokenTransaction.TokenOutputs {
+	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.GetTokenOutputs()))
+	for outputIndex, output := range tokenTransaction.GetTokenOutputs() {
 		revocationUUID, err := uuid.Parse(orderedOutputToCreateRevocationKeyshareIDs[outputIndex])
 		if err != nil {
 			return nil, err
@@ -388,13 +388,13 @@ func createTransactionEntities(
 
 		if output.TokenIdentifier != nil {
 			var found bool
-			tokenCreateEnt, found = tokenCreatesByIdentifier[string(output.TokenIdentifier)]
+			tokenCreateEnt, found = tokenCreatesByIdentifier[string(output.GetTokenIdentifier())]
 			if !found {
-				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for token identifier %x at output %d", output.TokenIdentifier, outputIndex))
+				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for token identifier %x at output %d", output.GetTokenIdentifier(), outputIndex))
 			}
 			issuerPublicKeyToWrite = tokenCreateEnt.IssuerPublicKey
-			tokenIdentifierToWrite = output.TokenIdentifier
-		} else if len(output.TokenPublicKey) != 0 {
+			tokenIdentifierToWrite = output.GetTokenIdentifier()
+		} else if len(output.GetTokenPublicKey()) != 0 {
 			tokenPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
 			if err != nil {
 				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key for output %d: %w", outputIndex, err))
@@ -402,7 +402,7 @@ func createTransactionEntities(
 			var found bool
 			tokenCreateEnt, found = tokenCreatesByIssuerPubKey[string(tokenPubKey.Serialize())]
 			if !found {
-				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for issuer public key %x at output %d", output.TokenPublicKey, outputIndex))
+				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for issuer public key %x at output %d", output.GetTokenPublicKey(), outputIndex))
 			}
 			tokenIdentifierToWrite = tokenCreateEnt.TokenIdentifier
 			issuerPublicKeyToWrite = tokenPubKey
@@ -410,12 +410,12 @@ func createTransactionEntities(
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d must have either token_identifier or token_public_key", outputIndex))
 		}
 
-		ownerPubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
+		ownerPubKey, err := keys.ParsePublicKey(output.GetOwnerPublicKey())
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse output token owner public key: %w", err))
 		}
 
-		tokenAmount, err := uint128.FromBytes(output.TokenAmount)
+		tokenAmount, err := uint128.FromBytes(output.GetTokenAmount())
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token amount must be 16 bytes: %w", err))
 		}
@@ -430,10 +430,10 @@ func createTransactionEntities(
 				SetOwnerPublicKey(ownerPubKey).
 				SetWithdrawBondSats(output.GetWithdrawBondSats()).
 				SetWithdrawRelativeBlockLocktime(output.GetWithdrawRelativeBlockLocktime()).
-				SetWithdrawRevocationCommitment(output.RevocationCommitment).
+				SetWithdrawRevocationCommitment(output.GetRevocationCommitment()).
 				SetTokenPublicKey(issuerPublicKeyToWrite).
 				SetTokenIdentifier(tokenIdentifierToWrite).
-				SetTokenAmount(output.TokenAmount).
+				SetTokenAmount(output.GetTokenAmount()).
 				SetAmount(tokenAmount).
 				SetNetwork(network).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
@@ -463,8 +463,8 @@ func fetchSignatureForOutputToSpend(
 	outputToSpendEnt *TokenOutput,
 ) (sig []byte, inputIndex uint32, err error) {
 	for i, o := range outputsToSpend {
-		if bytes.Equal(o.PrevTokenTransactionHash, outputToSpendEnt.CreatedTransactionFinalizedHash) &&
-			o.PrevTokenTransactionVout == uint32(outputToSpendEnt.CreatedTransactionOutputVout) {
+		if bytes.Equal(o.GetPrevTokenTransactionHash(), outputToSpendEnt.CreatedTransactionFinalizedHash) &&
+			o.GetPrevTokenTransactionVout() == uint32(outputToSpendEnt.CreatedTransactionOutputVout) {
 			sig, err = fetchSignatureForInput(signaturesWithIndex, uint32(i))
 			return sig, uint32(i), err
 		}
@@ -481,7 +481,7 @@ func fetchSignatureForOutputToSpend(
 // out-of-order or missing signatures from being silently persisted against the wrong input.
 func fetchSignatureForInput(signaturesWithIndex []*tokenpb.SignatureWithIndex, inputIndex uint32) ([]byte, error) {
 	for _, s := range signaturesWithIndex {
-		if s.InputIndex == inputIndex {
+		if s.GetInputIndex() == inputIndex {
 			return signature.GetEffectiveSingleSignature(s), nil
 		}
 	}
@@ -499,13 +499,13 @@ func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.T
 		if invoiceAttachment == nil {
 			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invoice attachment is nil"))
 		}
-		parsedInvoice, err := common.ParseSparkInvoice(invoiceAttachment.SparkInvoice)
+		parsedInvoice, err := common.ParseSparkInvoice(invoiceAttachment.GetSparkInvoice())
 		if err != nil {
 			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice: %w", err))
 		}
 		invoiceToCreate := db.SparkInvoice.Create().
 			SetID(parsedInvoice.Id).
-			SetSparkInvoice(invoiceAttachment.SparkInvoice).
+			SetSparkInvoice(invoiceAttachment.GetSparkInvoice()).
 			SetReceiverPublicKey(parsedInvoice.ReceiverPublicKey).
 			AddTokenTransactionIDs(tokenTransactionEnt.ID)
 		if expiry := parsedInvoice.ExpiryTime; expiry != nil {
@@ -890,10 +890,10 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 
-	if len(finalTokenTransaction.TokenOutputs) != len(tokenTransaction.Edges.CreatedOutput) {
+	if len(finalTokenTransaction.GetTokenOutputs()) != len(tokenTransaction.Edges.CreatedOutput) {
 		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
 			"number of outputs in proto (%d) does not match number of created outputs started with this transaction in the database (%d)",
-			len(finalTokenTransaction.TokenOutputs),
+			len(finalTokenTransaction.GetTokenOutputs()),
 			len(tokenTransaction.Edges.CreatedOutput),
 		))
 	}
@@ -1185,13 +1185,13 @@ func setTokenTransactionTimingFields(
 	builder *TokenTransactionCreate,
 	tokenTransaction *tokenpb.TokenTransaction,
 ) (*TokenTransactionCreate, error) {
-	if tokenTransaction.Version >= 3 {
-		if tokenTransaction.ClientCreatedTimestamp == nil {
+	if tokenTransaction.GetVersion() >= 3 {
+		if tokenTransaction.GetClientCreatedTimestamp() == nil {
 			return nil, sparkerrors.InternalObjectMissingField(
 				fmt.Errorf("v3+ token transaction missing client_created_timestamp"),
 			)
 		}
-		builder = builder.SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime())
+		builder = builder.SetClientCreatedTimestamp(tokenTransaction.GetClientCreatedTimestamp().AsTime())
 
 		if tokenTransaction.GetValidityDurationSeconds() == 0 {
 			return nil, sparkerrors.InternalObjectMissingField(
@@ -1199,14 +1199,14 @@ func setTokenTransactionTimingFields(
 			)
 		}
 		builder = builder.SetValidityDurationSeconds(tokenTransaction.GetValidityDurationSeconds())
-		expiryTime := tokenTransaction.ClientCreatedTimestamp.AsTime().Add(
+		expiryTime := tokenTransaction.GetClientCreatedTimestamp().AsTime().Add(
 			time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second,
 		)
 		// When execute_before is set, cap ExpiryTime to a short processing window.
 		// This prevents outputs from being locked for the full execute_before duration.
 		// The client can resubmit the same signed partial to get a fresh window.
-		if tokenTransaction.ExecuteBefore != nil {
-			executeBefore := tokenTransaction.ExecuteBefore.AsTime()
+		if tokenTransaction.GetExecuteBefore() != nil {
+			executeBefore := tokenTransaction.GetExecuteBefore().AsTime()
 			processingDeadline := time.Now().UTC().Add(time.Duration(tokenTransaction.GetValidityDurationSeconds()) * time.Second)
 			if executeBefore.Before(processingDeadline) {
 				expiryTime = executeBefore
@@ -1215,19 +1215,19 @@ func setTokenTransactionTimingFields(
 			}
 		}
 		builder = builder.SetExpiryTime(expiryTime)
-		if tokenTransaction.ExecuteBefore != nil {
-			eb := tokenTransaction.ExecuteBefore.AsTime()
+		if tokenTransaction.GetExecuteBefore() != nil {
+			eb := tokenTransaction.GetExecuteBefore().AsTime()
 			builder = builder.SetExecuteBefore(eb)
 		}
 		return builder, nil
 	}
 
-	if tokenTransaction.ClientCreatedTimestamp != nil {
-		builder = builder.SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime())
+	if tokenTransaction.GetClientCreatedTimestamp() != nil {
+		builder = builder.SetClientCreatedTimestamp(tokenTransaction.GetClientCreatedTimestamp().AsTime())
 	}
 
-	if tokenTransaction.ExpiryTime != nil {
-		builder = builder.SetExpiryTime(tokenTransaction.ExpiryTime.AsTime())
+	if tokenTransaction.GetExpiryTime() != nil {
+		builder = builder.SetExpiryTime(tokenTransaction.GetExpiryTime().AsTime())
 	}
 
 	return builder, nil

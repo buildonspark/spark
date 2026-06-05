@@ -144,10 +144,10 @@ func TestMarshalProto_UsesPreloadedLeaves(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
-	require.Len(t, proto.Leaves, 2)
-	require.Equal(t, transfer.ID.String(), proto.Id)
-	require.Equal(t, uint64(1000), proto.TotalValue)
-	require.Len(t, proto.Receivers, 2)
+	require.Len(t, proto.GetLeaves(), 2)
+	require.Equal(t, transfer.ID.String(), proto.GetId())
+	require.Equal(t, uint64(1000), proto.GetTotalValue())
+	require.Len(t, proto.GetReceivers(), 2)
 }
 
 func TestMarshalProtoForReceiver_PreloadedFiltersByReceiver(t *testing.T) {
@@ -156,14 +156,14 @@ func TestMarshalProtoForReceiver_PreloadedFiltersByReceiver(t *testing.T) {
 
 	proto1, err := transfer.MarshalProtoForReceiver(ctx, recv1Pub)
 	require.NoError(t, err)
-	require.Len(t, proto1.Leaves, 1)
-	require.Equal(t, uint64(700), proto1.Leaves[0].Leaf.Value)
+	require.Len(t, proto1.GetLeaves(), 1)
+	require.Equal(t, uint64(700), proto1.GetLeaves()[0].GetLeaf().GetValue())
 
 	proto2, err := transfer.MarshalProtoForReceiver(ctx, recv2Pub)
 	require.NoError(t, err)
-	require.Len(t, proto2.Leaves, 1)
-	require.Equal(t, uint64(300), proto2.Leaves[0].Leaf.Value)
-	require.NotEqual(t, proto1.Leaves[0].Leaf.Id, proto2.Leaves[0].Leaf.Id)
+	require.Len(t, proto2.GetLeaves(), 1)
+	require.Equal(t, uint64(300), proto2.GetLeaves()[0].GetLeaf().GetValue())
+	require.NotEqual(t, proto1.GetLeaves()[0].GetLeaf().GetId(), proto2.GetLeaves()[0].GetLeaf().GetId())
 }
 
 func TestMarshalProtoForReceiver_PreloadedReceiverNotInTransfer(t *testing.T) {
@@ -183,9 +183,9 @@ func TestMarshalProto_PopulatesSenders(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
-	require.Len(t, proto.Senders, 1, "expected one TransferSender")
-	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.Senders[0].IdentityPublicKey)
-	require.Equal(t, senderID.String(), proto.Senders[0].Id)
+	require.Len(t, proto.GetSenders(), 1, "expected one TransferSender")
+	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.GetSenders()[0].GetIdentityPublicKey())
+	require.Equal(t, senderID.String(), proto.GetSenders()[0].GetId())
 }
 
 func TestMarshalProto_PopulatesReceiverIDAndCompletionTime(t *testing.T) {
@@ -196,13 +196,13 @@ func TestMarshalProto_PopulatesReceiverIDAndCompletionTime(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
-	require.Len(t, proto.Receivers, 2)
+	require.Len(t, proto.GetReceivers(), 2)
 
 	// receivers[] iteration mirrors edge order; first entry has CompletionTime.
 	var completed *pb.TransferReceiver
 	var pending *pb.TransferReceiver
-	for _, r := range proto.Receivers {
-		if r.Id == transfer.Edges.TransferReceivers[0].ID.String() {
+	for _, r := range proto.GetReceivers() {
+		if r.GetId() == transfer.Edges.TransferReceivers[0].ID.String() {
 			completed = r
 		} else {
 			pending = r
@@ -210,8 +210,8 @@ func TestMarshalProto_PopulatesReceiverIDAndCompletionTime(t *testing.T) {
 	}
 	require.NotNil(t, completed)
 	require.NotNil(t, pending)
-	require.Equal(t, completion.Unix(), completed.CompletionTime.AsTime().Unix())
-	require.Nil(t, pending.CompletionTime, "non-completed receiver should have nil completion_time")
+	require.Equal(t, completion.Unix(), completed.GetCompletionTime().AsTime().Unix())
+	require.Nil(t, pending.GetCompletionTime(), "non-completed receiver should have nil completion_time")
 }
 
 func TestMarshalProto_EmitsReceiverWithoutLeaves(t *testing.T) {
@@ -220,9 +220,9 @@ func TestMarshalProto_EmitsReceiverWithoutLeaves(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
-	require.Len(t, proto.Receivers, 2, "receivers should still emit when no leaves point at them")
-	for _, r := range proto.Receivers {
-		require.Equal(t, uint64(0), r.AmountSats, "receivers with no leaves should report 0 sats")
+	require.Len(t, proto.GetReceivers(), 2, "receivers should still emit when no leaves point at them")
+	for _, r := range proto.GetReceivers() {
+		require.Equal(t, uint64(0), r.GetAmountSats(), "receivers with no leaves should report 0 sats")
 	}
 }
 
@@ -231,16 +231,16 @@ func TestMarshalProto_PopulatesLeafTransferReceiverID(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
-	require.Len(t, proto.Leaves, 2)
+	require.Len(t, proto.GetLeaves(), 2)
 
 	receiverIDs := make(map[string]struct{}, 2)
 	for _, r := range transfer.Edges.TransferReceivers {
 		receiverIDs[r.ID.String()] = struct{}{}
 	}
-	for _, leaf := range proto.Leaves {
-		require.NotEmpty(t, leaf.TransferReceiverId, "each leaf should carry its receiver id")
-		_, ok := receiverIDs[leaf.TransferReceiverId]
-		require.True(t, ok, "leaf.transfer_receiver_id %s should match one of the transfer's receivers", leaf.TransferReceiverId)
+	for _, leaf := range proto.GetLeaves() {
+		require.NotEmpty(t, leaf.GetTransferReceiverId(), "each leaf should carry its receiver id")
+		_, ok := receiverIDs[leaf.GetTransferReceiverId()]
+		require.True(t, ok, "leaf.transfer_receiver_id %s should match one of the transfer's receivers", leaf.GetTransferReceiverId())
 	}
 }
 
@@ -249,12 +249,12 @@ func TestMarshalProto_PopulatesLeafTransferSenderID(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(mimoOnContext(t))
 	require.NoError(t, err)
-	require.Len(t, proto.Leaves, 2)
+	require.Len(t, proto.GetLeaves(), 2)
 
 	// All leaves should carry the same single-sender id from the fixture.
 	senderID := transfer.Edges.TransferLeaves[0].TransferSenderID.String()
-	for _, leaf := range proto.Leaves {
-		require.Equal(t, senderID, leaf.TransferSenderId, "each leaf should carry its sender id")
+	for _, leaf := range proto.GetLeaves() {
+		require.Equal(t, senderID, leaf.GetTransferSenderId(), "each leaf should carry its sender id")
 	}
 }
 
@@ -269,11 +269,11 @@ func TestMarshalProto_KnobOff_OmitsMultiParticipantFields(t *testing.T) {
 	proto, err := transfer.MarshalProto(t.Context())
 	require.NoError(t, err)
 
-	require.Len(t, proto.Leaves, 2, "Leaves should still emit (legacy field)")
-	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.SenderIdentityPublicKey,
+	require.Len(t, proto.GetLeaves(), 2, "Leaves should still emit (legacy field)")
+	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.GetSenderIdentityPublicKey(),
 		"legacy scalar SenderIdentityPublicKey should still emit")
-	require.Empty(t, proto.Senders, "Senders[] should be empty when knob is off")
-	require.Empty(t, proto.Receivers, "Receivers[] should be empty when knob is off")
+	require.Empty(t, proto.GetSenders(), "Senders[] should be empty when knob is off")
+	require.Empty(t, proto.GetReceivers(), "Receivers[] should be empty when knob is off")
 }
 
 func TestMarshalProtoForReceiver_KnobOff_OmitsMultiParticipantFields(t *testing.T) {
@@ -288,9 +288,9 @@ func TestMarshalProtoForReceiver_KnobOff_OmitsMultiParticipantFields(t *testing.
 	// fields are gated.
 	proto, err := transfer.MarshalProtoForReceiver(t.Context(), recv1Pub)
 	require.NoError(t, err)
-	require.Len(t, proto.Leaves, 1, "leaf filtering by receiver still applies when knob off")
-	require.Empty(t, proto.Senders, "Senders[] should be empty when knob is off")
-	require.Empty(t, proto.Receivers, "Receivers[] should be empty when knob is off")
+	require.Len(t, proto.GetLeaves(), 1, "leaf filtering by receiver still applies when knob off")
+	require.Empty(t, proto.GetSenders(), "Senders[] should be empty when knob is off")
+	require.Empty(t, proto.GetReceivers(), "Receivers[] should be empty when knob is off")
 }
 
 func TestMarshalProto_KnobOn_WarnsWhenSendersMissing(t *testing.T) {
@@ -300,7 +300,7 @@ func TestMarshalProto_KnobOn_WarnsWhenSendersMissing(t *testing.T) {
 	ctx, logs := mimoOnContextWithLogObserver(t)
 	proto, err := transfer.MarshalProto(ctx)
 	require.NoError(t, err)
-	require.Empty(t, proto.Senders, "Senders[] is empty when the edge isn't pre-loaded")
+	require.Empty(t, proto.GetSenders(), "Senders[] is empty when the edge isn't pre-loaded")
 
 	warnings := logs.FilterMessageSnippet("TransferSenders not pre-loaded").All()
 	require.Len(t, warnings, 1, "expected one warning about missing TransferSenders edge")
@@ -317,8 +317,8 @@ func TestMarshalProto_KnobOn_WarnsWhenReceiversMissing(t *testing.T) {
 	ctx, logs := mimoOnContextWithLogObserver(t)
 	proto, err := transfer.MarshalProto(ctx)
 	require.NoError(t, err)
-	require.Empty(t, proto.Receivers, "Receivers[] is empty when the edge isn't pre-loaded")
-	require.Len(t, proto.Senders, 1, "Senders[] still emits when its edge is loaded")
+	require.Empty(t, proto.GetReceivers(), "Receivers[] is empty when the edge isn't pre-loaded")
+	require.Len(t, proto.GetSenders(), 1, "Senders[] still emits when its edge is loaded")
 
 	warnings := logs.FilterMessageSnippet("TransferReceivers not pre-loaded").All()
 	require.Len(t, warnings, 1, "expected one warning about missing TransferReceivers edge")
@@ -460,7 +460,7 @@ func TestMarshalProto_LazyLoadsLeavesWhenNotPreloaded(t *testing.T) {
 
 	proto, err := transfer.MarshalProto(ctx)
 	require.NoError(t, err)
-	require.Len(t, proto.Leaves, 2)
+	require.Len(t, proto.GetLeaves(), 2)
 }
 
 func TestMarshalProtoForReceiver_LazyLoadFiltersByReceiver(t *testing.T) {
@@ -478,10 +478,10 @@ func TestMarshalProtoForReceiver_LazyLoadFiltersByReceiver(t *testing.T) {
 
 	proto1, err := transfer.MarshalProtoForReceiver(ctx, fx.recv1Pub)
 	require.NoError(t, err)
-	require.Len(t, proto1.Leaves, 1)
+	require.Len(t, proto1.GetLeaves(), 1)
 
 	proto2, err := transfer.MarshalProtoForReceiver(ctx, fx.recv2Pub)
 	require.NoError(t, err)
-	require.Len(t, proto2.Leaves, 1)
-	require.NotEqual(t, proto1.Leaves[0].Leaf.Id, proto2.Leaves[0].Leaf.Id)
+	require.Len(t, proto2.GetLeaves(), 1)
+	require.NotEqual(t, proto1.GetLeaves()[0].GetLeaf().GetId(), proto2.GetLeaves()[0].GetLeaf().GetId())
 }

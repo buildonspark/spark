@@ -48,7 +48,7 @@ func (h *DepositTreeFlowHandler) Prepare(ctx context.Context, op proto.Message) 
 	}
 
 	// 1. Get the original user request
-	origReq := req.OriginalRequest
+	origReq := req.GetOriginalRequest()
 	if origReq == nil {
 		return nil, fmt.Errorf("original_request is required")
 	}
@@ -63,14 +63,14 @@ func (h *DepositTreeFlowHandler) Prepare(ctx context.Context, op proto.Message) 
 	// on non-coordinator SOs via internal ConsensusPrepare, which doesn't carry
 	// the user's session. The coordinator already authenticated the user before
 	// fanning out. We just parse the key for loadAndValidateDepositAddress.
-	reqIDPubKey, err := keys.ParsePublicKey(origReq.IdentityPublicKey)
+	reqIDPubKey, err := keys.ParsePublicKey(origReq.GetIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
 
-	network, err := convertAndValidateProtoNetwork(h.config, origReq.OnChainUtxo.Network)
+	network, err := convertAndValidateProtoNetwork(h.config, origReq.GetOnChainUtxo().GetNetwork())
 	if err != nil {
-		return nil, fmt.Errorf("invalid network %s: %w", origReq.OnChainUtxo.Network, err)
+		return nil, fmt.Errorf("invalid network %s: %w", origReq.GetOnChainUtxo().GetNetwork(), err)
 	}
 
 	// 4. Load and validate deposit address. The coordinator already
@@ -196,7 +196,7 @@ func (f *depositTreeCoordinatorFlow) BuildCommitPayload(ctx context.Context, res
 	// 3. Filter public shares to participants
 	publicKeys := make(map[string][]byte, len(participantIDs))
 	for _, id := range participantIDs {
-		pk, ok := keyPackage.PublicShares[id]
+		pk, ok := keyPackage.GetPublicShares()[id]
 		if !ok {
 			return nil, fmt.Errorf("missing public share for operator %s", id)
 		}
@@ -240,7 +240,7 @@ func (f *depositTreeCoordinatorFlow) BuildCommitPayload(ctx context.Context, res
 	}
 
 	// 8. Create tree and node on coordinator
-	createdTree, createdNode, err := createTreeAndNode(ctx, f.config, f.depositAddressEnt, f.onChainTxWire, f.onChainOutputWire, f.additionalUtxos, f.origReq.OnChainUtxo.Vout, f.networkTyped, f.verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
+	createdTree, createdNode, err := createTreeAndNode(ctx, f.config, f.depositAddressEnt, f.onChainTxWire, f.onChainOutputWire, f.additionalUtxos, f.origReq.GetOnChainUtxo().GetVout(), f.networkTyped, f.verifyingKey, signedCpfpRootTx, signedCpfpRefundTx, signedDirectFromCpfpRefundTx)
 	if err != nil {
 		return nil, err
 	}
@@ -295,14 +295,14 @@ func buildDepositCoordinatorFlow(
 		return nil, err
 	}
 
-	reqIDPubKey, err := validateIdentity(ctx, config, req.IdentityPublicKey)
+	reqIDPubKey, err := validateIdentity(ctx, config, req.GetIdentityPublicKey())
 	if err != nil {
 		return nil, err
 	}
 
-	network, err := convertAndValidateProtoNetwork(config, req.OnChainUtxo.Network)
+	network, err := convertAndValidateProtoNetwork(config, req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
-		return nil, fmt.Errorf("invalid network %s: %w", req.OnChainUtxo.Network, err)
+		return nil, fmt.Errorf("invalid network %s: %w", req.GetOnChainUtxo().GetNetwork(), err)
 	}
 
 	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, req, reqIDPubKey, true)
@@ -320,7 +320,7 @@ func buildDepositCoordinatorFlow(
 		return nil, err
 	}
 
-	rootSigningPubKey, err := keys.ParsePublicKey(req.RootTxSigningJob.SigningPublicKey)
+	rootSigningPubKey, err := keys.ParsePublicKey(req.GetRootTxSigningJob().GetSigningPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse root signing key: %w", err)
 	}
@@ -362,11 +362,11 @@ func collectDepositSignatureShares(results map[string]*anypb.Any) (map[string]ma
 		if err := anyResult.UnmarshalTo(resp); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal prepare result from %s: %w", opID, err)
 		}
-		for jobID, sigResult := range resp.Results {
+		for jobID, sigResult := range resp.GetResults() {
 			if allShares[jobID] == nil {
 				allShares[jobID] = make(map[string][]byte)
 			}
-			allShares[jobID][opID] = sigResult.SignatureShare
+			allShares[jobID][opID] = sigResult.GetSignatureShare()
 		}
 	}
 	return allShares, participantIDs, nil

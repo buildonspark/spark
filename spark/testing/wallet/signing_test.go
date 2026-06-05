@@ -47,17 +47,17 @@ func TestCreateUserKeyPackage(t *testing.T) {
 			result := CreateUserKeyPackage(tt.signingPrivateKey)
 
 			require.NotNil(t, result)
-			assert.Equal(t, tt.expectedIdentifier, result.Identifier)
-			assert.Equal(t, tt.signingPrivateKey.Serialize(), result.SecretShare)
-			assert.Equal(t, tt.expectedMinSigners, result.MinSigners)
+			assert.Equal(t, tt.expectedIdentifier, result.GetIdentifier())
+			assert.Equal(t, tt.signingPrivateKey.Serialize(), result.GetSecretShare())
+			assert.Equal(t, tt.expectedMinSigners, result.GetMinSigners())
 
 			// Verify public key is correctly derived
 			expectedPubKey := tt.signingPrivateKey.Public().Serialize()
-			assert.Equal(t, expectedPubKey, result.PublicKey)
+			assert.Equal(t, expectedPubKey, result.GetPublicKey())
 
 			// Verify public shares map contains the identifier
-			assert.Contains(t, result.PublicShares, tt.expectedIdentifier)
-			assert.Equal(t, expectedPubKey, result.PublicShares[tt.expectedIdentifier])
+			assert.Contains(t, result.GetPublicShares(), tt.expectedIdentifier)
+			assert.Equal(t, expectedPubKey, result.GetPublicShares()[tt.expectedIdentifier])
 		})
 	}
 }
@@ -291,17 +291,17 @@ func TestPrepareFrostSigningJobsForUserSignedRefund(t *testing.T) {
 				assert.Len(t, userCommitments, tt.expectedCommitmentsCount)
 
 				for i, job := range signingJobs {
-					assert.Equal(t, tt.leaves[i].Leaf.Id, job.JobId)
-					assert.NotNil(t, job.Message) // sighash should be generated
-					assert.NotNil(t, job.KeyPackage)
-					assert.Equal(t, tt.leaves[i].Leaf.VerifyingPublicKey, job.VerifyingKey)
-					assert.NotNil(t, job.Nonce)
-					assert.Equal(t, tt.signingCommitments[i].SigningNonceCommitments, job.Commitments)
-					assert.NotNil(t, job.UserCommitments)
+					assert.Equal(t, tt.leaves[i].Leaf.GetId(), job.GetJobId())
+					assert.NotNil(t, job.GetMessage()) // sighash should be generated
+					assert.NotNil(t, job.GetKeyPackage())
+					assert.Equal(t, tt.leaves[i].Leaf.GetVerifyingPublicKey(), job.GetVerifyingKey())
+					assert.NotNil(t, job.GetNonce())
+					assert.Equal(t, tt.signingCommitments[i].GetSigningNonceCommitments(), job.GetCommitments())
+					assert.NotNil(t, job.GetUserCommitments())
 
-					assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000063", job.KeyPackage.Identifier)
-					assert.Equal(t, tt.leaves[i].SigningPrivKey.Serialize(), job.KeyPackage.SecretShare)
-					assert.Equal(t, uint32(1), job.KeyPackage.MinSigners)
+					assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000063", job.GetKeyPackage().GetIdentifier())
+					assert.Equal(t, tt.leaves[i].SigningPrivKey.Serialize(), job.GetKeyPackage().GetSecretShare())
+					assert.Equal(t, uint32(1), job.GetKeyPackage().GetMinSigners())
 				}
 
 				for _, refundTx := range refundTxs {
@@ -633,20 +633,20 @@ func TestPrepareLeafSigningJobs(t *testing.T) {
 				assert.Len(t, leafSigningJobs, tt.expectedJobsCount)
 
 				for i, job := range leafSigningJobs {
-					assert.Equal(t, tt.leaves[i].Leaf.Id, job.LeafId)
-					assert.Equal(t, tt.refundTxs[i], job.RawTx)
-					assert.NotNil(t, job.SigningPublicKey)
-					assert.NotNil(t, job.SigningNonceCommitment)
-					assert.Equal(t, tt.signingResults[tt.leaves[i].Leaf.Id].SignatureShare, job.UserSignature)
-					assert.NotNil(t, job.SigningCommitments)
-					assert.Equal(t, tt.signingCommitments[i].SigningNonceCommitments, job.SigningCommitments.SigningCommitments)
+					assert.Equal(t, tt.leaves[i].Leaf.GetId(), job.GetLeafId())
+					assert.Equal(t, tt.refundTxs[i], job.GetRawTx())
+					assert.NotNil(t, job.GetSigningPublicKey())
+					assert.NotNil(t, job.GetSigningNonceCommitment())
+					assert.Equal(t, tt.signingResults[tt.leaves[i].Leaf.GetId()].GetSignatureShare(), job.GetUserSignature())
+					assert.NotNil(t, job.GetSigningCommitments())
+					assert.Equal(t, tt.signingCommitments[i].GetSigningNonceCommitments(), job.GetSigningCommitments().GetSigningCommitments())
 
 					// Verify public key is correctly derived from private key
 					expectedPubKey := tt.leaves[i].SigningPrivKey.Public().Serialize()
 					// Note that the following line acts as a regression test for putting
 					// the signing private key in the signing public key field.
 					// See https://linear.app/lightsparkdev/issue/LIG-8042
-					assert.Equal(t, expectedPubKey, job.SigningPublicKey)
+					assert.Equal(t, expectedPubKey, job.GetSigningPublicKey())
 				}
 			}
 		})

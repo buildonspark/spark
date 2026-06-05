@@ -33,7 +33,7 @@ func TestL1TokenMint(t *testing.T) {
 				[]keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
-			require.Len(t, finalIssueTokenTransaction.TokenOutputs, 2, "expected 2 created outputs in mint transaction")
+			require.Len(t, finalIssueTokenTransaction.GetTokenOutputs(), 2, "expected 2 created outputs in mint transaction")
 
 			verifyTokenBalance(t, userOutput1PrivKey, tokenPrivKey.Public(), testIssueOutput1Amount, "user one")
 			verifyTokenBalance(t, userOutput2PrivKey, tokenPrivKey.Public(), testIssueOutput2Amount, "user two")
@@ -84,11 +84,11 @@ func TestL1TokenMintAndTransfer(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to broadcast transfer token transaction")
 
-			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in transfer transaction")
-			transferAmount := new(big.Int).SetBytes(transferTokenTransactionResponse.TokenOutputs[0].TokenAmount)
+			require.Len(t, transferTokenTransactionResponse.GetTokenOutputs(), 1, "expected 1 created output in transfer transaction")
+			transferAmount := new(big.Int).SetBytes(transferTokenTransactionResponse.GetTokenOutputs()[0].GetTokenAmount())
 			expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
 			assert.Equal(t, expectedTransferAmount, transferAmount)
-			assert.Equal(t, userOutput3PrivKey.Public().Serialize(), transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
+			assert.Equal(t, userOutput3PrivKey.Public().Serialize(), transferTokenTransactionResponse.GetTokenOutputs()[0].GetOwnerPublicKey(), "transfer created output owner public key does not match expected")
 		})
 	}
 }
@@ -179,7 +179,7 @@ func TestTokenTransferWithMultipleTokenTypes(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to broadcast multi-token transfer transaction")
 
-			require.Len(t, finalTransferTx.TokenOutputs, 4, "expected 4 outputs in multi-token transfer")
+			require.Len(t, finalTransferTx.GetTokenOutputs(), 4, "expected 4 outputs in multi-token transfer")
 
 			// Verify recipient 1 received correct amounts of both tokens
 			verifyTokenBalance(t, recipient1PrivKey, token1.IssuerPrivateKey.Public(), 600, "recipient 1 token 1")

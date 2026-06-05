@@ -482,23 +482,23 @@ func TestQueryHTLCFiltersByRoleAndSessionIdentity(t *testing.T) {
 
 	receiverResp, err := handler.QueryHTLC(queryCtxFor(receiverIdentityPubKey), baseReqFor(receiverIdentityPubKey))
 	require.NoError(t, err)
-	require.Len(t, receiverResp.PreimageRequests, 1)
-	assert.Equal(t, paymentHash, receiverResp.PreimageRequests[0].PaymentHash)
+	require.Len(t, receiverResp.GetPreimageRequests(), 1)
+	assert.Equal(t, paymentHash, receiverResp.GetPreimageRequests()[0].GetPaymentHash())
 
 	senderDefaultResp, err := handler.QueryHTLC(queryCtxFor(senderIdentityPubKey), baseReqFor(senderIdentityPubKey))
 	require.NoError(t, err)
-	assert.Empty(t, senderDefaultResp.PreimageRequests, "sender should not see receiver-role HTLC rows by default")
+	assert.Empty(t, senderDefaultResp.GetPreimageRequests(), "sender should not see receiver-role HTLC rows by default")
 
 	senderRoleReq := baseReqFor(senderIdentityPubKey)
 	senderRoleReq.MatchRole = pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER
 	senderRoleResp, err := handler.QueryHTLC(queryCtxFor(senderIdentityPubKey), senderRoleReq)
 	require.NoError(t, err)
-	require.Len(t, senderRoleResp.PreimageRequests, 1)
-	assert.Equal(t, paymentHash, senderRoleResp.PreimageRequests[0].PaymentHash)
+	require.Len(t, senderRoleResp.GetPreimageRequests(), 1)
+	assert.Equal(t, paymentHash, senderRoleResp.GetPreimageRequests()[0].GetPaymentHash())
 
 	attackerResp, err := handler.QueryHTLC(queryCtxFor(attackerIdentityPubKey), baseReqFor(attackerIdentityPubKey))
 	require.NoError(t, err)
-	assert.Empty(t, attackerResp.PreimageRequests, "third party should not enumerate another user's HTLC by hash and transfer ID")
+	assert.Empty(t, attackerResp.GetPreimageRequests(), "third party should not enumerate another user's HTLC by hash and transfer ID")
 
 	_, err = handler.QueryHTLC(queryCtxFor(attackerIdentityPubKey), baseReqFor(receiverIdentityPubKey))
 	require.Equal(t, codes.PermissionDenied, status.Code(err))
@@ -593,9 +593,9 @@ func TestQueryUserSignedRefundsVisibleOnlyToReceiverWhileWaiting(t *testing.T) {
 
 	receiverResp, err := query(receiverIdentityPubKey)
 	require.NoError(t, err)
-	require.Len(t, receiverResp.UserSignedRefunds, 1)
-	require.NotNil(t, receiverResp.Transfer)
-	assert.Equal(t, transfer.ID.String(), receiverResp.Transfer.Id)
+	require.Len(t, receiverResp.GetUserSignedRefunds(), 1)
+	require.NotNil(t, receiverResp.GetTransfer())
+	assert.Equal(t, transfer.ID.String(), receiverResp.GetTransfer().GetId())
 
 	senderResp, err := query(senderIdentityPubKey)
 	require.Nil(t, senderResp)
@@ -1378,7 +1378,7 @@ func TestGetSigningCommitments(t *testing.T) {
 				require.NoError(t, err)
 				assert.NotNil(t, resp)
 				if tt.expectEmpty {
-					assert.Empty(t, resp.SigningCommitments)
+					assert.Empty(t, resp.GetSigningCommitments())
 				}
 			}
 		})
@@ -2018,7 +2018,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a tree node with a different owner than the session
-		nodeID, err := uuid.Parse(validTx.LeafId)
+		nodeID, err := uuid.Parse(validTx.GetLeafId())
 		require.NoError(t, err)
 
 		correctScript, err := common.P2TRScriptFromPubKey(wrongKey)

@@ -292,8 +292,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		result, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, bobSigningKeyshare.SecretShare.Serialize(), result[bobOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
+		assert.Equal(t, bobSigningKeyshare.SecretShare.Serialize(), result[bobOperatorPubKey][0].GetSecretShare())
+		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].GetSecretShare())
 	})
 
 	t.Run("excludes the partial revocation secret share if it is in the input", func(t *testing.T) {
@@ -313,8 +313,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		result, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, aliceSigningKeyshare.SecretShare.Serialize(), result[aliceOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
+		assert.Equal(t, aliceSigningKeyshare.SecretShare.Serialize(), result[aliceOperatorPubKey][0].GetSecretShare())
+		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].GetSecretShare())
 	})
 
 	t.Run("works with ByHashVout format", func(t *testing.T) {
@@ -338,8 +338,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		result, err := setup.handler.getSecretSharesNotInInput(setup.ctx, inputOperatorShareMap)
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, bobSigningKeyshare.SecretShare.Serialize(), result[bobOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
+		assert.Equal(t, bobSigningKeyshare.SecretShare.Serialize(), result[bobOperatorPubKey][0].GetSecretShare())
+		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].GetSecretShare())
 	})
 }
 
@@ -674,13 +674,13 @@ func TestExchangeRevocationSecretsShares_TransferTransaction_HappyPath(t *testin
 		require.NoError(t, err, "TRANSFER transaction should succeed with valid operator shares")
 		require.NotNil(t, resp)
 
-		require.NotEmpty(t, resp.ReceivedOperatorShares, "response should include revocation secret shares")
-		require.Len(t, resp.ReceivedOperatorShares, 1)
-		assert.Equal(t, setup.handler.config.SigningOperatorMap[exchangeSetup.operatorIDs[1]].IdentityPublicKey.Serialize(), resp.ReceivedOperatorShares[0].OperatorIdentityPublicKey)
-		require.Len(t, resp.ReceivedOperatorShares[0].Shares, 1)
-		require.NotNil(t, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef)
-		assert.Equal(t, exchangeSetup.spentOutput.CreatedTransactionFinalizedHash, resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionHash)
-		assert.Equal(t, uint32(exchangeSetup.spentOutput.CreatedTransactionOutputVout), resp.ReceivedOperatorShares[0].Shares[0].InputTtxoRef.PrevTokenTransactionVout)
+		require.NotEmpty(t, resp.GetReceivedOperatorShares(), "response should include revocation secret shares")
+		require.Len(t, resp.GetReceivedOperatorShares(), 1)
+		assert.Equal(t, setup.handler.config.SigningOperatorMap[exchangeSetup.operatorIDs[1]].IdentityPublicKey.Serialize(), resp.GetReceivedOperatorShares()[0].GetOperatorIdentityPublicKey())
+		require.Len(t, resp.GetReceivedOperatorShares()[0].GetShares(), 1)
+		require.NotNil(t, resp.GetReceivedOperatorShares()[0].GetShares()[0].GetInputTtxoRef())
+		assert.Equal(t, exchangeSetup.spentOutput.CreatedTransactionFinalizedHash, resp.GetReceivedOperatorShares()[0].GetShares()[0].GetInputTtxoRef().GetPrevTokenTransactionHash())
+		assert.Equal(t, uint32(exchangeSetup.spentOutput.CreatedTransactionOutputVout), resp.GetReceivedOperatorShares()[0].GetShares()[0].GetInputTtxoRef().GetPrevTokenTransactionVout())
 	})
 }
 

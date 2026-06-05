@@ -107,7 +107,7 @@ func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so
 	// Add operator public keys (must be sorted bytewise ascending for V3).
 	var opKeys [][]byte
 	for _, op := range config.GetSigningOperatorList() {
-		opKeys = append(opKeys, op.PublicKey)
+		opKeys = append(opKeys, op.GetPublicKey())
 	}
 	// Sort bytewise ascending.
 	for i := 0; i < len(opKeys); i++ {
@@ -143,7 +143,7 @@ func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so
 		Keyshare:          ks,
 		TxProto:           txProto,
 		Signature:         schnorrSig.Serialize(),
-		CoordinatorPubKey: firstOperator.PublicKey,
+		CoordinatorPubKey: firstOperator.GetPublicKey(),
 	}
 }
 
@@ -184,7 +184,7 @@ func TestSignTokenTransaction_IdempotencyReturnsSigned(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, operatorSig, resp.SparkOperatorSignature)
+	assert.Equal(t, operatorSig, resp.GetSparkOperatorSignature())
 }
 
 func TestSignTokenTransaction_IdempotencyRejectsNonSigned(t *testing.T) {
@@ -237,10 +237,10 @@ func TestSignTokenTransaction_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.NotEmpty(t, resp.SparkOperatorSignature)
+	assert.NotEmpty(t, resp.GetSparkOperatorSignature())
 	hash, err := utils.HashTokenTransaction(testData.TxProto, false)
 	require.NoError(t, err)
-	sig, err := ecdsa.ParseDERSignature(resp.SparkOperatorSignature)
+	sig, err := ecdsa.ParseDERSignature(resp.GetSparkOperatorSignature())
 	require.NoError(t, err)
 	assert.True(t, sig.Verify(hash, setup.config.IdentityPrivateKey.Public().ToBTCEC()))
 }

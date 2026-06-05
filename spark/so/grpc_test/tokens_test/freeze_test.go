@@ -30,7 +30,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-			for i, output := range finalIssueTokenTransaction.TokenOutputs {
+			for i, output := range finalIssueTokenTransaction.GetTokenOutputs() {
 				if output.GetWithdrawBondSats() != withdrawalBondSatsInConfig {
 					t.Errorf("output %d: expected withdrawal bond sats %d, got %d", i, uint64(withdrawalBondSatsInConfig), output.GetWithdrawBondSats())
 				}
@@ -39,12 +39,12 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 				}
 			}
 
-			ownerPubKey, err := keys.ParsePublicKey(finalIssueTokenTransaction.TokenOutputs[0].OwnerPublicKey)
+			ownerPubKey, err := keys.ParsePublicKey(finalIssueTokenTransaction.GetTokenOutputs()[0].GetOwnerPublicKey())
 			require.NoError(t, err)
-			freezeResponse, err := wallet.FreezeTokens(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.TokenOutputs[0].TokenIdentifier, false)
+			freezeResponse, err := wallet.FreezeTokens(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.GetTokenOutputs()[0].GetTokenIdentifier(), false)
 			require.NoError(t, err, "failed to freeze tokens")
 
-			frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount)
+			frozenAmount := new(big.Int).SetBytes(freezeResponse.GetImpactedTokenAmount())
 
 			expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testIssueOutput1Amount))
 
@@ -53,10 +53,10 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 
 			require.Equal(t, expectedAmount, frozenAmount,
 				"frozen amount %s does not match expected amount %s", frozenAmount.String(), expectedAmount.String())
-			require.Len(t, freezeResponse.ImpactedTokenOutputs, 1, "expected 1 impacted token output")
-			require.Equal(t, finalIssueTokenTransactionHash, freezeResponse.ImpactedTokenOutputs[0].TransactionHash,
+			require.Len(t, freezeResponse.GetImpactedTokenOutputs(), 1, "expected 1 impacted token output")
+			require.Equal(t, finalIssueTokenTransactionHash, freezeResponse.GetImpactedTokenOutputs()[0].GetTransactionHash(),
 				"freeze response transaction hash mismatch")
-			require.Equal(t, uint32(0), freezeResponse.ImpactedTokenOutputs[0].Vout,
+			require.Equal(t, uint32(0), freezeResponse.GetImpactedTokenOutputs()[0].GetVout(),
 				"freeze response vout mismatch")
 
 			transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(
@@ -74,17 +74,17 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			require.Error(t, err, "expected error when transferring frozen tokens")
 			require.Nil(t, transferFrozenTokenTransactionResponse, "expected nil response when transferring frozen tokens")
 
-			unfreezeResponse, err := wallet.FreezeTokens(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.TokenOutputs[0].TokenIdentifier, true)
+			unfreezeResponse, err := wallet.FreezeTokens(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.GetTokenOutputs()[0].GetTokenIdentifier(), true)
 			require.NoError(t, err, "failed to unfreeze tokens")
 
-			thawedAmount := new(big.Int).SetBytes(unfreezeResponse.ImpactedTokenAmount)
+			thawedAmount := new(big.Int).SetBytes(unfreezeResponse.GetImpactedTokenAmount())
 
 			require.Equal(t, expectedAmount, thawedAmount,
 				"thawed amount %s does not match expected amount %s", thawedAmount.String(), expectedAmount.String())
-			require.Len(t, unfreezeResponse.ImpactedTokenOutputs, 1, "expected 1 impacted token output")
-			require.Equal(t, finalIssueTokenTransactionHash, unfreezeResponse.ImpactedTokenOutputs[0].TransactionHash,
+			require.Len(t, unfreezeResponse.GetImpactedTokenOutputs(), 1, "expected 1 impacted token output")
+			require.Equal(t, finalIssueTokenTransactionHash, unfreezeResponse.GetImpactedTokenOutputs()[0].GetTransactionHash(),
 				"unfreeze response transaction hash mismatch")
-			require.Equal(t, uint32(0), unfreezeResponse.ImpactedTokenOutputs[0].Vout,
+			require.Equal(t, uint32(0), unfreezeResponse.GetImpactedTokenOutputs()[0].GetVout(),
 				"unfreeze response vout mismatch")
 
 			transferTokenTransactionPostThaw, _, err := createTestTokenTransferTransactionTokenPb(

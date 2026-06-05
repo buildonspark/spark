@@ -48,16 +48,16 @@ func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.Clean
 	}
 
 	// Delete preimage_share_partners before preimage_shares (FK constraint).
-	shares, _ := db.PreimageShare.Query().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).All(ctx)
+	shares, _ := db.PreimageShare.Query().Where(preimageshare.PaymentHashEQ(req.GetPaymentHash())).All(ctx)
 	for _, s := range shares {
 		db.PreimageSharePartner.Delete().Where(preimagesharepartner.HasPreimageShareWith(preimageshare.IDEQ(s.ID))).Exec(ctx) //nolint:errcheck // best-effort
 	}
 
-	_, err = db.PreimageShare.Delete().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).Exec(ctx)
+	_, err = db.PreimageShare.Delete().Where(preimageshare.PaymentHashEQ(req.GetPaymentHash())).Exec(ctx)
 	if err != nil {
 		return nil, err
 	}
-	preimageRequestQuery := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash))
+	preimageRequestQuery := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.GetPaymentHash()))
 	if preimageRequestQuery.CountX(ctx) == 0 {
 		return nil, nil
 	}
@@ -77,7 +77,7 @@ func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.Clean
 			}
 		}
 	}
-	_, err = db.PreimageRequest.Delete().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).Exec(ctx)
+	_, err = db.PreimageRequest.Delete().Where(preimagerequest.PaymentHashEQ(req.GetPaymentHash())).Exec(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (o *MockServer) UpdateNodesStatus(ctx context.Context, req *pbmock.UpdateNo
 		return nil, fmt.Errorf("unable to parse node id: %w", err)
 	}
 
-	_, err = db.TreeNode.Update().SetStatus(st.TreeNodeStatus(req.Status)).Where(treenode.IDIn(nodeUUIDs...)).Save(ctx)
+	_, err = db.TreeNode.Update().SetStatus(st.TreeNodeStatus(req.GetStatus())).Where(treenode.IDIn(nodeUUIDs...)).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update nodes: %w", err)
 	}
@@ -135,7 +135,7 @@ func (o *MockServer) QueryPreimageShare(ctx context.Context, req *pbmock.QueryPr
 		return nil, err
 	}
 
-	share, err := db.PreimageShare.Query().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).Only(ctx)
+	share, err := db.PreimageShare.Query().Where(preimageshare.PaymentHashEQ(req.GetPaymentHash())).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "preimage share not found for payment hash")
@@ -168,12 +168,12 @@ func (o *MockServer) ModifyNodeTimelock(ctx context.Context, req *pbmock.ModifyN
 		return nil, fmt.Errorf("unable to get node: %w", err)
 	}
 
-	updatedNodeTx, err := modifyTxSequence(node.RawTx, req.NodeTimelock)
+	updatedNodeTx, err := modifyTxSequence(node.RawTx, req.GetNodeTimelock())
 	if err != nil {
 		return nil, fmt.Errorf("failed to modify node tx sequence: %w", err)
 	}
 
-	updatedRefundTx, err := modifyTxSequence(node.RawRefundTx, req.RefundTimelock)
+	updatedRefundTx, err := modifyTxSequence(node.RawRefundTx, req.GetRefundTimelock())
 	if err != nil {
 		return nil, fmt.Errorf("failed to modify refund tx sequence: %w", err)
 	}

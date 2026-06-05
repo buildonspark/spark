@@ -350,7 +350,7 @@ func TestGRPCStatus_AttachesErrorInfo(t *testing.T) {
 	var gotReason string
 	for _, d := range st.Details() {
 		if ei, ok := d.(*errdetails.ErrorInfo); ok {
-			gotReason = ei.Reason
+			gotReason = ei.GetReason()
 			break
 		}
 	}
@@ -401,7 +401,7 @@ func TestReasonConstructor_ResourceExhaustedRateLimitExceeded(t *testing.T) {
 	var gotReason string
 	for _, d := range st.Details() {
 		if ei, ok := d.(*errdetails.ErrorInfo); ok {
-			gotReason = ei.Reason
+			gotReason = ei.GetReason()
 			break
 		}
 	}
@@ -501,10 +501,10 @@ func TestAbortedConcurrentClaimConflict_AttachesRetryInfo(t *testing.T) {
 		}
 	}
 	require.NotNil(t, errorInfo, "expected ErrorInfo detail")
-	assert.Equal(t, ReasonAbortedConcurrentClaimConflict, errorInfo.Reason)
+	assert.Equal(t, ReasonAbortedConcurrentClaimConflict, errorInfo.GetReason())
 	require.NotNil(t, retryInfo, "expected RetryInfo detail")
-	require.NotNil(t, retryInfo.RetryDelay)
-	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.RetryDelay.AsDuration())
+	require.NotNil(t, retryInfo.GetRetryDelay())
+	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.GetRetryDelay().AsDuration())
 
 	// A third-party client should not see internal SQLSTATE or table names
 	// leak into the wire message.
@@ -572,7 +572,7 @@ func TestWrapErrorWithMessage_PreservesRetryAfter(t *testing.T) {
 		}
 	}
 	require.NotNil(t, retryInfo, "wrapped error must preserve RetryInfo")
-	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.RetryDelay.AsDuration())
+	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.GetRetryDelay().AsDuration())
 }
 
 func TestWrapErrorWithReasonPrefix_PreservesRetryAfter(t *testing.T) {
@@ -588,7 +588,7 @@ func TestWrapErrorWithReasonPrefix_PreservesRetryAfter(t *testing.T) {
 		}
 	}
 	require.NotNil(t, retryInfo, "reason-prefix wrap must preserve RetryInfo")
-	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.RetryDelay.AsDuration())
+	assert.Equal(t, abortedLockConflictRetryAfter, retryInfo.GetRetryDelay().AsDuration())
 
 	// Reason should carry the prefix joined with the original reason.
 	_, reason := CodeAndReasonFrom(wrapped)

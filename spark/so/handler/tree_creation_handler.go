@@ -37,19 +37,19 @@ func NewTreeCreationHandler(config *so.Config) *TreeCreationHandler {
 }
 
 func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
-	tx, err := common.TxFromRawTxBytes(utxo.RawTx)
+	tx, err := common.TxFromRawTxBytes(utxo.GetRawTx())
 	if err != nil {
 		return nil, err
 	}
 	txHash := tx.TxHash()
-	if len(utxo.Txid) > 0 {
-		requestedTxid := hex.EncodeToString(utxo.Txid)
+	if len(utxo.GetTxid()) > 0 {
+		requestedTxid := hex.EncodeToString(utxo.GetTxid())
 		if requestedTxid != txHash.String() && requestedTxid != hex.EncodeToString(txHash[:]) {
 			return nil, fmt.Errorf("utxo txid does not match raw transaction txid")
 		}
 	}
-	if len(tx.TxOut) <= int(utxo.Vout) {
-		return nil, fmt.Errorf("vout out of bounds utxo, tx vout: %d, utxo vout: %d", len(tx.TxOut), utxo.Vout)
+	if len(tx.TxOut) <= int(utxo.GetVout()) {
+		return nil, fmt.Errorf("vout out of bounds utxo, tx vout: %d, utxo vout: %d", len(tx.TxOut), utxo.GetVout())
 	}
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -57,7 +57,7 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	}
 	query := db.Tree.Query().Where(
 		tree.BaseTxid(st.NewTxID(txHash)),
-		tree.Vout(int16(utxo.Vout)),
+		tree.Vout(int16(utxo.GetVout())),
 	)
 	count, err := query.Count(ctx)
 	if err != nil {
@@ -67,7 +67,7 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 		// The only way to detect a parent is split is to check if the subtree of that tree node already exists.
 		return nil, fmt.Errorf("tree with base txid %s already exists", txHash.String())
 	}
-	return tx.TxOut[utxo.Vout], nil
+	return tx.TxOut[utxo.GetVout()], nil
 }
 
 func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context, nodeOutput *pb.NodeOutput, lockParent bool) (*wire.TxOut, error) {
@@ -75,7 +75,7 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	nodeID, err := uuid.Parse(nodeOutput.NodeId)
+	nodeID, err := uuid.Parse(nodeOutput.GetNodeId())
 	if err != nil {
 		return nil, err
 	}
@@ -95,13 +95,13 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	if len(tx.TxOut) <= int(nodeOutput.Vout) {
-		return nil, fmt.Errorf("vout out of bounds node output, tx vout: %d, node output vout: %d", len(tx.TxOut), nodeOutput.Vout)
+	if len(tx.TxOut) <= int(nodeOutput.GetVout()) {
+		return nil, fmt.Errorf("vout out of bounds node output, tx vout: %d, node output vout: %d", len(tx.TxOut), nodeOutput.GetVout())
 	}
 
 	childQuery := db.TreeNode.Query().Where(
 		treenode.HasParentWith(treenode.ID(nodeID)),
-		treenode.Vout(int16(nodeOutput.Vout)),
+		treenode.Vout(int16(nodeOutput.GetVout())),
 	)
 	children, err := childQuery.Count(ctx)
 	if err != nil {
@@ -109,13 +109,13 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	}
 	if children > 0 {
 		// The only way to detect a child is split is to check if the subtree of that tree node already exists.
-		return nil, fmt.Errorf("node %s child vout %d already exists", nodeID.String(), nodeOutput.Vout)
+		return nil, fmt.Errorf("node %s child vout %d already exists", nodeID.String(), nodeOutput.GetVout())
 	}
-	return tx.TxOut[nodeOutput.Vout], nil
+	return tx.TxOut[nodeOutput.GetVout()], nil
 }
 
 func (h *TreeCreationHandler) findParentOutputFromPrepareTreeAddressRequest(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*wire.TxOut, error) {
-	switch req.Source.(type) {
+	switch req.GetSource().(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
 		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput(), false)
 	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
@@ -126,7 +126,7 @@ func (h *TreeCreationHandler) findParentOutputFromPrepareTreeAddressRequest(ctx 
 }
 
 func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.Context, req *pb.CreateTreeRequest) (*wire.TxOut, error) {
-	switch req.Source.(type) {
+	switch req.GetSource().(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput(), true)
 	case *pb.CreateTreeRequest_OnChainUtxo:
@@ -219,11 +219,11 @@ func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Conte
 	count := len(nodes) - 1
 	var publicKeys []keys.Public
 	for _, child := range nodes {
-		childPubKey, err := keys.ParsePublicKey(child.UserPublicKey)
+		childPubKey, err := keys.ParsePublicKey(child.GetUserPublicKey())
 		if err != nil {
 			return 0, err
 		}
-		childCount, err := h.validateAndCountTreeAddressNodes(ctx, childPubKey, child.Children)
+		childCount, err := h.validateAndCountTreeAddressNodes(ctx, childPubKey, child.GetChildren())
 		if err != nil {
 			return 0, err
 		}
@@ -244,18 +244,18 @@ func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Conte
 
 func (h *TreeCreationHandler) createPrepareTreeAddressNodeFromAddressNode(ctx context.Context, node *pb.AddressRequestNode) (*pbinternal.PrepareTreeAddressNode, error) {
 	if node.Children == nil {
-		return &pbinternal.PrepareTreeAddressNode{UserPublicKey: node.UserPublicKey}, nil
+		return &pbinternal.PrepareTreeAddressNode{UserPublicKey: node.GetUserPublicKey()}, nil
 	}
-	children := make([]*pbinternal.PrepareTreeAddressNode, len(node.Children))
+	children := make([]*pbinternal.PrepareTreeAddressNode, len(node.GetChildren()))
 	var err error
-	for i, child := range node.Children {
+	for i, child := range node.GetChildren() {
 		children[i], err = h.createPrepareTreeAddressNodeFromAddressNode(ctx, child)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return &pbinternal.PrepareTreeAddressNode{
-		UserPublicKey: node.UserPublicKey,
+		UserPublicKey: node.GetUserPublicKey(),
 		Children:      children,
 	}, nil
 }
@@ -291,7 +291,7 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 			keyshareIndex++
 			queue = append(queue, &element{
 				keyshare: electedKeyShare,
-				children: child.Children,
+				children: child.GetChildren(),
 			})
 			selectedKeyshares = append(selectedKeyshares, electedKeyShare)
 		}
@@ -308,7 +308,7 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 		keysharesMap[lastKeyshare.ID.String()] = lastKeyshare
 		queue = append(queue, &element{
 			keyshare: lastKeyshare,
-			children: currentElement.children[len(currentElement.children)-1].Children,
+			children: currentElement.children[len(currentElement.children)-1].GetChildren(),
 		})
 	}
 
@@ -323,8 +323,8 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 	userIdentityPubKey keys.Public,
 	save bool,
 ) (addressNode *pb.AddressNode, err error) {
-	signingKeyshare := keysharesMap[node.SigningKeyshareId]
-	nodeUserPubKey, err := keys.ParsePublicKey(node.UserPublicKey)
+	signingKeyshare := keysharesMap[node.GetSigningKeyshareId()]
+	nodeUserPubKey, err := keys.ParsePublicKey(node.GetUserPublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +351,7 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 			return nil, err
 		}
 	}
-	if len(node.Children) == 0 {
+	if len(node.GetChildren()) == 0 {
 		return &pb.AddressNode{
 			Address: &pb.Address{
 				Address:      depositAddress,
@@ -359,9 +359,9 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 			},
 		}, nil
 	}
-	children := make([]*pb.AddressNode, len(node.Children))
-	for i, child := range node.Children {
-		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, child, keysharesMap, userIdentityPubKey, len(node.Children) > 1)
+	children := make([]*pb.AddressNode, len(node.GetChildren()))
+	for i, child := range node.GetChildren() {
+		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, child, keysharesMap, userIdentityPubKey, len(node.GetChildren()) > 1)
 		if err != nil {
 			return nil, err
 		}
@@ -389,7 +389,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 
 	var network btcnetwork.Network
-	switch reqSource := req.Source.(type) {
+	switch reqSource := req.GetSource().(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
 		nodeID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
 		if err != nil {
@@ -437,7 +437,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 	parentUserPublicKey := parentDepositAddress.OwnerSigningPubkey
 
-	keyCount, err := h.validateAndCountTreeAddressNodes(ctx, parentUserPublicKey, []*pb.AddressRequestNode{req.Node})
+	keyCount, err := h.validateAndCountTreeAddressNodes(ctx, parentUserPublicKey, []*pb.AddressRequestNode{req.GetNode()})
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +451,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, fmt.Errorf("not enough keyshares available, need: %d, available: %d", keyCount, len(keyshares))
 	}
 
-	addressNode, err := h.createPrepareTreeAddressNodeFromAddressNode(ctx, req.Node)
+	addressNode, err := h.createPrepareTreeAddressNodeFromAddressNode(ctx, req.GetNode())
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +517,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	var vout uint32
 	var network btcnetwork.Network
 	var parentOutPoint wire.OutPoint
-	switch req.Source.(type) {
+	switch req.GetSource().(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		outputID, err := uuid.Parse(req.GetParentNodeOutput().GetNodeId())
 		if err != nil {
@@ -535,7 +535,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if !isTreeCreationParentStatusEligible(parentNode.Status) {
 			return nil, nil, fmt.Errorf("parent node %s status %s is not eligible for tree creation", parentNode.ID, parentNode.Status)
 		}
-		vout = req.GetParentNodeOutput().Vout
+		vout = req.GetParentNodeOutput().GetVout()
 		parentTree, err := parentNode.QueryTree().Only(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -548,12 +548,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		parentOutPoint = wire.OutPoint{Hash: parentTx.TxHash(), Index: vout}
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		parentNode = nil
-		vout = req.GetOnChainUtxo().Vout
-		network, err = btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().Network)
+		vout = req.GetOnChainUtxo().GetVout()
+		network, err = btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 		if err != nil {
 			return nil, nil, err
 		}
-		onChainTx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().RawTx)
+		onChainTx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().GetRawTx())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -592,7 +592,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	unchainUtxo := req.GetOnChainUtxo()
 	onChain := depositAddress.ConfirmationHeight != 0
 	if depositAddress.ConfirmationTxid != "" && unchainUtxo != nil {
-		if depositAddress.ConfirmationTxid != hex.EncodeToString(unchainUtxo.Txid) {
+		if depositAddress.ConfirmationTxid != hex.EncodeToString(unchainUtxo.GetTxid()) {
 			return nil, nil, errors.New("confirmation txid does not match utxo txid")
 		}
 	}
@@ -600,7 +600,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	queue := []*element{{
 		output:     parentOutput,
 		outPoint:   parentOutPoint,
-		node:       req.Node,
+		node:       req.GetNode(),
 		userPubKey: depositAddress.OwnerSigningPubkey,
 		keyshare:   keyshare,
 		parentNode: parentNode,
@@ -613,11 +613,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	for len(queue) > 0 {
 		currentElement := queue[0]
 		queue = queue[1:]
-		if len(currentElement.node.Children) > 0 && currentElement.node.RefundTxSigningJob != nil {
+		if len(currentElement.node.GetChildren()) > 0 && currentElement.node.GetRefundTxSigningJob() != nil {
 			return nil, nil, errors.New("refund tx should be on leaf node")
 		}
 
-		cpfpSigningJob, cpfpTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.NodeTxSigningJob, currentElement.output)
+		cpfpSigningJob, cpfpTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetNodeTxSigningJob(), currentElement.output)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -628,8 +628,8 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 
 		var directSigningJob *helper.SigningJob
 		var directTx *wire.MsgTx
-		if currentElement.node.DirectNodeTxSigningJob != nil {
-			directSigningJob, directTx, err = helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectNodeTxSigningJob, currentElement.output)
+		if currentElement.node.GetDirectNodeTxSigningJob() != nil {
+			directSigningJob, directTx, err = helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetDirectNodeTxSigningJob(), currentElement.output)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -650,7 +650,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if req.GetOnChainUtxo() == nil {
 				return nil, nil, errors.New("onchain utxo is required for new tree")
 			}
-			tx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().RawTx)
+			tx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().GetRawTx())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -660,7 +660,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				SetOwnerIdentityPubkey(userIDPubKey).
 				SetNetwork(network).
 				SetBaseTxid(st.NewTxID(txid)).
-				SetVout(int16(req.GetOnChainUtxo().Vout)).
+				SetVout(int16(req.GetOnChainUtxo().GetVout())).
 				SetDepositAddress(depositAddress)
 			if onChain {
 				treeMutator.SetStatus(st.TreeStatusAvailable)
@@ -685,27 +685,27 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		verifyingKey := currentElement.keyshare.PublicKey.Add(currentElement.userPubKey)
 
 		var cpfpRefundTx []byte
-		if currentElement.node.RefundTxSigningJob != nil {
-			cpfpRefundTx = currentElement.node.RefundTxSigningJob.RawTx
+		if currentElement.node.GetRefundTxSigningJob() != nil {
+			cpfpRefundTx = currentElement.node.GetRefundTxSigningJob().GetRawTx()
 		}
 
 		var directRefundTx []byte
-		if currentElement.node.DirectRefundTxSigningJob != nil {
-			directRefundTx = currentElement.node.DirectRefundTxSigningJob.RawTx
+		if currentElement.node.GetDirectRefundTxSigningJob() != nil {
+			directRefundTx = currentElement.node.GetDirectRefundTxSigningJob().GetRawTx()
 		} else if requireDirectTx {
 			return nil, nil, errors.New("directRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 
 		var directFromCpfpRefundTx []byte
-		if currentElement.node.DirectFromCpfpRefundTxSigningJob != nil {
-			directFromCpfpRefundTx = currentElement.node.DirectFromCpfpRefundTxSigningJob.RawTx
+		if currentElement.node.GetDirectFromCpfpRefundTxSigningJob() != nil {
+			directFromCpfpRefundTx = currentElement.node.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()
 		} else if requireDirectTx {
 			return nil, nil, errors.New("directFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 
 		var directTxRaw []byte
-		if currentElement.node.DirectNodeTxSigningJob != nil {
-			directTxRaw = currentElement.node.DirectNodeTxSigningJob.RawTx
+		if currentElement.node.GetDirectNodeTxSigningJob() != nil {
+			directTxRaw = currentElement.node.GetDirectNodeTxSigningJob().GetRawTx()
 		} else if requireDirectTx {
 			return nil, nil, errors.New("directNodeTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
@@ -719,7 +719,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			SetValue(uint64(currentElement.output.Value)).
 			SetVerifyingPubkey(verifyingKey).
 			SetSigningKeyshare(currentElement.keyshare).
-			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
+			SetRawTx(currentElement.node.GetNodeTxSigningJob().GetRawTx()).
 			SetRawRefundTx(cpfpRefundTx).
 			SetDirectTx(directTxRaw).
 			SetDirectRefundTx(directRefundTx).
@@ -741,12 +741,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, fmt.Errorf("failed to create tree node: %w", err)
 		}
 		nodes = append(nodes, node)
-		if currentElement.node.RefundTxSigningJob != nil {
+		if currentElement.node.GetRefundTxSigningJob() != nil {
 			if len(cpfpTx.TxOut) == 0 {
 				return nil, nil, fmt.Errorf("vout out of bounds for cpfp node tx, need at least one output")
 			}
 			cpfpRefundOutPoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
-			cpfpRefundSigningJob, cpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, cpfpTx.TxOut[0])
+			cpfpRefundSigningJob, cpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetRefundTxSigningJob(), cpfpTx.TxOut[0])
 			if err != nil {
 				return nil, nil, err
 			}
@@ -754,7 +754,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, err
 			}
 			signingJobs = append(signingJobs, cpfpRefundSigningJob)
-			if currentElement.node.DirectRefundTxSigningJob != nil && currentElement.node.DirectFromCpfpRefundTxSigningJob != nil {
+			if currentElement.node.GetDirectRefundTxSigningJob() != nil && currentElement.node.GetDirectFromCpfpRefundTxSigningJob() != nil {
 				if directTx == nil {
 					return nil, nil, errors.New("direct node tx signing job is required when direct refund tx signing jobs are provided")
 				}
@@ -762,14 +762,14 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 					return nil, nil, fmt.Errorf("vout out of bounds for cpfp node tx, need at least one output")
 				}
 				directRefundOutPoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
-				directRefundSigningJob, directRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectRefundTxSigningJob, directTx.TxOut[0])
+				directRefundSigningJob, directRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetDirectRefundTxSigningJob(), directTx.TxOut[0])
 				if err != nil {
 					return nil, nil, err
 				}
 				if err := validateTreeCreationTxSpendsOutpoint(directRefundTx, directRefundOutPoint, "direct refund transaction"); err != nil {
 					return nil, nil, err
 				}
-				directFromCpfpRefundSigningJob, directFromCpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.DirectFromCpfpRefundTxSigningJob, cpfpTx.TxOut[0])
+				directFromCpfpRefundSigningJob, directFromCpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetDirectFromCpfpRefundTxSigningJob(), cpfpTx.TxOut[0])
 				if err != nil {
 					return nil, nil, err
 				}
@@ -780,16 +780,16 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			} else if requireDirectTx {
 				return nil, nil, errors.New("directRefundTxSigningJob or DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
-		} else if len(currentElement.node.Children) > 0 {
+		} else if len(currentElement.node.GetChildren()) > 0 {
 			var userPublicKeys []keys.Public
 			var statechainPublicKeys []keys.Public
-			if len(cpfpTx.TxOut) < len(currentElement.node.Children) {
-				return nil, nil, fmt.Errorf("vout out of bounds for node split cpfp tx, had: %d, needed: %d", len(cpfpTx.TxOut), len(currentElement.node.Children))
+			if len(cpfpTx.TxOut) < len(currentElement.node.GetChildren()) {
+				return nil, nil, fmt.Errorf("vout out of bounds for node split cpfp tx, had: %d, needed: %d", len(cpfpTx.TxOut), len(currentElement.node.GetChildren()))
 			}
-			if directTx != nil && len(directTx.TxOut) < len(currentElement.node.Children) {
-				return nil, nil, fmt.Errorf("vout out of bounds for node split direct tx, had: %d, needed: %d", len(directTx.TxOut), len(currentElement.node.Children))
+			if directTx != nil && len(directTx.TxOut) < len(currentElement.node.GetChildren()) {
+				return nil, nil, fmt.Errorf("vout out of bounds for node split direct tx, had: %d, needed: %d", len(directTx.TxOut), len(currentElement.node.GetChildren()))
 			}
-			for i, child := range currentElement.node.Children {
+			for i, child := range currentElement.node.GetChildren() {
 				userSigningKey, signingKeyshare, err := h.getOwnedSigningKeyshareFromOutput(ctx, network, cpfpTx.TxOut[i], userIDPubKey)
 				if err != nil {
 					return nil, nil, err
@@ -845,7 +845,7 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 
 	queue := []*element{{
 		node:         root,
-		creationNode: req.Node,
+		creationNode: req.GetNode(),
 	}}
 
 	for len(queue) > 0 {
@@ -863,7 +863,7 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 		currentElement.node.NodeTxSigningResult = cpfpSigningResultProto
 
 		var directSigningResult *helper.SigningResult
-		if currentElement.creationNode.DirectNodeTxSigningJob != nil {
+		if currentElement.creationNode.GetDirectNodeTxSigningJob() != nil {
 			directSigningResult = signingResults[signingResultIndex]
 			signingResultIndex++
 			directSigningResultProto, err := directSigningResult.MarshalProto()
@@ -876,7 +876,7 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 			return nil, errors.New("directNodeTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 
-		if currentElement.creationNode.RefundTxSigningJob != nil {
+		if currentElement.creationNode.GetRefundTxSigningJob() != nil {
 			cpfpSigningResult := signingResults[signingResultIndex]
 			signingResultIndex++
 
@@ -887,7 +887,7 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 
 			currentElement.node.RefundTxSigningResult = cpfpRefundSigningResultProto
 
-			if currentElement.creationNode.DirectRefundTxSigningJob != nil && currentElement.creationNode.DirectFromCpfpRefundTxSigningJob != nil {
+			if currentElement.creationNode.GetDirectRefundTxSigningJob() != nil && currentElement.creationNode.GetDirectFromCpfpRefundTxSigningJob() != nil {
 				directSigningResult := signingResults[signingResultIndex]
 				signingResultIndex++
 				directFromCpfpRefundSigningResult := signingResults[signingResultIndex]
@@ -905,9 +905,9 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 			} else if requireDirectTx {
 				return nil, errors.New("directRefundTxSigningJob or DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
-		} else if len(currentElement.creationNode.Children) > 0 {
-			children := make([]*pb.CreationResponseNode, len(currentElement.creationNode.Children))
-			for i, child := range currentElement.creationNode.Children {
+		} else if len(currentElement.creationNode.GetChildren()) > 0 {
+			children := make([]*pb.CreationResponseNode, len(currentElement.creationNode.GetChildren()))
+			for i, child := range currentElement.creationNode.GetChildren() {
 				children[i] = &pb.CreationResponseNode{}
 				queue = append(queue, &element{
 					node:         children[i],

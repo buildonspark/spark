@@ -32,21 +32,21 @@ func validateQueryTokenOutputsRequest(req *tokenpb.QueryTokenOutputsRequest) err
 		return errors.InvalidArgumentMissingField(fmt.Errorf("network must be specified"))
 	}
 
-	if len(req.OwnerPublicKeys) > MaxTokenOutputFilterValues {
+	if len(req.GetOwnerPublicKeys()) > MaxTokenOutputFilterValues {
 		return errors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.OwnerPublicKeys), MaxTokenOutputFilterValues),
+			fmt.Errorf("too many owner public keys in filter: got %d, max %d", len(req.GetOwnerPublicKeys()), MaxTokenOutputFilterValues),
 		)
 	}
 
-	if len(req.IssuerPublicKeys) > MaxTokenOutputFilterValues {
+	if len(req.GetIssuerPublicKeys()) > MaxTokenOutputFilterValues {
 		return errors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.IssuerPublicKeys), MaxTokenOutputFilterValues),
+			fmt.Errorf("too many issuer public keys in filter: got %d, max %d", len(req.GetIssuerPublicKeys()), MaxTokenOutputFilterValues),
 		)
 	}
 
-	if len(req.TokenIdentifiers) > MaxTokenOutputFilterValues {
+	if len(req.GetTokenIdentifiers()) > MaxTokenOutputFilterValues {
 		return errors.InvalidArgumentOutOfRange(
-			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.TokenIdentifiers), MaxTokenOutputFilterValues),
+			fmt.Errorf("too many token identifiers in filter: got %d, max %d", len(req.GetTokenIdentifiers()), MaxTokenOutputFilterValues),
 		)
 	}
 
@@ -194,14 +194,14 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 
 	if len(ownedTokenOutputs) > 0 {
 		// Set previous cursor (first item's ID) - for going backward from this page
-		if first := ownedTokenOutputs[0]; first != nil && first.Output != nil && first.Output.Id != nil {
+		if first := ownedTokenOutputs[0]; first != nil && first.GetOutput() != nil && first.Output.Id != nil {
 			if firstUUID, err := uuid.Parse(first.GetOutput().GetId()); err == nil {
 				pageResponse.PreviousCursor = base64.RawURLEncoding.EncodeToString(firstUUID[:])
 			}
 		}
 
 		// Set next cursor (last item's ID) - for going forward from this page
-		if last := ownedTokenOutputs[len(ownedTokenOutputs)-1]; last != nil && last.Output != nil && last.Output.Id != nil {
+		if last := ownedTokenOutputs[len(ownedTokenOutputs)-1]; last != nil && last.GetOutput() != nil && last.Output.Id != nil {
 			if lastUUID, err := uuid.Parse(last.GetOutput().GetId()); err == nil {
 				pageResponse.NextCursor = base64.RawURLEncoding.EncodeToString(lastUUID[:])
 			}

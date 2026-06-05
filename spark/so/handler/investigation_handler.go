@@ -63,7 +63,7 @@ func (h *InvestigationHandler) InvestigateLeaves(ctx context.Context) error {
 	badNodes := make(map[string]bool)
 	for _, leaf := range leaves {
 		for _, result := range results {
-			resultPubKey, err := keys.ParsePublicKey(result.SigningPubkeys[leaf.ID.String()])
+			resultPubKey, err := keys.ParsePublicKey(result.GetSigningPubkeys()[leaf.ID.String()])
 			if err != nil {
 				return fmt.Errorf("failed to parse public key for leaf %v: %w", leaf.ID, err)
 			}
@@ -130,7 +130,7 @@ func (h *InvestigationHandler) QueryLeafSigningPubkeys(ctx context.Context, req 
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	leafIDs, err := uuids.ParseSlice(req.LeafIds)
+	leafIDs, err := uuids.ParseSlice(req.GetLeafIds())
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +154,12 @@ func (h *InvestigationHandler) ResolveLeafInvestigation(ctx context.Context, req
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	lostLeafIDs, err := uuids.ParseSlice(req.LostLeafIds)
+	lostLeafIDs, err := uuids.ParseSlice(req.GetLostLeafIds())
 	if err != nil {
 		return nil, err
 	}
 
-	availableLeafIDs, err := uuids.ParseSlice(req.AvailableLeafIds)
+	availableLeafIDs, err := uuids.ParseSlice(req.GetAvailableLeafIds())
 	if err != nil {
 		return nil, err
 	}

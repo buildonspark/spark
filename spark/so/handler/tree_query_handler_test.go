@@ -394,8 +394,8 @@ func TestQueryNodes_StatusField(t *testing.T) {
 
 	// Verify that only non-filtered statuses are returned
 	foundStatuses := make(map[string]bool)
-	for _, node := range resp.Nodes {
-		foundStatuses[node.Status] = true
+	for _, node := range resp.GetNodes() {
+		foundStatuses[node.GetStatus()] = true
 	}
 
 	for _, tt := range statusTests {
@@ -428,12 +428,12 @@ func TestQueryNodes_StatusField(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify only the requested statuses are returned
-	require.Len(t, respWithStatus.Nodes, 2)
-	for _, node := range respWithStatus.Nodes {
+	require.Len(t, respWithStatus.GetNodes(), 2)
+	for _, node := range respWithStatus.GetNodes() {
 		require.Contains(t, []string{
 			string(st.TreeNodeStatusAvailable),
 			string(st.TreeNodeStatusFrozenByIssuer),
-		}, node.Status, "Node should have one of the requested statuses")
+		}, node.GetStatus(), "Node should have one of the requested statuses")
 	}
 
 	// Test QueryNodes with node IDs (should return all statuses, no filtering)
@@ -454,10 +454,10 @@ func TestQueryNodes_StatusField(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should return all nodes regardless of status when querying by IDs
-	require.Len(t, respByIDs.Nodes, len(createdNodes))
+	require.Len(t, respByIDs.GetNodes(), len(createdNodes))
 	allStatusesFound := make(map[string]bool)
-	for _, node := range respByIDs.Nodes {
-		allStatusesFound[node.Status] = true
+	for _, node := range respByIDs.GetNodes() {
+		allStatusesFound[node.GetStatus()] = true
 	}
 
 	// Verify all statuses are present in the response
@@ -762,7 +762,7 @@ func TestQueryNodes_PrivacyEnabled_OwnerIdentityPubkey(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, false)
 	require.NoError(t, err)
-	assert.Empty(t, resp.Nodes, "Should return empty results when owner has privacy enabled and requester doesn't have read access")
+	assert.Empty(t, resp.GetNodes(), "Should return empty results when owner has privacy enabled and requester doesn't have read access")
 }
 
 func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
@@ -777,7 +777,7 @@ func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
 		},
 	}, false)
 	require.NoError(t, err)
-	assert.Empty(t, resp.Nodes, "Should not reveal a private node by ID when requester doesn't have read access")
+	assert.Empty(t, resp.GetNodes(), "Should not reveal a private node by ID when requester doesn't have read access")
 
 	ownerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.OwnerIdentityPubKey.Serialize()), 9999999999)
 	ownerResp, err := handler.QueryNodes(ownerCtx, &pb.QueryNodesRequest{
@@ -788,8 +788,8 @@ func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
 		},
 	}, false)
 	require.NoError(t, err)
-	require.Len(t, ownerResp.Nodes, 1, "Owner should still be able to query their own private node by ID")
-	assert.Equal(t, testData.Node.ID.String(), ownerResp.Nodes[testData.Node.ID.String()].Id)
+	require.Len(t, ownerResp.GetNodes(), 1, "Owner should still be able to query their own private node by ID")
+	assert.Equal(t, testData.Node.ID.String(), ownerResp.GetNodes()[testData.Node.ID.String()].GetId())
 }
 
 func TestQueryNodes_PrivacyDisabled_OwnerIdentityPubkey(t *testing.T) {
@@ -810,8 +810,8 @@ func TestQueryNodes_PrivacyDisabled_OwnerIdentityPubkey(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, false)
 	require.NoError(t, err)
-	assert.Len(t, resp.Nodes, 1, "Should return nodes when owner has privacy disabled (everyone has access)")
-	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+	assert.Len(t, resp.GetNodes(), 1, "Should return nodes when owner has privacy disabled (everyone has access)")
+	assert.Equal(t, testData.Node.ID.String(), resp.GetNodes()[testData.Node.ID.String()].GetId())
 }
 
 func TestQueryNodes_OwnerCanSeeOwnNodes(t *testing.T) {
@@ -832,8 +832,8 @@ func TestQueryNodes_OwnerCanSeeOwnNodes(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, false)
 	require.NoError(t, err)
-	assert.Len(t, resp.Nodes, 1, "Owner should be able to see their own nodes even with privacy enabled")
-	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+	assert.Len(t, resp.GetNodes(), 1, "Owner should be able to see their own nodes even with privacy enabled")
+	assert.Equal(t, testData.Node.ID.String(), resp.GetNodes()[testData.Node.ID.String()].GetId())
 }
 
 func TestQueryNodes_MasterCanSeeNodes(t *testing.T) {
@@ -857,8 +857,8 @@ func TestQueryNodes_MasterCanSeeNodes(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, false)
 	require.NoError(t, err)
-	assert.Len(t, resp.Nodes, 1, "Master should be able to see nodes even when privacy is enabled")
-	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+	assert.Len(t, resp.GetNodes(), 1, "Master should be able to see nodes even when privacy is enabled")
+	assert.Equal(t, testData.Node.ID.String(), resp.GetNodes()[testData.Node.ID.String()].GetId())
 }
 
 func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
@@ -879,8 +879,8 @@ func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, true) // isSSP=true
 	require.NoError(t, err)
-	assert.Len(t, resp.Nodes, 1, "SSP should be able to see nodes even when owner has privacy enabled")
-	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+	assert.Len(t, resp.GetNodes(), 1, "SSP should be able to see nodes even when owner has privacy enabled")
+	assert.Equal(t, testData.Node.ID.String(), resp.GetNodes()[testData.Node.ID.String()].GetId())
 }
 
 func TestQueryBalance_PrivacyEnabled_DifferentRequester(t *testing.T) {
@@ -898,8 +898,8 @@ func TestQueryBalance_PrivacyEnabled_DifferentRequester(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when privacy is enabled and requester doesn't have read access")
-	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when privacy is enabled and requester doesn't have read access")
+	assert.Equal(t, uint64(0), resp.GetBalance(), "Balance should be 0 when privacy is enabled and requester doesn't have read access")
+	assert.Empty(t, resp.GetNodeBalances(), "NodeBalances should be empty when privacy is enabled and requester doesn't have read access")
 }
 
 func TestQueryBalance_PrivacyDisabled_DifferentRequester(t *testing.T) {
@@ -917,9 +917,9 @@ func TestQueryBalance_PrivacyDisabled_DifferentRequester(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, testData.Node.Value, resp.Balance, "Balance should be returned when privacy is disabled (everyone has access)")
-	assert.Len(t, resp.NodeBalances, 1, "NodeBalances should contain the node when privacy is disabled")
-	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
+	assert.Equal(t, testData.Node.Value, resp.GetBalance(), "Balance should be returned when privacy is disabled (everyone has access)")
+	assert.Len(t, resp.GetNodeBalances(), 1, "NodeBalances should contain the node when privacy is disabled")
+	assert.Equal(t, testData.Node.Value, resp.GetNodeBalances()[testData.Node.ID.String()])
 }
 
 func TestQueryBalance_PrivacyEnabled_OwnerCanSeeOwnBalance(t *testing.T) {
@@ -937,9 +937,9 @@ func TestQueryBalance_PrivacyEnabled_OwnerCanSeeOwnBalance(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, testData.Node.Value, resp.Balance, "Owner should be able to see their own balance even when privacy is enabled")
-	assert.Len(t, resp.NodeBalances, 1, "Owner should be able to see their own node balances even when privacy is enabled")
-	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
+	assert.Equal(t, testData.Node.Value, resp.GetBalance(), "Owner should be able to see their own balance even when privacy is enabled")
+	assert.Len(t, resp.GetNodeBalances(), 1, "Owner should be able to see their own node balances even when privacy is enabled")
+	assert.Equal(t, testData.Node.Value, resp.GetNodeBalances()[testData.Node.ID.String()])
 }
 
 func TestQueryBalance_MasterCanSeeBalance(t *testing.T) {
@@ -960,9 +960,9 @@ func TestQueryBalance_MasterCanSeeBalance(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, testData.Node.Value, resp.Balance, "Master should be able to see balance even when privacy is enabled")
-	assert.Len(t, resp.NodeBalances, 1, "Master should be able to see node balances even when privacy is enabled")
-	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
+	assert.Equal(t, testData.Node.Value, resp.GetBalance(), "Master should be able to see balance even when privacy is enabled")
+	assert.Len(t, resp.GetNodeBalances(), 1, "Master should be able to see node balances even when privacy is enabled")
+	assert.Equal(t, testData.Node.Value, resp.GetNodeBalances()[testData.Node.ID.String()])
 }
 
 func TestQueryBalance_NoSession(t *testing.T) {
@@ -980,6 +980,6 @@ func TestQueryBalance_NoSession(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when no session is provided and privacy is enabled")
-	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when no session is provided and privacy is enabled")
+	assert.Equal(t, uint64(0), resp.GetBalance(), "Balance should be 0 when no session is provided and privacy is enabled")
+	assert.Empty(t, resp.GetNodeBalances(), "NodeBalances should be empty when no session is provided and privacy is enabled")
 }

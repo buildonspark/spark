@@ -155,8 +155,8 @@ func TestQueryTransfers_NotSSP_RequiresAuthz_Mismatch(t *testing.T) {
 	// Should return empty response (not error) when session doesn't have access
 	require.NoError(t, err, "Should not error when session doesn't have access, should return empty response")
 	assert.NotNil(t, resp)
-	assert.Empty(t, resp.Transfers, "Should return empty transfers when viewer doesn't have access")
-	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when no access")
+	assert.Empty(t, resp.GetTransfers(), "Should return empty transfers when viewer doesn't have access")
+	assert.Equal(t, int64(-1), resp.GetOffset(), "Offset should be -1 when no access")
 }
 
 func TestQueryTransfersRejectsMalformedFiltersWithTypedErrors(t *testing.T) {
@@ -281,8 +281,8 @@ func TestQueryTransfers_NotSSP_NoSession(t *testing.T) {
 	// Should return empty response (not error) when no session - HasReadAccessToWallet returns false (no access)
 	require.NoError(t, err, "Should not error when there's no session, should return empty response")
 	assert.NotNil(t, resp)
-	assert.Empty(t, resp.Transfers, "Should return empty transfers when no session")
-	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when no access")
+	assert.Empty(t, resp.GetTransfers(), "Should return empty transfers when no session")
+	assert.Equal(t, int64(-1), resp.GetOffset(), "Offset should be -1 when no access")
 }
 
 func TestQueryTransfersRejectsMalformedPagination(t *testing.T) {
@@ -500,10 +500,10 @@ func TestQueryTransfers_WithTransferIds_AccessCheck(t *testing.T) {
 	assert.NotNil(t, resp)
 
 	// Should only return transfers 1 and 2 (where viewer is sender or receiver)
-	assert.Len(t, resp.Transfers, 2, "Should only return transfers where viewer has access")
+	assert.Len(t, resp.GetTransfers(), 2, "Should only return transfers where viewer has access")
 	transferIDs := make(map[string]bool)
-	for _, t := range resp.Transfers {
-		transferIDs[t.Id] = true
+	for _, t := range resp.GetTransfers() {
+		transferIDs[t.GetId()] = true
 	}
 	assert.True(t, transferIDs[transfer1.ID.String()], "Transfer1 (viewer is sender) should be included")
 	assert.True(t, transferIDs[transfer2.ID.String()], "Transfer2 (viewer is receiver) should be included")
@@ -573,8 +573,8 @@ func TestQueryTransfers_WithTransferIds_MasterKeyAccess(t *testing.T) {
 	assert.NotNil(t, resp)
 
 	// Should return the transfer because master has access to the receiver wallet
-	assert.Len(t, resp.Transfers, 1, "Should return transfer where master has access to receiver wallet")
-	assert.Equal(t, transfer.ID.String(), resp.Transfers[0].Id)
+	assert.Len(t, resp.GetTransfers(), 1, "Should return transfer where master has access to receiver wallet")
+	assert.Equal(t, transfer.ID.String(), resp.GetTransfers()[0].GetId())
 }
 
 // TestQueryTransfers_WithTransferIds_AccessCheck_MIMO verifies that when the MIMO query-transfers knob is on,
@@ -663,10 +663,10 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	resp, err := handler.queryTransfers(ctx, filter, false, false)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Len(t, resp.Transfers, 2)
+	assert.Len(t, resp.GetTransfers(), 2)
 	received := make(map[string]bool)
-	for _, tr := range resp.Transfers {
-		received[tr.Id] = true
+	for _, tr := range resp.GetTransfers() {
+		received[tr.GetId()] = true
 	}
 	assert.True(t, received[transfer1.ID.String()])
 	assert.True(t, received[transfer2.ID.String()])
@@ -750,8 +750,8 @@ func TestQueryTransfers_WithTransferIds_MultiReceiverAccess_MIMO(t *testing.T) {
 	resp, err := handler.queryTransfers(ctx, filter, false, false)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.Len(t, resp.Transfers, 1, "viewer is one of the two receivers; should see the transfer")
-	assert.Equal(t, transfer.ID.String(), resp.Transfers[0].Id)
+	require.Len(t, resp.GetTransfers(), 1, "viewer is one of the two receivers; should see the transfer")
+	assert.Equal(t, transfer.ID.String(), resp.GetTransfers()[0].GetId())
 }
 
 // TestQueryTransfers_WithTransferIds_MissingSendersEdges_MIMO locks down the
@@ -906,11 +906,11 @@ func TestQueryTransfers_WithCreatedAfterFilter(t *testing.T) {
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, true)
 	require.NoError(t, err)
-	require.Len(t, resp.Transfers, 1) // Only transfer3 (future)
+	require.Len(t, resp.GetTransfers(), 1) // Only transfer3 (future)
 
 	// Verify correct transfers returned (transfer2 at 'now' is excluded - exclusive filter)
-	assert.Equal(t, transfer3.ID.String(), resp.Transfers[0].Id)
-	transferIds := []string{resp.Transfers[0].Id}
+	assert.Equal(t, transfer3.ID.String(), resp.GetTransfers()[0].GetId())
+	transferIds := []string{resp.GetTransfers()[0].GetId()}
 	assert.NotContains(t, transferIds, transfer1.ID.String())
 	assert.NotContains(t, transferIds, transfer2.ID.String())
 }
@@ -947,12 +947,12 @@ func TestQueryTransfers_WithCreatedBeforeFilter(t *testing.T) {
 	handler := NewTransferHandler(cfg)
 	resp, err := handler.queryTransfers(ctx, filter, false, true)
 	require.NoError(t, err)
-	require.Len(t, resp.Transfers, 2, "Should return exactly 2 transfers (oldTransfer and middleTransfer)")
+	require.Len(t, resp.GetTransfers(), 2, "Should return exactly 2 transfers (oldTransfer and middleTransfer)")
 
 	// Verify correct transfers returned
 	transferIds := make(map[string]bool)
-	for _, transfer := range resp.Transfers {
-		transferIds[transfer.Id] = true
+	for _, transfer := range resp.GetTransfers() {
+		transferIds[transfer.GetId()] = true
 	}
 	assert.True(t, transferIds[oldTransfer.ID.String()], "oldTransfer (-48h) should be included")
 	assert.True(t, transferIds[middleTransfer.ID.String()], "middleTransfer (-24h) should be included")

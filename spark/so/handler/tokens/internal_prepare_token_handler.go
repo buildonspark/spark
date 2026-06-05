@@ -53,35 +53,35 @@ func NewInternalPrepareTokenHandler(config *so.Config) *InternalPrepareTokenHand
 }
 
 func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx context.Context, req *tokeninternalpb.PrepareTransactionRequest) (*tokeninternalpb.PrepareTransactionResponse, error) {
-	ctx, span := GetTracer().Start(ctx, "InternalPrepareTokenHandler.PrepareTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, req.FinalTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "InternalPrepareTokenHandler.PrepareTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, req.GetFinalTokenTransaction()))
 	defer span.End()
 	logger := logging.GetLoggerFromContext(ctx)
-	msg := fmt.Sprintf("Starting token transaction (expiry: %s)", req.FinalTokenTransaction.ExpiryTime)
-	logger.Sugar().Infof("%s %s", msg, tokens.FormatTokenTransactionHashes(req.FinalTokenTransaction))
+	msg := fmt.Sprintf("Starting token transaction (expiry: %s)", req.GetFinalTokenTransaction().GetExpiryTime())
+	logger.Sugar().Infof("%s %s", msg, tokens.FormatTokenTransactionHashes(req.GetFinalTokenTransaction()))
 
 	finalTokenTx := req.GetFinalTokenTransaction()
 	// Set execute_before on the TokenTransaction so all downstream code (validation, hashing, entity creation) can derive it.
-	finalTokenTx.ExecuteBefore = req.ExecuteBefore
+	finalTokenTx.ExecuteBefore = req.GetExecuteBefore()
 
 	inputTtxos, err := h.validateAndLockForCommit(
 		ctx,
 		finalTokenTx,
-		req.KeyshareIds,
-		req.TokenTransactionSignatures,
-		req.CoordinatorPublicKey,
+		req.GetKeyshareIds(),
+		req.GetTokenTransactionSignatures(),
+		req.GetCoordinatorPublicKey(),
 	)
 	if err != nil {
 		return nil, err
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse coordinator public key: %w", err))
 	}
 
 	// Save the token transaction, created output ents, and update the outputs to spend.
-	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTx, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, coordinatorPubKey)
+	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTx, req.GetTokenTransactionSignatures(), req.GetKeyshareIds(), inputTtxos, coordinatorPubKey)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.FinalTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.GetFinalTokenTransaction(), err)
 	}
 
 	return &tokeninternalpb.PrepareTransactionResponse{}, nil
@@ -118,7 +118,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 		return nil, err
 	}
 
-	if finalTokenTx.Version >= 2 && finalTokenTx.GetInvoiceAttachments() != nil {
+	if finalTokenTx.GetVersion() >= 2 && finalTokenTx.GetInvoiceAttachments() != nil {
 		if err := validateSparkInvoicesForTransaction(ctx, finalTokenTx); err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 		}
 	}
 
-	if finalTokenTx.Version >= 3 {
+	if finalTokenTx.GetVersion() >= 3 {
 		if err := validateClientCreatedTimestamp(finalTokenTx); err != nil {
 			return nil, err
 		}
@@ -195,7 +195,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate mint token transaction signature", finalTokenTx, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate mint token transaction signature: %w", err)))
 		}
 
-		txNet, err := btcnetwork.FromProtoNetwork(finalTokenTx.Network)
+		txNet, err := btcnetwork.FromProtoNetwork(finalTokenTx.GetNetwork())
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", finalTokenTx, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
 		}
@@ -233,7 +233,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 			return nil, err
 		}
 
-		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTx, tokenTransactionSignatures, inputTtxos, h.config.Lrc20Configs[strings.ToLower(finalTokenTx.Network.String())].TransactionExpiryDuration)
+		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTx, tokenTransactionSignatures, inputTtxos, h.config.Lrc20Configs[strings.ToLower(finalTokenTx.GetNetwork().String())].TransactionExpiryDuration)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", finalTokenTx, err)
 		}
@@ -332,7 +332,7 @@ func validateTransferOwnerSignatures(ctx context.Context, operatorIdentityPublic
 				sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner signature at index %d is required", i)),
 			)
 		}
-		index := int(sig.InputIndex)
+		index := int(sig.GetInputIndex())
 		if index < 0 || index >= numInputs {
 			return tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf(tokens.ErrInputIndexOutOfRange, index, numInputs-1),
@@ -435,7 +435,7 @@ type potentiallySpendableOutput struct {
 // to PartialTokenTransaction (including execute_before when set) and uses protohash.
 // For older versions, falls back to the version-specific hash.
 func hashPartial(tokenTransaction *tokenpb.TokenTransaction) ([]byte, error) {
-	if tokenTransaction.Version >= 3 {
+	if tokenTransaction.GetVersion() >= 3 {
 		partial, err := protoconverter.ConvertV2TxShapeToPartial(tokenTransaction)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert to partial: %w", err)
@@ -489,8 +489,8 @@ func validateIssuerSignature(
 	sig := signaturesWithIndex[0]
 
 	// Gate multisig behind V4 version and knob before general validation.
-	if _, ok := sig.AuthoritySignatures.(*tokenpb.SignatureWithIndex_MultisigSignatures); ok {
-		if st.TokenTransactionVersion(tokenTransaction.Version) < st.TokenTransactionVersionV4 {
+	if _, ok := sig.GetAuthoritySignatures().(*tokenpb.SignatureWithIndex_MultisigSignatures); ok {
+		if st.TokenTransactionVersion(tokenTransaction.GetVersion()) < st.TokenTransactionVersionV4 {
 			return tokens.FormatErrorWithTransactionProto(
 				"multisig signatures require token transaction version V4 or later",
 				tokenTransaction,
@@ -533,7 +533,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 	tokenIdentifierToCreateID := make(map[string]string)
 	tokenPublicKeyToCreateID := make(map[string]string)
 
-	expectedTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier()
+	expectedTokenIdentifier := tokenTransaction.GetTokenOutputs()[0].GetTokenIdentifier()
 	useTokenIdentifier := expectedTokenIdentifier != nil
 
 	for _, outputEnt := range outputToSpendEnts {
@@ -560,7 +560,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 	}
 
 	// Sum outputs per token type by mapping to token_create_id
-	for _, output := range tokenTransaction.TokenOutputs {
+	for _, output := range tokenTransaction.GetTokenOutputs() {
 		var tokenKey string
 		var found bool
 
@@ -570,10 +570,10 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifier %x does not match any input", output.GetTokenIdentifier()))
 			}
 		} else {
-			tokenKey, found = tokenPublicKeyToCreateID[hex.EncodeToString(output.TokenPublicKey)]
+			tokenKey, found = tokenPublicKeyToCreateID[hex.EncodeToString(output.GetTokenPublicKey())]
 			if !found {
 				return tokens.FormatErrorWithTransactionProto("token not found in inputs", tokenTransaction,
-					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public key %x does not match any input", output.TokenPublicKey)))
+					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public key %x does not match any input", output.GetTokenPublicKey())))
 			}
 		}
 
@@ -605,8 +605,8 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 			if err != nil {
 				return sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to marshal network: %w", err))
 			}
-			if entNetwork != tokenTransaction.Network {
-				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d: %d != %d", i, entNetwork, tokenTransaction.Network))
+			if entNetwork != tokenTransaction.GetNetwork() {
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d: %d != %d", i, entNetwork, tokenTransaction.GetNetwork()))
 			}
 		}
 	}
@@ -624,10 +624,10 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		if sig == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("ownership signature cannot be nil"))
 		}
-		if _, ok := sig.AuthoritySignatures.(*tokenpb.SignatureWithIndex_MultisigSignatures); ok {
+		if _, ok := sig.GetAuthoritySignatures().(*tokenpb.SignatureWithIndex_MultisigSignatures); ok {
 			return sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("multisig owner signatures are not supported for token transfers"))
 		}
-		ownerSignaturesByIndex[sig.InputIndex] = sig
+		ownerSignaturesByIndex[sig.GetInputIndex()] = sig
 	}
 
 	if len(signaturesWithIndex) != len(tokenTransaction.GetTransferInput().GetOutputsToSpend()) {
@@ -768,7 +768,7 @@ func validateFinalTokenTransaction(
 	expectedRevocationPublicKeys []keys.Public,
 	expectedCreationEntityPublicKey keys.Public,
 ) error {
-	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.GetNetwork())
 	if err != nil {
 		return err
 	}
@@ -800,7 +800,7 @@ func validateTokenIdentifierNotAlreadyCreated(ctx context.Context, tokenTransact
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing create input"))
 	}
 
-	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.Network)
+	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.GetNetwork())
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
 	}
@@ -934,16 +934,16 @@ func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, toke
 		if err != nil {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
 		}
-		if sparkInvoiceFields.Version != 1 {
+		if sparkInvoiceFields.GetVersion() != 1 {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("version mismatch in invoice %s", invoice))
 		}
-		paymentType, ok := sparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment)
+		paymentType, ok := sparkInvoiceFields.GetPaymentType().(*sparkpb.SparkInvoiceFields_TokensPayment)
 		if !ok {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("not a tokens payment in invoice %s", invoice))
 		}
 		payment := paymentType.TokensPayment
 		// all invoices pay the outputs identifier
-		if !bytes.Equal(tokenIdentifier, payment.TokenIdentifier) {
+		if !bytes.Equal(tokenIdentifier, payment.GetTokenIdentifier()) {
 			return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier mismatch in invoice %s", invoice))
 		}
 		if expiry := sparkInvoiceFields.GetExpiryTime(); expiry != nil {
@@ -959,7 +959,7 @@ func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, toke
 		}
 		// if a sender public key is present, it must be the same across all invoices with a sender public key encoded
 		if sparkInvoiceFields.SenderPublicKey != nil {
-			decodedSenderPublicKey, err := keys.ParsePublicKey(sparkInvoiceFields.SenderPublicKey)
+			decodedSenderPublicKey, err := keys.ParsePublicKey(sparkInvoiceFields.GetSenderPublicKey())
 			if err != nil {
 				return keys.Public{}, btcnetwork.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender public key in invoice %s: %w", invoice, err))
 			}
@@ -1014,10 +1014,10 @@ func countInvoiceAmounts(invoiceAttachments []*tokenpb.InvoiceAttachment) (Invoi
 		if invoiceAmountMap[recipient] == nil {
 			invoiceAmountMap[recipient] = make(map[AmountKey]int)
 		}
-		if len(payment.Amount) == 0 {
+		if len(payment.GetAmount()) == 0 {
 			countNilAmountInvoicesMap[recipient]++
 		} else {
-			amount, err := toAmountKey(payment.Amount)
+			amount, err := toAmountKey(payment.GetAmount())
 			if err != nil {
 				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid amount in invoice %s: %w", invoice, err))
 			}
@@ -1030,7 +1030,7 @@ func countInvoiceAmounts(invoiceAttachments []*tokenpb.InvoiceAttachment) (Invoi
 func getCreatedOutputAmountMapAndTokenIdentifier(tokenTransaction *tokenpb.TokenTransaction) (CreatedOutputAmountMap, []byte, error) {
 	createdOutputMap := make(CreatedOutputAmountMap)
 	var tokenIdentifier []byte
-	for _, output := range tokenTransaction.TokenOutputs {
+	for _, output := range tokenTransaction.GetTokenOutputs() {
 		ownerPubkey, err := keys.ParsePublicKey(output.GetOwnerPublicKey())
 		if err != nil {
 			return nil, nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid owner public key: %w", err))
@@ -1167,14 +1167,14 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, senderPublicKey keys.Public, network btcnetwork.Network) error {
 	var outputsToSpend []*tokenpb.TokenOutputToSpend
 	if tokenTransaction.GetTransferInput() != nil {
-		outputsToSpend = tokenTransaction.GetTransferInput().OutputsToSpend
+		outputsToSpend = tokenTransaction.GetTransferInput().GetOutputsToSpend()
 	}
 	if len(outputsToSpend) > 0 {
 		voutsByPrevHash := make(map[string][]int32)
 		hashBytesByKey := make(map[string][]byte)
 		for _, o := range outputsToSpend {
-			prevHash := o.PrevTokenTransactionHash
-			prevVout := int32(o.PrevTokenTransactionVout)
+			prevHash := o.GetPrevTokenTransactionHash()
+			prevVout := int32(o.GetPrevTokenTransactionVout())
 			key := hex.EncodeToString(prevHash)
 			hashBytesByKey[key] = prevHash
 			existing := voutsByPrevHash[key]

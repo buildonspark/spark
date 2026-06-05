@@ -49,20 +49,20 @@ func (h *TransferHandler) startTransferV3Internal(
 	}
 
 	// MVP: single sender only.
-	if len(req.SenderPackages) != 1 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
+	if len(req.GetSenderPackages()) != 1 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
 	}
-	senderPkg := req.SenderPackages[0]
+	senderPkg := req.GetSenderPackages()[0]
 	if senderPkg == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender_package is required"))
 	}
 
-	if senderPkg.TransferPackage == nil {
+	if senderPkg.GetTransferPackage() == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 
 	// Auth
-	senderIDPK, err := keys.ParsePublicKey(senderPkg.OwnerIdentityPublicKey)
+	senderIDPK, err := keys.ParsePublicKey(senderPkg.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
 	}
@@ -81,7 +81,7 @@ func (h *TransferHandler) startTransferV3Internal(
 	// Parse receivers from the leaf→receiver map.
 	leafReceiverMap := make(map[string]keys.Public)
 	receiverSet := make(map[string]keys.Public)
-	for leafID, receiverBytes := range senderPkg.ReceiverIdentityPublicKeys {
+	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
 		recvPK, err := keys.ParsePublicKey(receiverBytes)
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
@@ -108,7 +108,7 @@ func (h *TransferHandler) startTransferV3Internal(
 	}
 
 	// Validate transfer package.
-	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.TransferPackage, senderIDPK, true /* requireDirectFromCpfpLeaves */)
+	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.GetTransferPackage(), senderIDPK, true /* requireDirectFromCpfpLeaves */)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", transferID, err)
 	}
@@ -122,7 +122,7 @@ func (h *TransferHandler) startTransferV3Internal(
 		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
 	}
 
-	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.TransferPackage)
+	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.GetTransferPackage())
 
 	// Mutual exclusivity
 	if err := createPendingSendTransferAndCommit(ctx, transferID); err != nil {
@@ -147,8 +147,8 @@ func (h *TransferHandler) startTransferV3Internal(
 	transfer, leafMap, err := h.createTransferV3(
 		ctx,
 		transferID,
-		senderPkg.TransferPackage,
-		req.ExpiryTime.AsTime(),
+		senderPkg.GetTransferPackage(),
+		req.GetExpiryTime().AsTime(),
 		senderIDPK,
 		receivers,
 		leafReceiverMap,
@@ -165,7 +165,7 @@ func (h *TransferHandler) startTransferV3Internal(
 	}
 
 	refundSignatures, err := h.signAggregateAndUpdateRefunds(
-		ctx, transfer, transferID.String(), senderPkg.TransferPackage, leafMap,
+		ctx, transfer, transferID.String(), senderPkg.GetTransferPackage(), leafMap,
 		keys.Public{}, keys.Public{}, keys.Public{}, nil,
 	)
 	if err != nil {
@@ -181,8 +181,8 @@ func (h *TransferHandler) startTransferV3Internal(
 	// Gossip sync: notify other SOs using InitiateTransferV2.
 	senderKeyTweakProofs := make(map[string]*pb.SecretProof)
 	for _, leaf := range leafTweakMap {
-		senderKeyTweakProofs[leaf.LeafId] = &pb.SecretProof{
-			Proofs: leaf.SecretShareTweak.Proofs,
+		senderKeyTweakProofs[leaf.GetLeafId()] = &pb.SecretProof{
+			Proofs: leaf.GetSecretShareTweak().GetProofs(),
 		}
 	}
 
@@ -301,15 +301,15 @@ func (h *TransferHandler) startTransferV3Consensus(
 	// out before we pay for the engine fan-out. The two sites must stay in
 	// sync; if you add a new structural check to parseSendTransferRequest,
 	// mirror it here.
-	if len(req.SenderPackages) != 1 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.SenderPackages)))
+	if len(req.GetSenderPackages()) != 1 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
 	}
-	senderPkg := req.SenderPackages[0]
-	if senderPkg.TransferPackage == nil {
+	senderPkg := req.GetSenderPackages()[0]
+	if senderPkg.GetTransferPackage() == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 
-	senderIDPK, err := keys.ParsePublicKey(senderPkg.OwnerIdentityPublicKey)
+	senderIDPK, err := keys.ParsePublicKey(senderPkg.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
 	}
@@ -324,7 +324,7 @@ func (h *TransferHandler) startTransferV3Consensus(
 	// multi-receiver guard. Parsing here also fails fast on malformed
 	// receiver keys before paying for the engine fan-out.
 	receiverSet := make(map[string]struct{})
-	for leafID, receiverBytes := range senderPkg.ReceiverIdentityPublicKeys {
+	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
 		recvPK, err := keys.ParsePublicKey(receiverBytes)
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
@@ -404,17 +404,17 @@ func (h *TransferHandler) syncTransferV3Init(
 	defer span.End()
 
 	initReq := &pbinternal.InitiateTransferV2Request{
-		TransferId: req.TransferId,
+		TransferId: req.GetTransferId(),
 		SenderPackages: []*pbinternal.InitiateTransferSenderPackage{{
-			SenderIdentityPublicKey:        senderPkg.OwnerIdentityPublicKey,
-			TransferPackage:                senderPkg.TransferPackage,
-			ReceiverIdentityPublicKeys:     senderPkg.ReceiverIdentityPublicKeys,
+			SenderIdentityPublicKey:        senderPkg.GetOwnerIdentityPublicKey(),
+			TransferPackage:                senderPkg.GetTransferPackage(),
+			ReceiverIdentityPublicKeys:     senderPkg.GetReceiverIdentityPublicKeys(),
 			RefundSignatures:               cpfpRefundSignatures,
 			DirectRefundSignatures:         directRefundSignatures,
 			DirectFromCpfpRefundSignatures: directFromCpfpRefundSignatures,
 		}},
 		SenderKeyTweakProofs: senderKeyTweakProofs,
-		ExpiryTime:           req.ExpiryTime,
+		ExpiryTime:           req.GetExpiryTime(),
 	}
 
 	selection := helper.OperatorSelection{
@@ -635,7 +635,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 	defer func() {
 		resultCount := 0
 		if resp != nil {
-			resultCount = len(resp.Transfers)
+			resultCount = len(resp.GetTransfers())
 		}
 		logQueryTransfersInvocation(ctx, "query_outgoing_in_flight", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
@@ -653,8 +653,8 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		return nil, fmt.Errorf("invalid sender identity public key: %w", err)
 	}
 
-	statuses := make([]st.TransferStatus, len(filter.Statuses))
-	for i, s := range filter.Statuses {
+	statuses := make([]st.TransferStatus, len(filter.GetStatuses()))
+	for i, s := range filter.GetStatuses() {
 		statuses[i], err = ent.TransferStatusSchema(s)
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer status: %w", err))
@@ -665,15 +665,15 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		QueryPath:       "query_outgoing_in_flight",
 		FilterType:      "sender",
 		HasStatusFilter: true,
-		HasTypeFilter:   len(filter.Types) > 0,
-		HasTransferIDs:  len(filter.TransferIds) > 0,
+		HasTypeFilter:   len(filter.GetTypes()) > 0,
+		HasTransferIDs:  len(filter.GetTransferIds()) > 0,
 	})
 
 	if resp, err := h.validateWalletReadAccess(ctx, walletPubkey, isSSP, metrics); resp != nil || err != nil {
 		return resp, err
 	}
 
-	limit, offset := normalizeTransferPagination(filter.Limit, filter.Offset)
+	limit, offset := normalizeTransferPagination(filter.GetLimit(), filter.GetOffset())
 
 	args := mimo.OutgoingInFlightArgs{
 		WalletPubkey:      walletPubkey,
@@ -685,7 +685,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 		CreatedAfter:      timeOrZero(filter.GetCreatedAfter()),
 		HasCreatedBefore:  filter.GetCreatedBefore() != nil,
 		CreatedBefore:     timeOrZero(filter.GetCreatedBefore()),
-		Order:             filter.Order,
+		Order:             filter.GetOrder(),
 		Limit:             limit,
 		Offset:            offset,
 	}
@@ -773,7 +773,7 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 	defer func() {
 		resultCount := 0
 		if resp != nil {
-			resultCount = len(resp.Transfers)
+			resultCount = len(resp.GetTransfers())
 		}
 		logQueryTransfersInvocation(ctx, "query_by_types", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
@@ -923,7 +923,7 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 	defer func() {
 		resultCount := 0
 		if resp != nil {
-			resultCount = len(resp.Transfers)
+			resultCount = len(resp.GetTransfers())
 		}
 		logQueryTransfersInvocation(ctx, "query_receiver_by_type_status", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
@@ -1078,7 +1078,7 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 	defer func() {
 		resultCount := 0
 		if resp != nil {
-			resultCount = len(resp.Transfers)
+			resultCount = len(resp.GetTransfers())
 		}
 		logQueryTransfersInvocation(ctx, "query_counter_swap", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),
@@ -1203,7 +1203,7 @@ func (h *TransferHandler) queryByParticipantFallback(ctx context.Context, filter
 	defer func() {
 		resultCount := 0
 		if resp != nil {
-			resultCount = len(resp.Transfers)
+			resultCount = len(resp.GetTransfers())
 		}
 		logQueryTransfersInvocation(ctx, "query_by_participant_fallback", filter, time.Since(start),
 			zap.Bool("is_ssp", isSSP),

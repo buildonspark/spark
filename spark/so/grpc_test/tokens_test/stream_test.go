@@ -95,11 +95,11 @@ func TestTokenTransactionStreamNotification(t *testing.T) {
 			if tokenEvent == nil {
 				continue // skip heartbeats and other non-token events
 			}
-			assert.Equal(t, expectedHash, tokenEvent.TokenTransactionHash)
-			require.NotEmpty(t, tokenEvent.TokenIdentifiers, "expected token identifiers")
+			assert.Equal(t, expectedHash, tokenEvent.GetTokenTransactionHash())
+			require.NotEmpty(t, tokenEvent.GetTokenIdentifiers(), "expected token identifiers")
 
 			found := false
-			for _, id := range tokenEvent.TokenIdentifiers {
+			for _, id := range tokenEvent.GetTokenIdentifiers() {
 				if bytes.Equal(id, tokenIdentifier) {
 					found = true
 					break

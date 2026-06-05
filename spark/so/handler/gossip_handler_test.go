@@ -115,9 +115,9 @@ func TestHandleRollbackUtxoSwapGossipMessage_NonExistentUtxo_Succeeds(t *testing
 	require.NoError(t, err)
 
 	gossipMsg := &pbgossip.GossipMessageRollbackUtxoSwap{
-		OnChainUtxo:          rollbackRequest.OnChainUtxo,
-		Signature:            rollbackRequest.Signature,
-		CoordinatorPublicKey: rollbackRequest.CoordinatorPublicKey,
+		OnChainUtxo:          rollbackRequest.GetOnChainUtxo(),
+		Signature:            rollbackRequest.GetSignature(),
+		CoordinatorPublicKey: rollbackRequest.GetCoordinatorPublicKey(),
 	}
 
 	err = handler.handleRollbackUtxoSwapGossipMessage(ctx, gossipMsg)

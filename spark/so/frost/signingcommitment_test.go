@@ -203,8 +203,8 @@ func TestSigningCommitment_MarshalProto(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, proto)
-	assert.Equal(t, commitment.binding.Serialize(), proto.Binding)
-	assert.Equal(t, commitment.hiding.Serialize(), proto.Hiding)
+	assert.Equal(t, commitment.binding.Serialize(), proto.GetBinding())
+	assert.Equal(t, commitment.hiding.Serialize(), proto.GetHiding())
 }
 
 func TestSigningCommitment_UnmarshalProto(t *testing.T) {

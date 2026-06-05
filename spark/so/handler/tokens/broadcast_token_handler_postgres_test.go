@@ -50,7 +50,7 @@ type broadcastTokenPostgresTestSetup struct {
 func (s *broadcastTokenPostgresTestSetup) sortedOperatorKeys() [][]byte {
 	var opKeys [][]byte
 	for _, op := range s.config.GetSigningOperatorList() {
-		opKeys = append(opKeys, op.PublicKey)
+		opKeys = append(opKeys, op.GetPublicKey())
 	}
 	for i := 0; i < len(opKeys); i++ {
 		for j := i + 1; j < len(opKeys); j++ {
@@ -194,7 +194,7 @@ func (s *mockBroadcastInternalServer) SignTokenTransaction(
 	_ context.Context,
 	req *tokeninternalpb.SignTokenTransactionRequest,
 ) (*tokeninternalpb.SignTokenTransactionResponse, error) {
-	finalTxHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
+	finalTxHash, err := utils.HashTokenTransaction(req.GetFinalTokenTransaction(), false)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +357,7 @@ func preInsertMintTransactionWithHashesAndExecuteBefore(
 		SetMint(mint).
 		SetExpiryTime(expiryTime).
 		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
-		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
+		SetClientCreatedTimestamp(setup.defaultMetadata().GetClientCreatedTimestamp().AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300)
 	if !executeBefore.IsZero() {
@@ -389,7 +389,7 @@ func preInsertCreateTransactionWithHashesAndExecuteBefore(
 	require.NoError(t, err)
 	createInput := partialLegacy.GetCreateInput()
 	require.NotNil(t, createInput)
-	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, partialLegacy.Network)
+	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, partialLegacy.GetNetwork())
 	require.NoError(t, err)
 	tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifier()
 	require.NoError(t, err)
@@ -416,7 +416,7 @@ func preInsertCreateTransactionWithHashesAndExecuteBefore(
 		SetCreate(tokenCreateEnt).
 		SetExpiryTime(expiryTime).
 		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
-		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
+		SetClientCreatedTimestamp(setup.defaultMetadata().GetClientCreatedTimestamp().AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300)
 	if !executeBefore.IsZero() {
@@ -477,7 +477,7 @@ func preInsertTransferTransactionWithHashesAndExecuteBefore(
 		SetStatus(st.TokenTransactionStatusSigned).
 		SetExpiryTime(expiryTime).
 		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
-		SetClientCreatedTimestamp(setup.defaultMetadata().ClientCreatedTimestamp.AsTime()).
+		SetClientCreatedTimestamp(setup.defaultMetadata().GetClientCreatedTimestamp().AsTime()).
 		SetVersion(st.TokenTransactionVersionV3).
 		SetValidityDurationSeconds(300).
 		SetOperatorSignature(operatorSig)
@@ -595,7 +595,7 @@ func TestBroadcastTokenTransaction_ExecuteBeforeRelaxesCCT(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
 }
 
 func TestBroadcastTokenTransaction_OldCCTWithoutExecuteBeforeFails(t *testing.T) {
@@ -632,9 +632,9 @@ func TestBroadcastTokenTransaction_Phase2_MintSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
-	assert.NotNil(t, resp.FinalTokenTransaction)
-	assert.Nil(t, resp.TokenIdentifier, "MINT transactions should not return token identifier")
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+	assert.NotNil(t, resp.GetFinalTokenTransaction())
+	assert.Nil(t, resp.GetTokenIdentifier(), "MINT transactions should not return token identifier")
 }
 
 func TestBroadcastTokenTransaction_DuplicateFinalizedExecuteBeforeMintReturnsExisting(t *testing.T) {
@@ -830,9 +830,9 @@ func TestBroadcastTokenTransaction_Phase2_CreateSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.CommitStatus)
-	assert.NotNil(t, resp.FinalTokenTransaction)
-	assert.NotEmpty(t, resp.TokenIdentifier)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, resp.GetCommitStatus())
+	assert.NotNil(t, resp.GetFinalTokenTransaction())
+	assert.NotEmpty(t, resp.GetTokenIdentifier())
 }
 
 func TestBroadcastTokenTransaction_Phase2_TransferSuccess(t *testing.T) {
@@ -854,8 +854,8 @@ func TestBroadcastTokenTransaction_Phase2_TransferSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
-	assert.NotNil(t, resp.FinalTokenTransaction)
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
+	assert.NotNil(t, resp.GetFinalTokenTransaction())
 }
 
 func TestBroadcastTokenTransaction_ExpiredExecuteBeforeTransferCanResubmit(t *testing.T) {
@@ -890,7 +890,7 @@ func TestBroadcastTokenTransaction_ExpiredExecuteBeforeTransferCanResubmit(t *te
 	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
 
 	txs, err := setup.root.TokenTransaction.Query().
 		Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
@@ -901,7 +901,7 @@ func TestBroadcastTokenTransaction_ExpiredExecuteBeforeTransferCanResubmit(t *te
 	resp, err = setup.handler.BroadcastTokenTransaction(ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.GetCommitStatus())
 
 	txs, err = setup.root.TokenTransaction.Query().
 		Where(tokentransaction.PartialTokenTransactionHash(partialHash)).
@@ -977,13 +977,13 @@ func TestBroadcastTokenTransaction_DuplicateMintRequest(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-				assert.Equal(t, tc.wantStatus, resp.CommitStatus)
-				assert.NotNil(t, resp.FinalTokenTransaction)
+				assert.Equal(t, tc.wantStatus, resp.GetCommitStatus())
+				assert.NotNil(t, resp.GetFinalTokenTransaction())
 				if tc.wantProgress {
-					require.NotNil(t, resp.CommitProgress)
-					assert.NotEmpty(t, resp.CommitProgress.CommittedOperatorPublicKeys)
+					require.NotNil(t, resp.GetCommitProgress())
+					assert.NotEmpty(t, resp.GetCommitProgress().GetCommittedOperatorPublicKeys())
 				} else {
-					assert.Nil(t, resp.CommitProgress)
+					assert.Nil(t, resp.GetCommitProgress())
 				}
 			}
 		})
@@ -1035,7 +1035,7 @@ func TestBroadcastTokenTransaction_TransferWithDuplicateOutputsToSpend(t *testin
 	req := setup.signAndBuildRequest(partial, ownerPriv)
 	req.TokenTransactionOwnerSignatures = append(req.TokenTransactionOwnerSignatures, &tokenpb.SignatureWithIndex{
 		InputIndex: 1,
-		Signature:  req.TokenTransactionOwnerSignatures[0].Signature,
+		Signature:  req.GetTokenTransactionOwnerSignatures()[0].GetSignature(),
 	})
 
 	resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
@@ -1118,19 +1118,19 @@ func TestBroadcastTokenTransaction_DuplicateTransferRequest(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-				assert.Equal(t, tc.wantStatus, resp.CommitStatus)
-				assert.NotNil(t, resp.FinalTokenTransaction)
+				assert.Equal(t, tc.wantStatus, resp.GetCommitStatus())
+				assert.NotNil(t, resp.GetFinalTokenTransaction())
 				if tc.wantProgress {
-					require.NotNil(t, resp.CommitProgress)
+					require.NotNil(t, resp.GetCommitProgress())
 					// Transfer uses reveal progress - only coordinator has keyshare
-					assert.Len(t, resp.CommitProgress.CommittedOperatorPublicKeys, 1,
+					assert.Len(t, resp.GetCommitProgress().GetCommittedOperatorPublicKeys(), 1,
 						"Only coordinator should be committed (has keyshare)")
-					assert.NotEmpty(t, resp.CommitProgress.UncommittedOperatorPublicKeys,
+					assert.NotEmpty(t, resp.GetCommitProgress().GetUncommittedOperatorPublicKeys(),
 						"Other operators should be uncommitted (no reveals)")
 					assert.Equal(t, setup.config.IdentityPublicKey().Serialize(),
-						resp.CommitProgress.CommittedOperatorPublicKeys[0])
+						resp.GetCommitProgress().GetCommittedOperatorPublicKeys()[0])
 				} else {
-					assert.Nil(t, resp.CommitProgress)
+					assert.Nil(t, resp.GetCommitProgress())
 				}
 			}
 		})

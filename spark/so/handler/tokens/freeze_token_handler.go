@@ -32,7 +32,7 @@ func NewFreezeTokenHandler(config *so.Config) *FreezeTokenHandler {
 // the freeze request to all other SOs before applying locally.
 func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.FreezeTokensRequest) (*tokenpb.FreezeTokensResponse, error) {
 	// Verify session auth - only the issuer can freeze tokens
-	tokenIdentifier := req.FreezeTokensPayload.GetTokenIdentifier()
+	tokenIdentifier := req.GetFreezeTokensPayload().GetTokenIdentifier()
 	if tokenIdentifier == nil {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("token identifier is required"))
 	}
@@ -47,7 +47,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		return nil, err
 	}
 
-	result, err := ValidateAndApplyFreeze(ctx, h.config, req.FreezeTokensPayload, req.IssuerSignature)
+	result, err := ValidateAndApplyFreeze(ctx, h.config, req.GetFreezeTokensPayload(), req.GetIssuerSignature())
 	if err != nil {
 		return nil, err
 	}
@@ -92,15 +92,15 @@ func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, r
 
 			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
 			return client.InternalFreezeTokens(ctx, &tokeninternalpb.InternalFreezeTokensRequest{
-				FreezeTokensPayload: req.FreezeTokensPayload,
-				IssuerSignature:     req.IssuerSignature,
+				FreezeTokensPayload: req.GetFreezeTokensPayload(),
+				IssuerSignature:     req.GetIssuerSignature(),
 			})
 		},
 	)
 	if err != nil {
 		logger.Warn("coordinated freeze fan-out setup failed",
 			zap.Error(err),
-			zap.Binary("token_identifier", req.FreezeTokensPayload.GetTokenIdentifier()),
+			zap.Binary("token_identifier", req.GetFreezeTokensPayload().GetTokenIdentifier()),
 		)
 		results = &helper.PartialResults[*tokeninternalpb.InternalFreezeTokensResponse]{
 			Successes: make(map[string]*tokeninternalpb.InternalFreezeTokensResponse),
@@ -111,7 +111,7 @@ func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, r
 			logger.Warn("coordinated freeze failed for operator",
 				zap.String("operator_id", opID),
 				zap.Error(opErr),
-				zap.Binary("token_identifier", req.FreezeTokensPayload.GetTokenIdentifier()),
+				zap.Binary("token_identifier", req.GetFreezeTokensPayload().GetTokenIdentifier()),
 			)
 		}
 	}

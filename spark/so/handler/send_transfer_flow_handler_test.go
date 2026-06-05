@@ -127,7 +127,7 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 		{
 			name: "two sender packages",
 			mutate: func(r *pb.StartTransferV3Request) {
-				r.SenderPackages = append(r.SenderPackages, r.SenderPackages[0])
+				r.SenderPackages = append(r.SenderPackages, r.GetSenderPackages()[0])
 			},
 			wantSub: "expected exactly 1 sender package",
 		},
@@ -237,8 +237,8 @@ func TestFilterJobsForThisOperator(t *testing.T) {
 
 	filtered := filterJobsForThisOperator(jobs, "op-a")
 	assert.Len(t, filtered, 2)
-	assert.Equal(t, "job-1", filtered[0].JobId)
-	assert.Equal(t, "job-3", filtered[1].JobId)
+	assert.Equal(t, "job-1", filtered[0].GetJobId())
+	assert.Equal(t, "job-3", filtered[1].GetJobId())
 }
 
 func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {

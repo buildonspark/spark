@@ -34,7 +34,7 @@ func TestValidatePreimageShareRejectsShortProofSet(t *testing.T) {
 	)
 	require.NoError(t, err)
 	secretShare := shares[int(config.Index)].MarshalProto()
-	secretShare.Proofs = secretShare.Proofs[:1]
+	secretShare.Proofs = secretShare.GetProofs()[:1]
 	shareBytes, err := proto.Marshal(secretShare)
 	require.NoError(t, err)
 	publicKey, err := eciesgo.NewPublicKeyFromBytes(config.IdentityPublicKey().Serialize())

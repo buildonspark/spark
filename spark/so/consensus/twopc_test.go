@@ -166,7 +166,7 @@ func TestExecute_PrepareSucceeds_SendsCommitWithPayload(t *testing.T) {
 
 	commit := gs.calls[0].msg.GetConsensusCommit()
 	require.NotNil(t, commit)
-	roundTripped, err := commit.Operation.UnmarshalNew()
+	roundTripped, err := commit.GetOperation().UnmarshalNew()
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(op, roundTripped))
 }
@@ -215,7 +215,7 @@ func TestExecute_BuildCommitPayload_CommitUsesAggregatedMessage(t *testing.T) {
 
 	commit := gs.calls[0].msg.GetConsensusCommit()
 	require.NotNil(t, commit)
-	roundTripped, err := commit.Operation.UnmarshalNew()
+	roundTripped, err := commit.GetOperation().UnmarshalNew()
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(commitOp, roundTripped))
 }
@@ -234,7 +234,7 @@ func TestExecute_BuildCommitPayloadFails_SendsRollback(t *testing.T) {
 
 	rollback := gs.calls[0].msg.GetConsensusRollback()
 	require.NotNil(t, rollback)
-	roundTripped, err := rollback.Operation.UnmarshalNew()
+	roundTripped, err := rollback.GetOperation().UnmarshalNew()
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(rollbackOp, roundTripped))
 }
@@ -267,7 +267,7 @@ func TestExecute_WritesCoordinatorRow_CommittedOnSuccess(t *testing.T) {
 	require.Len(t, gs.calls, 1)
 	commit := gs.calls[0].msg.GetConsensusCommit()
 	require.NotNil(t, commit)
-	assert.Equal(t, row.ID.String(), commit.FlowExecutionId)
+	assert.Equal(t, row.ID.String(), commit.GetFlowExecutionId())
 }
 
 func TestExecute_WritesCoordinatorRow_RolledBackOnPrepareFailure(t *testing.T) {
@@ -291,7 +291,7 @@ func TestExecute_WritesCoordinatorRow_RolledBackOnPrepareFailure(t *testing.T) {
 	require.Len(t, gs.calls, 1)
 	rollback := gs.calls[0].msg.GetConsensusRollback()
 	require.NotNil(t, rollback)
-	assert.Equal(t, row.ID.String(), rollback.FlowExecutionId)
+	assert.Equal(t, row.ID.String(), rollback.GetFlowExecutionId())
 }
 
 func TestExecute_WritesCoordinatorRow_RolledBackOnBuildCommitFailure(t *testing.T) {

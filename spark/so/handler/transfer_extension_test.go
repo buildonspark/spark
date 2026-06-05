@@ -71,21 +71,21 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 	t.Run("receiver A pubkey returns only A leaves and only A in Receivers", func(t *testing.T) {
 		proto, err := transfer.MarshalProtoForReceiver(ctx, receiverAPub)
 		require.NoError(t, err)
-		require.Len(t, proto.Leaves, 1)
-		assert.Equal(t, leafNodeA.ID.String(), proto.Leaves[0].Leaf.Id)
-		require.Len(t, proto.Receivers, 1)
-		assert.Equal(t, receiverAPub.Serialize(), proto.Receivers[0].IdentityPublicKey)
-		assert.Equal(t, uint64(1000), proto.Receivers[0].AmountSats)
+		require.Len(t, proto.GetLeaves(), 1)
+		assert.Equal(t, leafNodeA.ID.String(), proto.GetLeaves()[0].GetLeaf().GetId())
+		require.Len(t, proto.GetReceivers(), 1)
+		assert.Equal(t, receiverAPub.Serialize(), proto.GetReceivers()[0].GetIdentityPublicKey())
+		assert.Equal(t, uint64(1000), proto.GetReceivers()[0].GetAmountSats())
 	})
 
 	t.Run("receiver B pubkey returns only B leaves and only B in Receivers", func(t *testing.T) {
 		proto, err := transfer.MarshalProtoForReceiver(ctx, receiverBPub)
 		require.NoError(t, err)
-		require.Len(t, proto.Leaves, 1)
-		assert.Equal(t, leafNodeB.ID.String(), proto.Leaves[0].Leaf.Id)
-		require.Len(t, proto.Receivers, 1)
-		assert.Equal(t, receiverBPub.Serialize(), proto.Receivers[0].IdentityPublicKey)
-		assert.Equal(t, uint64(1000), proto.Receivers[0].AmountSats)
+		require.Len(t, proto.GetLeaves(), 1)
+		assert.Equal(t, leafNodeB.ID.String(), proto.GetLeaves()[0].GetLeaf().GetId())
+		require.Len(t, proto.GetReceivers(), 1)
+		assert.Equal(t, receiverBPub.Serialize(), proto.GetReceivers()[0].GetIdentityPublicKey())
+		assert.Equal(t, uint64(1000), proto.GetReceivers()[0].GetAmountSats())
 	})
 
 	t.Run("unrelated pubkey errors", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 		require.NoError(t, err)
 		proto, err := plainTransfer.MarshalProto(ctx)
 		require.NoError(t, err)
-		assert.Len(t, proto.Leaves, 2)
-		assert.Empty(t, proto.Receivers)
+		assert.Len(t, proto.GetLeaves(), 2)
+		assert.Empty(t, proto.GetReceivers())
 	})
 }

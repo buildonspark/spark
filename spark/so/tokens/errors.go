@@ -184,10 +184,10 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 
 	outputMsg := fmt.Sprintf("spent_outputs: %+v", spentOutputs)
 
-	if n := len(tokenTransaction.TokenOutputs); n > 0 {
+	if n := len(tokenTransaction.GetTokenOutputs()); n > 0 {
 		createdOutputs := make([]readableProtoOutput, min(n, 5))
 		for i := range createdOutputs {
-			output := tokenTransaction.TokenOutputs[i]
+			output := tokenTransaction.GetTokenOutputs()[i]
 			if output == nil {
 				createdOutputs[i] = readableProtoOutput{
 					OutputId:        "<nil>",

@@ -59,14 +59,14 @@ func testTransactionSigningScenarios(
 			TestValidityDurationSecs*time.Second,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
-		hash1, _ := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
-		hash2, _ := utils.HashTokenTransaction(startResp2.FinalTokenTransaction, false)
+		hash1, _ := utils.HashTokenTransaction(startResp.GetFinalTokenTransaction(), false)
+		hash2, _ := utils.HashTokenTransaction(startResp2.GetFinalTokenTransaction(), false)
 		require.Equal(t, finalTxHash, finalTxHash2, "final tx hashes should match on double start")
 		require.Equal(t, hash1, hash2, "final transactions should hash identically after double start with same tx blob")
 	}
 
 	if doubleStartDifferentTx {
-		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(tokenTransaction.ClientCreatedTimestamp.AsTime().Add(-time.Second * 1))
+		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(tokenTransaction.GetClientCreatedTimestamp().AsTime().Add(-time.Second * 1))
 		startResp2, finalTxHash2, startErr2 := startTokenTransactionOrBroadcast(
 			t,
 			t.Context(),
@@ -76,8 +76,8 @@ func testTransactionSigningScenarios(
 			TestValidityDurationSecs*time.Second,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
-		hash1, _ := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
-		hash2, _ := utils.HashTokenTransaction(startResp2.FinalTokenTransaction, false)
+		hash1, _ := utils.HashTokenTransaction(startResp.GetFinalTokenTransaction(), false)
+		hash2, _ := utils.HashTokenTransaction(startResp2.GetFinalTokenTransaction(), false)
 		require.NotEqual(t, finalTxHash, finalTxHash2, "final tx hashes should not match when double starting with different txs")
 		require.NotEqual(t, hash1, hash2, "final transactions should hash differently for txs with different client created timestamp")
 
@@ -95,7 +95,7 @@ func testTransactionSigningScenarios(
 			txQueryParams,
 		)
 		require.NoError(t, err, "failed to query token transactions")
-		require.Len(t, txQueryResponse.TokenTransactionsWithStatus, 2)
+		require.Len(t, txQueryResponse.GetTokenTransactionsWithStatus(), 2)
 
 		startResp = startResp2
 		finalTxHash = finalTxHash2
@@ -109,7 +109,7 @@ func testTransactionSigningScenarios(
 
 	// V3 does not have an explicit sign step, so no need to test signing.
 	if broadcastTokenTestsUseV3 {
-		return startResp.FinalTokenTransaction
+		return startResp.GetFinalTokenTransaction()
 	}
 
 	var operatorSignatures []*tokenpb.InputTtxoSignaturesPerOperator
@@ -134,7 +134,7 @@ func testTransactionSigningScenarios(
 	}
 
 	commitReq := &tokenpb.CommitTransactionRequest{
-		FinalTokenTransaction:          startResp.FinalTokenTransaction,
+		FinalTokenTransaction:          startResp.GetFinalTokenTransaction(),
 		FinalTokenTransactionHash:      finalTxHash,
 		InputTtxoSignaturesPerOperator: operatorSignatures,
 		OwnerIdentityPublicKey:         config.IdentityPublicKey().Serialize(),
@@ -148,16 +148,16 @@ func testTransactionSigningScenarios(
 	}
 	require.NoError(t, commitErr)
 
-	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, commitResp.CommitStatus)
-	require.Nil(t, commitResp.CommitProgress, "commit progress should be nil")
+	require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, commitResp.GetCommitStatus())
+	require.Nil(t, commitResp.GetCommitProgress(), "commit progress should be nil")
 
 	if doubleCommit {
 		commitResp2, commitErr2 := wallet.CommitTransaction(t.Context(), config, commitReq)
 		require.NoError(t, commitErr2, "unexpected error on second commit (double sign)")
-		require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, commitResp2.CommitStatus)
+		require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, commitResp2.GetCommitStatus())
 	}
 
-	return startResp.FinalTokenTransaction
+	return startResp.GetFinalTokenTransaction()
 }
 
 // testMintTransactionSigningScenarios tests mint transaction signing scenarios

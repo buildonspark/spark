@@ -74,14 +74,14 @@ func prepareFrostSigningJobsForDirectRefund(
 	userCommitments := make([]*frost.SigningCommitment, len(leaves))
 	for i, leaf := range leaves {
 		// Parse DirectTx (the parent transaction for direct refunds)
-		directTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+		directTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetDirectTx())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
 		}
 		directOutPoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
 
 		// Parse current DirectRefundTx to get the timelock
-		currDirectRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectRefundTx)
+		currDirectRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetDirectRefundTx())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse direct refund tx: %w", err)
 		}
@@ -124,12 +124,12 @@ func prepareFrostSigningJobsForDirectRefund(
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:           leaf.Leaf.Id,
+			JobId:           leaf.Leaf.GetId(),
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
-			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
+			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
 			Nonce:           signingNonceProto,
-			Commitments:     signingCommitments[i].SigningNonceCommitments,
+			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
 			UserCommitments: userCommitmentProto,
 		})
 	}
@@ -153,12 +153,12 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 	refundTxs := make([][]byte, len(leaves))
 	userCommitments := make([]*frost.SigningCommitment, len(leaves))
 	for i, leaf := range leaves {
-		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetNodeTx())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse node tx: %w", err)
 		}
 		nodeOutPoint := wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
-		currRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		currRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetRefundTx())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
@@ -211,12 +211,12 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:            leaf.Leaf.Id,
+			JobId:            leaf.Leaf.GetId(),
 			Message:          txSig.Serialize(),
 			KeyPackage:       userKeyPackage,
-			VerifyingKey:     leaf.Leaf.VerifyingPublicKey,
+			VerifyingKey:     leaf.Leaf.GetVerifyingPublicKey(),
 			Nonce:            signingNonceProto,
-			Commitments:      signingCommitments[i].SigningNonceCommitments,
+			Commitments:      signingCommitments[i].GetSigningNonceCommitments(),
 			UserCommitments:  userCommitmentProto,
 			AdaptorPublicKey: adaptorPublicKey.Serialize(),
 		})
@@ -252,26 +252,26 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 		var err error
 		switch htlcType {
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeCPFPRefund:
-			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.GetNodeTx())
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to parse direct from cpfp refund tx: %w", err)
 			}
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectFromCpfpRefund:
-			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.GetNodeTx())
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to parse direct from cpfp refund tx: %w", err)
 			}
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectRefund:
-			if len(leaf.Leaf.DirectTx) == 0 {
-				return nil, nil, nil, fmt.Errorf("direct tx is empty for leaf id: %s", leaf.Leaf.Id)
+			if len(leaf.Leaf.GetDirectTx()) == 0 {
+				return nil, nil, nil, fmt.Errorf("direct tx is empty for leaf id: %s", leaf.Leaf.GetId())
 			}
-			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.GetDirectTx())
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
 			}
 		}
 
-		refundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		refundTx, err := common.TxFromRawTxBytes(leaf.Leaf.GetRefundTx())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse refund tx: %w", err)
 		}
@@ -319,12 +319,12 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:           leaf.Leaf.Id,
+			JobId:           leaf.Leaf.GetId(),
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
-			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
+			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
 			Nonce:           signingNonceProto,
-			Commitments:     signingCommitments[i].SigningNonceCommitments,
+			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
 			UserCommitments: userCommitmentProto,
 		})
 	}
@@ -355,13 +355,13 @@ func prepareLeafSigningJobs(
 	for i, leaf := range leaves {
 		userCommitmentProto, _ := userCommitments[i].MarshalProto()
 		leafSigningJobs = append(leafSigningJobs, &pb.UserSignedTxSigningJob{
-			LeafId:                 leaf.Leaf.Id,
+			LeafId:                 leaf.Leaf.GetId(),
 			SigningPublicKey:       leaf.SigningPrivKey.Public().Serialize(),
 			RawTx:                  refundTxs[i],
 			SigningNonceCommitment: userCommitmentProto,
-			UserSignature:          signingResults[leaf.Leaf.Id].SignatureShare,
+			UserSignature:          signingResults[leaf.Leaf.GetId()].GetSignatureShare(),
 			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: signingCommitments[i].SigningNonceCommitments,
+				SigningCommitments: signingCommitments[i].GetSigningNonceCommitments(),
 			},
 		})
 	}
@@ -425,7 +425,7 @@ func SignTransactionWithFrost(
 		KeyPackage:      keyPackage,
 		VerifyingKey:    verificationKey.Serialize(),
 		Nonce:           signingNonceProto,
-		Commitments:     signingResult.SigningNonceCommitments,
+		Commitments:     signingResult.GetSigningNonceCommitments(),
 		UserCommitments: signingNonceCommitment,
 	}
 
@@ -439,17 +439,17 @@ func SignTransactionWithFrost(
 
 	aggResponse, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            txSig.Serialize(),
-		SignatureShares:    signingResult.SignatureShares,
-		PublicShares:       signingResult.PublicKeys,
+		SignatureShares:    signingResult.GetSignatureShares(),
+		PublicShares:       signingResult.GetPublicKeys(),
 		VerifyingKey:       verificationKey.Serialize(),
-		Commitments:        signingResult.SigningNonceCommitments,
+		Commitments:        signingResult.GetSigningNonceCommitments(),
 		UserCommitments:    signingNonceCommitment,
 		UserPublicKey:      verificationKey.Serialize(),
-		UserSignatureShare: response.Results[signingJob.JobId].SignatureShare,
+		UserSignatureShare: response.GetResults()[signingJob.GetJobId()].GetSignatureShare(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return aggResponse.Signature, nil
+	return aggResponse.GetSignature(), nil
 }

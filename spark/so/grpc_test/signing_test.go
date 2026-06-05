@@ -135,7 +135,7 @@ func TestFrostSign(t *testing.T) {
 	_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
 		Role:            pbfrost.SigningRole_USER,
 		Message:         msgHash[:],
-		SignatureShare:  userSignatures.Results[userJobID].SignatureShare,
+		SignatureShare:  userSignatures.GetResults()[userJobID].GetSignatureShare(),
 		PublicShare:     userPubKey.Serialize(),
 		VerifyingKey:    verifyingKey.Serialize(),
 		Commitments:     operatorCommitmentsProto,
@@ -154,12 +154,12 @@ func TestFrostSign(t *testing.T) {
 		Commitments:        operatorCommitmentsProto,
 		UserCommitments:    userNonceCommitmentProto,
 		UserPublicKey:      userPubKey.Serialize(),
-		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[userJobID].GetSignatureShare(),
 	})
 	require.NoError(t, err)
 
 	// Step 9: Verify signature using go lib.
-	sig, err := schnorr.ParseSignature(signatureResult.Signature)
+	sig, err := schnorr.ParseSignature(signatureResult.GetSignature())
 	require.NoError(t, err)
 
 	taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingKey.ToBTCEC())
@@ -325,13 +325,13 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 		Commitments:        operatorCommitmentsProto,
 		UserCommitments:    userNonceCommitmentProto,
 		UserPublicKey:      privKey.Public().Serialize(),
-		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[userJobID].GetSignatureShare(),
 		AdaptorPublicKey:   adaptorPub.Serialize(),
 	})
 	require.NoError(t, err)
 
 	taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(verifyingKey.ToBTCEC()))
-	_, err = common.ApplyAdaptorToSignature(taprootKey, msgHash[:], signatureResp.Signature, adaptorPrivKey)
+	_, err = common.ApplyAdaptorToSignature(taprootKey, msgHash[:], signatureResp.GetSignature(), adaptorPrivKey)
 	require.NoError(t, err)
 }
 
@@ -471,7 +471,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
 		Role:            pbfrost.SigningRole_USER,
 		Message:         msgHash[:],
-		SignatureShare:  userSignatures.Results[userJobID].SignatureShare,
+		SignatureShare:  userSignatures.GetResults()[userJobID].GetSignatureShare(),
 		PublicShare:     privKey.Public().Serialize(),
 		VerifyingKey:    verifyingKey.Serialize(),
 		Commitments:     operatorCommitmentsProto,
@@ -490,12 +490,12 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 		Commitments:        operatorCommitmentsProto,
 		UserCommitments:    userNonceCommitmentProto,
 		UserPublicKey:      privKey.Public().Serialize(),
-		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
+		UserSignatureShare: userSignatures.GetResults()[userJobID].GetSignatureShare(),
 	})
 	require.NoError(t, err)
 
 	// Step 11: Verify signature using go lib.
-	sig, err := schnorr.ParseSignature(signatureResult.Signature)
+	sig, err := schnorr.ParseSignature(signatureResult.GetSignature())
 	require.NoError(t, err)
 	taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingKey.ToBTCEC())
 	require.True(t, sig.Verify(msgHash[:], taprootKey), "signature verification failed")

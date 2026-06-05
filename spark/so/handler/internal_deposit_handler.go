@@ -56,11 +56,11 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	logger.Sugar().Infof("Marking keyshare %s for deposit address", req.KeyshareId)
+	logger.Sugar().Infof("Marking keyshare %s for deposit address", req.GetKeyshareId())
 
-	keyshareID, err := uuid.Parse(req.KeyshareId)
+	keyshareID, err := uuid.Parse(req.GetKeyshareId())
 	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse keyshare ID %s as UUID", req.KeyshareId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse keyshare ID %s as UUID", req.GetKeyshareId())
 		return nil, err
 	}
 
@@ -71,13 +71,13 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 
 	var network btcnetwork.Network
 	for _, networkVariant := range []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Regtest, btcnetwork.Testnet, btcnetwork.Signet} {
-		if utils.IsBitcoinAddressForNetwork(req.Address, networkVariant) {
+		if utils.IsBitcoinAddressForNetwork(req.GetAddress(), networkVariant) {
 			network = networkVariant
 			break
 		}
 	}
 	if network == btcnetwork.Unspecified {
-		return nil, fmt.Errorf("can not determine network for address: %s", req.Address)
+		return nil, fmt.Errorf("can not determine network for address: %s", req.GetAddress())
 	}
 
 	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
@@ -93,7 +93,7 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		// Always handle conflicts gracefully on operators. The coordinator
 		// controls user-facing error semantics via its own knob check;
 		// operators only receive this call after the coordinator succeeded.
-		_, err = saveStaticDepositAddress(ctx, db, keyshareID, ownerIDPubKey, ownerSigningPubKey, network, req.Address, true)
+		_, err = saveStaticDepositAddress(ctx, db, keyshareID, ownerIDPubKey, ownerSigningPubKey, network, req.GetAddress(), true)
 
 	} else {
 		_, err = db.DepositAddress.Create().
@@ -101,7 +101,7 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 			SetOwnerIdentityPubkey(ownerIDPubKey).
 			SetOwnerSigningPubkey(ownerSigningPubKey).
 			SetNetwork(network).
-			SetAddress(req.Address).
+			SetAddress(req.GetAddress()).
 			SetIsStatic(req.GetIsStatic()).
 			Save(ctx)
 	}
@@ -110,10 +110,10 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		logger.Error("Failed to link keyshare to deposit address", zap.Error(err))
 		return nil, err
 	}
-	logger.Sugar().Infof("Marked keyshare %s for deposit address", req.KeyshareId)
+	logger.Sugar().Infof("Marked keyshare %s for deposit address", req.GetKeyshareId())
 
 	signingKey := h.config.IdentityPrivateKey
-	addrHash := sha256.Sum256([]byte(req.Address))
+	addrHash := sha256.Sum256([]byte(req.GetAddress()))
 	addressSignature := ecdsa.Sign(signingKey.ToBTCEC(), addrHash[:])
 	return &pbinternal.MarkKeyshareForDepositAddressResponse{
 		AddressSignature: addressSignature.Serialize(),
@@ -128,7 +128,7 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	keyshareID, err := uuid.Parse(req.KeyshareId)
+	keyshareID, err := uuid.Parse(req.GetKeyshareId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse keyshare ID: %w", err)
 	}
@@ -143,7 +143,7 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 		return nil, fmt.Errorf("failed to parse owned identity public key: %w", err)
 	}
 	depositAddress, err := db.DepositAddress.Query().
-		Where(depositaddress.AddressEQ(req.Address)).
+		Where(depositaddress.AddressEQ(req.GetAddress())).
 		Where(depositaddress.IsStaticEQ(true)).
 		Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(keyshareID))).
 		Where(depositaddress.OwnerIdentityPubkeyEQ(ownerIDPubKey)).
@@ -154,10 +154,10 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 	}
 
 	if depositAddress == nil {
-		return nil, errors.NotFoundMissingEntity(fmt.Errorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.Address, ownerIDPubKey))
+		return nil, errors.NotFoundMissingEntity(fmt.Errorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.GetAddress(), ownerIDPubKey))
 	}
 
-	logger.Sugar().Infof("Generating proofs of possession for static deposit address %s generated from keyshare %s", req.Address, req.KeyshareId)
+	logger.Sugar().Infof("Generating proofs of possession for static deposit address %s generated from keyshare %s", req.GetAddress(), req.GetKeyshareId())
 
 	signingKey := h.config.IdentityPrivateKey
 	addrHash := sha256.Sum256([]byte(depositAddress.Address))
@@ -199,9 +199,9 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	treeNodeIDs := make([]string, len(req.Nodes))
-	for i, node := range req.Nodes {
-		treeNodeIDs[i] = node.Id
+	treeNodeIDs := make([]string, len(req.GetNodes()))
+	for i, node := range req.GetNodes() {
+		treeNodeIDs[i] = node.GetId()
 	}
 
 	logger.Sugar().Infof("Finalizing tree creation for tree nodes %+q", treeNodeIDs)
@@ -213,9 +213,9 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 
 	var tree *ent.Tree
 	var selectedNode *pbinternal.TreeNode
-	for _, node := range req.Nodes {
+	for _, node := range req.GetNodes() {
 		if node.ParentNodeId == nil {
-			logger.Sugar().Infof("Selected node %s", node.Id)
+			logger.Sugar().Infof("Selected node %s", node.GetId())
 			selectedNode = node
 			break
 		}
@@ -227,18 +227,18 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 	}
 	markNodeAsAvailable := false
 	if selectedNode.ParentNodeId == nil {
-		treeID, err := uuid.Parse(selectedNode.TreeId)
+		treeID, err := uuid.Parse(selectedNode.GetTreeId())
 		if err != nil {
 			return err
 		}
-		network, err := btcnetwork.FromProtoNetwork(req.Network)
+		network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
 			return err
 		}
 		if !h.config.IsNetworkSupported(network) {
 			return fmt.Errorf("network not supported")
 		}
-		signingKeyshareID, err := uuid.Parse(selectedNode.SigningKeyshareId)
+		signingKeyshareID, err := uuid.Parse(selectedNode.GetSigningKeyshareId())
 		if err != nil {
 			return err
 		}
@@ -251,7 +251,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		}
 		markNodeAsAvailable = address.ConfirmationHeight != 0
 		logger.Sugar().Infof("Marking node as available: %v", markNodeAsAvailable)
-		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
+		nodeTx, err := common.TxFromRawTxBytes(selectedNode.GetRawTx())
 		if err != nil {
 			return fmt.Errorf("failed to get node transaction: %w", err)
 		}
@@ -264,7 +264,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if nodeTx.TxIn[0].PreviousOutPoint.Index > math.MaxInt16 {
 			return fmt.Errorf("previous outpoint index overflows int16: %d", nodeTx.TxIn[0].PreviousOutPoint.Index)
 		}
-		ownerIDPubKey, err := keys.ParsePublicKey(selectedNode.OwnerIdentityPubkey)
+		ownerIDPubKey, err := keys.ParsePublicKey(selectedNode.GetOwnerIdentityPubkey())
 		if err != nil {
 			return fmt.Errorf("failed to parse owner identity public key: %w", err)
 		}
@@ -288,7 +288,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			return err
 		}
 	} else {
-		treeID, err := uuid.Parse(selectedNode.TreeId)
+		treeID, err := uuid.Parse(selectedNode.GetTreeId())
 		if err != nil {
 			return err
 		}
@@ -299,16 +299,16 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		markNodeAsAvailable = tree.Status == st.TreeStatusAvailable
 	}
 
-	for _, node := range req.Nodes {
-		nodeID, err := uuid.Parse(node.Id)
+	for _, node := range req.GetNodes() {
+		nodeID, err := uuid.Parse(node.GetId())
 		if err != nil {
 			return err
 		}
 
-		if node.Vout > math.MaxInt16 {
-			return fmt.Errorf("node vout value %d overflows int16", node.Vout)
+		if node.GetVout() > math.MaxInt16 {
+			return fmt.Errorf("node vout value %d overflows int16", node.GetVout())
 		}
-		signingKeyshareID, err := uuid.Parse(node.SigningKeyshareId)
+		signingKeyshareID, err := uuid.Parse(node.GetSigningKeyshareId())
 		if err != nil {
 			return err
 		}
@@ -341,15 +341,15 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetNetwork(tree.Network).
 			SetOwnerIdentityPubkey(ownerIdentityPubKey).
 			SetOwnerSigningPubkey(ownerSigningPubKey).
-			SetValue(node.Value).
+			SetValue(node.GetValue()).
 			SetVerifyingPubkey(verifyingPubKey).
 			SetSigningKeyshareID(signingKeyshareID).
-			SetVout(int16(node.Vout)).
-			SetRawTx(node.RawTx).
-			SetDirectTx(node.DirectTx).
-			SetRawRefundTx(node.RawRefundTx).
-			SetDirectRefundTx(node.DirectRefundTx).
-			SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+			SetVout(int16(node.GetVout())).
+			SetRawTx(node.GetRawTx()).
+			SetDirectTx(node.GetDirectTx()).
+			SetRawRefundTx(node.GetRawRefundTx()).
+			SetDirectRefundTx(node.GetDirectRefundTx()).
+			SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
 
 		if node.ParentNodeId != nil {
 			parentID, err := uuid.Parse(node.GetParentNodeId())
@@ -369,7 +369,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		}
 
 		if markNodeAsAvailable {
-			if len(node.RawRefundTx) > 0 {
+			if len(node.GetRawRefundTx()) > 0 {
 				nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 			} else {
 				nodeMutator.SetStatus(st.TreeNodeStatusSplitted)
@@ -716,34 +716,34 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeRollback,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rollback utxo swap request statement: %w", err)
 	}
 	// Coordinator pubkey comes from the request, but it's fine because it will be checked against the DB.
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
 	}
-	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.GetSignature(), messageHash); err != nil {
 		logger.Sugar().Debugf(
 			"Rollback utxo swap request signature (signature: %x txid: %x vout: %d network: %s coordinator: %s message_hash: %x)",
-			req.Signature,
-			req.OnChainUtxo.Txid,
-			req.OnChainUtxo.Vout,
+			req.GetSignature(),
+			req.GetOnChainUtxo().GetTxid(),
+			req.GetOnChainUtxo().GetVout(),
 			network,
-			req.CoordinatorPublicKey,
+			req.GetCoordinatorPublicKey(),
 			messageHash,
 		)
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
-	logger.Sugar().Infof("Cancelling UTXO swap for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Cancelling UTXO swap for %x:%d", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout())
 
-	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
@@ -753,7 +753,8 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 	// older coordinators or non-static-deposit callers — fall through to the
 	// receiver-side default. This avoids the case where a swap created at a
 	// 1-conf threshold is rejected here because the default is 3.
-	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.OnChainUtxo, req.ConfirmationThreshold)
+	confirmationThreshold := req.ConfirmationThreshold
+	targetUtxo, err := VerifiedTargetUtxoFromRequest(ctx, config, db, schemaNetwork, req.GetOnChainUtxo(), confirmationThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -798,15 +799,15 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 	}
 
 	// Convert and validate proto statuses to schema UtxoSwapStatus enum values at the start
-	rollbackFromStatuses := make([]st.UtxoSwapStatus, len(req.RollbackFromStatuses))
-	for i, s := range req.RollbackFromStatuses {
+	rollbackFromStatuses := make([]st.UtxoSwapStatus, len(req.GetRollbackFromStatuses()))
+	for i, s := range req.GetRollbackFromStatuses() {
 		status, err := protoToSchemaUtxoSwapStatus(s)
 		if err != nil {
 			return nil, fmt.Errorf("invalid rollback_from_status at index %d: %w", i, err)
 		}
 		rollbackFromStatuses[i] = status
 	}
-	rollbackToStatus, err := protoToSchemaUtxoSwapStatus(req.RollbackToStatus)
+	rollbackToStatus, err := protoToSchemaUtxoSwapStatus(req.GetRollbackToStatus())
 	if err != nil {
 		return nil, fmt.Errorf("invalid rollback_to_status: %w", err)
 	}
@@ -821,49 +822,49 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeRollback,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rollback utxo swap request statement: %w", err)
 	}
 	// Coordinator pubkey comes from the request, but it's fine because it will be checked against the DB.
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
 	}
-	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.GetSignature(), messageHash); err != nil {
 		logger.Sugar().Debugf(
 			"Rollback instant utxo swap request signature (signature: %x txid: %x vout: %d network: %s coordinator: %s message_hash: %x rollback_from_statuses: %v rollback_to_status: %s)",
-			req.Signature,
-			req.OnChainUtxo.Txid,
-			req.OnChainUtxo.Vout,
+			req.GetSignature(),
+			req.GetOnChainUtxo().GetTxid(),
+			req.GetOnChainUtxo().GetVout(),
 			network,
-			req.CoordinatorPublicKey,
+			req.GetCoordinatorPublicKey(),
 			messageHash,
-			req.RollbackFromStatuses,
-			req.RollbackToStatus,
+			req.GetRollbackFromStatuses(),
+			req.GetRollbackToStatus(),
 		)
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
-	logger.Sugar().Infof("Cancelling UTXO swap for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Cancelling UTXO swap for %x:%d", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout())
 
-	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
+	schemaNetwork, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
 
 	// Get the transaction amount and destination address from the raw transaction
-	onChainTx, err := common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
+	onChainTx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse on-chain transaction: %w", err)
 	}
-	if int(req.OnChainUtxo.Vout) >= len(onChainTx.TxOut) {
-		return nil, fmt.Errorf("vout %d out of bounds for transaction with %d outputs", req.OnChainUtxo.Vout, len(onChainTx.TxOut))
+	if int(req.GetOnChainUtxo().GetVout()) >= len(onChainTx.TxOut) {
+		return nil, fmt.Errorf("vout %d out of bounds for transaction with %d outputs", req.GetOnChainUtxo().GetVout(), len(onChainTx.TxOut))
 	}
-	txOut := onChainTx.TxOut[req.OnChainUtxo.Vout]
+	txOut := onChainTx.TxOut[req.GetOnChainUtxo().GetVout()]
 	amount := txOut.Value
 	networkParams, err := schemaNetwork.Params()
 	if err != nil {
@@ -909,7 +910,7 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 		return nil, err
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %x:%d set to %s", utxoSwap.ID, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, req.RollbackToStatus.String())
+	logger.Sugar().Infof("UTXO swap %s for %x:%d set to %s", utxoSwap.ID, req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), req.GetRollbackToStatus().String())
 	return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
 }
 
@@ -984,36 +985,36 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	network, err := btcnetwork.FromProtoNetwork(req.OnChainUtxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(req.GetOnChainUtxo().GetNetwork())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get network: %w", err)
 	}
 	messageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCompleted,
-		hex.EncodeToString(req.OnChainUtxo.Txid),
-		req.OnChainUtxo.Vout,
+		hex.EncodeToString(req.GetOnChainUtxo().GetTxid()),
+		req.GetOnChainUtxo().GetVout(),
 		network,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap completed statement: %w", err)
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
 	}
-	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.GetSignature(), messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
-	logger.Sugar().Infof("Marking UTXO swap for %x:%d as COMPLETED", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Marking UTXO swap for %x:%d as COMPLETED", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout())
 
 	// Look up the swap type to determine the correct confirmation threshold.
 	// Instant deposits require threshold=1; regular deposits use the default (3 or config).
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(
 			utxoswap.HasUtxoWith(
-				utxo.Txid(req.OnChainUtxo.Txid),
-				utxo.Vout(req.OnChainUtxo.Vout),
+				utxo.Txid(req.GetOnChainUtxo().GetTxid()),
+				utxo.Vout(req.GetOnChainUtxo().GetVout()),
 				utxo.NetworkEQ(network),
 			),
 			utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted),
@@ -1021,7 +1022,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		).
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get utxo swap for %x:%d: %w", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, err)
+		return nil, fmt.Errorf("unable to get utxo swap for %x:%d: %w", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), err)
 	}
 
 	if utxoSwap.Status == st.UtxoSwapStatusCompleted {
@@ -1036,7 +1037,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 	if confirmationThreshold == nil && utxoSwap.RequestType == st.UtxoSwapRequestTypeInstant {
 		confirmationThreshold = new(uint32(1))
 	}
-	_, err = VerifiedTargetUtxoFromRequest(ctx, config, db, network, req.OnChainUtxo, confirmationThreshold)
+	_, err = VerifiedTargetUtxoFromRequest(ctx, config, db, network, req.GetOnChainUtxo(), confirmationThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -1045,7 +1046,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return nil, fmt.Errorf("unable to complete utxo swap: %w", err)
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %x:%d marked as COMPLETED", utxoSwap.ID, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("UTXO swap %s for %x:%d marked as COMPLETED", utxoSwap.ID, req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout())
 	return &pbinternal.UtxoSwapCompletedResponse{}, nil
 }
 
@@ -1054,14 +1055,14 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 // re-verification matches the threshold the swap was originally created with;
 // nil falls back to the existing receiver-side defaulting logic.
 func CreateCompleteSwapForUtxoRequest(config *so.Config, utxo *pb.UTXO, confirmationThreshold *uint32) (*pbinternal.UtxoSwapCompletedRequest, error) {
-	network, err := btcnetwork.FromProtoNetwork(utxo.Network)
+	network, err := btcnetwork.FromProtoNetwork(utxo.GetNetwork())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get network: %w", err)
 	}
 	completedUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
 		UtxoSwapStatementTypeCompleted,
-		hex.EncodeToString(utxo.Txid),
-		utxo.Vout,
+		hex.EncodeToString(utxo.GetTxid()),
+		utxo.GetVout(),
 		network,
 	)
 	if err != nil {

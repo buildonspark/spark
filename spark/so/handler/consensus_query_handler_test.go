@@ -81,11 +81,11 @@ func TestQueryOutcome_CoordinatorCommitted_ReturnsCommittedWithPayload(t *testin
 	h := NewConsensusQueryHandler(sparktesting.TestConfig(t))
 	resp, err := h.QueryOutcome(ctx, &pbinternal.ConsensusQueryOutcomeRequest{FlowExecutionId: id.String()})
 	require.NoError(t, err)
-	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED, resp.Outcome)
-	assert.Equal(t, int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RENEW_LEAF), resp.OpType)
+	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_COMMITTED, resp.GetOutcome())
+	assert.Equal(t, int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RENEW_LEAF), resp.GetOpType())
 
-	require.NotNil(t, resp.DecisionPayload)
-	roundTripped, err := resp.DecisionPayload.UnmarshalNew()
+	require.NotNil(t, resp.GetDecisionPayload())
+	roundTripped, err := resp.GetDecisionPayload().UnmarshalNew()
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(commitOp, roundTripped), "round-tripped commit payload should match")
 }
@@ -99,10 +99,10 @@ func TestQueryOutcome_CoordinatorRolledBack_ReturnsRolledBackWithPayload(t *test
 	h := NewConsensusQueryHandler(sparktesting.TestConfig(t))
 	resp, err := h.QueryOutcome(ctx, &pbinternal.ConsensusQueryOutcomeRequest{FlowExecutionId: id.String()})
 	require.NoError(t, err)
-	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_ROLLED_BACK, resp.Outcome)
+	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_ROLLED_BACK, resp.GetOutcome())
 
-	require.NotNil(t, resp.DecisionPayload)
-	roundTripped, err := resp.DecisionPayload.UnmarshalNew()
+	require.NotNil(t, resp.GetDecisionPayload())
+	roundTripped, err := resp.GetDecisionPayload().UnmarshalNew()
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(rollbackOp, roundTripped), "round-tripped rollback payload should match")
 }
@@ -121,8 +121,8 @@ func TestQueryOutcome_CoordinatorInFlight_ReturnsInFlightWithRollbackPayload(t *
 	h := NewConsensusQueryHandler(sparktesting.TestConfig(t))
 	resp, err := h.QueryOutcome(ctx, &pbinternal.ConsensusQueryOutcomeRequest{FlowExecutionId: id.String()})
 	require.NoError(t, err)
-	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_IN_FLIGHT, resp.Outcome)
-	require.NotNil(t, resp.DecisionPayload)
+	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_IN_FLIGHT, resp.GetOutcome())
+	require.NotNil(t, resp.GetDecisionPayload())
 }
 
 func TestQueryOutcome_MissingRow_ReturnsUnspecified(t *testing.T) {
@@ -131,8 +131,8 @@ func TestQueryOutcome_MissingRow_ReturnsUnspecified(t *testing.T) {
 	h := NewConsensusQueryHandler(sparktesting.TestConfig(t))
 	resp, err := h.QueryOutcome(ctx, &pbinternal.ConsensusQueryOutcomeRequest{FlowExecutionId: uuid.NewString()})
 	require.NoError(t, err)
-	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED, resp.Outcome)
-	assert.Nil(t, resp.DecisionPayload)
+	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED, resp.GetOutcome())
+	assert.Nil(t, resp.GetDecisionPayload())
 }
 
 func TestQueryOutcome_ParticipantRow_ReturnsUnspecified(t *testing.T) {
@@ -143,7 +143,7 @@ func TestQueryOutcome_ParticipantRow_ReturnsUnspecified(t *testing.T) {
 	h := NewConsensusQueryHandler(sparktesting.TestConfig(t))
 	resp, err := h.QueryOutcome(ctx, &pbinternal.ConsensusQueryOutcomeRequest{FlowExecutionId: id.String()})
 	require.NoError(t, err)
-	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED, resp.Outcome,
+	assert.Equal(t, pbinternal.ConsensusQueryOutcomeResponse_OUTCOME_UNSPECIFIED, resp.GetOutcome(),
 		"querying a participant row should not leak participant state")
 }
 

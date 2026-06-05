@@ -44,7 +44,7 @@ func NewSignTokenHandler(config *so.Config) *SignTokenHandler {
 }
 
 func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
-	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.CommitTransaction", GetProtoTokenTransactionTraceAttributes(ctx, req.FinalTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.CommitTransaction", GetProtoTokenTransactionTraceAttributes(ctx, req.GetFinalTokenTransaction()))
 	defer span.End()
 	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
@@ -63,15 +63,15 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return nil, err
 	}
 
-	calculatedHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
+	calculatedHash, err := utils.HashTokenTransaction(req.GetFinalTokenTransaction(), false)
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(calculatedHash, req.FinalTokenTransactionHash) {
-		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.FinalTokenTransactionHash))
+	if !bytes.Equal(calculatedHash, req.GetFinalTokenTransactionHash()) {
+		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.GetFinalTokenTransactionHash()))
 	}
 
-	tokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, req.FinalTokenTransactionHash)
+	tokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, req.GetFinalTokenTransactionHash())
 	if err != nil {
 		return nil, err
 	}
@@ -82,17 +82,17 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return response, err
 	}
 
-	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction, req.FinalTokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction, req.GetFinalTokenTransaction()); err != nil {
 		return nil, err
 	}
 
 	requireInputSignatures := req.GetFinalTokenTransaction().GetVersion() < 3
-	inputSignaturesByOperatorHex := make(map[string]*tokenpb.InputTtxoSignaturesPerOperator, len(req.InputTtxoSignaturesPerOperator))
-	for _, opSigs := range req.InputTtxoSignaturesPerOperator {
-		if opSigs == nil || len(opSigs.OperatorIdentityPublicKey) == 0 {
+	inputSignaturesByOperatorHex := make(map[string]*tokenpb.InputTtxoSignaturesPerOperator, len(req.GetInputTtxoSignaturesPerOperator()))
+	for _, opSigs := range req.GetInputTtxoSignaturesPerOperator() {
+		if opSigs == nil || len(opSigs.GetOperatorIdentityPublicKey()) == 0 {
 			continue
 		}
-		inputSignaturesByOperatorHex[hex.EncodeToString(opSigs.OperatorIdentityPublicKey)] = opSigs
+		inputSignaturesByOperatorHex[hex.EncodeToString(opSigs.GetOperatorIdentityPublicKey())] = opSigs
 	}
 	selfHex := h.config.IdentityPublicKey().ToHex()
 	operatorSpecificSignatures := inputSignaturesByOperatorHex[selfHex]
@@ -115,10 +115,10 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 			defer conn.Close()
 			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
 			return client.SignTokenTransactionFromCoordination(ctx, &tokeninternalpb.SignTokenTransactionFromCoordinationRequest{
-				FinalTokenTransaction:          req.FinalTokenTransaction,
-				FinalTokenTransactionHash:      req.FinalTokenTransactionHash,
+				FinalTokenTransaction:          req.GetFinalTokenTransaction(),
+				FinalTokenTransactionHash:      req.GetFinalTokenTransactionHash(),
 				InputTtxoSignaturesPerOperator: foundOperatorSignatures,
-				OwnerIdentityPublicKey:         req.OwnerIdentityPublicKey,
+				OwnerIdentityPublicKey:         req.GetOwnerIdentityPublicKey(),
 			})
 		},
 	)
@@ -127,28 +127,28 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 			sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
-	lockedTokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
+	lockedTokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.GetFinalTokenTransaction())
 	if err != nil {
 		return nil, err
 	}
-	if err := validateTokenTransactionForSigning(ctx, h.config, lockedTokenTransaction, req.FinalTokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, lockedTokenTransaction, req.GetFinalTokenTransaction()); err != nil {
 		return nil, err
 	}
 	localResp, err := h.localSignAndCommitTransaction(
 		ctx,
 		operatorSpecificSignatures,
-		req.FinalTokenTransactionHash,
+		req.GetFinalTokenTransactionHash(),
 		lockedTokenTransaction,
-		req.FinalTokenTransaction,
+		req.GetFinalTokenTransaction(),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	signatures := make(operatorSignaturesMap, len(internalSignatures))
-	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
+	signatures[h.config.Identifier] = localResp.GetSparkOperatorSignature()
 	for operatorID, sig := range internalSignatures {
-		signatures[operatorID] = sig.SparkOperatorSignature
+		signatures[operatorID] = sig.GetSparkOperatorSignature()
 	}
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
 	if err := internalSignTokenHandler.validateAndPersistPeerSignatures(ctx, signatures, lockedTokenTransaction); err != nil {
@@ -176,7 +176,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		allOperatorSignatures := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(internalSignatures)+1)
 		maps.Copy(allOperatorSignatures, internalSignatures)
 		allOperatorSignatures[h.config.Identifier] = localResp
-		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.FinalTokenTransaction, allOperatorSignatures, req.FinalTokenTransactionHash); err != nil {
+		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.GetFinalTokenTransaction(), allOperatorSignatures, req.GetFinalTokenTransactionHash()); err != nil {
 			return nil, err
 		} else {
 			return response, nil
@@ -205,7 +205,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 		if exchangeResponse == nil {
 			return nil, tokens.FormatErrorWithTransactionProto("nil exchange response received from operator", tokenTransactionProto, sparkerrors.InternalInvalidOperatorResponse(err))
 		}
-		operatorShares = append(operatorShares, exchangeResponse.ReceivedOperatorShares...)
+		operatorShares = append(operatorShares, exchangeResponse.GetReceivedOperatorShares()...)
 	}
 	inputOperatorShareMap, err := buildInputOperatorShareMap(operatorShares)
 	if err != nil {
@@ -313,7 +313,7 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 			if err != nil {
 				return nil, fmt.Errorf("failed to get create/mint signed commit progress: %w", err)
 			}
-			if len(commitProgress.UncommittedOperatorPublicKeys) == 0 {
+			if len(commitProgress.GetUncommittedOperatorPublicKeys()) == 0 {
 				return &tokenpb.CommitTransactionResponse{
 					CommitStatus: tokenpb.CommitStatus_COMMIT_FINALIZED,
 				}, nil
@@ -371,7 +371,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	for identifier, sig := range allOperatorSignaturesResponse {
 		allOperatorSignaturesPackage = append(allOperatorSignaturesPackage, &tokeninternalpb.OperatorTransactionSignature{
 			OperatorIdentityPublicKey: h.config.SigningOperatorMap[identifier].IdentityPublicKey.Serialize(),
-			Signature:                 sig.SparkOperatorSignature,
+			Signature:                 sig.GetSparkOperatorSignature(),
 		})
 	}
 
@@ -438,8 +438,8 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	})
 
 	for identifier, resp := range response {
-		for _, operatorShares := range resp.ReceivedOperatorShares {
-			reqPubKey, err := keys.ParsePublicKey(operatorShares.OperatorIdentityPublicKey)
+		for _, operatorShares := range resp.GetReceivedOperatorShares() {
+			reqPubKey, err := keys.ParsePublicKey(operatorShares.GetOperatorIdentityPublicKey())
 			if err != nil {
 				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse request operator identity public key: %w", err))
 			}
@@ -447,7 +447,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 			logger.Sugar().Infof("Operator %s received from operator %s, %d secret shares originating from operator %s for token txHash: %s",
 				h.config.Identifier,
 				identifier,
-				len(operatorShares.Shares),
+				len(operatorShares.GetShares()),
 				reqOperatorIdentifier,
 				hex.EncodeToString(tokenTransactionHash),
 			)
@@ -637,7 +637,7 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
 	var ttxoSignatures []*tokenpb.SignatureWithIndex
 	if foundOperatorSignatures != nil {
-		ttxoSignatures = foundOperatorSignatures.TtxoSignatures
+		ttxoSignatures = foundOperatorSignatures.GetTtxoSignatures()
 	}
 	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(
 		ctx,

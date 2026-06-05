@@ -52,7 +52,7 @@ func buildDuplicateClaimLeafTweaksByOperator(
 		share.Share.FillBytes(secretShareBytes)
 
 		leafTweaks[identifier] = &sparkpb.ClaimLeafKeyTweak{
-			LeafId: leaf.Leaf.Id,
+			LeafId: leaf.Leaf.GetId(),
 			SecretShareTweak: &sparkpb.SecretShare{
 				SecretShare: secretShareBytes,
 				Proofs:      share.Proofs,
@@ -81,7 +81,7 @@ func findPendingTransferByID(t *testing.T, transfers []*sparkpb.Transfer, transf
 	t.Helper()
 
 	for _, transfer := range transfers {
-		if transfer.Id == transferID {
+		if transfer.GetId() == transferID {
 			return transfer
 		}
 	}
@@ -131,17 +131,17 @@ func TestClaimTransferTweakKeys_DuplicateLeafIDsRejected_Regression(t *testing.T
 
 	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
-	receiverTransfer := findPendingTransferByID(t, pending.Transfers, transfer.Id)
-	require.Len(t, receiverTransfer.Leaves, 2)
+	receiverTransfer := findPendingTransferByID(t, pending.GetTransfers(), transfer.GetId())
+	require.Len(t, receiverTransfer.GetLeaves(), 2)
 
-	receiverLeaves := make(map[string]*sparkpb.TreeNode, len(receiverTransfer.Leaves))
-	for _, leaf := range receiverTransfer.Leaves {
-		receiverLeaves[leaf.Leaf.Id] = leaf.Leaf
+	receiverLeaves := make(map[string]*sparkpb.TreeNode, len(receiverTransfer.GetLeaves()))
+	for _, leaf := range receiverTransfer.GetLeaves() {
+		receiverLeaves[leaf.GetLeaf().GetId()] = leaf.GetLeaf()
 	}
 
 	finalLeafKey1 := keys.GeneratePrivateKey()
 	duplicateLeaf := wallet.LeafKeyTweak{
-		Leaf:              receiverLeaves[node1.Id],
+		Leaf:              receiverLeaves[node1.GetId()],
 		SigningPrivKey:    newLeafKey1,
 		NewSigningPrivKey: finalLeafKey1,
 	}
@@ -159,7 +159,7 @@ func TestClaimTransferTweakKeys_DuplicateLeafIDsRejected_Regression(t *testing.T
 		grpcClient := sparkpb.NewSparkServiceClient(conn)
 
 		_, err = grpcClient.ClaimTransferTweakKeys(ctx, &sparkpb.ClaimTransferTweakKeysRequest{
-			TransferId:             transfer.Id,
+			TransferId:             transfer.GetId(),
 			OwnerIdentityPublicKey: receiverConfig.IdentityPublicKey().Serialize(),
 			LeavesToReceive: []*sparkpb.ClaimLeafKeyTweak{
 				duplicateTweaks[identifier],

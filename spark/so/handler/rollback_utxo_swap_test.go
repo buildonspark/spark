@@ -273,13 +273,13 @@ func generateRollbackInstantRequest(
 
 	return &pbinternal.RollbackInstantUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
-			Txid:    utxo.Txid,
-			Vout:    utxo.Vout,
-			Network: utxo.Network,
+			Txid:    utxo.GetTxid(),
+			Vout:    utxo.GetVout(),
+			Network: utxo.GetNetwork(),
 			RawTx:   rawTx,
 		},
-		Signature:            baseReq.Signature,
-		CoordinatorPublicKey: baseReq.CoordinatorPublicKey,
+		Signature:            baseReq.GetSignature(),
+		CoordinatorPublicKey: baseReq.GetCoordinatorPublicKey(),
 		RollbackFromStatuses: rollbackFrom,
 		RollbackToStatus:     rollbackTo,
 	}

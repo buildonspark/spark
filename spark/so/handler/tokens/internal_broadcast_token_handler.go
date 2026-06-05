@@ -43,7 +43,7 @@ func (h *SignTokenTransactionHandler) SignTokenTransaction(
 	}
 
 	// Set execute_before on the TokenTransaction before hashing so the hash includes it.
-	finalTokenTX.ExecuteBefore = req.ExecuteBefore
+	finalTokenTX.ExecuteBefore = req.GetExecuteBefore()
 
 	hash, err := utils.HashTokenTransaction(finalTokenTX, false)
 	if err != nil {
@@ -73,14 +73,14 @@ func (h *SignTokenTransactionHandler) SignTokenTransaction(
 	inputTtxos, err := h.prepareHandler.validateAndLockForCommit(
 		ctx,
 		finalTokenTX,
-		req.KeyshareIds,
-		req.TokenTransactionSignatures,
-		req.CoordinatorPublicKey,
+		req.GetKeyshareIds(),
+		req.GetTokenTransactionSignatures(),
+		req.GetCoordinatorPublicKey(),
 	)
 	if err != nil {
 		return nil, err
 	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse coordinator public key: %w", err))
 	}
@@ -89,8 +89,8 @@ func (h *SignTokenTransactionHandler) SignTokenTransaction(
 		ctx,
 		finalTokenTX,
 		hash,
-		req.TokenTransactionSignatures,
-		req.KeyshareIds,
+		req.GetTokenTransactionSignatures(),
+		req.GetKeyshareIds(),
 		inputTtxos,
 		coordinatorPubKey,
 	)

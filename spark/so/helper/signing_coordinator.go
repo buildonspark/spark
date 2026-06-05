@@ -151,8 +151,8 @@ func frostRound1(ctx context.Context, config *so.Config, operatorSelection *Oper
 		if resp == nil {
 			return nil, fmt.Errorf("nil FrostRound1Response")
 		}
-		commitments := make([]frost.SigningCommitment, len(resp.SigningCommitments))
-		for i, c := range resp.SigningCommitments {
+		commitments := make([]frost.SigningCommitment, len(resp.GetSigningCommitments()))
+		for i, c := range resp.GetSigningCommitments() {
 			if err := commitments[i].UnmarshalProto(c); err != nil {
 				return nil, err
 			}
@@ -225,7 +225,7 @@ func frostRound2(
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse job ID from results: %w", err)
 			}
-			results[jobID] = result.SignatureShare
+			results[jobID] = result.GetSignatureShare()
 		}
 
 		return results, nil
@@ -270,11 +270,11 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		return nil, nil, errors.New("prevOutput cannot be nil")
 	}
 
-	protoSigningPublicKey, err := keys.ParsePublicKey(proto.SigningPublicKey)
+	protoSigningPublicKey, err := keys.ParsePublicKey(proto.GetSigningPublicKey())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse signing public key: %w", err)
 	}
-	tx, err := common.TxFromRawTxBytes(proto.RawTx)
+	tx, err := common.TxFromRawTxBytes(proto.GetRawTx())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -299,7 +299,7 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		return nil, nil, err
 	}
 	userCommitment := frost.SigningCommitment{}
-	if err := userCommitment.UnmarshalProto(proto.SigningNonceCommitment); err != nil {
+	if err := userCommitment.UnmarshalProto(proto.GetSigningNonceCommitment()); err != nil {
 		return nil, nil, err
 	}
 	job := &SigningJob{
@@ -531,7 +531,7 @@ func prepareResults(
 		return nil, err
 	}
 	for i, job := range jobs {
-		allPublicShares := signingKeyshares[job.SigningKeyshareID].PublicShares
+		allPublicShares := signingKeyshares[job.SigningKeyshareID].GetPublicShares()
 		publicShares := make(map[string][]byte)
 		var keyshareOwnerIdentifiers []string
 		for i := range allPublicShares {
@@ -548,7 +548,7 @@ func prepareResults(
 			SigningCommitments:       round1Array[i],
 			PublicKeys:               publicShares,
 			KeyshareOwnerIdentifiers: keyshareOwnerIdentifiers,
-			KeyshareThreshold:        signingKeyshares[job.SigningKeyshareID].MinSigners,
+			KeyshareThreshold:        signingKeyshares[job.SigningKeyshareID].GetMinSigners(),
 		}
 	}
 

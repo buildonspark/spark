@@ -82,7 +82,7 @@ func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbint
 		return fmt.Errorf("failed to get database from context: %w", err)
 	}
 
-	id, err := uuid.Parse(req.NodeId)
+	id, err := uuid.Parse(req.GetNodeId())
 	if err != nil {
 		return fmt.Errorf("failed to parse leaf id: %w", err)
 	}
@@ -93,7 +93,7 @@ func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbint
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.NodeId))
+			return errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.GetNodeId()))
 		}
 		return fmt.Errorf("failed to get leaf node: %w", err)
 	}
@@ -113,7 +113,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 	}
 
 	// Get the leaf from the database
-	leafUUID, err := uuid.Parse(req.LeafId)
+	leafUUID, err := uuid.Parse(req.GetLeafId())
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse leaf id: %w", err))
 	}
@@ -131,7 +131,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.LeafId))
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.GetLeafId()))
 		}
 		return nil, fmt.Errorf("failed to get leaf node: %w", err)
 	}
@@ -178,25 +178,25 @@ func validateAndConstructNodeTimelock(ctx context.Context, leaf *ent.TreeNode, s
 	if signingJob == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("renew node timelock signing job is required"))
 	}
-	if signingJob.SplitNodeTxSigningJob == nil {
+	if signingJob.GetSplitNodeTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("split node tx signing job is required"))
 	}
-	if signingJob.SplitNodeDirectTxSigningJob == nil {
+	if signingJob.GetSplitNodeDirectTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("split node direct tx signing job is required"))
 	}
-	if signingJob.NodeTxSigningJob == nil {
+	if signingJob.GetNodeTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("node tx signing job is required"))
 	}
-	if signingJob.RefundTxSigningJob == nil {
+	if signingJob.GetRefundTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required"))
 	}
-	if signingJob.DirectNodeTxSigningJob == nil {
+	if signingJob.GetDirectNodeTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
-	if signingJob.DirectRefundTxSigningJob == nil {
+	if signingJob.GetDirectRefundTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct refund tx signing job is required"))
 	}
-	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
+	if signingJob.GetDirectFromCpfpRefundTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
@@ -210,20 +210,20 @@ func validateAndConstructNodeTimelock(ctx context.Context, leaf *ent.TreeNode, s
 		return nil, nil, nil, fmt.Errorf("failed to construct renew transactions: %w", err)
 	}
 
-	userRawTxs := [][]byte{signingJob.SplitNodeTxSigningJob.RawTx, signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx, signingJob.SplitNodeDirectTxSigningJob.RawTx, signingJob.DirectNodeTxSigningJob.RawTx, signingJob.DirectRefundTxSigningJob.RawTx, signingJob.DirectFromCpfpRefundTxSigningJob.RawTx}
+	userRawTxs := [][]byte{signingJob.GetSplitNodeTxSigningJob().GetRawTx(), signingJob.GetNodeTxSigningJob().GetRawTx(), signingJob.GetRefundTxSigningJob().GetRawTx(), signingJob.GetSplitNodeDirectTxSigningJob().GetRawTx(), signingJob.GetDirectNodeTxSigningJob().GetRawTx(), signingJob.GetDirectRefundTxSigningJob().GetRawTx(), signingJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()}
 	expectedTxs := []*wire.MsgTx{renewTxs.SplitNodeTx, renewTxs.NodeTx, renewTxs.RefundTx, renewTxs.DirectSplitNodeTx, renewTxs.DirectNodeTx, renewTxs.DirectRefundTx, renewTxs.DirectFromCpfpRefundTx}
 	if err := validateUserTransactions(userRawTxs, expectedTxs); err != nil {
 		return nil, nil, nil, fmt.Errorf("user transaction validation failed: %w", err)
 	}
 
 	entries := []sigEntry{
-		{signingJob.NodeTxSigningJob, renewTxs.NodeTx, renewTxs.SplitNodeTx.TxOut[0]},
-		{signingJob.RefundTxSigningJob, renewTxs.RefundTx, renewTxs.NodeTx.TxOut[0]},
-		{signingJob.SplitNodeTxSigningJob, renewTxs.SplitNodeTx, renewTxs.ParentOutput},
-		{signingJob.SplitNodeDirectTxSigningJob, renewTxs.DirectSplitNodeTx, renewTxs.ParentOutput},
-		{signingJob.DirectNodeTxSigningJob, renewTxs.DirectNodeTx, renewTxs.SplitNodeTx.TxOut[0]},
-		{signingJob.DirectRefundTxSigningJob, renewTxs.DirectRefundTx, renewTxs.DirectNodeTx.TxOut[0]},
-		{signingJob.DirectFromCpfpRefundTxSigningJob, renewTxs.DirectFromCpfpRefundTx, renewTxs.NodeTx.TxOut[0]},
+		{signingJob.GetNodeTxSigningJob(), renewTxs.NodeTx, renewTxs.SplitNodeTx.TxOut[0]},
+		{signingJob.GetRefundTxSigningJob(), renewTxs.RefundTx, renewTxs.NodeTx.TxOut[0]},
+		{signingJob.GetSplitNodeTxSigningJob(), renewTxs.SplitNodeTx, renewTxs.ParentOutput},
+		{signingJob.GetSplitNodeDirectTxSigningJob(), renewTxs.DirectSplitNodeTx, renewTxs.ParentOutput},
+		{signingJob.GetDirectNodeTxSigningJob(), renewTxs.DirectNodeTx, renewTxs.SplitNodeTx.TxOut[0]},
+		{signingJob.GetDirectRefundTxSigningJob(), renewTxs.DirectRefundTx, renewTxs.DirectNodeTx.TxOut[0]},
+		{signingJob.GetDirectFromCpfpRefundTxSigningJob(), renewTxs.DirectFromCpfpRefundTx, renewTxs.NodeTx.TxOut[0]},
 	}
 
 	return parentLeaf, renewTxs, entries, nil
@@ -240,19 +240,19 @@ func validateAndConstructRefundTimelock(ctx context.Context, leaf *ent.TreeNode,
 	if signingJob == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("renew refund timelock signing job is required"))
 	}
-	if signingJob.NodeTxSigningJob == nil {
+	if signingJob.GetNodeTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("node tx signing job is required"))
 	}
-	if signingJob.RefundTxSigningJob == nil {
+	if signingJob.GetRefundTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required"))
 	}
-	if signingJob.DirectNodeTxSigningJob == nil {
+	if signingJob.GetDirectNodeTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
-	if signingJob.DirectRefundTxSigningJob == nil {
+	if signingJob.GetDirectRefundTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct refund tx signing job is required"))
 	}
-	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
+	if signingJob.GetDirectFromCpfpRefundTxSigningJob() == nil {
 		return nil, nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
@@ -266,18 +266,18 @@ func validateAndConstructRefundTimelock(ctx context.Context, leaf *ent.TreeNode,
 		return nil, nil, nil, fmt.Errorf("failed to construct renew transactions: %w", err)
 	}
 
-	userRawTxs := [][]byte{signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx, signingJob.DirectNodeTxSigningJob.RawTx, signingJob.DirectRefundTxSigningJob.RawTx, signingJob.DirectFromCpfpRefundTxSigningJob.RawTx}
+	userRawTxs := [][]byte{signingJob.GetNodeTxSigningJob().GetRawTx(), signingJob.GetRefundTxSigningJob().GetRawTx(), signingJob.GetDirectNodeTxSigningJob().GetRawTx(), signingJob.GetDirectRefundTxSigningJob().GetRawTx(), signingJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()}
 	expectedTxs := []*wire.MsgTx{refundTxs.NodeTx, refundTxs.RefundTx, refundTxs.DirectNodeTx, refundTxs.DirectRefundTx, refundTxs.DirectFromCpfpRefundTx}
 	if err := validateUserTransactions(userRawTxs, expectedTxs); err != nil {
 		return nil, nil, nil, fmt.Errorf("user transaction validation failed: %w", err)
 	}
 
 	entries := []sigEntry{
-		{signingJob.NodeTxSigningJob, refundTxs.NodeTx, refundTxs.ParentOutput},
-		{signingJob.RefundTxSigningJob, refundTxs.RefundTx, refundTxs.NodeTx.TxOut[0]},
-		{signingJob.DirectNodeTxSigningJob, refundTxs.DirectNodeTx, refundTxs.ParentOutput},
-		{signingJob.DirectRefundTxSigningJob, refundTxs.DirectRefundTx, refundTxs.DirectNodeTx.TxOut[0]},
-		{signingJob.DirectFromCpfpRefundTxSigningJob, refundTxs.DirectFromCpfpRefundTx, refundTxs.NodeTx.TxOut[0]},
+		{signingJob.GetNodeTxSigningJob(), refundTxs.NodeTx, refundTxs.ParentOutput},
+		{signingJob.GetRefundTxSigningJob(), refundTxs.RefundTx, refundTxs.NodeTx.TxOut[0]},
+		{signingJob.GetDirectNodeTxSigningJob(), refundTxs.DirectNodeTx, refundTxs.ParentOutput},
+		{signingJob.GetDirectRefundTxSigningJob(), refundTxs.DirectRefundTx, refundTxs.DirectNodeTx.TxOut[0]},
+		{signingJob.GetDirectFromCpfpRefundTxSigningJob(), refundTxs.DirectFromCpfpRefundTx, refundTxs.NodeTx.TxOut[0]},
 	}
 
 	return parentLeaf, refundTxs, entries, nil
@@ -294,16 +294,16 @@ func validateAndConstructNodeZeroTimelock(leaf *ent.TreeNode, signingJob *pb.Ren
 	if signingJob == nil {
 		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("renew node zero timelock signing job is required"))
 	}
-	if signingJob.NodeTxSigningJob == nil {
+	if signingJob.GetNodeTxSigningJob() == nil {
 		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("node tx signing job is required"))
 	}
-	if signingJob.RefundTxSigningJob == nil {
+	if signingJob.GetRefundTxSigningJob() == nil {
 		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("refund tx signing job is required"))
 	}
-	if signingJob.DirectNodeTxSigningJob == nil {
+	if signingJob.GetDirectNodeTxSigningJob() == nil {
 		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
-	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
+	if signingJob.GetDirectFromCpfpRefundTxSigningJob() == nil {
 		return nil, nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
@@ -312,7 +312,7 @@ func validateAndConstructNodeZeroTimelock(leaf *ent.TreeNode, signingJob *pb.Ren
 		return nil, nil, fmt.Errorf("failed to construct renew zero timelock transactions: %w", err)
 	}
 
-	userRawTxs := [][]byte{signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx, signingJob.DirectNodeTxSigningJob.RawTx, signingJob.DirectFromCpfpRefundTxSigningJob.RawTx}
+	userRawTxs := [][]byte{signingJob.GetNodeTxSigningJob().GetRawTx(), signingJob.GetRefundTxSigningJob().GetRawTx(), signingJob.GetDirectNodeTxSigningJob().GetRawTx(), signingJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx()}
 	expectedTxs := []*wire.MsgTx{zeroTxs.NodeTx, zeroTxs.RefundTx, zeroTxs.DirectNodeTx, zeroTxs.DirectFromCpfpRefundTx}
 	if err := validateUserTransactions(userRawTxs, expectedTxs); err != nil {
 		return nil, nil, fmt.Errorf("user transaction validation failed: %w", err)
@@ -324,10 +324,10 @@ func validateAndConstructNodeZeroTimelock(leaf *ent.TreeNode, signingJob *pb.Ren
 	}
 
 	entries := []sigEntry{
-		{signingJob.NodeTxSigningJob, zeroTxs.NodeTx, originalTx.TxOut[0]},
-		{signingJob.RefundTxSigningJob, zeroTxs.RefundTx, zeroTxs.NodeTx.TxOut[0]},
-		{signingJob.DirectNodeTxSigningJob, zeroTxs.DirectNodeTx, originalTx.TxOut[0]},
-		{signingJob.DirectFromCpfpRefundTxSigningJob, zeroTxs.DirectFromCpfpRefundTx, zeroTxs.NodeTx.TxOut[0]},
+		{signingJob.GetNodeTxSigningJob(), zeroTxs.NodeTx, originalTx.TxOut[0]},
+		{signingJob.GetRefundTxSigningJob(), zeroTxs.RefundTx, zeroTxs.NodeTx.TxOut[0]},
+		{signingJob.GetDirectNodeTxSigningJob(), zeroTxs.DirectNodeTx, originalTx.TxOut[0]},
+		{signingJob.GetDirectFromCpfpRefundTxSigningJob(), zeroTxs.DirectFromCpfpRefundTx, zeroTxs.NodeTx.TxOut[0]},
 	}
 
 	return zeroTxs, entries, nil
@@ -636,7 +636,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 
 	// Construct split node transaction using parent node tx as prev outpoint
 	splitNodeTx := wire.NewMsgTx(3)
-	userSplitNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.SplitNodeTxSigningJob.RawTx)
+	userSplitNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetSplitNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided split node tx sequence: %w", err)
 	}
@@ -656,7 +656,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 
 	// Create extended node tx to spend the split node tx
 	extendedNodeTx := wire.NewMsgTx(3)
-	userExtendedNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.NodeTxSigningJob.RawTx)
+	userExtendedNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided extended node tx sequence: %w", err)
 	}
@@ -677,7 +677,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 		return nil, fmt.Errorf("failed to create refund script: %w", err)
 	}
 	refundTx := wire.NewMsgTx(3)
-	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.RefundTxSigningJob.RawTx)
+	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided refund tx sequence: %w", err)
 	}
@@ -697,7 +697,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 
 	// Direct split node tx uses parent node tx as prev outpoint with parent node value (no fee applied)
 	directSplitNodeTx := wire.NewMsgTx(3)
-	userDirectSplitNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.SplitNodeDirectTxSigningJob.RawTx)
+	userDirectSplitNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetSplitNodeDirectTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct split node tx sequence: %w", err)
 	}
@@ -716,7 +716,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 
 	directNodeTx := wire.NewMsgTx(3)
 	// Timelock is not changed in this case
-	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectNodeTxSigningJob.RawTx)
+	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct node tx sequence: %w", err)
 	}
@@ -734,7 +734,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 
 	directRefundTx := wire.NewMsgTx(3)
 	// Timelock is not changed in this case
-	userDirectRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectRefundTxSigningJob.RawTx)
+	userDirectRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct refund tx sequence: %w", err)
 	}
@@ -752,7 +752,7 @@ func constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode, signingJob *
 
 	directFromCpfpRefundTx := wire.NewMsgTx(3)
 	// Timelock is not changed in this case
-	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectFromCpfpRefundTxSigningJob.RawTx)
+	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct from cpfp refund tx sequence: %w", err)
 	}
@@ -812,7 +812,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 	// ******************************************************************
 	// NODE TX
 	// ******************************************************************
-	userNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.NodeTxSigningJob.RawTx)
+	userNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided extended node tx sequence: %w", err)
 	}
@@ -851,7 +851,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 	// REFUND TX
 	// Create refund tx to spend the extended node tx
 	// ******************************************************************
-	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.RefundTxSigningJob.RawTx)
+	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided refund tx sequence: %w", err)
 	}
@@ -879,7 +879,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 	// ******************************************************************
 	// DIRECT NODE TX
 	// ******************************************************************
-	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectNodeTxSigningJob.RawTx)
+	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct node tx sequence: %w", err)
 	}
@@ -900,7 +900,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 	// ******************************************************************
 	// DIRECT REFUND TX
 	// ******************************************************************
-	userDirectRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectRefundTxSigningJob.RawTx)
+	userDirectRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct refund tx sequence: %w", err)
 	}
@@ -921,7 +921,7 @@ func constructRenewRefundTransactions(leaf, parentLeaf *ent.TreeNode, signingJob
 	// ******************************************************************
 	// DIRECT FROM CPFP REFUND TX
 	// ******************************************************************
-	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectFromCpfpRefundTxSigningJob.RawTx)
+	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct from cpfp refund tx sequence: %w", err)
 	}
@@ -960,7 +960,7 @@ func constructRenewZeroNodeTransactions(leaf *ent.TreeNode, signingJob *pb.Renew
 	}
 	leafAmount := leafNodeTx.TxOut[0].Value
 
-	userNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.NodeTxSigningJob.RawTx)
+	userNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate old leaf node tx sequence: %w", err)
 	}
@@ -989,7 +989,7 @@ func constructRenewZeroNodeTransactions(leaf *ent.TreeNode, signingJob *pb.Renew
 	// ******************************************************************
 	// REFUND TX
 	// ******************************************************************
-	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.RefundTxSigningJob.RawTx)
+	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate old leaf node tx sequence: %w", err)
 	}
@@ -1016,7 +1016,7 @@ func constructRenewZeroNodeTransactions(leaf *ent.TreeNode, signingJob *pb.Renew
 	// ******************************************************************
 	// DIRECT NODE TX
 	// ******************************************************************
-	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectNodeTxSigningJob.RawTx)
+	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectNodeTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct split node tx sequence: %w", err)
 	}
@@ -1036,7 +1036,7 @@ func constructRenewZeroNodeTransactions(leaf *ent.TreeNode, signingJob *pb.Renew
 	// ******************************************************************
 	// DIRECT FROM CPFP REFUND TX
 	// ******************************************************************
-	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectFromCpfpRefundTxSigningJob.RawTx)
+	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate user provided direct from cpfp refund tx sequence: %w", err)
 	}

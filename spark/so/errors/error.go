@@ -189,8 +189,8 @@ func CodeAndReasonFrom(err error) (codes.Code, string) {
 		code := st.Code()
 		var reason string
 		for _, d := range st.Details() {
-			if ei, ok := d.(*errdetails.ErrorInfo); ok && ei.Reason != "" {
-				reason = ei.Reason
+			if ei, ok := d.(*errdetails.ErrorInfo); ok && ei.GetReason() != "" {
+				reason = ei.GetReason()
 				break
 			}
 		}
@@ -208,8 +208,8 @@ func retryAfterFrom(err error) time.Duration {
 	}
 	if st, ok := status.FromError(err); ok {
 		for _, d := range st.Details() {
-			if ri, ok := d.(*errdetails.RetryInfo); ok && ri.RetryDelay != nil {
-				return ri.RetryDelay.AsDuration()
+			if ri, ok := d.(*errdetails.RetryInfo); ok && ri.GetRetryDelay() != nil {
+				return ri.GetRetryDelay().AsDuration()
 			}
 		}
 	}

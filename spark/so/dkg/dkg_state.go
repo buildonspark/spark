@@ -275,7 +275,7 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		return err
 	}
 
-	if len(response.KeyPackages) == 0 {
+	if len(response.GetKeyPackages()) == 0 {
 		return nil
 	}
 
@@ -296,20 +296,20 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		return err
 	}
 
-	signingKeyshares := make([]*ent.SigningKeyshareCreate, 0, len(response.KeyPackages))
+	signingKeyshares := make([]*ent.SigningKeyshareCreate, 0, len(response.GetKeyPackages()))
 	ctx = ent.FreezeSigningKeyshareSecretDualWriteDecision(ctx)
-	for i, kp := range response.KeyPackages {
+	for i, kp := range response.GetKeyPackages() {
 		keyID := deriveKeyIndex(batchID, uint16(i))
 
-		publicShares, err := keys.ParsePublicKeyMap(kp.PublicShares)
+		publicShares, err := keys.ParsePublicKeyMap(kp.GetPublicShares())
 		if err != nil {
 			return err
 		}
-		publicKey, err := keys.ParsePublicKey(kp.PublicKey)
+		publicKey, err := keys.ParsePublicKey(kp.GetPublicKey())
 		if err != nil {
 			return err
 		}
-		secretShare, err := keys.ParsePrivateKey(kp.SecretShare)
+		secretShare, err := keys.ParsePrivateKey(kp.GetSecretShare())
 		if err != nil {
 			return err
 		}

@@ -11,12 +11,12 @@ func GetEffectiveSingleSignature(sig *tokenpb.SignatureWithIndex) []byte {
 	if sig == nil {
 		return nil
 	}
-	switch v := sig.AuthoritySignatures.(type) {
+	switch v := sig.GetAuthoritySignatures().(type) {
 	case *tokenpb.SignatureWithIndex_SingleSignature:
 		return v.SingleSignature.GetSignature()
 	case *tokenpb.SignatureWithIndex_MultisigSignatures:
 		return nil
 	default:
-		return sig.Signature
+		return sig.GetSignature()
 	}
 }

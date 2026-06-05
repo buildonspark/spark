@@ -75,7 +75,7 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 		return nil, sparkerrors.InternalObjectNull(fmt.Errorf("token transaction cannot be nil"))
 	}
 
-	switch tokenTransaction.Version {
+	switch tokenTransaction.GetVersion() {
 	case 0:
 		{
 			sparkTx, err := protoconverter.SparkTokenTransactionFromTokenProto(tokenTransaction)
@@ -91,7 +91,7 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 	case 3:
 		return HashTokenTransactionV3(tokenTransaction, partialHash)
 	default:
-		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token transaction version: %d", tokenTransaction.Version))
+		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token transaction version: %d", tokenTransaction.GetVersion()))
 	}
 }
 
@@ -221,14 +221,14 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 	// Hash token outputs (length + contents)
 	outputsLen := 0
 	if tokenTransaction.TokenOutputs != nil {
-		outputsLen = len(tokenTransaction.TokenOutputs)
+		outputsLen = len(tokenTransaction.GetTokenOutputs())
 	}
 	h.Reset()
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, uint32(outputsLen))
 	h.Write(buf)
 	allHashes = append(allHashes, h.Sum(nil)...)
-	for i, output := range tokenTransaction.TokenOutputs {
+	for i, output := range tokenTransaction.GetTokenOutputs() {
 		if output == nil {
 			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token output at index %d cannot be nil", i))
 		}
@@ -504,7 +504,7 @@ func HashTokenTransactionV0(tokenTransaction *legacypb.TokenTransaction, partial
 	}
 	allHashes = append(allHashes, inputHashes...)
 
-	outputHashes, err := hashTokenOutputs(h, tokenTransaction.TokenOutputs, partialHash)
+	outputHashes, err := hashTokenOutputs(h, tokenTransaction.GetTokenOutputs(), partialHash)
 	if err != nil {
 		return nil, err
 	}
@@ -787,13 +787,13 @@ func HashFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload) ([]byte, erro
 		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
 
-	switch payload.Version {
+	switch payload.GetVersion() {
 	case 0:
 		return HashFreezeTokensPayloadV0(payload)
 	case 1:
 		return HashFreezeTokensPayloadV1(payload)
 	default:
-		return nil, sparkerrors.InternalObjectOutOfRange(fmt.Errorf("unsupported payload version: %d", payload.Version))
+		return nil, sparkerrors.InternalObjectOutOfRange(fmt.Errorf("unsupported payload version: %d", payload.GetVersion()))
 	}
 }
 
@@ -857,7 +857,7 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 	allHashes = append(allHashes, h.Sum(nil)...)
 
 	h.Reset()
-	switch payload.Version {
+	switch payload.GetVersion() {
 	case 0:
 		tokenPublicKey := payload.GetTokenPublicKey()
 		if len(tokenPublicKey) == 0 {
@@ -956,7 +956,7 @@ func IsFinalTokenTransaction(tokenTransaction *tokenpb.TokenTransaction) bool {
 	}
 
 	// Check if expiry time is set (required for all final transactions)
-	if tokenTransaction.ExpiryTime == nil {
+	if tokenTransaction.GetExpiryTime() == nil {
 		return false
 	}
 
@@ -974,7 +974,7 @@ func IsFinalTokenTransaction(tokenTransaction *tokenpb.TokenTransaction) bool {
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
 		// Check if all outputs have SO-filled fields
-		for _, output := range tokenTransaction.TokenOutputs {
+		for _, output := range tokenTransaction.GetTokenOutputs() {
 			if output == nil {
 				return false
 			}
@@ -987,7 +987,7 @@ func IsFinalTokenTransaction(tokenTransaction *tokenpb.TokenTransaction) bool {
 			if output.WithdrawRelativeBlockLocktime == nil {
 				return false
 			}
-			if output.Id == nil || *output.Id == "" {
+			if output.Id == nil || output.GetId() == "" {
 				return false
 			}
 		}
@@ -1012,11 +1012,11 @@ func validateBaseCreateTransaction(
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("create signature cannot be nil"))
 	}
 
-	if len(tokenTransaction.TokenOutputs) > 0 {
+	if len(tokenTransaction.GetTokenOutputs()) > 0 {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("create transactions must not have any outputs"))
 	}
 
-	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.Network)
+	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.GetNetwork())
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
 	}
@@ -1048,7 +1048,7 @@ func validateBaseMintTransaction(
 	if tokenTransaction.TokenOutputs == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint outputs to create cannot be nil"))
 	}
-	if len(tokenTransaction.TokenOutputs) == 0 {
+	if len(tokenTransaction.GetTokenOutputs()) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint outputs to create cannot be empty"))
 	}
 
@@ -1058,7 +1058,7 @@ func validateBaseMintTransaction(
 
 	// Validate that all output token identifiers match the mint input
 	expectedTokenIdentifier := mintInput.GetTokenIdentifier()
-	for i, output := range tokenTransaction.TokenOutputs {
+	for i, output := range tokenTransaction.GetTokenOutputs() {
 		if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
 			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token identifier must match mint input token identifier: %x != %x", i, output.GetTokenIdentifier(), expectedTokenIdentifier))
 		}
@@ -1089,14 +1089,14 @@ func validateBaseTransferTransaction(
 	if tokenTransaction.TokenOutputs == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer outputs to create cannot be nil"))
 	}
-	if len(tokenTransaction.TokenOutputs) == 0 {
+	if len(tokenTransaction.GetTokenOutputs()) == 0 {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transfer outputs to create cannot be empty"))
 	}
 
 	if len(transferInput.GetOutputsToSpend()) == 0 {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transfer outputs to spend cannot be empty"))
 	}
-	if len(tokenTransaction.GetTransferInput().OutputsToSpend) > MaxInputOrOutputTokenTransactionOutputs {
+	if len(tokenTransaction.GetTransferInput().GetOutputsToSpend()) > MaxInputOrOutputTokenTransactionOutputs {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("too many outputs to spend, maximum is %d", MaxInputOrOutputTokenTransactionOutputs))
 	}
 
@@ -1121,7 +1121,7 @@ func validateBaseTransferTransaction(
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("number of signatures must match number of outputs to spend"))
 	}
 
-	for _, output := range tokenTransaction.TokenOutputs {
+	for _, output := range tokenTransaction.GetTokenOutputs() {
 		if output.GetTokenIdentifier() == nil {
 			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier cannot be nil"))
 		}
@@ -1152,11 +1152,11 @@ func ValidatePartialTokenTransaction(
 		return err
 	}
 
-	if tokenTransaction.ExpiryTime != nil {
+	if tokenTransaction.GetExpiryTime() != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time should not be set by the client"))
 	}
 
-	if tokenTransaction.Version < 3 && tokenTransaction.ValidityDurationSeconds != nil {
+	if tokenTransaction.GetVersion() < 3 && tokenTransaction.ValidityDurationSeconds != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("validity duration seconds should not be set by the client for v2 transactions"))
 	}
 
@@ -1173,11 +1173,11 @@ func ValidatePartialTokenTransaction(
 			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("creation entity public key will be added by the SO - do not set this field when starting transactions"))
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
-		for i, output := range tokenTransaction.TokenOutputs {
+		for i, output := range tokenTransaction.GetTokenOutputs() {
 			if output.GetRevocationCommitment() != nil {
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d revocation commitment will be added by the SO - do not set this field when starting transactions", i))
 			}
-			if tokenTransaction.Version < 3 {
+			if tokenTransaction.GetVersion() < 3 {
 				if output.WithdrawBondSats != nil {
 					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw bond sats will be added by the SO - do not set this field when starting transactions", i))
 				}
@@ -1185,14 +1185,14 @@ func ValidatePartialTokenTransaction(
 					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw relative block locktime will be added by the SO - do not set this field when starting transactions", i))
 				}
 			} else {
-				if output.WithdrawBondSats == nil || *output.WithdrawBondSats != expectedWithdrawBondSats {
+				if output.WithdrawBondSats == nil || output.GetWithdrawBondSats() != expectedWithdrawBondSats {
 					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw bond sats must equal configured value for network", i))
 				}
-				if output.WithdrawRelativeBlockLocktime == nil || *output.WithdrawRelativeBlockLocktime != expectedWithdrawRelativeBlockLocktime {
+				if output.WithdrawRelativeBlockLocktime == nil || output.GetWithdrawRelativeBlockLocktime() != expectedWithdrawRelativeBlockLocktime {
 					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw relative block locktime must equal configured value for network", i))
 				}
 			}
-			if output.Id != nil && *output.Id != "" {
+			if output.Id != nil && output.GetId() != "" {
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d ID will be added by the SO - do not set this field when starting transactions", i))
 			}
 		}
@@ -1203,11 +1203,11 @@ func ValidatePartialTokenTransaction(
 }
 
 func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction) error {
-	if len(tokenTransaction.TokenOutputs) == 0 {
+	if len(tokenTransaction.GetTokenOutputs()) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token outputs cannot be empty for mint and transfer transactions"))
 	}
 
-	for i, output := range tokenTransaction.TokenOutputs {
+	for i, output := range tokenTransaction.GetTokenOutputs() {
 		amount := new(big.Int).SetBytes(output.GetTokenAmount())
 		if amount.Cmp(zero) == 0 {
 			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("output %d token amount cannot be 0", i))
@@ -1220,7 +1220,7 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction) error 
 
 	// Validate each output has a valid token identifier and no token public key
 	// Multiple token types are allowed in a single transaction
-	for i, output := range tokenTransaction.TokenOutputs {
+	for i, output := range tokenTransaction.GetTokenOutputs() {
 		if output.GetTokenIdentifier() == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d missing token identifier", i))
 		}
@@ -1278,7 +1278,7 @@ func ValidateFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload, expectedS
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
 
-	switch payload.Version {
+	switch payload.GetVersion() {
 	case 1:
 		if payload.GetTokenPublicKey() != nil {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token public key must be nil for version 1"))
@@ -1287,7 +1287,7 @@ func ValidateFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload, expectedS
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier must be exactly 32 bytes, got %d", len(payload.GetTokenIdentifier())))
 		}
 	default:
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid freeze tokens payload version: %d", payload.Version))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid freeze tokens payload version: %d", payload.GetVersion()))
 	}
 	if payload.GetIssuerProvidedTimestamp() == 0 {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("issuer provided timestamp cannot be 0"))
@@ -1347,10 +1347,10 @@ func validateBaseTokenTransaction(
 	if tokenTransaction == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction cannot be nil"))
 	}
-	if len(tokenTransaction.TokenOutputs) > MaxInputOrOutputTokenTransactionOutputs {
+	if len(tokenTransaction.GetTokenOutputs()) > MaxInputOrOutputTokenTransactionOutputs {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("too many token outputs, maximum is %d", MaxInputOrOutputTokenTransactionOutputs))
 	}
-	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.Network)
+	network, err := btcnetwork.FromProtoNetwork(tokenTransaction.GetNetwork())
 	if err != nil {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert network: %w", err))
 	}
@@ -1359,8 +1359,8 @@ func validateBaseTokenTransaction(
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("network %s is not supported", network))
 	}
 
-	if !st.TokenTransactionVersion(tokenTransaction.Version).IsValid() {
-		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("invalid token transaction version: %d", tokenTransaction.Version))
+	if !st.TokenTransactionVersion(tokenTransaction.GetVersion()).IsValid() {
+		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("invalid token transaction version: %d", tokenTransaction.GetVersion()))
 	}
 
 	inputCount := 0
@@ -1554,14 +1554,14 @@ func ValidateFinalTokenTransaction(
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("creation entity public key does not match the reserved entity public key"))
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
-		if len(tokenTransaction.TokenOutputs) != len(config.ExpectedRevocationPublicKeys) {
+		if len(tokenTransaction.GetTokenOutputs()) != len(config.ExpectedRevocationPublicKeys) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 				"number of token outputs (%d) does not match number of expected revocation public keys (%d)",
-				len(tokenTransaction.TokenOutputs),
+				len(tokenTransaction.GetTokenOutputs()),
 				len(config.ExpectedRevocationPublicKeys),
 			))
 		}
-		for i, output := range tokenTransaction.TokenOutputs {
+		for i, output := range tokenTransaction.GetTokenOutputs() {
 			revocationCommitment, err := keys.ParsePublicKey(output.GetRevocationCommitment())
 			if err != nil {
 				return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse revocation commitment: %w", err))

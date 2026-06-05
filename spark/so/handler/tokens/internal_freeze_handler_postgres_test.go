@@ -19,8 +19,8 @@ func TestInternalFreezeTokens_Success(t *testing.T) {
 	externalReq := createFreezeTestRequestWithKey(t, cfg, tokenCreate, false, freezeTestIssuerKey)
 
 	internalReq := &tokeninternalpb.InternalFreezeTokensRequest{
-		FreezeTokensPayload: externalReq.FreezeTokensPayload,
-		IssuerSignature:     externalReq.IssuerSignature,
+		FreezeTokensPayload: externalReq.GetFreezeTokensPayload(),
+		IssuerSignature:     externalReq.GetIssuerSignature(),
 	}
 
 	resp, err := handler.InternalFreezeTokens(ctx, internalReq)
@@ -38,8 +38,8 @@ func TestInternalFreezeTokens_FailsWhenNotFreezable(t *testing.T) {
 	externalReq := createFreezeTestRequestWithKey(t, cfg, tokenCreate, false, freezeTestIssuerKey)
 
 	internalReq := &tokeninternalpb.InternalFreezeTokensRequest{
-		FreezeTokensPayload: externalReq.FreezeTokensPayload,
-		IssuerSignature:     externalReq.IssuerSignature,
+		FreezeTokensPayload: externalReq.GetFreezeTokensPayload(),
+		IssuerSignature:     externalReq.GetIssuerSignature(),
 	}
 
 	resp, err := handler.InternalFreezeTokens(ctx, internalReq)
@@ -58,8 +58,8 @@ func TestInternalFreezeTokens_ValidatesSignatureIndependently(t *testing.T) {
 	externalReq := createFreezeTestRequestWithKey(t, cfg, tokenCreate, false, wrongKey)
 
 	internalReq := &tokeninternalpb.InternalFreezeTokensRequest{
-		FreezeTokensPayload: externalReq.FreezeTokensPayload,
-		IssuerSignature:     externalReq.IssuerSignature,
+		FreezeTokensPayload: externalReq.GetFreezeTokensPayload(),
+		IssuerSignature:     externalReq.GetIssuerSignature(),
 	}
 
 	resp, err := handler.InternalFreezeTokens(ctx, internalReq)

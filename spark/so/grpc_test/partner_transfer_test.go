@@ -121,7 +121,7 @@ func testTransferWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signToke
 	)
 	require.NoError(t, err, "failed to initiate transfer")
 
-	transferID, err := uuid.Parse(senderTransfer.Id)
+	transferID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 
 	// Verify a transfer_partners record was created on the coordinator.
@@ -231,7 +231,7 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.Transfer, leaves, nil)
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.GetTransfer(), leaves, nil)
 	require.NoError(t, err)
 
 	// User provides preimage WITH partner JWT header.
@@ -239,9 +239,9 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 	ctx := metadata.AppendToOutgoingContext(t.Context(), "x-partner-jwt", token)
 	receiverTransfer, err := wallet.ProvidePreimage(ctx, userConfig, preimage[:])
 	require.NoError(t, err)
-	require.Equal(t, transfer.Id, receiverTransfer.Id)
+	require.Equal(t, transfer.GetId(), receiverTransfer.GetId())
 
-	transferID, err := uuid.Parse(receiverTransfer.Id)
+	transferID, err := uuid.Parse(receiverTransfer.GetId())
 	require.NoError(t, err)
 
 	// Verify a transfer_partners record was created on the coordinator.
@@ -337,9 +337,9 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		amountSats,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, response.Transfer)
+	require.NotNil(t, response.GetTransfer())
 
-	transferID, err := uuid.Parse(response.Transfer.Id)
+	transferID, err := uuid.Parse(response.GetTransfer().GetId())
 	require.NoError(t, err)
 
 	// Verify a transfer_partners record was created on the coordinator.
@@ -499,7 +499,7 @@ func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, response)
-	require.NotEmpty(t, response.Preimage)
+	require.NotEmpty(t, response.GetPreimage())
 
 	// Verify transfer_partner on coordinator.
 	coordClient := db.NewPostgresEntClientForIntegrationTest(t, userConfig.CoordinatorDatabaseURI)
@@ -687,7 +687,7 @@ func testCoopExitWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, useTrans
 	}
 	require.NoError(t, err, "failed to initiate coop exit")
 
-	transferID, err := uuid.Parse(senderTransfer.Id)
+	transferID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 
 	// Verify transfer_partner record on coordinator.

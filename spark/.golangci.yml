@@ -20,6 +20,7 @@ linters:
     - nolintlint
     - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL
     - predeclared # Finds code that shadows one of Go's predeclared identifiers
+    - protogetter # Reports direct reads from proto message fields when getters should be used
     - revive
     - staticcheck
     - testifylint # Checks that testify test assertions are correct

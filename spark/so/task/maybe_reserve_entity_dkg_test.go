@@ -57,8 +57,8 @@ func (s *mockSparkInternalServiceServer) ReserveEntityDkgKey(_ context.Context, 
 	if s.errToReturn != nil {
 		return nil, s.errToReturn
 	}
-	if s.expectedKeyshareID != "" && s.expectedKeyshareID != req.KeyshareId {
-		return nil, status.Errorf(codes.InvalidArgument, "expected keyshare %s, got %s", s.expectedKeyshareID, req.KeyshareId)
+	if s.expectedKeyshareID != "" && s.expectedKeyshareID != req.GetKeyshareId() {
+		return nil, status.Errorf(codes.InvalidArgument, "expected keyshare %s, got %s", s.expectedKeyshareID, req.GetKeyshareId())
 	}
 	return &emptypb.Empty{}, nil
 }

@@ -1016,9 +1016,9 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 	handler := NewDepositHandler(config)
 	response, err := handler.GenerateStaticDepositAddress(ctx, config, req)
 	require.NoError(t, err)
-	require.Equal(t, depositAddress1.Address, response.DepositAddress.Address)
-	require.Equal(t, depositAddress1.AddressSignatures, response.DepositAddress.DepositAddressProof.AddressSignatures)
-	require.Equal(t, depositAddress1.PossessionSignature, response.DepositAddress.DepositAddressProof.ProofOfPossessionSignature)
+	require.Equal(t, depositAddress1.Address, response.GetDepositAddress().GetAddress())
+	require.Equal(t, depositAddress1.AddressSignatures, response.GetDepositAddress().GetDepositAddressProof().GetAddressSignatures())
+	require.Equal(t, depositAddress1.PossessionSignature, response.GetDepositAddress().GetDepositAddressProof().GetProofOfPossessionSignature())
 
 }
 
@@ -1104,13 +1104,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 2)
+		require.Len(t, response.GetUtxos(), 2)
 
 		// Check that both UTXOs are returned with correct fields
 		txids := make(map[string]bool)
-		for _, utxo := range response.Utxos {
-			txids[hex.EncodeToString(utxo.Txid)] = true
-			assert.Equal(t, pb.Network_REGTEST, utxo.Network)
+		for _, utxo := range response.GetUtxos() {
+			txids[hex.EncodeToString(utxo.GetTxid())] = true
+			assert.Equal(t, pb.Network_REGTEST, utxo.GetNetwork())
 		}
 		assert.True(t, txids["746573745f747869645f31"]) // "test_txid_1" in hex
 		assert.True(t, txids["746573745f747869645f32"]) // "test_txid_2" in hex
@@ -1141,7 +1141,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Empty(t, response.Utxos)
+		require.Empty(t, response.GetUtxos())
 	})
 
 	t.Run("non-static deposit address with confirmation txid", func(t *testing.T) {
@@ -1169,8 +1169,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 1)
-		assert.Equal(t, confirmationTxid, hex.EncodeToString(response.Utxos[0].Txid))
+		require.Len(t, response.GetUtxos(), 1)
+		assert.Equal(t, confirmationTxid, hex.EncodeToString(response.GetUtxos()[0].GetTxid()))
 	})
 
 	t.Run("non-static deposit address with confirmation txid and UTXO record returns actual vout", func(t *testing.T) {
@@ -1218,9 +1218,9 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 1)
-		assert.Equal(t, confirmationTxid, hex.EncodeToString(response.Utxos[0].Txid))
-		assert.Equal(t, uint32(2), response.Utxos[0].Vout)
+		require.Len(t, response.GetUtxos(), 1)
+		assert.Equal(t, confirmationTxid, hex.EncodeToString(response.GetUtxos()[0].GetTxid()))
+		assert.Equal(t, uint32(2), response.GetUtxos()[0].GetVout())
 	})
 
 	t.Run("non-static deposit address without confirmation txid", func(t *testing.T) {
@@ -1245,7 +1245,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Empty(t, response.Utxos)
+		require.Empty(t, response.GetUtxos())
 	})
 
 	t.Run("deposit address not found", func(t *testing.T) {
@@ -1300,27 +1300,27 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 3)
+		require.Len(t, response.GetUtxos(), 3)
 
 		// Test offset
 		req.Offset = 2
 		req.Limit = 10
 		response, err = handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 3) // Should return remaining 3 UTXOs
+		require.Len(t, response.GetUtxos(), 3) // Should return remaining 3 UTXOs
 
 		// Test invalid limit (should be clamped to 100)
 		req.Offset = 0
 		req.Limit = 150
 		response, err = handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 5) // Should return all 5 UTXOs
+		require.Len(t, response.GetUtxos(), 5) // Should return all 5 UTXOs
 
 		// Test zero limit (should be clamped to 100)
 		req.Limit = 0
 		response, err = handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 5) // Should return all 5 UTXOs
+		require.Len(t, response.GetUtxos(), 5) // Should return all 5 UTXOs
 	})
 
 	t.Run("invalid confirmation txid", func(t *testing.T) {
@@ -1386,7 +1386,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Empty(t, response.Utxos) // Should not return UTXO with insufficient confirmations
+		require.Empty(t, response.GetUtxos()) // Should not return UTXO with insufficient confirmations
 	})
 
 	t.Run("static deposit address with exactly enough confirmations", func(t *testing.T) {
@@ -1428,7 +1428,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 1)
+		require.Len(t, response.GetUtxos(), 1)
 	})
 
 	t.Run("network validation error", func(t *testing.T) {
@@ -1550,13 +1550,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response1, err := handler.GetUtxosForAddress(ctx, req1)
 		require.NoError(t, err)
-		require.Len(t, response1.Utxos, 2)
+		require.Len(t, response1.GetUtxos(), 2)
 
 		// Verify only address1 UTXOs are returned
 		txids1 := make(map[string]bool)
-		for _, utxo := range response1.Utxos {
-			txids1[hex.EncodeToString(utxo.Txid)] = true
-			assert.Equal(t, pb.Network_REGTEST, utxo.Network)
+		for _, utxo := range response1.GetUtxos() {
+			txids1[hex.EncodeToString(utxo.GetTxid())] = true
+			assert.Equal(t, pb.Network_REGTEST, utxo.GetNetwork())
 		}
 		assert.True(t, txids1["61646472657373315f747869645f31"])  // "address1_txid_1" in hex
 		assert.True(t, txids1["61646472657373315f747869645f32"])  // "address1_txid_2" in hex
@@ -1573,13 +1573,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response2, err := handler.GetUtxosForAddress(ctx, req2)
 		require.NoError(t, err)
-		require.Len(t, response2.Utxos, 2)
+		require.Len(t, response2.GetUtxos(), 2)
 
 		// Verify only address2 UTXOs are returned
 		txids2 := make(map[string]bool)
-		for _, utxo := range response2.Utxos {
-			txids2[hex.EncodeToString(utxo.Txid)] = true
-			assert.Equal(t, pb.Network_REGTEST, utxo.Network)
+		for _, utxo := range response2.GetUtxos() {
+			txids2[hex.EncodeToString(utxo.GetTxid())] = true
+			assert.Equal(t, pb.Network_REGTEST, utxo.GetNetwork())
 		}
 		assert.True(t, txids2["61646472657373325f747869645f31"])  // "address2_txid_1" in hex
 		assert.True(t, txids2["61646472657373325f747869645f32"])  // "address2_txid_2" in hex
@@ -1671,13 +1671,13 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err := handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 2) // Should return utxo2 (cancelled swap) and utxo3 (no swap)
+		require.Len(t, response.GetUtxos(), 2) // Should return utxo2 (cancelled swap) and utxo3 (no swap)
 
 		// Verify the correct UTXOs are returned
 		txids := make(map[string]bool)
-		for _, utxo := range response.Utxos {
-			txids[hex.EncodeToString(utxo.Txid)] = true
-			assert.Equal(t, pb.Network_REGTEST, utxo.Network)
+		for _, utxo := range response.GetUtxos() {
+			txids[hex.EncodeToString(utxo.GetTxid())] = true
+			assert.Equal(t, pb.Network_REGTEST, utxo.GetNetwork())
 		}
 
 		// Should include utxo2 (cancelled swap) and utxo3 (no swap)
@@ -1698,7 +1698,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 
 		response, err = handler.GetUtxosForAddress(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 3)
+		require.Len(t, response.GetUtxos(), 3)
 	})
 
 	t.Run("exclude_claimed ignores non-cancelled swaps with null utxo edge", func(t *testing.T) {
@@ -1745,7 +1745,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			ExcludeClaimed: true,
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 1)
+		require.Len(t, response.GetUtxos(), 1)
 	})
 }
 
@@ -1937,27 +1937,27 @@ func TestGetUtxosForIdentity(t *testing.T) {
 
 		page1, err := env.handler.GetUtxosForIdentity(env.ctx, req)
 		require.NoError(t, err)
-		require.Len(t, page1.Utxos, 2)
-		require.True(t, page1.Page.HasNextPage)
-		require.False(t, page1.Page.HasPreviousPage)
+		require.Len(t, page1.GetUtxos(), 2)
+		require.True(t, page1.GetPage().GetHasNextPage())
+		require.False(t, page1.GetPage().GetHasPreviousPage())
 
-		req.Page.Cursor = page1.Page.NextCursor
+		req.Page.Cursor = page1.GetPage().GetNextCursor()
 		page2, err := env.handler.GetUtxosForIdentity(env.ctx, req)
 		require.NoError(t, err)
-		require.Len(t, page2.Utxos, 2)
-		require.False(t, page2.Page.HasNextPage)
-		require.True(t, page2.Page.HasPreviousPage)
+		require.Len(t, page2.GetUtxos(), 2)
+		require.False(t, page2.GetPage().GetHasNextPage())
+		require.True(t, page2.GetPage().GetHasPreviousPage())
 
-		allResults := append(page1.Utxos, page2.Utxos...)
+		allResults := append(page1.Utxos, page2.GetUtxos()...)
 		require.Len(t, allResults, 4)
 
 		gotTxids := make([]string, 0, len(allResults))
 		gotAddresses := make(map[string]bool, len(allResults))
 		for _, utxo := range allResults {
-			require.NotNil(t, utxo.Utxo)
-			require.True(t, utxo.IsConfirmed)
-			gotTxids = append(gotTxids, string(utxo.Utxo.Txid))
-			gotAddresses[utxo.Address] = true
+			require.NotNil(t, utxo.GetUtxo())
+			require.True(t, utxo.GetIsConfirmed())
+			gotTxids = append(gotTxids, string(utxo.GetUtxo().GetTxid()))
+			gotAddresses[utxo.GetAddress()] = true
 		}
 
 		require.Equal(t, []string{
@@ -1985,19 +1985,19 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 7)
+		require.Len(t, response.GetUtxos(), 7)
 
 		type gotUtxo struct {
 			txid        string
 			isConfirmed bool
 		}
 
-		got := make([]gotUtxo, 0, len(response.Utxos))
-		for _, utxo := range response.Utxos {
-			require.NotNil(t, utxo.Utxo)
+		got := make([]gotUtxo, 0, len(response.GetUtxos()))
+		for _, utxo := range response.GetUtxos() {
+			require.NotNil(t, utxo.GetUtxo())
 			got = append(got, gotUtxo{
-				txid:        string(utxo.Utxo.Txid),
-				isConfirmed: utxo.IsConfirmed,
+				txid:        string(utxo.GetUtxo().GetTxid()),
+				isConfirmed: utxo.GetIsConfirmed(),
 			})
 		}
 
@@ -2030,25 +2030,25 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			pageNumber++
 			response, err := env.handler.GetUtxosForIdentity(env.ctx, req)
 			require.NoError(t, err)
-			require.NotNil(t, response.Page)
+			require.NotNil(t, response.GetPage())
 			if pageNumber == 1 {
-				require.False(t, response.Page.HasPreviousPage)
+				require.False(t, response.GetPage().GetHasPreviousPage())
 			} else {
-				require.True(t, response.Page.HasPreviousPage)
+				require.True(t, response.GetPage().GetHasPreviousPage())
 			}
 
-			for _, utxo := range response.Utxos {
-				require.NotNil(t, utxo.Utxo)
-				txid := string(utxo.Utxo.Txid)
+			for _, utxo := range response.GetUtxos() {
+				require.NotNil(t, utxo.GetUtxo())
+				txid := string(utxo.GetUtxo().GetTxid())
 				require.False(t, seen[txid], "duplicate txid %s returned across pages", txid)
 				seen[txid] = true
 				got = append(got, txid)
 			}
 
-			if !response.Page.HasNextPage {
+			if !response.GetPage().GetHasNextPage() {
 				break
 			}
-			req.Page.Cursor = response.Page.NextCursor
+			req.Page.Cursor = response.GetPage().GetNextCursor()
 		}
 
 		require.Equal(t, []string{
@@ -2074,7 +2074,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 5)
+		require.Len(t, response.GetUtxos(), 5)
 
 		require.Equal(t, []struct {
 			txid        string
@@ -2089,11 +2089,11 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			txid        string
 			isConfirmed bool
 		}{
-			{txid: string(response.Utxos[0].Utxo.Txid), isConfirmed: response.Utxos[0].IsConfirmed},
-			{txid: string(response.Utxos[1].Utxo.Txid), isConfirmed: response.Utxos[1].IsConfirmed},
-			{txid: string(response.Utxos[2].Utxo.Txid), isConfirmed: response.Utxos[2].IsConfirmed},
-			{txid: string(response.Utxos[3].Utxo.Txid), isConfirmed: response.Utxos[3].IsConfirmed},
-			{txid: string(response.Utxos[4].Utxo.Txid), isConfirmed: response.Utxos[4].IsConfirmed},
+			{txid: string(response.GetUtxos()[0].GetUtxo().GetTxid()), isConfirmed: response.GetUtxos()[0].GetIsConfirmed()},
+			{txid: string(response.GetUtxos()[1].GetUtxo().GetTxid()), isConfirmed: response.GetUtxos()[1].GetIsConfirmed()},
+			{txid: string(response.GetUtxos()[2].GetUtxo().GetTxid()), isConfirmed: response.GetUtxos()[2].GetIsConfirmed()},
+			{txid: string(response.GetUtxos()[3].GetUtxo().GetTxid()), isConfirmed: response.GetUtxos()[3].GetIsConfirmed()},
+			{txid: string(response.GetUtxos()[4].GetUtxo().GetTxid()), isConfirmed: response.GetUtxos()[4].GetIsConfirmed()},
 		})
 	})
 
@@ -2125,7 +2125,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 5)
+		require.Len(t, response.GetUtxos(), 5)
 	})
 
 	t.Run("privacy enabled returns empty results without access", func(t *testing.T) {
@@ -2140,10 +2140,10 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Empty(t, response.Utxos)
-		require.NotNil(t, response.Page)
-		require.False(t, response.Page.HasNextPage)
-		require.False(t, response.Page.HasPreviousPage)
+		require.Empty(t, response.GetUtxos())
+		require.NotNil(t, response.GetPage())
+		require.False(t, response.GetPage().GetHasNextPage())
+		require.False(t, response.GetPage().GetHasPreviousPage())
 	})
 
 	t.Run("privacy disabled allows authenticated access", func(t *testing.T) {
@@ -2158,17 +2158,17 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 4)
+		require.Len(t, response.GetUtxos(), 4)
 		require.Equal(t, []string{
 			string(env.thresholdConfirmedUtxo.Txid),
 			string(env.cancelledSwapUtxo.Txid),
 			string(env.claimedConfirmedUtxo.Txid),
 			string(env.confirmedUtxo.Txid),
 		}, []string{
-			string(response.Utxos[0].Utxo.Txid),
-			string(response.Utxos[1].Utxo.Txid),
-			string(response.Utxos[2].Utxo.Txid),
-			string(response.Utxos[3].Utxo.Txid),
+			string(response.GetUtxos()[0].GetUtxo().GetTxid()),
+			string(response.GetUtxos()[1].GetUtxo().GetTxid()),
+			string(response.GetUtxos()[2].GetUtxo().GetTxid()),
+			string(response.GetUtxos()[3].GetUtxo().GetTxid()),
 		})
 	})
 
@@ -2185,7 +2185,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 4)
+		require.Len(t, response.GetUtxos(), 4)
 	})
 
 	t.Run("privacy enabled allows the wallet master", func(t *testing.T) {
@@ -2201,7 +2201,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, response.Utxos, 4)
+		require.Len(t, response.GetUtxos(), 4)
 	})
 
 	t.Run("privacy enabled returns empty results for a different identity", func(t *testing.T) {
@@ -2217,7 +2217,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Empty(t, response.Utxos)
+		require.Empty(t, response.GetUtxos())
 	})
 
 	t.Run("invalid requests are rejected", func(t *testing.T) {

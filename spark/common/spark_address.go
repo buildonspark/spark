@@ -32,16 +32,16 @@ func EncodeSparkAddressWithSignature(identityPublicKey keys.Public, network btcn
 		return "", fmt.Errorf("identity public key is required")
 	}
 	if sparkInvoiceFields != nil {
-		if sparkInvoiceFields.Version != 1 {
+		if sparkInvoiceFields.GetVersion() != 1 {
 			return "", fmt.Errorf("version must be 1")
 		}
 		if sparkInvoiceFields.Id == nil {
 			return "", fmt.Errorf("id is required")
 		}
-		if _, err := uuid.FromBytes(sparkInvoiceFields.Id); err != nil {
+		if _, err := uuid.FromBytes(sparkInvoiceFields.GetId()); err != nil {
 			return "", fmt.Errorf("id is not a valid uuid: %w", err)
 		}
-		paymentType := sparkInvoiceFields.PaymentType
+		paymentType := sparkInvoiceFields.GetPaymentType()
 		switch pt := paymentType.(type) {
 		case *pb.SparkInvoiceFields_TokensPayment:
 			tokensPayment := pt.TokensPayment
@@ -154,7 +154,7 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark address: %w", err))
 	}
-	if decoded.SparkAddress == nil || decoded.SparkAddress.SparkInvoiceFields == nil {
+	if decoded.SparkAddress == nil || decoded.SparkAddress.GetSparkInvoiceFields() == nil {
 		return nil, fmt.Errorf("spark address or invoice fields are nil")
 	}
 
@@ -163,22 +163,22 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 	}
 
 	// version is required
-	if decoded.SparkAddress.SparkInvoiceFields.Version != 1 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice version is not supported, expected: 1, got: %d", decoded.SparkAddress.SparkInvoiceFields.Version))
+	if decoded.SparkAddress.GetSparkInvoiceFields().GetVersion() != 1 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice version is not supported, expected: 1, got: %d", decoded.SparkAddress.GetSparkInvoiceFields().GetVersion()))
 	}
 	// receiver public key is required
-	receiverPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
+	receiverPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key: %w", err))
 	}
 	// id is required
-	decodedUUID, err := uuid.FromBytes(decoded.SparkAddress.SparkInvoiceFields.Id)
+	decodedUUID, err := uuid.FromBytes(decoded.SparkAddress.GetSparkInvoiceFields().GetId())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse invoice id: %w", err))
 	}
 
 	var payment ParsedPayment
-	switch pt := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(type) {
+	switch pt := decoded.SparkAddress.GetSparkInvoiceFields().GetPaymentType().(type) {
 	case *pb.SparkInvoiceFields_TokensPayment:
 		if pt.TokensPayment == nil {
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("tokens payment is nil"))
@@ -200,33 +200,33 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 	}
 	// sender public key is optional
 	var senderPublicKey keys.Public
-	if len(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey) > 0 {
-		senderPublicKey, err = keys.ParsePublicKey(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey)
+	if len(decoded.SparkAddress.GetSparkInvoiceFields().GetSenderPublicKey()) > 0 {
+		senderPublicKey, err = keys.ParsePublicKey(decoded.SparkAddress.GetSparkInvoiceFields().GetSenderPublicKey())
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse sender public key: %w", err))
 		}
 	}
 	// signature is optional. validate if present
-	if len(decoded.SparkAddress.Signature) > 0 {
+	if len(decoded.SparkAddress.GetSignature()) > 0 {
 		err = VerifySparkAddressSignature(decoded.SparkAddress, decoded.Network)
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid spark invoice signature: %w", err))
 		}
 	}
 	memo := ""
-	if m := decoded.SparkAddress.SparkInvoiceFields.Memo; m != nil {
+	if m := decoded.SparkAddress.GetSparkInvoiceFields().Memo; m != nil {
 		memo = *m
 	}
 
 	return &ParsedSparkInvoice{
-		Version:           decoded.SparkAddress.SparkInvoiceFields.Version,
+		Version:           decoded.SparkAddress.GetSparkInvoiceFields().GetVersion(),
 		Id:                decodedUUID,
 		ReceiverPublicKey: receiverPublicKey,
 		Payment:           payment,
 		Memo:              memo,
 		SenderPublicKey:   senderPublicKey,
-		ExpiryTime:        decoded.SparkAddress.SparkInvoiceFields.ExpiryTime,
-		Signature:         decoded.SparkAddress.Signature,
+		ExpiryTime:        decoded.SparkAddress.GetSparkInvoiceFields().GetExpiryTime(),
+		Signature:         decoded.SparkAddress.GetSignature(),
 		Network:           decoded.Network,
 	}, nil
 }
@@ -388,7 +388,7 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network btcnetwork.Network
 	// 4) receiver_public_key
 	all.Write(chainhash.HashB(receiverPublicKey.Serialize()))
 
-	switch pt := f.PaymentType.(type) {
+	switch pt := f.GetPaymentType().(type) {
 	case *pb.SparkInvoiceFields_TokensPayment:
 		all.Write(chainhash.HashB([]byte{1})) // tokens discriminator
 
@@ -448,7 +448,7 @@ func VerifySparkAddressSignature(addr *pb.SparkAddress, network btcnetwork.Netwo
 	if addr == nil {
 		return fmt.Errorf("spark address cannot be nil")
 	}
-	if addr.SparkInvoiceFields == nil {
+	if addr.GetSparkInvoiceFields() == nil {
 		return fmt.Errorf("spark invoice fields cannot be nil")
 	}
 	sig := addr.GetSignature()
@@ -459,7 +459,7 @@ func VerifySparkAddressSignature(addr *pb.SparkAddress, network btcnetwork.Netwo
 	if err != nil {
 		return fmt.Errorf("failed to parse identity public key: %w", err)
 	}
-	hash, err := HashSparkInvoiceFields(addr.SparkInvoiceFields, network, pubKey)
+	hash, err := HashSparkInvoiceFields(addr.GetSparkInvoiceFields(), network, pubKey)
 	if err != nil {
 		return fmt.Errorf("failed to hash spark invoice fields: %w", err)
 	}
@@ -471,7 +471,7 @@ func VerifySparkAddressSignature(addr *pb.SparkAddress, network btcnetwork.Netwo
 	if !pubKey.Verify(schnorrSig, hash) {
 		return fmt.Errorf("invalid spark address signature with hash: %x, sparkinvoicefields: %v, network: %s, receiver public key: %s, sig: %x",
 			hash,
-			addr.SparkInvoiceFields,
+			addr.GetSparkInvoiceFields(),
 			network,
 			pubKey,
 			sig,

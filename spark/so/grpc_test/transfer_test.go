@@ -62,18 +62,18 @@ func TestTransfer(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.GetType())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -85,7 +85,7 @@ func TestTransfer(t *testing.T) {
 		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
-	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+	require.Equal(t, res[0].GetId(), claimingNode.Leaf.GetId())
 }
 
 func TestClaimTransfer(t *testing.T) {
@@ -119,17 +119,17 @@ func TestClaimTransfer(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -137,9 +137,9 @@ func TestClaimTransfer(t *testing.T) {
 
 	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransferV2")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
-	require.Len(t, claimedTransfer.Leaves, 1)
-	require.Equal(t, claimingNode.Leaf.Id, claimedTransfer.Leaves[0].Leaf.Id)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.GetStatus())
+	require.Len(t, claimedTransfer.GetLeaves(), 1)
+	require.Equal(t, claimingNode.Leaf.GetId(), claimedTransfer.GetLeaves()[0].GetLeaf().GetId())
 }
 
 func TestV2MimoClaimTransferSingleReceiver(t *testing.T) {
@@ -173,17 +173,17 @@ func TestV2MimoClaimTransferSingleReceiver(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -191,12 +191,12 @@ func TestV2MimoClaimTransferSingleReceiver(t *testing.T) {
 
 	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransferV2")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
-	require.Len(t, claimedTransfer.Leaves, 1)
-	require.Equal(t, claimingNode.Leaf.Id, claimedTransfer.Leaves[0].Leaf.Id)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.GetStatus())
+	require.Len(t, claimedTransfer.GetLeaves(), 1)
+	require.Equal(t, claimingNode.Leaf.GetId(), claimedTransfer.GetLeaves()[0].GetLeaf().GetId())
 
 	// Verify the TransferReceiver status is Completed in the coordinator DB.
-	transferUUID, err := uuid.Parse(claimedTransfer.Id)
+	transferUUID, err := uuid.Parse(claimedTransfer.GetId())
 	require.NoError(t, err)
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, receiverConfig.CoordinatorDatabaseURI)
 	defer entClient.Close()
@@ -225,7 +225,7 @@ func TestV3ClaimTransferSingleReceiver(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 	leafReceiverMap := map[string]keys.Public{
-		rootNode.Id: receiverPrivKey.Public(),
+		rootNode.GetId(): receiverPrivKey.Public(),
 	}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
@@ -233,7 +233,7 @@ func TestV3ClaimTransferSingleReceiver(t *testing.T) {
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err, "failed to send V3 transfer")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
@@ -242,29 +242,29 @@ func TestV3ClaimTransferSingleReceiver(t *testing.T) {
 
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err)
-	require.Len(t, pendingTransfer.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pendingTransfer.Transfers[0].Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pendingTransfer.GetTransfers()[0].GetId())
 
-	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pendingTransfer.Transfers[0])
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pendingTransfer.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pendingTransfer.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pendingTransfer.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}}
-	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, pendingTransfer.Transfers[0], receiverConfig, claimLeaves)
+	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, pendingTransfer.GetTransfers()[0], receiverConfig, claimLeaves)
 	require.NoError(t, err, "failed to ClaimTransferV2")
 
 	// With a single receiver, the transfer should be COMPLETED immediately.
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.Status)
-	require.Len(t, claimedTransfer.Leaves, 1)
-	require.Equal(t, rootNode.Id, claimedTransfer.Leaves[0].Leaf.Id)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.GetStatus())
+	require.Len(t, claimedTransfer.GetLeaves(), 1)
+	require.Equal(t, rootNode.GetId(), claimedTransfer.GetLeaves()[0].GetLeaf().GetId())
 
 	// Verify the TransferReceiver status in the coordinator DB.
-	transferUUID, err := uuid.Parse(claimedTransfer.Id)
+	transferUUID, err := uuid.Parse(claimedTransfer.GetId())
 	require.NoError(t, err)
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, receiverConfig.CoordinatorDatabaseURI)
 	defer entClient.Close()
@@ -300,8 +300,8 @@ func TestV3TransferMultiReceiver(t *testing.T) {
 		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
 	}
 	leafReceiverMap := map[string]keys.Public{
-		rootNode1.Id: receiver1PrivKey.Public(),
-		rootNode2.Id: receiver2PrivKey.Public(),
+		rootNode1.GetId(): receiver1PrivKey.Public(),
+		rootNode2.GetId(): receiver2PrivKey.Public(),
 	}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
@@ -311,12 +311,12 @@ func TestV3TransferMultiReceiver(t *testing.T) {
 	require.NoError(t, err, "failed to send V3 transfer")
 
 	// After StartTransferV3 the transfer must be SENDER_KEY_TWEAKED.
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus(),
 		"transfer should be SENDER_KEY_TWEAKED immediately after StartTransferV3")
 
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
 	defer entClient.Close()
-	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 
 	// --- Receiver 1 claims ---
@@ -327,25 +327,25 @@ func TestV3TransferMultiReceiver(t *testing.T) {
 
 	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
 	require.NoError(t, err)
-	require.Len(t, pending1.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending1.Transfers[0].Id)
+	require.Len(t, pending1.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending1.GetTransfers()[0].GetId())
 
-	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.Transfers[0])
+	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode1.Id: newLeafPrivKey1}, leafPrivKeyMap1)
+	require.Equal(t, map[string]keys.Private{rootNode1.GetId(): newLeafPrivKey1}, leafPrivKeyMap1)
 
-	require.Len(t, pending1.Transfers[0].Leaves, 1)
+	require.Len(t, pending1.GetTransfers()[0].GetLeaves(), 1)
 	finalLeafPrivKey1 := keys.GeneratePrivateKey()
 	claimLeaves1 := []wallet.LeafKeyTweak{{
-		Leaf:              pending1.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending1.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey1,
 		NewSigningPrivKey: finalLeafPrivKey1,
 	}}
-	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
+	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.GetTransfers()[0], receiver1Config, claimLeaves1)
 	require.NoError(t, err)
 
 	// After receiver 1 (of 2) claims, transfer must NOT be COMPLETED yet.
-	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
+	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.GetStatus(),
 		"transfer must not be COMPLETED until all receivers claim")
 
 	// Verify per-receiver DB state: receiver 1 completed, receiver 2 not yet.
@@ -375,25 +375,25 @@ func TestV3TransferMultiReceiver(t *testing.T) {
 
 	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
 	require.NoError(t, err)
-	require.Len(t, pending2.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending2.Transfers[0].Id)
+	require.Len(t, pending2.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending2.GetTransfers()[0].GetId())
 
-	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode2.Id: newLeafPrivKey2}, leafPrivKeyMap2)
+	require.Equal(t, map[string]keys.Private{rootNode2.GetId(): newLeafPrivKey2}, leafPrivKeyMap2)
 
-	require.Len(t, pending2.Transfers[0].Leaves, 1)
+	require.Len(t, pending2.GetTransfers()[0].GetLeaves(), 1)
 	finalLeafPrivKey2 := keys.GeneratePrivateKey()
 	claimLeaves2 := []wallet.LeafKeyTweak{{
-		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending2.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey2,
 		NewSigningPrivKey: finalLeafPrivKey2,
 	}}
-	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.GetTransfers()[0], receiver2Config, claimLeaves2)
 	require.NoError(t, err)
 
 	// After both receivers claim the transfer is COMPLETED.
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.GetStatus(),
 		"transfer should be COMPLETED after all receivers claim")
 
 	// Verify receiver 2's DB record is also COMPLETED after their claim.
@@ -438,8 +438,8 @@ func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
 		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
 	}
 	leafReceiverMap := map[string]keys.Public{
-		rootNode1.Id: receiver1PrivKey.Public(),
-		rootNode2.Id: receiver2PrivKey.Public(),
+		rootNode1.GetId(): receiver1PrivKey.Public(),
+		rootNode2.GetId(): receiver2PrivKey.Public(),
 	}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
@@ -447,11 +447,11 @@ func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err, "failed to send V3 transfer")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
 	defer entClient.Close()
-	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 
 	// --- Receiver 2 claims FIRST ---
@@ -462,27 +462,27 @@ func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
 
 	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
 	require.NoError(t, err)
-	require.Len(t, pending2.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending2.Transfers[0].Id)
+	require.Len(t, pending2.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending2.GetTransfers()[0].GetId())
 
-	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode2.Id: newLeafPrivKey2}, leafPrivKeyMap2)
+	require.Equal(t, map[string]keys.Private{rootNode2.GetId(): newLeafPrivKey2}, leafPrivKeyMap2)
 
-	require.Len(t, pending2.Transfers[0].Leaves, 1)
+	require.Len(t, pending2.GetTransfers()[0].GetLeaves(), 1)
 	claimLeaves2 := []wallet.LeafKeyTweak{{
-		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending2.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey2,
 		NewSigningPrivKey: keys.GeneratePrivateKey(),
 	}}
-	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.GetTransfers()[0], receiver2Config, claimLeaves2)
 	require.NoError(t, err)
 
-	require.Len(t, claimed2.Leaves, 1, "claim response should only contain receiver 2's leaf")
-	require.Equal(t, rootNode2.Id, claimed2.Leaves[0].Leaf.Id,
+	require.Len(t, claimed2.GetLeaves(), 1, "claim response should only contain receiver 2's leaf")
+	require.Equal(t, rootNode2.GetId(), claimed2.GetLeaves()[0].GetLeaf().GetId(),
 		"claim response leaf should be receiver 2's leaf")
 
-	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
+	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.GetStatus(),
 		"transfer must not be COMPLETED until all receivers claim")
 
 	// Verify DB: receiver 2 completed, receiver 1 not yet
@@ -512,27 +512,27 @@ func TestV3TransferMultiReceiverReverseClaimOrder(t *testing.T) {
 
 	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
 	require.NoError(t, err)
-	require.Len(t, pending1.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending1.Transfers[0].Id)
+	require.Len(t, pending1.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending1.GetTransfers()[0].GetId())
 
-	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.Transfers[0])
+	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode1.Id: newLeafPrivKey1}, leafPrivKeyMap1)
+	require.Equal(t, map[string]keys.Private{rootNode1.GetId(): newLeafPrivKey1}, leafPrivKeyMap1)
 
-	require.Len(t, pending1.Transfers[0].Leaves, 1)
+	require.Len(t, pending1.GetTransfers()[0].GetLeaves(), 1)
 	claimLeaves1 := []wallet.LeafKeyTweak{{
-		Leaf:              pending1.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending1.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey1,
 		NewSigningPrivKey: keys.GeneratePrivateKey(),
 	}}
-	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
+	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.GetTransfers()[0], receiver1Config, claimLeaves1)
 	require.NoError(t, err)
 
-	require.Len(t, claimed1.Leaves, 1, "claim response should only contain receiver 1's leaf")
-	require.Equal(t, rootNode1.Id, claimed1.Leaves[0].Leaf.Id,
+	require.Len(t, claimed1.GetLeaves(), 1, "claim response should only contain receiver 1's leaf")
+	require.Equal(t, rootNode1.GetId(), claimed1.GetLeaves()[0].GetLeaf().GetId(),
 		"claim response leaf should be receiver 1's leaf")
 
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.GetStatus(),
 		"transfer should be COMPLETED after all receivers claim")
 
 	// Verify receiver 1's DB record is COMPLETED after claiming second.
@@ -586,9 +586,9 @@ func TestV3TransferMultiLeafPerReceiver(t *testing.T) {
 	}
 	// Receiver 1 gets leaves 1+2, receiver 2 gets leaf 3
 	leafReceiverMap := map[string]keys.Public{
-		rootNode1.Id: receiver1PrivKey.Public(),
-		rootNode2.Id: receiver1PrivKey.Public(),
-		rootNode3.Id: receiver2PrivKey.Public(),
+		rootNode1.GetId(): receiver1PrivKey.Public(),
+		rootNode2.GetId(): receiver1PrivKey.Public(),
+		rootNode3.GetId(): receiver2PrivKey.Public(),
 	}
 
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
@@ -597,12 +597,12 @@ func TestV3TransferMultiLeafPerReceiver(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to send V3 transfer")
 
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus(),
 		"transfer should be SENDER_KEY_TWEAKED immediately after StartTransferV3")
 
 	entClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
 	defer entClient.Close()
-	transferUUID, err := uuid.Parse(senderTransfer.Id)
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err)
 
 	// --- Receiver 1 claims (2 leaves) ---
@@ -613,29 +613,29 @@ func TestV3TransferMultiLeafPerReceiver(t *testing.T) {
 
 	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
 	require.NoError(t, err)
-	require.Len(t, pending1.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending1.Transfers[0].Id)
-	require.Len(t, pending1.Transfers[0].Leaves, 2)
+	require.Len(t, pending1.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending1.GetTransfers()[0].GetId())
+	require.Len(t, pending1.GetTransfers()[0].GetLeaves(), 2)
 
-	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.Transfers[0])
+	leafPrivKeyMap1, err := wallet.VerifyPendingTransfer(t.Context(), receiver1Config, pending1.GetTransfers()[0])
 	require.NoError(t, err)
 	require.Len(t, leafPrivKeyMap1, 2)
 
 	claimLeaves1 := make([]wallet.LeafKeyTweak, 0, 2)
-	for _, transferLeaf := range pending1.Transfers[0].Leaves {
-		signingKey, ok := leafPrivKeyMap1[transferLeaf.Leaf.Id]
-		require.True(t, ok, "missing private key for leaf %s", transferLeaf.Leaf.Id)
+	for _, transferLeaf := range pending1.GetTransfers()[0].GetLeaves() {
+		signingKey, ok := leafPrivKeyMap1[transferLeaf.GetLeaf().GetId()]
+		require.True(t, ok, "missing private key for leaf %s", transferLeaf.GetLeaf().GetId())
 		claimLeaves1 = append(claimLeaves1, wallet.LeafKeyTweak{
-			Leaf:              transferLeaf.Leaf,
+			Leaf:              transferLeaf.GetLeaf(),
 			SigningPrivKey:    signingKey,
 			NewSigningPrivKey: keys.GeneratePrivateKey(),
 		})
 	}
-	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.Transfers[0], receiver1Config, claimLeaves1)
+	claimed1, err := wallet.ClaimTransferV2(receiver1Ctx, pending1.GetTransfers()[0], receiver1Config, claimLeaves1)
 	require.NoError(t, err)
 
 	// After receiver 1 (of 2) claims, transfer must NOT be COMPLETED yet.
-	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.Status,
+	require.NotEqual(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed1.GetStatus(),
 		"transfer must not be COMPLETED until all receivers claim")
 
 	// Verify per-receiver DB state after first claim.
@@ -665,25 +665,25 @@ func TestV3TransferMultiLeafPerReceiver(t *testing.T) {
 
 	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
 	require.NoError(t, err)
-	require.Len(t, pending2.Transfers, 1)
-	require.Equal(t, senderTransfer.Id, pending2.Transfers[0].Id)
-	require.Len(t, pending2.Transfers[0].Leaves, 1)
+	require.Len(t, pending2.GetTransfers(), 1)
+	require.Equal(t, senderTransfer.GetId(), pending2.GetTransfers()[0].GetId())
+	require.Len(t, pending2.GetTransfers()[0].GetLeaves(), 1)
 
-	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode3.Id: newLeafPrivKey3}, leafPrivKeyMap2)
+	require.Equal(t, map[string]keys.Private{rootNode3.GetId(): newLeafPrivKey3}, leafPrivKeyMap2)
 
 	finalLeafPrivKey2 := keys.GeneratePrivateKey()
 	claimLeaves2 := []wallet.LeafKeyTweak{{
-		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending2.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey3,
 		NewSigningPrivKey: finalLeafPrivKey2,
 	}}
-	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	claimed2, err := wallet.ClaimTransferV2(receiver2Ctx, pending2.GetTransfers()[0], receiver2Config, claimLeaves2)
 	require.NoError(t, err)
 
 	// After both receivers claim the transfer is COMPLETED.
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.Status,
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed2.GetStatus(),
 		"transfer should be COMPLETED after all receivers claim")
 
 	// Verify receiver 2's DB record is COMPLETED after claiming second.
@@ -740,7 +740,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
 
 	incorrectNetworkReceiverConfig := receiverConfig
 	incorrectNetworkReceiverConfig.Network = btcnetwork.Mainnet
@@ -749,7 +749,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	incorrectNetworkReceiverCtx := wallet.ContextWithToken(t.Context(), incorrectNetworkReceiverToken)
 	pendingTransfer, err = wallet.QueryPendingTransfers(incorrectNetworkReceiverCtx, incorrectNetworkReceiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Empty(t, pendingTransfer.Transfers)
+	require.Empty(t, pendingTransfer.GetTransfers())
 }
 
 func TestTransferInterrupt(t *testing.T) {
@@ -790,18 +790,18 @@ func TestTransferInterrupt(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.GetType())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -831,11 +831,11 @@ func TestTransferInterrupt(t *testing.T) {
 	for attempts < 5 {
 		pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 		require.NoError(t, err, "failed to query pending transfers")
-		require.Len(t, pendingTransfer.Transfers, 1)
+		require.Len(t, pendingTransfer.GetTransfers(), 1)
 
-		receiverTransfer = pendingTransfer.Transfers[0]
-		require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-		require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
+		receiverTransfer = pendingTransfer.GetTransfers()[0]
+		require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+		require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.GetType())
 
 		res, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 		if err != nil {
@@ -850,7 +850,7 @@ func TestTransferInterrupt(t *testing.T) {
 	}
 
 	require.NotEmpty(t, claimedNodes, "failed to claim transfer after %d attempts", attempts)
-	require.Equal(t, claimingNode.Leaf.Id, claimedNodes[0].Id)
+	require.Equal(t, claimingNode.Leaf.GetId(), claimedNodes[0].GetId())
 }
 
 func TestTransferRecoverFinalizeSignatures(t *testing.T) {
@@ -885,18 +885,18 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.GetType())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -911,9 +911,9 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 
 	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer = pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer = pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	res, err := wallet.ClaimTransfer(
 		receiverCtx,
@@ -922,7 +922,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
-	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+	require.Equal(t, res[0].GetId(), claimingNode.Leaf.GetId())
 }
 
 func TestTransferZeroLeaves(t *testing.T) {
@@ -971,17 +971,17 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -997,13 +997,13 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 
 	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer = pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer = pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	_, err = wallet.ClaimTransferSignRefunds(
 		receiverCtx,
@@ -1017,7 +1017,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 
 	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
 
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
@@ -1061,17 +1061,17 @@ func TestDoubleClaimTransfer(t *testing.T) {
 
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -1092,9 +1092,9 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	if errCount.Load() == 5 {
 		pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 		require.NoError(t, err, "failed to query pending transfers")
-		require.Len(t, pendingTransfer.Transfers, 1)
-		receiverTransfer = pendingTransfer.Transfers[0]
-		require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+		require.Len(t, pendingTransfer.GetTransfers(), 1)
+		receiverTransfer = pendingTransfer.GetTransfers()[0]
+		require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 		res, err := wallet.ClaimTransfer(
 			receiverCtx,
@@ -1106,9 +1106,9 @@ func TestDoubleClaimTransfer(t *testing.T) {
 			// if the claim failed, the transfer should revert back to sender key tweaked status
 			pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 			require.NoError(t, err, "failed to query pending transfers")
-			require.Len(t, pendingTransfer.Transfers, 1)
-			receiverTransfer = pendingTransfer.Transfers[0]
-			require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+			require.Len(t, pendingTransfer.GetTransfers(), 1)
+			receiverTransfer = pendingTransfer.GetTransfers()[0]
+			require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 			res, err = wallet.ClaimTransfer(
 				receiverCtx,
@@ -1119,7 +1119,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 			require.NoError(t, err, "failed to ClaimTransfer")
 		}
 
-		require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+		require.Equal(t, res[0].GetId(), claimingNode.Leaf.GetId())
 	}
 }
 
@@ -1163,13 +1163,13 @@ func TestConcurrentClaimTransferV2DifferentKeys(t *testing.T) {
 
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Len(t, pendingTransfer.GetTransfers(), 1)
+	receiverTransfer := pendingTransfer.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	// --- Fire concurrent ClaimTransferV2 with DIFFERENT key tweaks ---
 	const concurrency = 5
@@ -1186,7 +1186,7 @@ func TestConcurrentClaimTransferV2DifferentKeys(t *testing.T) {
 			// Each goroutine uses a DIFFERENT NewSigningPrivKey, producing different key tweaks.
 			finalKey := keys.GeneratePrivateKey()
 			claimingNode := wallet.LeafKeyTweak{
-				Leaf:              receiverTransfer.Leaves[0].Leaf,
+				Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 				SigningPrivKey:    newLeafPrivKey,
 				NewSigningPrivKey: finalKey,
 			}
@@ -1211,12 +1211,12 @@ func TestConcurrentClaimTransferV2DifferentKeys(t *testing.T) {
 		t.Log("All concurrent claims failed due to contention, retrying...")
 		pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 		require.NoError(t, err, "failed to re-query pending transfers")
-		require.Len(t, pendingTransfer.Transfers, 1)
-		receiverTransfer = pendingTransfer.Transfers[0]
+		require.Len(t, pendingTransfer.GetTransfers(), 1)
+		receiverTransfer = pendingTransfer.GetTransfers()[0]
 
 		finalKey := keys.GeneratePrivateKey()
 		claimingNode := wallet.LeafKeyTweak{
-			Leaf:              receiverTransfer.Leaves[0].Leaf,
+			Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 			SigningPrivKey:    newLeafPrivKey,
 			NewSigningPrivKey: finalKey,
 		}
@@ -1225,7 +1225,7 @@ func TestConcurrentClaimTransferV2DifferentKeys(t *testing.T) {
 	}
 
 	require.NotNil(t, lastSuccessfulTransfer)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, lastSuccessfulTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, lastSuccessfulTransfer.GetStatus())
 
 	// --- Verify keys are usable: do a follow-up transfer from the claimed leaf ---
 	// Query the receiver's nodes to get the up-to-date leaf after claim.
@@ -1257,7 +1257,7 @@ func TestConcurrentClaimTransferV2DifferentKeys(t *testing.T) {
 	// available — this alone proves the transfer completed properly on all SOs,
 	// since QueryNodes reads from the coordinator and the coordinator applied
 	// the same key tweak as all other SOs.
-	require.Equal(t, "AVAILABLE", claimedNode.Status)
+	require.Equal(t, "AVAILABLE", claimedNode.GetStatus())
 	t.Log("Concurrent ClaimTransferV2 with different keys succeeded, leaf is available and consistent")
 }
 
@@ -1477,14 +1477,14 @@ func TestNonCanonicalInvoiceShouldError(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	decoded, err := common.DecodeSparkAddress(nonCanonicalInvoice)
 	require.NoError(t, err)
-	identityPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
+	identityPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 	require.NoError(t, err)
 
 	reEncoded, err := common.EncodeSparkAddressWithSignature(
 		identityPublicKey,
 		decoded.Network,
-		decoded.SparkAddress.SparkInvoiceFields,
-		decoded.SparkAddress.Signature,
+		decoded.SparkAddress.GetSparkInvoiceFields(),
+		decoded.SparkAddress.GetSignature(),
 	)
 	require.NoError(t, err)
 	require.NotEqual(t, nonCanonicalInvoice, reEncoded)
@@ -1764,17 +1764,17 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 		[]string{invoice},
 	)
 	require.NoError(t, err, "failed to query spark invoices")
-	transferID, err := uuid.Parse(senderTransfer.Id)
+	transferID, err := uuid.Parse(senderTransfer.GetId())
 	require.NoError(t, err, "failed to parse transfer ID")
 
-	require.Len(t, invoiceResponse.InvoiceStatuses, 1)
-	require.Equal(t, invoice, invoiceResponse.InvoiceStatuses[0].Invoice)
-	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.InvoiceStatuses[0].Status)
+	require.Len(t, invoiceResponse.GetInvoiceStatuses(), 1)
+	require.Equal(t, invoice, invoiceResponse.GetInvoiceStatuses()[0].GetInvoice())
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.GetInvoiceStatuses()[0].GetStatus())
 	require.Equal(t, &sparkpb.InvoiceResponse_SatsTransfer{
 		SatsTransfer: &sparkpb.SatsTransfer{
 			TransferId: transferID[:],
 		},
-	}, invoiceResponse.InvoiceStatuses[0].TransferType)
+	}, invoiceResponse.GetInvoiceStatuses()[0].GetTransferType())
 
 	// Receiver queries pending transfer
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
@@ -1783,28 +1783,28 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.NotEmpty(t, pendingTransfer.Transfers)
+	require.NotEmpty(t, pendingTransfer.GetTransfers())
 	// With deterministic private key generation, when the test is retried on failure,
 	// transfers from the previous failed run will come back as a pending transfer.
 	// Find the one that matches this run so we can pass retry.
 	var receiverTransfer *sparkpb.Transfer
-	for _, t := range pendingTransfer.Transfers {
-		if t.Id == senderTransfer.Id {
+	for _, t := range pendingTransfer.GetTransfers() {
+		if t.GetId() == senderTransfer.GetId() {
 			receiverTransfer = t
 			break
 		}
 	}
 	require.NotNil(t, receiverTransfer)
-	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, sparkpb.TransferType_TRANSFER, receiverTransfer.GetType())
 	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
+	require.Equal(t, map[string]keys.Private{rootNode.GetId(): newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
@@ -1816,7 +1816,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
-	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+	require.Equal(t, res[0].GetId(), claimingNode.Leaf.GetId())
 }
 
 func sendTransferWithInvoice(
@@ -1892,8 +1892,8 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 		[]string{invoice},
 	)
 	require.NoError(t, err, "failed to query spark invoices")
-	require.Len(t, invoiceResponse.InvoiceStatuses, 1)
-	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, invoiceResponse.InvoiceStatuses[0].Status)
+	require.Len(t, invoiceResponse.GetInvoiceStatuses(), 1)
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, invoiceResponse.GetInvoiceStatuses()[0].GetStatus())
 }
 
 func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
@@ -1965,11 +1965,11 @@ func TestQueryAllTransfersMIMO(t *testing.T) {
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
 		t.Context(), senderConfig,
 		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
-		map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()},
+		map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()},
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	// Enable the MIMO query path.
 	kc, err := sparktesting.NewKnobController(t)
@@ -1997,11 +1997,11 @@ func TestQueryAllTransfersMIMO(t *testing.T) {
 		Limit:   50,
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, resp.Transfers, "sender should see the transfer via MIMO query path")
+	require.NotEmpty(t, resp.GetTransfers(), "sender should see the transfer via MIMO query path")
 
 	var found bool
-	for _, tr := range resp.Transfers {
-		if tr.Id == senderTransfer.Id {
+	for _, tr := range resp.GetTransfers() {
+		if tr.GetId() == senderTransfer.GetId() {
 			found = true
 			break
 		}
@@ -2025,11 +2025,11 @@ func TestQueryAllTransfersMIMO(t *testing.T) {
 		Limit:   50,
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, resp.Transfers, "receiver should see the transfer via MIMO query path")
+	require.NotEmpty(t, resp.GetTransfers(), "receiver should see the transfer via MIMO query path")
 
 	found = false
-	for _, tr := range resp.Transfers {
-		if tr.Id == senderTransfer.Id {
+	for _, tr := range resp.GetTransfers() {
+		if tr.GetId() == senderTransfer.GetId() {
 			found = true
 			break
 		}
@@ -2055,7 +2055,7 @@ func TestQueryAllTransfersMIMO(t *testing.T) {
 		Limit:   50,
 	})
 	require.NoError(t, err)
-	require.Empty(t, resp.Transfers, "unrelated pubkey should see no transfers")
+	require.Empty(t, resp.GetTransfers(), "unrelated pubkey should see no transfers")
 }
 
 // TestQueryPendingTransfersMIMO verifies that QueryPendingTransfers with
@@ -2077,11 +2077,11 @@ func TestQueryPendingTransfersMIMO(t *testing.T) {
 	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
 		t.Context(), senderConfig,
 		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
-		map[string]keys.Public{rootNode.Id: receiverPrivKey.Public()},
+		map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()},
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err)
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	// Enable the MIMO query path.
 	kc, err := sparktesting.NewKnobController(t)
@@ -2110,8 +2110,8 @@ func TestQueryPendingTransfersMIMO(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for _, tr := range pendingResp.Transfers {
-		require.NotEqual(t, senderTransfer.Id, tr.Id,
+	for _, tr := range pendingResp.GetTransfers() {
+		require.NotEqual(t, senderTransfer.GetId(), tr.GetId(),
 			"sender should NOT see SENDER_KEY_TWEAKED transfer as pending (it's a receiver-pending status)")
 	}
 
@@ -2134,8 +2134,8 @@ func TestQueryPendingTransfersMIMO(t *testing.T) {
 	require.NoError(t, err)
 
 	var found bool
-	for _, tr := range pendingResp.Transfers {
-		if tr.Id == senderTransfer.Id {
+	for _, tr := range pendingResp.GetTransfers() {
+		if tr.GetId() == senderTransfer.GetId() {
 			found = true
 			break
 		}
@@ -2208,8 +2208,8 @@ func TestV3MimoReceiverCannotClaimOtherReceiversLeaves(t *testing.T) {
 		{Leaf: rootNode2, SigningPrivKey: leafPrivKey2, NewSigningPrivKey: newLeafPrivKey2},
 	}
 	leafReceiverMap := map[string]keys.Public{
-		rootNode1.Id: receiver1PrivKey.Public(),
-		rootNode2.Id: receiver2PrivKey.Public(),
+		rootNode1.GetId(): receiver1PrivKey.Public(),
+		rootNode2.GetId(): receiver2PrivKey.Public(),
 	}
 
 	// Send the MIMO transfer.
@@ -2218,7 +2218,7 @@ func TestV3MimoReceiverCannotClaimOtherReceiversLeaves(t *testing.T) {
 		time.Now().Add(10*time.Minute),
 	)
 	require.NoError(t, err, "failed to send V3 transfer")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.Status)
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	// Authenticate receiver 1.
 	receiver1Config := wallet.NewTestWalletConfigWithIdentityKey(t, receiver1PrivKey)
@@ -2229,9 +2229,9 @@ func TestV3MimoReceiverCannotClaimOtherReceiversLeaves(t *testing.T) {
 	// Receiver 1 queries their pending transfer — should see only their leaf.
 	pending1, err := wallet.QueryPendingTransfers(receiver1Ctx, receiver1Config)
 	require.NoError(t, err)
-	require.Len(t, pending1.Transfers, 1)
-	require.Len(t, pending1.Transfers[0].Leaves, 1, "receiver 1 should only see 1 leaf")
-	require.Equal(t, rootNode1.Id, pending1.Transfers[0].Leaves[0].Leaf.Id,
+	require.Len(t, pending1.GetTransfers(), 1)
+	require.Len(t, pending1.GetTransfers()[0].GetLeaves(), 1, "receiver 1 should only see 1 leaf")
+	require.Equal(t, rootNode1.GetId(), pending1.GetTransfers()[0].GetLeaves()[0].GetLeaf().GetId(),
 		"receiver 1 should see leaf 1, not leaf 2")
 
 	// Authenticate receiver 2 and get their pending transfer (with leaf 2).
@@ -2242,9 +2242,9 @@ func TestV3MimoReceiverCannotClaimOtherReceiversLeaves(t *testing.T) {
 
 	pending2, err := wallet.QueryPendingTransfers(receiver2Ctx, receiver2Config)
 	require.NoError(t, err)
-	require.Len(t, pending2.Transfers, 1)
-	require.Len(t, pending2.Transfers[0].Leaves, 1, "receiver 2 should only see 1 leaf")
-	require.Equal(t, rootNode2.Id, pending2.Transfers[0].Leaves[0].Leaf.Id,
+	require.Len(t, pending2.GetTransfers(), 1)
+	require.Len(t, pending2.GetTransfers()[0].GetLeaves(), 1, "receiver 2 should only see 1 leaf")
+	require.Equal(t, rootNode2.GetId(), pending2.GetTransfers()[0].GetLeaves()[0].GetLeaf().GetId(),
 		"receiver 2 should see leaf 2, not leaf 1")
 
 	// ATTACK: Receiver 1 tries to claim using receiver 2's leaf.
@@ -2253,26 +2253,26 @@ func TestV3MimoReceiverCannotClaimOtherReceiversLeaves(t *testing.T) {
 	// receiver 1 in the TransferReceiver scoping.
 	attackLeafPrivKey := keys.GeneratePrivateKey()
 	attackLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending2.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey2,
 		NewSigningPrivKey: attackLeafPrivKey,
 	}}
 
-	_, err = wallet.ClaimTransferV2(receiver1Ctx, pending2.Transfers[0], receiver1Config, attackLeaves)
+	_, err = wallet.ClaimTransferV2(receiver1Ctx, pending2.GetTransfers()[0], receiver1Config, attackLeaves)
 	require.Error(t, err, "receiver 1 should not be able to claim receiver 2's leaves")
 
 	// Verify receiver 2 can still claim their own leaf (not stolen).
-	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.Transfers[0])
+	leafPrivKeyMap2, err := wallet.VerifyPendingTransfer(t.Context(), receiver2Config, pending2.GetTransfers()[0])
 	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{rootNode2.Id: newLeafPrivKey2}, leafPrivKeyMap2)
+	require.Equal(t, map[string]keys.Private{rootNode2.GetId(): newLeafPrivKey2}, leafPrivKeyMap2)
 
 	finalLeafPrivKey2 := keys.GeneratePrivateKey()
 	claimLeaves2 := []wallet.LeafKeyTweak{{
-		Leaf:              pending2.Transfers[0].Leaves[0].Leaf,
+		Leaf:              pending2.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
 		SigningPrivKey:    newLeafPrivKey2,
 		NewSigningPrivKey: finalLeafPrivKey2,
 	}}
-	_, err = wallet.ClaimTransferV2(receiver2Ctx, pending2.Transfers[0], receiver2Config, claimLeaves2)
+	_, err = wallet.ClaimTransferV2(receiver2Ctx, pending2.GetTransfers()[0], receiver2Config, claimLeaves2)
 	require.NoError(t, err, "receiver 2 should still be able to claim their own leaf after the failed attack")
 }
 

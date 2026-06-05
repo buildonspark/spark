@@ -33,7 +33,7 @@ func AuthenticateWithConnection(ctx context.Context, config *TestWalletConfig, c
 		return "", fmt.Errorf("failed to get challenge: %w", err)
 	}
 
-	challengeBytes, err := proto.Marshal(challengeResp.ProtectedChallenge.Challenge)
+	challengeBytes, err := proto.Marshal(challengeResp.GetProtectedChallenge().GetChallenge())
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal challenge: %w", err)
 	}
@@ -42,7 +42,7 @@ func AuthenticateWithConnection(ctx context.Context, config *TestWalletConfig, c
 	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), hash[:])
 
 	verifyResp, err := client.VerifyChallenge(ctx, &pbauthn.VerifyChallengeRequest{
-		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		ProtectedChallenge: challengeResp.GetProtectedChallenge(),
 		Signature:          signature.Serialize(),
 		PublicKey:          config.IdentityPublicKey().Serialize(),
 	})
@@ -50,7 +50,7 @@ func AuthenticateWithConnection(ctx context.Context, config *TestWalletConfig, c
 		return "", fmt.Errorf("failed to verify challenge: %w", err)
 	}
 
-	return verifyResp.SessionToken, nil
+	return verifyResp.GetSessionToken(), nil
 }
 
 // ContextWithToken adds the session token to the context. If there is an existing session token, it will be replaced.

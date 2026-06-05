@@ -66,7 +66,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyRequest(t *testing
 	resp, err := handler.FinalizeNodeSignatures(ctx, req)
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
-	assert.Empty(t, resp.Nodes)
+	assert.Empty(t, resp.GetNodes())
 }
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_EmptyRequest(t *testing.T) {
@@ -95,7 +95,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_EmptyRequest(t *testi
 	resp, err := handler.FinalizeNodeSignaturesV2(ctx, req)
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
-	assert.Empty(t, resp.Nodes)
+	assert.Empty(t, resp.GetNodes())
 }
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignaturesRejectsTooManyNodeSignaturesBeforeDB(t *testing.T) {
@@ -630,7 +630,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *te
 	resp, err := handler.FinalizeNodeSignaturesV2(ctx, req)
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
-	assert.Empty(t, resp.Nodes)
+	assert.Empty(t, resp.GetNodes())
 }
 
 // Test that nodes with children are not set to Available status even with refund tx
@@ -1211,7 +1211,7 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 	resp, err := handler.FinalizeNodeSignatures(ctx, req)
 
 	require.NoError(t, err)
-	require.Equal(t, string(st.TreeNodeStatusCreating), resp.Nodes[0].Status)
+	require.Equal(t, string(st.TreeNodeStatusCreating), resp.GetNodes()[0].GetStatus())
 }
 
 // Test that trees cannot be finalized when no block height is present in db

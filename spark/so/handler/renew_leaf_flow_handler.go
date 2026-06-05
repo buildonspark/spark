@@ -55,10 +55,10 @@ func (h *RenewLeafFlowHandler) Prepare(ctx context.Context, op proto.Message) (p
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 
-	leafID, err := uuid.Parse(req.LeafId)
+	leafID, err := uuid.Parse(req.GetLeafId())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(
-			fmt.Errorf("invalid leaf ID %q: %w", req.LeafId, err),
+			fmt.Errorf("invalid leaf ID %q: %w", req.GetLeafId(), err),
 		)
 	}
 
@@ -94,7 +94,7 @@ func (h *RenewLeafFlowHandler) Prepare(ctx context.Context, op proto.Message) (p
 	// Each SO independently reconstructs expected transactions from the
 	// original request — no coordinator-provided data to verify against.
 	var entries []sigEntry
-	switch signingJob := req.SigningJobs.(type) {
+	switch signingJob := req.GetSigningJobs().(type) {
 	case *pb.RenewLeafRequest_RenewNodeTimelockSigningJob:
 		_, _, entries, err = validateAndConstructNodeTimelock(ctx, leaf, signingJob.RenewNodeTimelockSigningJob)
 	case *pb.RenewLeafRequest_RenewRefundTimelockSigningJob:
@@ -102,7 +102,7 @@ func (h *RenewLeafFlowHandler) Prepare(ctx context.Context, op proto.Message) (p
 	case *pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob:
 		_, entries, err = validateAndConstructNodeZeroTimelock(leaf, signingJob.RenewNodeZeroTimelockSigningJob)
 	default:
-		err = fmt.Errorf("unexpected signing job type %T", req.SigningJobs)
+		err = fmt.Errorf("unexpected signing job type %T", req.GetSigningJobs())
 	}
 	if err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -129,7 +129,7 @@ func (h *RenewLeafFlowHandler) Prepare(ctx context.Context, op proto.Message) (p
 	// 5. Local FROST signing — only if this SO is in the signing set.
 	// The signing threshold (t-of-n) means only a subset of SOs have commitments.
 	// SOs outside the signing set skip signing and return nil (just validation + locking).
-	if len(internalJobs) > 0 && internalJobs[0].Commitments[h.config.Identifier] != nil {
+	if len(internalJobs) > 0 && internalJobs[0].GetCommitments()[h.config.Identifier] != nil {
 		frostReq := &pbinternal.FrostRound2Request{SigningJobs: internalJobs}
 		frostHandler := signing_handler.NewFrostSigningHandler(h.config)
 		frostResp, err := frostHandler.FrostRound2(ctx, frostReq)
@@ -169,7 +169,7 @@ func (h *RenewLeafFlowHandler) Rollback(ctx context.Context, op proto.Message) e
 	if req == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	nodeIDStr := req.LeafId
+	nodeIDStr := req.GetLeafId()
 
 	nodeID, err := uuid.Parse(nodeIDStr)
 	if err != nil {
@@ -355,7 +355,7 @@ func (f *renewLeafCoordinatorFlow) BuildCommitPayload(ctx context.Context, resul
 	// 3. Filter public shares to participating operators
 	publicKeys := make(map[string][]byte, len(participantIDs))
 	for _, id := range participantIDs {
-		pk, ok := keyPackage.PublicShares[id]
+		pk, ok := keyPackage.GetPublicShares()[id]
 		if !ok {
 			return nil, fmt.Errorf("missing public share for operator %s", id)
 		}
@@ -379,7 +379,7 @@ func (f *renewLeafCoordinatorFlow) BuildCommitPayload(ctx context.Context, resul
 	}
 
 	// 5. Dispatch to variant-specific finalize
-	switch f.req.SigningJobs.(type) {
+	switch f.req.GetSigningJobs().(type) {
 	case *pb.RenewLeafRequest_RenewNodeTimelockSigningJob:
 		return f.finalizeNodeTimelock(ctx, signatures)
 	case *pb.RenewLeafRequest_RenewRefundTimelockSigningJob:
@@ -387,7 +387,7 @@ func (f *renewLeafCoordinatorFlow) BuildCommitPayload(ctx context.Context, resul
 	case *pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob:
 		return f.finalizeNodeZeroTimelock(ctx, signatures)
 	default:
-		return nil, fmt.Errorf("unexpected signing job type %T", f.req.SigningJobs)
+		return nil, fmt.Errorf("unexpected signing job type %T", f.req.GetSigningJobs())
 	}
 }
 
@@ -415,11 +415,11 @@ func collectSignatureShares(results map[string]*anypb.Any) (map[string]map[strin
 		if err := anyResult.UnmarshalTo(resp); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal prepare result from %s: %w", opID, err)
 		}
-		for jobID, sigResult := range resp.Results {
+		for jobID, sigResult := range resp.GetResults() {
 			if allShares[jobID] == nil {
 				allShares[jobID] = make(map[string][]byte)
 			}
-			allShares[jobID][opID] = sigResult.SignatureShare
+			allShares[jobID][opID] = sigResult.GetSignatureShare()
 		}
 	}
 	return allShares, participantIDs, nil
@@ -446,15 +446,15 @@ func aggregateSignature(
 		SignatureShares:    signatureShares,
 		PublicShares:       publicKeys,
 		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-		Commitments:        userSigningJob.SigningCommitments.SigningCommitments,
-		UserCommitments:    userSigningJob.SigningNonceCommitment,
+		Commitments:        userSigningJob.GetSigningCommitments().GetSigningCommitments(),
+		UserCommitments:    userSigningJob.GetSigningNonceCommitment(),
 		UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-		UserSignatureShare: userSigningJob.UserSignature,
+		UserSignatureShare: userSigningJob.GetUserSignature(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
 	}
-	return resp.Signature, nil
+	return resp.GetSignature(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -543,7 +543,7 @@ func buildCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.RenewL
 	}
 	flow.signingKeyshare = signingKeyshare
 
-	switch job := req.SigningJobs.(type) {
+	switch job := req.GetSigningJobs().(type) {
 	case *pb.RenewLeafRequest_RenewNodeTimelockSigningJob:
 		err = prepareNodeTimelockFlow(ctx, flow, leaf, signingKeyshare, job.RenewNodeTimelockSigningJob)
 	case *pb.RenewLeafRequest_RenewRefundTimelockSigningJob:

@@ -77,7 +77,7 @@ func TestRollbackUtxoSwap_HonorsRequestThreshold(t *testing.T) {
 	}, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, rollbackRequest.ConfirmationThreshold)
-	assert.Equal(t, uint32(1), *rollbackRequest.ConfirmationThreshold)
+	assert.Equal(t, uint32(1), rollbackRequest.GetConfirmationThreshold())
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
 	require.NoError(t, err)
@@ -115,7 +115,6 @@ func TestRollbackUtxoSwap_NilThresholdUsesNetworkDefault(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	assert.Nil(t, rollbackRequest.ConfirmationThreshold)
-
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
 	require.ErrorContains(t, err, "doesn't have enough confirmations")
 }
@@ -176,7 +175,7 @@ func TestUtxoSwapCompleted_HonorsRequestThreshold_FixedAmount(t *testing.T) {
 	}, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, completedRequest.ConfirmationThreshold)
-	assert.Equal(t, uint32(1), *completedRequest.ConfirmationThreshold)
+	assert.Equal(t, uint32(1), completedRequest.GetConfirmationThreshold())
 
 	_, err = handler.UtxoSwapCompleted(ctx, cfg, completedRequest)
 	notNotEnoughConfsError(t, err)
@@ -218,7 +217,6 @@ func TestUtxoSwapCompleted_FallsBackToInstantRequestType(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	assert.Nil(t, completedRequest.ConfirmationThreshold)
-
 	_, err = handler.UtxoSwapCompleted(ctx, cfg, completedRequest)
 	notNotEnoughConfsError(t, err)
 }
@@ -277,7 +275,7 @@ func TestCreateCompleteSwapForUtxoRequest_SetsThreshold(t *testing.T) {
 	withThreshold, err := CreateCompleteSwapForUtxoRequest(cfg, utxo, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, withThreshold.ConfirmationThreshold)
-	assert.Equal(t, uint32(1), *withThreshold.ConfirmationThreshold)
+	assert.Equal(t, uint32(1), withThreshold.GetConfirmationThreshold())
 
 	withoutThreshold, err := CreateCompleteSwapForUtxoRequest(cfg, utxo, nil)
 	require.NoError(t, err)
@@ -295,7 +293,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_SetsThreshold(t *te
 	withThreshold, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), cfg, utxo, new(uint32(1)))
 	require.NoError(t, err)
 	require.NotNil(t, withThreshold.ConfirmationThreshold)
-	assert.Equal(t, uint32(1), *withThreshold.ConfirmationThreshold)
+	assert.Equal(t, uint32(1), withThreshold.GetConfirmationThreshold())
 
 	withoutThreshold, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), cfg, utxo, nil)
 	require.NoError(t, err)
@@ -354,8 +352,8 @@ func TestHandleRollbackUtxoSwapGossipMessage_PropagatesThreshold(t *testing.T) {
 			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
-		Signature:             signed.Signature,
-		CoordinatorPublicKey:  signed.CoordinatorPublicKey,
+		Signature:             signed.GetSignature(),
+		CoordinatorPublicKey:  signed.GetCoordinatorPublicKey(),
 		ConfirmationThreshold: &one,
 	}
 

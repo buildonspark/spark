@@ -442,11 +442,11 @@ func TestBuildSigningResults_CpfpOnly(t *testing.T) {
 	results, err := buildSigningResultProtos(leafMap, cpfp, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Equal(t, "leaf1", results[0].LeafId)
-	assert.NotNil(t, results[0].RefundTxSigningResult)
-	assert.Nil(t, results[0].DirectRefundTxSigningResult)
-	assert.Nil(t, results[0].DirectFromCpfpRefundTxSigningResult)
-	assert.Equal(t, vk.Serialize(), results[0].VerifyingKey)
+	assert.Equal(t, "leaf1", results[0].GetLeafId())
+	assert.NotNil(t, results[0].GetRefundTxSigningResult())
+	assert.Nil(t, results[0].GetDirectRefundTxSigningResult())
+	assert.Nil(t, results[0].GetDirectFromCpfpRefundTxSigningResult())
+	assert.Equal(t, vk.Serialize(), results[0].GetVerifyingKey())
 }
 
 func TestBuildSigningResults_AllThreeRefundTypes(t *testing.T) {
@@ -461,9 +461,9 @@ func TestBuildSigningResults_AllThreeRefundTypes(t *testing.T) {
 	results, err := buildSigningResultProtos(leafMap, cpfp, direct, directFromCpfp)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.NotNil(t, results[0].RefundTxSigningResult)
-	assert.NotNil(t, results[0].DirectRefundTxSigningResult)
-	assert.NotNil(t, results[0].DirectFromCpfpRefundTxSigningResult)
+	assert.NotNil(t, results[0].GetRefundTxSigningResult())
+	assert.NotNil(t, results[0].GetDirectRefundTxSigningResult())
+	assert.NotNil(t, results[0].GetDirectFromCpfpRefundTxSigningResult())
 }
 
 func TestBuildSigningResults_LeafWithNoCpfpEntry(t *testing.T) {
@@ -475,9 +475,9 @@ func TestBuildSigningResults_LeafWithNoCpfpEntry(t *testing.T) {
 	results, err := buildSigningResultProtos(leafMap, map[string]*helper.SigningResult{}, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Nil(t, results[0].RefundTxSigningResult)
-	assert.Nil(t, results[0].DirectRefundTxSigningResult)
-	assert.Nil(t, results[0].DirectFromCpfpRefundTxSigningResult)
+	assert.Nil(t, results[0].GetRefundTxSigningResult())
+	assert.Nil(t, results[0].GetDirectRefundTxSigningResult())
+	assert.Nil(t, results[0].GetDirectFromCpfpRefundTxSigningResult())
 }
 
 func TestClaimLockConflictError_WireShape(t *testing.T) {
@@ -503,7 +503,7 @@ func TestClaimLockConflictError_WireShape(t *testing.T) {
 	for _, d := range st.Details() {
 		switch v := d.(type) {
 		case *errdetails.ErrorInfo:
-			reason = v.Reason
+			reason = v.GetReason()
 		case *errdetails.RetryInfo:
 			retryInfo = v
 		}
@@ -527,9 +527,9 @@ func TestBuildSigningResults_DirectOnlySurfacesDirect(t *testing.T) {
 	results, err := buildSigningResultProtos(leafMap, nil, direct, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Nil(t, results[0].RefundTxSigningResult, "no cpfp entry → cpfp proto must be nil")
-	assert.NotNil(t, results[0].DirectRefundTxSigningResult, "direct entry must surface even without cpfp")
-	assert.Nil(t, results[0].DirectFromCpfpRefundTxSigningResult)
+	assert.Nil(t, results[0].GetRefundTxSigningResult(), "no cpfp entry → cpfp proto must be nil")
+	assert.NotNil(t, results[0].GetDirectRefundTxSigningResult(), "direct entry must surface even without cpfp")
+	assert.Nil(t, results[0].GetDirectFromCpfpRefundTxSigningResult())
 }
 
 func TestBuildSigningResults_DfcOnlySurfacesDfc(t *testing.T) {
@@ -542,7 +542,7 @@ func TestBuildSigningResults_DfcOnlySurfacesDfc(t *testing.T) {
 	results, err := buildSigningResultProtos(leafMap, nil, nil, dfc)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Nil(t, results[0].RefundTxSigningResult)
-	assert.Nil(t, results[0].DirectRefundTxSigningResult)
-	assert.NotNil(t, results[0].DirectFromCpfpRefundTxSigningResult, "dfc entry must surface even without cpfp")
+	assert.Nil(t, results[0].GetRefundTxSigningResult())
+	assert.Nil(t, results[0].GetDirectRefundTxSigningResult())
+	assert.NotNil(t, results[0].GetDirectFromCpfpRefundTxSigningResult(), "dfc entry must surface even without cpfp")
 }

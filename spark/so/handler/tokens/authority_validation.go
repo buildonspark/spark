@@ -15,10 +15,10 @@ import (
 // validateDeprecatedSignatureConsistency checks that the deprecated signature
 // field is not set when the authority_signatures oneof is populated.
 func validateDeprecatedSignatureConsistency(sig *tokenpb.SignatureWithIndex) error {
-	if len(sig.Signature) == 0 {
+	if len(sig.GetSignature()) == 0 {
 		return nil
 	}
-	switch sig.AuthoritySignatures.(type) {
+	switch sig.GetAuthoritySignatures().(type) {
 	case *tokenpb.SignatureWithIndex_MultisigSignatures, *tokenpb.SignatureWithIndex_SingleSignature:
 		return sparkerrors.InvalidArgumentMalformedField(
 			fmt.Errorf("deprecated signature field must not be set when authority_signatures oneof is populated"))
@@ -45,7 +45,7 @@ func ValidateOwnershipSignatureFromAuthority(
 	if err := validateDeprecatedSignatureConsistency(sig); err != nil {
 		return err
 	}
-	switch v := sig.AuthoritySignatures.(type) {
+	switch v := sig.GetAuthoritySignatures().(type) {
 	case *tokenpb.SignatureWithIndex_SingleSignature:
 		pubKeyBytes := v.SingleSignature.GetPublicKey()
 		if len(pubKeyBytes) == 0 {
@@ -64,8 +64,8 @@ func ValidateOwnershipSignatureFromAuthority(
 		return validateMultisigFromProvidedConfig(hash, v.MultisigSignatures)
 	default:
 		// Backwards compat: fall back to deprecated signature field.
-		if len(sig.Signature) > 0 {
-			return utils.ValidateOwnershipSignature(sig.Signature, hash, ownerPublicKey)
+		if len(sig.GetSignature()) > 0 {
+			return utils.ValidateOwnershipSignature(sig.GetSignature(), hash, ownerPublicKey)
 		}
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signature provided in SignatureWithIndex"))
 	}
@@ -79,9 +79,9 @@ func validateMultisigFromProvidedConfig(hash []byte, sigSet *multisigpb.Multisig
 	if sigSet == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("multisig signature set cannot be nil"))
 	}
-	if sigSet.MultisigConfig == nil {
+	if sigSet.GetMultisigConfig() == nil {
 		return sparkerrors.InvalidArgumentMissingField(
 			fmt.Errorf("multisig signature set must contain multisig config"))
 	}
-	return multisig.ValidateMultisigSignatures(sigSet.MultisigConfig, hash, sigSet)
+	return multisig.ValidateMultisigSignatures(sigSet.GetMultisigConfig(), hash, sigSet)
 }

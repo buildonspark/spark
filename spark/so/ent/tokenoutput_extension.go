@@ -29,8 +29,8 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 			return nil, fmt.Errorf("prev token transaction hash is nil")
 		}
 		predicates = append(predicates, tokenoutput.And(
-			tokenoutput.CreatedTransactionFinalizedHash(output.PrevTokenTransactionHash),
-			tokenoutput.CreatedTransactionOutputVout(int32(output.PrevTokenTransactionVout)),
+			tokenoutput.CreatedTransactionFinalizedHash(output.GetPrevTokenTransactionHash()),
+			tokenoutput.CreatedTransactionOutputVout(int32(output.GetPrevTokenTransactionVout())),
 		))
 	}
 
@@ -65,14 +65,14 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 	result := make([]*TokenOutput, len(outputsToSpend))
 	for i, output := range outputsToSpend {
 		key := outputKey{
-			txHash: string(output.PrevTokenTransactionHash),
-			vout:   int32(output.PrevTokenTransactionVout),
+			txHash: string(output.GetPrevTokenTransactionHash()),
+			vout:   int32(output.GetPrevTokenTransactionVout()),
 		}
 		lockedOutput, ok := outputMap[key]
 		if !ok {
 			return nil, fmt.Errorf("no output found for prev tx hash %x and vout %d",
-				output.PrevTokenTransactionHash,
-				output.PrevTokenTransactionVout)
+				output.GetPrevTokenTransactionHash(),
+				output.GetPrevTokenTransactionVout())
 		}
 		result[i] = lockedOutput
 	}

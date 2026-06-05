@@ -28,18 +28,18 @@ func NewInternalTreeCreationHandler(config *so.Config) *InternalTreeCreationHand
 
 func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest) ([]*ent.SigningKeyshare, error) {
 	keyshareIDs := []uuid.UUID{}
-	nodeQueue := []*pbinternal.PrepareTreeAddressNode{req.Node}
+	nodeQueue := []*pbinternal.PrepareTreeAddressNode{req.GetNode()}
 
 	for len(nodeQueue) > 0 {
 		node := nodeQueue[0]
 		nodeQueue = nodeQueue[1:]
 
-		if len(node.Children) == 0 {
+		if len(node.GetChildren()) == 0 {
 			continue
 		}
 
-		for _, childNode := range node.Children[:len(node.Children)-1] {
-			keyshareID, err := uuid.Parse(childNode.SigningKeyshareId)
+		for _, childNode := range node.GetChildren()[:len(node.GetChildren())-1] {
+			keyshareID, err := uuid.Parse(childNode.GetSigningKeyshareId())
 			if err != nil {
 				return nil, err
 			}
@@ -47,7 +47,7 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 			nodeQueue = append(nodeQueue, childNode)
 		}
 
-		nodeQueue = append(nodeQueue, node.Children[len(node.Children)-1])
+		nodeQueue = append(nodeQueue, node.GetChildren()[len(node.GetChildren())-1])
 	}
 
 	keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareIDs)
@@ -59,7 +59,7 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 }
 
 func (h *InternalTreeCreationHandler) createKeyshareMapWithTarget(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest, existingSigningKeyshares []*ent.SigningKeyshare) (map[string]*ent.SigningKeyshare, error) {
-	parentKeyshareID, err := uuid.Parse(req.TargetKeyshareId)
+	parentKeyshareID, err := uuid.Parse(req.GetTargetKeyshareId())
 	if err != nil {
 		return nil, err
 	}
@@ -120,11 +120,11 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 	}
 
 	queue := []element{{
-		targetKeyshare: existingSigningKeyshares[req.TargetKeyshareId],
-		nodes:          []*pbinternal.PrepareTreeAddressNode{req.Node},
+		targetKeyshare: existingSigningKeyshares[req.GetTargetKeyshareId()],
+		nodes:          []*pbinternal.PrepareTreeAddressNode{req.GetNode()},
 	}}
 
-	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+	userIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -140,20 +140,20 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 
 		var selectedSigningKeyshares []*ent.SigningKeyshare
 		for _, node := range currentElement.nodes[:len(currentElement.nodes)-1] {
-			selectedSigningKeyshare, ok := existingSigningKeyshares[node.SigningKeyshareId]
+			selectedSigningKeyshare, ok := existingSigningKeyshares[node.GetSigningKeyshareId()]
 			if !ok {
-				return nil, fmt.Errorf("signing keyshare %s not found", node.SigningKeyshareId)
+				return nil, fmt.Errorf("signing keyshare %s not found", node.GetSigningKeyshareId())
 			}
 			selectedSigningKeyshares = append(selectedSigningKeyshares, selectedSigningKeyshare)
 
-			network, err := btcnetwork.FromProtoNetwork(req.Network)
+			network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 			if err != nil {
 				return nil, err
 			}
 			if !h.config.IsNetworkSupported(network) {
 				return nil, fmt.Errorf("network not supported")
 			}
-			userPubKey, err := keys.ParsePublicKey(node.UserPublicKey)
+			userPubKey, err := keys.ParsePublicKey(node.GetUserPublicKey())
 			if err != nil {
 				return nil, err
 			}
@@ -164,12 +164,12 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			depositAddressSignatures[address] = signature
 			queue = append(queue, element{
 				targetKeyshare: selectedSigningKeyshare,
-				nodes:          node.Children,
+				nodes:          node.GetChildren(),
 			})
 		}
 
 		lastNode := currentElement.nodes[len(currentElement.nodes)-1]
-		keyshareID, err := uuid.Parse(lastNode.SigningKeyshareId)
+		keyshareID, err := uuid.Parse(lastNode.GetSigningKeyshareId())
 		if err != nil {
 			return nil, err
 		}
@@ -178,14 +178,14 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			return nil, err
 		}
 
-		network, err := btcnetwork.FromProtoNetwork(req.Network)
+		network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
 		if err != nil {
 			return nil, err
 		}
 		if !h.config.IsNetworkSupported(network) {
 			return nil, fmt.Errorf("network not supported")
 		}
-		lastNodeUserPubKey, err := keys.ParsePublicKey(lastNode.UserPublicKey)
+		lastNodeUserPubKey, err := keys.ParsePublicKey(lastNode.GetUserPublicKey())
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 		depositAddressSignatures[address] = signature
 		queue = append(queue, element{
 			targetKeyshare: lastKeyShare,
-			nodes:          lastNode.Children,
+			nodes:          lastNode.GetChildren(),
 		})
 	}
 
