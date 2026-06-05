@@ -6141,6 +6141,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   public async cleanup() {
     this.cleanupState();
     try {
+      this.transferService.cleanup();
+      this.coopExitService.cleanup();
       await this.connectionManager.closeConnections();
     } finally {
       await this.logging.close();
