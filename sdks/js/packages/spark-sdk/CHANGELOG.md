@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.8.5
+
+### Patch Changes
+
+- Wait for optimization-held balances to become available before reporting insufficient available funds when sending.
+- Add `compareSparkInvoices` to compare decoded Spark invoices field by field.
+
 ## 0.8.4
 
 ### Patch Changes
