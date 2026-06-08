@@ -19,7 +19,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -207,21 +206,6 @@ func TestFlowExecution_ReconcileRecoversStuckParticipantRow(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-
-	// Enable active recovery for the duration of the test. The production
-	// default is monitor-only (knob = 0), so without this the reconcile
-	// task would just log the stuck row and return without transitioning
-	// it, and the polling assertion below would time out.
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot enable reconcile recovery: %v", err)
-	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobFlowExecutionReconcileEnabled, 1))
-	t.Cleanup(func() {
-		if err := kc.SetKnob(t, knobs.KnobFlowExecutionReconcileEnabled, 0); err != nil {
-			t.Logf("best-effort KnobFlowExecutionReconcileEnabled reset failed: %v", err)
-		}
-	})
 
 	config := wallet.NewTestWalletConfig(t)
 	coordinatorIdx := int(config.SigningOperators[config.CoordinatorIdentifier].ID)

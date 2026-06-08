@@ -890,12 +890,6 @@ func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTran
 	// v3 send-transfer flow. The legacy leaves_to_send / swap / coop-exit shapes
 	// fall through to startTransferInternal regardless of the knob.
 	if knobsService.GetValue(knobs.KnobUseConsensusTransfer, 0) > 0 && req.GetTransferPackage() != nil {
-		// Same FlowExecution-reconciler precondition as StartTransferV3; see the
-		// rollout note on KnobUseConsensusTransfer.
-		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"KnobUseConsensusTransfer requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route v2 through the engine")
-		}
 		return h.startTransferV3Consensus(ctx, convertV2ToV3SendTransferRequest(req), req.GetSparkInvoice())
 	}
 	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true, nil)
@@ -904,16 +898,6 @@ func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTran
 func (h *TransferHandler) StartTransferV3(ctx context.Context, req *pb.StartTransferV3Request) (*pb.StartTransferResponse, error) {
 	knobsService := knobs.GetKnobsService(ctx)
 	if knobsService.GetValue(knobs.KnobUseConsensusTransfer, 0) > 0 {
-		// Refuse to route through the engine unless the FlowExecution reconciler
-		// is also enabled. The engine commits coordinator-side domain state
-		// (SENDER_KEY_TWEAKED + tweaked shares) inside the request tx before
-		// commit-gossip dispatch; participants need the reconciler to resolve
-		// stale FlowExecution rows after a coordinator crash. See the rollout
-		// note on KnobUseConsensusTransfer.
-		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"KnobUseConsensusTransfer requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route v3 through the engine")
-		}
 		return h.startTransferV3Consensus(ctx, req, "")
 	}
 	return h.startTransferV3Internal(ctx, req)
@@ -3594,21 +3578,6 @@ func validateTransferReadyForReceiverClaim(transfer *ent.Transfer) error {
 func (h *TransferHandler) ClaimTransfer(ctx context.Context, req *pb.ClaimTransferRequest) (*pb.ClaimTransferResponse, error) {
 	knobsService := knobs.GetKnobsService(ctx)
 	if knobsService.GetValue(knobs.KnobUseConsensusClaim, 0) > 0 {
-		// Refuse to route through the engine unless the FlowExecution
-		// reconciler is also enabled. The engine commits coordinator-side
-		// Phase-1 settle state (RECEIVER_KEY_TWEAK_LOCKED + persisted key
-		// tweak proofs) inside the request tx before commit-gossip dispatch;
-		// participants need the reconciler to resolve stale FlowExecution
-		// rows after a coordinator crash. See the rollout note on
-		// KnobUseConsensusClaim.
-		// Match StartTransferV3's guard: surface FailedPrecondition without a
-		// per-request error log. The gRPC code already communicates the
-		// misconfiguration, and logging here would flood at ClaimTransfer rate
-		// while the knobs stay inconsistent.
-		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"KnobUseConsensusClaim requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route claim through the engine")
-		}
 		return h.claimTransferConsensus(ctx, req)
 	}
 	return h.claimTransferLegacy(ctx, req)

@@ -65,7 +65,6 @@ knobs:
     # Consensus (2PC engine). coop_exit is enabled here so local dev exercises
     # the consensus path; the sibling knobs (use_consensus_transfer/_claim/
     # _provide_preimage) are intentionally left off and managed separately.
-    spark.so.flow_execution.reconcile_enabled: 1
     spark.so.use_consensus_coop_exit: 1
     # Instant static deposit
     spark.so.enable_instant_static_deposit@REGTEST: 100

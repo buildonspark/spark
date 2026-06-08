@@ -18,14 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// enableConsensusProvidePreimageKnobs sets both KnobUseConsensusProvidePreimage
-// (the routing knob) and KnobFlowExecutionReconcileEnabled (required by
-// ProvidePreimage's engine gate at lightning_handler.go's reconciler
-// precondition check) so the consensus path is actually exercised end-to-end.
+// enableConsensusProvidePreimageKnobs sets KnobUseConsensusProvidePreimage
+// (the routing knob) so the consensus preimage path is exercised end-to-end.
 // Mirrors enableConsensusTransferKnobs in send_transfer_consensus_test.go.
 func enableConsensusProvidePreimageKnobs(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobFlowExecutionReconcileEnabled, 100))
 	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusProvidePreimage, 100))
 }
 

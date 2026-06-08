@@ -22,8 +22,6 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -64,14 +62,6 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	if req.GetTransfer().GetTransferPackage() != nil {
 		knobsService := knobs.GetKnobsService(ctx)
 		if knobsService.GetValue(knobs.KnobUseConsensusCoopExit, 0) > 0 {
-			// The engine commits coordinator-side domain state inside the request
-			// tx before commit-gossip dispatch; participants need the reconciler to
-			// resolve stale FlowExecution rows after a coordinator crash. Mirrors
-			// the guard on StartTransferV3.
-			if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
-				return nil, status.Errorf(codes.FailedPrecondition,
-					"KnobUseConsensusCoopExit requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route coop exit through the engine")
-			}
 			return h.cooperativeExitConsensus(ctx, req)
 		}
 		return h.cooperativeExitWithTransferPackage(ctx, req)

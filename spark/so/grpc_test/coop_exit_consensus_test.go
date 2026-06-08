@@ -28,12 +28,11 @@ import (
 // rather than vacuously passing the KnobOffUsesLegacyPath filter.
 const opTypeCoopExit = int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT)
 
-// enableConsensusCoopExitKnobs sets both KnobUseConsensusCoopExit (the routing
-// knob) and KnobFlowExecutionReconcileEnabled (required by CooperativeExitV2's
-// runtime guard). Restoration is handled by KnobController's own t.Cleanup.
+// enableConsensusCoopExitKnobs sets KnobUseConsensusCoopExit (the routing knob)
+// to route CooperativeExitV2 through the 2PC engine. Restoration is handled by
+// KnobController's own t.Cleanup.
 func enableConsensusCoopExitKnobs(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobFlowExecutionReconcileEnabled, 100))
 	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusCoopExit, 100))
 }
 

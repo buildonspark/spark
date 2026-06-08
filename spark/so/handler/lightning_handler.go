@@ -55,8 +55,6 @@ import (
 	"github.com/lightsparkdev/spark/so/partner"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -2648,16 +2646,6 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 
 	knobsService := knobs.GetKnobsService(ctx)
 	if knobsService.GetValue(knobs.KnobUseConsensusProvidePreimage, 0) > 0 {
-		// Refuse to route through the engine unless the FlowExecution
-		// reconciler is also enabled. Without it, a coordinator crash between
-		// engine DbCommit and commit-gossip dispatch leaves participant
-		// FlowExecution rows stuck IN_FLIGHT.
-		if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) == 0 {
-			logging.GetLoggerFromContext(ctx).Sugar().Errorf(
-				"KnobUseConsensusProvidePreimage is enabled but KnobFlowExecutionReconcileEnabled is disabled; refusing to route provide_preimage through the engine to avoid leaving participant FlowExecution rows stuck IN_FLIGHT after a coordinator crash")
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"KnobUseConsensusProvidePreimage requires KnobFlowExecutionReconcileEnabled to be enabled; refusing to route provide_preimage through the engine")
-		}
 		return h.providePreimageConsensus(ctx, req)
 	}
 	return h.providePreimageLegacy(ctx, req)

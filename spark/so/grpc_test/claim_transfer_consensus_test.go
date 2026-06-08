@@ -19,14 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// enableConsensusClaimKnobs sets both KnobUseConsensusClaim (the routing
-// knob) and KnobFlowExecutionReconcileEnabled (required by ClaimTransfer's
-// engine gate at transfer_handler.go's reconciler precondition check) so the
-// consensus path is actually exercised end-to-end. Mirrors
+// enableConsensusClaimKnobs sets KnobUseConsensusClaim (the routing knob) so
+// the consensus claim path is exercised end-to-end. Mirrors
 // enableConsensusTransferKnobs in send_transfer_consensus_test.go.
 func enableConsensusClaimKnobs(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobFlowExecutionReconcileEnabled, 100))
 	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 100))
 }
 

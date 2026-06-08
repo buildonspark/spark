@@ -24,14 +24,13 @@ import (
 // rather than vacuously passing the KnobOffUsesLegacyPath filter.
 const opTypeSendTransfer = int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
 
-// enableConsensusTransferKnobs sets both KnobUseConsensusTransfer (the routing
-// knob) and KnobFlowExecutionReconcileEnabled (required by StartTransferV3's
-// runtime guard). Restoration is handled by KnobController's own t.Cleanup
-// (registered in NewKnobController) which restores the entire ConfigMap to its
-// pre-test state — no explicit per-knob reset needed.
+// enableConsensusTransferKnobs sets KnobUseConsensusTransfer (the routing knob)
+// to route StartTransferV3 through the 2PC engine. Restoration is handled by
+// KnobController's own t.Cleanup (registered in NewKnobController) which
+// restores the entire ConfigMap to its pre-test state — no explicit per-knob
+// reset needed.
 func enableConsensusTransferKnobs(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobFlowExecutionReconcileEnabled, 100))
 	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusTransfer, 100))
 }
 

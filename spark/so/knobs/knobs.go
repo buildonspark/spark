@@ -163,9 +163,6 @@ const (
 	KnobEnablePartnerJWT = "spark.so.enable_partner_jwt"
 	// KnobUseConsensusTransfer routes StartTransferV3 through the 2PC engine
 	// instead of the legacy syncTransferV3Init + syncSettleSenderKeyTweaks fanout.
-	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
-	// StartTransferV3 entry point enforces this at request time and rejects
-	// requests if the reconciler is off.
 	//
 	// The sweep does not need to undo coordinator domain writes: the engine
 	// records the COMMITTED decision atomically with the coordinator's
@@ -179,12 +176,6 @@ const (
 	// gossip fanout. Interpreted as binary (any non-zero value enables) — not
 	// a percentage rollout.
 	//
-	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
-	// ClaimTransfer entry point enforces this at request time and rejects
-	// requests if the reconciler is off. Without the reconciler, a
-	// coordinator crash between engine DbCommit and commit-gossip dispatch
-	// leaves participant FlowExecution rows IN_FLIGHT indefinitely.
-	//
 	// The sweep does not need to undo coordinator domain writes: the engine
 	// records the COMMITTED decision atomically with the coordinator's
 	// RECEIVER_KEY_TWEAK_LOCKED / key-tweak writes (single request-tx DbCommit),
@@ -196,12 +187,6 @@ const (
 	// through the 2PC engine instead of the legacy fanout-RPC + SettleSenderKeyTweak
 	// gossip path. Interpreted as binary (any non-zero value enables) — not a
 	// percentage rollout.
-	//
-	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
-	// ProvidePreimage entry point enforces this at request time and rejects
-	// requests if the reconciler is off. Without the reconciler, a coordinator
-	// crash between engine DbCommit and commit-gossip dispatch leaves
-	// participant FlowExecution rows IN_FLIGHT indefinitely.
 	//
 	// Behavior diff vs legacy: under 2PC the coordinator's
 	// commitSenderKeyTweaks runs deterministically in BuildCommitPayload
@@ -222,12 +207,6 @@ const (
 	// CooperativeExitV2 through the 2PC engine instead of the legacy
 	// syncCoopExitInit -> InitiateCooperativeExit fanout. Interpreted as binary
 	// (any non-zero value enables) — not a percentage rollout.
-	//
-	// Enabling this knob requires KnobFlowExecutionReconcileEnabled — the
-	// CooperativeExitV2 entry point enforces this at request time and rejects
-	// requests if the reconciler is off. Without the reconciler, a coordinator
-	// crash between engine DbCommit and commit-gossip dispatch leaves
-	// participant FlowExecution rows IN_FLIGHT indefinitely.
 	//
 	// Unlike SEND_TRANSFER/CLAIM_TRANSFER, coop exit does NOT apply key tweaks in
 	// Commit: the chain watcher (tweakKeysForCoopExit) applies them only after the
@@ -303,16 +282,6 @@ const (
 	// still in the normal gossip-retry window and would just create noise on
 	// dashboards. Default 600s (10 minutes).
 	KnobFlowExecutionMetricsMinAgeSeconds = "spark.so.flow_execution.metrics_min_age_seconds"
-
-	// Master switch for the *active recovery* portion of the participant
-	// reconcile and coordinator self-sweep tasks. Disabled by default (0).
-	// When disabled, both tasks still query stuck/stale rows and log each
-	// one (and emit metrics if KnobFlowExecutionMetricsEnabled is on), but
-	// skip the actual mutation: no gossip dispatch on the participant
-	// reconcile path, and no UPDATE to ROLLED_BACK on the coordinator
-	// self-sweep. Flip this on once the recovery path is verified safe
-	// against the historical state in this environment.
-	KnobFlowExecutionReconcileEnabled = "spark.so.flow_execution.reconcile_enabled"
 )
 
 type Config struct {

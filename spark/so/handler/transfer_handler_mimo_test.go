@@ -1746,57 +1746,6 @@ func TestStartTransferV3Consensus_MultiReceiverRejection(t *testing.T) {
 		"multi-receiver rejection should produce FailedPrecondition")
 }
 
-// TestStartTransferV2_ConsensusRouting pins the routing decision in the public
-// StartTransferV2 handler: when KnobUseConsensusTransfer is set, a request with
-// a TransferPackage is routed through the 2PC engine (and therefore requires
-// KnobFlowExecutionReconcileEnabled), while a request without one stays on the
-// legacy path regardless of the knob. Both branches return before any DB work,
-// so a knob-injected context is all that's needed.
-func TestStartTransferV2_ConsensusRouting(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{61})
-	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	handler := NewTransferHandler(sparktesting.TestConfig(t))
-
-	makeReq := func(withPackage bool) *pb.StartTransferRequest {
-		req := &pb.StartTransferRequest{
-			TransferId:                uuid.New().String(),
-			OwnerIdentityPublicKey:    senderPubKey.Serialize(),
-			ReceiverIdentityPublicKey: receiverPubKey.Serialize(),
-			ExpiryTime:                timestamppb.New(time.Now().Add(time.Hour)),
-		}
-		if withPackage {
-			req.TransferPackage = &pb.TransferPackage{}
-		}
-		return req
-	}
-
-	t.Run("consensus knob without reconcile knob is refused", func(t *testing.T) {
-		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobUseConsensusTransfer:          1,
-			knobs.KnobFlowExecutionReconcileEnabled: 0,
-		}))
-		_, err := handler.StartTransferV2(ctx, makeReq(true))
-		require.Error(t, err)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
-		assert.Contains(t, err.Error(), "refusing to route v2 through the engine")
-	})
-
-	t.Run("no transfer package stays on legacy path", func(t *testing.T) {
-		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobUseConsensusTransfer:          1,
-			knobs.KnobFlowExecutionReconcileEnabled: 0,
-		}))
-		// Without a TransferPackage the request can't be a v3 send-transfer, so
-		// the engine precondition must not fire — the legacy path errors later
-		// (e.g. on auth) instead.
-		_, err := handler.StartTransferV2(ctx, makeReq(false))
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), "refusing to route v2 through the engine")
-	})
-}
-
 // -----------------------------------------------------------------------------
 // INITIATED is invalid for receivers on post-sender-tweak transfers
 // -----------------------------------------------------------------------------

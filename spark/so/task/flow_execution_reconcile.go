@@ -108,14 +108,7 @@ func (r *participantReconciler) reconcile(ctx context.Context) error {
 		return fmt.Errorf("failed to query stuck participant rows: %w", err)
 	}
 
-	recoveryEnabled := r.recoveryEnabled()
 	for _, row := range rows {
-		if !recoveryEnabled {
-			logger.Sugar().Infof(
-				"flow_execution reconcile (monitor-only): stuck PARTICIPANT row %s coordinator=%d op_type=%s age=%s — recovery disabled by knob",
-				row.ID, row.CoordinatorIndex, pbgossip.ConsensusOperationType(row.OpType), time.Since(row.UpdateTime))
-			continue
-		}
 		if err := r.reconcileOne(ctx, row); err != nil {
 			logger.With(zap.Error(err)).Sugar().Warnf(
 				"flow_execution reconcile: failed to resolve %s (coordinator=%d, op_type=%s)",
@@ -235,14 +228,6 @@ func stuckFlowExecutionError(role string, rows []*ent.FlowExecution, totalCount 
 		scale = fmt.Sprintf("%d/%d (batch limit reached)", len(rows), totalCount)
 	}
 	return fmt.Errorf("found %s stuck %s flow_execution rows: %s%s", scale, role, strings.Join(parts, ", "), more)
-}
-
-// recoveryEnabled reports whether the active recovery path (gossip dispatch
-// for participant rows, ROLLED_BACK transition for coordinator rows) is on.
-// Defaults to off so operators can run the tasks in monitor-only mode and
-// inspect what would be touched before authorizing mutations.
-func (r *participantReconciler) recoveryEnabled() bool {
-	return r.knobs.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) > 0
 }
 
 // metricsEnabled reports whether flow_execution.* metric emission is on for
@@ -492,8 +477,8 @@ func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService 
 	// only those. An unbounded UPDATE would hold many row locks in a single
 	// statement during a mass-stuck recovery; this fans the work across
 	// sweep ticks and lets newer rows rotate in once the oldest batch is
-	// processed. Fetch full rows (not just IDs) so monitor-only mode can
-	// log op_type and age per row.
+	// processed. Fetch full rows (not just IDs) so the alert error can
+	// report op_type and age per row.
 	rows, err := db.FlowExecution.Query().
 		Where(
 			flowexecution.RoleEQ(st.FlowExecutionRoleCoordinator),
@@ -508,24 +493,6 @@ func SweepStaleCoordinatorFlows(ctx context.Context, _ *so.Config, knobsService 
 	}
 	if len(rows) == 0 {
 		return nil
-	}
-
-	if knobsService.GetValue(knobs.KnobFlowExecutionReconcileEnabled, 0) <= 0 {
-		for _, row := range rows {
-			logger.Sugar().Infof(
-				"flow_execution sweep (monitor-only): stale COORDINATOR row %s op_type=%s age=%s — recovery disabled by knob",
-				row.ID, pbgossip.ConsensusOperationType(row.OpType), time.Since(row.UpdateTime))
-		}
-		// Even in monitor-only mode, surface the existence of stale
-		// rows so the alerting pipeline picks it up. No tx work was
-		// done so no commit is needed; the count can run on the
-		// session client (still alive) before we return.
-		totalCount, countErr := countStuckCoordinatorRows(ctx, db, cutoff)
-		if countErr != nil {
-			logger.With(zap.Error(countErr)).Warn("flow_execution sweep: failed to count total stale rows; alert message uses batch size")
-			totalCount = int64(len(rows))
-		}
-		return stuckFlowExecutionError("COORDINATOR", rows, totalCount)
 	}
 
 	ids := make([]uuid.UUID, len(rows))
