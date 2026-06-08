@@ -100,7 +100,7 @@ func TestValidateConnectorTxBindsToExitTxid_RejectsConnectorTxWithNoInputs(t *te
 	require.NoError(t, err)
 
 	err = validateConnectorTxBindsToExitTxid(raw, exitTxid)
-	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to parse connector transaction")
 }
 
 func TestValidateConnectorTxBindsToExitTxid_RejectsNonCanonicalConnectorTx(t *testing.T) {
