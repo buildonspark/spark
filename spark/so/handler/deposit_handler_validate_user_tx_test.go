@@ -279,37 +279,37 @@ func TestValidateUserTxsRejectsTrailingBytesInSigningJobs(t *testing.T) {
 		{
 			name: "on chain utxo",
 			mutate: func(req *pb.StartDepositTreeCreationRequest) {
-				req.OnChainUtxo.RawTx = withTrailingByte(req.OnChainUtxo.RawTx)
+				req.OnChainUtxo.RawTx = withTrailingByte(req.GetOnChainUtxo().GetRawTx())
 			},
 		},
 		{
 			name: "cpfp root",
 			mutate: func(req *pb.StartDepositTreeCreationRequest) {
-				req.RootTxSigningJob.RawTx = withTrailingByte(req.RootTxSigningJob.RawTx)
+				req.RootTxSigningJob.RawTx = withTrailingByte(req.GetRootTxSigningJob().GetRawTx())
 			},
 		},
 		{
 			name: "cpfp refund",
 			mutate: func(req *pb.StartDepositTreeCreationRequest) {
-				req.RefundTxSigningJob.RawTx = withTrailingByte(req.RefundTxSigningJob.RawTx)
+				req.RefundTxSigningJob.RawTx = withTrailingByte(req.GetRefundTxSigningJob().GetRawTx())
 			},
 		},
 		{
 			name: "direct root",
 			mutate: func(req *pb.StartDepositTreeCreationRequest) {
-				req.DirectRootTxSigningJob.RawTx = withTrailingByte(req.DirectRootTxSigningJob.RawTx)
+				req.DirectRootTxSigningJob.RawTx = withTrailingByte(req.GetDirectRootTxSigningJob().GetRawTx())
 			},
 		},
 		{
 			name: "direct refund",
 			mutate: func(req *pb.StartDepositTreeCreationRequest) {
-				req.DirectRefundTxSigningJob.RawTx = withTrailingByte(req.DirectRefundTxSigningJob.RawTx)
+				req.DirectRefundTxSigningJob.RawTx = withTrailingByte(req.GetDirectRefundTxSigningJob().GetRawTx())
 			},
 		},
 		{
 			name: "direct from cpfp refund",
 			mutate: func(req *pb.StartDepositTreeCreationRequest) {
-				req.DirectFromCpfpRefundTxSigningJob.RawTx = withTrailingByte(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+				req.DirectFromCpfpRefundTxSigningJob.RawTx = withTrailingByte(req.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
 			},
 		},
 	} {
