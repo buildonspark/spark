@@ -28,6 +28,7 @@ export * from "./spark-readonly-client/types.js";
 export * from "./spark-wallet/types.js";
 
 export { type WalletConfigService } from "./services/config.js";
+export { CoopExitService } from "./services/coop-exit.js";
 export { default as LeafManager } from "./services/leaf-manager.js";
 export { SigningService } from "./services/signing.js";
 export { default as SwapService } from "./services/swap.js";
