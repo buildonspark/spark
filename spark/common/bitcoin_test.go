@@ -405,3 +405,31 @@ func TestMaliciousTransaction(t *testing.T) {
 	})
 	require.Less(t, memory, uint64(1024*1024))
 }
+
+func TestTxFromRawTxBytesRejectsTrailingBytesAfterLocktime(t *testing.T) {
+	buildTx := func(withWitness bool) []byte {
+		tx := wire.NewMsgTx(3)
+		txIn := &wire.TxIn{}
+		if withWitness {
+			txIn.Witness = wire.TxWitness{[]byte{0x01}}
+		}
+		tx.AddTxIn(txIn)
+		tx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: []byte{0x51}})
+		rawTx, err := SerializeTx(tx)
+		require.NoError(t, err)
+		return rawTx
+	}
+
+	for _, test := range []struct {
+		name string
+		raw  []byte
+	}{
+		{name: "legacy serialization", raw: buildTx(false)},
+		{name: "witness serialization", raw: buildTx(true)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := TxFromRawTxBytes(append(test.raw, 0xaa, 0xbb))
+			require.ErrorContains(t, err, "trailing bytes after locktime")
+		})
+	}
+}

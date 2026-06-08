@@ -168,6 +168,26 @@ func TestVerifyTransactionWithDatabase_Error_InvalidClientTxBytes(t *testing.T) 
 	require.ErrorContains(t, err, "failed to parse client tx")
 }
 
+func TestVerifyTransactionWithDatabaseRejectsTrailingBytesInClientTx(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	networkString := dbLeaf.Network.String()
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock,
+		wire.NewTxOut(testSourceValue, userScript),
+		common.EphemeralAnchorOutput(),
+	)
+	clientRawTx = append(clientRawTx, 0xaa)
+
+	err = bitcointransaction.VerifyTransactionWithDatabase(ctx, clientRawTx, dbLeaf, bitcointransaction.TxTypeRefundCPFP, refundDestPubkey, networkString)
+	require.ErrorContains(t, err, "trailing bytes after locktime")
+}
+
 // Errors when the client transaction has no inputs.
 func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)

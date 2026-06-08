@@ -129,10 +129,14 @@ func TxFromRawTxBytes(rawTxBytes []byte) (*wire.MsgTx, error) {
 		return nil, fmt.Errorf("invalid transaction structure: %w", err)
 	}
 
+	reader := bytes.NewReader(rawTxBytes)
 	var tx wire.MsgTx
-	err := tx.Deserialize(bytes.NewReader(rawTxBytes))
+	err := tx.Deserialize(reader)
 	if err != nil {
 		return nil, err
+	}
+	if reader.Len() != 0 {
+		return nil, fmt.Errorf("transaction has %d trailing bytes after locktime", reader.Len())
 	}
 	return &tx, nil
 }

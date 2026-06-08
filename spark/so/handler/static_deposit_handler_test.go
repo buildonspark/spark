@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"math/rand/v2"
 	"testing"
@@ -158,14 +157,23 @@ func createOldBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
 	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
 	require.NoError(t, err)
 
-	// sequence = 10275 = 0x2823 (little-endian: 23 28 00 00)
-	scriptLen := fmt.Sprintf("%02x", len(p2trScript))
-	hexStr := "01010101010000000000000000000000000000000000000000000000000000000000000000ffffffff002328000001e803000000000000" +
-		scriptLen +
-		hex.EncodeToString(p2trScript) +
-		"000000000000000000000000000000000000000000"
-	asBytes, _ := hex.DecodeString(hexStr)
-	return asBytes
+	tx := wire.NewMsgTx(1)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  chainhash.Hash{},
+			Index: wire.MaxPrevOutIndex,
+		},
+		Sequence: 10275,
+	})
+	tx.AddTxOut(&wire.TxOut{
+		Value:    1000,
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+	return buf.Bytes()
 }
 
 func createValidUserSignatureForTest(

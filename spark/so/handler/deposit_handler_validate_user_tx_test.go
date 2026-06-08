@@ -232,6 +232,97 @@ func TestValidateUserTxs_Direct_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateUserTxsRejectsTrailingBytesInSigningJobs(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	withTrailingByte := func(raw []byte) []byte {
+		return append(append([]byte(nil), raw...), 0xaa)
+	}
+	buildRequest := func(t *testing.T) (*pb.StartDepositTreeCreationRequest, *depositData, keys.Public) {
+		t.Helper()
+
+		deposit := createDepositData(t)
+		refundDest := keys.GeneratePrivateKey().Public()
+		return &pb.StartDepositTreeCreationRequest{
+			IdentityPublicKey: keys.GeneratePrivateKey().Serialize(),
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   serializeTx(t, deposit.depositTx),
+				Vout:    0,
+				Txid:    []byte(deposit.depositTx.TxID()),
+				Network: pb.Network_REGTEST,
+			},
+			RootTxSigningJob: &pb.SigningJob{
+				RawTx: serializeTx(t, deposit.cpfpRootTx),
+			},
+			DirectRootTxSigningJob: &pb.SigningJob{
+				RawTx: serializeTx(t, deposit.directRootTx),
+			},
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:            serializeTx(t, makeClientCpfpTxForDeposit(t, deposit, refundDest)),
+				SigningPublicKey: refundDest.Serialize(),
+			},
+			DirectRefundTxSigningJob: &pb.SigningJob{
+				RawTx:            serializeTx(t, makeClientDirectTxForDeposit(t, deposit, refundDest)),
+				SigningPublicKey: refundDest.Serialize(),
+			},
+			DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+				RawTx:            serializeTx(t, makeClientDirectFromCpfpTxForDeposit(t, deposit, refundDest)),
+				SigningPublicKey: refundDest.Serialize(),
+			},
+		}, deposit, refundDest
+	}
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*pb.StartDepositTreeCreationRequest)
+	}{
+		{
+			name: "on chain utxo",
+			mutate: func(req *pb.StartDepositTreeCreationRequest) {
+				req.OnChainUtxo.RawTx = withTrailingByte(req.OnChainUtxo.RawTx)
+			},
+		},
+		{
+			name: "cpfp root",
+			mutate: func(req *pb.StartDepositTreeCreationRequest) {
+				req.RootTxSigningJob.RawTx = withTrailingByte(req.RootTxSigningJob.RawTx)
+			},
+		},
+		{
+			name: "cpfp refund",
+			mutate: func(req *pb.StartDepositTreeCreationRequest) {
+				req.RefundTxSigningJob.RawTx = withTrailingByte(req.RefundTxSigningJob.RawTx)
+			},
+		},
+		{
+			name: "direct root",
+			mutate: func(req *pb.StartDepositTreeCreationRequest) {
+				req.DirectRootTxSigningJob.RawTx = withTrailingByte(req.DirectRootTxSigningJob.RawTx)
+			},
+		},
+		{
+			name: "direct refund",
+			mutate: func(req *pb.StartDepositTreeCreationRequest) {
+				req.DirectRefundTxSigningJob.RawTx = withTrailingByte(req.DirectRefundTxSigningJob.RawTx)
+			},
+		},
+		{
+			name: "direct from cpfp refund",
+			mutate: func(req *pb.StartDepositTreeCreationRequest) {
+				req.DirectFromCpfpRefundTxSigningJob.RawTx = withTrailingByte(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req, deposit, refundDest := buildRequest(t)
+			test.mutate(req)
+
+			err := callValidateBitcoinTransactions(ctx, req, deposit.signingKey.Public(), refundDest, pb.Network_REGTEST.String())
+			require.ErrorContains(t, err, "trailing bytes after locktime")
+		})
+	}
+}
+
 func TestValidateUserTxs_DirectFromCpfp_Success(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
