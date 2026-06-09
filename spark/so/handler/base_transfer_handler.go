@@ -2644,6 +2644,14 @@ func (h *BaseTransferHandler) CommitSenderKeyTweaks(ctx context.Context, transfe
 }
 
 func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfer *ent.Transfer) (*ent.Transfer, error) {
+	return h.commitSenderKeyTweaksWithMode(ctx, transfer, false)
+}
+
+func (h *BaseTransferHandler) commitSenderKeyTweaksForAtomicSwap(ctx context.Context, transfer *ent.Transfer) (*ent.Transfer, error) {
+	return h.commitSenderKeyTweaksWithMode(ctx, transfer, true)
+}
+
+func (h *BaseTransferHandler) commitSenderKeyTweaksWithMode(ctx context.Context, transfer *ent.Transfer, allowSwapV3 bool) (*ent.Transfer, error) {
 	transfer, err := h.loadTransferForUpdate(ctx, transfer.ID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer: %w", err)
@@ -2656,7 +2664,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		return nil, err
 	}
 
-	if err := h.validateSenderKeyTweakCommitPreconditions(ctx, transfer); err != nil {
+	if err := h.validateSenderKeyTweakCommitPreconditions(ctx, transfer, allowSwapV3); err != nil {
 		return nil, err
 	}
 
@@ -2725,8 +2733,17 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	return transfer, nil
 }
 
-func (h *BaseTransferHandler) validateSenderKeyTweakCommitPreconditions(ctx context.Context, transfer *ent.Transfer) error {
-	if transfer.Type != st.TransferTypePreimageSwap {
+func (h *BaseTransferHandler) validateSenderKeyTweakCommitPreconditions(ctx context.Context, transfer *ent.Transfer, allowSwapV3 bool) error {
+	switch transfer.Type {
+	case st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3:
+		if !allowSwapV3 {
+			return sparkerrors.FailedPreconditionInvalidState(
+				fmt.Errorf("swap v3 sender key tweaks must be committed atomically through CommitSwapKeyTweaks for transfer %s", transfer.ID),
+			)
+		}
+		return nil
+	case st.TransferTypePreimageSwap:
+	default:
 		return nil
 	}
 
@@ -2786,22 +2803,40 @@ func (h *BaseTransferHandler) CommitSwapKeyTweaks(
 	if err != nil {
 		return fmt.Errorf("unable to load primary transfer: %w", err)
 	}
+	if counterTransfer.Type != st.TransferTypeCounterSwapV3 {
+		return fmt.Errorf("counter transfer %s has invalid type %s", counterTransfer.ID.String(), counterTransfer.Type)
+	}
+	if primaryTransfer.Type != st.TransferTypePrimarySwapV3 {
+		return fmt.Errorf("primary transfer %s has invalid type %s", primaryTransfer.ID.String(), primaryTransfer.Type)
+	}
 	// Sanity check. This should never happen because key tweaking is atomic.
-	if primaryTransfer.Status == st.TransferStatusSenderKeyTweaked {
-		if counterTransfer.Status != st.TransferStatusSenderKeyTweaked {
-			return fmt.Errorf("primary transfer %s is in sender key tweaked status, but the counter transfer %s is not", primaryTransfer.ID.String(), counterTransfer.ID.String())
+	if primaryTransfer.Status == st.TransferStatusSenderKeyTweaked || counterTransfer.Status == st.TransferStatusSenderKeyTweaked {
+		if primaryTransfer.Status != st.TransferStatusSenderKeyTweaked || counterTransfer.Status != st.TransferStatusSenderKeyTweaked {
+			return fmt.Errorf("swap key tweaks must be committed atomically: primary transfer %s status %s, counter transfer %s status %s", primaryTransfer.ID.String(), primaryTransfer.Status, counterTransfer.ID.String(), counterTransfer.Status)
 		}
 		return nil
+	}
+	if !isSwapKeyTweakCommitStatus(primaryTransfer.Status) {
+		return fmt.Errorf("primary transfer %s is not in a committable swap key tweak status: %s", primaryTransfer.ID.String(), primaryTransfer.Status)
+	}
+	if !isSwapKeyTweakCommitStatus(counterTransfer.Status) {
+		return fmt.Errorf("counter transfer %s is not in a committable swap key tweak status: %s", counterTransfer.ID.String(), counterTransfer.Status)
 	}
 
 	logger.Sugar().Infof("Checking commitSwapKeyTweaks for primary transfer %s (status: %s) and counter transfer %s (status: %s)", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)
 
 	for _, transfer := range []*ent.Transfer{primaryTransfer, counterTransfer} {
-		if _, err := h.commitSenderKeyTweaks(ctx, transfer); err != nil {
+		if _, err := h.commitSenderKeyTweaksForAtomicSwap(ctx, transfer); err != nil {
 			return fmt.Errorf("commitSenderKeyTweaks failed for transfer %s: %w", transfer.ID, err)
 		}
 	}
 	logger.Sugar().Infof("Successfully tweaked keys for primary transfer %s (status: %s) and counter transfer %s (status: %s)", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)
 
 	return nil
+}
+
+func isSwapKeyTweakCommitStatus(status st.TransferStatus) bool {
+	return status == st.TransferStatusSenderKeyTweakPending ||
+		status == st.TransferStatusSenderInitiatedCoordinator ||
+		status == st.TransferStatusApplyingSenderKeyTweak
 }
