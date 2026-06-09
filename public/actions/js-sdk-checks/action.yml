@@ -46,3 +46,13 @@ runs:
         fi
 
         bash ../../public/scripts/verify-android-page-size.sh
+
+    - name: "Verify Android minimum API compatibility"
+      shell: bash
+      working-directory: ${{ inputs.workspace }}
+      run: |
+        if ! command -v llvm-objdump &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y llvm
+        fi
+
+        bash ../../public/scripts/verify-android-min-api.sh
