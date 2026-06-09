@@ -24,13 +24,11 @@ import (
 
 // ProvidePreimageFlowHandler implements consensus.FlowHandler for
 // CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE. Reached via the engine when
-// LightningHandler.ProvidePreimage routes through it (gated on
-// KnobUseConsensusProvidePreimage).
+// LightningHandler.ProvidePreimage executes the flow.
 //
 // Holds a LightningHandler for ValidatePreimage + StorePreimage and a
-// TransferHandler for validateKeyTweakProofs + CommitSenderKeyTweaks — the
-// same helpers the legacy ValidatePreimageInternal + SettleSenderKeyTweak
-// gossip path uses today. Holds them as fields (rather than embedding one
+// TransferHandler for validateKeyTweakProofs + CommitSenderKeyTweaks. Holds
+// them as fields (rather than embedding one
 // like the send-transfer / claim-transfer handlers do) because both
 // handlers carry their own *so.Config and embedding both would create a
 // promoted-field ambiguity.

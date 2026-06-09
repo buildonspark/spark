@@ -2639,187 +2639,15 @@ func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.Query
 	return response, nil
 }
 
+// ProvidePreimage settles a HODL preimage swap through the 2PC consensus
+// engine: every SO runs Prepare (ValidatePreimage + validateKeyTweakProofs +
+// StorePreimage), then Commit (CommitSenderKeyTweaks). The coordinator-side
+// commit runs in BuildCommitPayload so the coordinator's state advances
+// deterministically rather than depending on the gossip-loopback firing.
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-
-	knobsService := knobs.GetKnobsService(ctx)
-	if knobsService.GetValue(knobs.KnobUseConsensusProvidePreimage, 0) > 0 {
-		return h.providePreimageConsensus(ctx, req)
-	}
-	return h.providePreimageLegacy(ctx, req)
-}
-
-// providePreimageLegacy is the pre-consensus implementation kept in place
-// behind KnobUseConsensusProvidePreimage for one release cycle while the
-// engine-driven path stabilizes.
-func (h *LightningHandler) providePreimageLegacy(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
-	spanOpt := lightningPaymentHashSpanOption(req.GetPaymentHash())
-	flowStart := time.Now()
-	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage.legacy", spanOpt)
-	defer func() {
-		endSpanWithError(span, retErr)
-		observeLightningFlow(ctx, lightningFlowProvidePreimage, lightningFlowPathUnknown, flowStart, retErr)
-	}()
-
-	phaseStart := time.Now()
-	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.validate", spanOpt)
-	identityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		endSpanWithError(validateSpan, err)
-		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
-	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, identityPubKey); err != nil {
-		endSpanWithError(validateSpan, err)
-		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
-		return nil, err
-	}
-	if err := authz.EnforceWalletNotKillSwitched(validateCtx, identityPubKey); err != nil {
-		endSpanWithError(validateSpan, err)
-		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
-		return nil, err
-	}
-	preimageRequest, transfer, err := h.ValidatePreimage(validateCtx, req)
-	endSpanWithError(validateSpan, err)
-	validateErr := err
-	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, validateErr)
-	if validateErr != nil {
-		return nil, fmt.Errorf("unable to provide preimage: %w", validateErr)
-	}
-
-	phaseStart = time.Now()
-	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.storePreimage", spanOpt)
-	err = h.StorePreimage(storeCtx, preimageRequest, req.GetPreimage())
-	endSpanWithError(storeSpan, err)
-	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, phaseStart, err)
-	if err != nil {
-		return nil, fmt.Errorf("unable to store preimage: %w", err)
-	}
-
-	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-		transferProto, err := transfer.MarshalProto(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
-		}
-
-		return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
-	}
-
-	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
-	}
-	internalReq := &pbinternal.ProvidePreimageRequest{
-		PaymentHash:       req.GetPaymentHash(),
-		Preimage:          req.GetPreimage(),
-		IdentityPublicKey: req.GetIdentityPublicKey(),
-	}
-	keyTweakProofMap := make(map[string]*pbspark.SecretProof)
-	for _, leaf := range transferLeaves {
-		keyTweakProto := &pbspark.SendLeafKeyTweak{}
-		err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
-		}
-		keyTweakProofMap[keyTweakProto.GetLeafId()] = &pbspark.SecretProof{
-			Proofs: keyTweakProto.GetSecretShareTweak().GetProofs(),
-		}
-	}
-	internalReq.KeyTweakProofs = keyTweakProofMap
-
-	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	phaseStart = time.Now()
-	fanoutCtx, fanoutSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout", spanOpt)
-	_, err = helper.ExecuteTaskWithAllOperators(fanoutCtx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (_ any, retErr error) {
-		operatorCtx, operatorSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.fanout.operator", spanOpt)
-		rpcStart := time.Now()
-		defer func() {
-			endSpanWithError(operatorSpan, retErr)
-			observeOperatorFanoutRPC(ctx, lightningOperationProvidePreimage, operator.Identifier, rpcStart, retErr)
-		}()
-		conn, err := operator.NewOperatorGRPCConnection()
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		_, err = client.ProvidePreimage(operatorCtx, internalReq)
-		if err != nil {
-			return nil, fmt.Errorf("unable to provide preimage: %w", err)
-		}
-		return nil, nil
-	})
-	endSpanWithError(fanoutSpan, err)
-	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseFanout, phaseStart, err)
-	if err != nil {
-		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
-	}
-
-	participants, err := operatorSelection.OperatorIdentifierList(h.config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get operator list: %w", err)
-	}
-	sendGossipHandler := NewSendGossipHandler(h.config)
-	phaseStart = time.Now()
-	gossipCtx, gossipSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.sendGossip", spanOpt)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(gossipCtx, &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
-			SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
-				TransferId:           transfer.ID.String(),
-				SenderKeyTweakProofs: keyTweakProofMap,
-			},
-		},
-	}, participants)
-	endSpanWithError(gossipSpan, err)
-	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseSendGossip, phaseStart, err)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create and send gossip message to settle sender key tweak: %w", err)
-	}
-
-	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeLightningReceive)
-
-	// The span includes DB context lookup; reload_transfer measures only the reload query.
-	reloadCtx, reloadSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.reloadTransfer", spanOpt)
-	tx, err := ent.GetDbFromContext(reloadCtx)
-	if err != nil {
-		endSpanWithError(reloadSpan, err)
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-	phaseStart = time.Now()
-	transfer, err = tx.Transfer.Query().
-		Where(enttransfer.ID(transfer.ID)).
-		WithTransferSenders().
-		WithTransferReceivers().
-		Only(reloadCtx)
-	endSpanWithError(reloadSpan, err)
-	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseReloadTransfer, phaseStart, err)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %w", err)
-	}
-
-	marshalStart := time.Now()
-	marshalCtx, marshalSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.marshalTransfer", spanOpt)
-	transferProto, err := transfer.MarshalProto(marshalCtx)
-	endSpanWithError(marshalSpan, err)
-	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseMarshalTransfer, marshalStart, err)
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
-	}
-
-	return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
-}
-
-// providePreimageConsensus routes ProvidePreimage through the 2PC consensus
-// engine when KnobUseConsensusProvidePreimage is enabled. Replaces the legacy
-// internal RPC fanout + SettleSenderKeyTweak gossip with a single engine.Execute
-// call: every SO runs Prepare (ValidatePreimage + validateKeyTweakProofs +
-// StorePreimage), then Commit (CommitSenderKeyTweaks). The coordinator-side
-// commit runs in BuildCommitPayload so the coordinator's state advances
-// deterministically rather than depending on the gossip-loopback firing.
-func (h *LightningHandler) providePreimageConsensus(ctx context.Context, req *pbspark.ProvidePreimageRequest) (resp *pbspark.ProvidePreimageResponse, retErr error) {
 	spanOpt := lightningPaymentHashSpanOption(req.GetPaymentHash())
 	flowStart := time.Now()
 	ctx, span := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus", spanOpt)
@@ -2859,15 +2687,13 @@ func (h *LightningHandler) providePreimageConsensus(ctx context.Context, req *pb
 
 	// Short-circuit when the transfer has already advanced past the pre-commit
 	// states — there are no sender key tweaks left to settle and the engine's
-	// bookkeeping overhead would be pure cost for a no-op flow. Same status
-	// condition as the legacy early-exit, but with a subtle ordering
-	// difference: legacy calls StorePreimage unconditionally before checking
-	// the status, while the consensus path calls it inside this branch only.
-	// That covers retries where the coordinator's preimage_request row was
-	// never persisted on the first attempt (e.g., the engine's Prepare-on-self
-	// never completed); StorePreimage is an idempotent CAS so a retry against
-	// an already-shared row is a no-op. The non-short-circuit branch below
-	// reaches StorePreimage via the engine's Prepare-on-self fanout.
+	// bookkeeping overhead would be pure cost for a no-op flow. StorePreimage
+	// is called inside this branch to cover retries where the coordinator's
+	// preimage_request row was never persisted on the first attempt (e.g., the
+	// engine's Prepare-on-self never completed); StorePreimage is an idempotent
+	// CAS so a retry against an already-shared row is a no-op. The
+	// non-short-circuit branch below reaches StorePreimage via the engine's
+	// Prepare-on-self fanout.
 	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
 		phaseStart = time.Now()
 		storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus.storePreimage", spanOpt)

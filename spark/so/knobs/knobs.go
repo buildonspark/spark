@@ -183,25 +183,6 @@ const (
 	// row (sweep → ROLLED_BACK, consistent) and a crash after it leaves a
 	// COMMITTED row the reconciler drives forward (SP-3195).
 	KnobUseConsensusClaim = "spark.so.use_consensus_claim"
-	// KnobUseConsensusProvidePreimage routes LightningHandler.ProvidePreimage
-	// through the 2PC engine instead of the legacy fanout-RPC + SettleSenderKeyTweak
-	// gossip path. Interpreted as binary (any non-zero value enables) — not a
-	// percentage rollout.
-	//
-	// Behavior diff vs legacy: under 2PC the coordinator's
-	// commitSenderKeyTweaks runs deterministically in BuildCommitPayload
-	// (mirroring CONSENSUS_OPERATION_TYPE_SEND_TRANSFER's pattern). The
-	// legacy path relies on the gossip-loopback in postSendingGossipMessage
-	// firing on the coordinator after all participants ACK, which strands
-	// the coordinator at SenderKeyTweakPending if any participant's gossip
-	// never delivers. The 2PC path is a strictly stronger guarantee.
-	//
-	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback
-	// for PROVIDE_PREIMAGE on the coordinator. Today the sweep only flips
-	// the FlowExecution row to ROLLED_BACK. Rollback for this flow is a
-	// no-op (preimage storage is intentionally irreversible; CommitSenderKeyTweaks
-	// only fires in Commit), so the sweep gap is benign here.
-	KnobUseConsensusProvidePreimage = "spark.so.use_consensus_provide_preimage"
 
 	// KnobUseConsensusCoopExit routes the TransferPackage (single-call) path of
 	// CooperativeExitV2 through the 2PC engine instead of the legacy
