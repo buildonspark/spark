@@ -671,14 +671,26 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 
 					for _, utxoSwap := range utxoSwaps {
-						dbTransfer, err := utxoSwap.QueryTransfer().Only(ctx)
-						if err != nil && !ent.IsNotFound(err) {
-							logger.Error("Failed to get transfer for a utxo swap", zap.Error(err))
-							continue
-						}
-						if dbTransfer == nil && utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund {
-							logger.Sugar().Debugf("No transfer found for a non-refund utxo swap %s", utxoSwap.ID)
-							continue
+						// Resolve the transfer via the edge with a requested_transfer_id
+						// fallback. A swap orphaned before completion never had its transfer
+						// edge persisted, but requested_transfer_id is always set at creation.
+						// Relying on the edge alone here would skip such a swap forever,
+						// leaving it CREATED while its transfer is already SENDER_KEY_TWEAKED
+						// (receiver-claimable). See SP-3261.
+						var dbTransfer *ent.Transfer
+						if utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund {
+							transfer, needUpdate, err := handler.GetTransferFromUtxoSwap(ctx, utxoSwap)
+							if err != nil {
+								logger.With(zap.Error(err)).Sugar().Debugf("No transfer found for a non-refund utxo swap %s", utxoSwap.ID)
+								continue
+							}
+							dbTransfer = transfer
+							if needUpdate {
+								if _, err := utxoSwap.Update().SetTransfer(dbTransfer).Save(ctx); err != nil {
+									logger.With(zap.Error(err)).Sugar().Warnf("Failed to repair transfer linkage for utxo swap %s", utxoSwap.ID)
+									continue
+								}
+							}
 						}
 
 						// If the utxo swap is a refund or the transfer is sent, mark the utxo swap as completed.

@@ -579,6 +579,30 @@ func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 	if utxoSwap.Status == st.UtxoSwapStatusCompleted {
 		return fmt.Errorf("utxo swap is already completed")
 	}
+	// Never cancel a swap whose transfer has already been sent to the receiver:
+	// the receiver can claim those leaves, so rolling back the swap would orphan a
+	// claimable transfer (a double spend). Such a swap must be completed, not
+	// cancelled. The transfer edge may be unset on an in-flight swap, so resolve
+	// via requested_transfer_id. A nil requested_transfer_id means no transfer was
+	// ever associated, so there is nothing claimable to orphan. See SP-3261.
+	if utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund && utxoSwap.RequestedTransferID != uuid.Nil {
+		transfer, _, err := GetTransferFromUtxoSwap(ctx, utxoSwap)
+		switch {
+		case err == nil:
+			if transfer != nil && transferHelper.IsTransferSent(transfer) {
+				return fmt.Errorf("refusing to cancel utxo swap %s: associated transfer %s is already sent (status %s)", utxoSwap.ID, transfer.ID, transfer.Status)
+			}
+		case ent.IsNotFound(err):
+			// Transfer doesn't exist yet (e.g. a rollback during the swap-creation
+			// phase, before initiateUtxoSwapTransfer runs) — there is nothing
+			// claimable to orphan, so cancelling is safe.
+		default:
+			// Transfer state is unreadable (e.g. the transient DB disruption that
+			// strands these swaps). Fail closed: refuse rather than risk orphaning a
+			// sent (claimable) transfer. The rollback is retried. See SP-3261.
+			return fmt.Errorf("cannot determine transfer state before cancelling utxo swap %s: %w", utxoSwap.ID, err)
+		}
+	}
 	if _, err := utxoSwap.Update().SetStatus(st.UtxoSwapStatusCancelled).Save(ctx); err != nil {
 		return fmt.Errorf("unable to cancel utxo swap: %w", err)
 	}
