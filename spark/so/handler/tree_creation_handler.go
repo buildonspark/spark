@@ -37,6 +37,9 @@ func NewTreeCreationHandler(config *so.Config) *TreeCreationHandler {
 }
 
 func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
+	if utxo == nil {
+		return nil, errors.New("on-chain utxo is required")
+	}
 	tx, err := common.TxFromRawTxBytes(utxo.GetRawTx())
 	if err != nil {
 		return nil, err
@@ -71,6 +74,9 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 }
 
 func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context, nodeOutput *pb.NodeOutput, lockParent bool) (*wire.TxOut, error) {
+	if nodeOutput == nil {
+		return nil, errors.New("parent node output is required")
+	}
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)

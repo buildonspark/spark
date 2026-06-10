@@ -764,6 +764,24 @@ func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "nil parent node output source",
+			req: &pb.PrepareTreeAddressRequest{
+				Source: &pb.PrepareTreeAddressRequest_ParentNodeOutput{
+					ParentNodeOutput: nil,
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "nil on-chain utxo source",
+			req: &pb.PrepareTreeAddressRequest{
+				Source: &pb.PrepareTreeAddressRequest_OnChainUtxo{
+					OnChainUtxo: nil,
+				},
+			},
+			expectError: true,
+		},
+		{
 			name: "invalid source - nil",
 			req: &pb.PrepareTreeAddressRequest{
 				Source: nil,
@@ -774,7 +792,11 @@ func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := handler.findParentOutputFromPrepareTreeAddressRequest(ctx, tt.req)
+			var output *wire.TxOut
+			var err error
+			require.NotPanics(t, func() {
+				output, err = handler.findParentOutputFromPrepareTreeAddressRequest(ctx, tt.req)
+			})
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -821,6 +843,24 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "nil parent node output source",
+			req: &pb.CreateTreeRequest{
+				Source: &pb.CreateTreeRequest_ParentNodeOutput{
+					ParentNodeOutput: nil,
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "nil on-chain utxo source",
+			req: &pb.CreateTreeRequest{
+				Source: &pb.CreateTreeRequest_OnChainUtxo{
+					OnChainUtxo: nil,
+				},
+			},
+			expectError: true,
+		},
+		{
 			name: "invalid source - nil",
 			req: &pb.CreateTreeRequest{
 				Source: nil,
@@ -831,7 +871,11 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := handler.findParentOutputFromCreateTreeRequest(ctx, tt.req)
+			var output *wire.TxOut
+			var err error
+			require.NotPanics(t, func() {
+				output, err = handler.findParentOutputFromCreateTreeRequest(ctx, tt.req)
+			})
 
 			if tt.expectError {
 				require.Error(t, err)
