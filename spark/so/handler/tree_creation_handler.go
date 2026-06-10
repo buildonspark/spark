@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -207,6 +208,81 @@ func (h *TreeCreationHandler) getOwnedSigningKeyshareFromOutput(ctx context.Cont
 	}
 
 	return depositAddress.OwnerSigningPubkey, keyshare, nil
+}
+
+// splitTxOutputsWithoutEphemeralAnchor returns the tx outputs, excluding an
+// optional trailing output that is exactly the canonical ephemeral anchor.
+// Production clients (SSP and SDK) append a zero-value anchor output to CPFP
+// txs for fee bumping; it is not a child output and has no prepared deposit
+// address. Anything that is not byte-exact (nonzero value or a different
+// script) is treated as a regular output and rejected by the prepared-address
+// and count checks.
+func splitTxOutputsWithoutEphemeralAnchor(tx *wire.MsgTx) []*wire.TxOut {
+	anchor := common.EphemeralAnchorOutput()
+	if last := len(tx.TxOut) - 1; last >= 0 && tx.TxOut[last].Value == anchor.Value && bytes.Equal(tx.TxOut[last].PkScript, anchor.PkScript) {
+		return tx.TxOut[:last]
+	}
+	return tx.TxOut
+}
+
+func (h *TreeCreationHandler) validateTreeCreationSplitOutputs(
+	ctx context.Context,
+	network btcnetwork.Network,
+	outputs []*wire.TxOut,
+	ownerIdentityPubkey keys.Public,
+	expectedUserPubkey keys.Public,
+	expectedStatechainPubkey keys.Public,
+	txName string,
+) ([]keys.Public, []*ent.SigningKeyshare, error) {
+	userPublicKeys := make([]keys.Public, 0, len(outputs))
+	signingKeyshares := make([]*ent.SigningKeyshare, 0, len(outputs))
+	statechainPublicKeys := make([]keys.Public, 0, len(outputs))
+	for i, output := range outputs {
+		userSigningKey, signingKeyshare, err := h.getOwnedSigningKeyshareFromOutput(ctx, network, output, ownerIdentityPubkey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s output %d must pay an owned prepared deposit address: %w", txName, i, err)
+		}
+		userPublicKeys = append(userPublicKeys, userSigningKey)
+		signingKeyshares = append(signingKeyshares, signingKeyshare)
+		statechainPublicKeys = append(statechainPublicKeys, signingKeyshare.PublicKey)
+	}
+
+	userPublicKeySum, err := keys.SumPublicKeys(userPublicKeys)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !userPublicKeySum.Equals(expectedUserPubkey) {
+		return nil, nil, errors.New("user public key does not add up")
+	}
+
+	statechainPublicKeySum, err := keys.SumPublicKeys(statechainPublicKeys)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !statechainPublicKeySum.Equals(expectedStatechainPubkey) {
+		return nil, nil, errors.New("statechain public key does not add up")
+	}
+
+	return userPublicKeys, signingKeyshares, nil
+}
+
+// validateTreeCreationDirectSplitOutputs binds each direct tx output to the
+// CPFP output at the same index so a caller cannot permute outputs or skew
+// values on the direct exit path relative to the validated CPFP outputs. The
+// direct tx carries no anchor and pays the fee-adjusted CPFP amounts.
+func validateTreeCreationDirectSplitOutputs(directTx *wire.MsgTx, cpfpOutputs []*wire.TxOut, txName string) error {
+	if len(directTx.TxOut) != len(cpfpOutputs) {
+		return fmt.Errorf("%s output count must match cpfp tx non-anchor output count, had: %d, needed: %d", txName, len(directTx.TxOut), len(cpfpOutputs))
+	}
+	for i, output := range directTx.TxOut {
+		if !bytes.Equal(output.PkScript, cpfpOutputs[i].PkScript) {
+			return fmt.Errorf("%s output %d script must match cpfp tx output %d script", txName, i, i)
+		}
+		if expectedValue := common.MaybeApplyFee(cpfpOutputs[i].Value); output.Value != expectedValue {
+			return fmt.Errorf("%s output %d value must be the fee-adjusted cpfp tx output value, had: %d, needed: %d", txName, i, output.Value, expectedValue)
+		}
+	}
+	return nil
 }
 
 func (h *TreeCreationHandler) findParentDepositAddress(ctx context.Context, network btcnetwork.Network, req *pb.PrepareTreeAddressRequest) (*ent.DepositAddress, error) {
@@ -787,46 +863,56 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, errors.New("directRefundTxSigningJob or DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
 		} else if len(currentElement.node.GetChildren()) > 0 {
-			var userPublicKeys []keys.Public
-			var statechainPublicKeys []keys.Public
-			if len(cpfpTx.TxOut) < len(currentElement.node.GetChildren()) {
-				return nil, nil, fmt.Errorf("vout out of bounds for node split cpfp tx, had: %d, needed: %d", len(cpfpTx.TxOut), len(currentElement.node.GetChildren()))
+			cpfpOutputs := splitTxOutputsWithoutEphemeralAnchor(cpfpTx)
+			if len(cpfpOutputs) != len(currentElement.node.GetChildren()) {
+				return nil, nil, fmt.Errorf("node split cpfp tx output count must match split child count, had: %d, needed: %d", len(cpfpOutputs), len(currentElement.node.GetChildren()))
 			}
-			if directTx != nil && len(directTx.TxOut) < len(currentElement.node.GetChildren()) {
-				return nil, nil, fmt.Errorf("vout out of bounds for node split direct tx, had: %d, needed: %d", len(directTx.TxOut), len(currentElement.node.GetChildren()))
+			userPublicKeys, signingKeyshares, err := h.validateTreeCreationSplitOutputs(
+				ctx,
+				network,
+				cpfpOutputs,
+				userIDPubKey,
+				currentElement.userPubKey,
+				currentElement.keyshare.PublicKey,
+				"node split cpfp tx",
+			)
+			if err != nil {
+				return nil, nil, err
 			}
 			for i, child := range currentElement.node.GetChildren() {
-				userSigningKey, signingKeyshare, err := h.getOwnedSigningKeyshareFromOutput(ctx, network, cpfpTx.TxOut[i], userIDPubKey)
-				if err != nil {
-					return nil, nil, err
-				}
-				userPublicKeys = append(userPublicKeys, userSigningKey)
-				statechainPublicKeys = append(statechainPublicKeys, signingKeyshare.PublicKey)
 				queue = append(queue, &element{
-					output:     cpfpTx.TxOut[i],
+					output:     cpfpOutputs[i],
 					outPoint:   wire.OutPoint{Hash: cpfpTx.TxHash(), Index: uint32(i)},
 					node:       child,
-					userPubKey: userSigningKey,
-					keyshare:   signingKeyshare,
+					userPubKey: userPublicKeys[i],
+					keyshare:   signingKeyshares[i],
 					parentNode: node,
 					vout:       uint32(i),
 				})
 			}
-
-			userPublicKeySum, err := keys.SumPublicKeys(userPublicKeys)
+			if directTx != nil {
+				if err := validateTreeCreationDirectSplitOutputs(directTx, cpfpOutputs, "node split direct tx"); err != nil {
+					return nil, nil, err
+				}
+			}
+		} else {
+			cpfpOutputs := splitTxOutputsWithoutEphemeralAnchor(cpfpTx)
+			_, _, err := h.validateTreeCreationSplitOutputs(
+				ctx,
+				network,
+				cpfpOutputs,
+				userIDPubKey,
+				currentElement.userPubKey,
+				currentElement.keyshare.PublicKey,
+				"deferred node split cpfp tx",
+			)
 			if err != nil {
 				return nil, nil, err
 			}
-			if !userPublicKeySum.Equals(currentElement.userPubKey) {
-				return nil, nil, errors.New("user public key does not add up")
-			}
-
-			statechainPublicKeySum, err := keys.SumPublicKeys(statechainPublicKeys)
-			if err != nil {
-				return nil, nil, err
-			}
-			if !statechainPublicKeySum.Equals(currentElement.keyshare.PublicKey) {
-				return nil, nil, errors.New("statechain public key does not add up")
+			if directTx != nil {
+				if err := validateTreeCreationDirectSplitOutputs(directTx, cpfpOutputs, "deferred node split direct tx"); err != nil {
+					return nil, nil, err
+				}
 			}
 		}
 	}

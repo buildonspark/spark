@@ -1166,6 +1166,613 @@ func TestPrepareSigningJobsRejectsChildDepositAddressOwnerMismatch(t *testing.T)
 	require.ErrorContains(t, err, "child deposit address owner")
 }
 
+func TestPrepareSigningJobsRejectsDeferredSplitOutputWithoutPreparedAddress(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{77})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x77}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	output1 := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 50000)
+	output2 := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 50000)
+	splitTx, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, output1, output2)
+	require.Len(t, splitTx.TxOut, 2)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}, false)
+
+	require.ErrorContains(t, err, "deferred node split cpfp tx output 0 must pay an owned prepared deposit address")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsDeferredDirectSplitOutputScriptMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{80})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x80}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	leftUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	rightUserPrivkey := parentUserPrivkey.Sub(leftUserPrivkey)
+	leftStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	rightStatePrivkey := parentStatePrivkey.Sub(leftStatePrivkey)
+	leftKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, leftStatePrivkey)
+	rightKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, rightStatePrivkey)
+
+	leftOutput := createTreeCreationSplitOutput(t, leftStatePrivkey.Public().Add(leftUserPrivkey.Public()), 50000)
+	rightOutput := createTreeCreationSplitOutput(t, rightStatePrivkey.Public().Add(rightUserPrivkey.Public()), 50000)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, leftOutput, identityPubkey, leftUserPrivkey.Public(), leftKeyshare)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, rightOutput, identityPubkey, rightUserPrivkey.Public(), rightKeyshare)
+
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, leftOutput, rightOutput)
+	directOutput1 := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 50000)
+	directOutput2 := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 50000)
+	_, directSplitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, directOutput1, directOutput2)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			DirectNodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  directSplitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}, false)
+
+	require.ErrorContains(t, err, "deferred node split direct tx output 0 script must match cpfp tx output 0 script")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsSingleOutputDeferredSplitOutputWithoutPreparedAddress(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{81})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x81}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	unpreparedOutput := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 100000)
+	splitTx, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, unpreparedOutput)
+	require.Len(t, splitTx.TxOut, 1)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}, false)
+
+	require.ErrorContains(t, err, "deferred node split cpfp tx output 0 must pay an owned prepared deposit address")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsSingleOutputDeferredDirectSplitOutputScriptMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{82})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x82}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, parentOutput)
+	unpreparedDirectOutput := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 100000)
+	directSplitTx, directSplitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, unpreparedDirectOutput)
+	require.Len(t, directSplitTx.TxOut, 1)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			DirectNodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  directSplitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}, false)
+
+	require.ErrorContains(t, err, "deferred node split direct tx output 0 script must match cpfp tx output 0 script")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsSplitWithExtraUntrackedOutput(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{78})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x78}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	output1 := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 30000)
+	output2 := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 30000)
+	extraOutput := createTreeCreationSplitOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 30000)
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, output1, output2, extraOutput)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			Children: []*pb.CreationNode{{}, {}},
+		},
+	}, false)
+
+	require.ErrorContains(t, err, "node split cpfp tx output count must match split child count")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsAllowsDeferredSplitToPreparedOutputs(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{79})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x79}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	leftUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	rightUserPrivkey := parentUserPrivkey.Sub(leftUserPrivkey)
+	leftStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	rightStatePrivkey := parentStatePrivkey.Sub(leftStatePrivkey)
+	leftKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, leftStatePrivkey)
+	rightKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, rightStatePrivkey)
+
+	leftOutput := createTreeCreationSplitOutput(t, leftStatePrivkey.Public().Add(leftUserPrivkey.Public()), 50000)
+	rightOutput := createTreeCreationSplitOutput(t, rightStatePrivkey.Public().Add(rightUserPrivkey.Public()), 50000)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, leftOutput, identityPubkey, leftUserPrivkey.Public(), leftKeyshare)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, rightOutput, identityPubkey, rightUserPrivkey.Public(), rightKeyshare)
+
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, leftOutput, rightOutput)
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}, false)
+
+	require.NoError(t, err)
+	require.Len(t, signingJobs, 1)
+	require.Len(t, nodes, 1)
+}
+
+func TestPrepareSigningJobsAllowsSingleOutputDeferredSplitToPreparedOutput(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{83})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{0x83}, Index: 0}, parentOutput)
+	parentTxid := parentTx.TxHash()
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, parentOutput)
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  splitRawTx,
+				SigningPublicKey:       parentUserPrivkey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}, false)
+
+	require.NoError(t, err)
+	require.Len(t, signingJobs, 1)
+	require.Len(t, nodes, 1)
+}
+
+type treeCreationSplitFixture struct {
+	identityPubkey   keys.Public
+	parentUserPubkey keys.Public
+	parentTx         *wire.MsgTx
+	parentRawTx      []byte
+	leftUserPubkey   keys.Public
+	rightUserPubkey  keys.Public
+	leftOutput       *wire.TxOut
+	rightOutput      *wire.TxOut
+}
+
+// setUpTreeCreationPreparedSplit creates a prepared parent deposit address worth
+// 100000 sats and two prepared child deposit addresses (50000 sats each) whose
+// user and statechain keys sum to the parent keys.
+func setUpTreeCreationPreparedSplit(t *testing.T, ctx context.Context, dbTX *ent.Client, rng *rand.ChaCha8, seed byte) treeCreationSplitFixture {
+	t.Helper()
+
+	identityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	parentUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, parentStatePrivkey)
+	parentOutput := createTreeCreationSplitOutput(t, parentStatePrivkey.Public().Add(parentUserPrivkey.Public()), 100000)
+	parentTx, parentRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: [32]byte{seed}, Index: 0}, parentOutput)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, parentOutput, identityPubkey, parentUserPrivkey.Public(), parentKeyshare)
+
+	leftUserPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	rightUserPrivkey := parentUserPrivkey.Sub(leftUserPrivkey)
+	leftStatePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	rightStatePrivkey := parentStatePrivkey.Sub(leftStatePrivkey)
+	leftKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, leftStatePrivkey)
+	rightKeyshare := createTreeCreationSplitOutputKeyshare(t, ctx, rng, dbTX, rightStatePrivkey)
+
+	leftOutput := createTreeCreationSplitOutput(t, leftStatePrivkey.Public().Add(leftUserPrivkey.Public()), 50000)
+	rightOutput := createTreeCreationSplitOutput(t, rightStatePrivkey.Public().Add(rightUserPrivkey.Public()), 50000)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, leftOutput, identityPubkey, leftUserPrivkey.Public(), leftKeyshare)
+	createTreeCreationSplitDepositAddress(t, ctx, dbTX, rightOutput, identityPubkey, rightUserPrivkey.Public(), rightKeyshare)
+
+	return treeCreationSplitFixture{
+		identityPubkey:   identityPubkey,
+		parentUserPubkey: parentUserPrivkey.Public(),
+		parentTx:         parentTx,
+		parentRawTx:      parentRawTx,
+		leftUserPubkey:   leftUserPrivkey.Public(),
+		rightUserPubkey:  rightUserPrivkey.Public(),
+		leftOutput:       leftOutput,
+		rightOutput:      rightOutput,
+	}
+}
+
+func (f treeCreationSplitFixture) createTreeRequest(rng *rand.ChaCha8, splitRawTx []byte, directSplitRawTx []byte, children []*pb.CreationNode) *pb.CreateTreeRequest {
+	parentTxid := f.parentTx.TxHash()
+	node := &pb.CreationNode{
+		NodeTxSigningJob: &pb.SigningJob{
+			RawTx:                  splitRawTx,
+			SigningPublicKey:       f.parentUserPubkey.Serialize(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		Children: children,
+	}
+	if directSplitRawTx != nil {
+		node.DirectNodeTxSigningJob = &pb.SigningJob{
+			RawTx:                  directSplitRawTx,
+			SigningPublicKey:       f.parentUserPubkey.Serialize(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		}
+	}
+	return &pb.CreateTreeRequest{
+		UserIdentityPublicKey: f.identityPubkey.Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   f.parentRawTx,
+				Txid:    parentTxid[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: node,
+	}
+}
+
+func feeAdjustedTreeCreationSplitOutput(output *wire.TxOut) *wire.TxOut {
+	return &wire.TxOut{Value: common.MaybeApplyFee(output.Value), PkScript: output.PkScript}
+}
+
+func TestPrepareSigningJobsAllowsSplitWithTrailingAnchorAndFeeAdjustedDirectTx(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{84})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	fixture := setUpTreeCreationPreparedSplit(t, ctx, dbTX, rng, 0x84)
+	parentTxid := fixture.parentTx.TxHash()
+
+	splitTx, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, fixture.leftOutput, fixture.rightOutput, common.EphemeralAnchorOutput())
+	splitTxid := splitTx.TxHash()
+	_, directSplitRawTx := createTreeCreationSplitTx(
+		t,
+		wire.OutPoint{Hash: parentTxid, Index: 0},
+		feeAdjustedTreeCreationSplitOutput(fixture.leftOutput),
+		feeAdjustedTreeCreationSplitOutput(fixture.rightOutput),
+	)
+
+	children := make([]*pb.CreationNode, 0, 2)
+	for i, childFields := range []struct {
+		output     *wire.TxOut
+		userPubkey keys.Public
+	}{
+		{fixture.leftOutput, fixture.leftUserPubkey},
+		{fixture.rightOutput, fixture.rightUserPubkey},
+	} {
+		_, childRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: splitTxid, Index: uint32(i)}, childFields.output, common.EphemeralAnchorOutput())
+		children = append(children, &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  childRawTx,
+				SigningPublicKey:       childFields.userPubkey.Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		})
+	}
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.createTreeRequest(rng, splitRawTx, directSplitRawTx, children), false)
+
+	require.NoError(t, err)
+	require.Len(t, signingJobs, 4)
+	require.Len(t, nodes, 3)
+}
+
+func TestPrepareSigningJobsRejectsSplitWithFakeAnchorOutput(t *testing.T) {
+	anchor := common.EphemeralAnchorOutput()
+	tests := []struct {
+		name       string
+		seed       byte
+		fakeAnchor *wire.TxOut
+	}{
+		{
+			name:       "nonzero value",
+			seed:       0x85,
+			fakeAnchor: &wire.TxOut{Value: 1, PkScript: anchor.PkScript},
+		},
+		{
+			name:       "wrong script",
+			seed:       0x86,
+			fakeAnchor: &wire.TxOut{Value: 0, PkScript: anchor.PkScript[:1]},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rng := rand.NewChaCha8([32]byte{tt.seed})
+			ctx, _ := db.ConnectToTestPostgres(t)
+			dbTX, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			fixture := setUpTreeCreationPreparedSplit(t, ctx, dbTX, rng, tt.seed)
+			parentTxid := fixture.parentTx.TxHash()
+			leftOutput := &wire.TxOut{Value: 49000, PkScript: fixture.leftOutput.PkScript}
+			rightOutput := &wire.TxOut{Value: 49000, PkScript: fixture.rightOutput.PkScript}
+			_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, leftOutput, rightOutput, tt.fakeAnchor)
+
+			handler := createTestHandler()
+			signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.createTreeRequest(rng, splitRawTx, nil, []*pb.CreationNode{{}, {}}), false)
+
+			require.ErrorContains(t, err, "node split cpfp tx output count must match split child count, had: 3, needed: 2")
+			assert.Empty(t, signingJobs)
+			assert.Empty(t, nodes)
+		})
+	}
+}
+
+func TestPrepareSigningJobsRejectsDirectSplitTxWithAnchor(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{87})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	fixture := setUpTreeCreationPreparedSplit(t, ctx, dbTX, rng, 0x87)
+	parentTxid := fixture.parentTx.TxHash()
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, fixture.leftOutput, fixture.rightOutput, common.EphemeralAnchorOutput())
+	_, directSplitRawTx := createTreeCreationSplitTx(
+		t,
+		wire.OutPoint{Hash: parentTxid, Index: 0},
+		feeAdjustedTreeCreationSplitOutput(fixture.leftOutput),
+		feeAdjustedTreeCreationSplitOutput(fixture.rightOutput),
+		common.EphemeralAnchorOutput(),
+	)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.createTreeRequest(rng, splitRawTx, directSplitRawTx, []*pb.CreationNode{{}, {}}), false)
+
+	require.ErrorContains(t, err, "node split direct tx output count must match cpfp tx non-anchor output count, had: 3, needed: 2")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsPermutedDirectSplitOutputs(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{88})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	fixture := setUpTreeCreationPreparedSplit(t, ctx, dbTX, rng, 0x88)
+	parentTxid := fixture.parentTx.TxHash()
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, fixture.leftOutput, fixture.rightOutput, common.EphemeralAnchorOutput())
+	_, directSplitRawTx := createTreeCreationSplitTx(
+		t,
+		wire.OutPoint{Hash: parentTxid, Index: 0},
+		feeAdjustedTreeCreationSplitOutput(fixture.rightOutput),
+		feeAdjustedTreeCreationSplitOutput(fixture.leftOutput),
+	)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.createTreeRequest(rng, splitRawTx, directSplitRawTx, []*pb.CreationNode{{}, {}}), false)
+
+	require.ErrorContains(t, err, "node split direct tx output 0 script must match cpfp tx output 0 script")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsDirectSplitOutputValueSkew(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{89})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	fixture := setUpTreeCreationPreparedSplit(t, ctx, dbTX, rng, 0x89)
+	parentTxid := fixture.parentTx.TxHash()
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, fixture.leftOutput, fixture.rightOutput, common.EphemeralAnchorOutput())
+	_, directSplitRawTx := createTreeCreationSplitTx(
+		t,
+		wire.OutPoint{Hash: parentTxid, Index: 0},
+		fixture.leftOutput,
+		feeAdjustedTreeCreationSplitOutput(fixture.rightOutput),
+	)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.createTreeRequest(rng, splitRawTx, directSplitRawTx, []*pb.CreationNode{{}, {}}), false)
+
+	require.ErrorContains(t, err, "node split direct tx output 0 value must be the fee-adjusted cpfp tx output value")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsDirectSplitOutputCountMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{90})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	fixture := setUpTreeCreationPreparedSplit(t, ctx, dbTX, rng, 0x90)
+	parentTxid := fixture.parentTx.TxHash()
+	_, splitRawTx := createTreeCreationSplitTx(t, wire.OutPoint{Hash: parentTxid, Index: 0}, fixture.leftOutput, fixture.rightOutput, common.EphemeralAnchorOutput())
+	_, directSplitRawTx := createTreeCreationSplitTx(
+		t,
+		wire.OutPoint{Hash: parentTxid, Index: 0},
+		feeAdjustedTreeCreationSplitOutput(fixture.leftOutput),
+	)
+
+	handler := createTestHandler()
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.createTreeRequest(rng, splitRawTx, directSplitRawTx, []*pb.CreationNode{{}, {}}), false)
+
+	require.ErrorContains(t, err, "node split direct tx output count must match cpfp tx non-anchor output count, had: 1, needed: 2")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
 func createTreeCreationOwnerAuthKeyshare(t *testing.T, ctx context.Context, rng *rand.ChaCha8, dbTX *ent.Client) *ent.SigningKeyshare {
 	t.Helper()
 
@@ -1181,6 +1788,69 @@ func createTreeCreationOwnerAuthKeyshare(t *testing.T, ctx context.Context, rng 
 		Save(ctx)
 	require.NoError(t, err)
 	return signingKeyshare
+}
+
+func createTreeCreationSplitOutputKeyshare(t *testing.T, ctx context.Context, rng *rand.ChaCha8, dbTX *ent.Client, secret keys.Private) *ent.SigningKeyshare {
+	t.Helper()
+
+	publicShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"test": publicShare.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+	return signingKeyshare
+}
+
+func createTreeCreationSplitOutput(t *testing.T, pubKey keys.Public, value int64) *wire.TxOut {
+	t.Helper()
+
+	pkScript, err := common.P2TRScriptFromPubKey(pubKey)
+	require.NoError(t, err)
+	return &wire.TxOut{Value: value, PkScript: pkScript}
+}
+
+func createTreeCreationSplitTx(t *testing.T, prevOut wire.OutPoint, outputs ...*wire.TxOut) (*wire.MsgTx, []byte) {
+	t.Helper()
+
+	tx := wire.NewMsgTx(wire.TxVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: prevOut,
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	for _, output := range outputs {
+		tx.AddTxOut(output)
+	}
+	rawTx, err := common.SerializeTx(tx)
+	require.NoError(t, err)
+	return tx, rawTx
+}
+
+func createTreeCreationSplitDepositAddress(
+	t *testing.T,
+	ctx context.Context,
+	dbTX *ent.Client,
+	output *wire.TxOut,
+	ownerIdentityPubkey keys.Public,
+	ownerSigningPubkey keys.Public,
+	signingKeyshare *ent.SigningKeyshare,
+) {
+	t.Helper()
+
+	address, err := common.P2TRAddressFromPkScript(output.PkScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*address).
+		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetOwnerSigningPubkey(ownerSigningPubkey).
+		SetSigningKeyshare(signingKeyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
 }
 
 func createTreeCreationOwnerAuthTx(t *testing.T, pkScript []byte) []byte {
