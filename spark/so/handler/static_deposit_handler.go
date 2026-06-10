@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/sighash"
 	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
@@ -372,7 +374,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			if err := validateUserSignature(depositAddress.OwnerIdentityPubkey, req.GetUserSignature(), spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, schemaNetwork, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.GetHashVariant()); err != nil {
 				return nil, fmt.Errorf("user signature validation failed: %w", err)
 			}
-			spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.GetOnChainUtxo(), req.GetRefundTxSigningJob(), nil)
+			spendTxSigningResult, depositAddressQueryResult, err := getSpendTxSigningResultForVerifiedTargetUtxo(ctx, config, targetUtxo, req.GetRefundTxSigningJob())
 			if err != nil {
 				return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 			}
@@ -404,7 +406,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	// **********************************************************************************************
 	// Signing the spend transactions.
 	// **********************************************************************************************
-	spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.GetOnChainUtxo(), req.GetRefundTxSigningJob(), nil)
+	spendTxSigningResult, depositAddressQueryResult, err := getSpendTxSigningResultForVerifiedTargetUtxo(ctx, config, targetUtxo, req.GetRefundTxSigningJob())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 	}
@@ -528,41 +530,68 @@ func (o *StaticDepositHandler) CreateSwapRefundForAllOperators(ctx context.Conte
 // This prevents attacks where a caller requests a refund for UTXO A but provides a transaction
 // that actually spends UTXO B.
 func validateStaticDepositRefundTx(targetUtxo *VerifiedTargetUtxo, rawTx []byte) error {
-	if targetUtxo == nil {
-		return fmt.Errorf("target UTXO is nil")
-	}
+	_, err := validateStaticDepositSingleInputTx(targetUtxo, rawTx, "refund")
+	return err
+}
 
-	if len(rawTx) == 0 {
-		return errors.InvalidArgumentMissingField(fmt.Errorf("refund transaction is empty"))
-	}
-
-	refundTx, err := common.TxFromRawTxBytes(rawTx)
+func validateStaticDepositSpendTxSpendsTargetUtxo(targetUtxo *VerifiedTargetUtxo, rawTx []byte) error {
+	spendTx, err := validateStaticDepositSingleInputTx(targetUtxo, rawTx, "spend")
 	if err != nil {
-		return errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse refund transaction: %w", err))
+		return err
 	}
 
-	// Create refund transaction internally using user provided outputs
-	tx := wire.NewMsgTx(3)
-	tx.AddTxIn(&wire.TxIn{
+	totalOutputValue := int64(0)
+	for _, out := range spendTx.TxOut {
+		if out.Value < 0 {
+			return errors.InvalidArgumentMalformedField(helper.ErrNegativeOutputValue)
+		}
+		if totalOutputValue > math.MaxInt64-out.Value {
+			return errors.InvalidArgumentMalformedField(helper.ErrTotalOutputValueGreaterThanMaxInt64)
+		}
+		totalOutputValue += out.Value
+	}
+	onChainTxOut := wire.NewTxOut(int64(targetUtxo.inner.Amount), targetUtxo.inner.PkScript)
+	if totalOutputValue > onChainTxOut.Value {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("%w: totalOutputValue: %d, prevOutputValue: %d", helper.ErrTotalOutputValueGreaterThanPrevOutputValue, totalOutputValue, onChainTxOut.Value))
+	}
+	if _, err := sighash.FromTx(spendTx, 0, onChainTxOut); err != nil {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("spend transaction is not signable: %w", err))
+	}
+	return nil
+}
+
+func validateStaticDepositSingleInputTx(targetUtxo *VerifiedTargetUtxo, rawTx []byte, txLabel string) (*wire.MsgTx, error) {
+	if targetUtxo == nil {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("target UTXO is nil"))
+	}
+	if len(rawTx) == 0 {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("%s transaction is empty", txLabel))
+	}
+
+	parsedTx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse %s transaction: %w", txLabel, err))
+	}
+
+	expectedTx := wire.NewMsgTx(3)
+	expectedTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{
 			Hash:  *targetUtxo.Hash(),
 			Index: targetUtxo.Vout(),
 		},
 		Sequence: wire.MaxTxInSequenceNum,
 	})
-	for _, txOut := range refundTx.TxOut {
-		tx.AddTxOut(txOut)
+	for _, txOut := range parsedTx.TxOut {
+		expectedTx.AddTxOut(txOut)
 	}
 
 	var buf bytes.Buffer
-	err = tx.Serialize(&buf)
-	if err != nil {
-		return fmt.Errorf("unable to serialize expected transaction")
+	if err := expectedTx.Serialize(&buf); err != nil {
+		return nil, fmt.Errorf("unable to serialize expected %s transaction", txLabel)
 	}
 	expectedTxBytes := buf.Bytes()
 	if !bytes.Equal(expectedTxBytes, rawTx) {
-		return errors.InvalidArgumentMalformedField(fmt.Errorf("unexpected refund transaction structure: expected %x, got %x", expectedTxBytes, rawTx))
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("unexpected %s transaction structure: expected %x, got %x", txLabel, expectedTxBytes, rawTx))
 	}
-
-	return nil
+	return parsedTx, nil
 }

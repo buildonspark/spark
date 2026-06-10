@@ -1657,6 +1657,17 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := validateStaticDepositSpendTxSpendsTargetUtxo(targetUtxo, spendTxSigningJob.GetRawTx()); err != nil {
+		return nil, nil, err
+	}
+
+	return getSpendTxSigningResultForVerifiedTargetUtxo(ctx, config, targetUtxo, spendTxSigningJob)
+}
+
+func getSpendTxSigningResultForVerifiedTargetUtxo(ctx context.Context, config *so.Config, targetUtxo *VerifiedTargetUtxo, spendTxSigningJob *pb.SigningJob) (*pb.SigningResult, *pb.DepositAddressQueryResult, error) {
+	if spendTxSigningJob == nil || spendTxSigningJob.GetSigningNonceCommitment() == nil || spendTxSigningJob.GetRawTx() == nil {
+		return nil, nil, fmt.Errorf("spend tx signing job is not valid")
+	}
 	depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get deposit address: %w", err)

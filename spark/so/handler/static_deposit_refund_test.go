@@ -78,6 +78,14 @@ func createSpendTxBytesSpendingOutpoint(t *testing.T, prevTxid chainhash.Hash, p
 	return buf.Bytes()
 }
 
+func createSpendTxBytesSpendingUtxo(t *testing.T, utxo *ent.Utxo, receiverPubKey keys.Public) []byte {
+	t.Helper()
+
+	txidHash, err := chainhash.NewHashFromStr(hex.EncodeToString(utxo.Txid))
+	require.NoError(t, err)
+	return createSpendTxBytesSpendingOutpoint(t, *txidHash, utxo.Vout, receiverPubKey, int64(utxo.Amount))
+}
+
 func createMockInitiateStaticDepositUtxoRefundRequest(
 	t *testing.T,
 	rng io.Reader,
