@@ -233,7 +233,7 @@ Spark uses a modified **FROST** (Flexible Round-Optimized Schnorr Threshold) sch
 4. **Tree Creation**: SO creates tree structure and publishes to L1
 5. **Confirmation**: After sufficient confirmations, leaves become available
 
-**Flow Documentation:** See `.claude/flows/static_deposits.md` and `.claude/flows/non_static_deposits.md`
+**Flow Documentation:** See `.claude/flows/static_deposits.md` (`non_static_deposits.md` is planned, not yet written)
 
 ### Transfer (Off-chain)
 
@@ -244,7 +244,7 @@ Spark uses a modified **FROST** (Flexible Round-Optimized Schnorr Threshold) sch
 3. **Validation**: Receiver verifies SE deleted old key shares (1-of-N trust model)
 4. **New Exit Tx**: Receiver gets new pre-signed exit transaction with shorter timelock
 
-**Flow Documentation:** See `.claude/flows/transfers.md`
+**Flow Documentation:** `.claude/flows/transfers.md` (planned, not yet written)
 
 ### Lightning Integration
 
@@ -254,20 +254,20 @@ Spark supports Lightning via **Atomic Swaps** with SSP:
 1. Client initiates preimage swap with SO, locking leaves for payment hash
 2. SSP pays Lightning invoice, learns preimage
 3. SSP provides preimage to SO, claims locked leaves
-4. **Flow Documentation:** See `.claude/flows/lightning_send_flow.md`
+4. **Flow Documentation:** `.claude/flows/lightning_send_flow.md` (planned, not yet written)
 
 **Lightning Receive:**
 1. Client generates preimage, requests invoice from SSP
 2. SSP creates Lightning invoice, waits for payment
 3. When paid, SSP transfers leaves to user, user provides preimage
-4. **Flow Documentation:** See `.claude/flows/lightning_receive_flow.md`
+4. **Flow Documentation:** `.claude/flows/lightning_receive_flow.md` (planned, not yet written)
 
 ### Withdrawal (Spark → L1)
 
 **Cooperative Exit:**
 1. User requests withdrawal, SSP creates connector transaction
 2. User signs refund transactions, SSP finalizes and broadcasts exit
-3. **Flow Documentation:** See `.claude/flows/coop_exit_detailed_flow.md`
+3. **Flow Documentation:** `.claude/flows/coop_exit_detailed_flow.md` (planned, not yet written)
 
 **Unilateral Exit:**
 1. User broadcasts pre-signed Branch Tx
@@ -403,7 +403,7 @@ Spark supports native tokens (BTKN) as metadata on leaves:
 - Token operations coordinated via two-phase commit across SOs
 - Token metadata does not appear on Bitcoin blockchain
 
-**Flow Documentation:** See `.claude/flows/token_creation_flow_CORRECTED.md` and related token flow docs
+**Flow Documentation:** `.claude/flows/token_creation_flow_CORRECTED.md` and related token flow docs (planned, not yet written)
 
 ## 10. Code Organization
 
@@ -534,11 +534,10 @@ golangci-lint run
 
 **Unit Tests** (Required):
 ```bash
-mise test-go           # Quick tests (recommended)
-# OR
-mise test-unit         # Without postgres-dependent tests (~20-30s faster)
-# OR
-mise test-unit-with-postgres  # Full unit tests with postgres
+mise test-go           # From repo root (runs spark's test-unit)
+# OR (from spark/ directory)
+mise test-unit         # lightspark build tags
+mise test-unit-oss     # OSS build (no lightspark tags)
 ```
 
 **Proto Generation** (When proto files change):
@@ -555,9 +554,9 @@ mise gen-ent
 
 **Integration Tests** (Before PR):
 ```bash
-mise test-grpc-minikube
+mise test-grpc-k8s     # Against minikube (sets SPARK_LOCAL_INGRESS_HOST automatically)
 # OR (from spark/ directory)
-MINIKUBE_IP=$(minikube ip) go test -failfast=false -p=2 ./so/grpc_test/...
+SPARK_LOCAL_INGRESS_HOST=$(minikube ip) go test -tags=lightspark -p=1 ./so/grpc_test/...
 ```
 
 ### SSP (Spark Service Provider) - Python
