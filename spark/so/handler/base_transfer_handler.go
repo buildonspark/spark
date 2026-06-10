@@ -1314,6 +1314,21 @@ func (h *BaseTransferHandler) CancelTransferInternal(ctx context.Context, transf
 	return h.executeCancelTransfer(ctx, transfer)
 }
 
+// isCancellableTransferStatus reports whether a transfer in the given status
+// may still be cancelled. Only early sender-side states qualify; once the
+// sender key tweak has been applied (or the transfer is terminal) it must not
+// be cancelled.
+func isCancellableTransferStatus(status st.TransferStatus) bool {
+	switch status {
+	case st.TransferStatusSenderInitiated,
+		st.TransferStatusSenderKeyTweakPending,
+		st.TransferStatusSenderInitiatedCoordinator:
+		return true
+	default:
+		return false
+	}
+}
+
 func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfer *ent.Transfer) error {
 	// Don't error if the transfer is already returned.
 	logger := logging.GetLoggerFromContext(ctx)
@@ -1326,10 +1341,7 @@ func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfe
 		transfer.Status == st.TransferStatusExpired {
 		return fmt.Errorf("transfer %s is already in terminal state %s and cannot be cancelled", transfer.ID, transfer.Status)
 	}
-	// Only allow cancellation from early states
-	if transfer.Status != st.TransferStatusSenderInitiated &&
-		transfer.Status != st.TransferStatusSenderKeyTweakPending &&
-		transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
+	if !isCancellableTransferStatus(transfer.Status) {
 		return fmt.Errorf("transfer %s cannot be cancelled from status %s", transfer.ID, transfer.Status)
 	}
 
