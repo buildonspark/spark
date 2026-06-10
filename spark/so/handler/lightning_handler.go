@@ -1541,7 +1541,15 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 }
 
 // InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.
+//
+// Gated on KnobUseConsensusInitiatePreimageSwap: when enabled, routes through the
+// 2PC consensus engine (initiatePreimageSwapV3Consensus); otherwise uses the
+// legacy initiatePreimageSwap fanout. V3 semantics: requireDirectTx=true, no
+// expiry override (expiry is taken from req.Transfer.ExpiryTime as-is).
 func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusInitiatePreimageSwap, 0) > 0 {
+		return h.initiatePreimageSwapV3Consensus(ctx, req)
+	}
 	return h.initiatePreimageSwap(ctx, req, true, nil)
 }
 

@@ -677,6 +677,7 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3: legacy V2 fanout path
 	)
 	require.NoError(t, err)
 

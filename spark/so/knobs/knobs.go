@@ -203,6 +203,24 @@ const (
 	// to RETURNED.
 	KnobUseConsensusCoopExit = "spark.so.use_consensus_coop_exit"
 
+	// KnobUseConsensusInitiatePreimageSwap routes InitiatePreimageSwapV3 through
+	// the 2PC engine instead of the legacy initiatePreimageSwap fanout
+	// (InitiatePreimageSwapV2 -> GetPreimageShare) + PreimageSwap gossip.
+	// Interpreted as binary (any non-zero value enables) — not a percentage
+	// rollout.
+	//
+	// Prepare validates + creates the transfer/preimage_request/user_signed_transaction
+	// rows on every SO and produces FROST round-2 shares over the HTLC refund txs
+	// (REASON_SEND); BuildCommitPayload aggregates those signatures and, on the
+	// non-HODL REASON_RECEIVE path, recovers the preimage from a threshold of
+	// shares. The engine records the COMMITTED decision atomically with the
+	// coordinator's domain commit (single request-tx DbCommit), so a crash before
+	// that commit rolls every SO back with an IN_FLIGHT row (sweep -> ROLLED_BACK,
+	// consistent) and a crash after it leaves a COMMITTED row the reconciler drives
+	// forward (SP-3195). Sender key tweaks for REASON_SEND are settled later by
+	// ProvidePreimage, not in this flow — matching legacy.
+	KnobUseConsensusInitiatePreimageSwap = "spark.so.use_consensus_initiate_preimage_swap"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)

@@ -21,6 +21,12 @@ import (
 )
 
 // SwapNodesForPreimage swaps a node for a preimage of a Lightning invoice.
+//
+// useV3 (optional, defaults to false) routes through InitiatePreimageSwapV3
+// instead of V2 — used by the consensus-path integration tests. The request
+// shape is identical; only the routing/expiry semantics differ on the SO side
+// (and V3 is knob-gated behind KnobUseConsensusInitiatePreimageSwap). Variadic
+// so the ~two dozen existing V2 callers don't need updating.
 func SwapNodesForPreimage(
 	ctx context.Context,
 	config *TestWalletConfig,
@@ -31,6 +37,7 @@ func SwapNodesForPreimage(
 	feeSats uint64,
 	isInboundPayment bool,
 	amountSats uint64,
+	useV3 ...bool,
 ) (*pb.InitiatePreimageSwapResponse, error) {
 	// SSP asks for signing commitment
 	conn, err := config.NewCoordinatorGRPCConnection()
@@ -211,7 +218,7 @@ func SwapNodesForPreimage(
 		}
 	}
 
-	response, err := client.InitiatePreimageSwapV2(tmpCtx, &pb.InitiatePreimageSwapRequest{
+	swapReq := &pb.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash,
 		Reason:      reason,
 		InvoiceAmount: &pb.InvoiceAmount{
@@ -223,7 +230,15 @@ func SwapNodesForPreimage(
 		Transfer:                  userSignedTransfer,
 		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 		FeeSats:                   feeSats,
-	})
+	}
+	if len(useV3) > 0 && useV3[0] {
+		response, err := client.InitiatePreimageSwapV3(tmpCtx, swapReq)
+		if err != nil {
+			return nil, err
+		}
+		return response, nil
+	}
+	response, err := client.InitiatePreimageSwapV2(tmpCtx, swapReq)
 	if err != nil {
 		return nil, err
 	}
@@ -294,6 +309,7 @@ func SwapNodesForPreimageWithHTLC(
 	feeSats uint64,
 	isInboundPayment bool,
 	amountSats uint64,
+	useV3 bool,
 ) (*pb.InitiatePreimageSwapResponse, error) {
 	// SSP asks for signing commitment
 	conn, err := config.NewCoordinatorGRPCConnection()
@@ -474,7 +490,7 @@ func SwapNodesForPreimageWithHTLC(
 		}
 	}
 
-	response, err := client.InitiatePreimageSwapV2(tmpCtx, &pb.InitiatePreimageSwapRequest{
+	swapReq := &pb.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash,
 		Reason:      reason,
 		InvoiceAmount: &pb.InvoiceAmount{
@@ -487,7 +503,17 @@ func SwapNodesForPreimageWithHTLC(
 		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 		FeeSats:                   feeSats,
 		TransferRequest:           transfer,
-	})
+	}
+	// V3 is gated behind KnobUseConsensusInitiatePreimageSwap on the SO side; the
+	// request shape is identical to V2, only the routing/expiry semantics differ.
+	if useV3 {
+		response, err := client.InitiatePreimageSwapV3(tmpCtx, swapReq)
+		if err != nil {
+			return nil, err
+		}
+		return response, nil
+	}
+	response, err := client.InitiatePreimageSwapV2(tmpCtx, swapReq)
 	if err != nil {
 		return nil, err
 	}
