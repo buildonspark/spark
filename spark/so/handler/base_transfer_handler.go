@@ -344,8 +344,12 @@ func validateSendLeafDirectRefundTxs(senderLeaf *ent.TreeNode, receiverDirectRef
 func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawRefundTx []byte, directRefundTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
 	leafIsWatchtowerReady := len(leaf.DirectTx) > 0
 	if leafIsWatchtowerReady {
-		receivedDirectTxs := len(directRefundTx) > 0 && len(directFromCpfpRefundTx) > 0
-		if receivedDirectTxs {
+		hasDirectRefundTx := len(directRefundTx) > 0
+		hasDirectFromCpfpRefundTx := len(directFromCpfpRefundTx) > 0
+		if hasDirectRefundTx != hasDirectFromCpfpRefundTx {
+			return fmt.Errorf("both direct refund txs are required when either direct refund tx is provided")
+		}
+		if hasDirectRefundTx {
 			if err := validateSendLeafDirectRefundTxs(leaf, directRefundTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount); err != nil {
 				return err
 			}

@@ -121,6 +121,56 @@ func TestLeafAvailableToTransferRejectsLeafOwnedByDifferentIdentity(t *testing.T
 	require.NoError(t, handler.LeafAvailableToTransfer(ctx, leaf, transfer))
 }
 
+func TestValidateSendLeafRefundTxsRejectsPartialDirectRefundPair(t *testing.T) {
+	receiverPub := keys.GeneratePrivateKey().Public()
+	receiverScript, err := common.P2TRScriptFromPubKey(receiverPub)
+	require.NoError(t, err)
+
+	nodeTx := wire.NewMsgTx(3)
+	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	nodeTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
+	nodeHash := nodeTx.TxHash()
+
+	directTx := wire.NewMsgTx(3)
+	directTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	directTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
+	directHash := directTx.TxHash()
+
+	const oldTimelock uint32 = 600
+	senderRefundTx := wire.NewMsgTx(3)
+	senderRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
+		Sequence:         oldTimelock,
+	})
+
+	senderLeaf := &ent.TreeNode{
+		RawTx:       mustSerializeTx(t, nodeTx),
+		DirectTx:    mustSerializeTx(t, directTx),
+		RawRefundTx: mustSerializeTx(t, senderRefundTx),
+	}
+
+	buildRefundTxBytes := func(outPoint wire.OutPoint, sequence uint32) []byte {
+		tx := wire.NewMsgTx(3)
+		tx.AddTxIn(&wire.TxIn{PreviousOutPoint: outPoint, Sequence: sequence})
+		tx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
+		return mustSerializeTx(t, tx)
+	}
+
+	canonicalCpfpSequence := oldTimelock - spark.TimeLockInterval
+	canonicalDirectSequence := oldTimelock - spark.TimeLockInterval + spark.DirectTimelockOffset
+	canonicalCpfpRefund := buildRefundTxBytes(wire.OutPoint{Hash: nodeHash, Index: 0}, canonicalCpfpSequence)
+	canonicalDirectRefund := buildRefundTxBytes(wire.OutPoint{Hash: directHash, Index: 0}, canonicalDirectSequence)
+	canonicalDirectFromCpfpRefund := buildRefundTxBytes(wire.OutPoint{Hash: nodeHash, Index: 0}, canonicalDirectSequence)
+
+	err = validateSendLeafRefundTxs(senderLeaf, canonicalCpfpRefund, canonicalDirectRefund, nil, receiverPub, 1, false)
+	require.ErrorContains(t, err, "both direct refund txs are required")
+
+	err = validateSendLeafRefundTxs(senderLeaf, canonicalCpfpRefund, nil, canonicalDirectFromCpfpRefund, receiverPub, 1, false)
+	require.ErrorContains(t, err, "both direct refund txs are required")
+
+	require.NoError(t, validateSendLeafRefundTxs(senderLeaf, canonicalCpfpRefund, canonicalDirectRefund, canonicalDirectFromCpfpRefund, receiverPub, 1, false))
+}
+
 func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.ConnectToTestPostgres(t)
