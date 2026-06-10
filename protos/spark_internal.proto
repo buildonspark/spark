@@ -542,6 +542,56 @@ message ProvidePreimageRollbackRequest {
     string transfer_id = 1;
 }
 
+// InitiatePreimageSwapPrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP 2PC flow. It wraps the public
+// InitiatePreimageSwapRequest verbatim. Every SO runs the full preimage-swap
+// validation (ValidateGetPreimageRequest, ValidateTransferPackage,
+// buildHTLCRefundMaps), persists the transfer + preimage_request +
+// user_signed_transaction rows, and — for REASON_SEND with a transfer package —
+// produces FROST round-2 signature shares over the HTLC refund txs. The
+// expiry-override / receive-no-expiry mutation is applied by the coordinator
+// onto original_request before fan-out, so every SO agrees on the same expiry.
+// Field name mirrors the sibling 2PC PrepareRequest messages
+// (SendTransferPrepareRequest, ProvidePreimagePrepareRequest, CoopExitPrepareRequest).
+message InitiatePreimageSwapPrepareRequest {
+    spark.InitiatePreimageSwapRequest original_request = 1;
+}
+
+// InitiatePreimageSwapPrepareResponse is each SO's Prepare result. The two
+// fields are populated on disjoint flow paths: frost_response carries this SO's
+// FROST round-2 signature shares over the HTLC refund txs (REASON_SEND with a
+// transfer package; nil when this SO is outside the signing set or on a receive
+// flow), while preimage_share carries this SO's share of the payment preimage
+// (non-HODL REASON_RECEIVE only, where the coordinator recovers the preimage
+// from a threshold of shares in BuildCommitPayload).
+message InitiatePreimageSwapPrepareResponse {
+    FrostRound2Response frost_response = 1;
+    bytes preimage_share = 2;
+}
+
+// InitiatePreimageSwapCommitRequest is the 2PC commit payload the coordinator
+// builds in BuildCommitPayload. Field population is mutually exclusive by flow:
+// leaf_signatures for REASON_SEND (aggregated HTLC refund signatures every SO
+// applies via UpdateTransferLeavesSignatures); preimage + key_tweak_proofs for
+// the non-HODL REASON_RECEIVE path (the recovered preimage to persist plus the
+// proofs used to settle sender key tweaks). All empty for HODL receive /
+// send-without-package, where the state written in Prepare is already terminal
+// for this flow.
+message InitiatePreimageSwapCommitRequest {
+    string transfer_id = 1;
+    repeated SendTransferLeafSignatures leaf_signatures = 2;
+    bytes preimage = 3;
+    map<string, spark.SecretProof> key_tweak_proofs = 4;
+}
+
+// InitiatePreimageSwapRollbackRequest is the 2PC rollback payload. Each SO
+// cancels the transfer it wrote in Prepare (transfer -> RETURNED, leaves
+// unlocked) via executeCancelTransfer. Idempotent: a never-created transfer or
+// an already-terminal one is a no-op.
+message InitiatePreimageSwapRollbackRequest {
+    string transfer_id = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }

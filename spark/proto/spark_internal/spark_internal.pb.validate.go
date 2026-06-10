@@ -7652,6 +7652,572 @@ var _ interface {
 	ErrorName() string
 } = ProvidePreimageRollbackRequestValidationError{}
 
+// Validate checks the field values on InitiatePreimageSwapPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InitiatePreimageSwapPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiatePreimageSwapPrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiatePreimageSwapPrepareRequestMultiError, or nil if none found.
+func (m *InitiatePreimageSwapPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiatePreimageSwapPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiatePreimageSwapPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiatePreimageSwapPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiatePreimageSwapPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiatePreimageSwapPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiatePreimageSwapPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiatePreimageSwapPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiatePreimageSwapPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiatePreimageSwapPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiatePreimageSwapPrepareRequestMultiError) AllErrors() []error { return m }
+
+// InitiatePreimageSwapPrepareRequestValidationError is the validation error
+// returned by InitiatePreimageSwapPrepareRequest.Validate if the designated
+// constraints aren't met.
+type InitiatePreimageSwapPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiatePreimageSwapPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiatePreimageSwapPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiatePreimageSwapPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiatePreimageSwapPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiatePreimageSwapPrepareRequestValidationError) ErrorName() string {
+	return "InitiatePreimageSwapPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiatePreimageSwapPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiatePreimageSwapPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiatePreimageSwapPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiatePreimageSwapPrepareRequestValidationError{}
+
+// Validate checks the field values on InitiatePreimageSwapPrepareResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InitiatePreimageSwapPrepareResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiatePreimageSwapPrepareResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiatePreimageSwapPrepareResponseMultiError, or nil if none found.
+func (m *InitiatePreimageSwapPrepareResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiatePreimageSwapPrepareResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetFrostResponse()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiatePreimageSwapPrepareResponseValidationError{
+					field:  "FrostResponse",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiatePreimageSwapPrepareResponseValidationError{
+					field:  "FrostResponse",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFrostResponse()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiatePreimageSwapPrepareResponseValidationError{
+				field:  "FrostResponse",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for PreimageShare
+
+	if len(errors) > 0 {
+		return InitiatePreimageSwapPrepareResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiatePreimageSwapPrepareResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiatePreimageSwapPrepareResponse.ValidateAll() if the designated
+// constraints aren't met.
+type InitiatePreimageSwapPrepareResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiatePreimageSwapPrepareResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiatePreimageSwapPrepareResponseMultiError) AllErrors() []error { return m }
+
+// InitiatePreimageSwapPrepareResponseValidationError is the validation error
+// returned by InitiatePreimageSwapPrepareResponse.Validate if the designated
+// constraints aren't met.
+type InitiatePreimageSwapPrepareResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiatePreimageSwapPrepareResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiatePreimageSwapPrepareResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiatePreimageSwapPrepareResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiatePreimageSwapPrepareResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiatePreimageSwapPrepareResponseValidationError) ErrorName() string {
+	return "InitiatePreimageSwapPrepareResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiatePreimageSwapPrepareResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiatePreimageSwapPrepareResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiatePreimageSwapPrepareResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiatePreimageSwapPrepareResponseValidationError{}
+
+// Validate checks the field values on InitiatePreimageSwapCommitRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InitiatePreimageSwapCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiatePreimageSwapCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiatePreimageSwapCommitRequestMultiError, or nil if none found.
+func (m *InitiatePreimageSwapCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiatePreimageSwapCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InitiatePreimageSwapCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InitiatePreimageSwapCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InitiatePreimageSwapCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Preimage
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweakProofs()))
+		i := 0
+		for key := range m.GetKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for KeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiatePreimageSwapCommitRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiatePreimageSwapCommitRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiatePreimageSwapCommitRequestValidationError{
+						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiatePreimageSwapCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiatePreimageSwapCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiatePreimageSwapCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiatePreimageSwapCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiatePreimageSwapCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiatePreimageSwapCommitRequestMultiError) AllErrors() []error { return m }
+
+// InitiatePreimageSwapCommitRequestValidationError is the validation error
+// returned by InitiatePreimageSwapCommitRequest.Validate if the designated
+// constraints aren't met.
+type InitiatePreimageSwapCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiatePreimageSwapCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiatePreimageSwapCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiatePreimageSwapCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiatePreimageSwapCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiatePreimageSwapCommitRequestValidationError) ErrorName() string {
+	return "InitiatePreimageSwapCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiatePreimageSwapCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiatePreimageSwapCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiatePreimageSwapCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiatePreimageSwapCommitRequestValidationError{}
+
+// Validate checks the field values on InitiatePreimageSwapRollbackRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InitiatePreimageSwapRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiatePreimageSwapRollbackRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiatePreimageSwapRollbackRequestMultiError, or nil if none found.
+func (m *InitiatePreimageSwapRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiatePreimageSwapRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	if len(errors) > 0 {
+		return InitiatePreimageSwapRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiatePreimageSwapRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiatePreimageSwapRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiatePreimageSwapRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiatePreimageSwapRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiatePreimageSwapRollbackRequestMultiError) AllErrors() []error { return m }
+
+// InitiatePreimageSwapRollbackRequestValidationError is the validation error
+// returned by InitiatePreimageSwapRollbackRequest.Validate if the designated
+// constraints aren't met.
+type InitiatePreimageSwapRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiatePreimageSwapRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiatePreimageSwapRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiatePreimageSwapRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiatePreimageSwapRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiatePreimageSwapRollbackRequestValidationError) ErrorName() string {
+	return "InitiatePreimageSwapRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiatePreimageSwapRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiatePreimageSwapRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiatePreimageSwapRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiatePreimageSwapRollbackRequestValidationError{}
+
 // Validate checks the field values on ReserveEntityDkgKeyRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
