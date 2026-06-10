@@ -493,7 +493,11 @@ func (h *TransferHandler) startTransferInternal(
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
+		// The transfer itself succeeded at this point; failing here lets the sender recover via
+		// the normal pending-transfer query/resume paths instead of receiving a success response
+		// with a nil Transfer.
 		logger.With(zap.Error(err)).Sugar().Errorf("Unable to marshal transfer %s", transfer.ID)
+		return nil, fmt.Errorf("transfer %s was initiated but the response could not be built: %w", transfer.ID, err)
 	}
 
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
