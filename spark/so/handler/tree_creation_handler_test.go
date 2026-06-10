@@ -10,6 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -197,6 +198,413 @@ func createTreeCreationTestParentNode(
 	require.NoError(t, err)
 
 	return parentNode, parentTx, parentOutput
+}
+
+func createTreeCreationRefundValidationKeyshare(t *testing.T, ctx context.Context, dbTX *ent.Client, rng io.Reader) *ent.SigningKeyshare {
+	t.Helper()
+
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keysharePrivKey).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return signingKeyshare
+}
+
+func createTreeCreationRefundValidationOutput(t *testing.T, pubKey keys.Public, value int64) *wire.TxOut {
+	t.Helper()
+
+	pkScript, err := common.P2TRScriptFromPubKey(pubKey)
+	require.NoError(t, err)
+	return wire.NewTxOut(value, pkScript)
+}
+
+func createTreeCreationRefundValidationTx(t *testing.T, prevOut wire.OutPoint, sequence uint32, outputs ...*wire.TxOut) (*wire.MsgTx, []byte) {
+	t.Helper()
+
+	tx := wire.NewMsgTx(3)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: prevOut,
+		Sequence:         sequence,
+	})
+	for _, output := range outputs {
+		tx.AddTxOut(wire.NewTxOut(output.Value, append([]byte(nil), output.PkScript...)))
+	}
+
+	rawTx, err := common.SerializeTx(tx)
+	require.NoError(t, err)
+	return tx, rawTx
+}
+
+func createTreeCreationRefundValidationSigningJob(t *testing.T, rng io.Reader, rawTx []byte, signingPubKey keys.Public) *pb.SigningJob {
+	t.Helper()
+
+	return &pb.SigningJob{
+		RawTx:                  rawTx,
+		SigningPublicKey:       signingPubKey.Serialize(),
+		SigningNonceCommitment: createTestSigningCommitment(rng),
+	}
+}
+
+type treeCreationRefundValidationFixture struct {
+	req                              *pb.CreateTreeRequest
+	nodeTx                           *wire.MsgTx
+	directNodeTx                     *wire.MsgTx
+	nodeOutput                       *wire.TxOut
+	directNodeOutput                 *wire.TxOut
+	ownerSigningPubKey               keys.Public
+	refundTxSigningJob               *pb.SigningJob
+	directRefundTxSigningJob         *pb.SigningJob
+	directFromCpfpRefundTxSigningJob *pb.SigningJob
+}
+
+func createTreeCreationRefundValidationFixture(t *testing.T, ctx context.Context, rng io.Reader) *treeCreationRefundValidationFixture {
+	t.Helper()
+
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshare := createTreeCreationRefundValidationKeyshare(t, ctx, dbTX, rng)
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keyshare.PublicKey.Add(ownerSigningPubKey)
+
+	parentOutput := createTreeCreationRefundValidationOutput(t, verifyingPubKey, 100_000)
+	parentTx, parentRawTx := createTreeCreationRefundValidationTx(
+		t,
+		wire.OutPoint{Hash: [32]byte{1, 2, 3}, Index: 0},
+		wire.MaxTxInSequenceNum,
+		parentOutput,
+	)
+	parentTxHash := parentTx.TxHash()
+
+	parentAddress, err := common.P2TRAddressFromPkScript(parentOutput.PkScript, btcnetwork.Regtest)
+	require.NoError(t, err)
+	_, err = dbTX.DepositAddress.Create().
+		SetAddress(*parentAddress).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetSigningKeyshare(keyshare).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeOutput := createTreeCreationRefundValidationOutput(t, verifyingPubKey, parentOutput.Value)
+	nodeTx, nodeRawTx := createTreeCreationRefundValidationTx(
+		t,
+		wire.OutPoint{Hash: parentTxHash, Index: 0},
+		wire.MaxTxInSequenceNum,
+		nodeOutput,
+	)
+	nodeTxHash := nodeTx.TxHash()
+
+	directNodeOutput := createTreeCreationRefundValidationOutput(t, verifyingPubKey, common.MaybeApplyFee(parentOutput.Value))
+	directNodeTx, directNodeRawTx := createTreeCreationRefundValidationTx(
+		t,
+		wire.OutPoint{Hash: parentTxHash, Index: 0},
+		wire.MaxTxInSequenceNum,
+		directNodeOutput,
+	)
+	directNodeTxHash := directNodeTx.TxHash()
+
+	refundOutput := createTreeCreationRefundValidationOutput(t, ownerSigningPubKey, nodeOutput.Value)
+	_, refundRawTx := createTreeCreationRefundValidationTx(
+		t,
+		wire.OutPoint{Hash: nodeTxHash, Index: 0},
+		spark.InitialSequence(),
+		refundOutput,
+		common.EphemeralAnchorOutput(),
+	)
+	directRefundOutput := createTreeCreationRefundValidationOutput(t, ownerSigningPubKey, common.MaybeApplyFee(directNodeOutput.Value))
+	_, directRefundRawTx := createTreeCreationRefundValidationTx(
+		t,
+		wire.OutPoint{Hash: directNodeTxHash, Index: 0},
+		spark.InitialSequence()+spark.DirectTimelockOffset,
+		directRefundOutput,
+	)
+	directFromCpfpRefundOutput := createTreeCreationRefundValidationOutput(t, ownerSigningPubKey, common.MaybeApplyFee(nodeOutput.Value))
+	_, directFromCpfpRefundRawTx := createTreeCreationRefundValidationTx(
+		t,
+		wire.OutPoint{Hash: nodeTxHash, Index: 0},
+		spark.InitialSequence()+spark.DirectTimelockOffset,
+		directFromCpfpRefundOutput,
+	)
+
+	nodeTxSigningJob := createTreeCreationRefundValidationSigningJob(t, rng, nodeRawTx, ownerSigningPubKey)
+	directNodeTxSigningJob := createTreeCreationRefundValidationSigningJob(t, rng, directNodeRawTx, ownerSigningPubKey)
+	refundTxSigningJob := createTreeCreationRefundValidationSigningJob(t, rng, refundRawTx, ownerSigningPubKey)
+	directRefundTxSigningJob := createTreeCreationRefundValidationSigningJob(t, rng, directRefundRawTx, ownerSigningPubKey)
+	directFromCpfpRefundTxSigningJob := createTreeCreationRefundValidationSigningJob(t, rng, directFromCpfpRefundRawTx, ownerSigningPubKey)
+
+	return &treeCreationRefundValidationFixture{
+		req: &pb.CreateTreeRequest{
+			Source: &pb.CreateTreeRequest_OnChainUtxo{
+				OnChainUtxo: createTestUTXO(parentRawTx, 0),
+			},
+			UserIdentityPublicKey: ownerIdentityPubKey.Serialize(),
+			Node: &pb.CreationNode{
+				NodeTxSigningJob:                 nodeTxSigningJob,
+				DirectNodeTxSigningJob:           directNodeTxSigningJob,
+				RefundTxSigningJob:               refundTxSigningJob,
+				DirectRefundTxSigningJob:         directRefundTxSigningJob,
+				DirectFromCpfpRefundTxSigningJob: directFromCpfpRefundTxSigningJob,
+			},
+		},
+		nodeTx:                           nodeTx,
+		directNodeTx:                     directNodeTx,
+		nodeOutput:                       nodeOutput,
+		directNodeOutput:                 directNodeOutput,
+		ownerSigningPubKey:               ownerSigningPubKey,
+		refundTxSigningJob:               refundTxSigningJob,
+		directRefundTxSigningJob:         directRefundTxSigningJob,
+		directFromCpfpRefundTxSigningJob: directFromCpfpRefundTxSigningJob,
+	}
+}
+
+func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) {
+	tests := []struct {
+		name      string
+		mutate    func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader)
+		wantError string
+	}{
+		{
+			name: "cpfp refund pays attacker key",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence(),
+					createTreeCreationRefundValidationOutput(t, attackerPubKey, f.nodeOutput.Value),
+					common.EphemeralAnchorOutput(),
+				)
+				f.refundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "refund transaction verification failed",
+		},
+		{
+			name: "cpfp refund disables relative timelock",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					wire.SequenceLockTimeDisabled|(spark.InitialSequence()&0xFFFF),
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, f.nodeOutput.Value),
+					common.EphemeralAnchorOutput(),
+				)
+				f.refundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "refund transaction verification failed",
+		},
+		{
+			name: "cpfp refund omits anchor",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence(),
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, f.nodeOutput.Value),
+				)
+				f.refundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "refund transaction verification failed",
+		},
+		{
+			name: "cpfp refund pays wrong value",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence(),
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, f.nodeOutput.Value-1000),
+					common.EphemeralAnchorOutput(),
+				)
+				f.refundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "refund transaction verification failed",
+		},
+		{
+			name: "cpfp refund uses wrong but enabled timelock",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence()-spark.TimeLockInterval,
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, f.nodeOutput.Value),
+					common.EphemeralAnchorOutput(),
+				)
+				f.refundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "refund transaction verification failed",
+		},
+		{
+			name: "direct refund pays attacker key",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+				directNodeTxHash := f.directNodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: directNodeTxHash, Index: 0},
+					spark.InitialSequence()+spark.DirectTimelockOffset,
+					createTreeCreationRefundValidationOutput(t, attackerPubKey, common.MaybeApplyFee(f.directNodeOutput.Value)),
+				)
+				f.directRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct refund transaction verification failed",
+		},
+		{
+			name: "direct refund disables relative timelock",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				directNodeTxHash := f.directNodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: directNodeTxHash, Index: 0},
+					wire.SequenceLockTimeDisabled|((spark.InitialSequence()+spark.DirectTimelockOffset)&0xFFFF),
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, common.MaybeApplyFee(f.directNodeOutput.Value)),
+				)
+				f.directRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct refund transaction verification failed",
+		},
+		{
+			name: "direct refund adds anchor",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				directNodeTxHash := f.directNodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: directNodeTxHash, Index: 0},
+					spark.InitialSequence()+spark.DirectTimelockOffset,
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, common.MaybeApplyFee(f.directNodeOutput.Value)),
+					common.EphemeralAnchorOutput(),
+				)
+				f.directRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct refund transaction verification failed",
+		},
+		{
+			name: "direct from cpfp refund pays attacker key",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence()+spark.DirectTimelockOffset,
+					createTreeCreationRefundValidationOutput(t, attackerPubKey, common.MaybeApplyFee(f.nodeOutput.Value)),
+				)
+				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct-from-cpfp refund transaction verification failed",
+		},
+		{
+			name: "direct from cpfp refund disables relative timelock",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					wire.SequenceLockTimeDisabled|((spark.InitialSequence()+spark.DirectTimelockOffset)&0xFFFF),
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, common.MaybeApplyFee(f.nodeOutput.Value)),
+				)
+				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct-from-cpfp refund transaction verification failed",
+		},
+		{
+			name: "direct from cpfp refund adds anchor",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence()+spark.DirectTimelockOffset,
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, common.MaybeApplyFee(f.nodeOutput.Value)),
+					common.EphemeralAnchorOutput(),
+				)
+				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct-from-cpfp refund transaction verification failed",
+		},
+		{
+			name: "direct from cpfp refund deducts the fee three times",
+			mutate: func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader) {
+				nodeTxHash := f.nodeTx.TxHash()
+				tripleFeeValue := common.MaybeApplyFee(common.MaybeApplyFee(common.MaybeApplyFee(f.nodeOutput.Value)))
+				_, rawTx := createTreeCreationRefundValidationTx(
+					t,
+					wire.OutPoint{Hash: nodeTxHash, Index: 0},
+					spark.InitialSequence()+spark.DirectTimelockOffset,
+					createTreeCreationRefundValidationOutput(t, f.ownerSigningPubKey, tripleFeeValue),
+				)
+				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
+			},
+			wantError: "direct-from-cpfp refund transaction verification failed",
+		},
+	}
+
+	t.Run("canonical refund transactions", func(t *testing.T) {
+		rng := rand.NewChaCha8([32]byte{91})
+		ctx, _ := db.ConnectToTestPostgres(t)
+		handler := createTestHandler()
+		fixture := createTreeCreationRefundValidationFixture(t, ctx, rng)
+
+		signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.req, true)
+		require.NoError(t, err)
+		require.Len(t, signingJobs, 5)
+		require.Len(t, nodes, 1)
+	})
+
+	// The production SSP (sparkcore's tree_creation.py) deducts the default fee from the
+	// direct-from-cpfp refund twice (it reuses the direct refund amount, which already has
+	// one fee applied), while the SDK deducts it once. Both constructions must be accepted.
+	t.Run("sparkcore double-fee direct from cpfp refund accepted", func(t *testing.T) {
+		rng := rand.NewChaCha8([32]byte{92})
+		ctx, _ := db.ConnectToTestPostgres(t)
+		handler := createTestHandler()
+		fixture := createTreeCreationRefundValidationFixture(t, ctx, rng)
+
+		nodeTxHash := fixture.nodeTx.TxHash()
+		doubleFeeValue := common.MaybeApplyFee(common.MaybeApplyFee(fixture.nodeOutput.Value))
+		_, rawTx := createTreeCreationRefundValidationTx(
+			t,
+			wire.OutPoint{Hash: nodeTxHash, Index: 0},
+			spark.InitialSequence()+spark.DirectTimelockOffset,
+			createTreeCreationRefundValidationOutput(t, fixture.ownerSigningPubKey, doubleFeeValue),
+		)
+		fixture.directFromCpfpRefundTxSigningJob.RawTx = rawTx
+
+		signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.req, true)
+		require.NoError(t, err)
+		require.Len(t, signingJobs, 5)
+		require.Len(t, nodes, 1)
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rng := rand.NewChaCha8([32]byte{42})
+			ctx, _ := db.ConnectToTestPostgres(t)
+			handler := createTestHandler()
+			fixture := createTreeCreationRefundValidationFixture(t, ctx, rng)
+			tt.mutate(t, fixture, rng)
+
+			signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.req, true)
+			require.ErrorContains(t, err, tt.wantError)
+			require.Nil(t, signingJobs)
+			require.Nil(t, nodes)
+		})
+	}
 }
 
 func TestNewTreeCreationHandler(t *testing.T) {

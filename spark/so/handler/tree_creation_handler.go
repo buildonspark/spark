@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/lightsparkdev/spark"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -152,6 +154,56 @@ func validateTreeCreationTxSpendsOutpoint(tx *wire.MsgTx, expectedOutPoint wire.
 	}
 	if tx.TxIn[0].PreviousOutPoint != expectedOutPoint {
 		return fmt.Errorf("%s input 0 must spend %s, got %s", txName, expectedOutPoint.String(), tx.TxIn[0].PreviousOutPoint.String())
+	}
+	return nil
+}
+
+func validateTreeCreationRefundTransaction(ctx context.Context, rawTx []byte, sourceRawTx []byte, txName string, txType bitcointransaction.TxType, refundDestPubkey keys.Public, network btcnetwork.Network) error {
+	// We add TimeLockInterval to ensure that expectedTx has locktime
+	// set to InitialTimeLock
+	cpfpTimelock := spark.InitialTimeLock + spark.TimeLockInterval
+	if err := bitcointransaction.VerifyTransactionWithSource(ctx, rawTx, sourceRawTx, 0, cpfpTimelock, txType, refundDestPubkey, network.String()); err != nil {
+		return fmt.Errorf("%s verification failed: %w", txName, err)
+	}
+	return nil
+}
+
+// validateTreeCreationDirectFromCpfpRefundTransaction verifies a direct-from-cpfp refund
+// against the CPFP node transaction. The canonical SDK construction (spark-frost's
+// construct_refund_tx_trio) deducts the default fee from the CPFP output value once, but
+// the production SSP (sparkcore's tree_creation.py) reuses the direct refund amount,
+// deducting the fee twice. Both values are accepted; the outpoint, destination script,
+// sequence/timelock, and anchor-less single-output shape are enforced either way.
+func validateTreeCreationDirectFromCpfpRefundTransaction(ctx context.Context, rawTx []byte, sourceRawTx []byte, refundDestPubkey keys.Public, network btcnetwork.Network) error {
+	err := validateTreeCreationRefundTransaction(ctx, rawTx, sourceRawTx, "direct-from-cpfp refund transaction", bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, network)
+	if err == nil {
+		return nil
+	}
+
+	clientTx, parseErr := common.TxFromRawTxBytes(rawTx)
+	if parseErr != nil || clientTx.Version != 3 {
+		return err
+	}
+	clientSequence, seqErr := bitcointransaction.GetAndValidateUserSequence(rawTx)
+	if seqErr != nil {
+		return err
+	}
+	cpfpTimelock := spark.InitialTimeLock + spark.TimeLockInterval
+	expectedTx, constructErr := bitcointransaction.ConstructExpectedTransaction(sourceRawTx, 0, cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, refundDestPubkey, clientSequence, clientTx.Version)
+	if constructErr != nil {
+		return err
+	}
+	expectedTx.TxOut[0].Value = common.MaybeApplyFee(expectedTx.TxOut[0].Value)
+	expectedTxBytes, serializeErr := common.SerializeTxNoWitness(expectedTx)
+	if serializeErr != nil {
+		return err
+	}
+	clientTxBytes, serializeErr := common.SerializeTxNoWitness(clientTx)
+	if serializeErr != nil {
+		return err
+	}
+	if !bytes.Equal(expectedTxBytes, clientTxBytes) {
+		return err
 	}
 	return nil
 }
@@ -835,6 +887,17 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if err := validateTreeCreationTxSpendsOutpoint(cpfpRefundTx, cpfpRefundOutPoint, "refund transaction"); err != nil {
 				return nil, nil, err
 			}
+			if err := validateTreeCreationRefundTransaction(
+				ctx,
+				currentElement.node.GetRefundTxSigningJob().GetRawTx(),
+				currentElement.node.GetNodeTxSigningJob().GetRawTx(),
+				"refund transaction",
+				bitcointransaction.TxTypeRefundCPFP,
+				currentElement.userPubKey,
+				network,
+			); err != nil {
+				return nil, nil, err
+			}
 			signingJobs = append(signingJobs, cpfpRefundSigningJob)
 			if currentElement.node.GetDirectRefundTxSigningJob() != nil && currentElement.node.GetDirectFromCpfpRefundTxSigningJob() != nil {
 				if directTx == nil {
@@ -851,11 +914,31 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				if err := validateTreeCreationTxSpendsOutpoint(directRefundTx, directRefundOutPoint, "direct refund transaction"); err != nil {
 					return nil, nil, err
 				}
+				if err := validateTreeCreationRefundTransaction(
+					ctx,
+					currentElement.node.GetDirectRefundTxSigningJob().GetRawTx(),
+					currentElement.node.GetDirectNodeTxSigningJob().GetRawTx(),
+					"direct refund transaction",
+					bitcointransaction.TxTypeRefundDirect,
+					currentElement.userPubKey,
+					network,
+				); err != nil {
+					return nil, nil, err
+				}
 				directFromCpfpRefundSigningJob, directFromCpfpRefundTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetDirectFromCpfpRefundTxSigningJob(), cpfpTx.TxOut[0])
 				if err != nil {
 					return nil, nil, err
 				}
 				if err := validateTreeCreationTxSpendsOutpoint(directFromCpfpRefundTx, cpfpRefundOutPoint, "direct-from-cpfp refund transaction"); err != nil {
+					return nil, nil, err
+				}
+				if err := validateTreeCreationDirectFromCpfpRefundTransaction(
+					ctx,
+					currentElement.node.GetDirectFromCpfpRefundTxSigningJob().GetRawTx(),
+					currentElement.node.GetNodeTxSigningJob().GetRawTx(),
+					currentElement.userPubKey,
+					network,
+				); err != nil {
 					return nil, nil, err
 				}
 				signingJobs = append(signingJobs, directRefundSigningJob, directFromCpfpRefundSigningJob)
