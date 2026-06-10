@@ -15,8 +15,8 @@ import (
 
 func TestMarshalProtoForReceiver(t *testing.T) {
 	ctx, dbCtx := db.ConnectToTestPostgres(t)
-	// Match prod: multi-participant format knob is on, so MarshalProto emits
-	// Senders[]/Receivers[].
+	// Match prod: KnobReadMIMOMultiParticipantFormat on = strict mode, so a
+	// missing participant edge is a hard error rather than a silent empty array.
 	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobReadMIMOMultiParticipantFormat: 100,
 	}))
@@ -46,6 +46,15 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	// Every real transfer has at least one sender row; strict-mode marshal
+	// requires the edge to be present.
+	_, err = client.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(senderPub).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+
 	tree := createTestTreeForClaim(t, ctx, senderPub, client)
 	keyshare1 := createTestSigningKeyshare(t, ctx, rng, client)
 	keyshare2 := createTestSigningKeyshare(t, ctx, rng, client)
@@ -60,9 +69,10 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 	_, err = leafB.Update().SetTransferReceiverID(receiverB.ID).Save(ctx)
 	require.NoError(t, err)
 
-	// Re-query transfer with edges needed by MarshalProtoForReceiver
+	// Re-query transfer with edges needed by MarshalProtoForReceiver in strict mode.
 	transfer, err = client.Transfer.Query().
 		Where(enttransfer.ID(transfer.ID)).
+		WithTransferSenders().
 		WithTransferReceivers().
 		WithSparkInvoice().
 		Only(ctx)
@@ -103,15 +113,13 @@ func TestMarshalProtoForReceiver(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("MarshalProto without pre-loaded receivers has empty Receivers", func(t *testing.T) {
+	t.Run("MarshalProto without pre-loaded edges errors in strict mode", func(t *testing.T) {
 		plainTransfer, err := client.Transfer.Query().
 			Where(enttransfer.ID(transfer.ID)).
 			WithSparkInvoice().
 			Only(ctx)
 		require.NoError(t, err)
-		proto, err := plainTransfer.MarshalProto(ctx)
-		require.NoError(t, err)
-		assert.Len(t, proto.GetLeaves(), 2)
-		assert.Empty(t, proto.GetReceivers())
+		_, err = plainTransfer.MarshalProto(ctx)
+		require.ErrorContains(t, err, "not pre-loaded")
 	})
 }

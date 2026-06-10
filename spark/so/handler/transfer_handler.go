@@ -1984,48 +1984,6 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	return &pb.FinalizeTransferResponse{Transfer: transferProto}, err
 }
 
-// checkTransferAccessWithPubkeys checks if the viewer has read access to either the sender or receiver wallet.
-// It updates the accessMap cache to avoid redundant database queries.
-func (h *TransferHandler) checkTransferAccessWithPubkeys(
-	ctx context.Context,
-	transferID uuid.UUID,
-	senderPubkey, receiverPubkey keys.Public,
-	accessMap map[keys.Public]bool,
-) (bool, error) {
-	hasReadAccess, exists := accessMap[senderPubkey]
-	if !exists {
-		var err error
-		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, senderPubkey)
-		if err != nil {
-			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transferID.String(), err)
-		}
-		accessMap[senderPubkey] = hasReadAccess
-	}
-	if hasReadAccess {
-		return true, nil
-	}
-
-	hasReadAccess, exists = accessMap[receiverPubkey]
-	if !exists {
-		var err error
-		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, receiverPubkey)
-		if err != nil {
-			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transferID.String(), err)
-		}
-		accessMap[receiverPubkey] = hasReadAccess
-	}
-	return hasReadAccess, nil
-}
-
-// checkTransferAccessLegacy checks if the viewer has read access using the transfer's legacy sender/receiver identity fields.
-func (h *TransferHandler) checkTransferAccessLegacy(
-	ctx context.Context,
-	transfer *ent.Transfer,
-	accessMap map[keys.Public]bool,
-) (bool, error) {
-	return h.checkTransferAccessWithPubkeys(ctx, transfer.ID, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey, accessMap)
-}
-
 // checkTransferAccessMIMO grants access if the viewer matches any sender or
 // receiver of the transfer. Requires WithTransferSenders/WithTransferReceivers
 // to be pre-loaded. Errors if either edge is empty — every transfer must have
@@ -2072,7 +2030,6 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
 
-	useMIMO := knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMOMultiParticipantFormat, 0) > 0
 	start := time.Now()
 	defer func() {
 		resultCount := 0
@@ -2304,13 +2261,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	accessMap := make(map[keys.Public]bool)
 	for _, transfer := range transfers {
 		if walletIdentityPubkey == nil && !isSSP {
-			// If no participant is set and not SSP, we need to check if the viewer has read access to either the sender or receiver
+			// No participant filter scoped the query, so check viewer access per row.
 			var hasReadAccess bool
-			if useMIMO {
-				hasReadAccess, err = h.checkTransferAccessMIMO(ctx, transfer, accessMap)
-			} else {
-				hasReadAccess, err = h.checkTransferAccessLegacy(ctx, transfer, accessMap)
-			}
+			hasReadAccess, err = h.checkTransferAccessMIMO(ctx, transfer, accessMap)
 			if err != nil {
 				return nil, err
 			}
@@ -2320,7 +2273,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 
 		var transferProto *pb.Transfer
-		if useMIMO && walletIdentityPubkey != nil && transfer.HasReceiver(*walletIdentityPubkey) {
+		if walletIdentityPubkey != nil && transfer.HasReceiver(*walletIdentityPubkey) {
 			transferProto, err = transfer.MarshalProtoForReceiver(ctx, *walletIdentityPubkey)
 		} else {
 			transferProto, err = transfer.MarshalProto(ctx)

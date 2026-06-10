@@ -1029,12 +1029,7 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
 	}
 	// Reload the transfer post-Commit so the marshaled response carries the
-	// final status + edges. Eager-load TransferSenders + TransferReceivers
-	// unconditionally to match legacy claimTransferLegacy's marshal reload
-	// — Transfer.MarshalProto / MarshalProtoForReceiver both consult these
-	// edges and emit a spark_transfer_marshal_missing_edge_total metric when
-	// they're absent (see warnIfParticipantEdgesMissing). The metric is on
-	// track to become a hard error per the TODO in transfer_extension.go.
+	// final status + edges.
 	freshTransferQuery := freshDb.Transfer.Query().
 		Where(enttransfer.ID(transferEnt.ID)).
 		WithTransferSenders().

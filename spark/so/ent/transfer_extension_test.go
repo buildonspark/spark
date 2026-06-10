@@ -23,7 +23,8 @@ import (
 )
 
 // mimoOnContext returns a context with KnobReadMIMOMultiParticipantFormat=100,
-// so MarshalProto emits Senders[]/Receivers[]. Mirrors how prod runs today.
+// which puts MarshalProto into strict mode: a missing participant edge becomes a
+// hard error rather than a silent empty array. Mirrors how prod runs today.
 func mimoOnContext(t *testing.T) context.Context {
 	t.Helper()
 	return knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
@@ -31,16 +32,14 @@ func mimoOnContext(t *testing.T) context.Context {
 	}))
 }
 
-// mimoOnContextWithLogObserver returns a knob-on context plus an observer for
-// captured log entries, so tests can assert on the missing-edge warnings.
-func mimoOnContextWithLogObserver(t *testing.T) (context.Context, *observer.ObservedLogs) {
+// knobOffContextWithLogObserver returns a context with the enforcement knob off
+// (tolerant mode) plus an observer capturing warn-level logs, so tests can assert
+// a missing-edge warning fires instead of the marshal path silently continuing.
+func knobOffContextWithLogObserver(t *testing.T) (context.Context, *observer.ObservedLogs) {
 	t.Helper()
 	core, logs := observer.New(zapcore.WarnLevel)
-	ctx := logging.Inject(t.Context(), zap.New(core))
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
-	}))
-	return ctx, logs
+	// No knob injection -> KnobReadMIMOMultiParticipantFormat defaults to 0 (off).
+	return logging.Inject(t.Context(), zap.New(core)), logs
 }
 
 // Valid bitcoin transaction with a parseable encoded user timelock — same
@@ -258,84 +257,105 @@ func TestMarshalProto_PopulatesLeafTransferSenderID(t *testing.T) {
 	}
 }
 
-func TestMarshalProto_KnobOff_OmitsMultiParticipantFields(t *testing.T) {
+func TestMarshalProto_EmitsMultiParticipantFieldsRegardlessOfKnob(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 	senderID := uuid.New()
 	transfer.Edges.TransferSenders = []*ent.TransferSender{
 		{ID: senderID, IdentityPubkey: transfer.SenderIdentityPubkey},
 	}
 
-	// No knob injection -> KnobReadMIMOMultiParticipantFormat defaults to 0.
+	// Knob off (no injection); emission is knob-independent — the knob only gates
+	// strict-vs-tolerant enforcement.
 	proto, err := transfer.MarshalProto(t.Context())
 	require.NoError(t, err)
 
 	require.Len(t, proto.GetLeaves(), 2, "Leaves should still emit (legacy field)")
 	require.Equal(t, transfer.SenderIdentityPubkey.Serialize(), proto.GetSenderIdentityPublicKey(),
 		"legacy scalar SenderIdentityPublicKey should still emit")
-	require.Empty(t, proto.GetSenders(), "Senders[] should be empty when knob is off")
-	require.Empty(t, proto.GetReceivers(), "Receivers[] should be empty when knob is off")
+	require.Len(t, proto.GetSenders(), 1, "Senders[] emits even with the knob off")
+	require.Len(t, proto.GetReceivers(), 2, "Receivers[] emits even with the knob off")
 }
 
-func TestMarshalProtoForReceiver_KnobOff_OmitsMultiParticipantFields(t *testing.T) {
+func TestMarshalProtoForReceiver_EmitsMultiParticipantFieldsRegardlessOfKnob(t *testing.T) {
 	transfer, recv1Pub, _ := preloadedTransfer(t)
 	senderID := uuid.New()
 	transfer.Edges.TransferSenders = []*ent.TransferSender{
 		{ID: senderID, IdentityPubkey: transfer.SenderIdentityPubkey},
 	}
 
-	// MarshalProtoForReceiver still filters leaves by receiver regardless of knob,
-	// since the filtering is required for correctness — only the proto Senders[]/Receivers[]
-	// fields are gated.
+	// Knob off, but emission is unconditional: leaves are filtered to the receiver
+	// and the Senders[]/Receivers[] fields still populate.
 	proto, err := transfer.MarshalProtoForReceiver(t.Context(), recv1Pub)
 	require.NoError(t, err)
-	require.Len(t, proto.GetLeaves(), 1, "leaf filtering by receiver still applies when knob off")
-	require.Empty(t, proto.GetSenders(), "Senders[] should be empty when knob is off")
-	require.Empty(t, proto.GetReceivers(), "Receivers[] should be empty when knob is off")
+	require.Len(t, proto.GetLeaves(), 1, "leaf filtering by receiver still applies")
+	require.Len(t, proto.GetSenders(), 1, "Senders[] emits even with the knob off")
+	require.Len(t, proto.GetReceivers(), 1, "Receivers[] is the single filtered receiver")
 }
 
-func TestMarshalProto_KnobOn_WarnsWhenSendersMissing(t *testing.T) {
+func TestMarshalProto_KnobOn_ErrorsWhenSendersMissing(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 	transfer.Edges.TransferSenders = nil
 
-	ctx, logs := mimoOnContextWithLogObserver(t)
-	proto, err := transfer.MarshalProto(ctx)
-	require.NoError(t, err)
-	require.Empty(t, proto.GetSenders(), "Senders[] is empty when the edge isn't pre-loaded")
-
-	warnings := logs.FilterMessageSnippet("TransferSenders not pre-loaded").All()
-	require.Len(t, warnings, 1, "expected one warning about missing TransferSenders edge")
-	require.Equal(t, zapcore.WarnLevel, warnings[0].Level)
+	_, err := transfer.MarshalProto(mimoOnContext(t))
+	require.ErrorContains(t, err, "TransferSenders not pre-loaded",
+		"MarshalProto must hard-error when the Senders edge isn't pre-loaded and the knob is on")
 }
 
-func TestMarshalProto_KnobOn_WarnsWhenReceiversMissing(t *testing.T) {
+func TestMarshalProto_KnobOn_ErrorsWhenReceiversMissing(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 	transfer.Edges.TransferReceivers = nil
 	transfer.Edges.TransferSenders = []*ent.TransferSender{
 		{ID: uuid.New(), IdentityPubkey: transfer.SenderIdentityPubkey},
 	}
 
-	ctx, logs := mimoOnContextWithLogObserver(t)
-	proto, err := transfer.MarshalProto(ctx)
-	require.NoError(t, err)
-	require.Empty(t, proto.GetReceivers(), "Receivers[] is empty when the edge isn't pre-loaded")
-	require.Len(t, proto.GetSenders(), 1, "Senders[] still emits when its edge is loaded")
-
-	warnings := logs.FilterMessageSnippet("TransferReceivers not pre-loaded").All()
-	require.Len(t, warnings, 1, "expected one warning about missing TransferReceivers edge")
+	_, err := transfer.MarshalProto(mimoOnContext(t))
+	require.ErrorContains(t, err, "TransferReceivers not pre-loaded",
+		"MarshalProto must hard-error when the Receivers edge isn't pre-loaded and the knob is on")
 }
 
-func TestMarshalProto_KnobOff_NoWarningsWhenEdgesMissing(t *testing.T) {
+func TestMarshalProtoForReceiver_KnobOn_ErrorsWhenSendersMissing(t *testing.T) {
+	transfer, recv1Pub, _ := preloadedTransfer(t)
+	// TransferReceivers stays loaded (MarshalProtoForReceiver's own precondition
+	// requires it); only the Senders edge is dropped.
+	transfer.Edges.TransferSenders = nil
+
+	_, err := transfer.MarshalProtoForReceiver(mimoOnContext(t), recv1Pub)
+	require.ErrorContains(t, err, "TransferSenders not pre-loaded",
+		"MarshalProtoForReceiver must hard-error when the Senders edge isn't pre-loaded and the knob is on")
+}
+
+func TestMarshalProto_KnobOff_WarnsAndDegradesWhenEdgesMissing(t *testing.T) {
 	transfer, _, _ := preloadedTransfer(t)
 	transfer.Edges.TransferReceivers = nil
 	transfer.Edges.TransferSenders = nil
 
-	core, logs := observer.New(zapcore.WarnLevel)
-	ctx := logging.Inject(t.Context(), zap.New(core))
-	// No knob injection -> knob off -> we never inspect the edges -> no warnings.
-
-	_, err := transfer.MarshalProto(ctx)
+	// Knob off -> tolerant: missing edges warn (never silent) and degrade to empty
+	// arrays, no error.
+	ctx, logs := knobOffContextWithLogObserver(t)
+	proto, err := transfer.MarshalProto(ctx)
 	require.NoError(t, err)
-	require.Zero(t, logs.Len(), "no warnings should fire when the knob is off")
+	require.Empty(t, proto.GetSenders(), "Senders[] degrades to empty when its edge is missing and knob off")
+	require.Empty(t, proto.GetReceivers(), "Receivers[] degrades to empty when its edge is missing and knob off")
+	require.NotEmpty(t, logs.FilterMessageSnippet("TransferReceivers not pre-loaded").All(),
+		"missing Receivers edge must warn, not silently continue")
+	require.NotEmpty(t, logs.FilterMessageSnippet("TransferSenders not pre-loaded").All(),
+		"missing Senders edge must warn, not silently continue")
+}
+
+func TestMarshalProtoForReceiver_KnobOff_WarnsAndDegradesWhenSendersMissing(t *testing.T) {
+	transfer, recv1Pub, _ := preloadedTransfer(t)
+	// TransferReceivers stays loaded (precondition); only Senders is dropped.
+	transfer.Edges.TransferSenders = nil
+
+	// Knob off -> tolerant: missing Senders edge warns and degrades to an empty
+	// array instead of erroring, while the filtered receiver still emits.
+	ctx, logs := knobOffContextWithLogObserver(t)
+	proto, err := transfer.MarshalProtoForReceiver(ctx, recv1Pub)
+	require.NoError(t, err)
+	require.Empty(t, proto.GetSenders(), "Senders[] degrades to empty when its edge is missing and knob off")
+	require.Len(t, proto.GetReceivers(), 1, "the filtered receiver still emits")
+	require.NotEmpty(t, logs.FilterMessageSnippet("TransferSenders not pre-loaded").All(),
+		"missing Senders edge must warn, not silently continue")
 }
 
 // dbFixture seeds postgres with a Tree, TreeNode, and Transfer that has two
