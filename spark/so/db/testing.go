@@ -107,7 +107,15 @@ func NewTestSQLiteClient(tb testing.TB) *ent.Client {
 	return enttest.Open(tb, "sqlite3", sqlitePath)
 }
 
-var postgresPort string
+const (
+	testPostgresHostEnv = "SPARK_TEST_POSTGRES_HOST"
+	testPostgresPortEnv = "SPARK_TEST_POSTGRES_PORT"
+)
+
+var (
+	postgresHost string
+	postgresPort string
+)
 
 // StartPostgresServer starts an ephemeral postgres server and returns a stop func.
 // This is meant to be called in a TestMain function, like so:
@@ -124,6 +132,20 @@ func StartPostgresServer() (stop func()) {
 	if !sparktesting.PostgresTestsEnabled() {
 		return func() {}
 	}
+
+	// If `SPARK_TEST_POSTGRES_HOST` and `SPARK_TEST_POSTGRES_PORT` are set, we assume there is an
+	// external Postgres server we can connect to, and we skip starting an embedded one.
+	if host := os.Getenv(testPostgresHostEnv); host != "" {
+		postgresHost = host
+	}
+	if port := os.Getenv(testPostgresPortEnv); port != "" {
+		postgresPort = port
+	}
+
+	if postgresHost != "" && postgresPort != "" {
+		return func() {}
+	}
+
 	port, err := findFreePort()
 	if err != nil {
 		panic(err)
@@ -179,7 +201,7 @@ func ConnectToTestPostgres(t testing.TB) (context.Context, *TestContext) {
 		DriverName:                "pgx",
 		User:                      "postgres",
 		Password:                  "postgres",
-		Host:                      "localhost",
+		Host:                      postgresHost,
 		Database:                  "spark_test",
 		Port:                      postgresPort,
 		Options:                   "sslmode=disable",
