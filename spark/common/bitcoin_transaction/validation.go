@@ -372,17 +372,16 @@ func RoundDownToTimelockInterval(timelock uint32) uint32 {
 // Use GetAndValidateUserSequence to get the valid currSequence for this function.
 func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence uint32, err error) {
 	currTimelock := GetTimelockFromSequence(currSequence)
-	nextTimelock := int32(currTimelock) - spark.TimeLockInterval
-
-	if nextTimelock < 0 {
-		return 0, 0, fmt.Errorf("next timelock interval is less than 0, call renew node timelock")
+	if currTimelock <= spark.TimeLockInterval {
+		return 0, 0, fmt.Errorf("current timelock %d is too small to subtract TimeLockInterval %d without reaching zero, call renew node timelock", currTimelock, spark.TimeLockInterval)
 	}
+	nextTimelock := currTimelock - spark.TimeLockInterval
 
 	// reset timelock
 	currSequence &= 0xFFFF0000
 
 	// Construct the new sequence
-	nextSequence = uint32(nextTimelock) | currSequence
+	nextSequence = nextTimelock | currSequence
 	nextDirectSequence = nextSequence + spark.DirectTimelockOffset
 
 	return

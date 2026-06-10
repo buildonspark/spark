@@ -119,6 +119,118 @@ func transferAndClaimSingleLeaf(
 	return receiverConfig, claimedNodes[0], claimedSigningPrivKey
 }
 
+func transferLeafToFreshWallet(
+	t *testing.T,
+	senderConfig *wallet.TestWalletConfig,
+	leaf *pb.TreeNode,
+	signingPrivKey keys.Private,
+) (*wallet.TestWalletConfig, *pb.TreeNode, keys.Private) {
+	t.Helper()
+
+	receiverIdentityPrivKey := keys.GeneratePrivateKey()
+	receiverTransferSigningPrivKey := keys.GeneratePrivateKey()
+	receiverFinalSigningPrivKey := keys.GeneratePrivateKey()
+
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		t.Context(),
+		senderConfig,
+		[]wallet.LeafKeyTweak{{
+			Leaf:              leaf,
+			SigningPrivKey:    signingPrivKey,
+			NewSigningPrivKey: receiverTransferSigningPrivKey,
+		}},
+		receiverIdentityPrivKey.Public(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err)
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverIdentityPrivKey)
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err)
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+
+	pendingTransfers, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err)
+	require.Len(t, pendingTransfers.GetTransfers(), 1)
+	receiverTransfer := pendingTransfers.GetTransfers()[0]
+	require.Equal(t, senderTransfer.GetId(), receiverTransfer.GetId())
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
+	require.NoError(t, err)
+	require.Equal(t, receiverTransferSigningPrivKey, leafPrivKeyMap[leaf.GetId()])
+
+	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{{
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
+		SigningPrivKey:    receiverTransferSigningPrivKey,
+		NewSigningPrivKey: receiverFinalSigningPrivKey,
+	}})
+	require.NoError(t, err)
+	require.Equal(t, pb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimedTransfer.GetStatus())
+	require.Len(t, claimedTransfer.GetLeaves(), 1)
+
+	return receiverConfig, claimedTransfer.GetLeaves()[0].GetLeaf(), receiverFinalSigningPrivKey
+}
+
+func TestRenewNodeZeroTimelockAfterTransferDrivenExhaustionBoundary(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	currentSigningPrivKey := keys.GeneratePrivateKey()
+	currentLeaf, err := wallet.CreateNewTree(config, faucet, currentSigningPrivKey, 100000)
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), getTimelockFromTxBytes(t, currentLeaf.GetNodeTx()))
+	require.Equal(t, spark.InitialTimeLock, getTimelockFromTxBytes(t, currentLeaf.GetRefundTx()))
+
+	currentConfig := config
+	transfersPerformed := 0
+	for getTimelockFromTxBytes(t, currentLeaf.GetRefundTx()) > spark.TimeLockInterval {
+		oldTimelock := getTimelockFromTxBytes(t, currentLeaf.GetRefundTx())
+
+		currentConfig, currentLeaf, currentSigningPrivKey = transferLeafToFreshWallet(
+			t,
+			currentConfig,
+			currentLeaf,
+			currentSigningPrivKey,
+		)
+		transfersPerformed++
+
+		require.Equal(t, oldTimelock-spark.TimeLockInterval, getTimelockFromTxBytes(t, currentLeaf.GetRefundTx()))
+		require.Equal(t, uint32(0), getTimelockFromTxBytes(t, currentLeaf.GetNodeTx()))
+	}
+
+	require.Equal(t, int((spark.InitialTimeLock-uint32(spark.TimeLockInterval))/uint32(spark.TimeLockInterval)), transfersPerformed)
+	require.Equal(t, uint32(spark.TimeLockInterval), getTimelockFromTxBytes(t, currentLeaf.GetRefundTx()))
+
+	_, err = wallet.SendTransferWithKeyTweaks(
+		t.Context(),
+		currentConfig,
+		[]wallet.LeafKeyTweak{{
+			Leaf:              currentLeaf,
+			SigningPrivKey:    currentSigningPrivKey,
+			NewSigningPrivKey: keys.GeneratePrivateKey(),
+		}},
+		keys.GeneratePrivateKey().Public(),
+		time.Now().Add(10*time.Minute),
+	)
+	// This rejection originates client-side: the test wallet refuses to construct a
+	// zero-timelock refund in PrepareRefundSoSigningJobs (via bitcointransaction.NextSequence).
+	// The server-side guard is covered by TestValidateUserTxs_Package_RejectsZeroTimelockCpfpRefund.
+	require.ErrorContains(t, err, "too small to subtract TimeLockInterval")
+
+	currentToken, err := wallet.AuthenticateWithServer(t.Context(), currentConfig)
+	require.NoError(t, err)
+	currentLeaf = queryLeafByID(t, currentConfig, currentToken, currentLeaf.GetId())
+	require.Equal(t, "AVAILABLE", currentLeaf.GetStatus())
+	require.Equal(t, uint32(spark.TimeLockInterval), getTimelockFromTxBytes(t, currentLeaf.GetRefundTx()))
+
+	currentCtx := wallet.ContextWithToken(t.Context(), currentToken)
+	renewedLeaf, err := wallet.RenewNodeZeroTimelock(currentCtx, currentConfig, currentLeaf, currentSigningPrivKey)
+	require.NoError(t, err)
+	require.NotNil(t, renewedLeaf)
+
+	require.Equal(t, uint32(0), getTimelockFromTxBytes(t, renewedLeaf.GetNodeTx()))
+	require.Equal(t, spark.InitialTimeLock, getTimelockFromTxBytes(t, renewedLeaf.GetRefundTx()))
+	require.Equal(t, "AVAILABLE", renewedLeaf.GetStatus())
+}
+
 func TestRenewNodeZeroTimelock(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()

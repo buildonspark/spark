@@ -63,6 +63,10 @@ type testConnector struct {
 }
 
 func createDbLeaf(t *testing.T, ctx context.Context, requireNodeTxTimelock bool) *testLeaf {
+	return createDbLeafWithRefundTimelock(t, ctx, requireNodeTxTimelock, testTimeLock)
+}
+
+func createDbLeafWithRefundTimelock(t *testing.T, ctx context.Context, requireNodeTxTimelock bool, refundTimelock uint32) *testLeaf {
 	t.Helper()
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -104,8 +108,7 @@ func createDbLeaf(t *testing.T, ctx context.Context, requireNodeTxTimelock bool)
 	nodeTxHash := nodeTx.TxHash()
 	directTx := newTestTx(testSourceValue, directSeq, nil, srcScript)
 	directTxHash := directTx.TxHash()
-	// Existing CPFP refund tx in DB with timelock = testTimeLock
-	cpfpRefund := newTestTx(testSourceValue, testTimeLock, &nodeTxHash, srcScript)
+	cpfpRefund := newTestTx(testSourceValue, refundTimelock, &nodeTxHash, srcScript)
 
 	node, err := tx.TreeNode.Create().
 		SetID(uuid.New()).
@@ -132,13 +135,16 @@ func createDbLeaf(t *testing.T, ctx context.Context, requireNodeTxTimelock bool)
 }
 
 func makeClientCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Public) []byte {
+	return makeClientCpfpTxWithSequence(t, leaf, refundDest, testTimeLock-spark.TimeLockInterval)
+}
+
+func makeClientCpfpTxWithSequence(t *testing.T, leaf *testLeaf, refundDest keys.Public, sequence uint32) []byte {
 	userScript, err := common.P2TRScriptFromPubKey(refundDest)
 	require.NoError(t, err)
-	expectedCpfp := uint32(testTimeLock - spark.TimeLockInterval)
 	tx := wire.NewMsgTx(3)
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: leaf.nodeTxHash, Index: 0},
-		Sequence:         expectedCpfp,
+		Sequence:         sequence,
 	})
 	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
 	tx.AddTxOut(common.EphemeralAnchorOutput())
@@ -159,13 +165,16 @@ func makeClientDirectTx(t *testing.T, leaf *testLeaf, refundDest keys.Public) []
 }
 
 func makeClientDirectFromCpfpTx(t *testing.T, leaf *testLeaf, refundDest keys.Public) []byte {
+	return makeClientDirectFromCpfpTxWithSequence(t, leaf, refundDest, testTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset)
+}
+
+func makeClientDirectFromCpfpTxWithSequence(t *testing.T, leaf *testLeaf, refundDest keys.Public, sequence uint32) []byte {
 	userScript, err := common.P2TRScriptFromPubKey(refundDest)
 	require.NoError(t, err)
-	expected := testTimeLock - spark.TimeLockInterval + spark.DirectTimelockOffset
 	tx := wire.NewMsgTx(3)
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: leaf.nodeTxHash, Index: 0},
-		Sequence:         expected,
+		Sequence:         sequence,
 	})
 	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
 	return serializeTx(t, tx)
@@ -556,6 +565,36 @@ func TestValidateUserTxs_Package_WithoutDirect_Success(t *testing.T) {
 	h := handlerWithConfig()
 	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
 	require.NoError(t, err)
+}
+
+func TestValidateUserTxs_Package_RejectsZeroTimelockCpfpRefund(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	leaf := createDbLeafWithRefundTimelock(t, ctx, false, spark.TimeLockInterval)
+	refundDest := keys.GeneratePrivateKey().Public()
+
+	cpfp := &pb.UserSignedTxSigningJob{
+		LeafId: leaf.node.ID.String(),
+		RawTx:  makeClientCpfpTxWithSequence(t, leaf, refundDest, 0),
+	}
+	directFromCpfp := &pb.UserSignedTxSigningJob{
+		LeafId: leaf.node.ID.String(),
+		RawTx:  makeClientDirectFromCpfpTxWithSequence(t, leaf, refundDest, spark.DirectTimelockOffset),
+	}
+
+	req := &pb.StartTransferRequest{
+		ReceiverIdentityPublicKey: refundDest.Serialize(),
+		TransferPackage: &pb.TransferPackage{
+			LeavesToSend:               []*pb.UserSignedTxSigningJob{cpfp},
+			DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{directFromCpfp},
+			KeyTweakPackage:            map[string][]byte{"noop": {}},
+			UserSignature:              []byte{1},
+		},
+	}
+
+	h := handlerWithConfig()
+	err := validateAndConstructBitcoinTransactionsForTest(t, ctx, h, req, st.TransferTypeTransfer, nil)
+	require.ErrorContains(t, err, "CPFP refund tx validation failed")
 }
 
 func TestValidateUserTxs_Package_InvalidDirectRefund_Error(t *testing.T) {

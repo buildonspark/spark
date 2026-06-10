@@ -429,7 +429,6 @@ func TestNextSequence(t *testing.T) {
 		{name: "basic", currSeq: 1000, wantSeq: 900, wantDirectSeq: 950},
 		{name: "mixed upper-word pattern", currSeq: 0xAAAA0500, wantSeq: 0xAAAA049C, wantDirectSeq: 0xAAAA04CE},
 		{name: "large timelock value", currSeq: 65535, wantSeq: 65435, wantDirectSeq: 65485},
-		{name: "boundary at exactly one TimeLockInterval", currSeq: 100, wantSeq: 0, wantDirectSeq: 50},
 		{name: "multiple higher-order bits", currSeq: 1<<30 | 1<<29 | 1<<16 | 2000, wantSeq: 1<<30 | 1<<29 | 1<<16 | 1900, wantDirectSeq: 1<<30 | 1<<29 | 1<<16 | 1950},
 		{name: "preserves higher-order bits", currSeq: 1<<30 | 1000, wantSeq: 1<<30 | 900, wantDirectSeq: 1<<30 | 950},
 	}
@@ -459,7 +458,7 @@ func TestNextSequence(t *testing.T) {
 	}
 }
 
-// Errors when timelock minus interval would be negative.
+// Errors when timelock minus interval would be zero or negative.
 func TestNextSequence_ErrorTimelockTooSmall(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -467,13 +466,14 @@ func TestNextSequence_ErrorTimelockTooSmall(t *testing.T) {
 	}{
 		{"zero timelock", 0},
 		{"less than interval", 99},
+		{"exactly one interval", 100},
 		{"less than interval with higher bits", 1<<30 | 50},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			nextSeq, nextDirectSeq, err := bitcointransaction.NextSequence(tc.currSequence)
-			require.ErrorContains(t, err, "next timelock interval is less than 0")
+			require.ErrorContains(t, err, "too small to subtract TimeLockInterval")
 			assert.Zero(t, nextSeq)
 			assert.Zero(t, nextDirectSeq)
 		})
