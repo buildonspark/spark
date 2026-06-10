@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/bare",
-  "version": "0.0.73",
+  "version": "0.0.74",
   "author": "",
   "license": "Apache-2.0",
   "main": "./dist/index.js",
@@ -76,7 +76,7 @@
   },
   "dependencies": {
     "@buildonspark/spark-frost-bare-addon": "0.0.12",
-    "@buildonspark/spark-sdk": "0.8.5",
+    "@buildonspark/spark-sdk": "0.8.6",
     "bare-node-runtime": "^1.2.0"
   },
   "engines": {

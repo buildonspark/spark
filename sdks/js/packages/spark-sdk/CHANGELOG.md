@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.8.6
+
+### Patch Changes
+
+- 028de60: - Export wallet service classes and types for advanced SDK integrations.
+  - Stop pending transfer claim retries when the wallet is cleaned up.
+
 ## 0.8.5
 
 ### Patch Changes
