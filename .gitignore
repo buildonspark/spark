@@ -72,3 +72,5 @@ lefthook-local.yml
 
 signer/spark-token-primitives-uniffi/spark-token-primitives-python/spark_token_primitives_python.egg-info/
 signer/spark-token-primitives-uniffi/spark-token-primitives-python/src/spark_token_primitives/__pycache__/
+# macOS installer packages (e.g. AWSCLIV2.pkg downloaded for local setup)
+*.pkg
