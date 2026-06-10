@@ -164,12 +164,10 @@ android/src/main/
 ├── java/uniffi/uniffi/spark_frost/
 │   └── spark_frost.kt              # UniFFI-generated Kotlin bindings (auto-generated, do not edit)
 └── jniLibs/                        # Pre-compiled Rust shared libs
-    ├── arm64-v8a/{libspark_frost,libuniffi_spark_frost}.so
-    ├── armeabi-v7a/{libspark_frost,libuniffi_spark_frost}.so
-    ├── x86/{libspark_frost,libuniffi_spark_frost}.so
-    └── x86_64/{libspark_frost,libuniffi_spark_frost}.so
-    # Note: build-rn-bindings.sh only regenerates libuniffi_spark_frost.so (renamed from cargo output).
-    # libspark_frost.so is also present but managed separately.
+    ├── arm64-v8a/libuniffi_spark_frost.so
+    ├── armeabi-v7a/libuniffi_spark_frost.so
+    ├── x86/libuniffi_spark_frost.so
+    └── x86_64/libuniffi_spark_frost.so
 ```
 
 ### Adding a New Rust Function to the SDK
