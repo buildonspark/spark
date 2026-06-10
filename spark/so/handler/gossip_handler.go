@@ -21,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.opentelemetry.io/otel"
@@ -472,9 +473,18 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get preimage request for %x", gossip.GetPaymentHash())
 		return err
 	}
-
+	activePreimageRequests := make([]*ent.PreimageRequest, 0, len(preimageRequests))
 	for _, preimageRequest := range preimageRequests {
-		_, err = preimageRequest.Update().SetPreimage(gossip.GetPreimage()).Save(ctx)
+		if preimageRequest.Status != st.PreimageRequestStatusReturned {
+			activePreimageRequests = append(activePreimageRequests, preimageRequest)
+		}
+	}
+	if len(activePreimageRequests) > 1 {
+		return fmt.Errorf("preimage gossip for payment hash %x matches multiple preimage requests without a transfer binding", gossip.GetPaymentHash())
+	}
+
+	for _, preimageRequest := range activePreimageRequests {
+		_, err = db.PreimageRequest.UpdateOneID(preimageRequest.ID).SetPreimage(gossip.GetPreimage()).Save(ctx)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to update preimage request for %x", gossip.GetPaymentHash())
 			return err
@@ -501,12 +511,47 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 		return fmt.Errorf("failed to get db context: %w", err)
 	}
 
-	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.GetPaymentHash())).ForUpdate().All(ctx)
+	preimageRequestQuery := db.PreimageRequest.Query().
+		Where(preimagerequest.PaymentHashEQ(gossip.GetPaymentHash())).
+		ForUpdate()
+	preimageRequestTransferIDString := gossip.GetPreimageRequestTransferId()
+	if preimageRequestTransferIDString == "" {
+		preimageRequestTransferIDString = gossip.GetTransferId()
+	} else if gossip.GetTransferId() != "" && gossip.GetTransferId() != preimageRequestTransferIDString {
+		return fmt.Errorf("preimage swap gossip transfer_id %s does not match preimage_request_transfer_id %s", gossip.GetTransferId(), preimageRequestTransferIDString)
+	}
+	var preimageRequestTransferID uuid.UUID
+	if preimageRequestTransferIDString != "" {
+		preimageRequestTransferID, err = uuid.Parse(preimageRequestTransferIDString)
+		if err != nil {
+			return fmt.Errorf("invalid preimage request transfer ID in preimage swap gossip: %s: %w", preimageRequestTransferIDString, err)
+		}
+		preimageRequestQuery = preimageRequestQuery.Where(preimagerequest.HasTransfersWith(enttransfer.IDEQ(preimageRequestTransferID)))
+	}
+	preimageRequests, err := preimageRequestQuery.All(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get preimage requests for %x: %w", gossip.GetPaymentHash(), err)
 	}
+	activePreimageRequests := make([]*ent.PreimageRequest, 0, len(preimageRequests))
 	for _, preimageRequest := range preimageRequests {
-		update := preimageRequest.Update().SetPreimage(gossip.GetPreimage())
+		if preimageRequest.Status != st.PreimageRequestStatusReturned {
+			activePreimageRequests = append(activePreimageRequests, preimageRequest)
+		}
+	}
+	if preimageRequestTransferIDString != "" && len(preimageRequests) == 0 {
+		return fmt.Errorf("preimage swap gossip for transfer %s did not match a preimage request for payment hash %x", preimageRequestTransferID, gossip.GetPaymentHash())
+	}
+	if preimageRequestTransferIDString == "" && len(activePreimageRequests) > 1 {
+		return fmt.Errorf("preimage swap gossip for payment hash %x matches multiple preimage requests without a transfer binding", gossip.GetPaymentHash())
+	}
+	if preimageRequestTransferIDString != "" && len(activePreimageRequests) == 0 {
+		logger.Sugar().Infof("Preimage swap gossip for transfer %s and payment hash %x matched only returned preimage requests; skipping preimage update", preimageRequestTransferID, gossip.GetPaymentHash())
+	}
+	if preimageRequestTransferIDString != "" && len(activePreimageRequests) > 1 {
+		return fmt.Errorf("preimage swap gossip for transfer %s and payment hash %x matches multiple active preimage requests", preimageRequestTransferID, gossip.GetPaymentHash())
+	}
+	for _, preimageRequest := range activePreimageRequests {
+		update := db.PreimageRequest.UpdateOneID(preimageRequest.ID).SetPreimage(gossip.GetPreimage())
 		if preimageRequest.Status == st.PreimageRequestStatusWaitingForPreimage {
 			update = update.SetStatus(st.PreimageRequestStatusPreimageShared)
 		}
@@ -515,12 +560,12 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 		}
 	}
 
-	if gossip.GetTransferId() != "" {
-		transferHandler := NewBaseTransferHandler(h.config)
+	if gossip.GetTransferId() != "" && len(gossip.GetSenderKeyTweakProofs()) > 0 {
 		transferID, err := uuid.Parse(gossip.GetTransferId())
 		if err != nil {
 			return fmt.Errorf("invalid transfer ID in preimage swap gossip: %s: %w", gossip.GetTransferId(), err)
 		}
+		transferHandler := NewBaseTransferHandler(h.config)
 		if _, err = transferHandler.CommitSenderKeyTweaks(ctx, transferID, gossip.GetSenderKeyTweakProofs()); err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", transferID)
 			return err

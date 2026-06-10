@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -15,6 +17,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -84,6 +87,364 @@ func TestHandleRollbackTransfer_InvalidTransferID_ReturnsError(t *testing.T) {
 	err := handler.handleRollbackTransfer(ctx, rollbackTransfer)
 
 	require.Error(t, err, "rolling back with a malformed transfer ID should return an error")
+}
+
+func TestHandlePreimageSwapGossipScopesPreimageByPreimageRequestTransferID(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 42
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	otherReceiver := keys.GeneratePrivateKey().Public()
+	transfer := createPreimageGossipTestTransfer(t, ctx, client, sender, receiver)
+	otherTransfer := createPreimageGossipTestTransfer(t, ctx, client, sender, otherReceiver)
+	request := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, transfer)
+	otherRequest := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], otherReceiver, otherTransfer)
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:                  preimage,
+		PaymentHash:               paymentHash[:],
+		PreimageRequestTransferId: transfer.ID.String(),
+	}, false)
+	require.NoError(t, err)
+
+	updated, err := client.PreimageRequest.Get(ctx, request.ID)
+	require.NoError(t, err)
+	require.Equal(t, preimage, updated.Preimage)
+	require.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
+
+	unchanged, err := client.PreimageRequest.Get(ctx, otherRequest.ID)
+	require.NoError(t, err)
+	require.Empty(t, unchanged.Preimage)
+	require.Equal(t, st.PreimageRequestStatusWaitingForPreimage, unchanged.Status)
+}
+
+func TestHandlePreimageSwapGossipScopesPreimageByLegacyTransferID(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 46
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	otherReceiver := keys.GeneratePrivateKey().Public()
+	transfer := createPreimageGossipTestTransfer(t, ctx, client, sender, receiver)
+	otherTransfer := createPreimageGossipTestTransfer(t, ctx, client, sender, otherReceiver)
+	request := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, transfer)
+	otherRequest := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], otherReceiver, otherTransfer)
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:    preimage,
+		PaymentHash: paymentHash[:],
+		TransferId:  transfer.ID.String(),
+	}, false)
+	require.NoError(t, err)
+
+	updated, err := client.PreimageRequest.Get(ctx, request.ID)
+	require.NoError(t, err)
+	require.Equal(t, preimage, updated.Preimage)
+	require.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
+
+	unchanged, err := client.PreimageRequest.Get(ctx, otherRequest.ID)
+	require.NoError(t, err)
+	require.Empty(t, unchanged.Preimage)
+	require.Equal(t, st.PreimageRequestStatusWaitingForPreimage, unchanged.Status)
+}
+
+func TestBuildPreimageSwapGossipMessageUsesBindingFieldWithoutLegacyTransferIDWhenNoKeyTweaks(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 47
+	paymentHash := sha256.Sum256(preimage)
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	transfer := createPreimageGossipTestTransfer(t, ctx, client, sender, receiver)
+
+	gossip, err := buildPreimageSwapGossipMessage(ctx, preimage, paymentHash[:], transfer, false)
+	require.NoError(t, err)
+	require.Equal(t, preimage, gossip.GetPreimage())
+	require.Equal(t, paymentHash[:], gossip.GetPaymentHash())
+	require.Equal(t, transfer.ID.String(), gossip.GetPreimageRequestTransferId())
+	require.Empty(t, gossip.GetTransferId())
+	require.Empty(t, gossip.GetSenderKeyTweakProofs())
+}
+
+func TestHandlePreimageSwapGossipRejectsAmbiguousPaymentHashWithoutTransferID(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 43
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	otherReceiver := keys.GeneratePrivateKey().Public()
+	createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, createPreimageGossipTestTransfer(t, ctx, client, sender, receiver))
+	createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], otherReceiver, createPreimageGossipTestTransfer(t, ctx, client, sender, otherReceiver))
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:    preimage,
+		PaymentHash: paymentHash[:],
+	}, false)
+
+	require.ErrorContains(t, err, "matches multiple preimage requests without a transfer binding")
+	count, err := client.PreimageRequest.Query().
+		Where(preimagerequest.PaymentHashEQ(paymentHash[:]), preimagerequest.PreimageIsNil()).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+}
+
+func TestHandlePreimageGossipIgnoresReturnedRequestWhenActiveRequestExists(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 44
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	returnedRequest := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, createPreimageGossipTestTransfer(t, ctx, client, sender, receiver))
+	returnedRequest, err = returnedRequest.Update().
+		SetStatus(st.PreimageRequestStatusReturned).
+		Save(ctx)
+	require.NoError(t, err)
+	activeRequest := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, createPreimageGossipTestTransfer(t, ctx, client, sender, receiver))
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageGossipMessage(ctx, &pbgossip.GossipMessagePreimage{
+		Preimage:    preimage,
+		PaymentHash: paymentHash[:],
+	}, false)
+	require.NoError(t, err)
+
+	updated, err := client.PreimageRequest.Get(ctx, activeRequest.ID)
+	require.NoError(t, err)
+	require.Equal(t, preimage, updated.Preimage)
+
+	unchanged, err := client.PreimageRequest.Get(ctx, returnedRequest.ID)
+	require.NoError(t, err)
+	require.Empty(t, unchanged.Preimage)
+	require.Equal(t, st.PreimageRequestStatusReturned, unchanged.Status)
+}
+
+func TestHandlePreimageSwapGossipIgnoresReturnedRequestWhenActiveRequestExistsWithoutTransferID(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 45
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	returnedRequest := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, createPreimageGossipTestTransfer(t, ctx, client, sender, receiver))
+	returnedRequest, err = returnedRequest.Update().
+		SetStatus(st.PreimageRequestStatusReturned).
+		Save(ctx)
+	require.NoError(t, err)
+	activeRequest := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, createPreimageGossipTestTransfer(t, ctx, client, sender, receiver))
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:    preimage,
+		PaymentHash: paymentHash[:],
+	}, false)
+	require.NoError(t, err)
+
+	updated, err := client.PreimageRequest.Get(ctx, activeRequest.ID)
+	require.NoError(t, err)
+	require.Equal(t, preimage, updated.Preimage)
+	require.Equal(t, st.PreimageRequestStatusPreimageShared, updated.Status)
+
+	unchanged, err := client.PreimageRequest.Get(ctx, returnedRequest.ID)
+	require.NoError(t, err)
+	require.Empty(t, unchanged.Preimage)
+	require.Equal(t, st.PreimageRequestStatusReturned, unchanged.Status)
+}
+
+// The handler's settlement guard only commits sender key tweaks when
+// transfer_id is present alongside the proofs, so the builder must keep
+// setting the legacy field (in addition to the binding field) whenever key
+// tweaks are included. This protects the rolling-deploy invariant.
+func TestBuildPreimageSwapGossipMessageWithKeyTweaksSetsBothTransferIDs(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 48
+	paymentHash := sha256.Sum256(preimage)
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	transfer := createPreimageGossipTestTransfer(t, ctx, client, sender, receiver)
+
+	keysharePrivKey := keys.GeneratePrivateKey()
+	signingKeyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keysharePrivKey).
+		SetPublicShares(map[string]keys.Public{"test": keys.GeneratePrivateKey().Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	tree, err := client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(sender).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetSigningKeyshare(signingKeyshare).
+		SetValue(1000).
+		SetVerifyingPubkey(keys.GeneratePrivateKey().Public()).
+		SetOwnerIdentityPubkey(sender).
+		SetOwnerSigningPubkey(keys.GeneratePrivateKey().Public()).
+		SetRawTx(createTestTxBytes(t, 6000)).
+		SetRawRefundTx(createTestTxBytes(t, 6001)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	proofs := [][]byte{[]byte("key-tweak-proof-bytes")}
+	keyTweakBytes, err := proto.Marshal(&pb.SendLeafKeyTweak{
+		LeafId:           leaf.ID.String(),
+		SecretShareTweak: &pb.SecretShare{Proofs: proofs},
+	})
+	require.NoError(t, err)
+	_, err = client.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(leaf).
+		SetPreviousRefundTx(createTestTxBytes(t, 6002)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 6003)).
+		SetKeyTweak(keyTweakBytes).
+		Save(ctx)
+	require.NoError(t, err)
+
+	gossip, err := buildPreimageSwapGossipMessage(ctx, preimage, paymentHash[:], transfer, true)
+	require.NoError(t, err)
+	require.Equal(t, preimage, gossip.GetPreimage())
+	require.Equal(t, paymentHash[:], gossip.GetPaymentHash())
+	require.Equal(t, transfer.ID.String(), gossip.GetTransferId())
+	require.Equal(t, transfer.ID.String(), gossip.GetPreimageRequestTransferId())
+	require.Len(t, gossip.GetSenderKeyTweakProofs(), 1)
+	require.Equal(t, proofs, gossip.GetSenderKeyTweakProofs()[leaf.ID.String()].GetProofs())
+}
+
+func TestHandlePreimageSwapGossipRejectsMismatchedTransferBinding(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 49
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	otherReceiver := keys.GeneratePrivateKey().Public()
+	transfer := createPreimageGossipTestTransfer(t, ctx, client, sender, receiver)
+	otherTransfer := createPreimageGossipTestTransfer(t, ctx, client, sender, otherReceiver)
+	createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, transfer)
+	createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], otherReceiver, otherTransfer)
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:                  preimage,
+		PaymentHash:               paymentHash[:],
+		TransferId:                transfer.ID.String(),
+		PreimageRequestTransferId: otherTransfer.ID.String(),
+	}, false)
+
+	require.ErrorContains(t, err, "does not match preimage_request_transfer_id")
+	count, err := client.PreimageRequest.Query().
+		Where(
+			preimagerequest.PaymentHashEQ(paymentHash[:]),
+			preimagerequest.PreimageIsNil(),
+			preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
+		).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+}
+
+func TestHandlePreimageSwapGossipRejectsBoundTransferWithNoMatchingRequest(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	preimage := make([]byte, sha256.Size)
+	preimage[0] = 50
+	paymentHash := sha256.Sum256(preimage)
+
+	sender := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	otherReceiver := keys.GeneratePrivateKey().Public()
+	transfer := createPreimageGossipTestTransfer(t, ctx, client, sender, receiver)
+	request := createPreimageGossipTestRequest(t, ctx, client, paymentHash[:], receiver, transfer)
+	unboundTransfer := createPreimageGossipTestTransfer(t, ctx, client, sender, otherReceiver)
+
+	err = NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:                  preimage,
+		PaymentHash:               paymentHash[:],
+		PreimageRequestTransferId: unboundTransfer.ID.String(),
+	}, false)
+
+	require.ErrorContains(t, err, "did not match a preimage request for payment hash")
+	unchanged, err := client.PreimageRequest.Get(ctx, request.ID)
+	require.NoError(t, err)
+	require.Empty(t, unchanged.Preimage)
+	require.Equal(t, st.PreimageRequestStatusWaitingForPreimage, unchanged.Status)
+}
+
+func createPreimageGossipTestTransfer(t *testing.T, ctx context.Context, client *ent.Client, sender keys.Public, receiver keys.Public) *ent.Transfer {
+	t.Helper()
+
+	transfer, err := client.Transfer.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TransferStatusSenderInitiated).
+		SetType(st.TransferTypePreimageSwap).
+		SetSenderIdentityPubkey(sender).
+		SetReceiverIdentityPubkey(receiver).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+	return transfer
+}
+
+func createPreimageGossipTestRequest(t *testing.T, ctx context.Context, client *ent.Client, paymentHash []byte, receiver keys.Public, transfer *ent.Transfer) *ent.PreimageRequest {
+	t.Helper()
+
+	request, err := client.PreimageRequest.Create().
+		SetPaymentHash(paymentHash).
+		SetReceiverIdentityPubkey(receiver).
+		SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+		SetTransfers(transfer).
+		Save(ctx)
+	require.NoError(t, err)
+	return request
 }
 
 func TestHandleSettleSenderKeyTweakGossipMessage_InvalidTransferID_ReturnsError(t *testing.T) {

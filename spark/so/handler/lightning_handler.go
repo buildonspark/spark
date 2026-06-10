@@ -2111,28 +2111,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 }
 
 func (h *LightningHandler) sendPreimageSwapGossipMessage(ctx context.Context, preimage []byte, paymentHash []byte, transfer *ent.Transfer, includeKeyTweaks bool) error {
-	gossipMsg := &pbgossip.GossipMessagePreimageSwap{
-		Preimage:    preimage,
-		PaymentHash: paymentHash,
-	}
-
-	if includeKeyTweaks {
-		transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to get transfer leaves for settlement gossip: %w", err)
-		}
-		keyTweakProofMap := make(map[string]*pbspark.SecretProof)
-		for _, leaf := range transferLeaves {
-			keyTweakProto := &pbspark.SendLeafKeyTweak{}
-			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
-				return fmt.Errorf("unable to unmarshal key tweak: %w", err)
-			}
-			keyTweakProofMap[keyTweakProto.GetLeafId()] = &pbspark.SecretProof{
-				Proofs: keyTweakProto.GetSecretShareTweak().GetProofs(),
-			}
-		}
-		gossipMsg.TransferId = transfer.ID.String()
-		gossipMsg.SenderKeyTweakProofs = keyTweakProofMap
+	gossipMsg, err := buildPreimageSwapGossipMessage(ctx, preimage, paymentHash, transfer, includeKeyTweaks)
+	if err != nil {
+		return err
 	}
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -2151,6 +2132,35 @@ func (h *LightningHandler) sendPreimageSwapGossipMessage(ctx context.Context, pr
 		return fmt.Errorf("unable to create and send preimage swap gossip: %w", err)
 	}
 	return nil
+}
+
+func buildPreimageSwapGossipMessage(ctx context.Context, preimage []byte, paymentHash []byte, transfer *ent.Transfer, includeKeyTweaks bool) (*pbgossip.GossipMessagePreimageSwap, error) {
+	gossipMsg := &pbgossip.GossipMessagePreimageSwap{
+		Preimage:                  preimage,
+		PaymentHash:               paymentHash,
+		PreimageRequestTransferId: transfer.ID.String(),
+	}
+
+	if includeKeyTweaks {
+		transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get transfer leaves for settlement gossip: %w", err)
+		}
+		keyTweakProofMap := make(map[string]*pbspark.SecretProof)
+		for _, leaf := range transferLeaves {
+			keyTweakProto := &pbspark.SendLeafKeyTweak{}
+			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
+				return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
+			}
+			keyTweakProofMap[keyTweakProto.GetLeafId()] = &pbspark.SecretProof{
+				Proofs: keyTweakProto.GetSecretShareTweak().GetProofs(),
+			}
+		}
+		gossipMsg.TransferId = transfer.ID.String()
+		gossipMsg.SenderKeyTweakProofs = keyTweakProofMap
+	}
+
+	return gossipMsg, nil
 }
 
 // UpdatePreimageRequest updates the preimage request.

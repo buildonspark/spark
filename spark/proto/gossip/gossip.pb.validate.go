@@ -3171,6 +3171,8 @@ func (m *GossipMessagePreimageSwap) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for PreimageRequestTransferId
+
 	if len(errors) > 0 {
 		return GossipMessagePreimageSwapMultiError(errors)
 	}

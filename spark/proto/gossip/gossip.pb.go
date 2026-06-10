@@ -1325,16 +1325,20 @@ func (x *GossipMessagePreimage) GetPaymentHash() []byte {
 }
 
 // PreimageSwap combines the preimage and optional key tweak settlement into a
-// single atomic gossip message. When transfer_id is set, the receiver applies
-// both the preimage update and the sender key tweaks in one transaction.
+// single atomic gossip message. transfer_id is the legacy key-tweak settlement
+// transfer and should only be set when sender_key_tweak_proofs is set.
+// preimage_request_transfer_id binds the preimage update to the linked transfer
+// without implying key-tweak settlement, so old binaries ignore it during rolling
+// deploys.
 type GossipMessagePreimageSwap struct {
-	state                protoimpl.MessageState        `protogen:"open.v1"`
-	Preimage             []byte                        `protobuf:"bytes,1,opt,name=preimage,proto3" json:"preimage,omitempty"`
-	PaymentHash          []byte                        `protobuf:"bytes,2,opt,name=payment_hash,json=paymentHash,proto3" json:"payment_hash,omitempty"`
-	TransferId           string                        `protobuf:"bytes,3,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
-	SenderKeyTweakProofs map[string]*spark.SecretProof `protobuf:"bytes,4,rep,name=sender_key_tweak_proofs,json=senderKeyTweakProofs,proto3" json:"sender_key_tweak_proofs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                     protoimpl.MessageState        `protogen:"open.v1"`
+	Preimage                  []byte                        `protobuf:"bytes,1,opt,name=preimage,proto3" json:"preimage,omitempty"`
+	PaymentHash               []byte                        `protobuf:"bytes,2,opt,name=payment_hash,json=paymentHash,proto3" json:"payment_hash,omitempty"`
+	TransferId                string                        `protobuf:"bytes,3,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
+	SenderKeyTweakProofs      map[string]*spark.SecretProof `protobuf:"bytes,4,rep,name=sender_key_tweak_proofs,json=senderKeyTweakProofs,proto3" json:"sender_key_tweak_proofs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	PreimageRequestTransferId string                        `protobuf:"bytes,5,opt,name=preimage_request_transfer_id,json=preimageRequestTransferId,proto3" json:"preimage_request_transfer_id,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *GossipMessagePreimageSwap) Reset() {
@@ -1393,6 +1397,13 @@ func (x *GossipMessagePreimageSwap) GetSenderKeyTweakProofs() map[string]*spark.
 		return x.SenderKeyTweakProofs
 	}
 	return nil
+}
+
+func (x *GossipMessagePreimageSwap) GetPreimageRequestTransferId() string {
+	if x != nil {
+		return x.PreimageRequestTransferId
+	}
+	return ""
 }
 
 // SettleSwapKeyTweak is called in Swap V3 flow when a counter transfer is
@@ -1889,13 +1900,14 @@ const file_gossip_proto_rawDesc = "" +
 	"\atree_id\x18\x01 \x01(\tR\x06treeId\"V\n" +
 	"\x15GossipMessagePreimage\x12\x1a\n" +
 	"\bpreimage\x18\x01 \x01(\fR\bpreimage\x12!\n" +
-	"\fpayment_hash\x18\x02 \x01(\fR\vpaymentHash\"\xcc\x02\n" +
+	"\fpayment_hash\x18\x02 \x01(\fR\vpaymentHash\"\x8d\x03\n" +
 	"\x19GossipMessagePreimageSwap\x12\x1a\n" +
 	"\bpreimage\x18\x01 \x01(\fR\bpreimage\x12!\n" +
 	"\fpayment_hash\x18\x02 \x01(\fR\vpaymentHash\x12\x1f\n" +
 	"\vtransfer_id\x18\x03 \x01(\tR\n" +
 	"transferId\x12r\n" +
-	"\x17sender_key_tweak_proofs\x18\x04 \x03(\v2;.gossip.GossipMessagePreimageSwap.SenderKeyTweakProofsEntryR\x14senderKeyTweakProofs\x1a[\n" +
+	"\x17sender_key_tweak_proofs\x18\x04 \x03(\v2;.gossip.GossipMessagePreimageSwap.SenderKeyTweakProofsEntryR\x14senderKeyTweakProofs\x12?\n" +
+	"\x1cpreimage_request_transfer_id\x18\x05 \x01(\tR\x19preimageRequestTransferId\x1a[\n" +
 	"\x19SenderKeyTweakProofsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12(\n" +
 	"\x05value\x18\x02 \x01(\v2\x12.spark.SecretProofR\x05value:\x028\x01\"Q\n" +

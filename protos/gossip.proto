@@ -149,13 +149,17 @@ message GossipMessagePreimage {
 }
 
 // PreimageSwap combines the preimage and optional key tweak settlement into a
-// single atomic gossip message. When transfer_id is set, the receiver applies
-// both the preimage update and the sender key tweaks in one transaction.
+// single atomic gossip message. transfer_id is the legacy key-tweak settlement
+// transfer and should only be set when sender_key_tweak_proofs is set.
+// preimage_request_transfer_id binds the preimage update to the linked transfer
+// without implying key-tweak settlement, so old binaries ignore it during rolling
+// deploys.
 message GossipMessagePreimageSwap {
     bytes preimage = 1;
     bytes payment_hash = 2;
     string transfer_id = 3;
     map<string, spark.SecretProof> sender_key_tweak_proofs = 4;
+    string preimage_request_transfer_id = 5;
 }
 
 // SettleSwapKeyTweak is called in Swap V3 flow when a counter transfer is
