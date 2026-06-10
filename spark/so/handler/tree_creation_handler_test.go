@@ -2881,10 +2881,11 @@ func TestPrepareSigningJobsRejectsRefundTxWrongNodeOutpoint(t *testing.T) {
 	parentTxHash := parentTx.TxHash()
 	createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
 
-	nodeOutput := createTreeCreationTestOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), 900)
-	_, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutput)
+	nodeOutput := createTreeCreationTestOutput(t, signingKeyshare.PublicKey.Add(signingPrivKey.Public()), parentOutput.Value)
+	nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutput)
 	refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), 800)
 	_, refundTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x98}, Index: 0}, refundOutput)
+	require.NotEqual(t, [32]byte{0x98}, nodeTx.TxHash())
 
 	req := &pb.CreateTreeRequest{
 		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
@@ -2912,6 +2913,418 @@ func TestPrepareSigningJobsRejectsRefundTxWrongNodeOutpoint(t *testing.T) {
 
 	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
 	require.ErrorContains(t, err, "refund transaction input 0 must spend")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsLeafNodeOutputNotVerifyingKey(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{6})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	handler := createTestHandler()
+
+	signingKeyshare := createTreeCreationTestSigningKeyshare(t, ctx, dbTX, rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentOutput := createTreeCreationTestOutput(t, signingKeyshare.PublicKey.Add(signingPrivKey.Public()), 10_000)
+	parentTx, parentTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x31}, Index: 0}, parentOutput)
+	parentTxHash := parentTx.TxHash()
+	createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
+
+	attackerOutput := createTreeCreationTestOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), parentOutput.Value)
+	nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, attackerOutput)
+	refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), common.MaybeApplyFee(parentOutput.Value))
+	_, refundTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}, refundOutput)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentTxBytes,
+				Txid:    parentTxHash[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  nodeTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:                  refundTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}
+
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+	require.ErrorContains(t, err, "node transaction output 0 must pay the node verifying key")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsLeafNodeOutputValueMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{7})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	handler := createTestHandler()
+
+	signingKeyshare := createTreeCreationTestSigningKeyshare(t, ctx, dbTX, rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingKey := signingKeyshare.PublicKey.Add(signingPrivKey.Public())
+	parentOutput := createTreeCreationTestOutput(t, verifyingKey, 10_000)
+	parentTx, parentTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x32}, Index: 0}, parentOutput)
+	parentTxHash := parentTx.TxHash()
+	createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
+
+	nodeOutput := createTreeCreationTestOutput(t, verifyingKey, parentOutput.Value-1)
+	nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutput)
+	refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), common.MaybeApplyFee(nodeOutput.Value))
+	_, refundTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}, refundOutput)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentTxBytes,
+				Txid:    parentTxHash[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  nodeTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:                  refundTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}
+
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+	require.ErrorContains(t, err, "node transaction output 0 has value")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsDirectNodeOutputNotVerifyingKey(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{8})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	handler := createTestHandler()
+
+	signingKeyshare := createTreeCreationTestSigningKeyshare(t, ctx, dbTX, rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingKey := signingKeyshare.PublicKey.Add(signingPrivKey.Public())
+	parentOutput := createTreeCreationTestOutput(t, verifyingKey, 10_000)
+	parentTx, parentTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x33}, Index: 0}, parentOutput)
+	parentTxHash := parentTx.TxHash()
+	createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
+
+	nodeOutput := createTreeCreationTestOutput(t, verifyingKey, parentOutput.Value)
+	nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutput)
+	directOutput := createTreeCreationTestOutput(t, keys.MustGeneratePrivateKeyFromRand(rng).Public(), common.MaybeApplyFee(parentOutput.Value))
+	_, directTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, directOutput)
+	refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), common.MaybeApplyFee(parentOutput.Value))
+	_, refundTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}, refundOutput)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentTxBytes,
+				Txid:    parentTxHash[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  nodeTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			DirectNodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  directTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:                  refundTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}
+
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+	require.ErrorContains(t, err, "direct node transaction output 0 must pay the node verifying key")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestPrepareSigningJobsRejectsDirectNodeOutputValueMismatch(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{9})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	handler := createTestHandler()
+
+	signingKeyshare := createTreeCreationTestSigningKeyshare(t, ctx, dbTX, rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingKey := signingKeyshare.PublicKey.Add(signingPrivKey.Public())
+	parentOutput := createTreeCreationTestOutput(t, verifyingKey, 10_000)
+	parentTx, parentTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x34}, Index: 0}, parentOutput)
+	parentTxHash := parentTx.TxHash()
+	createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
+
+	nodeOutput := createTreeCreationTestOutput(t, verifyingKey, parentOutput.Value)
+	nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutput)
+	directOutput := createTreeCreationTestOutput(t, verifyingKey, parentOutput.Value)
+	_, directTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, directOutput)
+	refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), common.MaybeApplyFee(parentOutput.Value))
+	_, refundTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}, refundOutput)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentTxBytes,
+				Txid:    parentTxHash[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  nodeTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			DirectNodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  directTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:                  refundTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}
+
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+	require.ErrorContains(t, err, "direct node transaction output 0 has value")
+	assert.Empty(t, signingJobs)
+	assert.Empty(t, nodes)
+}
+
+func TestValidateTreeCreationLeafNodeOutputAnchorHandling(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{11})
+	verifyingKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leafOutput := createTreeCreationTestOutput(t, verifyingKey, 1_000)
+	anchor := common.EphemeralAnchorOutput()
+
+	tests := []struct {
+		name                 string
+		outputs              []*wire.TxOut
+		allowEphemeralAnchor bool
+		wantErr              string
+	}{
+		{
+			name:                 "single output with anchor allowed",
+			outputs:              []*wire.TxOut{leafOutput},
+			allowEphemeralAnchor: true,
+		},
+		{
+			name:    "single output with anchor disallowed",
+			outputs: []*wire.TxOut{leafOutput},
+		},
+		{
+			name:                 "trailing ephemeral anchor",
+			outputs:              []*wire.TxOut{leafOutput, common.EphemeralAnchorOutput()},
+			allowEphemeralAnchor: true,
+		},
+		{
+			name:                 "anchor with nonzero value",
+			outputs:              []*wire.TxOut{leafOutput, {Value: 1, PkScript: anchor.PkScript}},
+			allowEphemeralAnchor: true,
+			wantErr:              "output 1 must be an ephemeral anchor output",
+		},
+		{
+			name:                 "anchor with wrong script",
+			outputs:              []*wire.TxOut{leafOutput, {Value: 0, PkScript: leafOutput.PkScript}},
+			allowEphemeralAnchor: true,
+			wantErr:              "output 1 must be an ephemeral anchor output",
+		},
+		{
+			name:    "anchor when disallowed",
+			outputs: []*wire.TxOut{leafOutput, common.EphemeralAnchorOutput()},
+			wantErr: "must have exactly one output, got 2",
+		},
+		{
+			name:                 "extra output beyond anchor",
+			outputs:              []*wire.TxOut{leafOutput, common.EphemeralAnchorOutput(), common.EphemeralAnchorOutput()},
+			allowEphemeralAnchor: true,
+			wantErr:              "got 3",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx, _ := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x41}, Index: 0}, tt.outputs...)
+			err := validateTreeCreationLeafNodeOutput(tx, verifyingKey, leafOutput.Value, "node transaction", tt.allowEphemeralAnchor)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestPrepareSigningJobsAcceptsLeafNodeTx(t *testing.T) {
+	tests := []struct {
+		name       string
+		seed       byte
+		prevHash   byte
+		withAnchor bool
+	}{
+		// The production SSP appends an ephemeral anchor output to CPFP leaf node txs.
+		{name: "with trailing ephemeral anchor", seed: 13, prevHash: 0x35, withAnchor: true},
+		{name: "without anchor", seed: 14, prevHash: 0x36},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rng := rand.NewChaCha8([32]byte{tt.seed})
+			ctx, _ := db.ConnectToTestPostgres(t)
+			dbTX, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+			handler := createTestHandler()
+
+			signingKeyshare := createTreeCreationTestSigningKeyshare(t, ctx, dbTX, rng)
+			identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+			signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+			verifyingKey := signingKeyshare.PublicKey.Add(signingPrivKey.Public())
+			parentOutput := createTreeCreationTestOutput(t, verifyingKey, 10_000)
+			parentTx, parentTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{tt.prevHash}, Index: 0}, parentOutput)
+			parentTxHash := parentTx.TxHash()
+			createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
+
+			nodeOutputs := []*wire.TxOut{createTreeCreationTestOutput(t, verifyingKey, parentOutput.Value)}
+			if tt.withAnchor {
+				nodeOutputs = append(nodeOutputs, common.EphemeralAnchorOutput())
+			}
+			nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutputs...)
+			refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), parentOutput.Value)
+			_, refundTxBytes := createTreeCreationRefundValidationTx(
+				t,
+				wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
+				spark.InitialSequence(),
+				refundOutput,
+				common.EphemeralAnchorOutput(),
+			)
+
+			req := &pb.CreateTreeRequest{
+				UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+				Source: &pb.CreateTreeRequest_OnChainUtxo{
+					OnChainUtxo: &pb.UTXO{
+						RawTx:   parentTxBytes,
+						Txid:    parentTxHash[:],
+						Vout:    0,
+						Network: pb.Network_REGTEST,
+					},
+				},
+				Node: &pb.CreationNode{
+					NodeTxSigningJob: &pb.SigningJob{
+						RawTx:                  nodeTxBytes,
+						SigningPublicKey:       signingPrivKey.Public().Serialize(),
+						SigningNonceCommitment: createTestSigningCommitment(rng),
+					},
+					RefundTxSigningJob: &pb.SigningJob{
+						RawTx:                  refundTxBytes,
+						SigningPublicKey:       signingPrivKey.Public().Serialize(),
+						SigningNonceCommitment: createTestSigningCommitment(rng),
+					},
+				},
+			}
+
+			signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+			require.NoError(t, err)
+			assert.Len(t, signingJobs, 2)
+			assert.Len(t, nodes, 1)
+		})
+	}
+}
+
+func TestPrepareSigningJobsRejectsDirectNodeTxWithAnchor(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{15})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	handler := createTestHandler()
+
+	signingKeyshare := createTreeCreationTestSigningKeyshare(t, ctx, dbTX, rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingKey := signingKeyshare.PublicKey.Add(signingPrivKey.Public())
+	parentOutput := createTreeCreationTestOutput(t, verifyingKey, 10_000)
+	parentTx, parentTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x37}, Index: 0}, parentOutput)
+	parentTxHash := parentTx.TxHash()
+	createTreeCreationTestDepositAddress(t, ctx, dbTX, parentOutput, identityPrivKey.Public(), signingPrivKey.Public(), signingKeyshare)
+
+	nodeOutput := createTreeCreationTestOutput(t, verifyingKey, parentOutput.Value)
+	nodeTx, nodeTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, nodeOutput)
+	directOutput := createTreeCreationTestOutput(t, verifyingKey, common.MaybeApplyFee(parentOutput.Value))
+	_, directTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: parentTxHash, Index: 0}, directOutput, common.EphemeralAnchorOutput())
+	refundOutput := createTreeCreationTestOutput(t, signingPrivKey.Public(), common.MaybeApplyFee(parentOutput.Value))
+	_, refundTxBytes := createTreeCreationTestTx(t, wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}, refundOutput)
+
+	req := &pb.CreateTreeRequest{
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
+		Source: &pb.CreateTreeRequest_OnChainUtxo{
+			OnChainUtxo: &pb.UTXO{
+				RawTx:   parentTxBytes,
+				Txid:    parentTxHash[:],
+				Vout:    0,
+				Network: pb.Network_REGTEST,
+			},
+		},
+		Node: &pb.CreationNode{
+			NodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  nodeTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			DirectNodeTxSigningJob: &pb.SigningJob{
+				RawTx:                  directTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+			RefundTxSigningJob: &pb.SigningJob{
+				RawTx:                  refundTxBytes,
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
+				SigningNonceCommitment: createTestSigningCommitment(rng),
+			},
+		},
+	}
+
+	signingJobs, nodes, err := handler.prepareSigningJobs(ctx, req, false)
+	require.ErrorContains(t, err, "direct node transaction must have exactly one output, got 2")
 	assert.Empty(t, signingJobs)
 	assert.Empty(t, nodes)
 }

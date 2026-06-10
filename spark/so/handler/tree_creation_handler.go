@@ -208,6 +208,38 @@ func validateTreeCreationDirectFromCpfpRefundTransaction(ctx context.Context, ra
 	return nil
 }
 
+// allowEphemeralAnchor permits an optional trailing ephemeral anchor output:
+// the production SSP appends one to CPFP leaf node txs, so the CPFP path must
+// accept it. Direct node txs carry no anchor and must have exactly one output.
+func validateTreeCreationLeafNodeOutput(tx *wire.MsgTx, verifyingKey keys.Public, expectedValue int64, txName string, allowEphemeralAnchor bool) error {
+	if tx == nil {
+		return fmt.Errorf("%s is required", txName)
+	}
+	switch {
+	case len(tx.TxOut) == 1:
+	case allowEphemeralAnchor && len(tx.TxOut) == 2:
+		anchor := common.EphemeralAnchorOutput()
+		if tx.TxOut[1].Value != anchor.Value || !bytes.Equal(tx.TxOut[1].PkScript, anchor.PkScript) {
+			return fmt.Errorf("%s output 1 must be an ephemeral anchor output", txName)
+		}
+	case allowEphemeralAnchor:
+		return fmt.Errorf("%s must have exactly one output, or one output plus a trailing ephemeral anchor, got %d", txName, len(tx.TxOut))
+	default:
+		return fmt.Errorf("%s must have exactly one output, got %d", txName, len(tx.TxOut))
+	}
+	if tx.TxOut[0].Value != expectedValue {
+		return fmt.Errorf("%s output 0 has value %d, expected %d", txName, tx.TxOut[0].Value, expectedValue)
+	}
+	expectedScript, err := common.P2TRScriptFromPubKey(verifyingKey)
+	if err != nil {
+		return fmt.Errorf("failed to build expected %s output script: %w", txName, err)
+	}
+	if !bytes.Equal(tx.TxOut[0].PkScript, expectedScript) {
+		return fmt.Errorf("%s output 0 must pay the node verifying key", txName)
+	}
+	return nil
+}
+
 func isTreeCreationParentStatusEligible(status st.TreeNodeStatus) bool {
 	return status == st.TreeNodeStatusCreating || status == st.TreeNodeStatusAvailable
 }
@@ -750,6 +782,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if len(currentElement.node.GetChildren()) > 0 && currentElement.node.GetRefundTxSigningJob() != nil {
 			return nil, nil, errors.New("refund tx should be on leaf node")
 		}
+		verifyingKey := currentElement.keyshare.PublicKey.Add(currentElement.userPubKey)
 
 		cpfpSigningJob, cpfpTx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.GetNodeTxSigningJob(), currentElement.output)
 		if err != nil {
@@ -757,6 +790,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		}
 		if err := validateTreeCreationTxSpendsOutpoint(cpfpTx, currentElement.outPoint, "node transaction"); err != nil {
 			return nil, nil, err
+		}
+		if currentElement.node.GetRefundTxSigningJob() != nil {
+			if err := validateTreeCreationLeafNodeOutput(cpfpTx, verifyingKey, currentElement.output.Value, "node transaction", true); err != nil {
+				return nil, nil, err
+			}
 		}
 		signingJobs = append(signingJobs, cpfpSigningJob)
 
@@ -769,6 +807,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			}
 			if err := validateTreeCreationTxSpendsOutpoint(directTx, currentElement.outPoint, "direct node transaction"); err != nil {
 				return nil, nil, err
+			}
+			if currentElement.node.GetRefundTxSigningJob() != nil {
+				expectedDirectValue := common.MaybeApplyFee(currentElement.output.Value)
+				if err := validateTreeCreationLeafNodeOutput(directTx, verifyingKey, expectedDirectValue, "direct node transaction", false); err != nil {
+					return nil, nil, err
+				}
 			}
 			signingJobs = append(signingJobs, directSigningJob)
 		} else if requireDirectTx {
@@ -816,8 +860,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			}
 			parentNodeID = &currentElement.parentNode.ID
 		}
-		verifyingKey := currentElement.keyshare.PublicKey.Add(currentElement.userPubKey)
-
 		var cpfpRefundTx []byte
 		if currentElement.node.GetRefundTxSigningJob() != nil {
 			cpfpRefundTx = currentElement.node.GetRefundTxSigningJob().GetRawTx()
