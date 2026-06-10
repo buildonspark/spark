@@ -252,6 +252,8 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 func retryFingerprint(job *pb.SigningJob) []byte {
 	hashState := sha256.New()
 
+	writeBytesCollisionResistant(hashState, []byte(job.GetKeyshareId()))
+
 	writeBytesCollisionResistant(hashState, job.GetMessage())
 
 	writeBytesCollisionResistant(hashState, job.GetVerifyingKey())

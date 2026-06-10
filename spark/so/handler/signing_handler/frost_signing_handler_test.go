@@ -1,17 +1,21 @@
 package signing_handler
 
 import (
+	"context"
 	"errors"
 	"math"
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
 	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +23,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	code := m.Run()
+	stop()
+	os.Exit(code)
+}
 
 func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 	tests := []struct {
@@ -258,12 +269,199 @@ func TestFrostSigningHandler_FrostRound2RejectsMissingKeyshareBeforeSigner(t *te
 	require.False(t, frostFactory.called, "missing keyshare IDs must be rejected before calling the signer")
 }
 
+func TestFrostSigningHandler_FrostRound2RejectsNonceReuseForDifferentJobBeforeSigner(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	frostFactory := &rejectingFrostConnectionFactory{}
+	config := &so.Config{
+		Identifier:                 "operator-1",
+		FrostGRPCConnectionFactory: frostFactory,
+	}
+	handler := NewFrostSigningHandler(config)
+
+	keyshare, keyshareSecret := createFrostRound2TestKeyshare(t, ctx, config.Identifier)
+
+	nonceResp, err := handler.GenerateRandomNonces(ctx, 1)
+	require.NoError(t, err)
+	require.Len(t, nonceResp.GetSigningCommitments(), 1)
+
+	newJob := func(message []byte) *pb.SigningJob {
+		return &pb.SigningJob{
+			JobId:        "job-1",
+			KeyshareId:   keyshare.ID.String(),
+			Message:      message,
+			VerifyingKey: keyshareSecret.Public().Serialize(),
+			Commitments: map[string]*pbcommon.SigningCommitment{
+				config.Identifier: nonceResp.GetSigningCommitments()[0],
+			},
+		}
+	}
+
+	resp, err := handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{newJob([]byte("message-a"))},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.True(t, frostFactory.called, "first use should reach the signer after recording the nonce fingerprint")
+
+	frostFactory.called = false
+	resp, err = handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{newJob([]byte("message-b"))},
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "already used for a different signing job")
+	require.False(t, frostFactory.called, "nonce reuse for a different message must be rejected before calling the signer")
+}
+
+func TestFrostSigningHandler_FrostRound2RejectsNonceReuseForDifferentKeyshareBeforeSigner(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	frostFactory := &rejectingFrostConnectionFactory{}
+	config := &so.Config{
+		Identifier:                 "operator-1",
+		FrostGRPCConnectionFactory: frostFactory,
+	}
+	handler := NewFrostSigningHandler(config)
+
+	firstKeyshare, firstKeyshareSecret := createFrostRound2TestKeyshare(t, ctx, config.Identifier)
+	secondKeyshare, _ := createFrostRound2TestKeyshare(t, ctx, config.Identifier)
+
+	nonceResp, err := handler.GenerateRandomNonces(ctx, 1)
+	require.NoError(t, err)
+	require.Len(t, nonceResp.GetSigningCommitments(), 1)
+
+	newJob := func(keyshareID string) *pb.SigningJob {
+		return &pb.SigningJob{
+			JobId:        "job-1",
+			KeyshareId:   keyshareID,
+			Message:      []byte("message"),
+			VerifyingKey: firstKeyshareSecret.Public().Serialize(),
+			Commitments: map[string]*pbcommon.SigningCommitment{
+				config.Identifier: nonceResp.GetSigningCommitments()[0],
+			},
+		}
+	}
+
+	resp, err := handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{newJob(firstKeyshare.ID.String())},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.True(t, frostFactory.called, "first use should reach the signer after recording the nonce fingerprint")
+
+	frostFactory.called = false
+	resp, err = handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{newJob(secondKeyshare.ID.String())},
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "already used for a different signing job")
+	require.False(t, frostFactory.called, "nonce reuse with a different keyshare must be rejected before calling the signer")
+}
+
+func TestFrostSigningHandler_FrostRound2AllowsNonceReuseForSameJobRetryBeforeSigner(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	frostFactory := &rejectingFrostConnectionFactory{}
+	config := &so.Config{
+		Identifier:                 "operator-1",
+		FrostGRPCConnectionFactory: frostFactory,
+	}
+	handler := NewFrostSigningHandler(config)
+
+	keyshare, keyshareSecret := createFrostRound2TestKeyshare(t, ctx, config.Identifier)
+
+	nonceResp, err := handler.GenerateRandomNonces(ctx, 1)
+	require.NoError(t, err)
+	require.Len(t, nonceResp.GetSigningCommitments(), 1)
+
+	job := &pb.SigningJob{
+		JobId:        "job-1",
+		KeyshareId:   keyshare.ID.String(),
+		Message:      []byte("message"),
+		VerifyingKey: keyshareSecret.Public().Serialize(),
+		Commitments: map[string]*pbcommon.SigningCommitment{
+			config.Identifier: nonceResp.GetSigningCommitments()[0],
+		},
+	}
+
+	resp, err := handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{job},
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "frost signer should not be called")
+	require.Equal(t, 1, frostFactory.callCount)
+
+	resp, err = handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{job},
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "frost signer should not be called")
+	require.Equal(t, 2, frostFactory.callCount)
+}
+
+func TestFrostSigningHandler_FrostRound2RejectsDuplicateNonceCommitmentInSameRequestBeforeSigner(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	frostFactory := &rejectingFrostConnectionFactory{}
+	config := &so.Config{
+		Identifier:                 "operator-1",
+		FrostGRPCConnectionFactory: frostFactory,
+	}
+	handler := NewFrostSigningHandler(config)
+
+	keyshare, keyshareSecret := createFrostRound2TestKeyshare(t, ctx, config.Identifier)
+
+	nonceResp, err := handler.GenerateRandomNonces(ctx, 1)
+	require.NoError(t, err)
+	require.Len(t, nonceResp.GetSigningCommitments(), 1)
+
+	newJob := func(jobID string, message []byte) *pb.SigningJob {
+		return &pb.SigningJob{
+			JobId:        jobID,
+			KeyshareId:   keyshare.ID.String(),
+			Message:      message,
+			VerifyingKey: keyshareSecret.Public().Serialize(),
+			Commitments: map[string]*pbcommon.SigningCommitment{
+				config.Identifier: nonceResp.GetSigningCommitments()[0],
+			},
+		}
+	}
+
+	resp, err := handler.FrostRound2(ctx, &pb.FrostRound2Request{
+		SigningJobs: []*pb.SigningJob{
+			newJob("job-1", []byte("message-a")),
+			newJob("job-2", []byte("message-b")),
+		},
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "duplicate signing nonce commitment")
+	require.False(t, frostFactory.called, "duplicate nonce use in one batch must be rejected before calling the signer")
+}
+
+func createFrostRound2TestKeyshare(t *testing.T, ctx context.Context, identifier string) (*ent.SigningKeyshare, keys.Private) {
+	t.Helper()
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshareSecret := keys.GeneratePrivateKey()
+	keyshare, err := dbTx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keyshareSecret).
+		SetPublicShares(map[string]keys.Public{identifier: keyshareSecret.Public()}).
+		SetPublicKey(keyshareSecret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return keyshare, keyshareSecret
+}
+
 type rejectingFrostConnectionFactory struct {
-	called bool
+	called    bool
+	callCount int
 }
 
 func (f *rejectingFrostConnectionFactory) NewFrostGRPCConnection(string) (*grpc.ClientConn, error) {
 	f.called = true
+	f.callCount++
 	return nil, errors.New("frost signer should not be called")
 }
 
@@ -292,6 +490,7 @@ func TestFrostSigningHandler_GenerateRandomNonces_DatabaseError(t *testing.T) {
 func TestRetryFingerprintBindsSigningJobInputs(t *testing.T) {
 	newJob := func() *pb.SigningJob {
 		return &pb.SigningJob{
+			KeyshareId:       "keyshare-a",
 			Message:          []byte("message"),
 			VerifyingKey:     []byte("verifying-key"),
 			AdaptorPublicKey: []byte("adaptor-public-key"),
@@ -315,6 +514,7 @@ func TestRetryFingerprintBindsSigningJobInputs(t *testing.T) {
 	baseFingerprint := retryFingerprint(newJob())
 
 	sameJobDifferentMapOrder := &pb.SigningJob{
+		KeyshareId:       "keyshare-a",
 		Message:          []byte("message"),
 		VerifyingKey:     []byte("verifying-key"),
 		AdaptorPublicKey: []byte("adaptor-public-key"),
@@ -339,6 +539,12 @@ func TestRetryFingerprintBindsSigningJobInputs(t *testing.T) {
 		name   string
 		mutate func(*pb.SigningJob)
 	}{
+		{
+			name: "keyshare id",
+			mutate: func(job *pb.SigningJob) {
+				job.KeyshareId = "keyshare-b"
+			},
+		},
 		{
 			name: "message",
 			mutate: func(job *pb.SigningJob) {
