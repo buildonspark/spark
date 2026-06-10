@@ -2490,6 +2490,169 @@ func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
 	require.Equal(t, "OUT_OF_RANGE", reason)
 }
 
+func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{5})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHashBytes := sha256.Sum256([]byte("extra preimage refund input"))
+	paymentHash := paymentHashBytes[:]
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": destinationPubKey}).
+		SetPublicKey(destinationPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440005")
+	outputScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+
+	createParentAndRefundTxWithPrevIndex := func(prevIndex uint32) ([]byte, []byte) {
+		t.Helper()
+		parentTx := wire.NewMsgTx(2)
+		parentTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Index: prevIndex},
+			Sequence:         wire.MaxTxInSequenceNum,
+		})
+		parentTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: outputScript})
+		parentTxBytes, err := common.SerializeTx(parentTx)
+		require.NoError(t, err)
+
+		refundTx := wire.NewMsgTx(2)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+			Sequence:         wire.MaxTxInSequenceNum,
+		})
+		refundTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: outputScript})
+		refundTxBytes, err := common.SerializeTx(refundTx)
+		require.NoError(t, err)
+		return parentTxBytes, refundTxBytes
+	}
+
+	cpfpParentTx, cpfpRefundTx := createParentAndRefundTxWithPrevIndex(0)
+	directParentTx, directRefundTx := createParentAndRefundTxWithPrevIndex(1)
+	directFromCpfpRefundTx := cpfpRefundTx
+
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(nodeID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetOwnerSigningPubkey(destinationPubKey).
+		SetRawTx(cpfpParentTx).
+		SetDirectTx(directParentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	signingJob := func(rawTx []byte) *pb.UserSignedTxSigningJob {
+		return &pb.UserSignedTxSigningJob{
+			LeafId: nodeID.String(),
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: map[string]*pbcommon.SigningCommitment{
+					"test": {
+						Hiding:  []byte("test_hiding"),
+						Binding: []byte("test_binding"),
+					},
+				},
+			},
+			SigningNonceCommitment: &pbcommon.SigningCommitment{
+				Hiding:  []byte("test_nonce_hiding"),
+				Binding: []byte("test_nonce_binding"),
+			},
+			UserSignature: []byte("test_signature"),
+			RawTx:         rawTx,
+		}
+	}
+
+	withExtraInput := func(rawTx []byte) []byte {
+		t.Helper()
+		parsed, err := common.TxFromRawTxBytes(rawTx)
+		require.NoError(t, err)
+		parsed.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Index: 42},
+			Sequence:         wire.MaxTxInSequenceNum,
+		})
+		serialized, err := common.SerializeTx(parsed)
+		require.NoError(t, err)
+		return serialized
+	}
+
+	tests := []struct {
+		name                       string
+		cpfpTransactions           []*pb.UserSignedTxSigningJob
+		directTransactions         []*pb.UserSignedTxSigningJob
+		directFromCpfpTransactions []*pb.UserSignedTxSigningJob
+		expectedErr                string
+	}{
+		{
+			name:             "cpfp refund with extra input",
+			cpfpTransactions: []*pb.UserSignedTxSigningJob{signingJob(withExtraInput(cpfpRefundTx))},
+			expectedErr:      "cpfp refund tx should have exactly 1 input",
+		},
+		{
+			name:               "direct refund with extra input",
+			cpfpTransactions:   []*pb.UserSignedTxSigningJob{signingJob(cpfpRefundTx)},
+			directTransactions: []*pb.UserSignedTxSigningJob{signingJob(withExtraInput(directRefundTx))},
+			expectedErr:        "direct refund tx should have exactly 1 input",
+		},
+		{
+			name:                       "direct from cpfp refund with extra input",
+			cpfpTransactions:           []*pb.UserSignedTxSigningJob{signingJob(cpfpRefundTx)},
+			directFromCpfpTransactions: []*pb.UserSignedTxSigningJob{signingJob(withExtraInput(directFromCpfpRefundTx))},
+			expectedErr:                "direct from cpfp refund tx should have exactly 1 input",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+				ctx,
+				&mockFrostServiceClientConnection{},
+				paymentHash,
+				tt.cpfpTransactions,
+				tt.directTransactions,
+				tt.directFromCpfpTransactions,
+				1000,
+				destinationPubKey,
+				0,
+				pb.InitiatePreimageSwapRequest_REASON_SEND,
+				false,
+			)
+
+			require.ErrorContains(t, err, tt.expectedErr)
+			code, reason := sparkerrors.CodeAndReasonFrom(err)
+			require.Equal(t, codes.InvalidArgument, code)
+			require.Equal(t, "MALFORMED_FIELD", reason)
+		})
+	}
+}
+
 func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{3})
 	ctx, _ := db.ConnectToTestPostgres(t)

@@ -656,8 +656,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
-		if len(cpfpRefundTx.TxIn) == 0 {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx has no inputs for tree_node id: %s", nodeID))
+		if len(cpfpRefundTx.TxIn) != 1 {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx should have exactly 1 input, got %d for tree_node id: %s", len(cpfpRefundTx.TxIn), nodeID))
 		}
 		expectedCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
 		if cpfpRefundTx.TxIn[0].PreviousOutPoint != expectedCpfpOutpoint {
@@ -733,8 +733,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
-		if len(directRefundTx.TxIn) == 0 {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx has no inputs for tree_node id: %s", nodeID))
+		if len(directRefundTx.TxIn) != 1 {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx should have exactly 1 input, got %d for tree_node id: %s", len(directRefundTx.TxIn), nodeID))
 		}
 		expectedDirectOutpoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
 		if directRefundTx.TxIn[0].PreviousOutPoint != expectedDirectOutpoint {
@@ -809,8 +809,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
 		}
 
-		if len(directFromCpfpRefundTx.TxIn) == 0 {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx has no inputs for tree_node id: %s", nodeID))
+		if len(directFromCpfpRefundTx.TxIn) != 1 {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx should have exactly 1 input, got %d for tree_node id: %s", len(directFromCpfpRefundTx.TxIn), nodeID))
 		}
 		expectedDirectFromCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
 		if directFromCpfpRefundTx.TxIn[0].PreviousOutPoint != expectedDirectFromCpfpOutpoint {
