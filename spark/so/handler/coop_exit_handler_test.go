@@ -70,6 +70,36 @@ func TestCooperativeExitV2RejectsMalformedRequestShape(t *testing.T) {
 				}}),
 			},
 		},
+		{
+			name: "malformed leaf id",
+			req: &pb.CooperativeExitRequest{
+				Transfer: baseTransfer([]*pb.LeafRefundTxSigningJob{{
+					LeafId:                           "not-a-uuid",
+					RefundTxSigningJob:               &pb.SigningJob{RawTx: []byte{0x01}},
+					DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: []byte{0x02}},
+				}}),
+			},
+		},
+		{
+			name: "duplicate leaf id",
+			req: &pb.CooperativeExitRequest{
+				Transfer: baseTransfer(func() []*pb.LeafRefundTxSigningJob {
+					leafID := uuid.New().String()
+					return []*pb.LeafRefundTxSigningJob{
+						{
+							LeafId:                           leafID,
+							RefundTxSigningJob:               &pb.SigningJob{RawTx: []byte{0x01}},
+							DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: []byte{0x02}},
+						},
+						{
+							LeafId:                           leafID,
+							RefundTxSigningJob:               &pb.SigningJob{RawTx: []byte{0x03}},
+							DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{RawTx: []byte{0x04}},
+						},
+					}
+				}()),
+			},
+		},
 	}
 
 	for _, tt := range tests {

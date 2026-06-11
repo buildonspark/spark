@@ -1298,6 +1298,34 @@ func TestValidateTransferPackage_DuplicateLeafID(t *testing.T) {
 	require.ErrorContains(t, err, "duplicate leaf id in LeavesToSend")
 }
 
+func TestValidateLegacyLeafRefundTxSigningJobsRejectsDuplicateLeafID(t *testing.T) {
+	leafID := uuid.New().String()
+
+	err := validateLegacyLeafRefundTxSigningJobs([]*pbspark.LeafRefundTxSigningJob{
+		{
+			LeafId:             leafID,
+			RefundTxSigningJob: &pbspark.SigningJob{RawTx: []byte{1}},
+		},
+		{
+			LeafId:             leafID,
+			RefundTxSigningJob: &pbspark.SigningJob{RawTx: []byte{2}},
+		},
+	})
+
+	require.ErrorContains(t, err, "duplicate leaf id in leaves_to_send")
+}
+
+func TestValidateLegacyLeafRefundTxSigningJobsRejectsMalformedLeafID(t *testing.T) {
+	err := validateLegacyLeafRefundTxSigningJobs([]*pbspark.LeafRefundTxSigningJob{
+		{
+			LeafId:             "not-a-uuid",
+			RefundTxSigningJob: &pbspark.SigningJob{RawTx: []byte{1}},
+		},
+	})
+
+	require.ErrorContains(t, err, "unable to parse leaves_to_send[0].leaf_id as a uuid")
+}
+
 func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	h := NewBaseTransferHandler(config)

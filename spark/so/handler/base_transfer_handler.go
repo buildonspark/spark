@@ -136,10 +136,21 @@ func loadLeafRefundMaps(req *pbspark.StartTransferRequest) (cpfp, direct, direct
 }
 
 func validateLegacyLeafRefundTxSigningJobs(leaves []*pbspark.LeafRefundTxSigningJob) error {
+	seenLeafIDs := make(map[string]struct{}, len(leaves))
 	for i, leaf := range leaves {
 		if leaf == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d] is required", i))
 		}
+		leafIDValue := leaf.GetLeafId()
+		parsedLeafID, err := uuid.Parse(leafIDValue)
+		if err != nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaves_to_send[%d].leaf_id as a uuid: %s: %w", i, leafIDValue, err))
+		}
+		leafID := parsedLeafID.String()
+		if _, exists := seenLeafIDs[leafID]; exists {
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id in leaves_to_send: %s", leafID))
+		}
+		seenLeafIDs[leafID] = struct{}{}
 		if leaf.GetRefundTxSigningJob() == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaves_to_send[%d].refund_tx_signing_job is required", i))
 		}

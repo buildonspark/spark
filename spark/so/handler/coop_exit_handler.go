@@ -75,6 +75,12 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 	if len(req.GetTransfer().GetLeavesToSend()) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one leaf to send is required"))
 	}
+	// Reject duplicate or malformed leaf IDs before collapsing the slice into
+	// maps: signRefunds iterates the raw slice and would sign every entry,
+	// while validation only ever sees the last entry per leaf ID.
+	if err := validateLegacyLeafRefundTxSigningJobs(req.GetTransfer().GetLeavesToSend()); err != nil {
+		return nil, err
+	}
 	for _, job := range req.GetTransfer().GetLeavesToSend() {
 		if job == nil {
 			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf refund tx signing job is required"))
