@@ -145,6 +145,7 @@
     "react-native": "0.79.4",
     "react-native-get-random-values": "^1.11.0",
     "ts-jest": "^29.4.9",
+    "ts-proto": "2.8.3",
     "tsdown": "^0.20.3",
     "typescript": "^5.7.3"
   },
@@ -170,7 +171,6 @@
     "nice-grpc-client-middleware-retry": "^3.1.10",
     "nice-grpc-common": "^2.0.2",
     "nice-grpc-web": "^3.3.7",
-    "ts-proto": "2.8.3",
     "ua-parser-js": "^2.0.6",
     "uuidv7": "^1.0.2"
   },
