@@ -88,6 +88,70 @@ func TestSplitLeafSignatures(t *testing.T) {
 	assert.NotContains(t, dfc, "leaf-c")
 }
 
+func TestSendTransferRollbackMissingTransferNoops(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	handler := NewSendTransferFlowHandler(setUpTestConfigWithRegtestNoAuthz(t))
+	transferID := uuid.NewString()
+
+	cases := []struct {
+		name string
+		op   *pbinternal.SendTransferPrepareRequest
+		msg  *pbinternal.SendTransferRollbackRequest
+	}{
+		{
+			name: "rollback payload",
+			msg:  &pbinternal.SendTransferRollbackRequest{TransferId: transferID},
+		},
+		{
+			name: "prepare payload",
+			op: &pbinternal.SendTransferPrepareRequest{
+				OriginalRequest: &pb.StartTransferV3Request{TransferId: transferID},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.msg != nil {
+				require.NoError(t, handler.Rollback(ctx, tt.msg))
+			} else {
+				require.NoError(t, handler.Rollback(ctx, tt.op))
+			}
+		})
+	}
+}
+
+func TestSendTransferRollbackAdvancedStatusesNoop(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{71})
+	handler := NewSendTransferFlowHandler(setUpTestConfigWithRegtestNoAuthz(t))
+
+	statuses := []st.TransferStatus{
+		st.TransferStatusReturned,
+		st.TransferStatusApplyingSenderKeyTweak,
+		st.TransferStatusSenderKeyTweaked,
+		st.TransferStatusReceiverKeyTweaked,
+		st.TransferStatusReceiverKeyTweakLocked,
+		st.TransferStatusReceiverKeyTweakApplied,
+		st.TransferStatusReceiverRefundSigned,
+		st.TransferStatusCompleted,
+		st.TransferStatusExpired,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			transfer := createTestTransfer(t, ctx, rng, dbCtx.Client, status)
+
+			err := handler.Rollback(ctx, &pbinternal.SendTransferRollbackRequest{TransferId: transfer.ID.String()})
+			require.NoError(t, err)
+
+			updated, err := dbCtx.Client.Transfer.Get(ctx, transfer.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, updated.Status)
+		})
+	}
+}
+
 // TestParseSendTransferRequest_Errors covers the validation guards that turn
 // malformed v3 requests into typed sparkerrors before any DB work happens.
 func TestParseSendTransferRequest_Errors(t *testing.T) {

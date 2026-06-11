@@ -178,8 +178,8 @@ func (h *SendTransferFlowHandler) Commit(ctx context.Context, op proto.Message) 
 // BuildCommitPayload fails). It marks the transfer RETURNED via
 // executeCancelTransfer — same path the legacy CancelTransfer /
 // RollbackTransferGossip uses. Idempotent: a never-created transfer is a
-// no-op, and an already-RETURNED transfer short-circuits inside
-// executeCancelTransfer.
+// no-op, and a transfer already RETURNED or past the rollbackable pre-commit
+// states short-circuits in rollbackSendTransfer.
 //
 // Accepts both SendTransferRollbackRequest (the normal rollback payload) and
 // SendTransferPrepareRequest (the prepare op echoed back by the reconciler
@@ -266,8 +266,8 @@ func (h *SendTransferFlowHandler) applySendTransferCommit(ctx context.Context, r
 //
 // Idempotent in two directions:
 //   - if Prepare never created a row on this SO (NotFound) → no-op
-//   - if rollback already ran (status == RETURNED, or any other terminal
-//     status) → no-op via executeCancelTransfer's own idempotent check.
+//   - if rollback already ran, or the transfer is already past the rollbackable
+//     pre-commit states, the late rollback is a no-op.
 func (h *SendTransferFlowHandler) rollbackSendTransfer(ctx context.Context, transferID uuid.UUID) error {
 	transferEnt, err := h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
@@ -276,6 +276,26 @@ func (h *SendTransferFlowHandler) rollbackSendTransfer(ctx context.Context, tran
 		}
 		return fmt.Errorf("unable to load transfer %s for rollback: %w", transferID, err)
 	}
+
+	switch transferEnt.Status {
+	case st.TransferStatusSenderInitiated,
+		st.TransferStatusSenderInitiatedCoordinator,
+		st.TransferStatusSenderKeyTweakPending:
+		// These are the only states where rollback can safely return the leaf to
+		// the sender. Later states may already have applied key tweaks or receiver
+		// claim progress, so a rollback delivered after commit must be idempotent.
+	case st.TransferStatusReturned:
+		logging.GetLoggerFromContext(ctx).Sugar().Infof("send transfer 2pc rollback: transfer %s already RETURNED", transferID)
+		return nil
+	default:
+		logging.GetLoggerFromContext(ctx).Sugar().Infof(
+			"send transfer 2pc rollback: transfer %s already past rollbackable status %s",
+			transferID,
+			transferEnt.Status,
+		)
+		return nil
+	}
+
 	if err := h.executeCancelTransfer(ctx, transferEnt); err != nil {
 		return fmt.Errorf("unable to cancel transfer %s during rollback: %w", transferID, err)
 	}
