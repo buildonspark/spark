@@ -70,19 +70,20 @@ func (h *SignTokenTransactionHandler) SignTokenTransaction(
 		}
 	}
 
+	coordinatorPubKey, isCoordinator, coordinatorIndex, err := h.prepareHandler.validateInternalCoordinatorPublicKey(ctx, req.GetCoordinatorPublicKey())
+	if err != nil {
+		return nil, err
+	}
 	inputTtxos, err := h.prepareHandler.validateAndLockForCommit(
 		ctx,
 		finalTokenTX,
 		req.GetKeyshareIds(),
 		req.GetTokenTransactionSignatures(),
-		req.GetCoordinatorPublicKey(),
+		isCoordinator,
+		coordinatorIndex,
 	)
 	if err != nil {
 		return nil, err
-	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse coordinator public key: %w", err))
 	}
 
 	sig, err := h.createSignedTokenTransactionEntitiesAndSign(

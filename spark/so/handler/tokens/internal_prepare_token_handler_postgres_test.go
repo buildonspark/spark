@@ -16,7 +16,6 @@ import (
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so/db"
@@ -186,17 +185,11 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			require.NoError(t, err)
 			sig := schnorrSig.Serialize()
 
-			operatorList := handler.config.GetSigningOperatorList()
-			var firstOperator *sparkpb.SigningOperatorInfo
-			for _, operator := range operatorList {
-				firstOperator = operator
-				break
-			}
 			req := &tokeninternalpb.PrepareTransactionRequest{
 				FinalTokenTransaction:      txProto,
 				TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: sig}},
 				KeyshareIds:                []string{ks.ID.String()},
-				CoordinatorPublicKey:       firstOperator.GetPublicKey(),
+				CoordinatorPublicKey:       testNonSelfCoordinatorPublicKey(t, cfg),
 			}
 
 			_, err = handler.PrepareTokenTransactionInternal(ctx, req)
@@ -309,19 +302,12 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 	require.NoError(t, err)
 	attackerSig := attackerSchnorrSig.Serialize()
 
-	operatorList := cfg.GetSigningOperatorList()
-	var firstOperator *sparkpb.SigningOperatorInfo
-	for _, operator := range operatorList {
-		firstOperator = operator
-		break
-	}
-
 	// Attempt unauthorized mint
 	unauthorizedReq := &tokeninternalpb.PrepareTransactionRequest{
 		FinalTokenTransaction:      unauthorizedMintTx,
 		TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: attackerSig}},
 		KeyshareIds:                []string{ks.ID.String()},
-		CoordinatorPublicKey:       firstOperator.GetPublicKey(),
+		CoordinatorPublicKey:       testNonSelfCoordinatorPublicKey(t, cfg),
 	}
 
 	// Execute and verify rejection
@@ -366,7 +352,7 @@ func TestPrepareTokenTransactionInternal_MintIssuerAuthorizationCheck(t *testing
 		FinalTokenTransaction:      legitimateMintTx,
 		TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: legitimateSig}},
 		KeyshareIds:                []string{legitimateKs.ID.String()},
-		CoordinatorPublicKey:       firstOperator.GetPublicKey(),
+		CoordinatorPublicKey:       testNonSelfCoordinatorPublicKey(t, cfg),
 	}
 
 	_, err = handler.PrepareTokenTransactionInternal(ctx, legitimateReq)
@@ -421,6 +407,11 @@ func TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization(t *
 
 	// Create a keyshare for the single transfer output's revocation commitment.
 	ks := f.CreateKeyshare()
+	coordinator := testNonSelfCoordinator(t, cfg)
+	ks, err = dbtx.SigningKeyshare.UpdateOneID(ks.ID).
+		SetCoordinatorIndex(coordinator.ID).
+		Save(ctx)
+	require.NoError(t, err)
 
 	// Build the final transfer proto: 2 inputs → 1 output (balanced).
 	now := time.Now()
@@ -488,18 +479,11 @@ func TestPrepareTokenTransactionInternal_TransferSignatureIndexNormalization(t *
 		{InputIndex: 0, Signature: sig0Schnorr.Serialize()},
 	}
 
-	operatorList := cfg.GetSigningOperatorList()
-	var firstOperator *sparkpb.SigningOperatorInfo
-	for _, op := range operatorList {
-		firstOperator = op
-		break
-	}
-
 	req := &tokeninternalpb.PrepareTransactionRequest{
 		FinalTokenTransaction:      txProto,
 		TokenTransactionSignatures: signaturesOutOfOrder,
 		KeyshareIds:                []string{ks.ID.String()},
-		CoordinatorPublicKey:       firstOperator.GetPublicKey(),
+		CoordinatorPublicKey:       coordinator.IdentityPublicKey.Serialize(),
 	}
 
 	// The handler should accept the request (validation uses InputIndex correctly).

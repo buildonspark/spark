@@ -757,6 +757,14 @@ func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Co
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
 func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UUID) ([]*SigningKeyshare, error) {
+	return markSigningKeysharesAsUsed(ctx, ids, nil)
+}
+
+func MarkSigningKeysharesAsUsedForCoordinator(ctx context.Context, ids []uuid.UUID, coordinatorIndex uint64) ([]*SigningKeyshare, error) {
+	return markSigningKeysharesAsUsed(ctx, ids, &coordinatorIndex)
+}
+
+func markSigningKeysharesAsUsed(ctx context.Context, ids []uuid.UUID, coordinatorIndex *uint64) ([]*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.MarkSigningKeysharesAsUsed")
 	defer span.End()
 
@@ -784,12 +792,20 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 
 	var updatedKeyshares []*SigningKeyshare
 
-	//nolint:forbidigo // We use a custom a custom query here to select and update the keyshares in a single query
-	rows, err := db.QueryContext(ctx, `
+	query := `
 		UPDATE signing_keyshares
 		SET status = 'IN_USE', update_time = NOW()
 		WHERE signing_keyshares.status = 'AVAILABLE'
 		AND signing_keyshares.id = ANY($1)
+	`
+	args := []any{pq.Array(ids)}
+	if coordinatorIndex != nil {
+		query += `
+		AND signing_keyshares.coordinator_index = $2
+		`
+		args = append(args, *coordinatorIndex)
+	}
+	query += `
 		RETURNING
 			signing_keyshares.id,
 			signing_keyshares.create_time,
@@ -801,7 +817,10 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 			signing_keyshares.public_key,
 			signing_keyshares.min_signers,
 			signing_keyshares.coordinator_index
-	`, []any{pq.Array(ids)}...)
+	`
+
+	//nolint:forbidigo // We use a custom query here to select and update the keyshares in a single query.
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -828,6 +847,9 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 			if _, ok := updatedSet[id]; !ok {
 				missing = append(missing, id)
 			}
+		}
+		if coordinatorIndex != nil {
+			return nil, fmt.Errorf("keyshares are not all available for coordinator index %d: ids=%v (total=%d) could not be reserved from %v", *coordinatorIndex, missing, len(ids)-len(updatedKeyshares), ids)
 		}
 		return nil, fmt.Errorf("keyshares are not all available: ids=%v (total=%d) could not be reserved from %v", missing, len(ids)-len(updatedKeyshares), ids)
 	}

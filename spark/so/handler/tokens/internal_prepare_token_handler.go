@@ -40,6 +40,7 @@ import (
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens/signature"
 	"github.com/lightsparkdev/spark/so/utils"
+	"google.golang.org/grpc"
 )
 
 type InternalPrepareTokenHandler struct {
@@ -63,19 +64,20 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	// Set execute_before on the TokenTransaction so all downstream code (validation, hashing, entity creation) can derive it.
 	finalTokenTx.ExecuteBefore = req.GetExecuteBefore()
 
+	coordinatorPubKey, isCoordinator, coordinatorIndex, err := h.validateInternalCoordinatorPublicKey(ctx, req.GetCoordinatorPublicKey())
+	if err != nil {
+		return nil, err
+	}
 	inputTtxos, err := h.validateAndLockForCommit(
 		ctx,
 		finalTokenTx,
 		req.GetKeyshareIds(),
 		req.GetTokenTransactionSignatures(),
-		req.GetCoordinatorPublicKey(),
+		isCoordinator,
+		coordinatorIndex,
 	)
 	if err != nil {
 		return nil, err
-	}
-	coordinatorPubKey, err := keys.ParsePublicKey(req.GetCoordinatorPublicKey())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse coordinator public key: %w", err))
 	}
 
 	// Save the token transaction, created output ents, and update the outputs to spend.
@@ -92,14 +94,14 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 	finalTokenTx *tokenpb.TokenTransaction,
 	keyshareIDs []string,
 	tokenTransactionSignatures []*tokenpb.SignatureWithIndex,
-	coordinatorPublicKeyBytes []byte,
+	isCoordinator bool,
+	coordinatorIndex uint64,
 ) ([]*ent.TokenOutput, error) {
 	if finalTokenTx == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("final token transaction is required"))
 	}
 
-	isCoordinator := bytes.Equal(coordinatorPublicKeyBytes, h.config.IdentityPublicKey().Serialize())
-	expectedRevocationPublicKeys, err := h.validateAndReserveKeyshares(ctx, keyshareIDs, finalTokenTx, isCoordinator)
+	expectedRevocationPublicKeys, err := h.validateAndReserveKeyshares(ctx, keyshareIDs, finalTokenTx, isCoordinator, coordinatorIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +250,44 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 	return inputTtxos, nil
 }
 
+func (h *InternalPrepareTokenHandler) validateInternalCoordinatorPublicKey(ctx context.Context, coordinatorPublicKeyBytes []byte) (keys.Public, bool, uint64, error) {
+	coordinatorPubKey, err := keys.ParsePublicKey(coordinatorPublicKeyBytes)
+	if err != nil {
+		return keys.Public{}, false, 0, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse coordinator public key: %w", err))
+	}
+
+	coordinatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(coordinatorPubKey)
+	if coordinatorIdentifier == "" {
+		return keys.Public{}, false, 0, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("coordinator public key is not a configured signing operator: %x", coordinatorPublicKeyBytes))
+	}
+	coordinatorOperator := h.config.SigningOperatorMap[coordinatorIdentifier]
+	if coordinatorOperator == nil {
+		return keys.Public{}, false, 0, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("coordinator public key has no configured signing operator: %x", coordinatorPublicKeyBytes))
+	}
+
+	isCoordinator := coordinatorPubKey.Equals(h.config.IdentityPublicKey())
+	if isCoordinator && isTokenInternalRPC(ctx) {
+		return keys.Public{}, false, 0, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("local coordinator public key cannot be used through token internal RPC"))
+	}
+
+	return coordinatorPubKey, isCoordinator, coordinatorOperator.ID, nil
+}
+
+func isTokenInternalRPC(ctx context.Context) bool {
+	stream := grpc.ServerTransportStreamFromContext(ctx)
+	if stream == nil {
+		return false
+	}
+
+	switch stream.Method() {
+	case tokeninternalpb.SparkTokenInternalService_PrepareTransaction_FullMethodName,
+		tokeninternalpb.SparkTokenInternalService_SignTokenTransaction_FullMethodName:
+		return true
+	default:
+		return false
+	}
+}
+
 func anyTtxosHaveSpentTransactions(ttxos []*ent.TokenOutput) bool {
 	for _, ttxo := range ttxos {
 		if ttxo.Edges.OutputSpentTokenTransaction != nil {
@@ -258,7 +298,7 @@ func anyTtxosHaveSpentTransactions(ttxos []*ent.TokenOutput) bool {
 }
 
 // validateAndReserveKeyshares parses keyshare IDs, checks for duplicates, marks them as used, and returns expected revocation public keys
-func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Context, keyshareIDs []string, finalTokenTransaction *tokenpb.TokenTransaction, isCoordinator bool) ([]keys.Public, error) {
+func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Context, keyshareIDs []string, finalTokenTransaction *tokenpb.TokenTransaction, isCoordinator bool, coordinatorIndex uint64) ([]keys.Public, error) {
 	keyshareUUIDs := make([]uuid.UUID, len(keyshareIDs))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different outputs.
 	seenUUIDs := make(map[uuid.UUID]bool)
@@ -277,7 +317,7 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 	var keysharesMap map[uuid.UUID]*ent.SigningKeyshare
 	var err error
 	if !isCoordinator {
-		keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareUUIDs)
+		keyshares, err := ent.MarkSigningKeysharesAsUsedForCoordinator(ctx, keyshareUUIDs, coordinatorIndex)
 		addTraceEvent(ctx, "mark_keyshares", attribute.String("keyshare_ids", strings.Join(keyshareIDs, ",")), attribute.Bool("success", err == nil), attribute.Bool("skipped", false))
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalKeyshareError(err))
@@ -299,6 +339,30 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 		keyshare, ok := keysharesMap[id]
 		if !ok {
 			return nil, tokens.FormatErrorWithTransactionProto("keyshare ID not found", finalTokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("keyshare ID not found: %s", id)))
+		}
+		if keyshare.CoordinatorIndex != coordinatorIndex {
+			return nil, tokens.FormatErrorWithTransactionProto(
+				"keyshare coordinator index mismatch",
+				finalTokenTransaction,
+				sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+					"keyshare %s has coordinator index %d, expected %d",
+					id,
+					keyshare.CoordinatorIndex,
+					coordinatorIndex,
+				)),
+			)
+		}
+		if isCoordinator && keyshare.Status != st.KeyshareStatusInUse {
+			return nil, tokens.FormatErrorWithTransactionProto(
+				"local coordinator keyshare is not reserved",
+				finalTokenTransaction,
+				sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+					"local coordinator keyshare %s has status %s, expected %s",
+					id,
+					keyshare.Status,
+					st.KeyshareStatusInUse,
+				)),
+			)
 		}
 		expectedRevocationPublicKeys[i] = keyshare.PublicKey
 	}

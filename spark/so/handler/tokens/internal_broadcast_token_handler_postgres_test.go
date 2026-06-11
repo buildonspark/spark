@@ -1,7 +1,6 @@
 package tokens
 
 import (
-	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -78,6 +77,12 @@ func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so
 
 	// Regular keyshare for output's RevocationCommitment (doesn't need entity DKG key).
 	ks := f.CreateKeyshare()
+	coordinator := testNonSelfCoordinator(t, config)
+	var err error
+	ks, err = f.Client.SigningKeyshare.UpdateOneID(ks.ID).
+		SetCoordinatorIndex(coordinator.ID).
+		Save(f.Ctx)
+	require.NoError(t, err)
 
 	now := time.Now()
 	validityDuration := uint64(300) // 5 minutes (max allowed)
@@ -104,20 +109,7 @@ func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so
 		Network:                 sparkpb.Network_REGTEST,
 	}
 
-	// Add operator public keys (must be sorted bytewise ascending for V3).
-	var opKeys [][]byte
-	for _, op := range config.GetSigningOperatorList() {
-		opKeys = append(opKeys, op.GetPublicKey())
-	}
-	// Sort bytewise ascending.
-	for i := 0; i < len(opKeys); i++ {
-		for j := i + 1; j < len(opKeys); j++ {
-			if bytes.Compare(opKeys[i], opKeys[j]) > 0 {
-				opKeys[i], opKeys[j] = opKeys[j], opKeys[i]
-			}
-		}
-	}
-	txProto.SparkOperatorIdentityPublicKeys = opKeys
+	txProto.SparkOperatorIdentityPublicKeys = testSortedOperatorPublicKeys(config)
 
 	// Set withdraw bond and locktime from config.
 	cfgVals := config.Lrc20Configs[strings.ToLower(btcnetwork.Regtest.String())]
@@ -130,20 +122,12 @@ func createSignTokenTxTestData(t *testing.T, f *entfixtures.Fixtures, config *so
 	schnorrSig, err := schnorr.Sign(issuerPriv.ToBTCEC(), partialHash)
 	require.NoError(t, err)
 
-	// Get coordinator public key.
-	operatorList := config.GetSigningOperatorList()
-	var firstOperator *sparkpb.SigningOperatorInfo
-	for _, operator := range operatorList {
-		firstOperator = operator
-		break
-	}
-
 	return &signTokenTxTestData{
 		TokenCreate:       tokenCreate,
 		Keyshare:          ks,
 		TxProto:           txProto,
 		Signature:         schnorrSig.Serialize(),
-		CoordinatorPubKey: firstOperator.GetPublicKey(),
+		CoordinatorPubKey: coordinator.IdentityPublicKey.Serialize(),
 	}
 }
 
@@ -243,4 +227,95 @@ func TestSignTokenTransaction_Success(t *testing.T) {
 	sig, err := ecdsa.ParseDERSignature(resp.GetSparkOperatorSignature())
 	require.NoError(t, err)
 	assert.True(t, sig.Verify(hash, setup.config.IdentityPrivateKey.Public().ToBTCEC()))
+}
+
+func TestSignTokenTransaction_RejectsUnknownCoordinatorPublicKey(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
+
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
+	req := testData.buildValidSignRequest()
+	req.CoordinatorPublicKey = setup.fixtures.GeneratePrivateKey().Public().Serialize()
+
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
+	require.ErrorContains(t, err, "coordinator public key is not a configured signing operator")
+	require.Nil(t, resp)
+
+	keyshare, err := setup.client.SigningKeyshare.Get(setup.ctx, testData.Keyshare.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.KeyshareStatusAvailable, keyshare.Status)
+}
+
+func TestSignTokenTransaction_LocalCoordinatorRequiresReservedKeyshare(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
+
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
+	req := testData.buildValidSignRequest()
+	req.CoordinatorPublicKey = setup.config.IdentityPublicKey().Serialize()
+	err := setup.client.SigningKeyshare.UpdateOneID(testData.Keyshare.ID).
+		SetCoordinatorIndex(setup.config.Index).
+		Exec(setup.ctx)
+	require.NoError(t, err)
+
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
+	require.ErrorContains(t, err, "local coordinator keyshare")
+	require.Nil(t, resp)
+
+	keyshare, err := setup.client.SigningKeyshare.Get(setup.ctx, testData.Keyshare.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.KeyshareStatusAvailable, keyshare.Status)
+}
+
+func TestSignTokenTransaction_RejectsWrongCoordinatorKeysharePool(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
+
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
+	req := testData.buildValidSignRequest()
+	err := setup.client.SigningKeyshare.UpdateOneID(testData.Keyshare.ID).
+		SetCoordinatorIndex(setup.config.Index).
+		Exec(setup.ctx)
+	require.NoError(t, err)
+
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
+	require.ErrorContains(t, err, "coordinator index")
+	require.Nil(t, resp)
+
+	keyshare, err := setup.client.SigningKeyshare.Get(setup.ctx, testData.Keyshare.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.KeyshareStatusAvailable, keyshare.Status)
+}
+
+func TestSignTokenTransaction_LocalCoordinatorAcceptsReservedKeyshare(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
+
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
+	req := testData.buildValidSignRequest()
+	req.CoordinatorPublicKey = setup.config.IdentityPublicKey().Serialize()
+	err := setup.client.SigningKeyshare.UpdateOneID(testData.Keyshare.ID).
+		SetCoordinatorIndex(setup.config.Index).
+		SetStatus(st.KeyshareStatusInUse).
+		Exec(setup.ctx)
+	require.NoError(t, err)
+
+	resp, err := setup.handler.SignTokenTransaction(setup.ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotEmpty(t, resp.GetSparkOperatorSignature())
+}
+
+func TestSignTokenTransaction_RejectsLocalCoordinatorOverInternalRPC(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
+
+	testData := createSignTokenTxTestData(t, setup.fixtures, setup.config)
+	req := testData.buildValidSignRequest()
+	req.CoordinatorPublicKey = setup.config.IdentityPublicKey().Serialize()
+	err := setup.client.SigningKeyshare.UpdateOneID(testData.Keyshare.ID).
+		SetCoordinatorIndex(setup.config.Index).
+		SetStatus(st.KeyshareStatusInUse).
+		Exec(setup.ctx)
+	require.NoError(t, err)
+
+	internalCtx := withTokenInternalMethod(setup.ctx, t, tokeninternalpb.SparkTokenInternalService_SignTokenTransaction_FullMethodName)
+	resp, err := setup.handler.SignTokenTransaction(internalCtx, req)
+	require.ErrorContains(t, err, "local coordinator public key cannot be used through token internal RPC")
+	require.Nil(t, resp)
 }
