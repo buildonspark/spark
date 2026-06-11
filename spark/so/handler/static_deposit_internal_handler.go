@@ -433,6 +433,9 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	if err != nil {
 		return nil, fmt.Errorf("unable to get deposit address: %w", err)
 	}
+	if depositAddress.Network != btcnetwork.Unspecified && depositAddress.Network != network {
+		return nil, fmt.Errorf("deposit address network %s does not match utxo network %s", depositAddress.Network, network)
+	}
 
 	// Validate general transfer signatures and leaves
 	if err = validateTransfer(req.GetTransfer()); err != nil {
@@ -445,12 +448,15 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 	}
 
 	// Load leaves and compute total transfer value
-	leaves, _, err := loadLeavesWithLock(ctx, db, leafRefundMap)
+	leaves, transferNetwork, err := loadLeavesWithLock(ctx, db, leafRefundMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load leaves: %w", err)
 	}
 	if len(leaves) == 0 {
 		return nil, fmt.Errorf("no leaves found")
+	}
+	if transferNetwork != network {
+		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
 	}
 	totalAmount := getTotalTransferValue(leaves)
 	if totalAmount != uint64(req.GetCreditAmountSats()) {
@@ -623,6 +629,9 @@ func (h *StaticDepositInternalHandler) SaveUtxoForInstantStaticDeposit(ctx conte
 
 	if utxoDepositAddress.ID != swapDepositAddress.ID {
 		return nil, fmt.Errorf("utxo deposit address %s does not match swap deposit address %s", utxoDepositAddress.ID, swapDepositAddress.ID)
+	}
+	if swapDepositAddress.Network != btcnetwork.Unspecified && swapDepositAddress.Network != network {
+		return nil, fmt.Errorf("swap deposit address network %s does not match utxo network %s", swapDepositAddress.Network, network)
 	}
 
 	_, err = db.UtxoSwap.UpdateOneID(swap.ID).SetUtxo(targetUtxo.inner).Save(ctx)
