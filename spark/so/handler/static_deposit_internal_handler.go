@@ -442,21 +442,10 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("transfer validation failed: %w", err)
 	}
 
-	leafRefundMap := make(map[string][]byte)
-	for _, leaf := range req.GetTransfer().GetTransferPackage().GetLeavesToSend() {
-		leafRefundMap[leaf.GetLeafId()] = leaf.GetRawTx()
-	}
-
 	// Load leaves and compute total transfer value
-	leaves, transferNetwork, err := loadLeavesWithLock(ctx, db, leafRefundMap)
+	leaves, err := loadUtxoSwapTransferLeavesOnNetwork(ctx, db, req.GetTransfer(), network)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load leaves: %w", err)
-	}
-	if len(leaves) == 0 {
-		return nil, fmt.Errorf("no leaves found")
-	}
-	if transferNetwork != network {
-		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
+		return nil, err
 	}
 	totalAmount := getTotalTransferValue(leaves)
 	if totalAmount != uint64(req.GetCreditAmountSats()) {

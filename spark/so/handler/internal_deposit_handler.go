@@ -426,6 +426,18 @@ func validateTransfer(transferRequest *pb.StartTransferRequest) error {
 	return nil
 }
 
+func loadUtxoSwapTransferLeavesOnNetwork(ctx context.Context, db *ent.Client, transferRequest *pb.StartTransferRequest, expectedNetwork btcnetwork.Network) ([]*ent.TreeNode, error) {
+	leafRefundMap, _, _ := loadLeafRefundMaps(transferRequest)
+	leaves, transferNetwork, err := loadLeavesWithLock(ctx, db, leafRefundMap)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load leaves: %w", err)
+	}
+	if transferNetwork != expectedNetwork {
+		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, expectedNetwork)
+	}
+	return leaves, nil
+}
+
 // validateUserSignature verifies that the user has authorized the UTXO swap by validating their signature.
 func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network btcnetwork.Network, txIdString string, vout uint32, totalAmount uint64, hashVariant pb.HashVariant) error {
 	if len(userSignature) == 0 {
