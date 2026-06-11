@@ -29,7 +29,7 @@ func createSwapTransferWithStatus(t *testing.T, ctx context.Context, client *ent
 		SetStatus(status).
 		SetTotalValue(2000).
 		SetExpiryTime(time.Now().Add(10 * time.Minute)).
-		SetType(st.TransferTypePrimarySwapV3).
+		SetType(st.TransferTypeUtxoSwap).
 		SetNetwork(btcnetwork.Regtest).
 		Save(ctx)
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func createOrphanedSwapForRollback(t *testing.T, ctx context.Context, client *en
 		SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
 		SetCreditAmountSats(transfer.TotalValue).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetSspIdentityPublicKey(transfer.SenderIdentityPubkey).
 		SetUserIdentityPublicKey(transfer.ReceiverIdentityPubkey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetRequestedTransferID(transfer.ID).

@@ -471,7 +471,6 @@ func TestLinkUtxoSwapTransfer_LinksTransferEdge(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{10})
 	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	txClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -480,11 +479,11 @@ func TestLinkUtxoSwapTransfer_LinksTransferEdge(t *testing.T) {
 	transfer, err := txClient.Transfer.Create().
 		SetID(transferID).
 		SetSenderIdentityPubkey(sspIdentityPubKey).
-		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
 		SetStatus(st.TransferStatusSenderKeyTweaked).
 		SetType(st.TransferTypeUtxoSwap).
 		SetNetwork(btcnetwork.Regtest).
-		SetTotalValue(10000).
+		SetTotalValue(9000).
 		SetExpiryTime(time.Now().Add(10 * time.Minute)).
 		Save(ctx)
 	require.NoError(t, err)
@@ -527,6 +526,576 @@ func TestLinkUtxoSwapTransfer_LinksTransferEdge(t *testing.T) {
 	linkedTransfer, err = savedSwap.QueryTransfer().Only(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, transfer.ID, linkedTransfer.ID)
+}
+
+func TestLinkUtxoSwapTransfer_RejectsMismatchedTransfer(t *testing.T) {
+	tests := []struct {
+		name        string
+		mutate      func(*keys.Public, *keys.Public, *st.TransferType, *uint64, keys.Public)
+		expectedErr string
+	}{
+		{
+			name: "wrong type",
+			mutate: func(_ *keys.Public, _ *keys.Public, transferType *st.TransferType, _ *uint64, _ keys.Public) {
+				*transferType = st.TransferTypeTransfer
+			},
+			expectedErr: "type TRANSFER does not match utxo swap type UTXO_SWAP",
+		},
+		{
+			name: "wrong sender",
+			mutate: func(sender *keys.Public, _ *keys.Public, _ *st.TransferType, _ *uint64, replacement keys.Public) {
+				*sender = replacement
+			},
+			expectedErr: "sender does not match utxo swap SSP identity",
+		},
+		{
+			name: "wrong receiver",
+			mutate: func(_ *keys.Public, receiver *keys.Public, _ *st.TransferType, _ *uint64, replacement keys.Public) {
+				*receiver = replacement
+			},
+			expectedErr: "receiver does not match utxo swap user identity",
+		},
+		{
+			name: "wrong amount",
+			mutate: func(_ *keys.Public, _ *keys.Public, _ *st.TransferType, totalValue *uint64, _ keys.Public) {
+				*totalValue = 10000
+			},
+			expectedErr: "total value 10000 does not match utxo swap amount 9000",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+
+			cfg := setUpTestConfigWithRegtestNoAuthz(t)
+			handler := NewStaticDepositInternalHandler(cfg)
+
+			rng := rand.NewChaCha8([32]byte{14})
+			sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			replacementPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+			transferSender := sspIdentityPubKey
+			transferReceiver := userIdentityPubKey
+			transferType := st.TransferTypeUtxoSwap
+			transferTotalValue := uint64(9000)
+			tc.mutate(&transferSender, &transferReceiver, &transferType, &transferTotalValue, replacementPubKey)
+
+			txClient, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			transferID := uuid.New()
+			transfer, err := txClient.Transfer.Create().
+				SetID(transferID).
+				SetSenderIdentityPubkey(transferSender).
+				SetReceiverIdentityPubkey(transferReceiver).
+				SetStatus(st.TransferStatusSenderKeyTweaked).
+				SetType(transferType).
+				SetNetwork(btcnetwork.Regtest).
+				SetTotalValue(transferTotalValue).
+				SetExpiryTime(time.Now().Add(10 * time.Minute)).
+				Save(ctx)
+			require.NoError(t, err)
+
+			utxoSwap, err := txClient.UtxoSwap.Create().
+				SetStatus(st.UtxoSwapStatusCreated).
+				SetRequestType(st.UtxoSwapRequestTypeInstant).
+				SetUtxoValueSats(10000).
+				SetCreditAmountSats(9000).
+				SetSspSignature([]byte("test_ssp_signature")).
+				SetSspIdentityPublicKey(sspIdentityPubKey).
+				SetUserIdentityPublicKey(userIdentityPubKey).
+				SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+				SetRequestedTransferID(transferID).
+				Save(ctx)
+			require.NoError(t, err)
+
+			messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+			require.NoError(t, err)
+			signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+			req := &pbinternal.LinkUtxoSwapTransferRequest{
+				TransferId:           transferID.String(),
+				Signature:            signature.Serialize(),
+				CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+			}
+
+			resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+			require.Error(t, err)
+			require.Nil(t, resp)
+			require.ErrorContains(t, err, tc.expectedErr)
+
+			savedSwap, err := txClient.UtxoSwap.Get(ctx, utxoSwap.ID)
+			require.NoError(t, err)
+			linkedTransfer, err := savedSwap.QueryTransfer().Only(ctx)
+			require.True(t, ent.IsNotFound(err))
+			require.Nil(t, linkedTransfer)
+			require.Equal(t, transferID, transfer.ID)
+		})
+	}
+}
+
+func TestLinkUtxoSwapTransfer_RejectsNetworkMismatch(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{16})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, txClient)
+	depositAddress, err := txClient.DepositAddress.Create().
+		SetAddress("bc1ptest_network_bound_static_deposit_address").
+		SetOwnerIdentityPubkey(userIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetSigningKeyshare(keyshare).
+		SetNetwork(btcnetwork.Regtest).
+		SetIsStatic(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transferID := uuid.New()
+	_, err = txClient.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeUtxoSwap).
+		SetNetwork(btcnetwork.Mainnet).
+		SetTotalValue(9000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = txClient.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "network")
+	require.ErrorContains(t, err, "does not match utxo swap network")
+
+	savedSwap, err := txClient.UtxoSwap.Get(ctx, utxoSwap.ID)
+	require.NoError(t, err)
+	linkedTransfer, err := savedSwap.QueryTransfer().Only(ctx)
+	require.True(t, ent.IsNotFound(err))
+	require.Nil(t, linkedTransfer)
+}
+
+func TestLinkUtxoSwapTransferRejectsTransferUsedByCompletedSwap(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewStaticDepositInternalHandler(cfg)
+
+	rng := rand.NewChaCha8([32]byte{20})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	transferID := uuid.New()
+	transfer, err := txClient.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeUtxoSwap).
+		SetNetwork(btcnetwork.Regtest).
+		SetTotalValue(9000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, userIdentityPubKey, keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
+
+	_, err = txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCompleted).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
+		SetTransfer(transfer).
+		SetUtxo(utxo).
+		Save(ctx)
+	require.NoError(t, err)
+
+	newSwap, err := txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	messageHash, err := CreateLinkUtxoSwapTransferStatement(transferID.String())
+	require.NoError(t, err)
+	signature := ecdsa.Sign(cfg.IdentityPrivateKey.ToBTCEC(), messageHash)
+
+	req := &pbinternal.LinkUtxoSwapTransferRequest{
+		TransferId:           transferID.String(),
+		Signature:            signature.Serialize(),
+		CoordinatorPublicKey: cfg.IdentityPublicKey().Serialize(),
+	}
+
+	resp, err := handler.LinkUtxoSwapTransfer(ctx, cfg, req)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "already used by another non-cancelled utxo swap")
+
+	savedSwap, err := txClient.UtxoSwap.Get(ctx, newSwap.ID)
+	require.NoError(t, err)
+	linkedTransfer, err := savedSwap.QueryTransfer().Only(ctx)
+	require.True(t, ent.IsNotFound(err))
+	require.Nil(t, linkedTransfer)
+}
+
+func TestGetSecondaryTransferFromUtxoSwap_RejectsMismatchedTransfer(t *testing.T) {
+	tests := []struct {
+		name        string
+		mutate      func(*keys.Public, *keys.Public, *st.TransferType, *uint64, keys.Public)
+		expectedErr string
+	}{
+		{
+			name: "wrong type",
+			mutate: func(_ *keys.Public, _ *keys.Public, transferType *st.TransferType, _ *uint64, _ keys.Public) {
+				*transferType = st.TransferTypeTransfer
+			},
+			expectedErr: "type TRANSFER does not match utxo swap type UTXO_SWAP",
+		},
+		{
+			name: "wrong sender",
+			mutate: func(sender *keys.Public, _ *keys.Public, _ *st.TransferType, _ *uint64, replacement keys.Public) {
+				*sender = replacement
+			},
+			expectedErr: "sender does not match utxo swap SSP identity",
+		},
+		{
+			name: "wrong receiver",
+			mutate: func(_ *keys.Public, receiver *keys.Public, _ *st.TransferType, _ *uint64, replacement keys.Public) {
+				*receiver = replacement
+			},
+			expectedErr: "receiver does not match utxo swap user identity",
+		},
+		{
+			name: "wrong amount",
+			mutate: func(_ *keys.Public, _ *keys.Public, _ *st.TransferType, totalValue *uint64, _ keys.Public) {
+				*totalValue = 9000
+			},
+			expectedErr: "total value 9000 does not match utxo swap amount 500",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+
+			cfg := setUpTestConfigWithRegtestNoAuthz(t)
+			rng := rand.NewChaCha8([32]byte{15})
+			sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			replacementPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+			transferSender := sspIdentityPubKey
+			transferReceiver := userIdentityPubKey
+			transferType := st.TransferTypeUtxoSwap
+			transferTotalValue := uint64(500)
+			tc.mutate(&transferSender, &transferReceiver, &transferType, &transferTotalValue, replacementPubKey)
+
+			txClient, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			transferID := uuid.New()
+			transfer, err := txClient.Transfer.Create().
+				SetID(transferID).
+				SetSenderIdentityPubkey(transferSender).
+				SetReceiverIdentityPubkey(transferReceiver).
+				SetStatus(st.TransferStatusSenderKeyTweaked).
+				SetType(transferType).
+				SetNetwork(btcnetwork.Regtest).
+				SetTotalValue(transferTotalValue).
+				SetExpiryTime(time.Now().Add(10 * time.Minute)).
+				Save(ctx)
+			require.NoError(t, err)
+
+			utxoSwap, err := txClient.UtxoSwap.Create().
+				SetStatus(st.UtxoSwapStatusCreated).
+				SetRequestType(st.UtxoSwapRequestTypeInstant).
+				SetUtxoValueSats(10000).
+				SetCreditAmountSats(9000).
+				SetSecondaryCreditAmountSats(500).
+				SetSspSignature([]byte("test_ssp_signature")).
+				SetSspIdentityPublicKey(sspIdentityPubKey).
+				SetUserIdentityPublicKey(userIdentityPubKey).
+				SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+				SetRequestedTransferID(uuid.New()).
+				SetRequestedSecondaryTransferID(transferID).
+				Save(ctx)
+			require.NoError(t, err)
+
+			secondaryTransfer, needUpdate, err := GetSecondaryTransferFromUtxoSwap(ctx, utxoSwap)
+			require.Error(t, err)
+			require.Nil(t, secondaryTransfer)
+			require.False(t, needUpdate)
+			require.ErrorContains(t, err, tc.expectedErr)
+			require.Equal(t, transferID, transfer.ID)
+		})
+	}
+}
+
+func TestGetSecondaryTransferFromUtxoSwap_RejectsNetworkMismatch(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	rng := rand.NewChaCha8([32]byte{17})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, txClient)
+	depositAddress, err := txClient.DepositAddress.Create().
+		SetAddress("bc1ptest_secondary_network_bound_static_deposit_address").
+		SetOwnerIdentityPubkey(userIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetSigningKeyshare(keyshare).
+		SetNetwork(btcnetwork.Regtest).
+		SetIsStatic(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transferID := uuid.New()
+	_, err = txClient.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeUtxoSwap).
+		SetNetwork(btcnetwork.Mainnet).
+		SetTotalValue(500).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10000).
+		SetCreditAmountSats(9000).
+		SetSecondaryCreditAmountSats(500).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(uuid.New()).
+		SetRequestedSecondaryTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = txClient.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+
+	secondaryTransfer, needUpdate, err := GetSecondaryTransferFromUtxoSwap(ctx, utxoSwap)
+	require.Error(t, err)
+	require.Nil(t, secondaryTransfer)
+	require.False(t, needUpdate)
+	require.ErrorContains(t, err, "network")
+	require.ErrorContains(t, err, "does not match utxo swap network")
+}
+
+func TestGetTransferFromUtxoSwapRejectsTransferUsedByOtherNonCancelledSwap(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     st.UtxoSwapStatus
+		otherRole  string
+		shouldFail bool
+	}{
+		{name: "created swap requested primary", status: st.UtxoSwapStatusCreated, otherRole: "requested_primary", shouldFail: true},
+		{name: "completed swap linked primary", status: st.UtxoSwapStatusCompleted, otherRole: "linked_primary", shouldFail: true},
+		{name: "created swap requested secondary", status: st.UtxoSwapStatusCreated, otherRole: "requested_secondary", shouldFail: true},
+		{name: "completed swap linked secondary", status: st.UtxoSwapStatusCompleted, otherRole: "linked_secondary", shouldFail: true},
+		{name: "cancelled swap linked primary", status: st.UtxoSwapStatusCancelled, otherRole: "linked_primary", shouldFail: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, sessionCtx := db.ConnectToTestPostgres(t)
+			txClient := sessionCtx.Client
+
+			rng := rand.NewChaCha8([32]byte{18, byte(len(test.name))})
+			sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+			transferID := uuid.New()
+			transfer, err := txClient.Transfer.Create().
+				SetID(transferID).
+				SetSenderIdentityPubkey(sspIdentityPubKey).
+				SetReceiverIdentityPubkey(userIdentityPubKey).
+				SetStatus(st.TransferStatusSenderKeyTweaked).
+				SetType(st.TransferTypeUtxoSwap).
+				SetNetwork(btcnetwork.Regtest).
+				SetTotalValue(9000).
+				SetExpiryTime(time.Now().Add(10 * time.Minute)).
+				Save(ctx)
+			require.NoError(t, err)
+
+			currentSwap, err := txClient.UtxoSwap.Create().
+				SetStatus(st.UtxoSwapStatusCreated).
+				SetRequestType(st.UtxoSwapRequestTypeInstant).
+				SetUtxoValueSats(10000).
+				SetCreditAmountSats(9000).
+				SetSspSignature([]byte("test_ssp_signature")).
+				SetSspIdentityPublicKey(sspIdentityPubKey).
+				SetUserIdentityPublicKey(userIdentityPubKey).
+				SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+				SetRequestedTransferID(transferID).
+				Save(ctx)
+			require.NoError(t, err)
+
+			otherCreate := txClient.UtxoSwap.Create().
+				SetStatus(test.status).
+				SetRequestType(st.UtxoSwapRequestTypeInstant).
+				SetUtxoValueSats(10000).
+				SetCreditAmountSats(9000).
+				SetSspSignature([]byte("test_ssp_signature")).
+				SetSspIdentityPublicKey(sspIdentityPubKey).
+				SetUserIdentityPublicKey(userIdentityPubKey).
+				SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+			if test.status == st.UtxoSwapStatusCompleted {
+				createTestBlockHeight(t, ctx, txClient, 100)
+				keyshare := createTestSigningKeyshare(t, ctx, rng, txClient)
+				depositAddress := createTestStaticDepositAddress(t, ctx, txClient, keyshare, userIdentityPubKey, keys.MustGeneratePrivateKeyFromRand(rng).Public())
+				otherCreate = otherCreate.SetUtxo(createTestUtxo(t, ctx, txClient, depositAddress, 100))
+			}
+			switch test.otherRole {
+			case "requested_primary":
+				otherCreate = otherCreate.SetRequestedTransferID(transferID)
+			case "linked_primary":
+				otherCreate = otherCreate.SetRequestedTransferID(uuid.New()).SetTransfer(transfer)
+			case "requested_secondary":
+				otherCreate = otherCreate.
+					SetRequestedTransferID(uuid.New()).
+					SetSecondaryCreditAmountSats(9000).
+					SetRequestedSecondaryTransferID(transferID)
+			case "linked_secondary":
+				otherCreate = otherCreate.
+					SetRequestedTransferID(uuid.New()).
+					SetSecondaryCreditAmountSats(9000).
+					SetRequestedSecondaryTransferID(uuid.New()).
+					SetSecondaryTransfer(transfer)
+			}
+			_, err = otherCreate.Save(ctx)
+			require.NoError(t, err)
+
+			primaryTransfer, needUpdate, err := GetTransferFromUtxoSwap(ctx, currentSwap)
+			if test.shouldFail {
+				require.Error(t, err)
+				require.Nil(t, primaryTransfer)
+				require.False(t, needUpdate)
+				require.ErrorContains(t, err, "already used by another non-cancelled utxo swap")
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, primaryTransfer)
+			require.True(t, needUpdate)
+			require.Equal(t, transferID, primaryTransfer.ID)
+		})
+	}
+}
+
+func TestUtxoSwapTransferLookupRejectsSameTransferAsPrimaryAndSecondary(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	txClient := sessionCtx.Client
+
+	rng := rand.NewChaCha8([32]byte{19})
+	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transferID := uuid.New()
+	_, err := txClient.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(sspIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
+		SetStatus(st.TransferStatusSenderKeyTweaked).
+		SetType(st.TransferTypeUtxoSwap).
+		SetNetwork(btcnetwork.Regtest).
+		SetTotalValue(9000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	utxoSwap, err := txClient.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(20000).
+		SetCreditAmountSats(9000).
+		SetSecondaryCreditAmountSats(9000).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(sspIdentityPubKey).
+		SetUserIdentityPublicKey(userIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetRequestedTransferID(transferID).
+		SetRequestedSecondaryTransferID(transferID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	primaryTransfer, primaryNeedUpdate, err := GetTransferFromUtxoSwap(ctx, utxoSwap)
+	require.Error(t, err)
+	require.Nil(t, primaryTransfer)
+	require.False(t, primaryNeedUpdate)
+	require.ErrorContains(t, err, "also requested as secondary transfer")
+
+	secondaryTransfer, secondaryNeedUpdate, err := GetSecondaryTransferFromUtxoSwap(ctx, utxoSwap)
+	require.Error(t, err)
+	require.Nil(t, secondaryTransfer)
+	require.False(t, secondaryNeedUpdate)
+	require.ErrorContains(t, err, "also requested as primary transfer")
 }
 
 func TestLinkUtxoSwapTransfer_InvalidSignature(t *testing.T) {
@@ -584,7 +1153,6 @@ func TestLinkUtxoSwapTransfer_AlreadyLinked(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{12})
 	sspIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	txClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -593,11 +1161,11 @@ func TestLinkUtxoSwapTransfer_AlreadyLinked(t *testing.T) {
 	transfer, err := txClient.Transfer.Create().
 		SetID(transferID).
 		SetSenderIdentityPubkey(sspIdentityPubKey).
-		SetReceiverIdentityPubkey(receiverIdentityPubKey).
+		SetReceiverIdentityPubkey(userIdentityPubKey).
 		SetStatus(st.TransferStatusSenderKeyTweaked).
 		SetType(st.TransferTypeUtxoSwap).
 		SetNetwork(btcnetwork.Regtest).
-		SetTotalValue(10000).
+		SetTotalValue(9000).
 		SetExpiryTime(time.Now().Add(10 * time.Minute)).
 		Save(ctx)
 	require.NoError(t, err)

@@ -100,7 +100,7 @@ func TestCompleteInstantUtxoSwap(t *testing.T) {
 			transfer := client.Transfer.Create().
 				SetNetwork(btcnetwork.Regtest).
 				SetStatus(tc.transferStatus).
-				SetType(st.TransferTypeTransfer).
+				SetType(st.TransferTypeUtxoSwap).
 				SetSenderIdentityPubkey(senderPubKey).
 				SetReceiverIdentityPubkey(receiverPubKey).
 				SetTotalValue(10000).
@@ -113,6 +113,9 @@ func TestCompleteInstantUtxoSwap(t *testing.T) {
 				SetRequestType(st.UtxoSwapRequestTypeInstant).
 				SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 				SetUtxoValueSats(utxo.Amount).
+				SetCreditAmountSats(transfer.TotalValue).
+				SetSspIdentityPublicKey(senderPubKey).
+				SetUserIdentityPublicKey(receiverPubKey).
 				SetUtxo(utxo).
 				SetTransfer(transfer).
 				SetRequestedTransferID(transfer.ID).

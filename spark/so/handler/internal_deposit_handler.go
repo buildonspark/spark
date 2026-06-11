@@ -28,6 +28,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
@@ -627,7 +628,11 @@ func CompleteUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 		return fmt.Errorf("utxo swap is already cancelled")
 	}
 	if utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund {
-		transfer, needUpdate, err := GetTransferFromUtxoSwap(ctx, utxoSwap)
+		swapNetwork, hasSwapNetwork, err := getKnownUtxoSwapNetwork(ctx, utxoSwap)
+		if err != nil {
+			return fmt.Errorf("unable to get utxo swap network: %w", err)
+		}
+		transfer, needUpdate, err := getTransferFromUtxoSwap(ctx, utxoSwap, swapNetwork, hasSwapNetwork)
 		if err != nil {
 			return fmt.Errorf("unable to get transfer from utxo swap: %w", err)
 		}
@@ -648,7 +653,7 @@ func CompleteUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 			return fmt.Errorf("UTXO swap cannot be completed from transfer status %s: transfer is not sent", transfer.Status)
 		}
 
-		secondaryTransfer, needSecondaryUpdate, err := GetSecondaryTransferFromUtxoSwap(ctx, utxoSwap)
+		secondaryTransfer, needSecondaryUpdate, err := getSecondaryTransferFromUtxoSwap(ctx, utxoSwap, swapNetwork, hasSwapNetwork)
 		if err != nil {
 			return fmt.Errorf("unable to get secondary transfer from utxo swap: %w", err)
 		}
@@ -676,10 +681,19 @@ func CompleteUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 }
 
 func GetTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) (*ent.Transfer, bool, error) {
+	swapNetwork, hasSwapNetwork, err := getKnownUtxoSwapNetwork(ctx, utxoSwap)
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to get primary utxo swap network: %w", err)
+	}
+	return getTransferFromUtxoSwap(ctx, utxoSwap, swapNetwork, hasSwapNetwork)
+}
+
+func getTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap, swapNetwork btcnetwork.Network, hasSwapNetwork bool) (*ent.Transfer, bool, error) {
 	transfer, err := utxoSwap.QueryTransfer().Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, false, fmt.Errorf("unable to get transfer: %w", err)
 	}
+	needUpdate := false
 	if transfer == nil {
 		if utxoSwap.RequestedTransferID == uuid.Nil {
 			return nil, false, fmt.Errorf("requested transfer id is nil")
@@ -692,19 +706,40 @@ func GetTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) (*ent.
 		if err != nil {
 			return nil, false, fmt.Errorf("unable to fetch transfer by requested id=%s: %w", utxoSwap.RequestedTransferID, err)
 		}
-		return transfer, true, nil
+		needUpdate = true
 	}
-	return transfer, false, nil
+	if err := validateTransferMatchesUtxoSwap(ctx, transfer, utxoSwap, utxoSwap.CreditAmountSats, "primary", swapNetwork, hasSwapNetwork); err != nil {
+		return nil, false, err
+	}
+	return transfer, needUpdate, nil
 }
 
 func GetSecondaryTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) (*ent.Transfer, bool, error) {
 	if utxoSwap.RequestedSecondaryTransferID == uuid.Nil {
 		return nil, false, nil
 	}
+	if utxoSwap.SecondaryCreditAmountSats == nil {
+		return nil, false, fmt.Errorf("secondary transfer requested without secondary credit amount")
+	}
+	swapNetwork, hasSwapNetwork, err := getKnownUtxoSwapNetwork(ctx, utxoSwap)
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to get secondary utxo swap network: %w", err)
+	}
+	return getSecondaryTransferFromUtxoSwap(ctx, utxoSwap, swapNetwork, hasSwapNetwork)
+}
+
+func getSecondaryTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap, swapNetwork btcnetwork.Network, hasSwapNetwork bool) (*ent.Transfer, bool, error) {
+	if utxoSwap.RequestedSecondaryTransferID == uuid.Nil {
+		return nil, false, nil
+	}
+	if utxoSwap.SecondaryCreditAmountSats == nil {
+		return nil, false, fmt.Errorf("secondary transfer requested without secondary credit amount")
+	}
 	transfer, err := utxoSwap.QuerySecondaryTransfer().Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, false, fmt.Errorf("unable to get secondary transfer: %w", err)
 	}
+	needUpdate := false
 	if transfer == nil {
 		db, err := ent.GetDbFromContext(ctx)
 		if err != nil {
@@ -714,9 +749,105 @@ func GetSecondaryTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwa
 		if err != nil {
 			return nil, false, fmt.Errorf("unable to fetch secondary transfer by requested id=%s: %w", utxoSwap.RequestedSecondaryTransferID, err)
 		}
-		return transfer, true, nil
+		needUpdate = true
 	}
-	return transfer, false, nil
+	if err := validateTransferMatchesUtxoSwap(ctx, transfer, utxoSwap, *utxoSwap.SecondaryCreditAmountSats, "secondary", swapNetwork, hasSwapNetwork); err != nil {
+		return nil, false, err
+	}
+	return transfer, needUpdate, nil
+}
+
+func validateTransferMatchesUtxoSwap(ctx context.Context, transfer *ent.Transfer, utxoSwap *ent.UtxoSwap, expectedAmount uint64, label string, swapNetwork btcnetwork.Network, hasSwapNetwork bool) error {
+	if transfer.Type != st.TransferTypeUtxoSwap {
+		return fmt.Errorf("%s transfer %s type %s does not match utxo swap type %s", label, transfer.ID, transfer.Type, st.TransferTypeUtxoSwap)
+	}
+	if !transfer.SenderIdentityPubkey.Equals(utxoSwap.SspIdentityPublicKey) {
+		return fmt.Errorf("%s transfer %s sender does not match utxo swap SSP identity", label, transfer.ID)
+	}
+	if !transfer.ReceiverIdentityPubkey.Equals(utxoSwap.UserIdentityPublicKey) {
+		return fmt.Errorf("%s transfer %s receiver does not match utxo swap user identity", label, transfer.ID)
+	}
+	if transfer.TotalValue != expectedAmount {
+		return fmt.Errorf("%s transfer %s total value %d does not match utxo swap amount %d", label, transfer.ID, transfer.TotalValue, expectedAmount)
+	}
+	if hasSwapNetwork && transfer.Network != swapNetwork {
+		return fmt.Errorf("%s transfer %s network %s does not match utxo swap network %s", label, transfer.ID, transfer.Network, swapNetwork)
+	}
+	if err := validateUtxoSwapTransferNotReused(ctx, transfer, utxoSwap, label); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateUtxoSwapTransferNotReused(ctx context.Context, transfer *ent.Transfer, utxoSwap *ent.UtxoSwap, label string) error {
+	if label == "primary" {
+		if utxoSwap.RequestedSecondaryTransferID == transfer.ID {
+			return fmt.Errorf("primary transfer %s is also requested as secondary transfer for utxo swap %s", transfer.ID, utxoSwap.ID)
+		}
+		secondaryTransfer, err := utxoSwap.QuerySecondaryTransfer().Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return fmt.Errorf("unable to get secondary transfer for reuse validation: %w", err)
+		}
+		if secondaryTransfer != nil && secondaryTransfer.ID == transfer.ID {
+			return fmt.Errorf("primary transfer %s is already linked as secondary transfer for utxo swap %s", transfer.ID, utxoSwap.ID)
+		}
+	} else if label == "secondary" {
+		if utxoSwap.RequestedTransferID == transfer.ID {
+			return fmt.Errorf("secondary transfer %s is also requested as primary transfer for utxo swap %s", transfer.ID, utxoSwap.ID)
+		}
+		primaryTransfer, err := utxoSwap.QueryTransfer().Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return fmt.Errorf("unable to get primary transfer for reuse validation: %w", err)
+		}
+		if primaryTransfer != nil && primaryTransfer.ID == transfer.ID {
+			return fmt.Errorf("secondary transfer %s is already linked as primary transfer for utxo swap %s", transfer.ID, utxoSwap.ID)
+		}
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db for transfer reuse validation: %w", err)
+	}
+	reused, err := db.UtxoSwap.Query().
+		Where(
+			utxoswap.IDNEQ(utxoSwap.ID),
+			utxoswap.StatusNEQ(st.UtxoSwapStatusCancelled),
+			utxoswap.Or(
+				utxoswap.RequestedTransferIDEQ(transfer.ID),
+				utxoswap.RequestedSecondaryTransferIDEQ(transfer.ID),
+				utxoswap.HasTransferWith(enttransfer.IDEQ(transfer.ID)),
+				utxoswap.HasSecondaryTransferWith(enttransfer.IDEQ(transfer.ID)),
+			),
+		).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to check whether %s transfer %s is already used by another utxo swap: %w", label, transfer.ID, err)
+	}
+	if reused {
+		return fmt.Errorf("%s transfer %s is already used by another non-cancelled utxo swap", label, transfer.ID)
+	}
+
+	return nil
+}
+
+func getKnownUtxoSwapNetwork(ctx context.Context, utxoSwap *ent.UtxoSwap) (btcnetwork.Network, bool, error) {
+	swapUtxo, err := utxoSwap.QueryUtxo().Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return btcnetwork.Unspecified, false, err
+	}
+	if swapUtxo != nil && swapUtxo.Network != btcnetwork.Unspecified {
+		return swapUtxo.Network, true, nil
+	}
+
+	depositAddress, err := utxoSwap.QueryDepositAddress().Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return btcnetwork.Unspecified, false, err
+	}
+	if depositAddress != nil && depositAddress.Network != btcnetwork.Unspecified {
+		return depositAddress.Network, true, nil
+	}
+
+	return btcnetwork.Unspecified, false, nil
 }
 
 func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *so.Config, req *pbinternal.RollbackUtxoSwapRequest) (*pbinternal.RollbackUtxoSwapResponse, error) {
