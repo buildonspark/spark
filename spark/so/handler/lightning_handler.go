@@ -2703,29 +2703,45 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, fmt.Errorf("unable to provide preimage: %w", err)
 	}
 
-	// Short-circuit when the transfer has already advanced past the pre-commit
-	// states — there are no sender key tweaks left to settle and the engine's
-	// bookkeeping overhead would be pure cost for a no-op flow. StorePreimage
-	// is called inside this branch to cover retries where the coordinator's
-	// preimage_request row was never persisted on the first attempt (e.g., the
-	// engine's Prepare-on-self never completed); StorePreimage is an idempotent
-	// CAS so a retry against an already-shared row is a no-op. The
-	// non-short-circuit branch below reaches StorePreimage via the engine's
-	// Prepare-on-self fanout.
-	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-		phaseStart = time.Now()
-		storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus.storePreimage", spanOpt)
-		err = h.StorePreimage(storeCtx, preimageRequest, req.GetPreimage())
-		endSpanWithError(storeSpan, err)
-		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, phaseStart, err)
-		if err != nil {
-			return nil, fmt.Errorf("unable to store preimage: %w", err)
-		}
-		transferProto, err := transfer.MarshalProto(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
-		}
-		return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
+	// Route by transfer status, enumerating every state we know how to handle
+	// and failing closed on everything else.
+	switch transfer.Status {
+	case st.TransferStatusSenderKeyTweakPending, st.TransferStatusSenderInitiatedCoordinator:
+		// Pre-commit and committable through this coordinator: fall through to
+		// the 2PC engine below, which stores the preimage and commits the
+		// sender key tweaks atomically across all SOs.
+
+	case st.TransferStatusApplyingSenderKeyTweak,
+		st.TransferStatusSenderKeyTweaked,
+		st.TransferStatusReceiverKeyTweaked,
+		st.TransferStatusReceiverKeyTweakLocked,
+		st.TransferStatusReceiverKeyTweakApplied,
+		st.TransferStatusReceiverRefundSigned,
+		st.TransferStatusCompleted:
+		// Commit already settled (or, for ApplyingSenderKeyTweak, settlement is
+		// in flight): there are no sender key tweaks left for the engine to
+		// commit and its bookkeeping overhead would be pure cost for a no-op
+		// flow. StorePreimage covers retries where the coordinator's
+		// preimage_request row was never persisted on the first attempt (e.g.,
+		// the engine's Prepare-on-self never completed); it is an idempotent
+		// CAS so a retry against an already-shared row is a no-op. The engine
+		// path below reaches StorePreimage via its Prepare-on-self fanout.
+		return h.storePreimageShortCircuit(ctx, transfer, preimageRequest, req, spanOpt)
+
+	default:
+		// Fail closed. SenderInitiated is a pre-commit state where the staging
+		// InitiatePreimageSwap never landed key tweaks on this SO, so there is
+		// nothing for the consensus path to commit; Expired/Returned mean the
+		// swap was abandoned. Storing the preimage for any of these durably
+		// leaks the secret (readable by the sender via QueryPreimage) while
+		// the receiver is left with an unclaimable transfer. A new lifecycle
+		// status also lands here — a recoverable FailedPrecondition — rather
+		// than silently falling into StorePreimage and leaking.
+		err := sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+			"provide preimage: transfer %s is at status %s; refusing to persist the preimage for a non-committable transfer",
+			transfer.ID, transfer.Status))
+		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, time.Now(), err)
+		return nil, err
 	}
 
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
@@ -2765,4 +2781,23 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		return nil, fmt.Errorf("provide preimage consensus completed without building a response for transfer %s", transfer.ID)
 	}
 	return flow.response, nil
+}
+
+// storePreimageShortCircuit persists the preimage for a transfer whose sender
+// key tweaks are already settled (or settling), bypassing the consensus
+// engine. Only reachable from ProvidePreimage's post-commit status routing.
+func (h *LightningHandler) storePreimageShortCircuit(ctx context.Context, transfer *ent.Transfer, preimageRequest *ent.PreimageRequest, req *pbspark.ProvidePreimageRequest, spanOpt trace.SpanStartOption) (*pbspark.ProvidePreimageResponse, error) {
+	phaseStart := time.Now()
+	storeCtx, storeSpan := tracer.Start(ctx, "LightningHandler.ProvidePreimage.consensus.storePreimage", spanOpt)
+	err := h.StorePreimage(storeCtx, preimageRequest, req.GetPreimage())
+	endSpanWithError(storeSpan, err)
+	observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseStorePreimage, phaseStart, err)
+	if err != nil {
+		return nil, fmt.Errorf("unable to store preimage: %w", err)
+	}
+	transferProto, err := transfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
+	}
+	return &pbspark.ProvidePreimageResponse{Transfer: transferProto}, nil
 }
