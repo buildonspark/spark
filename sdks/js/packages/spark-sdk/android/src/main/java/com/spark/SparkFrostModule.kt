@@ -1,4 +1,4 @@
-package com.sparkfrost
+package com.spark
 
 import com.facebook.react.bridge.*
 import com.facebook.react.module.annotations.ReactModule

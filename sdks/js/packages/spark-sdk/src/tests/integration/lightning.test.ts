@@ -113,7 +113,7 @@ describe.each(walletTypes)(
           operator.address,
         );
         await client.clean_up_preimage_share({ paymentHash });
-        client.close();
+        await client.close();
       }
     });
 
@@ -165,7 +165,7 @@ describe.each(walletTypes)(
         expect(resp.preimageShare.length).toBe(32);
         expect(resp.threshold).toBe(threshold);
         expect(resp.invoiceString).toBe(invoice.invoice.encodedInvoice);
-        mockClient.close();
+        await mockClient.close();
       }
     });
 

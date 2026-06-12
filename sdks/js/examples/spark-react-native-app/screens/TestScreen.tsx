@@ -1,10 +1,20 @@
 import { IssuerSparkWallet } from '@buildonspark/issuer-sdk';
-import { getSparkFrost } from '@buildonspark/spark-sdk';
-import { Fragment, useState } from 'react';
+import { getSparkFrost, SparkWalletEvent } from '@buildonspark/spark-sdk';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { CONFIG } from '../config';
 import { HERMETIC_CONFIG } from '../config/hermeticConfig';
 import { SPARK_ENV } from '../config/sparkEnv';
 import { Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+
+const STREAM_TEST_SENDER_MNEMONIC =
+  'soldier spare tell clog armed cup future grocery achieve duck butter awkward';
+const STREAM_TEST_AMOUNT_SATS = 100;
+const STREAM_TEST_MIN_SENDER_BALANCE_SATS = 300;
+const STREAM_TEST_BOOTSTRAP_AMOUNT_SATS = 500;
+const BALANCE_WAIT_INTERVAL_MS = 1500;
+const BALANCE_WAIT_ATTEMPTS = 24;
+const CLAIM_EVENT_WAIT_INTERVAL_MS = 1000;
+const CLAIM_EVENT_WAIT_ATTEMPTS = 90;
 
 function App() {
   const [wallet, setWallet] = useState<IssuerSparkWallet | null>(null);
@@ -19,6 +29,71 @@ function App() {
   const [isCreatingTestToken, setIsCreatingTestToken] = useState(false);
   const [testTokenTxId, setTestTokenTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isTestingTransferClaim, setIsTestingTransferClaim] = useState(false);
+  const [lastClaimedTransferId, setLastClaimedTransferId] = useState<
+    string | null
+  >(null);
+  const [lastClaimedTransferBalance, setLastClaimedTransferBalance] = useState<
+    string | null
+  >(null);
+  const [transferClaimResult, setTransferClaimResult] = useState<string | null>(
+    null,
+  );
+  const [transferClaimError, setTransferClaimError] = useState<string | null>(
+    null,
+  );
+  const lastClaimedTransferIdRef = useRef<string | null>(null);
+  const lastClaimedTransferBalanceRef = useRef<string | null>(null);
+  const walletRef = useRef<IssuerSparkWallet | null>(null);
+
+  useEffect(() => {
+    walletRef.current = wallet;
+  }, [wallet]);
+
+  useEffect(() => {
+    return () => {
+      const currentWallet = walletRef.current;
+      walletRef.current = null;
+      if (currentWallet) {
+        currentWallet.cleanupConnections().catch((cleanupError: unknown) => {
+          console.error('Wallet cleanup error:', cleanupError);
+        });
+      }
+    };
+  }, []);
+
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => setTimeout(resolve, ms));
+
+  const waitForBalanceAtLeast = async (
+    targetWallet: IssuerSparkWallet,
+    minBalance: bigint,
+  ): Promise<bigint> => {
+    for (let i = 0; i < BALANCE_WAIT_ATTEMPTS; i++) {
+      const { balance } = await targetWallet.getBalance();
+      if (balance >= minBalance) {
+        return balance;
+      }
+      await sleep(BALANCE_WAIT_INTERVAL_MS);
+    }
+
+    throw new Error(
+      `Timed out waiting for sender balance >= ${minBalance.toString()} sats`,
+    );
+  };
+
+  const waitForClaimedTransfer = async (expectedTransferId: string) => {
+    for (let i = 0; i < CLAIM_EVENT_WAIT_ATTEMPTS; i++) {
+      if (lastClaimedTransferIdRef.current === expectedTransferId) {
+        return lastClaimedTransferBalanceRef.current;
+      }
+      await sleep(CLAIM_EVENT_WAIT_INTERVAL_MS);
+    }
+
+    throw new Error(
+      `Timed out waiting for TransferClaimed event for transfer ${expectedTransferId}`,
+    );
+  };
 
   const connectWallet = async () => {
     try {
@@ -28,10 +103,38 @@ function App() {
       setInvoice(null);
       setDummyTx(null);
       setTestTokenTxId(null);
+      setTransferClaimResult(null);
+      setTransferClaimError(null);
+      setLastClaimedTransferId(null);
+      setLastClaimedTransferBalance(null);
+      lastClaimedTransferIdRef.current = null;
+      lastClaimedTransferBalanceRef.current = null;
+      if (wallet) {
+        await wallet.cleanupConnections();
+        setWallet(null);
+        setSparkAddress(null);
+        setBalance(null);
+      }
+      const baseConfig = SPARK_ENV.isHermeticTest
+        ? { network: 'LOCAL' as const, ...HERMETIC_CONFIG }
+        : CONFIG;
       const { wallet: initializedWallet } = await IssuerSparkWallet.initialize({
-        options: SPARK_ENV.isHermeticTest
-          ? { network: 'LOCAL', ...HERMETIC_CONFIG }
-          : CONFIG,
+        options: {
+          ...baseConfig,
+          events: {
+            [SparkWalletEvent.TransferClaimed]: (
+              transferId: string,
+              updatedBalance: bigint,
+            ) => {
+              const updatedBalanceStr = updatedBalance.toString();
+              setBalance(updatedBalanceStr);
+              setLastClaimedTransferId(transferId);
+              setLastClaimedTransferBalance(updatedBalanceStr);
+              lastClaimedTransferIdRef.current = transferId;
+              lastClaimedTransferBalanceRef.current = updatedBalanceStr;
+            },
+          },
+        },
       });
       setWallet(initializedWallet);
       const addr = await initializedWallet.getSparkAddress();
@@ -114,6 +217,83 @@ function App() {
     }
   };
 
+  const testTransferAndClaim = async () => {
+    if (!wallet) {
+      return;
+    }
+
+    let senderWallet: IssuerSparkWallet | null = null;
+
+    try {
+      setIsTestingTransferClaim(true);
+      setTransferClaimResult(null);
+      setTransferClaimError(null);
+
+      const receiverSparkAddress = await wallet.getSparkAddress();
+      const senderOptions = SPARK_ENV.isHermeticTest
+        ? { network: 'LOCAL' as const, ...HERMETIC_CONFIG }
+        : CONFIG;
+      const { wallet: sender } = await IssuerSparkWallet.initialize({
+        mnemonicOrSeed: STREAM_TEST_SENDER_MNEMONIC,
+        options: senderOptions,
+      });
+      senderWallet = sender;
+
+      const senderSparkAddress = await senderWallet.getSparkAddress();
+      const minimumBalance = BigInt(STREAM_TEST_MIN_SENDER_BALANCE_SATS);
+      let { balance: senderBalance } = await senderWallet.getBalance();
+
+      if (senderBalance < minimumBalance) {
+        const { balance: receiverBalance } = await wallet.getBalance();
+        const bootstrapAmount = BigInt(STREAM_TEST_BOOTSTRAP_AMOUNT_SATS);
+
+        if (receiverBalance < bootstrapAmount) {
+          throw new Error(
+            `Insufficient funds for stream claim test (sender=${senderBalance.toString()} sats, receiver=${receiverBalance.toString()} sats)`,
+          );
+        }
+
+        await wallet.transfer({
+          amountSats: STREAM_TEST_BOOTSTRAP_AMOUNT_SATS,
+          receiverSparkAddress: senderSparkAddress,
+        });
+
+        senderBalance = await waitForBalanceAtLeast(
+          senderWallet,
+          minimumBalance,
+        );
+        console.log(
+          `Bootstrapped sender wallet. Sender balance: ${senderBalance.toString()} sats`,
+        );
+      }
+
+      setLastClaimedTransferId(null);
+      setLastClaimedTransferBalance(null);
+      lastClaimedTransferIdRef.current = null;
+      lastClaimedTransferBalanceRef.current = null;
+
+      const incomingTransfer = await senderWallet.transfer({
+        amountSats: STREAM_TEST_AMOUNT_SATS,
+        receiverSparkAddress,
+      });
+
+      const claimedBalance = await waitForClaimedTransfer(incomingTransfer.id);
+      setTransferClaimResult(
+        `transfer_id=${incomingTransfer.id}; claimed_balance=${claimedBalance ?? 'unknown'}`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      setTransferClaimError(errorMessage);
+      console.error('Transfer and claim test error:', error);
+    } finally {
+      if (senderWallet) {
+        await senderWallet.cleanupConnections();
+      }
+      setIsTestingTransferClaim(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ marginTop: 24 }}>
@@ -148,6 +328,16 @@ function App() {
           onPress={createTestToken}
           disabled={isCreatingTestToken || !wallet}
           testID="create-test-token-button"
+        />
+        <Button
+          title={
+            isTestingTransferClaim
+              ? 'Testing Transfer + Claim...'
+              : 'Test Transfer + Claim Stream'
+          }
+          onPress={testTransferAndClaim}
+          disabled={isTestingTransferClaim || !wallet}
+          testID="test-transfer-claim-button"
         />
         {error && (
           <Text style={styles.errorText} testID="wallet-error">
@@ -202,6 +392,46 @@ function App() {
               {testTokenTxId}
             </Text>
           </Fragment>
+        )}
+        {lastClaimedTransferId && (
+          <Fragment>
+            <Text style={styles.successText}>✅ Last Claimed Transfer ID:</Text>
+            <Text
+              selectable
+              style={styles.infoText}
+              testID="last-claimed-transfer-id-display"
+            >
+              {lastClaimedTransferId}
+            </Text>
+          </Fragment>
+        )}
+        {lastClaimedTransferBalance && (
+          <Text
+            selectable
+            style={styles.infoText}
+            testID="last-claimed-transfer-balance-display"
+          >
+            Claimed balance: {lastClaimedTransferBalance} sats
+          </Text>
+        )}
+        {transferClaimResult && (
+          <Fragment>
+            <Text style={styles.successText}>
+              ✅ Transfer + Stream Claim Verified:
+            </Text>
+            <Text
+              selectable
+              style={styles.infoText}
+              testID="transfer-claim-result-display"
+            >
+              {transferClaimResult}
+            </Text>
+          </Fragment>
+        )}
+        {transferClaimError && (
+          <Text style={styles.errorText} testID="transfer-claim-error-display">
+            Transfer/claim test failed: {transferClaimError}
+          </Text>
         )}
       </View>
     </SafeAreaView>

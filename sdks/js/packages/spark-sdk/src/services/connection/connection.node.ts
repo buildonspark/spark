@@ -100,7 +100,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
 
   public async createMockClient(address: string): Promise<
     MockServiceClient & {
-      close: () => void;
+      close: () => void | Promise<void>;
     }
   > {
     const key = this.makeChannelKey(address, false);
@@ -262,7 +262,7 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     withRetries: boolean,
     middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: string,
-  ): Promise<T & { close?: () => void }> {
+  ): Promise<T & { close?: () => void | Promise<void> }> {
     const retryOptions: RetryOptions = {
       retry: true,
       retryMaxAttempts: 3,

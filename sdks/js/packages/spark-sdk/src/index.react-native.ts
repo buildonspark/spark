@@ -25,7 +25,7 @@ setSparkTokenPrimitivesOnce(new SparkTokenPrimitives());
 
 export * from "./index-shared.js";
 
-export { ConnectionManagerBrowser as ConnectionManager } from "./services/connection/connection.browser.js";
+export { ConnectionManagerReactNative as ConnectionManager } from "./services/connection/connection.react-native.js";
 export { type ConnectionManager as BaseConnectionManager } from "./services/connection/connection.js";
 export { SparkReadonlyClientReactNative as SparkReadonlyClient } from "./spark-readonly-client/spark-readonly-client.react-native.js";
 export { SparkWallet } from "./spark-wallet/spark-wallet.react-native.js";

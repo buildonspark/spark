@@ -3,9 +3,9 @@ export default {
     platforms: {
       android: {
         packageImportPath:
-          "import com.sparkfrost.SparkFrostPackage;\nimport com.sparktokenprimitives.SparkTokenPrimitivesPackage;",
+          "import com.spark.SparkPackage;\nimport com.sparktokenprimitives.SparkTokenPrimitivesPackage;",
         packageInstance:
-          "new SparkFrostPackage(), new SparkTokenPrimitivesPackage()",
+          "new SparkPackage(), new SparkTokenPrimitivesPackage()",
       },
     },
   },

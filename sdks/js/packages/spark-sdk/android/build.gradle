@@ -14,12 +14,21 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    namespace "com.sparkfrost"
+    namespace "com.spark"
     compileSdkVersion 33
 
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion 33
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = "11"
     }
 
     sourceSets {
@@ -32,11 +41,24 @@ android {
 
 }
 
+afterEvaluate {
+    // Newer React Native app builds may set JavaCompile targets after android.compileOptions.
+    tasks.withType(JavaCompile).configureEach {
+        sourceCompatibility = JavaVersion.VERSION_11.toString()
+        targetCompatibility = JavaVersion.VERSION_11.toString()
+    }
+}
+
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     
     implementation 'com.facebook.react:react-native:+'
     implementation 'com.facebook.react:react-android:+'
+
+    implementation platform("io.grpc:grpc-bom:1.66.0")
+    implementation "io.grpc:grpc-okhttp"
+    implementation "io.grpc:grpc-stub"
+    implementation "io.grpc:grpc-protobuf-lite"
 
     implementation "net.java.dev.jna:jna:5.17.0@aar"
 }

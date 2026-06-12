@@ -63,11 +63,13 @@ type CachedToken = {
 const TOKEN_EXPIRY_BUFFER_SEC = 60;
 
 type SparkAuthnServiceClientWithClose = SparkAuthnServiceClient & {
-  close?: () => void;
+  close?: CloseHandler;
 };
 
+type CloseHandler = () => void | Promise<void>;
+
 type ClientWithClose<T> = T & {
-  close?: () => void;
+  close?: CloseHandler;
 };
 
 export type SparkClientType = "spark" | "stream" | "tokens";
@@ -131,20 +133,24 @@ export abstract class ConnectionManager {
     }
   }
 
-  protected static releaseChannel(key: ChannelKey) {
+  protected static releaseChannel(key: ChannelKey): Promise<void> {
+    return ConnectionManager.releaseChannelAsync(key);
+  }
+
+  protected static async releaseChannelAsync(key: ChannelKey): Promise<void> {
     const entry = ConnectionManager.channelCache.get(key);
     if (!entry) return;
     entry.refCount--;
     if (entry.refCount <= 0) {
       const ch = entry.channel;
+      ConnectionManager.channelCache.delete(key);
       if ("close" in ch && typeof ch.close === "function") {
         try {
-          ch.close();
+          await Promise.resolve(ch.close());
         } catch {
           // Ignore close failures while releasing a cached channel.
         }
       }
-      ConnectionManager.channelCache.delete(key);
     }
   }
 
@@ -256,7 +262,7 @@ export abstract class ConnectionManager {
     withRetries: boolean,
     middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: ChannelKey,
-  ): Promise<T & { close?: () => void }>;
+  ): Promise<T & { close?: CloseHandler }>;
 
   private config: WalletConfigService;
   private timeSync: ServerTimeSync;
@@ -390,7 +396,7 @@ export abstract class ConnectionManager {
 
   async createSparkStreamClient(
     address: string,
-  ): Promise<SparkServiceClient & { close?: () => void }> {
+  ): Promise<SparkServiceClient & { close?: CloseHandler }> {
     return this.getOrCreateClientInternal<SparkServiceClient>(
       "stream",
       address,
@@ -399,13 +405,13 @@ export abstract class ConnectionManager {
 
   async createSparkClient(
     address: string,
-  ): Promise<SparkServiceClient & { close?: () => void }> {
+  ): Promise<SparkServiceClient & { close?: CloseHandler }> {
     return this.getOrCreateClientInternal<SparkServiceClient>("spark", address);
   }
 
   async createSparkTokenClient(
     address: string,
-  ): Promise<SparkTokenServiceClient & { close?: () => void }> {
+  ): Promise<SparkTokenServiceClient & { close?: CloseHandler }> {
     return this.getOrCreateClientInternal<SparkTokenServiceClient>(
       "tokens",
       address,
@@ -523,7 +529,7 @@ export abstract class ConnectionManager {
             },
           );
         } finally {
-          sparkAuthnClient.close?.();
+          await sparkAuthnClient.close?.();
         }
       },
     );

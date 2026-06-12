@@ -20,9 +20,10 @@ Pod::Spec.new do |s|
   s.source_files = "ios/*.{h,m,mm,swift}"
   s.dependency "React"
   s.dependency "React-Core" # Or "React-CoreModules" depending on RN version and setup
+  s.dependency "gRPC-Swift"
   s.vendored_frameworks = ["ios/spark_frostFFI.xcframework", "ios/spark_token_primitivesFFI.xcframework"]
 
-  s.swift_version = "5.0"
+  s.swift_version = "5.4"
   
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES'

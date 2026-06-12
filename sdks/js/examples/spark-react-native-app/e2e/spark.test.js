@@ -46,74 +46,78 @@ describe('Spark React Native App', () => {
     await device.terminateApp();
   });
 
-  it('should handle wallet operations in sequence', async () => {
-    await waitFor(element(by.id('open-test-screen-button')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+  it(
+    'should handle wallet operations in sequence',
+    async () => {
+      await waitFor(element(by.id('open-test-screen-button')))
+        .toBeVisible()
+        .withTimeout(TIMEOUT);
 
-    await expect(element(by.id('open-test-screen-button'))).toBeVisible();
+      await expect(element(by.id('open-test-screen-button'))).toBeVisible();
 
-    await element(by.id('open-test-screen-button')).tap();
+      await element(by.id('open-test-screen-button')).tap();
 
-    await waitFor(element(by.id('connect-wallet-button')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+      await waitFor(element(by.id('connect-wallet-button')))
+        .toBeVisible()
+        .withTimeout(TIMEOUT);
 
-    await expect(element(by.id('connect-wallet-button'))).toBeVisible();
-    await expect(element(by.id('create-invoice-button'))).toBeVisible();
-    await expect(element(by.id('test-bindings-button'))).toBeVisible();
+      await expect(element(by.id('connect-wallet-button'))).toBeVisible();
+      await expect(element(by.id('create-invoice-button'))).toBeVisible();
+      await expect(element(by.id('test-bindings-button'))).toBeVisible();
 
-    await device.disableSynchronization();
+      await device.disableSynchronization();
 
-    await element(by.id('connect-wallet-button')).tap();
+      await element(by.id('connect-wallet-button')).tap();
 
-    const result = await waitForEither(
-      'wallet-status',
-      'wallet-error',
-      TIMEOUT * 2,
-    );
-    if (result === 'error') {
-      const errorElement = element(by.id('wallet-error'));
-      const attrs = await errorElement.getAttributes();
-      throw new Error(`Wallet connection failed: ${attrs.text}`);
-    }
+      const result = await waitForEither(
+        'wallet-status',
+        'wallet-error',
+        TIMEOUT * 2,
+      );
+      if (result === 'error') {
+        const errorElement = element(by.id('wallet-error'));
+        const attrs = await errorElement.getAttributes();
+        throw new Error(`Wallet connection failed: ${attrs.text}`);
+      }
 
-    await device.enableSynchronization();
+      await device.enableSynchronization();
 
-    await expect(element(by.id('wallet-status'))).toBeVisible();
+      await expect(element(by.id('wallet-status'))).toBeVisible();
 
-    await expect(element(by.id('get-balance-button'))).toBeVisible();
+      await expect(element(by.id('get-balance-button'))).toBeVisible();
 
-    await element(by.id('get-balance-button')).tap();
+      await element(by.id('get-balance-button')).tap();
 
-    await waitFor(element(by.id('wallet-balance')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+      await waitFor(element(by.id('wallet-balance')))
+        .toBeVisible()
+        .withTimeout(TIMEOUT);
 
-    await expect(element(by.id('wallet-balance'))).toBeVisible();
+      await expect(element(by.id('wallet-balance'))).toBeVisible();
 
-    await element(by.id('create-invoice-button')).tap();
+      await element(by.id('create-invoice-button')).tap();
 
-    await waitFor(element(by.id('invoice-display')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+      await waitFor(element(by.id('invoice-display')))
+        .toBeVisible()
+        .withTimeout(TIMEOUT);
 
-    await expect(element(by.id('invoice-display'))).toBeVisible();
+      await expect(element(by.id('invoice-display'))).toBeVisible();
 
-    await element(by.id('test-bindings-button')).tap();
+      await element(by.id('test-bindings-button')).tap();
 
-    await waitFor(element(by.id('dummy-tx-display')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+      await waitFor(element(by.id('dummy-tx-display')))
+        .toBeVisible()
+        .withTimeout(TIMEOUT);
 
-    await expect(element(by.id('dummy-tx-display'))).toBeVisible();
+      await expect(element(by.id('dummy-tx-display'))).toBeVisible();
 
-    await element(by.id('create-test-token-button')).tap();
+      await element(by.id('create-test-token-button')).tap();
 
-    await waitFor(element(by.id('test-token-tx-id-display')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+      await waitFor(element(by.id('test-token-tx-id-display')))
+        .toBeVisible()
+        .withTimeout(TIMEOUT);
 
-    await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
-  });
+      await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
+    },
+    TIMEOUT * 12,
+  );
 });

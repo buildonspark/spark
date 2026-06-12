@@ -17,6 +17,16 @@ end
 target 'SparkReactNativeApp' do
   config = use_native_modules!
 
+  # Required for gRPC-Swift's C shim dependencies when building static libraries.
+  pod 'CGRPCZlib', :modular_headers => true
+  pod 'CNIOAtomics', :modular_headers => true
+  pod 'CNIOBoringSSL', :modular_headers => true
+  pod 'CNIOBoringSSLShims', :modular_headers => true
+  pod 'CNIODarwin', :modular_headers => true
+  pod 'CNIOHTTPParser', :modular_headers => true
+  pod 'CNIOLinux', :modular_headers => true
+  pod 'CNIOWindows', :modular_headers => true
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
@@ -31,5 +41,23 @@ target 'SparkReactNativeApp' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+
+        %w[OTHER_CFLAGS OTHER_CPLUSPLUSFLAGS].each do |key|
+          flags = build_config.build_settings[key] || '$(inherited)'
+          flags = [flags] unless flags.is_a?(Array)
+
+          ['-Wno-error=non-modular-include-in-framework-module',
+           '-Wno-non-modular-include-in-framework-module'].each do |suppression|
+            flags << suppression unless flags.include?(suppression)
+          end
+
+          build_config.build_settings[key] = flags
+        end
+      end
+    end
   end
 end

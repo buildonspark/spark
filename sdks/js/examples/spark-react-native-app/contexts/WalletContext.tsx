@@ -1,9 +1,11 @@
 import { IssuerSparkWallet } from '@buildonspark/issuer-sdk';
+import { SparkWalletEvent } from '@buildonspark/spark-sdk';
 import React, {
   createContext,
   ReactNode,
   useCallback,
   useContext,
+  useRef,
   useState,
 } from 'react';
 import { CONFIG } from '../config';
@@ -45,6 +47,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const walletRef = useRef<IssuerSparkWallet | null>(null);
 
   const connectWallet = useCallback(async (mnemonic?: string) => {
     try {
@@ -52,11 +55,30 @@ export function WalletProvider({ children }: WalletProviderProps) {
       setIsLoadingBalance(true);
       setError(null);
 
+      if (walletRef.current) {
+        await walletRef.current.cleanupConnections();
+        walletRef.current = null;
+        setWallet(null);
+        setSparkAddress(null);
+        setBalance(null);
+      }
+
       const { wallet: newWallet } = await IssuerSparkWallet.initialize({
-        options: CONFIG,
+        options: {
+          ...CONFIG,
+          events: {
+            [SparkWalletEvent.TransferClaimed]: (_, updatedBalance) => {
+              setBalance(updatedBalance.toString());
+            },
+            [SparkWalletEvent.DepositConfirmed]: (_, updatedBalance) => {
+              setBalance(updatedBalance.toString());
+            },
+          },
+        },
         mnemonicOrSeed: mnemonic,
       });
 
+      walletRef.current = newWallet;
       setWallet(newWallet);
 
       const addr = await newWallet.getSparkAddress();
@@ -75,6 +97,11 @@ export function WalletProvider({ children }: WalletProviderProps) {
   }, []);
 
   const disconnectWallet = useCallback(() => {
+    if (walletRef.current) {
+      void walletRef.current.cleanupConnections();
+      walletRef.current = null;
+    }
+
     setWallet(null);
     setSparkAddress(null);
     setBalance(null);

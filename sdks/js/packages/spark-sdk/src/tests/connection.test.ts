@@ -16,7 +16,7 @@ import type { SparkTokenServiceDefinition } from "../proto/spark_token.js";
 import { DefaultSparkSigner } from "../signer/signer.js";
 
 class FakeChannel {
-  public close = jest.fn<() => void>();
+  public close = jest.fn<() => void | Promise<void>>();
 }
 
 type AnyServiceDef =
@@ -49,13 +49,13 @@ class TestConnectionManager extends ConnectionManagerNodeJS {
     _withRetries: boolean,
     _middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: string,
-  ): Promise<T & { close?: () => void }> {
+  ): Promise<T & { close?: () => void | Promise<void> }> {
     await Promise.resolve();
     const close =
       channelKey != null
         ? () => TestConnectionManager.releaseChannel(channelKey)
         : channel.close.bind(channel);
-    return { close } as T & { close?: () => void };
+    return { close } as T & { close?: () => void | Promise<void> };
   }
 
   protected async authenticate(_address: string): Promise<string> {
@@ -367,6 +367,36 @@ describe("ConnectionManager channel cache", () => {
     expect(streamCh!.close).toHaveBeenCalledTimes(1);
   });
 
+  test("waits for async channel close before closeConnections resolves", async () => {
+    const config = new WalletConfigService(
+      { network: "LOCAL" },
+      new DefaultSparkSigner(),
+    );
+    const mgr = new TestConnectionManager(config);
+    const address = "https://0.spark.minikube.local";
+
+    await mgr.createSparkClient(address);
+    const ch = mgr.createdChannels[0]!;
+    let resolveClose!: () => void;
+    const closePromise = new Promise<void>((resolve) => {
+      resolveClose = resolve;
+    });
+    ch.close.mockImplementation(() => closePromise);
+
+    let closeConnectionsResolved = false;
+    const closeConnectionsPromise = mgr.closeConnections().then(() => {
+      closeConnectionsResolved = true;
+    });
+
+    await Promise.resolve();
+    expect(ch.close).toHaveBeenCalledTimes(1);
+    expect(closeConnectionsResolved).toBe(false);
+
+    resolveClose();
+    await closeConnectionsPromise;
+    expect(closeConnectionsResolved).toBe(true);
+  });
+
   test("deduplicates concurrent channel creation and exposes channel via getChannelForClient", async () => {
     const config = new WalletConfigService(
       { network: "LOCAL" },
@@ -433,8 +463,8 @@ describe("ConnectionManager channel cache", () => {
     expect(mgr.createdChannels).toHaveLength(1);
     const ch = mgr.createdChannels[0]!;
 
-    client.close?.();
-    client.close?.();
+    await client.close?.();
+    await client.close?.();
 
     expect(ch.close).toHaveBeenCalledTimes(1);
   });
@@ -598,13 +628,13 @@ describe("ConnectionManager middleware", () => {
       _withRetries: boolean,
       _middleware?: ClientMiddleware<RetryOptions, object>,
       channelKey?: string,
-    ): Promise<T & { close?: () => void }> {
+    ): Promise<T & { close?: () => void | Promise<void> }> {
       await Promise.resolve();
       const close =
         channelKey != null
           ? () => MiddlewareTestConnectionManager.releaseChannel(channelKey)
           : channel.close.bind(channel);
-      return { close } as T & { close?: () => void };
+      return { close } as T & { close?: () => void | Promise<void> };
     }
 
     protected async authenticate(_address: string): Promise<string> {
@@ -687,7 +717,7 @@ describe("ConnectionManager middleware", () => {
       _withRetries: boolean,
       _middleware?: ClientMiddleware<RetryOptions, object>,
       channelKey?: string,
-    ): Promise<T & { close?: () => void }> {
+    ): Promise<T & { close?: () => void | Promise<void> }> {
       await Promise.resolve();
       const close =
         channelKey != null
@@ -722,7 +752,7 @@ describe("ConnectionManager middleware", () => {
           };
         },
         close,
-      } as unknown as T & { close?: () => void };
+      } as unknown as T & { close?: () => void | Promise<void> };
 
       return fakeAuthClient;
     }
@@ -852,7 +882,7 @@ describe("ConnectionManager middleware", () => {
         _withRetries: boolean,
         _middleware?: ClientMiddleware<RetryOptions, object>,
         channelKey?: string,
-      ): Promise<T & { close?: () => void }> {
+      ): Promise<T & { close?: () => void | Promise<void> }> {
         await Promise.resolve();
         const close =
           channelKey != null
@@ -890,7 +920,7 @@ describe("ConnectionManager middleware", () => {
             };
           },
           close,
-        } as unknown as T & { close?: () => void };
+        } as unknown as T & { close?: () => void | Promise<void> };
 
         return fakeClient;
       }

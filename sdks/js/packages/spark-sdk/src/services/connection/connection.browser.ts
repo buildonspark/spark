@@ -69,7 +69,7 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     withRetries: boolean,
     middleware?: ClientMiddleware<RetryOptions, object>,
     channelKey?: string,
-  ): Promise<T & { close?: () => void }> {
+  ): Promise<T & { close?: () => void | Promise<void> }> {
     let clientFactory: ClientFactoryWeb;
 
     const retryOptions = {

@@ -12,7 +12,7 @@ export const HERMETIC_CONFIG: ConfigOptions = {
       id: 0,
       identifier:
         '0000000000000000000000000000000000000000000000000000000000000001',
-      address: 'https://0.spark-web.minikube.local',
+      address: 'https://0.spark.minikube.local',
       identityPublicKey:
         '0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510',
     },
@@ -20,7 +20,7 @@ export const HERMETIC_CONFIG: ConfigOptions = {
       id: 1,
       identifier:
         '0000000000000000000000000000000000000000000000000000000000000002',
-      address: 'https://1.spark-web.minikube.local',
+      address: 'https://1.spark.minikube.local',
       identityPublicKey:
         '0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27',
     },
@@ -28,7 +28,7 @@ export const HERMETIC_CONFIG: ConfigOptions = {
       id: 2,
       identifier:
         '0000000000000000000000000000000000000000000000000000000000000003',
-      address: 'https://2.spark-web.minikube.local',
+      address: 'https://2.spark.minikube.local',
       identityPublicKey:
         '0305ab8d485cc752394de4981f8a5ae004f2becfea6f432c9a59d5022d8764f0a6',
     },
