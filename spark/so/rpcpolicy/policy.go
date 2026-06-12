@@ -166,7 +166,6 @@ func sparkInternalServicePolicies() map[string]Policy {
 		pbinternal.SparkInternalService_NodeAvailableForRenew_FullMethodName:              unauthInternal,
 		pbinternal.SparkInternalService_InitiatePreimageSwap_FullMethodName:               unauthInternal,
 		pbinternal.SparkInternalService_InitiatePreimageSwapV2_FullMethodName:             unauthInternal,
-		pbinternal.SparkInternalService_ProvidePreimage_FullMethodName:                    unauthInternal,
 		pbinternal.SparkInternalService_UpdatePreimageRequest_FullMethodName:              unauthInternal,
 		pbinternal.SparkInternalService_StorePreimageShare_FullMethodName:                 unauthInternal,
 		pbinternal.SparkInternalService_PrepareTreeAddress_FullMethodName:                 unauthInternal,

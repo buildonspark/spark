@@ -2560,35 +2560,6 @@ func (h *LightningHandler) StorePreimage(ctx context.Context, preimageRequest *e
 	return nil
 }
 
-func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pbinternal.ProvidePreimageRequest) (*ent.Transfer, error) {
-	if req == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
-	}
-
-	providePreimageRequest := &pbspark.ProvidePreimageRequest{
-		PaymentHash:       req.GetPaymentHash(),
-		Preimage:          req.GetPreimage(),
-		IdentityPublicKey: req.GetIdentityPublicKey(),
-	}
-	preimageRequest, transfer, err := h.ValidatePreimage(ctx, providePreimageRequest)
-	if err != nil {
-		return nil, fmt.Errorf("unable to validate preimage: %w", err)
-	}
-
-	transferHandler := NewBaseTransferHandler(h.config)
-	err = transferHandler.validateKeyTweakProofs(ctx, transfer, req.GetKeyTweakProofs())
-	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
-	}
-
-	err = h.StorePreimage(ctx, preimageRequest, req.GetPreimage())
-	if err != nil {
-		return nil, fmt.Errorf("unable to store preimage: %w", err)
-	}
-
-	return transfer, nil
-}
-
 func (h *LightningHandler) QueryPreimage(ctx context.Context, req *pbspark.QueryPreimageRequest) (*pbspark.QueryPreimageResponse, error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
@@ -2687,10 +2658,9 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pbspark.Pro
 		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)
 		return nil, err
 	}
-	// Kill-switch enforcement parity with providePreimageLegacy. Required on
-	// every state-mutating user-facing handler per so/authz/killswitch.go's
-	// contract — without it, ramping the consensus knob lets a kill-switched
-	// wallet settle a HODL preimage swap that the legacy path would reject.
+	// Kill-switch enforcement is required on every state-mutating user-facing
+	// handler per so/authz/killswitch.go's contract — without it, a
+	// kill-switched wallet could settle a HODL preimage swap.
 	if err := authz.EnforceWalletNotKillSwitched(validateCtx, identityPubKey); err != nil {
 		endSpanWithError(validateSpan, err)
 		observeLightningPhase(ctx, lightningFlowProvidePreimage, lightningPhaseValidate, phaseStart, err)

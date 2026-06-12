@@ -50,7 +50,7 @@ func NewProvidePreimageFlowHandler(config *so.Config) *ProvidePreimageFlowHandle
 // + key-tweak proofs against this SO's local state and persists the preimage
 // on the preimage_request row.
 //
-// Mirrors the legacy ValidatePreimageInternal body: ValidatePreimage runs the
+// ValidatePreimage runs the
 // cryptographic checks + loads the transfer; validateKeyTweakProofs cross-checks
 // the coordinator-supplied proofs against the participant's own TransferLeaf
 // rows; StorePreimage CASes preimage_request WAITING → PREIMAGE_SHARED. The

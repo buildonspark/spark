@@ -208,13 +208,6 @@ func TestLightningHandlersRejectNilRequests(t *testing.T) {
 			},
 		},
 		{
-			name: "ValidatePreimageInternal",
-			call: func() error {
-				_, err := handler.ValidatePreimageInternal(ctx, nil)
-				return err
-			},
-		},
-		{
 			name: "QueryPreimage",
 			call: func() error {
 				_, err := handler.QueryPreimage(ctx, nil)

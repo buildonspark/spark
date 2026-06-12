@@ -160,13 +160,6 @@ func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *
 	return &emptypb.Empty{}, transferHandler.InitiateCooperativeExit(ctx, req)
 }
 
-// ProvidePreimage provides the preimage for the given payment hash.
-func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*emptypb.Empty, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
-	_, err := lightningHandler.ValidatePreimageInternal(ctx, req)
-	return &emptypb.Empty{}, err
-}
-
 func (s *SparkInternalServer) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pb.InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewTransferHandler(s.config)
 	return &emptypb.Empty{}, transferHandler.InitiateSettleReceiverKeyTweak(ctx, req)

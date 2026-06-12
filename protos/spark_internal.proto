@@ -35,7 +35,6 @@ service SparkInternalService {
 
     rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
-    rpc provide_preimage(ProvidePreimageRequest) returns (google.protobuf.Empty) {}
     rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
     rpc store_preimage_share(spark.StorePreimageShareV2Request) returns (google.protobuf.Empty) {}
 
@@ -503,14 +502,6 @@ message ResolveLeafInvestigationRequest {
     repeated string available_leaf_ids = 2;
 }
 
-message ProvidePreimageRequest {
-    bytes payment_hash = 1;
-    bytes preimage = 2;
-    bytes identity_public_key = 3;
-    // The key tweak proofs for the leaves, to validate that each SO holds the correct key tweak.
-    map<string, spark.SecretProof> key_tweak_proofs = 4;
-}
-
 // ProvidePreimagePrepareRequest is the Prepare payload for the
 // CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE 2PC flow. Wraps the public
 // ProvidePreimageRequest plus the coordinator-derived key_tweak_proofs map
@@ -518,9 +509,9 @@ message ProvidePreimageRequest {
 // and write its preimage_request row in one Prepare pass.
 message ProvidePreimagePrepareRequest {
     spark.ProvidePreimageRequest original_request = 1;
-    // Key tweak proofs derived by the coordinator from its TransferLeaf rows,
-    // mirroring the legacy ProvidePreimage fanout payload. Participants
-    // cross-check against their own stored tweaks via validateKeyTweakProofs.
+    // Key tweak proofs derived by the coordinator from its TransferLeaf rows.
+    // Participants cross-check against their own stored tweaks via
+    // validateKeyTweakProofs.
     map<string, spark.SecretProof> key_tweak_proofs = 2;
 }
 
