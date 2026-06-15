@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -15,9 +16,13 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func mustSerializeTx(t *testing.T, tx *wire.MsgTx) []byte {
@@ -39,6 +44,59 @@ func TestValidateLeafRefundTxInputRejectsZeroTimelock(t *testing.T) {
 
 	err := validateLeafRefundTxInput(refundTx, spark.TimeLockInterval, &expectedOutPoint, 1)
 	require.ErrorContains(t, err, "time lock on the new refund tx must be greater than 0")
+}
+
+func TestValidateLeafRefundTxInputClassifiesTimelockErrors(t *testing.T) {
+	expectedOutPoint := wire.OutPoint{}
+
+	// Old timelock at the floor: the leaf needs renewal before any transfer.
+	floorTx := wire.NewMsgTx(3)
+	floorTx.AddTxIn(&wire.TxIn{PreviousOutPoint: expectedOutPoint, Sequence: 50})
+	err := validateLeafRefundTxInput(floorTx, spark.TimeLockInterval, &expectedOutPoint, 1)
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, sparkerrors.ReasonInvalidArgumentLeafRenewalRequired, reason)
+
+	// Insufficient decrement: provided timelock disagrees with expected.
+	mismatchTx := wire.NewMsgTx(3)
+	mismatchTx.AddTxIn(&wire.TxIn{PreviousOutPoint: expectedOutPoint, Sequence: 950})
+	err = validateLeafRefundTxInput(mismatchTx, 1000, &expectedOutPoint, 1)
+	code, reason = sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, sparkerrors.ReasonInvalidArgumentTimelockMismatch, reason)
+}
+
+func TestWrapLeafValidationError(t *testing.T) {
+	leafID := uuid.New()
+
+	structured := sparkerrors.InvalidArgumentLeafRenewalRequired(fmt.Errorf("at floor"))
+	wrapped := wrapLeafValidationError(structured, "CPFP refund tx validation failed for leaf", leafID)
+	code, reason := sparkerrors.CodeAndReasonFrom(wrapped)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, sparkerrors.ReasonInvalidArgumentLeafRenewalRequired, reason)
+	require.Contains(t, wrapped.Error(), "CPFP refund tx validation failed for leaf: at floor")
+
+	st, ok := status.FromError(wrapped)
+	require.True(t, ok)
+	require.Equal(t, leafID.String(), errorInfoLeafIDFrom(t, st))
+
+	plain := fmt.Errorf("failed to parse client tx")
+	wrapped = wrapLeafValidationError(plain, "CPFP refund tx validation failed for leaf", leafID)
+	code, reason = sparkerrors.CodeAndReasonFrom(wrapped)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, sparkerrors.ReasonInvalidArgumentMalformedField, reason)
+	require.Contains(t, wrapped.Error(), "CPFP refund tx validation failed for leaf: failed to parse client tx")
+}
+
+func errorInfoLeafIDFrom(t *testing.T, st *status.Status) string {
+	t.Helper()
+	for _, d := range st.Details() {
+		if ei, ok := d.(*errdetails.ErrorInfo); ok {
+			return ei.GetMetadata()[sparkerrors.ErrorMetadataLeafID]
+		}
+	}
+	t.Fatal("status has no ErrorInfo detail")
+	return ""
 }
 
 func TestLeafAvailableToTransferRejectsLeafOwnedByDifferentIdentity(t *testing.T) {

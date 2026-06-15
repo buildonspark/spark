@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -27,6 +28,7 @@ type grpcError struct {
 	Cause      error
 	Reason     string
 	RetryAfter time.Duration
+	Metadata   map[string]string
 }
 
 // newGRPCError creates a new gRPC error with the given code and cause
@@ -66,7 +68,7 @@ func (e *grpcError) GRPCStatus() *status.Status {
 	st := status.New(e.Code, e.Cause.Error())
 	var details []protoadapt.MessageV1
 	if e.Reason != "" {
-		details = append(details, &errdetails.ErrorInfo{Reason: e.Reason})
+		details = append(details, &errdetails.ErrorInfo{Reason: e.Reason, Metadata: e.Metadata})
 	}
 	if e.RetryAfter > 0 {
 		details = append(details, &errdetails.RetryInfo{
@@ -110,6 +112,7 @@ func toGRPCError(err error) error {
 			Cause:      err,
 			Reason:     grpcErr.Reason,
 			RetryAfter: grpcErr.RetryAfter,
+			Metadata:   grpcErr.Metadata,
 		}
 	}
 
@@ -160,6 +163,30 @@ func WrapErrorWithMessage(orig error, message string) error {
 	return wrapGRPC(orig, nil, nil, message)
 }
 
+// WrapErrorWithMetadata attaches additional ErrorInfo metadata to an error that
+// already carries a reason, preserving its code, reason, message, retry hint,
+// and prior metadata. Errors without a reason are returned unchanged (metadata
+// is only emitted alongside a reason).
+func WrapErrorWithMetadata(err error, metadata map[string]string) error {
+	if err == nil {
+		return nil
+	}
+	code, reason := CodeAndReasonFrom(err)
+	if reason == "" {
+		return err
+	}
+	merged := make(map[string]string, len(metadata))
+	maps.Copy(merged, metadataFrom(err))
+	maps.Copy(merged, metadata)
+	return &grpcError{Code: code, Cause: err, Reason: reason, RetryAfter: retryAfterFrom(err), Metadata: merged}
+}
+
+// WrapErrorWithMessageAndMetadata combines WrapErrorWithMessage and
+// WrapErrorWithMetadata.
+func WrapErrorWithMessageAndMetadata(orig error, message string, metadata map[string]string) error {
+	return WrapErrorWithMetadata(WrapErrorWithMessage(orig, message), metadata)
+}
+
 // WrapErrorWithReasonPrefix should be used when an error is returned from an external service (e.g., another coordinator)
 // to add context about the source of the error. The original gRPC code and message are preserved, but the reason is
 // prefixed to identify where the error originated.
@@ -176,7 +203,13 @@ func WrapErrorWithReasonPrefix(err error, prefix string) error {
 			reason = fmt.Sprintf("%s:%s", prefix, reason)
 		}
 	}
-	return &grpcError{Code: code, Cause: err, Reason: reason, RetryAfter: retryAfterFrom(err)}
+	return &grpcError{Code: code, Cause: err, Reason: reason, RetryAfter: retryAfterFrom(err), Metadata: metadataFrom(err)}
+}
+
+// HasReason reports whether err already carries a machine-readable reason.
+func HasReason(err error) bool {
+	_, reason := CodeAndReasonFrom(err)
+	return reason != ""
 }
 
 func CodeAndReasonFrom(err error) (codes.Code, string) {
@@ -197,6 +230,23 @@ func CodeAndReasonFrom(err error) (codes.Code, string) {
 		return code, reason
 	}
 	return codes.Internal, ""
+}
+
+// metadataFrom extracts the ErrorInfo metadata from a grpcError or from a
+// google.rpc.ErrorInfo detail on a gRPC status. Returns nil if none is set.
+func metadataFrom(err error) map[string]string {
+	var ge *grpcError
+	if errors.As(err, &ge) {
+		return ge.Metadata
+	}
+	if st, ok := status.FromError(err); ok {
+		for _, d := range st.Details() {
+			if ei, ok := d.(*errdetails.ErrorInfo); ok && len(ei.GetMetadata()) > 0 {
+				return ei.GetMetadata()
+			}
+		}
+	}
+	return nil
 }
 
 // retryAfterFrom extracts the retry-after hint from a grpcError or from a
@@ -227,19 +277,24 @@ func wrapGRPC(err error, codeOverride *codes.Code, reasonOverride *string, msg s
 	// WrapErrorWithCode(abortedClaimConflictErr, codes.Internal) would emit
 	// an Internal error with RetryInfo, telling clients it's safe to retry.
 	retryAfter := retryAfterFrom(err)
+	// Metadata is keyed to the reason's semantics: preserved with the reason,
+	// dropped when the reason is cleared or overridden.
+	metadata := metadataFrom(err)
 	if codeOverride != nil {
 		code = *codeOverride
 		if reasonOverride == nil {
 			reason = ""
+			metadata = nil
 		}
 		retryAfter = 0
 	}
 	if reasonOverride != nil {
 		reason = *reasonOverride
+		metadata = nil
 	}
 	cause := err
 	if msg != "" {
 		cause = fmt.Errorf("%s: %w", msg, err)
 	}
-	return &grpcError{Code: code, Cause: cause, Reason: reason, RetryAfter: retryAfter}
+	return &grpcError{Code: code, Cause: cause, Reason: reason, RetryAfter: retryAfter, Metadata: metadata}
 }

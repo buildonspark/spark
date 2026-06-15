@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
 // TxType represents the type of refund transaction expected
@@ -47,7 +48,10 @@ func VerifyTransactionWithDatabase(ctx context.Context, clientRawTxBytes []byte,
 	}
 	err = VerifyTransactionWithSource(ctx, clientRawTxBytes, sourceRawTxBytes, 0, cpfpRefundTxTimelock, txType, refundDestPubkey, networkString)
 	if err != nil {
-		return fmt.Errorf("failed to verify transaction of leaf %s: %w", dbLeaf.ID, err)
+		return sparkerrors.WrapErrorWithMetadata(
+			fmt.Errorf("failed to verify transaction of leaf %s: %w", dbLeaf.ID, err),
+			map[string]string{sparkerrors.ErrorMetadataLeafID: dbLeaf.ID.String()},
+		)
 	}
 	return nil
 }
@@ -277,8 +281,8 @@ func ValidateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32)
 		// For refund transaction, validate that the timelock is large enough to
 		// subtract TimeLockInterval without producing a zero-timelock refund.
 		if roundedCpfpTimelock <= spark.TimeLockInterval {
-			return 0, fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d without reaching zero",
-				roundedCpfpTimelock, cpfpTimelock, spark.TimeLockInterval)
+			return 0, sparkerrors.InvalidArgumentLeafRenewalRequired(fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d without reaching zero",
+				roundedCpfpTimelock, cpfpTimelock, spark.TimeLockInterval))
 		}
 		// Calculate the expected new timelock (should be TimeLockInterval shorter)
 		expectedCPFPTimelock = roundedCpfpTimelock - spark.TimeLockInterval
@@ -297,7 +301,9 @@ func ValidateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32)
 
 	providedTimelock := GetTimelockFromSequence(clientSequence)
 	if providedTimelock != expectedTimelock {
-		return 0, fmt.Errorf("provided timelock 0x%08X does not match expected timelock 0x%08X", providedTimelock, expectedTimelock)
+		return 0, sparkerrors.InvalidArgumentTimelockMismatch(
+			fmt.Errorf("provided timelock 0x%08X does not match expected timelock 0x%08X", providedTimelock, expectedTimelock),
+			expectedTimelock, providedTimelock)
 	}
 
 	// Validate that the client's timelock (bits 0-15) matches expected
@@ -373,7 +379,7 @@ func RoundDownToTimelockInterval(timelock uint32) uint32 {
 func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence uint32, err error) {
 	currTimelock := GetTimelockFromSequence(currSequence)
 	if currTimelock <= spark.TimeLockInterval {
-		return 0, 0, fmt.Errorf("current timelock %d is too small to subtract TimeLockInterval %d without reaching zero, call renew node timelock", currTimelock, spark.TimeLockInterval)
+		return 0, 0, sparkerrors.InvalidArgumentLeafRenewalRequired(fmt.Errorf("current timelock %d is too small to subtract TimeLockInterval %d without reaching zero, call renew node timelock", currTimelock, spark.TimeLockInterval))
 	}
 	nextTimelock := currTimelock - spark.TimeLockInterval
 

@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -42,6 +43,8 @@ const (
 	ReasonInvalidArgumentPublicKeyMismatch   = "PUBLIC_KEY_MISMATCH"
 	ReasonInvalidArgumentOutOfRange          = "OUT_OF_RANGE"
 	ReasonInvalidArgumentNetworkNotSupported = "NETWORK_NOT_SUPPORTED"
+	ReasonInvalidArgumentLeafRenewalRequired = "LEAF_RENEWAL_REQUIRED"
+	ReasonInvalidArgumentTimelockMismatch    = "TIMELOCK_MISMATCH"
 
 	ReasonFailedPreconditionBadSignature              = "BAD_SIGNATURE"
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
@@ -73,6 +76,14 @@ const (
 	// ErrorReasonPrefixFailedWithExternalCoordinator is a prefix for errors that occur when the coordinator calls out to another
 	// coordinator and that call fails. The underlying reason from the external coordinator should be appended after a colon.
 	ErrorReasonPrefixFailedWithExternalCoordinator = "FAILED_WITH_EXTERNAL_COORDINATOR"
+)
+
+// Keys for ErrorInfo.Metadata entries. Keep stable: callers parse these to
+// identify the offending entity without matching on message text.
+const (
+	ErrorMetadataLeafID           = "leaf_id"
+	ErrorMetadataExpectedTimelock = "expected_timelock"
+	ErrorMetadataProvidedTimelock = "provided_timelock"
 )
 
 func InternalTypeConversionError(err error) error {
@@ -170,6 +181,25 @@ func InvalidArgumentOutOfRange(err error) error {
 
 func InvalidArgumentNetworkNotSupported(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentNetworkNotSupported)
+}
+
+// Use when a leaf's refund timelock is at the floor and the leaf cannot be
+// transferred until renewed. Callers with the leaf in scope should attach its
+// id via WrapErrorWithMetadata(err, {ErrorMetadataLeafID: ...}).
+func InvalidArgumentLeafRenewalRequired(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentLeafRenewalRequired)
+}
+
+// Use when the caller's proposed refund timelock disagrees with the operator's
+// expected next timelock for the leaf. Callers with the leaf in scope should
+// attach its id via WrapErrorWithMetadata(err, {ErrorMetadataLeafID: ...}).
+func InvalidArgumentTimelockMismatch(err error, expectedTimelock, providedTimelock uint32) error {
+	e := newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentTimelockMismatch)
+	e.Metadata = map[string]string{
+		ErrorMetadataExpectedTimelock: strconv.FormatUint(uint64(expectedTimelock), 10),
+		ErrorMetadataProvidedTimelock: strconv.FormatUint(uint64(providedTimelock), 10),
+	}
+	return e
 }
 
 func FailedPreconditionBadSignature(err error) error {
