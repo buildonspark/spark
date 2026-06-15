@@ -285,10 +285,10 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expecte
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the new refund tx must be greater than 0"))
 	}
 	if oldTimeLock <= spark.TimeLockInterval {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the old refund tx %d is too small to transfer without reaching zero", oldTimeLock))
+		return sparkerrors.InvalidArgumentLeafRenewalRequired(fmt.Errorf("time lock on the old refund tx %d is too small to transfer without reaching zero", oldTimeLock))
 	}
 	if newTimeLock+spark.TimeLockInterval > oldTimeLock {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock))
+		return sparkerrors.InvalidArgumentTimelockMismatch(fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock), oldTimeLock-spark.TimeLockInterval, newTimeLock)
 	}
 	if len(refundTx.TxIn) != int(expectedInputCount) {
 		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
@@ -328,7 +328,9 @@ func validateSendLeafDirectRefundTxs(senderLeaf *ent.TreeNode, receiverDirectRef
 
 	expectedReceiverDirectRefundTxSequence, err := bitcointransaction.ValidateSequence(cpfpTimelock, bitcointransaction.TxTypeRefundDirect, receiverDirectRefundTx.TxIn[0].Sequence)
 	if err != nil {
-		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
+		return sparkerrors.WrapErrorWithMetadata(
+			fmt.Errorf("unable to validate direct refund tx inputs: %w", err),
+			map[string]string{sparkerrors.ErrorMetadataLeafID: senderLeaf.ID.String()})
 	}
 	if err := validateLeafRefundTxInputExact(receiverDirectRefundTx, expectedReceiverDirectRefundTxSequence, &expectedReceiverDirectRefundOutPoint, expectedInputCount); err != nil {
 		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
@@ -336,7 +338,9 @@ func validateSendLeafDirectRefundTxs(senderLeaf *ent.TreeNode, receiverDirectRef
 
 	expectedReceiverDirectFromCpfpRefundTxSequence, err := bitcointransaction.ValidateSequence(cpfpTimelock, bitcointransaction.TxTypeRefundDirectFromCPFP, receiverDirectFromCpfpRefundTx.TxIn[0].Sequence)
 	if err != nil {
-		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
+		return sparkerrors.WrapErrorWithMetadata(
+			fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err),
+			map[string]string{sparkerrors.ErrorMetadataLeafID: senderLeaf.ID.String()})
 	}
 	if err := validateLeafRefundTxInputExact(receiverDirectFromCpfpRefundTx, expectedReceiverDirectFromCpfpRefundTxSequence, new(senderRefundTx.TxIn[0].PreviousOutPoint), expectedInputCount); err != nil {
 		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
@@ -391,7 +395,7 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawRefundTx []byte, directRef
 	// expectedNewCpfpRefundSequence := oldCpfpRefundTxIn.Sequence - spark.TimeLockInterval
 
 	if err := validateLeafRefundTxInput(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount); err != nil {
-		return fmt.Errorf("unable to validate cpfp refund tx inputs: %w", err)
+		return wrapLeafValidationError(err, "unable to validate cpfp refund tx inputs", leaf.ID)
 	}
 
 	if err := validateLeafRefundTxOutput(newCpfpRefundTx, receiverIdentityPubKey); err != nil {
@@ -1893,6 +1897,17 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	}
 }
 
+// wrapLeafValidationError adds context while preserving an existing structured
+// classification, attaching the leaf id as metadata; errors without a
+// classification keep the historical MALFORMED_FIELD class.
+func wrapLeafValidationError(err error, msg string, leafID uuid.UUID) error {
+	if sparkerrors.HasReason(err) {
+		return sparkerrors.WrapErrorWithMessageAndMetadata(
+			err, msg, map[string]string{sparkerrors.ErrorMetadataLeafID: leafID.String()})
+	}
+	return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s: %w", msg, err))
+}
+
 func validateSingleLeafRefundTxs(
 	ctx context.Context,
 	node *ent.TreeNode,
@@ -1916,7 +1931,7 @@ func validateSingleLeafRefundTxs(
 		refundDestPubkey,
 		networkString,
 	); err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("CPFP refund tx validation failed for leaf: %w", err))
+		return wrapLeafValidationError(err, "CPFP refund tx validation failed for leaf", node.ID)
 	}
 
 	validateDirectRefunds := transferType == st.TransferTypeTransfer ||
@@ -1940,7 +1955,7 @@ func validateSingleLeafRefundTxs(
 			refundDestPubkey,
 			networkString,
 		); err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from CPFP refund tx validation failed for leaf: %w", err))
+			return wrapLeafValidationError(err, "direct from CPFP refund tx validation failed for leaf", node.ID)
 		}
 
 		hasDirectRefundTx := len(directRefundTx) > 0
@@ -1963,7 +1978,7 @@ func validateSingleLeafRefundTxs(
 				refundDestPubkey,
 				networkString,
 			); err != nil {
-				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx validation failed for leaf: %w", err))
+				return wrapLeafValidationError(err, "direct refund tx validation failed for leaf", node.ID)
 			}
 		} else if requireDirectFromCpfpRefund && hasDirectNodeTx && !isZeroNode {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String()))
@@ -2322,7 +2337,7 @@ func validateRefundTxWithConnector(
 		refundDestPubkey,
 		networkString,
 	); err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transaction structure validation failed: %w", err))
+		return wrapLeafValidationError(err, "transaction structure validation failed", node.ID)
 	}
 
 	return nil
