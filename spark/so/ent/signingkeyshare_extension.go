@@ -2,6 +2,7 @@ package ent
 
 import (
 	"context"
+	stdsql "database/sql"
 	"errors"
 	"fmt"
 	"maps"
@@ -1149,14 +1150,13 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 }
 
 // RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
-func RunDKGIfNeeded(ctx context.Context, config *so.Config) error {
+//
+// The readiness query takes a raw, non-transactional *sql.DB on purpose: RunDKG blocks on the
+// full cross-operator DKG protocol, so running this check inside a task transaction would hold a
+// connection idle in-transaction past Postgres's idle_in_transaction_session_timeout.
+func RunDKGIfNeeded(ctx context.Context, config *so.Config, rawDB *stdsql.DB) error {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.RunDKGIfNeeded")
 	defer span.End()
-
-	db, err := GetDbFromContext(ctx)
-	if err != nil {
-		return err
-	}
 
 	minAvailableKeys := defaultMinAvailableKeys
 	if config.DKGConfig.MinAvailableKeys != nil && *config.DKGConfig.MinAvailableKeys > 0 {
@@ -1174,8 +1174,7 @@ func RunDKGIfNeeded(ctx context.Context, config *so.Config) error {
 		) AS limited
 	`
 
-	//nolint:forbidigo // This query runs every 10 seconds, scans a lot of rows, and can't be expressed using the ent query builder.
-	rows, err := db.QueryContext(ctx, query, minAvailableKeys, string(st.KeyshareStatusAvailable), config.Index, minAvailableKeys+1)
+	rows, err := rawDB.QueryContext(ctx, query, minAvailableKeys, string(st.KeyshareStatusAvailable), config.Index, minAvailableKeys+1)
 	if err != nil {
 		return err
 	}

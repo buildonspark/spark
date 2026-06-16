@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -145,4 +146,24 @@ func TestCalculateAndStoreLastKey_ClearsSecretVersion(t *testing.T) {
 	persisted, err := client.SigningKeyshare.Get(ctx, lastKeyID)
 	require.NoError(t, err)
 	require.Nil(t, persisted.SecretVersion)
+}
+
+func TestRunDKGIfNeeded_ReadsReadinessOnRawConnection(t *testing.T) {
+	// Passing a context with no DB session injected proves the readiness check reads via the
+	// raw connection and never opens a task transaction (a GetDbFromContext call would fail here).
+	ctx, tc := db.ConnectToTestPostgres(t)
+
+	rawDB, err := tc.Client.RawDB()
+	require.NoError(t, err)
+
+	createSigningKeyshareForAggregateTest(t, ctx, tc.Client, nil)
+	createSigningKeyshareForAggregateTest(t, ctx, tc.Client, nil)
+
+	minAvailableKeys := 1
+	config := &so.Config{
+		Index:     0,
+		DKGConfig: so.DkgConfig{MinAvailableKeys: &minAvailableKeys},
+	}
+
+	require.NoError(t, ent.RunDKGIfNeeded(t.Context(), config, rawDB))
 }
