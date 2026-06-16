@@ -476,6 +476,9 @@ url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.3.0/
 version = "1.96.0"
 backend = "core:rust"
 
+[tools.rust.options]
+profile = "minimal"
+
 [[tools.tilt]]
 version = "0.36.0"
 backend = "aqua:tilt-dev/tilt"
