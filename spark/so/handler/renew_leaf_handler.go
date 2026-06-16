@@ -1143,8 +1143,9 @@ func validateRenewRefundTimelock(leaf *ent.TreeNode) error {
 
 // validateRenewNodeZeroTimelock validates the timelock requirements for a renew
 // node zero timelock operation. The node transaction must have a timelock of 0
-// and the refund transaction must have a timelock at or below
-// spark.RenewTimelockThreshold with a nonzero watchtower window.
+// or a final, relative-timelock-disabled sequence (a deposit-root leaf), and the
+// refund transaction must have a timelock at or below spark.RenewTimelockThreshold
+// with a nonzero watchtower window.
 func validateRenewNodeZeroTimelock(leaf *ent.TreeNode) error {
 	// Check the leaf's node transaction sequence
 	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
@@ -1156,8 +1157,11 @@ func validateRenewNodeZeroTimelock(leaf *ent.TreeNode) error {
 	}
 	nodeTimelock := leafNodeTx.TxIn[0].Sequence & 0xffff
 
-	if nodeTimelock != 0 {
-		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s node transaction sequence must be 0 for zero timelock renewal, got %d", leaf.ID, nodeTimelock))
+	// A deposit-root leaf's node tx has a final (timelock-disabled) sequence that
+	// can't be decremented — like node_tl==0, it renews via re-split. Accept both.
+	timelockDisabled := leafNodeTx.TxIn[0].Sequence&wire.SequenceLockTimeDisabled != 0
+	if nodeTimelock != 0 && !timelockDisabled {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s node transaction sequence must be 0 or final for zero timelock renewal, got %d", leaf.ID, nodeTimelock))
 	}
 
 	// Check the leaf's refund transaction sequence

@@ -260,3 +260,13 @@ func TestCheckNodeRenewPrecondition(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckNodeRenewPreconditionAcceptsFinalSequenceLeaf(t *testing.T) {
+	leafID := uuid.New()
+	// Deposit-root leaf: a final (timelock-disabled) current sequence masks to 65535 > 300,
+	// but it renews via the zero-timelock re-split path, so the precondition must accept it.
+	currentTx := createValidTestTransactionBytesWithSequence(t, 0xffffffff)
+	if err := checkNodeRenewPrecondition(currentTx, leafID); err != nil {
+		t.Fatalf("final-sequence (deposit-root) leaf must pass node-renew precondition, got: %v", err)
+	}
+}

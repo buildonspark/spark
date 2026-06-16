@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
@@ -217,19 +218,27 @@ func leafFieldsMatchNodeFinalize(leafNode *ent.TreeNode, target *pbinternal.Tree
 }
 
 // checkNodeRenewPrecondition rejects a renew-node finalize whose target
-// leaf is not in a renew-eligible state. validateAndConstructNodeTimelock
-// only produces a renew-node payload when the existing leaf's RawTx
-// timelock is at or below spark.RenewTimelockThreshold (300, including 0
-// for the node-zero variant). A current timelock above the threshold
-// means another renew-node has happened since the payload was generated
+// leaf is not in a renew-eligible state. A renew-node payload is only
+// produced when the existing leaf's RawTx timelock is at or below
+// spark.RenewTimelockThreshold (300, including 0 for the node-zero variant)
+// or has a final, relative-timelock-disabled sequence (deposit-root leaf,
+// also node-zero). A current decrementable timelock above the threshold
+// means another renew-node already happened since the payload was generated
 // and applying this old payload would clobber the leaf's newer state.
 // Takes raw tx bytes for unit-test friendliness.
 func checkNodeRenewPrecondition(currentRawTx []byte, leafID uuid.UUID) error {
-	currentTimelock, err := rawTxTimelock(currentRawTx, "current leaf RawTx")
+	tx, err := common.TxFromRawTxBytes(currentRawTx)
 	if err != nil {
-		return fmt.Errorf("leaf %s: %w", leafID, err)
+		return fmt.Errorf("leaf %s: parse current leaf RawTx: %w", leafID, err)
 	}
-	if currentTimelock > spark.RenewTimelockThreshold {
+	if len(tx.TxIn) == 0 {
+		return fmt.Errorf("leaf %s: current leaf RawTx has no inputs", leafID)
+	}
+	seq := tx.TxIn[0].Sequence
+	currentTimelock := bitcointransaction.GetTimelockFromSequence(seq)
+	// A final (timelock-disabled) sequence can't be decremented and renews via
+	// re-split, so it isn't the stale/already-renewed case the threshold guards.
+	if currentTimelock > spark.RenewTimelockThreshold && seq&wire.SequenceLockTimeDisabled == 0 {
 		return errors.AlreadyExistsDuplicateOperation(fmt.Errorf(
 			"stale node renew finalize for leaf %s: current RawTx timelock %d > renew threshold %d (leaf has been renewed since this payload was generated)",
 			leafID, currentTimelock, spark.RenewTimelockThreshold))
