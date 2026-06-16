@@ -595,6 +595,43 @@ func TestValidateAndConstructRenewSigningJobsRejectMissingRequiredJobs(t *testin
 	require.ErrorContains(t, err, "node tx signing job is required")
 }
 
+func TestValidateAndConstructNodeZeroTimelockAcceptsFinalSequenceLeaf(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{19})
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerIdentityPubKey)
+	parent := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+
+	const sequenceFlag = 1 << 30
+	makeLeaf := func(nodeSeq uint32, refundTimelock uint32) *ent.TreeNode {
+		t.Helper()
+		leaf := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parent, 0)
+		leaf, err = leaf.Update().
+			SetRawTx(createValidTestTransactionBytesWithSequence(t, nodeSeq)).
+			SetRawRefundTx(createValidTestTransactionBytesWithSequence(t, refundTimelock|sequenceFlag)).
+			Save(ctx)
+		require.NoError(t, err)
+		return leaf
+	}
+
+	// Final (timelock-disabled) node sequence + decayed refund: validation passes,
+	// so a nil signing job yields the missing-job error, not a timelock rejection.
+	_, _, err = validateAndConstructNodeZeroTimelock(makeLeaf(0xffffffff, 100), nil)
+	require.ErrorContains(t, err, "renew node zero timelock signing job is required")
+
+	// node_tl == 0 still passes validation.
+	_, _, err = validateAndConstructNodeZeroTimelock(makeLeaf(0|sequenceFlag, 100), nil)
+	require.ErrorContains(t, err, "renew node zero timelock signing job is required")
+
+	// Regression: a decrementable node (non-zero, not final) is still rejected.
+	_, _, err = validateAndConstructNodeZeroTimelock(makeLeaf(150|sequenceFlag, 100), nil)
+	require.ErrorContains(t, err, "must be 0 or final")
+}
+
 func TestRenewLeafRejectsNilRequest(t *testing.T) {
 	handler := NewRenewLeafHandler(nil)
 
@@ -1503,7 +1540,7 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 			nodeSequence:   1,
 			refundSequence: 200,
 			expectError:    true,
-			errorContains:  "node transaction sequence must be 0 for zero timelock renewal",
+			errorContains:  "node transaction sequence must be 0 or final for zero timelock renewal",
 		},
 		{
 			name:           "invalid refund timelock - too high",
@@ -1517,7 +1554,7 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 			nodeSequence:   100,
 			refundSequence: 200,
 			expectError:    true,
-			errorContains:  "node transaction sequence must be 0 for zero timelock renewal",
+			errorContains:  "node transaction sequence must be 0 or final for zero timelock renewal",
 		},
 	}
 
