@@ -184,11 +184,16 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 10 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
-				Name:         "dkg",
-				Timeout:      &dkgTaskTimeout,
-				RunInTestEnv: true,
+				Name:                "dkg",
+				Timeout:             &dkgTaskTimeout,
+				RunInTestEnv:        true,
+				RequiresRawDBClient: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return ent.RunDKGIfNeeded(ctx, config)
+					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // The readiness check must run outside a task transaction: RunDKG blocks on the full cross-operator DKG protocol, which would hold a transaction idle past Postgres's idle_in_transaction_session_timeout.
+					if err != nil {
+						return fmt.Errorf("failed to get raw db client from context: %w", err)
+					}
+					return ent.RunDKGIfNeeded(ctx, config, rawDB)
 				},
 			},
 		},
