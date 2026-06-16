@@ -159,13 +159,6 @@ func TestLightningHandlersRejectNilRequests(t *testing.T) {
 			},
 		},
 		{
-			name: "InitiatePreimageSwap",
-			call: func() error {
-				_, err := handler.InitiatePreimageSwap(ctx, nil)
-				return err
-			},
-		},
-		{
 			name: "InitiatePreimageSwapV2",
 			call: func() error {
 				_, err := handler.InitiatePreimageSwapV2(ctx, nil)
@@ -1905,7 +1898,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			var resp *pb.InitiatePreimageSwapResponse
 			var err error
 			require.NotPanics(t, func() {
-				resp, err = lightningHandler.InitiatePreimageSwap(ctx, req)
+				resp, err = lightningHandler.InitiatePreimageSwapV2(ctx, req)
 			})
 
 			require.ErrorContains(t, err, tt.expectedErrMsg)
@@ -2863,7 +2856,7 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 			FeeSats: 0,
 		}
 
-		_, err := lightningHandler.InitiatePreimageSwap(ctx, req)
+		_, err := lightningHandler.InitiatePreimageSwapV2(ctx, req)
 
 		require.ErrorContains(t, err, "duplicate leaf id")
 	})

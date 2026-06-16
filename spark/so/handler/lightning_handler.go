@@ -1546,7 +1546,11 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 // 2PC consensus engine (initiatePreimageSwapV3Consensus); otherwise uses the
 // legacy initiatePreimageSwap fanout. V3 semantics: requireDirectTx=true, no
 // expiry override (expiry is taken from req.Transfer.ExpiryTime as-is).
-func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	defer func() { observePreimageSwapShape(ctx, req, "v3", retErr) }()
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusInitiatePreimageSwap, 0) > 0 {
 		return h.initiatePreimageSwapV3Consensus(ctx, req)
 	}
@@ -1554,10 +1558,11 @@ func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbsp
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
+	defer func() { observePreimageSwapShape(ctx, req, "v2", retErr) }()
 
 	var expireTimeOverride *time.Time
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
@@ -1570,21 +1575,8 @@ func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbsp
 	return h.initiatePreimageSwap(ctx, req, true, expireTimeOverride)
 }
 
-func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pbspark.InitiatePreimageSwapResponse, error) {
-	if req == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
-	}
-
-	var expireTimeOverride *time.Time
-	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
-		expireTimeOverride = new(time.Now().Add(LightningPaymentExpiryDuration))
-	} else {
-		expireTimeOverride = new(time.Now().Add(LightningReceiveExpiryDuration))
-	}
-	return h.initiatePreimageSwap(ctx, req, false, expireTimeOverride)
-}
-
-// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+// initiatePreimageSwap is the shared legacy-fanout implementation behind
+// InitiatePreimageSwapV2/V3.
 func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
