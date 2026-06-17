@@ -20,6 +20,7 @@ import { type WalletConfigService } from "../config.js";
 import { getMonotonicTime } from "../time-sync.js";
 import type { LoggingService } from "../../utils/logging-service.js";
 import { type AuthMode, ConnectionManager } from "./connection.js";
+import { deadlineMiddleware } from "./deadline-middleware.js";
 
 export type Transport = NonNullable<Parameters<typeof createChannel>[1]>;
 
@@ -81,7 +82,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     };
     let options: RetryOptions = {};
 
-    clientFactory = createClientFactory();
+    // Innermost so a deadline abort surfaces as a non-retryable
+    // DEADLINE_EXCEEDED per attempt rather than a retryable CANCELLED.
+    clientFactory = createClientFactory().use(deadlineMiddleware);
     if (withRetries) {
       options = retryOptions;
       clientFactory = clientFactory.use(retryMiddleware);

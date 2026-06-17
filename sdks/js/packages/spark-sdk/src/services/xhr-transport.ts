@@ -10,6 +10,10 @@ import type {
 import { NoopLogger } from "../utils/logging.js";
 import type { LoggingService } from "../utils/logging-service.js";
 
+// Last-resort cap for unary XHR calls (XMLHttpRequest has no default timeout).
+// Larger than any per-call deadline so an explicit deadline still wins.
+const UNARY_REQUEST_TIMEOUT_MS = 60_000;
+
 class GrpcCallData {
   responseHeaders: Metadata = new Metadata();
   responseChunks: Uint8Array[] = [];
@@ -29,14 +33,54 @@ async function xhrPost(
   requestBody: BodyInit,
   config?: XHRTransportConfig,
   logger: Logger = NoopLogger,
+  signal?: AbortSignal,
+  timeoutMs?: number,
 ): Promise<GrpcCallData> {
   const callData: GrpcCallData = new GrpcCallData();
-  return new Promise(function (resolve, reject) {
+  return new Promise(function (resolve) {
     // TODO - Support fallback for node?
     const xhr = new XMLHttpRequest();
+
+    // Set by timeout/abort/error so the trailing loadend doesn't overwrite the
+    // terminal status with the HTTP-code-derived one.
+    let terminalStatusSet = false;
+    let settled = false;
+
+    const onAbort = () => {
+      try {
+        xhr.abort();
+      } catch {
+        // ignore – the request may have already settled
+      }
+    };
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      resolve(callData);
+    };
+
+    const settleAborted = () => {
+      terminalStatusSet = true;
+      if (signal?.reason instanceof ClientError) {
+        callData.grpcStatus = signal.reason.code;
+        callData.statusMessage = signal.reason.message;
+      } else {
+        callData.grpcStatus = Status.CANCELLED;
+        callData.statusMessage = "Request aborted";
+      }
+      finish();
+    };
+
     xhr.open("POST", url, true);
     xhr.withCredentials = config?.credentials ?? true;
     xhr.responseType = "arraybuffer";
+    if (timeoutMs !== undefined && timeoutMs > 0) {
+      xhr.timeout = timeoutMs;
+    }
 
     for (const [key, values] of metadata) {
       for (const value of values) {
@@ -54,19 +98,41 @@ async function xhrPost(
           logger,
         );
       } else if (xhr.readyState === XMLHttpRequest.DONE) {
-        resolve(callData);
+        finish();
       }
     };
     xhr.onerror = function () {
+      terminalStatusSet = true;
+      callData.grpcStatus = Status.UNKNOWN;
       callData.statusMessage = getErrorDetailsFromHttpResponse(
         xhr.status,
         xhr.statusText,
       );
     };
-    xhr.onloadend = function () {
-      callData.responseChunks.push(new Uint8Array(xhr.response as ArrayBuffer));
-      callData.grpcStatus = getStatusFromHttpCode(xhr.status);
+    xhr.ontimeout = function () {
+      terminalStatusSet = true;
+      callData.grpcStatus = Status.DEADLINE_EXCEEDED;
+      callData.statusMessage = `Request timed out after ${timeoutMs}ms`;
+      finish();
     };
+    xhr.onabort = settleAborted;
+    xhr.onloadend = function () {
+      callData.responseChunks.push(
+        xhr.response
+          ? new Uint8Array(xhr.response as ArrayBuffer)
+          : new Uint8Array(0),
+      );
+      if (!terminalStatusSet) {
+        callData.grpcStatus = getStatusFromHttpCode(xhr.status);
+      }
+    };
+
+    if (signal?.aborted) {
+      // xhr.abort() before send() is a no-op, so settle without dispatching.
+      settleAborted();
+      return;
+    }
+    signal?.addEventListener("abort", onAbort);
 
     xhr.send(requestBody);
   });
@@ -140,7 +206,19 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
       });
     }
 
-    const xhrData = await xhrPost(url, metadata, requestBody, config, logger);
+    // No cap on server streams, which are long-lived by design.
+    const timeoutMs = method.responseStream
+      ? undefined
+      : UNARY_REQUEST_TIMEOUT_MS;
+    const xhrData = await xhrPost(
+      url,
+      metadata,
+      requestBody,
+      config,
+      logger,
+      signal,
+      timeoutMs,
+    );
 
     yield {
       type: "header",
