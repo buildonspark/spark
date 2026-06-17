@@ -727,7 +727,9 @@ enum StringOrU64 {
 impl StringOrU64 {
     fn to_u64(&self) -> u64 {
         match self {
-            StringOrU64::String(s) => s.parse().unwrap(),
+            StringOrU64::String(s) => s
+                .parse()
+                .expect("validityDurationSeconds string should be a valid u64"),
             StringOrU64::U64(n) => *n,
         }
     }
