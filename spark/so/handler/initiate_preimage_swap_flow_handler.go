@@ -150,8 +150,11 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 // requireDirectTx=true) so participants could trust it; under 2PC Prepare is the
 // only createTransfer call site, so the check lives here on every SO.
 func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapPreparedState, error) {
-	if req.GetTransfer() == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	// No knob here: Prepare is the participant path; transfer-less acceptance is
+	// deploy-gated, the public coordinator entrypoint holds the knob.
+	inputs, normErr := preimageSwapInputsFromRequest(req)
+	if normErr != nil {
+		return nil, normErr
 	}
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.GetFeeSats() != 0 {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("fee is not allowed for receive preimage swap"))
@@ -204,7 +207,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		}
 	}
 
-	if err := h.lightning.ValidateDuplicateLeaves(ctx, req.GetTransfer().GetLeavesToSend(), req.GetTransfer().GetDirectLeavesToSend(), req.GetTransfer().GetDirectFromCpfpLeavesToSend()); err != nil {
+	if err := h.lightning.ValidateDuplicateLeaves(ctx, inputs.validationCpfp, inputs.validationDirect, inputs.validationDirectFromCpfp); err != nil {
 		return nil, err
 	}
 
@@ -214,12 +217,17 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		}
 	}
 
-	if err := h.lightning.ValidateGetPreimageRequest(
+	if inputs.isPackageOnlySend {
+		// validateNodeOwnership=false: session-based, coordinator-entrypoint-only.
+		if err := h.lightning.validatePackageOnlySendRequest(ctx, req, inputs, invoiceAmount, receiverIdentityPubKey, false); err != nil {
+			return nil, fmt.Errorf("unable to validate request for payment hash %x: %w", req.GetPaymentHash(), err)
+		}
+	} else if err := h.lightning.ValidateGetPreimageRequest(
 		ctx,
 		req.GetPaymentHash(),
-		req.GetTransfer().GetLeavesToSend(),
-		req.GetTransfer().GetDirectLeavesToSend(),
-		req.GetTransfer().GetDirectFromCpfpLeavesToSend(),
+		inputs.validationCpfp,
+		inputs.validationDirect,
+		inputs.validationDirectFromCpfp,
 		invoiceAmount,
 		receiverIdentityPubKey,
 		req.GetFeeSats(),
@@ -229,11 +237,11 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		return nil, fmt.Errorf("unable to validate request for payment hash %x: %w", req.GetPaymentHash(), err)
 	}
 
-	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
+	ownerIdentityPubKey, err := keys.ParsePublicKey(inputs.ownerIdentityPublicKey)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
 	}
-	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
+	transferID, err := uuid.Parse(inputs.transferID)
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
@@ -245,13 +253,13 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 	cpfpLeafRefundMap := make(map[string][]byte)
 	directLeafRefundMap := make(map[string][]byte)
 	directFromCpfpLeafRefundMap := make(map[string][]byte)
-	for _, t := range req.GetTransfer().GetLeavesToSend() {
+	for _, t := range inputs.validationCpfp {
 		cpfpLeafRefundMap[t.GetLeafId()] = t.GetRawTx()
 	}
-	for _, t := range req.GetTransfer().GetDirectLeavesToSend() {
+	for _, t := range inputs.validationDirect {
 		directLeafRefundMap[t.GetLeafId()] = t.GetRawTx()
 	}
-	for _, t := range req.GetTransfer().GetDirectFromCpfpLeavesToSend() {
+	for _, t := range inputs.validationDirectFromCpfp {
 		directFromCpfpLeafRefundMap[t.GetLeafId()] = t.GetRawTx()
 	}
 
@@ -272,7 +280,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		transferID,
 		nil,
 		st.TransferTypePreimageSwap,
-		req.GetTransfer().GetExpiryTime().AsTime(),
+		inputs.expiryTime.AsTime(),
 		ownerIdentityPubKey,
 		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
@@ -297,7 +305,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		ctx,
 		req.GetPaymentHash(),
 		preimageShare,
-		req.GetTransfer().GetLeavesToSend(),
+		inputs.validationCpfp,
 		transfer,
 		status,
 		receiverIdentityPubKey,
@@ -510,7 +518,7 @@ func (h *InitiatePreimageSwapFlowHandler) Rollback(ctx context.Context, op proto
 		transferIDStr = r.GetTransferId()
 	case *pbinternal.InitiatePreimageSwapPrepareRequest:
 		if req := r.GetOriginalRequest(); req != nil {
-			transferIDStr = req.GetTransfer().GetTransferId()
+			transferIDStr = preimageSwapTransferIDFromRequest(req)
 		}
 	default:
 		return fmt.Errorf("unexpected operation type %T for initiate preimage swap rollback", op)
@@ -819,7 +827,7 @@ func collectPreimageSwapFrostShares(results map[string]*anypb.Any) (map[string]m
 // is resolved by the entrypoint (it already looked up the preimage share to apply
 // the expiry mutation).
 func buildInitiatePreimageSwapCoordinatorFlow(ctx context.Context, config *so.Config, req *pbspark.InitiatePreimageSwapRequest, isNonHodlReceive bool) (*initiatePreimageSwapCoordinatorFlow, error) {
-	transferID, err := uuid.Parse(req.GetTransfer().GetTransferId())
+	transferID, err := uuid.Parse(preimageSwapTransferIDFromRequest(req))
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
@@ -897,8 +905,15 @@ func preloadLeavesForTransferPackage(ctx context.Context, pkg *pbspark.TransferP
 // cancel_expired_transfers task leaves them alone), then drives the flow through
 // the engine. Per-SO validation + state creation happens inside Prepare.
 func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
-	if req == nil || req.GetTransfer() == nil {
+	if req == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if req.GetTransfer() == nil && knobs.GetKnobsService(ctx).GetValue(knobs.KnobAllowPreimageSwapWithoutTransfer, 0) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	}
+	inputs, normErr := preimageSwapInputsFromRequest(req)
+	if normErr != nil {
+		return nil, normErr
 	}
 
 	// Observability parity with the legacy initiatePreimageSwap and the
@@ -925,7 +940,7 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 	phaseStart := time.Now()
 	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwapV3Consensus.validate", spanOpt)
 	validateErr := func() error {
-		ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
+		ownerIdentityPubKey, err := keys.ParsePublicKey(inputs.ownerIdentityPublicKey)
 		if err != nil {
 			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
 		}
@@ -935,16 +950,17 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 		if err := authz.EnforceWalletNotKillSwitched(validateCtx, ownerIdentityPubKey); err != nil {
 			return err
 		}
-		if len(req.GetTransfer().GetLeavesToSend()) == 0 {
+		if len(inputs.cpfpLeaves()) == 0 {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
 		}
-		if req.GetTransfer().GetReceiverIdentityPublicKey() == nil {
+		if inputs.receiverIdentityPublicKey == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("receiver identity public key is required"))
 		}
 
 		// Resolve the preimage share once (non-HODL vs HODL receive) and apply the
 		// expiry mutation, mirroring legacy initiatePreimageSwap. For V3 there is no
 		// positive expiry override; only the non-HODL-receive "no expiry" rule applies.
+		effectiveExpiry := inputs.expiryTime
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 			db, err := ent.GetDbFromContext(validateCtx)
 			if err != nil {
@@ -964,10 +980,8 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 				flowPath = lightningFlowPathReceiveNonHodl
 				// non-HODL receive: strip expiry so the transfer is not cancelled by
 				// the cancel_expired_transfers task.
-				req.Transfer.ExpiryTime = nil
-				if req.GetTransferRequest() != nil {
-					req.TransferRequest.ExpiryTime = nil
-				}
+				effectiveExpiry = nil
+				setPreimageSwapExpiry(req, nil)
 			}
 		}
 		isNonHodlReceive = req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil
@@ -975,15 +989,23 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 		// Reject an already-expired expiry up front, matching legacy initiatePreimageSwap.
 		// createTransfer re-checks this inside Prepare, but failing here gives the
 		// client the same early InvalidArgument and avoids fanning out a doomed flow.
-		expiryTime := req.GetTransfer().GetExpiryTime().AsTime()
+		expiryTime := effectiveExpiry.AsTime()
 		if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
+		}
+
+		// Transfer-less packages get the size cap before the ownership load and
+		// the flow builder's preload — Prepare re-checks it in the validator.
+		if req.GetTransfer() == nil {
+			if err := validatePreimageSwapPackageSize(validateCtx, req.GetTransferRequest().GetTransferPackage()); err != nil {
+				return err
+			}
 		}
 
 		// Coordinator-only node ownership check (session-based; participants run
 		// validateNodeOwnership=false in Prepare). Loads the cpfp leaves non-locking
 		// — Prepare re-loads them FOR UPDATE before mutating.
-		if err := h.validateLeafOwnershipForPreimageSwap(validateCtx, req.GetTransfer().GetLeavesToSend()); err != nil {
+		if err := h.validateLeafOwnershipForPreimageSwap(validateCtx, inputs.cpfpLeaves()); err != nil {
 			return err
 		}
 		return nil

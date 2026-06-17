@@ -966,6 +966,104 @@ func validateLightningRefundOutputValue(value int64, txType string, leafID strin
 	return uint64(value), nil
 }
 
+// validatePreimageSwapPackageSize is the shared DoS cap for package-only
+// requests, mirroring the plain validator's KnobSoMaxTransactionsPerRequest.
+func validatePreimageSwapPackageSize(ctx context.Context, pkg *pbspark.TransferPackage) error {
+	maxTransactionsPerRequest := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoMaxTransactionsPerRequest, 100))
+	totalTransactions := len(pkg.GetLeavesToSend()) + len(pkg.GetDirectLeavesToSend()) + len(pkg.GetDirectFromCpfpLeavesToSend())
+	if totalTransactions > maxTransactionsPerRequest {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("too many transactions: %d, maximum allowed: %d", totalTransactions, maxTransactionsPerRequest))
+	}
+	return nil
+}
+
+// validatePackageOnlySendRequest runs the request guards a transfer-less SEND
+// loses by skipping ValidateGetPreimageRequest (it has no P2TR refunds): payment-hash
+// shape, duplicate-request rejection, and amount sufficiency over the package leaves.
+func (h *LightningHandler) validatePackageOnlySendRequest(
+	ctx context.Context,
+	req *pbspark.InitiatePreimageSwapRequest,
+	inputs *preimageSwapInputs,
+	invoiceAmount *pbspark.InvoiceAmount,
+	receiverIdentityPubKey keys.Public,
+	validateNodeOwnership bool,
+) error {
+	// The payment hash keys the preimage request, so it must be a 32-byte sha256 digest.
+	if len(req.GetPaymentHash()) != 32 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.GetPaymentHash())))
+	}
+
+	// Cap request size before the DB work below (ValidateTransferPackage's looser limit runs later).
+	if err := validatePreimageSwapPackageSize(ctx, req.GetTransferRequest().GetTransferPackage()); err != nil {
+		return err
+	}
+
+	// Reject a duplicate in-flight request up front; the partial unique index is the insert-time backstop.
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	existing, err := tx.PreimageRequest.Query().Where(
+		preimagerequest.PaymentHashEQ(req.GetPaymentHash()),
+		preimagerequest.ReceiverIdentityPubkeyEQ(receiverIdentityPubKey),
+		preimagerequest.StatusNEQ(st.PreimageRequestStatusReturned),
+	).Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get preimage request with paymentHash %x: %w", req.GetPaymentHash(), err)
+	}
+	if existing {
+		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("preimage request already exists for paymentHash %x", req.GetPaymentHash()))
+	}
+
+	// Every referenced leaf must exist; a short count means a nonexistent or duplicate leaf id.
+	leafIDs := make([]uuid.UUID, 0, len(inputs.packageCpfp))
+	for _, leaf := range inputs.packageCpfp {
+		id, err := uuid.Parse(leaf.GetLeafId())
+		if err != nil {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse node id: %w", err))
+		}
+		leafIDs = append(leafIDs, id)
+	}
+	nodes, err := tx.TreeNode.Query().Where(treenode.IDIn(leafIDs...)).All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to load leaves for amount validation: %w", err)
+	}
+	if len(nodes) != len(leafIDs) {
+		return sparkerrors.InvalidArgumentMalformedField(
+			fmt.Errorf("preimage swap references %d leaves but only %d exist (nonexistent or duplicate leaf id)", len(leafIDs), len(nodes)))
+	}
+	// Leaves must be claimable; createTransfer's FOR-UPDATE check is the race guard.
+	for _, node := range nodes {
+		if err := leafAvailableStatus(node); err != nil {
+			return err
+		}
+	}
+	// Coordinator entrypoints set this to confirm the session owns the leaves.
+	if validateNodeOwnership {
+		if err := h.validateNodeOwnership(ctx, nodes); err != nil {
+			return fmt.Errorf("unable to validate node ownership: %w", err)
+		}
+	}
+
+	// Leaf values must cover invoice+fee. node.Value is server-authoritative (set at
+	// deposit, not client-supplied), so summing it is a trustworthy amount bound.
+	var totalAmountSats uint64
+	for _, node := range nodes {
+		if node.Value > math.MaxUint64-totalAmountSats {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("leaf value amount overflow"))
+		}
+		totalAmountSats += node.Value
+	}
+	if req.GetFeeSats() >= totalAmountSats {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("fee exceeds total amount, fee: %d, total amount: %d", req.GetFeeSats(), totalAmountSats))
+	}
+	totalAmountSats -= req.GetFeeSats()
+	if invoiceAmount.GetValueSats() != 0 && totalAmountSats < invoiceAmount.GetValueSats() {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid amount, expected: %d or more, got: %d", invoiceAmount.GetValueSats(), totalAmountSats))
+	}
+	return nil
+}
+
 func (h *LightningHandler) storeUserSignedTransactions(
 	ctx context.Context,
 	paymentHash []byte,
@@ -1066,8 +1164,11 @@ func (h *LightningHandler) GetPreimageShare(
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	if req.GetTransfer() == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+	// No knob here: this is the internal participant path; transfer-less
+	// acceptance is deploy-gated, the public coordinator entrypoints hold the knob.
+	inputs, normErr := preimageSwapInputsFromRequest(req)
+	if normErr != nil {
+		return nil, normErr
 	}
 
 	spanOpt := lightningPaymentHashSpanOption(req.GetPaymentHash())
@@ -1132,13 +1233,14 @@ func (h *LightningHandler) GetPreimageShare(
 				},
 			}
 		}
-		if err := h.ValidateDuplicateLeaves(validateCtx, req.GetTransfer().GetLeavesToSend(), req.GetTransfer().GetDirectLeavesToSend(), req.GetTransfer().GetDirectFromCpfpLeavesToSend()); err != nil {
+		// No-op for a package-only send (validation* lists empty); ValidateTransferPackage
+		// runs the dedup/orphan checks on the package below.
+		if err := h.ValidateDuplicateLeaves(validateCtx, inputs.validationCpfp, inputs.validationDirect, inputs.validationDirectFromCpfp); err != nil {
 			return err
 		}
 
-		// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
-		// Currently all validation is done in req.Transfer, so we only need to validate that req.TransferRequest has all the same leaves as req.Transfer.
-		// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
+		// TODO(SP-3285): transitional cross-check while callers send both shapes;
+		// remove with the legacy transfer field.
 		transferRequest := req.GetTransferRequest()
 		if transferRequest != nil {
 			err := h.validateIdenticalLeavesInTransferAndTransferRequest(validateCtx, req)
@@ -1147,18 +1249,22 @@ func (h *LightningHandler) GetPreimageShare(
 			}
 		}
 
-		err = h.ValidateGetPreimageRequest(
-			validateCtx,
-			req.GetPaymentHash(),
-			req.GetTransfer().GetLeavesToSend(),
-			req.GetTransfer().GetDirectLeavesToSend(),
-			req.GetTransfer().GetDirectFromCpfpLeavesToSend(),
-			invoiceAmount,
-			receiverIdentityPubKey,
-			req.GetFeeSats(),
-			req.GetReason(),
-			false,
-		)
+		if inputs.isPackageOnlySend {
+			err = h.validatePackageOnlySendRequest(validateCtx, req, inputs, invoiceAmount, receiverIdentityPubKey, false)
+		} else {
+			err = h.ValidateGetPreimageRequest(
+				validateCtx,
+				req.GetPaymentHash(),
+				inputs.validationCpfp,
+				inputs.validationDirect,
+				inputs.validationDirectFromCpfp,
+				invoiceAmount,
+				receiverIdentityPubKey,
+				req.GetFeeSats(),
+				req.GetReason(),
+				false,
+			)
+		}
 		if err != nil {
 			return fmt.Errorf("unable to validate get preimage request: %w", err)
 		}
@@ -1166,25 +1272,22 @@ func (h *LightningHandler) GetPreimageShare(
 		cpfpLeafRefundMap = make(map[string][]byte)
 		directLeafRefundMap = make(map[string][]byte)
 		directFromCpfpLeafRefundMap = make(map[string][]byte)
-		for i := range req.GetTransfer().GetLeavesToSend() {
-			cpfpTransaction := req.GetTransfer().GetLeavesToSend()[i]
+		for _, cpfpTransaction := range inputs.validationCpfp {
 			cpfpLeafRefundMap[cpfpTransaction.GetLeafId()] = cpfpTransaction.GetRawTx()
 		}
-		for i := range req.GetTransfer().GetDirectLeavesToSend() {
-			directTransaction := req.GetTransfer().GetDirectLeavesToSend()[i]
+		for _, directTransaction := range inputs.validationDirect {
 			directLeafRefundMap[directTransaction.GetLeafId()] = directTransaction.GetRawTx()
 		}
-		for i := range req.GetTransfer().GetDirectFromCpfpLeavesToSend() {
-			directFromCpfpTransaction := req.GetTransfer().GetDirectFromCpfpLeavesToSend()[i]
+		for _, directFromCpfpTransaction := range inputs.validationDirectFromCpfp {
 			directFromCpfpLeafRefundMap[directFromCpfpTransaction.GetLeafId()] = directFromCpfpTransaction.GetRawTx()
 		}
 
-		ownerIdentityPubKey, err = keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
+		ownerIdentityPubKey, err = keys.ParsePublicKey(inputs.ownerIdentityPublicKey)
 		if err != nil {
 			return fmt.Errorf("unable to parse owner identity public key: %w", err)
 		}
 
-		transferID, err = uuid.Parse(req.GetTransfer().GetTransferId())
+		transferID, err = uuid.Parse(inputs.transferID)
 		if err != nil {
 			return fmt.Errorf("unable to parse transfer id: %w", err)
 		}
@@ -1229,8 +1332,7 @@ func (h *LightningHandler) GetPreimageShare(
 		transferID,
 		nil,
 		st.TransferTypePreimageSwap,
-		// TODO: (LIG-8397) Remove once we can remove transfer
-		req.GetTransfer().GetExpiryTime().AsTime(),
+		inputs.expiryTime.AsTime(),
 		ownerIdentityPubKey,
 		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
@@ -1272,7 +1374,7 @@ func (h *LightningHandler) GetPreimageShare(
 		storeCtx,
 		req.GetPaymentHash(),
 		preimageShare,
-		req.GetTransfer().GetLeavesToSend(),
+		inputs.validationCpfp,
 		transfer,
 		status,
 		receiverIdentityPubKey,
@@ -1338,8 +1440,11 @@ func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context,
 }
 
 func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) error {
-	// The purpose of the function is to validate that req.Transfer and req.TransferRequest have the same leaves.
-	// The idea is to replace req.Transfer with req.TransferRequest, but until SSP stop using the query user refund call, we can't simply remove req.Transfer.
+	// Validates that req.Transfer and req.TransferRequest carry the same leaves
+	// while callers send both shapes. TODO(SP-3285): remove with the legacy field.
+	if req.GetTransfer() == nil {
+		return nil
+	}
 	if req.GetTransferRequest().GetTransferPackage() == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request.transfer_package is required"))
 	}
@@ -1597,6 +1702,8 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	logger := logging.GetLoggerFromContext(ctx)
 
 	var (
+		inputs                      *preimageSwapInputs
+		effectiveExpiry             *timestamppb.Timestamp
 		ownerIdentityPubKey         keys.Public
 		receiverIdentityPubKey      keys.Public
 		preimageShare               *ent.PreimageShare
@@ -1610,12 +1717,16 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	phaseStart := time.Now()
 	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.validate", spanOpt)
 	validateErr := func() error {
-		if req.GetTransfer() == nil {
+		if req.GetTransfer() == nil && knobs.GetKnobsService(validateCtx).GetValue(knobs.KnobAllowPreimageSwapWithoutTransfer, 0) == 0 {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 		}
 
 		var err error
-		ownerIdentityPubKey, err = keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
+		inputs, err = preimageSwapInputsFromRequest(req)
+		if err != nil {
+			return err
+		}
+		ownerIdentityPubKey, err = keys.ParsePublicKey(inputs.ownerIdentityPublicKey)
 		if err != nil {
 			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
 		}
@@ -1625,17 +1736,17 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		if err = authz.EnforceWalletNotKillSwitched(validateCtx, ownerIdentityPubKey); err != nil {
 			return err
 		}
-		if len(req.GetTransfer().GetLeavesToSend()) == 0 {
+		if len(inputs.cpfpLeaves()) == 0 {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
 		}
-		if req.Transfer.ReceiverIdentityPublicKey == nil {
+		if inputs.receiverIdentityPublicKey == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("receiver identity public key is required"))
 		}
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.GetFeeSats() != 0 {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("fee is not allowed for receive preimage swap"))
 		}
 
-		receiverIdentityPubKey, err = keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
+		receiverIdentityPubKey, err = keys.ParsePublicKey(inputs.receiverIdentityPublicKey)
 		if err != nil {
 			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse receiver identity public key: %w", err))
 		}
@@ -1683,31 +1794,27 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			}
 		}
 
-		if err := h.ValidateDuplicateLeaves(validateCtx, req.GetTransfer().GetLeavesToSend(), req.GetTransfer().GetDirectLeavesToSend(), req.GetTransfer().GetDirectFromCpfpLeavesToSend()); err != nil {
+		if err := h.ValidateDuplicateLeaves(validateCtx, inputs.validationCpfp, inputs.validationDirect, inputs.validationDirectFromCpfp); err != nil {
 			return err
 		}
 
 		// Receive preimage swap only has expiry time when it is HODL invoice.
 		// Apply the override before validation so that Transfer and TransferRequest
 		// have matching expiry times when checked below.
+		effectiveExpiry = inputs.expiryTime
 		if expireTimeOverride != nil && (req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil) {
-			req.Transfer.ExpiryTime = timestamppb.New(*expireTimeOverride)
-			if req.GetTransferRequest() != nil {
-				req.TransferRequest.ExpiryTime = timestamppb.New(*expireTimeOverride)
-			}
+			effectiveExpiry = timestamppb.New(*expireTimeOverride)
+			setPreimageSwapExpiry(req, effectiveExpiry)
 		}
 
 		// We do not want expiry times for receive preimage swap when it is a non-HODL invoice or else these transfers will be cancelled by the cancel_expired_transfers task.
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil {
-			req.Transfer.ExpiryTime = nil
-			if req.GetTransferRequest() != nil {
-				req.TransferRequest.ExpiryTime = nil
-			}
+			effectiveExpiry = nil
+			setPreimageSwapExpiry(req, nil)
 		}
 
-		// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
-		// Currently all validation is done in req.Transfer, so we only need to validate that req.TransferRequest has all the same leaves as req.Transfer.
-		// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
+		// TODO(SP-3285): transitional cross-check while callers send both shapes;
+		// remove with the legacy transfer field.
 		if transferRequest := req.GetTransferRequest(); transferRequest != nil {
 			err := h.validateIdenticalLeavesInTransferAndTransferRequest(validateCtx, req)
 			if err != nil {
@@ -1715,18 +1822,22 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			}
 		}
 
-		err = h.ValidateGetPreimageRequest(
-			validateCtx,
-			req.GetPaymentHash(),
-			req.GetTransfer().GetLeavesToSend(),
-			req.GetTransfer().GetDirectLeavesToSend(),
-			req.GetTransfer().GetDirectFromCpfpLeavesToSend(),
-			invoiceAmount,
-			receiverIdentityPubKey,
-			req.GetFeeSats(),
-			req.GetReason(),
-			true,
-		)
+		if inputs.isPackageOnlySend {
+			err = h.validatePackageOnlySendRequest(validateCtx, req, inputs, invoiceAmount, receiverIdentityPubKey, true)
+		} else {
+			err = h.ValidateGetPreimageRequest(
+				validateCtx,
+				req.GetPaymentHash(),
+				inputs.validationCpfp,
+				inputs.validationDirect,
+				inputs.validationDirectFromCpfp,
+				invoiceAmount,
+				receiverIdentityPubKey,
+				req.GetFeeSats(),
+				req.GetReason(),
+				true,
+			)
+		}
 		if err != nil {
 			return fmt.Errorf("unable to validate request for payment hash: %x: %w", req.GetPaymentHash(), err)
 		}
@@ -1734,25 +1845,22 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		cpfpLeafRefundMap = make(map[string][]byte)
 		directLeafRefundMap = make(map[string][]byte)
 		directFromCpfpLeafRefundMap = make(map[string][]byte)
-		for i := range req.GetTransfer().GetLeavesToSend() {
-			cpfpTransaction := req.GetTransfer().GetLeavesToSend()[i]
+		for _, cpfpTransaction := range inputs.validationCpfp {
 			cpfpLeafRefundMap[cpfpTransaction.GetLeafId()] = cpfpTransaction.GetRawTx()
 		}
-		for i := range req.GetTransfer().GetDirectLeavesToSend() {
-			directTransaction := req.GetTransfer().GetDirectLeavesToSend()[i]
+		for _, directTransaction := range inputs.validationDirect {
 			directLeafRefundMap[directTransaction.GetLeafId()] = directTransaction.GetRawTx()
 		}
-		for i := range req.GetTransfer().GetDirectFromCpfpLeavesToSend() {
-			directFromCpfpTransaction := req.GetTransfer().GetDirectFromCpfpLeavesToSend()[i]
+		for _, directFromCpfpTransaction := range inputs.validationDirectFromCpfp {
 			directFromCpfpLeafRefundMap[directFromCpfpTransaction.GetLeafId()] = directFromCpfpTransaction.GetRawTx()
 		}
 
-		expiryTime := req.GetTransfer().GetExpiryTime().AsTime()
+		expiryTime := effectiveExpiry.AsTime()
 		if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
 		}
 
-		transferID, err = uuid.Parse(req.GetTransfer().GetTransferId())
+		transferID, err = uuid.Parse(inputs.transferID)
 		if err != nil {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 		}
@@ -1830,7 +1938,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			transferID,
 			nil,
 			st.TransferTypePreimageSwap,
-			req.GetTransfer().GetExpiryTime().AsTime(),
+			effectiveExpiry.AsTime(),
 			ownerIdentityPubKey,
 			receiverIdentityPubKey,
 			cpfpLeafRefundMap,
@@ -1892,7 +2000,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		storeCtx,
 		req.GetPaymentHash(),
 		preimageShare,
-		req.GetTransfer().GetLeavesToSend(),
+		inputs.validationCpfp,
 		transfer,
 		status,
 		receiverIdentityPubKey,

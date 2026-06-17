@@ -2945,3 +2945,216 @@ func TestQueryPreimageSkipsReturnedRows(t *testing.T) {
 	// not the stale RETURNED row (which has no transfer edge and would have caused
 	// "no transfer found" error).
 }
+
+func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{83})
+	ownerPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	paymentHash := sha256.Sum256([]byte("package-only-payment"))
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	knobCtx := func(ctx context.Context, allow float64) context.Context {
+		return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobAllowPreimageSwapWithoutTransfer: allow,
+		}))
+	}
+
+	newSendRequest := func(jobs []*pb.UserSignedTxSigningJob, invoiceSats, feeSats uint64) *pb.InitiatePreimageSwapRequest {
+		return &pb.InitiatePreimageSwapRequest{
+			PaymentHash:               paymentHash[:],
+			InvoiceAmount:             &pb.InvoiceAmount{ValueSats: invoiceSats},
+			Reason:                    pb.InitiatePreimageSwapRequest_REASON_SEND,
+			ReceiverIdentityPublicKey: receiverPrivKey.Public().Serialize(),
+			FeeSats:                   feeSats,
+			TransferRequest: &pb.StartTransferRequest{
+				TransferId:                uuid.NewString(),
+				OwnerIdentityPublicKey:    ownerPrivKey.Public().Serialize(),
+				ReceiverIdentityPublicKey: receiverPrivKey.Public().Serialize(),
+				ExpiryTime:                timestamppb.New(time.Now().Add(time.Hour)),
+				TransferPackage:           &pb.TransferPackage{LeavesToSend: jobs},
+			},
+		}
+	}
+
+	t.Run("rejected while knob is off", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 0), req)
+		require.ErrorContains(t, err, "transfer is required")
+	})
+
+	t.Run("send rejects invalid payment hash length", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		req.PaymentHash = []byte("short")
+		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), req)
+		require.ErrorContains(t, err, "invalid payment hash length")
+	})
+
+	t.Run("send rejects nonexistent leaves", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), req)
+		require.ErrorContains(t, err, "leaves but only")
+	})
+
+	t.Run("send amount checks from tree-node values", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		keyshare := createTestSigningKeyshare(t, ctx, rng, tx)
+		tree := createTestTreeForClaim(t, ctx, ownerPrivKey.Public(), tx)
+		// createTestTreeNode pins Value to 1000 sats per leaf and creates it TRANSFER_LOCKED.
+		leafA := createTestTreeNode(t, ctx, rng, tx, tree, keyshare)
+		leafB := createTestTreeNode(t, ctx, rng, tx, tree, keyshare)
+		_, err = tx.TreeNode.Update().SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
+		require.NoError(t, err)
+		jobs := []*pb.UserSignedTxSigningJob{{LeafId: leafA.ID.String()}, {LeafId: leafB.ID.String()}}
+
+		_, err = lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newSendRequest(jobs, 100, 2000))
+		require.ErrorContains(t, err, "fee exceeds total amount")
+
+		_, err = lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newSendRequest(jobs, 5000, 100))
+		require.ErrorContains(t, err, "invalid amount, expected: 5000 or more, got: 1900")
+	})
+
+	t.Run("send rejects duplicate payment hash", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		_, err = tx.PreimageRequest.Create().
+			SetPaymentHash(paymentHash[:]).
+			SetReceiverIdentityPubkey(receiverPrivKey.Public()).
+			SetSenderIdentityPubkey(ownerPrivKey.Public()).
+			SetStatus(st.PreimageRequestStatusWaitingForPreimage).
+			Save(ctx)
+		require.NoError(t, err)
+
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err = lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), req)
+		require.ErrorContains(t, err, "preimage request already exists")
+	})
+
+	t.Run("receive routes package leaves through plain validation", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{
+			LeafId:                 uuid.NewString(),
+			RawTx:                  []byte{0x01},
+			SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
+			SigningNonceCommitment: &pbcommon.SigningCommitment{},
+		}}, 0, 0)
+		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), req)
+		// The package leaf reached ValidateGetPreimageRequest's per-leaf node
+		// lookup — proof the plain machinery consumed the package lists.
+		require.ErrorContains(t, err, "unable to get cpfpTransaction tree_node")
+	})
+
+	t.Run("send rejects oversized package before node queries", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		jobs := make([]*pb.UserSignedTxSigningJob, 101)
+		for i := range jobs {
+			jobs[i] = &pb.UserSignedTxSigningJob{LeafId: uuid.NewString()}
+		}
+		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newSendRequest(jobs, 100, 0))
+		require.ErrorContains(t, err, "too many transactions")
+	})
+
+	// Participant paths accept transfer-less requests with NO knob — deploy-gated.
+	t.Run("participant GetPreimageShare accepts transfer-less send without knob", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+		// Past resolution and into amount validation — only the missing node stops it.
+		require.ErrorContains(t, err, "leaves but only")
+	})
+
+	t.Run("participant GetPreimageShare receive routes package leaves through plain validation", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{
+			LeafId:                 uuid.NewString(),
+			RawTx:                  []byte{0x01},
+			SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
+			SigningNonceCommitment: &pbcommon.SigningCommitment{},
+		}}, 0, 0)
+		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+		require.ErrorContains(t, err, "unable to get cpfpTransaction tree_node")
+	})
+
+	t.Run("participant GetPreimageShare rejects receiver mismatch", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		req.ReceiverIdentityPublicKey = ownerPrivKey.Public().Serialize()
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+		require.ErrorContains(t, err, "receiver identity public key mismatch")
+	})
+
+	t.Run("2PC prepareState accepts transfer-less send without knob", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		flowHandler := NewInitiatePreimageSwapFlowHandler(config)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err := flowHandler.prepareState(ctx, req)
+		require.ErrorContains(t, err, "leaves but only")
+	})
+
+	t.Run("v3 consensus coordinator gates transfer-less on the knob", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		consensusCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobUseConsensusInitiatePreimageSwap: 1,
+			knobs.KnobAllowPreimageSwapWithoutTransfer: 0,
+		}))
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err := lightningHandler.InitiatePreimageSwapV3(consensusCtx, req)
+		require.ErrorContains(t, err, "transfer is required")
+	})
+
+	t.Run("v3 consensus coordinator ownership check consumes package leaves", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		consensusCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobUseConsensusInitiatePreimageSwap: 1,
+			knobs.KnobAllowPreimageSwapWithoutTransfer: 1,
+		}))
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+		_, err := lightningHandler.InitiatePreimageSwapV3(consensusCtx, req)
+		require.ErrorContains(t, err, "leaves but only")
+	})
+
+	t.Run("send rejects unavailable leaves before package work", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		keyshare := createTestSigningKeyshare(t, ctx, rng, tx)
+		tree := createTestTreeForClaim(t, ctx, ownerPrivKey.Public(), tx)
+		leaf := createTestTreeNode(t, ctx, rng, tx, tree, keyshare) // TRANSFER_LOCKED
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String()}}, 100, 0)
+		_, err = lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), req)
+		require.ErrorContains(t, err, "not available to transfer")
+	})
+
+	t.Run("send rejects leaves the session does not own", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		keyshare := createTestSigningKeyshare(t, ctx, rng, tx)
+		tree := createTestTreeForClaim(t, ctx, ownerPrivKey.Public(), tx)
+		// createTestTreeNode assigns a random owner — not the session identity.
+		leaf := createTestTreeNode(t, ctx, rng, tx, tree, keyshare)
+
+		_, err = tx.TreeNode.UpdateOne(leaf).SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
+		require.NoError(t, err)
+
+		authzHandler := NewLightningHandler(&so.Config{
+			AuthzEnforced:              true,
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		})
+		sessionCtx := authn.InjectSessionForTests(
+			knobCtx(ctx, 1), hex.EncodeToString(ownerPrivKey.Public().Serialize()), time.Now().Add(time.Hour).Unix())
+
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String()}}, 100, 0)
+		_, err = authzHandler.InitiatePreimageSwapV2(sessionCtx, req)
+		require.ErrorContains(t, err, "not owned by the authenticated identity")
+	})
+}
