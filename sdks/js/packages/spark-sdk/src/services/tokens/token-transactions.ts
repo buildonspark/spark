@@ -56,6 +56,19 @@ import type {
 const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
 export const MAX_TOKEN_OUTPUTS_TX = 500;
 
+// Bound the coordinator RPCs so a never-delivered response rejects with
+// DEADLINE_EXCEEDED instead of leaving the await pending forever.
+const TOKEN_TRANSACTION_RPC_TIMEOUT_MS = 30_000;
+
+function tokenTransactionCallOptions(): SparkCallOptions {
+  return {
+    retry: true,
+    retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],
+    retryMaxAttempts: 3,
+    deadline: new Date(Date.now() + TOKEN_TRANSACTION_RPC_TIMEOUT_MS),
+  } as SparkCallOptions;
+}
+
 export interface FetchOwnedTokenOutputsParams {
   ownerPublicKeys: Uint8Array[];
   issuerPublicKeys?: Uint8Array[];
@@ -814,16 +827,7 @@ export class TokenTransactionService {
           partialTokenTransaction,
           tokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
         },
-        {
-          retry: true,
-          retryableStatuses: [
-            "UNKNOWN",
-            "UNAVAILABLE",
-            "CANCELLED",
-            "INTERNAL",
-          ],
-          retryMaxAttempts: 3,
-        } as SparkCallOptions,
+        tokenTransactionCallOptions(),
       );
     }
 
@@ -923,11 +927,7 @@ export class TokenTransactionService {
 
     return await sparkClient.broadcast_transaction(
       BroadcastTransactionRequest.decode(broadcastRequestBytes),
-      {
-        retry: true,
-        retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],
-        retryMaxAttempts: 3,
-      } as SparkCallOptions,
+      tokenTransactionCallOptions(),
     );
   }
 
@@ -1038,11 +1038,7 @@ export class TokenTransactionService {
         validityDurationSeconds: this.config.getTokenValidityDurationSeconds(),
         partialTokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
       },
-      {
-        retry: true,
-        retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],
-        retryMaxAttempts: 3,
-      } as SparkCallOptions,
+      tokenTransactionCallOptions(),
     );
 
     if (!startResponse.finalTokenTransaction) {
@@ -1101,16 +1097,7 @@ export class TokenTransactionService {
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
         },
-        {
-          retry: true,
-          retryableStatuses: [
-            "UNKNOWN",
-            "UNAVAILABLE",
-            "CANCELLED",
-            "INTERNAL",
-          ],
-          retryMaxAttempts: 3,
-        } as SparkCallOptions,
+        tokenTransactionCallOptions(),
       );
     } catch (error) {
       throw new SparkRequestError("Failed to sign token transaction", {

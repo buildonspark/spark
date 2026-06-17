@@ -27,6 +27,7 @@ import { getMonotonicTime } from "../time-sync.js";
 import type { LoggingService } from "../../utils/logging-service.js";
 import type { ResolvedTlsOptions } from "../wallet-config.js";
 import { type AuthMode, ConnectionManager } from "./connection.js";
+import { deadlineMiddleware } from "./deadline-middleware.js";
 
 // The default @grpc/grpc-js message size limit is 4 MB. Wallets with many
 // leaves can exceed this — e.g. start_transfer_v2 responses have been observed
@@ -272,7 +273,9 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     };
     let options: RetryOptions = {};
 
-    let clientFactory = createClientFactory();
+    // Innermost so a deadline abort surfaces as a non-retryable
+    // DEADLINE_EXCEEDED per attempt rather than a retryable CANCELLED.
+    let clientFactory = createClientFactory().use(deadlineMiddleware);
     if (withRetries) {
       options = retryOptions;
       clientFactory = clientFactory.use(retryMiddleware);
