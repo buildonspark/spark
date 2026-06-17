@@ -25,6 +25,7 @@ include = [
 [dependencies]
 bech32 = { workspace = true }
 prost = { workspace = true }
+prost-reflect = { workspace = true }
 prost-types = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
@@ -38,6 +39,7 @@ time = { version = "0.3.37", features = ["parsing", "formatting"] }
 
 [build-dependencies]
 prost-build = { workspace = true }
+prost-reflect-build = { workspace = true }
 
 [lib]
 name = "spark_token_primitives"

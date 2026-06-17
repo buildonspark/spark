@@ -48,7 +48,9 @@ fn main() -> Result<()> {
         proto_dir.join("multisig.proto"),
     ];
 
-    prost_build::Config::new().compile_protos(protos, &[proto_dir])?;
+    prost_reflect_build::Builder::new()
+        .descriptor_pool("crate::protohash::DESCRIPTOR_POOL")
+        .compile_protos(protos, &[proto_dir])?;
 
     Ok(())
 }

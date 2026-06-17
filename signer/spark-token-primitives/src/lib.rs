@@ -1,6 +1,9 @@
 mod invoice;
 pub mod proto;
+pub mod protohash;
 mod token_transaction;
+
+pub use protohash::{hash_proto, ProtoHasherError};
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum SparkTokenPrimitivesError {
