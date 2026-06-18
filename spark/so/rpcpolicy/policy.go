@@ -19,6 +19,7 @@ import (
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbauthn "github.com/lightsparkdev/spark/proto/spark_authn"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	pbpartner "github.com/lightsparkdev/spark/proto/spark_partner"
 	pbtoken "github.com/lightsparkdev/spark/proto/spark_token"
 	pbtokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 )
@@ -90,12 +91,23 @@ func init() {
 	register(gossipServicePolicies())
 	register(mockServicePolicies())
 	register(healthServicePolicies())
+	register(sparkPartnerServicePolicies())
 }
 
 func sparkAuthnPolicies() map[string]Policy {
 	return map[string]Policy{
 		pbauthn.SparkAuthnService_GetChallenge_FullMethodName:    {AuthMode: AuthUnauthenticated},
 		pbauthn.SparkAuthnService_VerifyChallenge_FullMethodName: {AuthMode: AuthUnauthenticated},
+	}
+}
+
+// sparkPartnerServicePolicies covers the external partner-facing read API. The endpoint currently returns
+// Unimplemented; this PR introduces the service surface only. It's marked AuthUnauthenticated for now so it is
+// reachable without a session token — a follow-up PR introduces HTTP Basic Auth (verified by its own interceptor)
+// and tightens this to a dedicated auth mode. It is not InternalOnly: partners reach it from outside the VPC.
+func sparkPartnerServicePolicies() map[string]Policy {
+	return map[string]Policy{
+		pbpartner.SparkPartnerService_QuerySparkTransactionVolumes_FullMethodName: {AuthMode: AuthUnauthenticated},
 	}
 }
 
