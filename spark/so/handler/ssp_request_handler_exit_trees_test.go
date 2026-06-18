@@ -15,6 +15,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestExitTreesRejectsNilRequest(t *testing.T) {
@@ -88,4 +90,60 @@ func TestValidateExitingTreeRejectsAlreadyExitedTreeForSigning(t *testing.T) {
 	_, err = handler.validateExitingTree(ctx, tree.ID.String(), ownerIdentity)
 
 	require.ErrorContains(t, err, "not eligible for exit signing")
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+}
+
+func TestValidateExitingTreeRejectsTreeWithIneligibleLeaves(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentity := keys.GeneratePrivateKey().Public()
+	tree, err := dbTx.Tree.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetOwnerIdentityPubkey(ownerIdentity).
+		Save(ctx)
+	require.NoError(t, err)
+
+	secret := keys.GeneratePrivateKey()
+	ks, err := dbTx.SigningKeyshare.Create().
+		SetID(uuid.New()).
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"1": secret.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// The tree is still AVAILABLE, but a leaf owned by a different identity
+	// makes it ineligible — this exercises the leaf-eligibility branch rather
+	// than the tree-status branch.
+	otherIdentity := keys.GeneratePrivateKey().Public()
+	_, err = dbTx.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(tree).
+		SetSigningKeyshare(ks).
+		SetValue(testSourceValue).
+		SetVerifyingPubkey(secret.Public()).
+		SetOwnerIdentityPubkey(otherIdentity).
+		SetOwnerSigningPubkey(secret.Public()).
+		SetVout(0).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetRawTx(makeMinimalRawTx(t)).
+		SetRawRefundTx(makeMinimalRawTx(t)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewSspRequestHandler(&so.Config{})
+	_, err = handler.validateExitingTree(ctx, tree.ID.String(), ownerIdentity)
+
+	require.ErrorContains(t, err, "not eligible for exit because of leaves")
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 }

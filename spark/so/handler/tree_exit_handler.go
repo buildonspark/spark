@@ -17,6 +17,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 )
 
@@ -233,7 +234,7 @@ func validateExitTreeStillSignable(ctx context.Context, tree *ent.Tree) (*ent.Tr
 		return nil, fmt.Errorf("unable to reload tree %s before exit signing: %w", tree.ID.String(), err)
 	}
 	if latest.Status != st.TreeStatusAvailable {
-		return nil, fmt.Errorf("tree %s is in status %s and is not eligible for exit signing", tree.ID.String(), latest.Status)
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("tree %s is in status %s and is not eligible for exit signing", tree.ID.String(), latest.Status))
 	}
 	return latest, nil
 }
