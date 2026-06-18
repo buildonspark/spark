@@ -352,7 +352,7 @@ func TestMasterWalletHasReadAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set up stream context with master session
-	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	streamCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Inject knobs and session into stream context
@@ -362,14 +362,25 @@ func TestMasterWalletHasReadAccess(t *testing.T) {
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 
 	// Subscribe should succeed because master has access
-	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
-	require.NoError(t, err, "Master wallet should have read access")
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- router.SubscribeToEvents(walletOwnerPubKey, stream)
+	}()
+	waitForConnectedEvent(t, stream, errCh)
 
 	// Verify that the stream received the connected event
 	stream.mu.Lock()
 	require.NotEmpty(t, stream.messages, "Stream should have received connected event")
 	require.NotNil(t, stream.messages[0].GetConnected(), "First message should be connected event")
 	stream.mu.Unlock()
+
+	cancel()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err, "Master wallet should have read access")
+	case <-time.After(time.Second):
+		t.Fatal("router did not exit after cancel")
+	}
 }
 
 func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
@@ -398,7 +409,7 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set up stream context with owner session
-	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	streamCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
@@ -407,12 +418,23 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 
 	// Subscribe should succeed because owner has access
-	err = router.SubscribeToEvents(walletOwnerPubKey, stream)
-	require.NoError(t, err, "Owner should have read access")
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- router.SubscribeToEvents(walletOwnerPubKey, stream)
+	}()
+	waitForConnectedEvent(t, stream, errCh)
 
 	stream.mu.Lock()
 	require.NotEmpty(t, stream.messages, "Stream should have received connected event")
 	stream.mu.Unlock()
+
+	cancel()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err, "Owner should have read access")
+	case <-time.After(time.Second):
+		t.Fatal("router did not exit after cancel")
+	}
 }
 
 func TestEventRouter_SendsHeartbeatWhileIdle(t *testing.T) {
@@ -1429,13 +1451,28 @@ func TestEventRouter_TokenTransactionKnobDisabled(t *testing.T) {
 
 // waitForConnectedEvent blocks until the SubscribeToEvents handler has sent the
 // initial Connected event, indicating it has entered its receive loop.
-func waitForConnectedEvent(t *testing.T, stream *mockStream) {
+func waitForConnectedEvent(t *testing.T, stream *mockStream, errCh <-chan error) {
 	t.Helper()
-	require.Eventually(t, func() bool {
-		stream.mu.Lock()
-		defer stream.mu.Unlock()
-		return len(stream.messages) > 0
-	}, 2*time.Second, 10*time.Millisecond, "handler did not enter receive loop")
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(2 * time.Second)
+
+	for {
+		select {
+		case err := <-errCh:
+			require.NoError(t, err, "SubscribeToEvents returned before sending connected event")
+			t.Fatal("SubscribeToEvents returned before sending connected event")
+		case <-ticker.C:
+			stream.mu.Lock()
+			connected := len(stream.messages) > 0
+			stream.mu.Unlock()
+			if connected {
+				return
+			}
+		case <-timeout:
+			t.Fatal("handler did not enter receive loop")
+		}
+	}
 }
 
 func TestSubscribeToEventsShutdownReturnsUnavailableForGrpcWeb(t *testing.T) {
@@ -1458,7 +1495,7 @@ func TestSubscribeToEventsShutdownReturnsUnavailableForGrpcWeb(t *testing.T) {
 		errCh <- router.SubscribeToEvents(identityKey, stream)
 	}()
 
-	waitForConnectedEvent(t, stream)
+	waitForConnectedEvent(t, stream, errCh)
 	stopShutdown()
 
 	select {
@@ -1488,7 +1525,7 @@ func TestSubscribeToEventsShutdownReturnsUnavailableForNativeGrpc(t *testing.T) 
 		errCh <- router.SubscribeToEvents(identityKey, stream)
 	}()
 
-	waitForConnectedEvent(t, stream)
+	waitForConnectedEvent(t, stream, errCh)
 	stopShutdown()
 
 	select {
