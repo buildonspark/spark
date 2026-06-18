@@ -50,7 +50,7 @@ var defaultRetryPolicy = RetryPolicyConfig{
 	InitialBackoff:       1 * time.Second,
 	MaxBackoff:           10 * time.Second,
 	BackoffMultiplier:    2.0,
-	RetryableStatusCodes: []string{"UNAVAILABLE", "UNKNOWN"},
+	RetryableStatusCodes: []string{"UNAVAILABLE"},
 	LoadBalancingPolicy:  "round_robin",
 }
 
