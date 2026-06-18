@@ -342,7 +342,9 @@ const file_spark_partner_proto_rawDesc = "" +
 	"%SPARK_TRANSACTION_TYPE_LIGHTNING_SEND\x10\x02\x12,\n" +
 	"(SPARK_TRANSACTION_TYPE_LIGHTNING_RECEIVE\x10\x03\x12+\n" +
 	"'SPARK_TRANSACTION_TYPE_COOPERATIVE_EXIT\x10\x04\x12\"\n" +
-	"\x1eSPARK_TRANSACTION_TYPE_DEPOSIT\x10\x05B4Z2github.com/lightsparkdev/spark/proto/spark_partnerb\x06proto3"
+	"\x1eSPARK_TRANSACTION_TYPE_DEPOSIT\x10\x052\xa4\x01\n" +
+	"\x13SparkPartnerService\x12\x8c\x01\n" +
+	"\x1fquery_spark_transaction_volumes\x122.spark_partner.QuerySparkTransactionVolumesRequest\x1a3.spark_partner.QuerySparkTransactionVolumesResponse\"\x00B4Z2github.com/lightsparkdev/spark/proto/spark_partnerb\x06proto3"
 
 var (
 	file_spark_partner_proto_rawDescOnce sync.Once
@@ -370,8 +372,10 @@ var file_spark_partner_proto_depIdxs = []int32{
 	4, // 1: spark_partner.QuerySparkTransactionVolumesRequest.network:type_name -> spark.Network
 	0, // 2: spark_partner.SparkTransactionVolume.transaction_type:type_name -> spark_partner.SparkTransactionType
 	2, // 3: spark_partner.QuerySparkTransactionVolumesResponse.transaction_types:type_name -> spark_partner.SparkTransactionVolume
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
+	1, // 4: spark_partner.SparkPartnerService.query_spark_transaction_volumes:input_type -> spark_partner.QuerySparkTransactionVolumesRequest
+	3, // 5: spark_partner.SparkPartnerService.query_spark_transaction_volumes:output_type -> spark_partner.QuerySparkTransactionVolumesResponse
+	5, // [5:6] is the sub-list for method output_type
+	4, // [4:5] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
 	4, // [4:4] is the sub-list for extension extendee
 	0, // [0:4] is the sub-list for field type_name
@@ -391,7 +395,7 @@ func file_spark_partner_proto_init() {
 			NumEnums:      1,
 			NumMessages:   3,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_spark_partner_proto_goTypes,
 		DependencyIndexes: file_spark_partner_proto_depIdxs,

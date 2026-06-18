@@ -7,12 +7,13 @@ option go_package = "github.com/lightsparkdev/spark/proto/spark_partner";
 import "spark.proto";
 import "validate/validate.proto";
 
-// Message contract for the partner transaction-volume query. These types were
-// moved out of spark.proto when the endpoint was removed from SparkService.
-//
-// No service is defined yet: the SparkPartnerService that exposes
-// query_spark_transaction_volumes (authenticated via HTTP Basic Auth) is added
-// in a follow-up PR, so the endpoint is not reachable in the interim.
+// SparkPartnerService exposes partner-facing read endpoints.
+service SparkPartnerService {
+    // query_spark_transaction_volumes returns aggregated transaction volume for the
+    // authenticated partner over the requested date range, optionally scoped by
+    // transaction type and network.
+    rpc query_spark_transaction_volumes(QuerySparkTransactionVolumesRequest) returns (QuerySparkTransactionVolumesResponse) {}
+}
 
 enum SparkTransactionType {
     SPARK_TRANSACTION_TYPE_UNSPECIFIED = 0;
