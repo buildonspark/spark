@@ -65,14 +65,19 @@ input ClaimStaticDepositFixedAmountInput {
   static_deposit_quote_id: ID!
 
   """
-  The user's private key share for the static deposit address. This key share is used in combination with Spark operator key shares to create the final signature for the spend transaction.
-  """
-  static_deposit_address_private_key_share: String!
-
-  """
   The user's signature authorizing the static deposit claim. This is a hex-encoded ECDSA signature that proves the user's authorization to claim the deposit. The signature should be created by signing a message containing the claim details (transaction ID, output index, network, and credit amount) with the user's identity private key. This signature is used to authenticate the claim request and prevent unauthorized access to the deposit funds.
   """
   signature: String!
+
+  """
+  The user's private key share for the static deposit address. This key share is used in combination with Spark operator key shares to create the final signature for the spend transaction. May be omitted if encrypted_static_deposit_address_private_key_share is provided, or if the SSP has a key share stored from a previous claim for the same static deposit address.
+  """
+  static_deposit_address_private_key_share: String = null
+
+  """
+  The user's private key share for the static deposit address, ECIES-encrypted to the SSP's identity public key for the network and hex-encoded (the same encryption scheme as transfer leaf secret ciphers). Provide instead of static_deposit_address_private_key_share so the raw key never leaves the user's signer.
+  """
+  encrypted_static_deposit_address_private_key_share: String = null
 }
 
 input ClaimStaticDepositInput {
@@ -91,17 +96,24 @@ input ClaimStaticDepositInput {
   """The amount of sats to deduct from the UTXO value for MAX_FEE quote."""
   max_fee_sats: Long
 
-  """The deposit key of the user."""
-  deposit_secret_key: String!
-
   """The signature of the claim provided by the user."""
   signature: String!
 
   """The signature of the quote provided by the SSP."""
   quote_signature: String!
 
+  """
+  The deposit key of the user, hex-encoded. May be omitted if encrypted_deposit_secret_key is provided, or if the SSP has a key stored from a previous claim for the same static deposit address.
+  """
+  deposit_secret_key: String = null
+
   """The type of the claim request."""
   request_type: ClaimStaticDepositRequestType = null @deprecated(reason: "Different types of claim requests are no longer supported.")
+
+  """
+  The deposit key of the user, ECIES-encrypted to the SSP's identity public key for the network and hex-encoded (the same encryption scheme as transfer leaf secret ciphers). Provide instead of deposit_secret_key so the raw key never leaves the user's signer.
+  """
+  encrypted_deposit_secret_key: String = null
 }
 
 type ClaimStaticDepositOutput {
@@ -348,14 +360,19 @@ input CreateClaimInstantStaticDepositInput {
   static_deposit_quote_id: ID!
 
   """
-  The user's private key share for the static deposit address. This key share is used in combination with Spark operator key shares to create the final signature for the spend transaction.
-  """
-  static_deposit_address_private_key_share: String!
-
-  """
   The user's signature authorizing the static deposit claim. This is a hex-encoded ECDSA signature that proves the user's authorization to claim the deposit. The signature should be created by signing a message containing the claim details (transaction ID, output index, network, and credit amount) with the user's identity private key. This signature is used to authenticate the claim request and prevent unauthorized access to the deposit funds.
   """
   signature: String!
+
+  """
+  The user's private key share for the static deposit address. This key share is used in combination with Spark operator key shares to create the final signature for the spend transaction. May be omitted if encrypted_static_deposit_address_private_key_share is provided, or if the SSP has a key share stored from a previous claim for the same static deposit address.
+  """
+  static_deposit_address_private_key_share: String = null
+
+  """
+  The user's private key share for the static deposit address, ECIES-encrypted to the SSP's identity public key for the network and hex-encoded (the same encryption scheme as transfer leaf secret ciphers). Provide instead of static_deposit_address_private_key_share so the raw key never leaves the user's signer.
+  """
+  encrypted_static_deposit_address_private_key_share: String = null
 }
 
 type CreateClaimInstantStaticDepositOutput {
