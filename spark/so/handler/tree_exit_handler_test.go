@@ -16,6 +16,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // makeMinimalRawTx returns a serialized Bitcoin transaction suitable for DB
@@ -217,4 +219,5 @@ func TestSignExitTransactionRejectsTreeExitedAfterValidation(t *testing.T) {
 
 	require.Nil(t, resp)
 	require.ErrorContains(t, err, "not eligible for exit signing")
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 }
