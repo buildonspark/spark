@@ -16,6 +16,17 @@ func IsLockNotAvailableError(err error) bool {
 	return strings.Contains(err.Error(), "SQLSTATE 55P03")
 }
 
+// IsTransientContentionError reports whether err is a retryable Postgres contention error: lock_not_available (55P03), deadlock_detected (40P01), or serialization_failure (40001).
+func IsTransientContentionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return IsLockNotAvailableError(err) ||
+		strings.Contains(errStr, "SQLSTATE 40P01") ||
+		strings.Contains(errStr, "SQLSTATE 40001")
+}
+
 // IsRetriableSQLStateError returns true for transient database errors that might
 // succeed on retry (connection issues, timeouts, resource exhaustion).
 // Returns false for constraint violations which will always fail on retry
