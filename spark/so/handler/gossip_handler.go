@@ -17,6 +17,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/consensus"
+	sparkdb "github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -24,6 +25,7 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -165,6 +167,11 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		}
 	default:
 		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.GetMessage())
+	}
+
+	// Transient contention during a gossip apply is retryable (redelivered, idempotent), not a hard failure.
+	if err != nil && sparkdb.IsTransientContentionError(err) {
+		err = sparkerrors.AbortedLockConflict(err)
 	}
 
 	if err != nil {

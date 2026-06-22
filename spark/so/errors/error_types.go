@@ -57,6 +57,7 @@ const (
 
 	ReasonAbortedTransactionPreempted    = "TRANSACTION_PREEMPTED"
 	ReasonAbortedConcurrentClaimConflict = "CONCURRENT_CLAIM_CONFLICT"
+	ReasonAbortedLockConflict            = "LOCK_CONFLICT"
 
 	ReasonAlreadyExistsDuplicateOperation = "DUPLICATE_OPERATION"
 	ReasonAlreadyExistsExpiredTransaction = "EXPIRED_TRANSACTION"
@@ -246,6 +247,10 @@ func AbortedTransactionPreempted(err error) error {
 
 func AbortedConcurrentClaimConflict(err error) error {
 	return newRetryableGRPCError(codes.Aborted, err, ReasonAbortedConcurrentClaimConflict, abortedLockConflictRetryAfter)
+}
+
+func AbortedLockConflict(err error) error {
+	return newRetryableGRPCError(codes.Aborted, err, ReasonAbortedLockConflict, abortedLockConflictRetryAfter)
 }
 
 func AlreadyExistsDuplicateOperation(err error) error {

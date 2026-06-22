@@ -30,6 +30,27 @@ var (
 	}
 )
 
+func TestAbortedLockConflict(t *testing.T) {
+	err := AbortedLockConflict(fmt.Errorf("canceling statement due to lock timeout (SQLSTATE 55P03)"))
+
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Aborted, st.Code())
+
+	var reason string
+	var retryInfo *errdetails.RetryInfo
+	for _, d := range st.Details() {
+		switch v := d.(type) {
+		case *errdetails.ErrorInfo:
+			reason = v.GetReason()
+		case *errdetails.RetryInfo:
+			retryInfo = v
+		}
+	}
+	assert.Equal(t, ReasonAbortedLockConflict, reason)
+	require.NotNil(t, retryInfo, "AbortedLockConflict must carry a RetryInfo detail")
+}
+
 func TestErrorInterceptor_NoError_ReturnsValue(t *testing.T) {
 	serverInfo := &grpc.UnaryServerInfo{FullMethod: "/spark.SparkService/SomeMethod"}
 	okHandler := func(_ context.Context, _ any) (any, error) {
