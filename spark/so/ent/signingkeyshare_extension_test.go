@@ -191,6 +191,168 @@ func TestPrepareSigningKeyshareCreateWithSecret_UsesEphemeralWithoutDualWriteWhe
 	require.True(t, resolvedSecret.Equals(secret))
 }
 
+func buildNewSigningKeyshareCreates(t *testing.T, client *ent.Client, n int) ([]*ent.SigningKeyshareCreate, []uuid.UUID, []keys.Private) {
+	t.Helper()
+	creates := make([]*ent.SigningKeyshareCreate, 0, n)
+	ids := make([]uuid.UUID, 0, n)
+	secrets := make([]keys.Private, 0, n)
+	for range n {
+		id := uuid.New()
+		secret := keys.GeneratePrivateKey()
+		pubSource := keys.GeneratePrivateKey()
+		creates = append(creates, client.SigningKeyshare.Create().
+			SetID(id).
+			SetStatus(st.KeyshareStatusAvailable).
+			SetPublicShares(map[string]keys.Public{"1": pubSource.Public()}).
+			SetPublicKey(pubSource.Public()).
+			SetMinSigners(1).
+			SetCoordinatorIndex(0))
+		ids = append(ids, id)
+		secrets = append(secrets, secret)
+	}
+	return creates, ids, secrets
+}
+
+// These tests exercise ent.PrepareSigningKeyshareCreatesWithSecrets directly, the same boundary the
+// sibling single-key PrepareSigningKeyshareCreateWithSecret tests use. They target the secret-storage
+// contract (ephemeral vs. main column, version assignment) and the main-tx rollback cleanup invariant
+// for keyshare secrets — security-sensitive transaction-lifecycle behavior that the full DKG flow
+// (covered end-to-end in so/grpc_test) cannot observe from its public surface.
+func TestPrepareSigningKeyshareCreatesWithSecrets_UsesEphemeralAndDualWritesWhenEnabled(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	creates, ids, secrets := buildNewSigningKeyshareCreates(t, tc.Client, 3)
+	creates, err := ent.PrepareSigningKeyshareCreatesWithSecrets(ctx, creates, ids, secrets)
+	require.NoError(t, err)
+	require.NoError(t, tc.Client.SigningKeyshare.CreateBulk(creates...).Exec(ctx))
+
+	for i, id := range ids {
+		created, err := tc.Client.SigningKeyshare.Get(ctx, id)
+		require.NoError(t, err)
+		require.NotNil(t, created.SecretVersion)
+		require.Equal(t, int32(0), *created.SecretVersion)
+		require.NotNil(t, created.SecretShare)
+		require.Equal(t, secrets[i], *created.SecretShare)
+
+		ephemeralSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, id, 0)
+		require.NoError(t, err)
+		require.True(t, ephemeralSecret.SecretShare.Equals(secrets[i]))
+	}
+}
+
+func TestPrepareSigningKeyshareCreatesWithSecrets_UsesEphemeralWithoutDualWriteWhenDisabled(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 0,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	creates, ids, secrets := buildNewSigningKeyshareCreates(t, tc.Client, 3)
+	creates, err := ent.PrepareSigningKeyshareCreatesWithSecrets(ctx, creates, ids, secrets)
+	require.NoError(t, err)
+	require.NoError(t, tc.Client.SigningKeyshare.CreateBulk(creates...).Exec(ctx))
+
+	for i, id := range ids {
+		created, err := tc.Client.SigningKeyshare.Get(ctx, id)
+		require.NoError(t, err)
+		require.NotNil(t, created.SecretVersion)
+		require.Equal(t, int32(0), *created.SecretVersion)
+		require.Nil(t, created.SecretShare)
+
+		require.NoError(t, ent.HydrateSigningKeyshareSecrets(ctx, []*ent.SigningKeyshare{created}))
+		resolved, err := created.GetSecretShare(ctx)
+		require.NoError(t, err)
+		require.True(t, resolved.Equals(secrets[i]))
+	}
+}
+
+func TestPrepareSigningKeyshareCreatesWithSecrets_MainRollbackCleansUpEphemeralVersions(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 100,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	// Build and create the keyshares through the request's tx-bound client (as the DKG store does),
+	// so the rollback below actually discards the main rows.
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	creates, ids, secrets := buildNewSigningKeyshareCreates(t, txClient, 3)
+	creates, err = ent.PrepareSigningKeyshareCreatesWithSecrets(ctx, creates, ids, secrets)
+	require.NoError(t, err)
+	require.NoError(t, txClient.SigningKeyshare.CreateBulk(creates...).Exec(ctx))
+
+	for i, id := range ids {
+		ephemeralSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, id, 0)
+		require.NoError(t, err)
+		require.True(t, ephemeralSecret.SecretShare.Equals(secrets[i]))
+	}
+
+	mainTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, mainTx.Rollback())
+
+	// The main keyshares were never committed, so the rollback cleanup re-reads main, finds them
+	// absent, and deletes the now-orphaned ephemeral versions.
+	for _, id := range ids {
+		_, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, id, 0)
+		require.ErrorIs(t, err, entephemeral.ErrNoSecretVersion)
+	}
+}
+
+func TestPrepareSigningKeyshareCreatesWithSecrets_AmbiguousCommitPreservesEphemeralVersions(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	// Dual-write off is the worst case: the secret lives only in the ephemeral store, so an
+	// erroneous rollback cleanup would be unrecoverable signing-material loss.
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 0,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	txClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	creates, ids, secrets := buildNewSigningKeyshareCreates(t, txClient, 3)
+	creates, err = ent.PrepareSigningKeyshareCreatesWithSecrets(ctx, creates, ids, secrets)
+	require.NoError(t, err)
+	require.NoError(t, txClient.SigningKeyshare.CreateBulk(creates...).Exec(ctx))
+
+	// Simulate the ambiguous-commit case: the main tx actually commits, then the middleware still
+	// attempts a rollback (e.g. Commit() returned an error after the rows persisted). Tx.Rollback runs
+	// the cleanup hook unconditionally, and it must see the committed keyshares (which reference
+	// ephemeral version 0) and preserve their secrets.
+	mainTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, mainTx.Commit())
+	_ = mainTx.Rollback() // fires the cleanup hook; the driver rollback errors (already committed) and is ignored
+
+	for i, id := range ids {
+		ephemeralSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, id, 0)
+		require.NoError(t, err, "secret for committed keyshare %s must be preserved", id)
+		require.True(t, ephemeralSecret.SecretShare.Equals(secrets[i]))
+	}
+}
+
+func TestPrepareSigningKeyshareCreatesWithSecrets_FallsBackToMainDBWhenEphemeralUnavailable(t *testing.T) {
+	ctx, tc := db.NewTestSQLiteContext(t)
+
+	creates, ids, secrets := buildNewSigningKeyshareCreates(t, tc.Client, 3)
+	creates, err := ent.PrepareSigningKeyshareCreatesWithSecrets(ctx, creates, ids, secrets)
+	require.NoError(t, err)
+	require.NoError(t, tc.Client.SigningKeyshare.CreateBulk(creates...).Exec(ctx))
+
+	for i, id := range ids {
+		created, err := tc.Client.SigningKeyshare.Get(ctx, id)
+		require.NoError(t, err)
+		require.NotNil(t, created.SecretShare)
+		require.Equal(t, secrets[i], *created.SecretShare)
+		require.Nil(t, created.SecretVersion)
+	}
+}
+
 func TestHydrateSigningKeyshareSecrets_HydratesDuplicatePointersForSameID(t *testing.T) {
 	ctx, tc := db.ConnectToTestPostgres(t)
 	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{

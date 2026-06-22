@@ -296,40 +296,48 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		return err
 	}
 
-	signingKeyshares := make([]*ent.SigningKeyshareCreate, 0, len(response.GetKeyPackages()))
+	keyPackages := response.GetKeyPackages()
 	ctx = ent.FreezeSigningKeyshareSecretDualWriteDecision(ctx)
-	for i, kp := range response.GetKeyPackages() {
+
+	signingKeyshares := make([]*ent.SigningKeyshareCreate, 0, len(keyPackages))
+	keyshareIDs := make([]uuid.UUID, 0, len(keyPackages))
+	secretShares := make([]keys.Private, 0, len(keyPackages))
+	for i, keyPackage := range keyPackages {
 		keyID := deriveKeyIndex(batchID, uint16(i))
 
-		publicShares, err := keys.ParsePublicKeyMap(kp.GetPublicShares())
+		publicShares, err := keys.ParsePublicKeyMap(keyPackage.GetPublicShares())
 		if err != nil {
 			return err
 		}
-		publicKey, err := keys.ParsePublicKey(kp.GetPublicKey())
+		publicKey, err := keys.ParsePublicKey(keyPackage.GetPublicKey())
 		if err != nil {
 			return err
 		}
-		secretShare, err := keys.ParsePrivateKey(kp.GetSecretShare())
+		secretShare, err := keys.ParsePrivateKey(keyPackage.GetSecretShare())
 		if err != nil {
 			return err
 		}
 
-		create := db.SigningKeyshare.Create().
+		signingKeyshares = append(signingKeyshares, db.SigningKeyshare.Create().
 			SetID(keyID).
 			SetStatus(startingStatus).
 			SetMinSigners(int32(s.MinSigners)).
 			SetPublicShares(publicShares).
 			SetPublicKey(publicKey).
-			SetCoordinatorIndex(s.CoordinatorIndex)
-		create, err = ent.PrepareSigningKeyshareCreateWithSecret(ctx, create, keyID, secretShare)
-		if err != nil {
-			return err
-		}
-		signingKeyshares = append(signingKeyshares, create)
+			SetCoordinatorIndex(s.CoordinatorIndex))
+		keyshareIDs = append(keyshareIDs, keyID)
+		secretShares = append(secretShares, secretShare)
 	}
 
-	err = db.SigningKeyshare.CreateBulk(signingKeyshares...).Exec(ctx)
+	// Persist all keyshare secrets to the ephemeral store in a single bulk insert rather than once
+	// per key. Brand-new keyshare IDs have no prior secret version, so the per-key version lookup and
+	// advisory locking are unnecessary.
+	signingKeyshares, err = ent.PrepareSigningKeyshareCreatesWithSecrets(ctx, signingKeyshares, keyshareIDs, secretShares)
 	if err != nil {
+		return err
+	}
+
+	if err := db.SigningKeyshare.CreateBulk(signingKeyshares...).Exec(ctx); err != nil {
 		return err
 	}
 
