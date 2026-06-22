@@ -160,6 +160,41 @@ func GetOrCreateSigningKeyshareSecretVersion(
 	return secret, nil
 }
 
+// CreateSigningKeyshareSecretVersionsBulk inserts one secret version per (signingKeyshareID,
+// secretShare) pair at the given version in a single bulk INSERT. Unlike
+// CreateSigningKeyshareSecretVersion it does NOT acquire per-keyshare advisory locks and does NOT
+// look up an existing version, so callers MUST only use it for freshly created keyshare IDs that
+// cannot already have a secret version (e.g. DKG output). A duplicate (signingKeyshareID, version)
+// pair returns a constraint error (check with IsConstraintError). signingKeyshareIDs and
+// secretShares must be the same length and aligned by index.
+func CreateSigningKeyshareSecretVersionsBulk(
+	ctx context.Context,
+	signingKeyshareIDs []uuid.UUID,
+	version int32,
+	secretShares []keys.Private,
+) error {
+	if len(signingKeyshareIDs) != len(secretShares) {
+		return fmt.Errorf("mismatched lengths: ids=%d secrets=%d", len(signingKeyshareIDs), len(secretShares))
+	}
+	if len(signingKeyshareIDs) == 0 {
+		return nil
+	}
+
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	builders := make([]*SigningKeyshareSecretCreate, len(signingKeyshareIDs))
+	for i, id := range signingKeyshareIDs {
+		builders[i] = tx.SigningKeyshareSecret.Create().
+			SetSigningKeyshareID(id).
+			SetVersion(version).
+			SetSecretShare(secretShares[i])
+	}
+	return tx.SigningKeyshareSecret.CreateBulk(builders...).Exec(ctx)
+}
+
 func AddSigningKeyshareSecretVersion(
 	ctx context.Context,
 	signingKeyshareID uuid.UUID,

@@ -449,6 +449,247 @@ func PrepareSigningKeyshareCreateWithSecret(
 	return create, nil
 }
 
+// newKeyshareSecretVersion is the secret version assigned to brand-new keyshares. Freshly generated
+// keyshare IDs have no prior secret version, so their first (and at creation, only) version is 0.
+const newKeyshareSecretVersion int32 = 0
+
+// PrepareSigningKeyshareCreatesWithSecrets is the batched form of PrepareSigningKeyshareCreateWithSecret
+// for freshly generated keyshares (e.g. DKG output). All keyshare IDs MUST be new: secrets are written
+// at version 0 with a single bulk insert and without per-keyshare advisory locks, which is safe only
+// because brand-new IDs cannot contend with concurrent versioning or collide with an existing version.
+// The creates, ids, and secretShares must be the same length and aligned by index.
+//
+// Batch callers must freeze the dual-write rollout decision once via
+// FreezeSigningKeyshareSecretDualWriteDecision so every keyshare in the batch makes the same choice.
+func PrepareSigningKeyshareCreatesWithSecrets(
+	ctx context.Context,
+	creates []*SigningKeyshareCreate,
+	ids []uuid.UUID,
+	secretShares []keys.Private,
+) ([]*SigningKeyshareCreate, error) {
+	if len(creates) != len(ids) || len(ids) != len(secretShares) {
+		return nil, fmt.Errorf(
+			"mismatched lengths: creates=%d ids=%d secrets=%d",
+			len(creates), len(ids), len(secretShares),
+		)
+	}
+	if len(creates) == 0 {
+		return creates, nil
+	}
+
+	useEphemeral, err := bulkCreateEphemeralSecretVersionsForNewKeyshares(ctx, ids, secretShares)
+	if err != nil {
+		return nil, err
+	}
+
+	dualWrite := shouldDualWriteSigningKeyshareSecret(ctx)
+	for i, create := range creates {
+		if useEphemeral {
+			create.SetSecretVersion(newKeyshareSecretVersion)
+		}
+		if !useEphemeral || dualWrite {
+			create.SetSecretShare(secretShares[i])
+		}
+	}
+	return creates, nil
+}
+
+// bulkCreateEphemeralSecretVersionsForNewKeyshares writes version-0 secrets for brand-new keyshares
+// to the ephemeral store in a single bulk insert, mirroring prepareSigningKeyshareSecretRotation's
+// crash-safety contract for the create case. It returns useEphemeral=false (and writes nothing) when
+// no ephemeral transaction provider is configured, so the caller stores the secret in the main column.
+//
+// On success it registers a main-tx rollback hook that re-reads committed main state and deletes only
+// the ephemeral versions main does not reference (see cleanupNewKeyshareSecretVersionsAfterMainOutcome);
+// no commit-time cleanup is needed because brand-new keyshares have no prior version to retire.
+func bulkCreateEphemeralSecretVersionsForNewKeyshares(
+	ctx context.Context,
+	ids []uuid.UUID,
+	secretShares []keys.Private,
+) (bool, error) {
+	ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
+	if err != nil {
+		if errors.Is(err, entephemeral.ErrNoTransactionProvider) {
+			return false, nil
+		}
+		return false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = ephemeralTx.Rollback()
+		}
+	}()
+
+	if err := entephemeral.CreateSigningKeyshareSecretVersionsBulk(ctx, ids, newKeyshareSecretVersion, secretShares); err != nil {
+		return false, err
+	}
+	if err := ephemeralTx.Commit(); err != nil {
+		return false, err
+	}
+	committed = true
+
+	// Cleanup must not inherit request cancellation, or rollback hooks can leave orphaned versions.
+	cleanupCtx := context.WithoutCancel(ctx)
+
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		// No main transaction, so the keyshares were never written to main. Re-read committed main
+		// state (best effort) and delete the now-orphaned ephemeral versions.
+		mainDB, mainDBErr := GetDbFromContext(ctx)
+		if mainDBErr != nil {
+			mainDB = nil
+		}
+		cleanupNewKeyshareSecretVersionsAfterMainOutcome(cleanupCtx, mainDB, ids, "main tx unavailable after ephemeral bulk commit")
+		return false, err
+	}
+
+	mainDBForCleanup, err := nonTransactionalClientFromTx(tx)
+	if err != nil {
+		// Without a main DB client we cannot tell committed keyshares apart from rolled-back ones, so
+		// preserve every version and let the dangling-secret purge cron reclaim any orphans rather than
+		// risk deleting live signing material.
+		recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "main_read_failed")
+		logging.GetLoggerFromContext(cleanupCtx).With(zap.Error(err)).Sugar().Warnf(
+			"signing keyshare secret bulk cleanup will preserve all %d versions because main DB client could not be prepared",
+			len(ids),
+		)
+		return true, nil
+	}
+
+	tx.OnRollback(func(fn Rollbacker) Rollbacker {
+		return RollbackFunc(func(ctx context.Context, tx *Tx) error {
+			err := fn.Rollback(ctx, tx)
+			cleanupNewKeyshareSecretVersionsAfterMainOutcome(cleanupCtx, mainDBForCleanup, ids, "main tx rollback")
+			return err
+		})
+	})
+
+	return true, nil
+}
+
+// cleanupNewKeyshareSecretVersionsAfterMainOutcome deletes the version-0 ephemeral secrets written for
+// a brand-new keyshare batch, but only for IDs the committed main DB does not reference at version 0.
+// This guards the ambiguous-commit case: if the main Commit() reports an error after the rows actually
+// persisted, the main-tx rollback hook still fires, and an unconditional delete would strand the
+// secret_version pointer of committed keyshares (unrecoverable when dual-write is off). IDs whose main
+// row is absent (a genuine rollback) are unreferenced, so their orphaned ephemeral rows are deleted; if
+// main state cannot be read, nothing is deleted and the dangling-secret purge cron reclaims any orphans.
+func cleanupNewKeyshareSecretVersionsAfterMainOutcome(
+	ctx context.Context,
+	mainDB *Client,
+	ids []uuid.UUID,
+	reason string,
+) {
+	if len(ids) == 0 {
+		return
+	}
+	logger := logging.GetLoggerFromContext(ctx)
+	if mainDB == nil {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
+		logger.Sugar().Warnf(
+			"skipping cleanup of %d new keyshare secrets after %s because main DB is unavailable",
+			len(ids), reason,
+		)
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), signingKeyshareSecretCleanupMainReadTimeout)
+	defer cancel()
+
+	committedKeyshares, err := mainDB.SigningKeyshare.Query().
+		Where(signingkeyshare.IDIn(ids...)).
+		Select(signingkeyshare.FieldID, signingkeyshare.FieldSecretVersion).
+		All(readCtx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"skipping cleanup of %d new keyshare secrets after %s because main state could not be read",
+			len(ids), reason,
+		)
+		return
+	}
+
+	referencesNewVersion := make(map[uuid.UUID]struct{}, len(committedKeyshares))
+	for _, keyshare := range committedKeyshares {
+		if keyshare.SecretVersion != nil && *keyshare.SecretVersion == newKeyshareSecretVersion {
+			referencesNewVersion[keyshare.ID] = struct{}{}
+		}
+	}
+
+	toDelete := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := referencesNewVersion[id]; !ok {
+			toDelete = append(toDelete, id)
+		}
+	}
+	if len(toDelete) == 0 {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_new")
+		return
+	}
+
+	recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_old_or_other")
+	if !deleteSigningKeyshareSecretVersionsBestEffort(ctx, toDelete, newKeyshareSecretVersion, reason) {
+		recordSigningKeyshareSecretCleanupOutcome(ctx, "delete_new_failed")
+	}
+}
+
+// deleteSigningKeyshareSecretVersionsBestEffort deletes the given version for all provided keyshare
+// IDs in a single statement, on its own ephemeral transaction. It is the bulk analog of
+// deleteSigningKeyshareSecretVersionBestEffort and is used for rollback cleanup, so failures are
+// logged and counted rather than returned.
+func deleteSigningKeyshareSecretVersionsBestEffort(ctx context.Context, signingKeyshareIDs []uuid.UUID, version int32, reason string) bool {
+	if len(signingKeyshareIDs) == 0 {
+		return true
+	}
+	logger := logging.GetLoggerFromContext(ctx)
+
+	ephemeralDB, err := entephemeral.GetDbFromContext(ctx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "get_db", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to get ephemeral db client to cleanup %d signing keyshare secrets version %d (%s)",
+			len(signingKeyshareIDs), version, reason,
+		)
+		return false
+	}
+
+	ephemeralTx, err := ephemeralDB.Tx(ctx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "begin_tx", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to begin ephemeral cleanup tx for %d signing keyshare secrets version %d (%s)",
+			len(signingKeyshareIDs), version, reason,
+		)
+		return false
+	}
+	defer func() { _ = ephemeralTx.Rollback() }()
+
+	if _, err := ephemeralTx.SigningKeyshareSecret.Delete().
+		Where(
+			signingkeysharesecret.SigningKeyshareIDIn(signingKeyshareIDs...),
+			signingkeysharesecret.VersionEQ(version),
+		).
+		Exec(ctx); err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "delete", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to delete %d signing keyshare secrets version %d (%s)",
+			len(signingKeyshareIDs), version, reason,
+		)
+		return false
+	}
+
+	if err := ephemeralTx.Commit(); err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "commit", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to commit ephemeral cleanup tx for %d signing keyshare secrets version %d (%s)",
+			len(signingKeyshareIDs), version, reason,
+		)
+		return false
+	}
+	return true
+}
+
 // GetSecretShare returns the secret share for this keyshare using the following order:
 // 1) signing_keyshares.secret_share, 2) preloaded ExternalSecret, 3) ephemeral secret store lookup by secret_version.
 func (sk *SigningKeyshare) GetSecretShare(ctx context.Context) (*keys.Private, error) {
