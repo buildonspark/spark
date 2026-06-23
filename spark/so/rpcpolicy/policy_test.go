@@ -126,6 +126,11 @@ func TestLookupBehavior(t *testing.T) {
 			method:       "/grpc.health.v1.Health/Check",
 			wantAuthMode: AuthUnauthenticated,
 		},
+		{
+			name:         "partner basic-auth query",
+			method:       pbpartner.SparkPartnerService_QuerySparkTransactionVolumes_FullMethodName,
+			wantAuthMode: AuthPartnerBasic,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -133,10 +138,21 @@ func TestLookupBehavior(t *testing.T) {
 			require.True(t, ok, "policy must exist for %s", tc.method)
 			assert.Equal(t, tc.wantAuthMode, p.AuthMode)
 			assert.Equal(t, tc.wantInternalOnly, p.InternalOnly)
-			assert.Equal(t, tc.wantAuthMode != AuthUnauthenticated, IsAuthenticated(tc.method))
+			// Only AuthSession requires a session token; AuthPartnerBasic is authenticated downstream.
+			assert.Equal(t, tc.wantAuthMode == AuthSession, IsAuthenticated(tc.method))
 			assert.Equal(t, tc.wantInternalOnly, IsInternalOnly(tc.method))
 		})
 	}
+}
+
+// TestSparkPartnerServiceIsUnaryOnly guards the AuthPartnerBasic streaming footgun: Basic Auth is
+// enforced only on the unary interceptor chain, so a streaming SparkPartnerService method would be
+// effectively unauthenticated. If a streaming RPC is ever added here, this fails until the auth model
+// is extended to cover it.
+func TestSparkPartnerServiceIsUnaryOnly(t *testing.T) {
+	require.Empty(t, pbpartner.SparkPartnerService_ServiceDesc.Streams,
+		"SparkPartnerService must stay unary-only: AuthPartnerBasic is enforced only on the unary chain "+
+			"(BasicAuthInterceptor), so a streaming method would skip Basic Auth verification")
 }
 
 func TestUnknownMethodFailsClosed(t *testing.T) {
