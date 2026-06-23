@@ -764,6 +764,9 @@ func main() {
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+			// SparkPartnerService is AuthPartnerBasic in rpcpolicy (no session token); this
+			// interceptor enforces its HTTP Basic Auth and is a no-op for all other services.
+			partner.NewBasicAuthInterceptor(dbClient).UnaryServerInterceptor,
 			partner.NewInterceptor(dbClient).KnobGatedInterceptor(knobsService),
 			// Concurrency and rate limiting after authentication so pubkey is available for rate limiting
 			// but before DB session.

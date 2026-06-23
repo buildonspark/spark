@@ -33,6 +33,15 @@ const (
 	// AuthUnauthenticated skips session-token verification. Use only for public discovery RPCs or for internal RPCs
 	// that rely on IP allowlisting instead of session auth.
 	AuthUnauthenticated
+	// AuthPartnerBasic means the method is authenticated, but via HTTP Basic Auth rather than a session token. The
+	// authn interceptor does not require a session token (so the "Basic …" credential passes through); the credential
+	// itself is verified downstream by partner.BasicAuthInterceptor against partner_keys.basic_auth_secret_hash.
+	//
+	// IMPORTANT: BasicAuthInterceptor is on the UNARY chain only. A *streaming* AuthPartnerBasic method would skip
+	// session auth (StreamAuthnInterceptor also consults IsAuthenticated) yet never have its Basic credential verified
+	// — i.e. effectively unauthenticated. Keep AuthPartnerBasic methods unary-only; TestSparkPartnerServiceIsUnaryOnly
+	// enforces this.
+	AuthPartnerBasic
 )
 
 // Policy is the per-method declarative policy.
@@ -63,10 +72,14 @@ func LookUp(fullMethod string) (Policy, bool) {
 }
 
 // IsAuthenticated reports whether the authn interceptor should require session-token enforcement for the method.
-// Unknown methods default to requiring a session, and fail closed if someone forgets to register a new RPC.
+// AuthUnauthenticated and AuthPartnerBasic are the only modes that don't use a session token (the latter is
+// authenticated downstream by its own interceptor); every other mode — including any future AuthMode and any
+// unregistered method — fails closed and requires a session.
 func IsAuthenticated(fullMethod string) bool {
 	p, ok := LookUp(fullMethod)
-	return !ok || p.AuthMode != AuthUnauthenticated
+	// Fail closed for unregistered methods; explicitly exclude the two modes that don't use session
+	// tokens so any future AuthMode defaults to requiring a session.
+	return !ok || (p.AuthMode != AuthUnauthenticated && p.AuthMode != AuthPartnerBasic)
 }
 
 // IsInternalOnly reports whether the authz interceptor should require a VPC-internal or allowlisted peer IP for the
@@ -101,13 +114,12 @@ func sparkAuthnPolicies() map[string]Policy {
 	}
 }
 
-// sparkPartnerServicePolicies covers the external partner-facing read API. The endpoint currently returns
-// Unimplemented; this PR introduces the service surface only. It's marked AuthUnauthenticated for now so it is
-// reachable without a session token — a follow-up PR introduces HTTP Basic Auth (verified by its own interceptor)
-// and tightens this to a dedicated auth mode. It is not InternalOnly: partners reach it from outside the VPC.
+// sparkPartnerServicePolicies covers the external partner-facing read API. It's authenticated via HTTP Basic
+// Auth (AuthPartnerBasic), enforced by partner.BasicAuthInterceptor against partner_keys.basic_auth_secret_hash
+// rather than a session token. It is not InternalOnly: partners reach it from outside the VPC.
 func sparkPartnerServicePolicies() map[string]Policy {
 	return map[string]Policy{
-		pbpartner.SparkPartnerService_QuerySparkTransactionVolumes_FullMethodName: {AuthMode: AuthUnauthenticated},
+		pbpartner.SparkPartnerService_QuerySparkTransactionVolumes_FullMethodName: {AuthMode: AuthPartnerBasic},
 	}
 }
 

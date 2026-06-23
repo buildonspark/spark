@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"fmt"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -42,13 +43,19 @@ type contextKey string
 const partnerContextKey = contextKey("partner_info")
 
 // PartnerInfo holds the verified partner identity extracted from a JWT.
+//
+// It is present in the context only when a valid partner JWT (or, for SparkPartnerService, a valid
+// Basic Auth credential) was supplied. When there is no JWT, or the JWT is invalid, PartnerInfo is
+// simply absent: traffic attribution is skipped, but the request is not blocked — the flow proceeds
+// unattributed (see PartnerJWTInterceptor).
 type PartnerInfo struct {
-	// PartnerDBID is the UUID primary key of the partners row (for transfer attribution).
-	// Empty when label is absent or label lookup/creation failed.
+	// PartnerDBID is the UUID primary key of the partners row, used for transfer
+	// attribution. Set by the partner JWT interceptor; empty for Basic Auth, which
+	// identifies only the partner_id and not a specific label/partners row.
 	PartnerDBID uuid.UUID
-	// PartnerID is the partner identifier (JWT "iss" claim).
+	// PartnerID is the partner identifier (JWT "iss" claim, or the Basic Auth username).
 	PartnerID string
-	// Label is the partner label (JWT "sub" claim).
+	// Label is the partner label (JWT "sub" claim) used for traffic attribution.
 	Label string
 }
 
@@ -89,8 +96,14 @@ func newInterceptorWithLookups(
 
 // KnobGatedInterceptor returns a UnaryServerInterceptor that only runs the partner JWT
 // check when the KnobEnablePartnerJWT knob is enabled; otherwise it passes through.
+//
+// SparkPartnerService methods are always skipped: that service authenticates via HTTP
+// Basic Auth (BasicAuthInterceptor), so partner JWTs never authorize it.
 func (i *Interceptor) KnobGatedInterceptor(knobsService knobs.Knobs) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if strings.HasPrefix(info.FullMethod, SparkPartnerServiceMethodPrefix) {
+			return handler(ctx, req)
+		}
 		if knobsService.GetValue(knobs.KnobEnablePartnerJWT, 0) > 0 {
 			return i.PartnerJWTInterceptor(ctx, req, info, handler)
 		}
