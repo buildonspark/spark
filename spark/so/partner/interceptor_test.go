@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	jwtkeys "github.com/lightsparkdev/spark/common/keys/jwt"
 	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -178,6 +179,50 @@ func respCtx(t *testing.T, resp any) context.Context {
 }
 
 const testLabel = "client-1"
+
+// --- KnobGatedInterceptor: gating (knob + coordinator) ---
+
+// TestKnobGatedInterceptor_Gating verifies the wrapper runs the inner interceptor only on the
+// coordinator with the knob on. A valid token is present, so attribution lands iff the gate ran.
+func TestKnobGatedInterceptor_Gating(t *testing.T) {
+	priv, pub := makeP256Key(t)
+	partnerID := "partner-a"
+	pkID := uuid.New()
+	dbID := uuid.New()
+	i := makeTestInterceptor(
+		map[string]*testPartnerKeyEntry{partnerID: {pubKey: pub, partnerKeyID: pkID}},
+		map[string]uuid.UUID{pkID.String() + "/" + testLabel: dbID},
+	)
+	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+
+	tests := []struct {
+		name           string
+		knobEnabled    bool
+		isCoordinator  bool
+		wantAttributed bool
+	}{
+		{"coordinator with knob on runs attribution", true, true, true},
+		{"non-coordinator passes through", true, false, false},
+		{"knob off passes through", false, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			knobValue := 0.0
+			if tt.knobEnabled {
+				knobValue = 1
+			}
+			k := knobs.NewFixedKnobs(map[string]float64{knobs.KnobEnablePartnerJWT: knobValue})
+			gated := i.KnobGatedInterceptor(k, tt.isCoordinator)
+
+			ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
+			resp, err := gated(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+			require.NoError(t, err)
+
+			_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+			assert.Equal(t, tt.wantAttributed, ok)
+		})
+	}
+}
 
 // --- ES256 (P-256) interceptor tests ---
 
