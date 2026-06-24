@@ -90,7 +90,11 @@ type QuerySparkTransactionVolumesRequest struct {
 	TransactionTypes []SparkTransactionType `protobuf:"varint,3,rep,packed,name=transaction_types,json=transactionTypes,proto3,enum=spark_partner.SparkTransactionType" json:"transaction_types,omitempty"`
 	// If unset, results include all networks. When set, results are scoped to that
 	// single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
-	Network       *spark.Network `protobuf:"varint,4,opt,name=network,proto3,enum=spark.Network,oneof" json:"network,omitempty"`
+	Network *spark.Network `protobuf:"varint,4,opt,name=network,proto3,enum=spark.Network,oneof" json:"network,omitempty"`
+	// Optional partner label (sub-account). If empty, results aggregate across all of
+	// the authenticated partner's labels; if set, results are scoped to that label.
+	// Always scoped to the authenticated partner_id regardless of this value.
+	Label         string `protobuf:"bytes,5,opt,name=label,proto3" json:"label,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -151,6 +155,13 @@ func (x *QuerySparkTransactionVolumesRequest) GetNetwork() spark.Network {
 		return *x.Network
 	}
 	return spark.Network(0)
+}
+
+func (x *QuerySparkTransactionVolumesRequest) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
 }
 
 type SparkTransactionVolume struct {
@@ -309,7 +320,7 @@ var File_spark_partner_proto protoreflect.FileDescriptor
 
 const file_spark_partner_proto_rawDesc = "" +
 	"\n" +
-	"\x13spark_partner.proto\x12\rspark_partner\x1a\vspark.proto\x1a\x17validate/validate.proto\"\xd9\x02\n" +
+	"\x13spark_partner.proto\x12\rspark_partner\x1a\vspark.proto\x1a\x17validate/validate.proto\"\xf9\x02\n" +
 	"#QuerySparkTransactionVolumesRequest\x12E\n" +
 	"\n" +
 	"start_date\x18\x01 \x01(\tB&\xfaB#r!2\x1c^[0-9]{4}-[0-9]{2}-[0-9]{2}$\x98\x01\n" +
@@ -318,7 +329,8 @@ const file_spark_partner_proto_rawDesc = "" +
 	"R\aendDate\x12a\n" +
 	"\x11transaction_types\x18\x03 \x03(\x0e2#.spark_partner.SparkTransactionTypeB\x0f\xfaB\f\x92\x01\t\"\a\x82\x01\x04\x10\x01 \x00R\x10transactionTypes\x129\n" +
 	"\anetwork\x18\x04 \x01(\x0e2\x0e.spark.NetworkB\n" +
-	"\xfaB\a\x82\x01\x04\x10\x01 \x00H\x00R\anetwork\x88\x01\x01B\n" +
+	"\xfaB\a\x82\x01\x04\x10\x01 \x00H\x00R\anetwork\x88\x01\x01\x12\x1e\n" +
+	"\x05label\x18\x05 \x01(\tB\b\xfaB\x05r\x03\x18\xff\x01R\x05labelB\n" +
 	"\n" +
 	"\b_network\"\xb6\x01\n" +
 	"\x16SparkTransactionVolume\x12N\n" +

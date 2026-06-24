@@ -33,6 +33,10 @@ message QuerySparkTransactionVolumesRequest {
     // If unset, results include all networks. When set, results are scoped to that
     // single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
     optional spark.Network network = 4 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+    // Optional partner label (sub-account). If empty, results aggregate across all of
+    // the authenticated partner's labels; if set, results are scoped to that label.
+    // Always scoped to the authenticated partner_id regardless of this value.
+    string label = 5 [(validate.rules).string = {max_len: 255}];
 }
 
 message SparkTransactionVolume {

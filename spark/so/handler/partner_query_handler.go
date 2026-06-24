@@ -23,7 +23,8 @@ func NewPartnerQueryHandler(rwClient *partner.RisingWaveClient) *PartnerQueryHan
 }
 
 // QuerySparkTransactionVolumes returns aggregated transaction volumes for the
-// authenticated partner. Requires a valid partner JWT in the request context.
+// authenticated partner. The partner identity must be present in the request context,
+// populated by the HTTP Basic Auth interceptor on SparkPartnerService.
 func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	ctx context.Context,
 	req *pbpartner.QuerySparkTransactionVolumesRequest,
@@ -35,7 +36,7 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	pInfo, ok := partner.GetPartnerInfoFromContext(ctx)
 	if !ok {
 		return nil, sparkerrors.PermissionDeniedNoReadAccess(
-			fmt.Errorf("partner JWT required for transaction volume queries"),
+			fmt.Errorf("partner authentication required for transaction volume queries"),
 		)
 	}
 
@@ -86,7 +87,7 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 	}
 
 	rows, err := h.rwClient.QueryTransactionVolumes(
-		ctx, pInfo.PartnerID, pInfo.Label, start, end, txTypeFilter, networkFilter,
+		ctx, pInfo.PartnerID, req.GetLabel(), start, end, txTypeFilter, networkFilter,
 	)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(
@@ -110,7 +111,7 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 
 	return &pbpartner.QuerySparkTransactionVolumesResponse{
 		PartnerId:             pInfo.PartnerID,
-		Label:                 pInfo.Label,
+		Label:                 req.GetLabel(),
 		StartDate:             req.GetStartDate(),
 		EndDate:               req.GetEndDate(),
 		TransactionTypes:      txTypes,

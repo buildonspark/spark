@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/logging"
@@ -11,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/grpcutil"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/partner"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -50,11 +52,16 @@ func DatabaseSessionMiddleware(
 		sessionCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		// Use read-only session for query_nodes, regular session for everything else
+		// Use a read-only session for read-only endpoints (knob-gated rollout) and always for the
+		// partner-facing read API. A read-only session also makes IdempotencyInterceptor skip the
+		// request, which matters for SparkPartnerService: it authenticates via Basic Auth (no authn
+		// session), so a writable session would cache every partner under the empty idempotency
+		// identity and could return one partner's response to another on a colliding key.
 		knobsService := knobs.GetKnobsService(ctx)
 		var session ent.Session
 		var ephemeralSession entephemeral.Session
-		if knobsService.RolloutRandomTarget(knobs.KnobReadOnlyEndpoints, &info.FullMethod, 0) {
+		isPartnerRead := strings.HasPrefix(info.FullMethod, partner.SparkPartnerServiceMethodPrefix)
+		if isPartnerRead || knobsService.RolloutRandomTarget(knobs.KnobReadOnlyEndpoints, &info.FullMethod, 0) {
 			session = db.NewReadOnlySession(sessionCtx, dbClient, opts...)
 			if ephemeralFactory != nil {
 				ephemeralSession = ephemeralFactory.NewReadOnlySession(sessionCtx, opts...)
