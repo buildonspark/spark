@@ -767,7 +767,7 @@ func main() {
 			// SparkPartnerService is AuthPartnerBasic in rpcpolicy (no session token); this
 			// interceptor enforces its HTTP Basic Auth and is a no-op for all other services.
 			partner.NewBasicAuthInterceptor(dbClient).UnaryServerInterceptor,
-			partner.NewInterceptor(dbClient).KnobGatedInterceptor(knobsService),
+			partner.NewInterceptor(dbClient).KnobGatedInterceptor(knobsService, config.Index == 0), // SO0 (coordinator) only
 			// Concurrency and rate limiting after authentication so pubkey is available for rate limiting
 			// but before DB session.
 			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard, clientInfoProvider, knobsService),

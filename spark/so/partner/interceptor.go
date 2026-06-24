@@ -94,17 +94,15 @@ func newInterceptorWithLookups(
 	}
 }
 
-// KnobGatedInterceptor returns a UnaryServerInterceptor that only runs the partner JWT
-// check when the KnobEnablePartnerJWT knob is enabled; otherwise it passes through.
-//
-// SparkPartnerService methods are always skipped: that service authenticates via HTTP
-// Basic Auth (BasicAuthInterceptor), so partner JWTs never authorize it.
-func (i *Interceptor) KnobGatedInterceptor(knobsService knobs.Knobs) grpc.UnaryServerInterceptor {
+// KnobGatedInterceptor runs the partner JWT check only on the coordinator (SO0,
+// where the partner_keys/partners rows live) when KnobEnablePartnerJWT is on.
+// SparkPartnerService is skipped — it authenticates via Basic Auth, not JWT.
+func (i *Interceptor) KnobGatedInterceptor(knobsService knobs.Knobs, isCoordinator bool) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if strings.HasPrefix(info.FullMethod, SparkPartnerServiceMethodPrefix) {
 			return handler(ctx, req)
 		}
-		if knobsService.GetValue(knobs.KnobEnablePartnerJWT, 0) > 0 {
+		if isCoordinator && knobsService.GetValue(knobs.KnobEnablePartnerJWT, 0) > 0 {
 			return i.PartnerJWTInterceptor(ctx, req, info, handler)
 		}
 		return handler(ctx, req)
