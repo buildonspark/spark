@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.8.7
+
+### Patch Changes
+
+- Remove stale Android frost library artifacts
+- Add native gRPC transport layer for React Native
+- Add timeout to token tranasction RPC calls
+
 ## 0.8.6
 
 ### Patch Changes

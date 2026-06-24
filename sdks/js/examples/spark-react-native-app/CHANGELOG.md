@@ -1,5 +1,13 @@
 # spark-react-native-app
 
+## 0.0.81
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.8.7
+  - @buildonspark/issuer-sdk@0.1.43
+
 ## 0.0.80
 
 ### Patch Changes
