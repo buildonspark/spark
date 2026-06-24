@@ -15,8 +15,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestExitTreesRejectsNilRequest(t *testing.T) {
@@ -42,7 +40,7 @@ func TestExitTreesRejectsNilExitingTreeBeforeDBLookup(t *testing.T) {
 	require.ErrorContains(t, err, "exiting_trees[0] is required")
 }
 
-func TestValidateExitingTreeRejectsAlreadyExitedTreeForSigning(t *testing.T) {
+func TestValidateExitingTreeReportsAlreadyExitedTree(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -87,13 +85,13 @@ func TestValidateExitingTreeRejectsAlreadyExitedTreeForSigning(t *testing.T) {
 	require.NoError(t, err)
 
 	handler := NewSspRequestHandler(&so.Config{})
-	_, err = handler.validateExitingTree(ctx, tree.ID.String(), ownerIdentity)
+	_, reason, err := handler.validateExitingTree(ctx, tree.ID.String(), ownerIdentity)
 
-	require.ErrorContains(t, err, "not eligible for exit signing")
-	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+	require.NoError(t, err)
+	require.Equal(t, pbssp.IneligibleReason_INELIGIBLE_REASON_ALREADY_EXITED, reason)
 }
 
-func TestValidateExitingTreeRejectsTreeWithIneligibleLeaves(t *testing.T) {
+func TestValidateExitingTreeReportsTreeWithIneligibleLeaves(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -142,8 +140,49 @@ func TestValidateExitingTreeRejectsTreeWithIneligibleLeaves(t *testing.T) {
 	require.NoError(t, err)
 
 	handler := NewSspRequestHandler(&so.Config{})
-	_, err = handler.validateExitingTree(ctx, tree.ID.String(), ownerIdentity)
+	_, reason, err := handler.validateExitingTree(ctx, tree.ID.String(), ownerIdentity)
 
-	require.ErrorContains(t, err, "not eligible for exit because of leaves")
-	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+	require.NoError(t, err)
+	require.Equal(t, pbssp.IneligibleReason_INELIGIBLE_REASON_INELIGIBLE_LEAVES, reason)
+}
+
+func TestExitTreesReturnsIneligibleTreesWithoutSigning(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewSspRequestHandler(cfg)
+	ownerIdentity := keys.GeneratePrivateKey().Public()
+
+	// Two already-exited trees: the SOs can't sign either, so ExitTrees should
+	// report both as ineligible rather than erroring, and sign nothing.
+	var exitingTrees []*pb.ExitingTree
+	for range 2 {
+		tree, err := dbTx.Tree.Create().
+			SetID(uuid.New()).
+			SetNetwork(btcnetwork.Regtest).
+			SetStatus(st.TreeStatusExited).
+			SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+			SetVout(0).
+			SetOwnerIdentityPubkey(ownerIdentity).
+			Save(ctx)
+		require.NoError(t, err)
+		exitingTrees = append(exitingTrees, &pb.ExitingTree{TreeId: tree.ID.String()})
+	}
+
+	resp, err := handler.ExitTrees(ctx, &pbssp.ExitTreesRequest{
+		OwnerIdentityPublicKey: ownerIdentity.Serialize(),
+		ExitingTrees:           exitingTrees,
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, resp.GetSigningResults())
+	require.Nil(t, resp.GetSigned())
+	ineligible := resp.GetIneligible()
+	require.NotNil(t, ineligible)
+	require.Len(t, ineligible.GetTrees(), 2)
+	for _, it := range ineligible.GetTrees() {
+		require.Equal(t, pbssp.IneligibleReason_INELIGIBLE_REASON_ALREADY_EXITED, it.GetReason())
+	}
 }
