@@ -1460,8 +1460,7 @@ func waitForConnectedEvent(t *testing.T, stream *mockStream, errCh <-chan error)
 	for {
 		select {
 		case err := <-errCh:
-			require.NoError(t, err, "SubscribeToEvents returned before sending connected event")
-			t.Fatal("SubscribeToEvents returned before sending connected event")
+			t.Fatalf("SubscribeToEvents returned before sending connected event: %v", err)
 		case <-ticker.C:
 			stream.mu.Lock()
 			connected := len(stream.messages) > 0
