@@ -135,6 +135,17 @@ func (m *QuerySparkTransactionVolumesRequest) validate(all bool) error {
 
 	}
 
+	if utf8.RuneCountInString(m.GetLabel()) > 255 {
+		err := QuerySparkTransactionVolumesRequestValidationError{
+			field:  "Label",
+			reason: "value length must be at most 255 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if m.Network != nil {
 
 		if _, ok := _QuerySparkTransactionVolumesRequest_Network_NotInLookup[m.GetNetwork()]; ok {

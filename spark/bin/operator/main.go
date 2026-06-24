@@ -841,6 +841,15 @@ func main() {
 	serverOpts = append(serverOpts, grpc.Creds(creds))
 	grpcServer := grpc.NewServer(serverOpts...)
 
+	// RisingWave client for partner analytics queries (connects lazily; nil when the
+	// --risingwave-database DSN is empty). Owned here and passed in like dbClient.
+	rwClient := partner.NewRisingWaveClient(config.RisingWaveDSN)
+	defer func() {
+		if rwClient != nil {
+			_ = rwClient.Close()
+		}
+	}()
+
 	err = RegisterGrpcServers(
 		grpcServer,
 		args,
@@ -851,6 +860,7 @@ func main() {
 		frostConnection,
 		sessionTokenCreatorVerifier,
 		eventsRouter,
+		rwClient,
 	)
 	if err != nil {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))

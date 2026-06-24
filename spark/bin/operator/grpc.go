@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
+	"github.com/lightsparkdev/spark/so/partner"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -35,6 +36,7 @@ func RegisterGrpcServers(
 	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
 	eventsRouter *events.EventRouter,
+	rwClient *partner.RisingWaveClient,
 ) error {
 	if args.RunningLocally {
 		mockServer := sparkgrpc.NewMockServer(config, dbClient, ephemeralDBClient)
@@ -55,7 +57,7 @@ func RegisterGrpcServers(
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	// Public partner endpoint
-	sparkPartnerServer := sparkgrpc.NewSparkPartnerServer()
+	sparkPartnerServer := sparkgrpc.NewSparkPartnerServer(rwClient)
 	pbpartner.RegisterSparkPartnerServiceServer(grpcServer, sparkPartnerServer)
 
 	// Public SO token endpoint
