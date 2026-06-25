@@ -427,11 +427,11 @@ func validateOutputWithdrawable(
 }
 
 func checkSpendingTransactionAllowsWithdrawal(spentTx *ent.TokenTransaction) error {
+	if spentTx.Status == schematype.TokenTransactionStatusRevealed ||
+		spentTx.Status == schematype.TokenTransactionStatusFinalized {
+		return fmt.Errorf("%w: already spent by finalized transaction", ErrOutputNotWithdrawable)
+	}
 	if err := spentTx.ValidateNotExpired(); err == nil {
-		if spentTx.Status == schematype.TokenTransactionStatusRevealed ||
-			spentTx.Status == schematype.TokenTransactionStatusFinalized {
-			return fmt.Errorf("%w: already spent by finalized transaction", ErrOutputNotWithdrawable)
-		}
 		return fmt.Errorf("%w: spending transaction in progress (status: %s)", ErrOutputNotWithdrawable, spentTx.Status)
 	}
 	return nil
