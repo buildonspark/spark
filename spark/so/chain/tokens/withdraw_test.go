@@ -1344,6 +1344,68 @@ func TestHandleTokenWithdrawals_DuplicateBitcoinVoutOnlyAttemptsOneJusticeBroadc
 	require.Equal(t, 1, outputWithdrawalCount)
 }
 
+func TestHandleTokenWithdrawals_RejectsExpiredTerminalSpendingTransaction(t *testing.T) {
+	for _, status := range []schematype.TokenTransactionStatus{
+		schematype.TokenTransactionStatusRevealed,
+		schematype.TokenTransactionStatusFinalized,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, dbClient, fixtures, config, sePubKey := setupWithdrawalTestContext(t)
+
+			ownerPubKey := keys.GeneratePrivateKey().Public()
+			revocationPrivKey := keys.GeneratePrivateKey()
+			revocationXOnly := revocationPrivKey.Public().SerializeXOnly()
+			revocationCommitment := revocationPrivKey.Public().Serialize()
+
+			sparkTxHash := fixtures.RandomBytes(32)
+			bondSats := uint64(10000)
+			csvBlocks := uint64(1000)
+
+			tokenCreate := fixtures.CreateTokenCreate(btcnetwork.Regtest, nil, nil)
+			terminalSpendingTx, err := dbClient.TokenTransaction.Create().
+				SetPartialTokenTransactionHash(fixtures.RandomBytes(32)).
+				SetFinalizedTokenTransactionHash(fixtures.RandomBytes(32)).
+				SetStatus(status).
+				SetVersion(3).
+				SetClientCreatedTimestamp(time.Now().Add(-2 * time.Hour)).
+				SetValidityDurationSeconds(3600).
+				SetCreate(tokenCreate).
+				Save(ctx)
+			require.NoError(t, err)
+
+			tokenOutput := createTestTokenOutputWithStatus(t, ctx, dbClient, fixtures, sparkTxHash, 0, ownerPubKey, revocationCommitment, bondSats, csvBlocks, schematype.TokenOutputStatusSpentFinalized, terminalSpendingTx)
+			require.NotNil(t, tokenOutput)
+
+			expectedOutput, err := ConstructRevocationCsvTaprootOutput(revocationXOnly, ownerPubKey.SerializeXOnly(), csvBlocks)
+			require.NoError(t, err)
+
+			ownerSignature := make([]byte, 64)
+			withdrawalScript := buildWithdrawalScript(t, sePubKey.Serialize(), ownerSignature, []withdrawalRecord{
+				{bitcoinVout: 0, sparkTxHash: sparkTxHash, sparkTxVout: 0},
+			})
+
+			tx := wire.NewMsgTx(2)
+			tx.AddTxOut(&wire.TxOut{Value: int64(bondSats), PkScript: expectedOutput.ScriptPubKey})
+			tx.AddTxOut(&wire.TxOut{Value: 0, PkScript: withdrawalScript})
+
+			blockHash := chainhash.Hash{}
+			err = HandleTokenWithdrawals(ctx, config, nil, dbClient, []wire.MsgTx{*tx}, btcnetwork.Regtest, 100, blockHash)
+			require.NoError(t, err)
+
+			count, err := dbClient.L1WithdrawalTransaction.Query().Count(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, 0, count)
+
+			updatedOutput, err := dbClient.TokenOutput.Query().
+				Where(tokenoutput.ID(tokenOutput.ID)).
+				WithWithdrawal().
+				Only(ctx)
+			require.NoError(t, err)
+			assert.Nil(t, updatedOutput.Edges.Withdrawal)
+		})
+	}
+}
+
 // Owner signature validation tests
 
 func TestHandleTokenWithdrawals_AcceptsValidOwnerSignature(t *testing.T) {
