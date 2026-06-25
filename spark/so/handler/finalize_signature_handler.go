@@ -462,6 +462,9 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 			return nil, fmt.Errorf("leaf %s does not belong to transfer %s", leafID, transfer.ID.String())
 		}
 	}
+	if err := validateFinalizeNodeSignatureTransferLeafStates(ctx, db, transfer.ID, leafIDs); err != nil {
+		return nil, err
+	}
 
 	receiverCount, err := transfer.QueryTransferReceivers().Count(ctx)
 	if err != nil {
@@ -482,6 +485,28 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 	}
 
 	return updatedTransfer, nil
+}
+
+func validateFinalizeNodeSignatureTransferLeafStates(ctx context.Context, db *ent.Client, transferID uuid.UUID, leafIDs []uuid.UUID) error {
+	leaves, err := db.TreeNode.Query().
+		Where(treenode.IDIn(leafIDs...)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to lock transfer leaves for transfer %s: %w", transferID, err)
+	}
+	if len(leaves) != len(leafIDs) {
+		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("not all transfer leaves found for transfer %s: expected %d, got %d", transferID, len(leafIDs), len(leaves)))
+	}
+	for _, leaf := range leaves {
+		switch leaf.Status {
+		case st.TreeNodeStatusTransferLocked, st.TreeNodeStatusAvailable:
+			continue
+		default:
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s for transfer %s has status %s, expected TRANSFER_LOCKED or AVAILABLE", leaf.ID, transferID, leaf.Status))
+		}
+	}
+	return nil
 }
 
 func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent, requireDirectTx bool) (*pb.TreeNode, *pbinternal.TreeNode, error) {
