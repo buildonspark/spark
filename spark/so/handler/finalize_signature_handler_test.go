@@ -1521,6 +1521,8 @@ func TestVerifyAndUpdateTransfer_UpdatesReceiverStatus(t *testing.T) {
 	receiverPub := keys.GeneratePrivateKey().Public()
 
 	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
+	_, err = node.Update().SetStatus(st.TreeNodeStatusTransferLocked).Save(ctx)
+	require.NoError(t, err)
 
 	transfer, err := dbTx.Transfer.Create().
 		SetSenderIdentityPubkey(senderPub).
@@ -1569,6 +1571,88 @@ func TestVerifyAndUpdateTransfer_UpdatesReceiverStatus(t *testing.T) {
 	require.NotNil(t, updatedReceiver.CompletionTime)
 }
 
+func TestVerifyAndUpdateTransferRejectsNonCompletableLeafStatuses(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusCreating,
+		st.TreeNodeStatusFrozenByIssuer,
+		st.TreeNodeStatusSplitLocked,
+		st.TreeNodeStatusAggregated,
+		st.TreeNodeStatusAggregateLock,
+		st.TreeNodeStatusInvestigation,
+		st.TreeNodeStatusLost,
+		st.TreeNodeStatusRenewLocked,
+	}
+
+	for _, leafStatus := range statuses {
+		t.Run(string(leafStatus), func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			handler := NewFinalizeSignatureHandler(&so.Config{})
+			dbTx, transfer, node, receiverPub := createReceiverRefundSignedTransferForFinalizeTest(t, ctx, leafStatus)
+
+			req := &pb.FinalizeNodeSignaturesRequest{
+				NodeSignatures: []*pb.NodeSignatures{
+					{NodeId: node.ID.String()},
+				},
+				Intent: pbcommon.SignatureIntent_TRANSFER,
+			}
+
+			ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+			_, err := handler.verifyAndUpdateTransfer(ctx, req)
+			require.ErrorContains(t, err, "expected TRANSFER_LOCKED or AVAILABLE")
+
+			updatedTransfer, err := dbTx.Transfer.Get(ctx, transfer.ID)
+			require.NoError(t, err)
+			require.Equal(t, st.TransferStatusReceiverRefundSigned, updatedTransfer.Status)
+
+			updatedLeaf, err := dbTx.TreeNode.Get(ctx, node.ID)
+			require.NoError(t, err)
+			require.Equal(t, leafStatus, updatedLeaf.Status)
+		})
+	}
+}
+
+func TestVerifyAndUpdateTransferAllowsTransferLockedLeaf(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	handler := NewFinalizeSignatureHandler(&so.Config{})
+	_, transfer, node, receiverPub := createReceiverRefundSignedTransferForFinalizeTest(t, ctx, st.TreeNodeStatusTransferLocked)
+
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{NodeId: node.ID.String()},
+		},
+		Intent: pbcommon.SignatureIntent_TRANSFER,
+	}
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, transfer.ID, updatedTransfer.ID)
+	require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
+}
+
+func TestVerifyAndUpdateTransferAllowsAvailableLeaf(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	handler := NewFinalizeSignatureHandler(&so.Config{})
+	dbTx, transfer, node, receiverPub := createReceiverRefundSignedTransferForFinalizeTest(t, ctx, st.TreeNodeStatusAvailable)
+
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{NodeId: node.ID.String()},
+		},
+		Intent: pbcommon.SignatureIntent_TRANSFER,
+	}
+
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, transfer.ID, updatedTransfer.ID)
+	require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
+
+	updatedLeaf, err := dbTx.TreeNode.Get(ctx, node.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TreeNodeStatusAvailable, updatedLeaf.Status)
+}
+
 func TestVerifyAndUpdateTransfer_SkipsAlreadyCompletedReceiver(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 
@@ -1582,6 +1666,8 @@ func TestVerifyAndUpdateTransfer_SkipsAlreadyCompletedReceiver(t *testing.T) {
 	receiverPub := keys.GeneratePrivateKey().Public()
 
 	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
+	_, err = node.Update().SetStatus(st.TreeNodeStatusTransferLocked).Save(ctx)
+	require.NoError(t, err)
 
 	transfer, err := dbTx.Transfer.Create().
 		SetSenderIdentityPubkey(senderPub).
@@ -1629,6 +1715,50 @@ func TestVerifyAndUpdateTransfer_SkipsAlreadyCompletedReceiver(t *testing.T) {
 	require.Equal(t, st.TransferReceiverStatusCompleted, updatedReceiver.Status)
 }
 
+func createReceiverRefundSignedTransferForFinalizeTest(t *testing.T, ctx context.Context, leafStatus st.TreeNodeStatus) (*ent.Client, *ent.Transfer, *ent.TreeNode, keys.Public) {
+	t.Helper()
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+
+	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
+	_, err = node.Update().SetStatus(leafStatus).Save(ctx)
+	require.NoError(t, err)
+
+	transfer, err := dbTx.Transfer.Create().
+		SetSenderIdentityPubkey(senderPub).
+		SetReceiverIdentityPubkey(receiverPub).
+		SetStatus(st.TransferStatusReceiverRefundSigned).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetType(st.TransferTypeTransfer).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	receiver, err := dbTx.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPub).
+		SetStatus(st.TransferReceiverStatusRefundSigned).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = dbTx.TransferLeaf.Create().
+		SetTransfer(transfer).
+		SetLeaf(node).
+		SetTransferReceiverID(receiver.ID).
+		SetPreviousRefundTx(buildTestTxBytes(t, 3000)).
+		SetIntermediateRefundTx(buildTestTxBytes(t, 4000)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return dbTx, transfer, node, receiverPub
+}
+
 func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 
@@ -1643,6 +1773,8 @@ func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 	receiverPub2 := keys.GeneratePrivateKey().Public()
 
 	_, node := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
+	_, err = node.Update().SetStatus(st.TreeNodeStatusTransferLocked).Save(ctx)
+	require.NoError(t, err)
 
 	transfer, err := dbTx.Transfer.Create().
 		SetSenderIdentityPubkey(senderPub).
