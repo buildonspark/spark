@@ -132,6 +132,18 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		}
 		splitParentID = parentID
 	}
+	currentParentID := uuid.Nil
+	currentParent, err := extendedLeafNode.QueryParent().Only(ctx)
+	if err != nil {
+		if !ent.IsNotFound(err) {
+			return fmt.Errorf("failed to query parent for extended leaf %s: %w", extendedLeafID, err)
+		}
+	} else {
+		currentParentID = currentParent.ID
+	}
+	if splitParentID != currentParentID {
+		return fmt.Errorf("split node parent %s does not match current parent %s for leaf %s", splitParentID, currentParentID, extendedLeafID)
+	}
 
 	treeEnt, err := extendedLeafNode.QueryTree().Only(ctx)
 	if err != nil {

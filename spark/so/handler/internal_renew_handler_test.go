@@ -199,6 +199,74 @@ func TestFinalizeRenewNodeTimelockRejectsSplitNodeFromDifferentTree(t *testing.T
 	require.True(t, ent.IsNotFound(err), "malformed renew finalize must not reparent the leaf")
 }
 
+func TestFinalizeRenewNodeTimelockRejectsSplitNodeWithWrongParent(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{12})
+
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerIdentityPubKey)
+	currentParent := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+	wrongParent := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, 0)
+	extendedLeaf := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, currentParent, 0)
+
+	const sequenceFlag = 1 << 30
+	currentRenewableTx := createValidTestTransactionBytesWithSequence(t, (spark.RenewTimelockThreshold-1)|sequenceFlag)
+	extendedLeaf, err = extendedLeaf.Update().SetRawTx(currentRenewableTx).Save(ctx)
+	require.NoError(t, err)
+
+	incomingLeafTx := createValidTestTransactionBytesWithSequence(t, (spark.RenewTimelockThreshold-2)|sequenceFlag)
+	wrongParentID := wrongParent.ID.String()
+	splitNodeID := uuid.New()
+	req := &pbinternal.FinalizeRenewNodeTimelockRequest{
+		SplitNode: &pbinternal.TreeNode{
+			Id:                  splitNodeID.String(),
+			Value:               extendedLeaf.Value,
+			VerifyingPubkey:     extendedLeaf.VerifyingPubkey.Serialize(),
+			OwnerIdentityPubkey: extendedLeaf.OwnerIdentityPubkey.Serialize(),
+			OwnerSigningPubkey:  extendedLeaf.OwnerSigningPubkey.Serialize(),
+			RawTx:               currentRenewableTx,
+			DirectTx:            currentRenewableTx,
+			ParentNodeId:        &wrongParentID,
+			TreeId:              tree.ID.String(),
+			SigningKeyshareId:   keyshare.ID.String(),
+			Vout:                0,
+		},
+		Node: &pbinternal.TreeNode{
+			Id:                     extendedLeaf.ID.String(),
+			RawTx:                  incomingLeafTx,
+			RawRefundTx:            extendedLeaf.RawRefundTx,
+			DirectTx:               extendedLeaf.DirectTx,
+			DirectRefundTx:         extendedLeaf.DirectRefundTx,
+			DirectFromCpfpRefundTx: extendedLeaf.DirectFromCpfpRefundTx,
+			TreeId:                 tree.ID.String(),
+			SigningKeyshareId:      keyshare.ID.String(),
+			VerifyingPubkey:        extendedLeaf.VerifyingPubkey.Serialize(),
+			OwnerIdentityPubkey:    extendedLeaf.OwnerIdentityPubkey.Serialize(),
+			OwnerSigningPubkey:     extendedLeaf.OwnerSigningPubkey.Serialize(),
+			Value:                  extendedLeaf.Value,
+			Vout:                   0,
+		},
+	}
+
+	handler := NewInternalRenewLeafHandler(nil)
+	err = handler.FinalizeRenewNodeTimelock(ctx, req)
+	require.ErrorContains(t, err, "does not match current parent")
+
+	exists, err := dbClient.TreeNode.Query().Where(treenode.IDEQ(splitNodeID)).Exist(ctx)
+	require.NoError(t, err)
+	require.False(t, exists, "malformed renew finalize must not create a split node under the wrong parent")
+
+	updatedLeaf, err := dbClient.TreeNode.Get(ctx, extendedLeaf.ID)
+	require.NoError(t, err)
+	parent, err := updatedLeaf.QueryParent().Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, currentParent.ID, parent.ID)
+}
+
 // TestCheckNodeRenewPrecondition exercises the stale-replay guard for
 // FinalizeRenewNodeTimelock. validateAndConstructNodeTimelock only
 // produces a renew-node payload when the existing leaf's RawTx timelock
