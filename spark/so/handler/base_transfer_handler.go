@@ -1313,8 +1313,18 @@ func syncReceiversToTerminalStatus(ctx context.Context, transferID uuid.UUID, tr
 
 	for _, r := range receivers {
 		update := r.Update().SetStatus(expectedStatus)
-		if expectedStatus == st.TransferReceiverStatusCompleted {
-			update = update.SetCompletionTime(completionTime)
+		switch expectedStatus {
+		case st.TransferReceiverStatusCompleted:
+			// Preserve an already-recorded completion time; only stamp one when absent.
+			if r.CompletionTime.IsZero() {
+				update = update.SetCompletionTime(completionTime)
+			}
+		case st.TransferReceiverStatusCancelled:
+			// A cancelled receiver must not retain a completion time.
+			update = update.ClearCompletionTime()
+		default:
+			// Non-terminal statuses carry no completion-time rule; this helper
+			// is only invoked with terminal statuses (completed/cancelled).
 		}
 		if _, err := update.Save(ctx); err != nil {
 			return fmt.Errorf("failed to update receiver %s to %s: %w", r.ID, expectedStatus, err)
