@@ -14,8 +14,8 @@ import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
 import { type ConfigOptions } from "../../services/wallet-config.js";
-import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { DefaultSparkSigner } from "../../signer/signer.js";
+import { type KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { ExitSpeed } from "../../types/index.js";
 import {
   getP2TRAddressFromPublicKey,
@@ -29,6 +29,7 @@ import {
   SparkWalletTestingIntegration,
 } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { retryUntilSuccess } from "../utils/utils.js";
 
 describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
   it(`${name} - test coop exit`, async () => {
@@ -315,6 +316,96 @@ describe("malicious SSP cooperative exit rejection", () => {
     const balanceAfter = await userWallet.getBalance();
     expect(balanceAfter.balance).toBe(amountSats);
   }, 600_000);
+});
+
+describe("malicious SSP coop-exit rejection (SDK-side binding check)", () => {
+  it("withdraw() rejects when coopExitTxid does not bind to connector_tx", async () => {
+    const faucet = BitcoinFaucet.getInstance();
+    const amountSats = 100_000n;
+    const feeAmountSats = 1_000;
+
+    const options: ConfigOptions = { network: "LOCAL" };
+    const { wallet: userWallet } = await SparkWalletTesting.initialize({
+      options,
+      signer: new DefaultSparkSigner(),
+    });
+
+    // Fund the wallet so withdraw() has a leaf to send. createNewTree only
+    // returns once the deposit tx is mined; wait for the wallet's
+    // background sync to ingest the leaf so getBalance() reflects it.
+    const leafId = uuidv7();
+    await createNewTree(userWallet, leafId, faucet, amountSats);
+    await retryUntilSuccess(async () => {
+      const { balance } = await userWallet.getBalance();
+      if (balance !== amountSats) {
+        throw new Error(`balance not yet ${amountSats}, got ${balance}`);
+      }
+      return balance;
+    });
+
+    // Build a structurally-valid rawConnectorTransaction whose first input
+    // spends an arbitrary "legit" parent hash. The connector tx itself
+    // never has to be broadcast; we only need it to parse and have a
+    // first input.
+    const legitParent = new Uint8Array(32).fill(0).map((_, i) => i + 1);
+    const connectorTx = new Transaction({ allowUnknownOutputs: true });
+    connectorTx.addInput({ txid: legitParent, index: 0 });
+    connectorTx.addOutput({
+      script: new Uint8Array([0x51]),
+      amount: 354n,
+    });
+
+    // The "alibi" coopExitTxid the SSP returns: 32 bytes that do NOT match
+    // legitParent in either endianness. This is the request shape that the
+    // SO validator (parseAndValidateCoopExitTxid) catches; the SDK should
+    // refuse to make the SO RPC at all.
+    const alibiCoopExitTxid = new Uint8Array(32).fill(0).map((_, i) => 255 - i);
+
+    const withdrawalAddress = getP2TRAddressFromPublicKey(
+      secp256k1.getPublicKey(secp256k1.utils.randomPrivateKey()),
+      Network.LOCAL,
+    );
+
+    const maliciousResponse = {
+      coopExitTxid: bytesToHex(alibiCoopExitTxid),
+      rawConnectorTransaction: bytesToHex(connectorTx.toBytes()),
+      rawCoopExitTransaction: bytesToHex(connectorTx.toBytes()),
+      id: uuidv7(),
+    };
+
+    const requestCoopExit = jest.fn(() => Promise.resolve(maliciousResponse));
+    const completeCoopExit = jest.fn();
+    (
+      userWallet as unknown as {
+        sspClient: { requestCoopExit: unknown; completeCoopExit: unknown };
+      }
+    ).sspClient = {
+      requestCoopExit,
+      completeCoopExit,
+    };
+
+    await expect(
+      userWallet.withdraw({
+        amountSats: Number(amountSats),
+        feeAmountSats,
+        // feeQuoteId is forwarded to the (stubbed) sspClient so any
+        // non-empty value gets us past the SDK's early validation.
+        feeQuoteId: "test-fee-quote-id",
+        onchainAddress: withdrawalAddress,
+        exitSpeed: ExitSpeed.FAST,
+        deductFeeFromWithdrawalAmount: true,
+      }),
+    ).rejects.toThrow(SparkValidationError);
+
+    expect(requestCoopExit).toHaveBeenCalledTimes(1);
+    // No completion RPC should fire when the SDK rejects upstream.
+    expect(completeCoopExit).not.toHaveBeenCalled();
+
+    // Balance must be unchanged: no SO RPC, no refund signing, no leaf
+    // state mutation.
+    const { balance } = await userWallet.getBalance();
+    expect(balance).toBe(amountSats);
+  }, 60000);
 });
 
 async function buildMaliciousCoopExitResponse({

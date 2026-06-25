@@ -125,6 +125,59 @@ export function getP2WPKHAddressFromPublicKey(
   return address;
 }
 
+/**
+ * Validates that the connector transaction's first input spends the L1
+ * transaction identified by `coopExitTxId`. This is the SDK-side mirror of
+ * the SO validator `parseAndValidateCoopExitTxid`; it rejects malicious
+ * SSP responses before any RPC, refund tx signing, or local key tweak
+ * preparation runs.
+ *
+ * Accepts both byte orders (internal LE vs display BE) to mirror the SO
+ * validator's accept-both tolerance.
+ *
+ * Throws `SparkValidationError` if the connector tx has no inputs or its
+ * first input does not spend `coopExitTxId`.
+ */
+export function validateConnectorTxBindsToCoopExitTxid(
+  connectorTx: btc.Transaction,
+  coopExitTxId: Uint8Array,
+): void {
+  if (connectorTx.inputsLength === 0) {
+    throw new SparkValidationError(
+      "SSP coop exit response is malformed: connector_tx has no inputs",
+      { field: "rawConnectorTransaction", value: "no inputs" },
+    );
+  }
+  const connectorParent = connectorTx.getInput(0)?.txid;
+  if (!connectorParent) {
+    throw new SparkValidationError(
+      "SSP coop exit response is malformed: connector_tx input 0 has no parent txid",
+      { field: "rawConnectorTransaction", value: "no parent" },
+    );
+  }
+  // input.txid is internal (little-endian) bytes, matching coopExitTxId.
+  // Also accept the reversed (display / big-endian) byte order so this
+  // mirrors the SO validator's accept-both tolerance.
+  const matchesLE =
+    connectorParent.length === coopExitTxId.length &&
+    connectorParent.every((b, i) => b === coopExitTxId[i]);
+  const matchesBE =
+    connectorParent.length === coopExitTxId.length &&
+    connectorParent.every(
+      (b, i) => b === coopExitTxId[coopExitTxId.length - 1 - i],
+    );
+  if (!matchesLE && !matchesBE) {
+    throw new SparkValidationError(
+      "SSP coop exit response is inconsistent: connector_tx parent does not match coopExitTxid",
+      {
+        field: "coopExitTxid",
+        value: bytesToHex(coopExitTxId),
+        expected: bytesToHex(connectorParent),
+      },
+    );
+  }
+}
+
 export function getTxFromRawTxHex(rawTxHex: string): btc.Transaction {
   const txBytes = hexToBytes(rawTxHex);
   const tx = btc.Transaction.fromRaw(txBytes, {
