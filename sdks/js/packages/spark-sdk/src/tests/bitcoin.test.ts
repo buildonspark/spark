@@ -9,6 +9,7 @@ import {
   getSigHashFromTx,
   getTxFromRawTxHex,
   getTxId,
+  validateConnectorTxBindsToCoopExitTxid,
 } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
 
@@ -125,5 +126,64 @@ describe("bitcoin", () => {
     expect(bytesToHex(script)).toEqual(
       "51208af8e5e92783248418d5c68007dc8659a2100261b5bb561efc28dde94ec8cb93",
     );
+  });
+
+  describe("validateConnectorTxBindsToCoopExitTxid", () => {
+    const buildConnectorTxSpending = (
+      parent: Uint8Array,
+    ): { tx: Transaction; parent: Uint8Array } => {
+      const tx = new Transaction({ allowUnknownOutputs: true });
+      tx.addInput({ txid: parent, index: 1 });
+      tx.addOutput({ script: new Uint8Array([0x51]), amount: 354n });
+      return { tx, parent };
+    };
+
+    const parentHash = new Uint8Array(32).fill(0).map((_, i) => i + 1);
+
+    it("accepts matching parent (LE byte order)", () => {
+      const { tx } = buildConnectorTxSpending(parentHash);
+      // input.txid is internal LE bytes; coopExitTxId is also LE.
+      expect(() =>
+        validateConnectorTxBindsToCoopExitTxid(tx, parentHash),
+      ).not.toThrow();
+    });
+
+    it("accepts reversed-endianness coopExitTxid (BE byte order)", () => {
+      const { tx } = buildConnectorTxSpending(parentHash);
+      const reversed = new Uint8Array([...parentHash].reverse());
+      expect(() =>
+        validateConnectorTxBindsToCoopExitTxid(tx, reversed),
+      ).not.toThrow();
+    });
+
+    it("rejects an unrelated alibi coopExitTxid (the attack)", () => {
+      const { tx } = buildConnectorTxSpending(parentHash);
+      const alibi = new Uint8Array(32).fill(0).map((_, i) => 255 - i);
+      expect(() => validateConnectorTxBindsToCoopExitTxid(tx, alibi)).toThrow(
+        SparkValidationError,
+      );
+      expect(() => validateConnectorTxBindsToCoopExitTxid(tx, alibi)).toThrow(
+        /does not match coopExitTxid/,
+      );
+    });
+
+    it("rejects a connector_tx with no inputs", () => {
+      const tx = new Transaction({ allowUnknownOutputs: true });
+      tx.addOutput({ script: new Uint8Array([0x51]), amount: 354n });
+      expect(() =>
+        validateConnectorTxBindsToCoopExitTxid(tx, parentHash),
+      ).toThrow(SparkValidationError);
+      expect(() =>
+        validateConnectorTxBindsToCoopExitTxid(tx, parentHash),
+      ).toThrow(/has no inputs/);
+    });
+
+    it("rejects mismatched length coopExitTxid", () => {
+      const { tx } = buildConnectorTxSpending(parentHash);
+      const shortTxid = new Uint8Array(16); // wrong length
+      expect(() =>
+        validateConnectorTxBindsToCoopExitTxid(tx, shortTxid),
+      ).toThrow(SparkValidationError);
+    });
   });
 });

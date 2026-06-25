@@ -133,6 +133,7 @@ import {
   getTxFromRawTxBytes,
   getTxFromRawTxHex,
   getTxId,
+  validateConnectorTxBindsToCoopExitTxid,
   validateCoopExitPayoutTransaction,
 } from "../utils/bitcoin.js";
 import { getFetch } from "../utils/fetch.js";
@@ -5091,6 +5092,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       // Converting hex to bytes gives us the correct little-endian format that SO expects
       const coopExitTxId = hexToBytes(coopExitRequest.coopExitTxid);
       const connectorTxId = getTxId(connectorTx);
+
+      // Defense-in-depth: ensure the connector transaction's first input
+      // spends the same L1 transaction whose txid the SO will hand to the
+      // chain watcher. The SO performs the same check
+      // (parseAndValidateCoopExitTxid in base_transfer_handler.go), but
+      // validating client-side rejects malicious SSP responses before any
+      // SO RPC, refund signing, or local key tweak preparation.
+      validateConnectorTxBindsToCoopExitTxid(connectorTx, coopExitTxId);
 
       const connectorOutputs: TransactionInput[] = [];
       for (let i = 0; i < connectorTx.outputsLength - 1; i++) {
