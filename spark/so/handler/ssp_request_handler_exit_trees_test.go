@@ -186,3 +186,30 @@ func TestExitTreesReturnsIneligibleTreesWithoutSigning(t *testing.T) {
 		require.Equal(t, pbssp.IneligibleReason_INELIGIBLE_REASON_ALREADY_EXITED, it.GetReason())
 	}
 }
+
+func TestSyncExitedTreesRejectsLocallyAvailableTree(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	ownerIdentity := keys.GeneratePrivateKey().Public()
+	tree, err := dbTx.Tree.Create().
+		SetID(uuid.New()).
+		SetNetwork(btcnetwork.Regtest).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		SetOwnerIdentityPubkey(ownerIdentity).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewSspRequestHandler(&so.Config{})
+	err = handler.SyncExitedTrees(ctx, &pbssp.SyncExitedTreesRequest{
+		TreeIds: []string{tree.ID.String()},
+	})
+
+	require.ErrorContains(t, err, "not locally exited")
+	reloadedTree, err := dbTx.Tree.Get(ctx, tree.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TreeStatusAvailable, reloadedTree.Status)
+}
