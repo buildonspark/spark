@@ -82,20 +82,29 @@ func handshakeOverPipe(t *testing.T, clientCfg brontide.ClientConfig, serverCfg 
 
 	deadline := time.After(5 * time.Second)
 	var clientRes, serverRes out
-	for range 2 {
+	gotClient, gotServer := false, false
+	for !gotClient || !gotServer {
 		select {
 		case clientRes = <-clientCh:
-			if clientRes.err != nil {
-				return handshakeResult{}, clientRes.err
-			}
+			gotClient = true
 		case serverRes = <-serverCh:
-			if serverRes.err != nil {
-				return handshakeResult{}, serverRes.err
-			}
+			gotServer = true
 		case <-deadline:
 			return handshakeResult{}, errors.New("handshake timed out")
 		}
 	}
+
+	// Wait for both sides before deciding, and surface the server's error in preference to the client's. The two
+	// net.Pipe() halves share close state: when one side rejects the handshake and closes its end, an in-flight
+	// SetDeadline/IO call on the other end fails with io.ErrClosedPipe. Returning whichever error landed first let
+	// that incidental closed-pipe error mask the rejection these tests actually assert on (e.g. "unknown peer").
+	if serverRes.err != nil {
+		return handshakeResult{}, serverRes.err
+	}
+	if clientRes.err != nil {
+		return handshakeResult{}, clientRes.err
+	}
+
 	return handshakeResult{
 		clientConn: clientRes.conn,
 		clientInfo: clientRes.info,
