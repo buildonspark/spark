@@ -239,6 +239,72 @@ func TestValidateOwnershipSignatureFromAuthority_MultisigSuccess(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateOwnershipSignatureFromAuthority_MultisigRejectsOwnerOutsideConfig(t *testing.T) {
+	ctx := t.Context()
+
+	sortedPrivKeys, msConfig := createMultisigConfig(t, 3, 2)
+	ownerPubKey := keys.GeneratePrivateKey().Public()
+
+	hash := make([]byte, 32)
+	hash[0] = 0xBC
+
+	sigs := make([]*multisigpb.KeyedSignature, 2)
+	for i := range 2 {
+		sig, err := schnorr.Sign(sortedPrivKeys[i].ToBTCEC(), hash)
+		require.NoError(t, err)
+		sigs[i] = &multisigpb.KeyedSignature{
+			PublicKey: sortedPrivKeys[i].Public().Serialize(),
+			Signature: sig.Serialize(),
+		}
+	}
+
+	sigWithIndex := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_MultisigSignatures{
+			MultisigSignatures: &multisigpb.MultisigSignatureSet{
+				MultisigConfig: msConfig,
+				Signatures:     sigs,
+			},
+		},
+	}
+
+	err := ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, ownerPubKey)
+	require.ErrorContains(t, err, "owner public key")
+}
+
+func TestValidateOwnershipSignatureFromAuthority_MultisigRejectsThresholdWithoutOwnerSignature(t *testing.T) {
+	ctx := t.Context()
+
+	sortedPrivKeys, msConfig := createMultisigConfig(t, 3, 2)
+	ownerPubKey := sortedPrivKeys[0].Public()
+
+	hash := make([]byte, 32)
+	hash[0] = 0xCD
+
+	sigs := make([]*multisigpb.KeyedSignature, 2)
+	for i, signer := range sortedPrivKeys[1:3] {
+		sig, err := schnorr.Sign(signer.ToBTCEC(), hash)
+		require.NoError(t, err)
+		sigs[i] = &multisigpb.KeyedSignature{
+			PublicKey: signer.Public().Serialize(),
+			Signature: sig.Serialize(),
+		}
+	}
+
+	sigWithIndex := &tokenpb.SignatureWithIndex{
+		InputIndex: 0,
+		AuthoritySignatures: &tokenpb.SignatureWithIndex_MultisigSignatures{
+			MultisigSignatures: &multisigpb.MultisigSignatureSet{
+				MultisigConfig: msConfig,
+				Signatures:     sigs,
+			},
+		},
+	}
+
+	err := ValidateOwnershipSignatureFromAuthority(ctx, sigWithIndex, hash, ownerPubKey)
+	require.ErrorContains(t, err, "owner public key")
+}
+
 func TestValidateOwnershipSignatureFromAuthority_MultisigThresholdNotMet(t *testing.T) {
 	ctx := t.Context()
 
