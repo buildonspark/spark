@@ -1456,12 +1456,18 @@ func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, tr
 		if err != nil {
 			return fmt.Errorf("unable to get tree node: %w", err)
 		}
-		// Skip leaves that have already advanced to a terminal state (e.g. their
-		// refund tx confirmed on-chain, marking the leaf EXITED). Reviving such
-		// a leaf to AVAILABLE would let the sender create a second transfer
-		// from an already-spent outpoint. See SP-3049.
-		if !treeNode.Status.CanBecomeAvailable() {
-			logger.Sugar().Infof("Skipping unlock of tree node %s in terminal status %s during cancel of transfer %s", treeNode.ID, treeNode.Status, transfer.ID)
+		// Cancel only owns the TRANSFER_LOCKED lock it placed when the transfer
+		// was initiated. AVAILABLE means the unlock already happened (idempotent
+		// retry). Any other status means another state machine has since claimed
+		// the leaf (e.g. EXITED/ON_CHAIN after an on-chain spend — SP-3049 — or
+		// safety/lock states like INVESTIGATION, LOST, FROZEN_BY_ISSUER,
+		// RENEW_LOCKED, SPLIT_LOCKED, AGGREGATE_LOCK); reviving it to AVAILABLE
+		// here would bypass that quarantine/lock, so leave it untouched.
+		if treeNode.Status == st.TreeNodeStatusAvailable {
+			continue
+		}
+		if treeNode.Status != st.TreeNodeStatusTransferLocked {
+			logger.Sugar().Infof("Skipping unlock of tree node %s in non-transfer-locked status %s during cancel of transfer %s", treeNode.ID, treeNode.Status, transfer.ID)
 			continue
 		}
 		_, err = treeNode.Update().SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
