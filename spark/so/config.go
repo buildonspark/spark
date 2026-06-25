@@ -118,7 +118,9 @@ type Config struct {
 	// Database is the configuration for the database.
 	Database DatabaseConfig
 	// identityPubkeyToOperatorIdentifierMap maps the signing operator identity pubkeys to its corresponding identifier.
+	// It is built lazily exactly once via identityPubkeyMapOnce so concurrent callers don't race on the map.
 	identityPubkeyToOperatorIdentifierMap map[keys.Public]string
+	identityPubkeyMapOnce                 sync.Once
 	// Token is the configuration for token-related settings.
 	Token TokenConfig
 	// ServiceAuthz specifies the enforcement of authorization checks for
@@ -752,9 +754,7 @@ func (c *Config) buildIdentityPubkeyMap() {
 }
 
 func (c *Config) GetOperatorIdentifierFromIdentityPublicKey(identityPublicKey keys.Public) string {
-	if len(c.identityPubkeyToOperatorIdentifierMap) == 0 {
-		c.buildIdentityPubkeyMap()
-	}
+	c.identityPubkeyMapOnce.Do(c.buildIdentityPubkeyMap)
 	return c.identityPubkeyToOperatorIdentifierMap[identityPublicKey]
 }
 
