@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -32,10 +33,9 @@ func validateDeprecatedSignatureConsistency(sig *tokenpb.SignatureWithIndex) err
 // with backwards-compatible fallback to the deprecated signature field.
 //
 // For single-key signatures, ownerPublicKey is used for verification.
-// For multisig signatures, the config embedded in the request is used
-// for pure cryptographic validation. Callers are responsible for
-// verifying the config is authorized for the entity being operated on
-// (e.g. via entity edges).
+// For multisig signatures, the embedded config must satisfy its threshold and
+// the signature set must include ownerPublicKey, binding the presented multisig
+// authority back to the stored owner or issuer key.
 func ValidateOwnershipSignatureFromAuthority(
 	ctx context.Context,
 	sig *tokenpb.SignatureWithIndex,
@@ -61,7 +61,10 @@ func ValidateOwnershipSignatureFromAuthority(
 		}
 		return utils.ValidateOwnershipSignature(v.SingleSignature.GetSignature(), hash, ownerPublicKey)
 	case *tokenpb.SignatureWithIndex_MultisigSignatures:
-		return validateMultisigFromProvidedConfig(hash, v.MultisigSignatures)
+		if err := validateMultisigFromProvidedConfig(hash, v.MultisigSignatures); err != nil {
+			return err
+		}
+		return validateMultisigIncludesOwnerSignature(v.MultisigSignatures, ownerPublicKey)
 	default:
 		// Backwards compat: fall back to deprecated signature field.
 		if len(sig.GetSignature()) > 0 {
@@ -73,8 +76,9 @@ func ValidateOwnershipSignatureFromAuthority(
 
 // validateMultisigFromProvidedConfig validates multisig signatures using
 // the MultisigConfig embedded in the signature set, without a DB lookup.
-// Authorization (verifying the config is the correct authority for the
-// entity) must be enforced by callers, e.g. via entity edge checks.
+// This is pure cryptographic validation of the set against its own config;
+// binding the config to the entity being authorized is enforced by
+// validateMultisigIncludesOwnerSignature in ValidateOwnershipSignatureFromAuthority.
 func validateMultisigFromProvidedConfig(hash []byte, sigSet *multisigpb.MultisigSignatureSet) error {
 	if sigSet == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("multisig signature set cannot be nil"))
@@ -84,4 +88,27 @@ func validateMultisigFromProvidedConfig(hash []byte, sigSet *multisigpb.Multisig
 			fmt.Errorf("multisig signature set must contain multisig config"))
 	}
 	return multisig.ValidateMultisigSignatures(sigSet.GetMultisigConfig(), hash, sigSet)
+}
+
+// validateMultisigIncludesOwnerSignature requires the multisig signature set
+// to contain a signature from ownerPublicKey, binding the request-supplied
+// multisig config to the stored owner/issuer key. It must run after
+// validateMultisigFromProvidedConfig, which verifies that every signature in
+// the set is cryptographically valid and from a distinct config member, so
+// presence of the owner key here implies a valid owner signature.
+func validateMultisigIncludesOwnerSignature(sigSet *multisigpb.MultisigSignatureSet, ownerPublicKey keys.Public) error {
+	if ownerPublicKey.IsZero() {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner public key cannot be zero"))
+	}
+	ownerPublicKeyBytes := ownerPublicKey.Serialize()
+	for _, sig := range sigSet.GetSignatures() {
+		if sig == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("multisig signature cannot be nil"))
+		}
+		if !bytes.Equal(sig.GetPublicKey(), ownerPublicKeyBytes) {
+			continue
+		}
+		return nil
+	}
+	return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("multisig signature set must include a valid signature from the owner public key"))
 }
