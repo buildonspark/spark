@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
@@ -46,6 +48,7 @@ import (
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/partner"
+	"github.com/lightsparkdev/spark/so/rpcauth/brontide"
 	"github.com/lightsparkdev/spark/so/rpcpolicy"
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
@@ -85,6 +88,7 @@ type args struct {
 	Port                       uint64
 	HttpPort                   uint64
 	GrpcPort                   uint64
+	InternalGrpcPort           uint64
 	DatabasePath               string
 	EphemeralDatabasePath      string
 	RunningLocally             bool
@@ -141,6 +145,7 @@ func loadArgs() (*args, error) {
 	flag.Uint64Var(&args.Port, "port", 0, "DEPRECATED: Use --http-port instead. HTTP port (grpc-web + metrics)")
 	flag.Uint64Var(&args.HttpPort, "http-port", 0, "HTTP port (grpc-web + metrics)")
 	flag.Uint64Var(&args.GrpcPort, "grpc-port", 0, "Native gRPC port (if 0 or same as http-port, uses ServeHTTP multiplexing)")
+	flag.Uint64Var(&args.InternalGrpcPort, "internal-grpc-port", 0, "If non-zero, start a second gRPC listener on this port that requires TLS + brontide mutual auth. Hosts the SO-to-SO services (SparkInternal, SparkTokenInternal, Gossip, DKG). Internal services remain registered on the public listener too; a future change will introduce a flag to take them off the public listener once peer clients are brontide-aware.")
 	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
 	flag.StringVar(&args.EphemeralDatabasePath, "ephemeral-database", "", "Path to ephemeral database file")
 	flag.BoolVar(&args.RunningLocally, "local", false, "Running locally")
@@ -189,10 +194,20 @@ func loadArgs() (*args, error) {
 	}
 	if args.HttpPort == 0 && args.Port != 0 {
 		args.HttpPort = args.Port
-		fmt.Fprintf(os.Stderr, "WARNING: --port is deprecated, use --http-port instead\n")
+		_, _ = fmt.Fprintf(os.Stderr, "WARNING: --port is deprecated, use --http-port instead\n")
 	}
 	if args.HttpPort != 0 && args.Port != 0 && args.HttpPort != args.Port {
-		fmt.Fprintf(os.Stderr, "WARNING: Both --port (%d) and --http-port (%d) specified; using --http-port value\n", args.Port, args.HttpPort)
+		_, _ = fmt.Fprintf(os.Stderr, "WARNING: Both --port (%d) and --http-port (%d) specified; using --http-port value\n", args.Port, args.HttpPort)
+	}
+
+	if args.InternalGrpcPort != 0 {
+		if args.InternalGrpcPort == args.HttpPort {
+			return nil, fmt.Errorf("internal-grpc-port (%d) must differ from http-port", args.InternalGrpcPort)
+		}
+		// grpc-port of 0 means ServeHTTP multiplexing with no separate gRPC listener, so it only conflicts when non-zero.
+		if args.GrpcPort != 0 && args.InternalGrpcPort == args.GrpcPort {
+			return nil, fmt.Errorf("internal-grpc-port (%d) must differ from grpc-port", args.InternalGrpcPort)
+		}
 	}
 
 	return args, nil
@@ -837,9 +852,9 @@ func main() {
 		MinVersion:   tls.VersionTLS12,
 	}
 
-	creds := credentials.NewTLS(&tlsConfig)
-	serverOpts = append(serverOpts, grpc.Creds(creds))
-	grpcServer := grpc.NewServer(serverOpts...)
+	tlsCreds := credentials.NewTLS(&tlsConfig)
+	publicOpts := append(slices.Clone(serverOpts), grpc.Creds(tlsCreds))
+	grpcServer := grpc.NewServer(publicOpts...)
 
 	// RisingWave client for partner analytics queries (connects lazily; nil when the
 	// --risingwave-database DSN is empty). Owned here and passed in like dbClient.
@@ -850,14 +865,13 @@ func main() {
 		}
 	}()
 
-	err = RegisterGrpcServers(
+	err = RegisterPublicGrpcServers(
 		grpcServer,
 		args,
 		config,
 		logger,
 		dbClient,
 		ephemeralDbClient,
-		frostConnection,
 		sessionTokenCreatorVerifier,
 		eventsRouter,
 		rwClient,
@@ -866,13 +880,57 @@ func main() {
 		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
 
+	// SO-to-SO services are registered on the public listener so existing peer clients continue to reach them. A follow-up
+	// change will make the client factory brontide-aware and introduce a flag to take these services off the public listener entirely.
+	if err := RegisterInternalGrpcServers(grpcServer, args, config, frostConnection, dbClient); err != nil {
+		logger.Fatal("Failed to register internal gRPC servers on public listener", zap.Error(err))
+	}
+
+	// Optionally start a second listener that requires TLS + brontide mutual auth and hosts only the SO-to-SO services.
+	// When --internal-grpc-port is non-zero, we build a separate grpc.Server with brontide-wrapped TLS credentials and
+	// serve it on its own listener.
+	var internalGrpcServer *grpc.Server
+	if args.InternalGrpcPort != 0 {
+		peerLookup := brontide.PeerLookupFunc(func(pub keys.Public) *brontide.Peer {
+			id := config.GetOperatorIdentifierFromIdentityPublicKey(pub)
+			if id == "" {
+				return nil
+			}
+			return &brontide.Peer{Identifier: id, IdentityPublicKey: pub}
+		})
+
+		brontideCreds, err := brontide.NewServerCredentials(brontide.ServerConfig{
+			Inner:           tlsCreds,
+			LocalPrivateKey: config.IdentityPrivateKey,
+			Peers:           peerLookup,
+		})
+		if err != nil {
+			logger.Fatal("Failed to construct brontide server credentials", zap.Error(err))
+		}
+
+		internalOpts := append(slices.Clone(serverOpts), grpc.Creds(brontideCreds))
+		internalGrpcServer = grpc.NewServer(internalOpts...)
+
+		if err := RegisterInternalGrpcServers(internalGrpcServer, args, config, frostConnection, dbClient); err != nil {
+			logger.Fatal("Failed to register internal gRPC servers on internal listener", zap.Error(err))
+		}
+
+		healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, ephemeralDbClient)
+		grpc_health_v1.RegisterHealthServer(internalGrpcServer, healthServer)
+	}
+
 	healthServer := sparkgrpc.NewHealthServer(errCtx, dbClient, ephemeralDbClient)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
-	// Fail-closed: every method registered on this server must have an rpcpolicy entry. Catches the case where a new
+	// Fail-closed: every method registered on either server must have an rpcpolicy entry. Catches the case where a new
 	// RPC is added without declaring its auth policy.
 	if missing := registeredMethodsMissingPolicy(grpcServer); len(missing) > 0 {
 		logger.Sugar().Fatalf("gRPC methods registered without an rpcpolicy entry: %v", missing)
+	}
+	if internalGrpcServer != nil {
+		if missing := registeredMethodsMissingPolicy(internalGrpcServer); len(missing) > 0 {
+			logger.Sugar().Fatalf("gRPC methods registered on internal listener without an rpcpolicy entry: %v", missing)
+		}
 	}
 
 	// Web compatibility layer
@@ -982,6 +1040,21 @@ func main() {
 		return nil
 	})
 
+	if internalGrpcServer != nil {
+		internalListener, err := net.Listen("tcp", fmt.Sprintf(":%d", args.InternalGrpcPort))
+		if err != nil {
+			logger.Fatal("Failed to create internal gRPC listener", zap.Error(err))
+		}
+		errGrp.Go(func() error {
+			logger.Sugar().Infof("Internal gRPC server listening (TLS + brontide) on port %d", args.InternalGrpcPort)
+			if err := internalGrpcServer.Serve(internalListener); err != nil {
+				logger.Error("Internal gRPC server failed", zap.Error(err))
+				return err
+			}
+			return nil
+		})
+	}
+
 	// Now we wait... for something to fail.
 	<-errCtx.Done()
 
@@ -1010,9 +1083,38 @@ func main() {
 		logger.Info("HTTP server stopped")
 	}
 
-	logger.Info("Stopping gRPC server...")
-	grpcServer.GracefulStop()
-	logger.Info("gRPC server stopped")
+	// GracefulStop blocks until all in-flight RPCs drain and ignores shutdownCtx, so a single hung or long-lived RPC
+	// would otherwise block shutdown indefinitely, past the pod's termination grace period and into a SIGKILL.
+	// This method bounds each stop by shutdownCtx, falling back to a hard Stop().
+	// The public and internal servers are stopped concurrently so total shutdown time is max(public, internal) rather
+	// than their sum. The HTTP server is already drained above, which is required before stopping the grpc-web-wrapped
+	// public server; the internal server has no such dependency.
+	stopGraceful := func(name string, s *grpc.Server) {
+		logger.Sugar().Infof("Stopping %s gRPC server...", name)
+		done := make(chan struct{})
+		go func() {
+			s.GracefulStop()
+			close(done)
+		}()
+		select {
+		case <-done:
+			logger.Sugar().Infof("%s gRPC server stopped", name)
+		case <-shutdownCtx.Done():
+			logger.Sugar().Warnf("%s gRPC server graceful stop timed out, forcing stop", name)
+			s.Stop()
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		stopGraceful("public", grpcServer)
+	})
+	if internalGrpcServer != nil {
+		wg.Go(func() {
+			stopGraceful("internal", internalGrpcServer)
+		})
+	}
+	wg.Wait()
 
 	shutDownPprof(shutdownCtx, pprofServer, logger)
 

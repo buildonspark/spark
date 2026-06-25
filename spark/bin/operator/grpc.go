@@ -26,14 +26,15 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterGrpcServers(
+// RegisterPublicGrpcServers registers services that handle traffic from outside the SO cluster. These services accept
+// connections authenticated by user identity tokens or run unauthenticated; they don't speak the brontide handshake.
+func RegisterPublicGrpcServers(
 	grpcServer *grpc.Server,
 	args *args,
 	config *so.Config,
 	logger *zap.Logger,
 	dbClient *ent.Client,
 	ephemeralDBClient *entephemeral.Client,
-	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
 	eventsRouter *events.EventRouter,
 	rwClient *partner.RisingWaveClient,
@@ -43,16 +44,6 @@ func RegisterGrpcServers(
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
 	}
 
-	if !args.DisableDKG {
-		dkgServer := dkg.NewServer(frostClient, config)
-		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
-	}
-
-	// Private/Internal SO <-> SO endpoint
-	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
-	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
-
-	// Public SO endpoint
 	sparkServer := sparkgrpc.NewSparkServer(config, eventsRouter)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
@@ -64,15 +55,6 @@ func RegisterGrpcServers(
 	sparkTokenServer := sparkgrpc.NewSparkTokenServer(config, config, dbClient)
 	pbtoken.RegisterSparkTokenServiceServer(grpcServer, sparkTokenServer)
 
-	// Gossip endpoint
-	gossipServer := sparkgrpc.NewGossipServer(config)
-	pbgossip.RegisterGossipServiceServer(grpcServer, gossipServer)
-
-	// Private/Internal token SO <-> SO endpoint
-	sparkTokenInternalServer := sparkgrpc.NewSparkTokenInternalServer(config, dbClient)
-	pbtokeninternal.RegisterSparkTokenInternalServiceServer(grpcServer, sparkTokenInternalServer)
-
-	// Public ID challenge auth endpoint
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
 		IdentityPrivateKey: config.IdentityPrivateKey,
 		ChallengeTimeout:   args.ChallengeTimeout,
@@ -82,6 +64,34 @@ func RegisterGrpcServers(
 		return fmt.Errorf("failed to create authentication server: %w", err)
 	}
 	pbauthn.RegisterSparkAuthnServiceServer(grpcServer, authnServer)
+
+	return nil
+}
+
+// RegisterInternalGrpcServers registers services that only ever talk to other SOs.
+// When the operator is deployed with a separate internal listener, these services live behind TLS+brontide mutual auth.
+// When the internal listener is disabled, they are registered on the same server as the public services and protected
+// by the existing IP allowlist alone.
+func RegisterInternalGrpcServers(
+	grpcServer *grpc.Server,
+	args *args,
+	config *so.Config,
+	frostClient *grpc.ClientConn,
+	dbClient *ent.Client,
+) error {
+	if !args.DisableDKG {
+		dkgServer := dkg.NewServer(frostClient, config)
+		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
+	}
+
+	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
+	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
+
+	gossipServer := sparkgrpc.NewGossipServer(config)
+	pbgossip.RegisterGossipServiceServer(grpcServer, gossipServer)
+
+	sparkTokenInternalServer := sparkgrpc.NewSparkTokenInternalServer(config, dbClient)
+	pbtokeninternal.RegisterSparkTokenInternalServiceServer(grpcServer, sparkTokenInternalServer)
 
 	return nil
 }
