@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.8.8
+
+### Patch Changes
+
+- Register token primitives for React Native autolinking
+
 ## 0.8.7
 
 ### Patch Changes
