@@ -110,7 +110,7 @@ func (i *BasicAuthInterceptor) UnaryServerInterceptor(ctx context.Context, req a
 			return nil, sparkerrors.WrapErrorWithCode(fmt.Errorf("invalid partner credentials"), codes.Unauthenticated)
 		}
 	}
-	return handler(context.WithValue(ctx, partnerContextKey, pInfo), req)
+	return handler(ContextWithPartnerInfo(ctx, pInfo), req)
 }
 
 func (i *BasicAuthInterceptor) authenticate(ctx context.Context) (*PartnerInfo, error) {

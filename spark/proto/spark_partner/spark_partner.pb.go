@@ -91,8 +91,9 @@ type QuerySparkTransactionVolumesRequest struct {
 	// If unset, results include all networks. When set, results are scoped to that
 	// single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
 	Network *spark.Network `protobuf:"varint,4,opt,name=network,proto3,enum=spark.Network,oneof" json:"network,omitempty"`
-	// Optional partner label (sub-account). If empty, results aggregate across all of
-	// the authenticated partner's labels; if set, results are scoped to that label.
+	// Optional partner label (sub-account). If empty, results contain one entry per
+	// (label, transaction_type) pair across all of the authenticated partner's labels;
+	// if set, results are scoped to that label (still one entry per transaction type).
 	// Always scoped to the authenticated partner_id regardless of this value.
 	Label         string `protobuf:"bytes,5,opt,name=label,proto3" json:"label,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -164,29 +165,32 @@ func (x *QuerySparkTransactionVolumesRequest) GetLabel() string {
 	return ""
 }
 
-type SparkTransactionVolume struct {
+// TransactionVolumeEntry holds the aggregated transaction volume for a single
+// (label, transaction type) pair over the requested date range.
+type TransactionVolumeEntry struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	TransactionType  SparkTransactionType   `protobuf:"varint,1,opt,name=transaction_type,json=transactionType,proto3,enum=spark_partner.SparkTransactionType" json:"transaction_type,omitempty"`
-	VolumeSats       int64                  `protobuf:"varint,2,opt,name=volume_sats,json=volumeSats,proto3" json:"volume_sats,omitempty"`
-	TransactionCount int64                  `protobuf:"varint,3,opt,name=transaction_count,json=transactionCount,proto3" json:"transaction_count,omitempty"`
+	Label            string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	TransactionType  SparkTransactionType   `protobuf:"varint,2,opt,name=transaction_type,json=transactionType,proto3,enum=spark_partner.SparkTransactionType" json:"transaction_type,omitempty"`
+	VolumeSats       int64                  `protobuf:"varint,3,opt,name=volume_sats,json=volumeSats,proto3" json:"volume_sats,omitempty"`
+	TransactionCount int64                  `protobuf:"varint,4,opt,name=transaction_count,json=transactionCount,proto3" json:"transaction_count,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
-func (x *SparkTransactionVolume) Reset() {
-	*x = SparkTransactionVolume{}
+func (x *TransactionVolumeEntry) Reset() {
+	*x = TransactionVolumeEntry{}
 	mi := &file_spark_partner_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SparkTransactionVolume) String() string {
+func (x *TransactionVolumeEntry) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SparkTransactionVolume) ProtoMessage() {}
+func (*TransactionVolumeEntry) ProtoMessage() {}
 
-func (x *SparkTransactionVolume) ProtoReflect() protoreflect.Message {
+func (x *TransactionVolumeEntry) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_partner_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -198,26 +202,33 @@ func (x *SparkTransactionVolume) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SparkTransactionVolume.ProtoReflect.Descriptor instead.
-func (*SparkTransactionVolume) Descriptor() ([]byte, []int) {
+// Deprecated: Use TransactionVolumeEntry.ProtoReflect.Descriptor instead.
+func (*TransactionVolumeEntry) Descriptor() ([]byte, []int) {
 	return file_spark_partner_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *SparkTransactionVolume) GetTransactionType() SparkTransactionType {
+func (x *TransactionVolumeEntry) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *TransactionVolumeEntry) GetTransactionType() SparkTransactionType {
 	if x != nil {
 		return x.TransactionType
 	}
 	return SparkTransactionType_SPARK_TRANSACTION_TYPE_UNSPECIFIED
 }
 
-func (x *SparkTransactionVolume) GetVolumeSats() int64 {
+func (x *TransactionVolumeEntry) GetVolumeSats() int64 {
 	if x != nil {
 		return x.VolumeSats
 	}
 	return 0
 }
 
-func (x *SparkTransactionVolume) GetTransactionCount() int64 {
+func (x *TransactionVolumeEntry) GetTransactionCount() int64 {
 	if x != nil {
 		return x.TransactionCount
 	}
@@ -225,14 +236,16 @@ func (x *SparkTransactionVolume) GetTransactionCount() int64 {
 }
 
 type QuerySparkTransactionVolumesResponse struct {
-	state                 protoimpl.MessageState    `protogen:"open.v1"`
-	PartnerId             string                    `protobuf:"bytes,1,opt,name=partner_id,json=partnerId,proto3" json:"partner_id,omitempty"`
-	Label                 string                    `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	StartDate             string                    `protobuf:"bytes,3,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
-	EndDate               string                    `protobuf:"bytes,4,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
-	TransactionTypes      []*SparkTransactionVolume `protobuf:"bytes,5,rep,name=transaction_types,json=transactionTypes,proto3" json:"transaction_types,omitempty"`
-	TotalVolumeSats       int64                     `protobuf:"varint,6,opt,name=total_volume_sats,json=totalVolumeSats,proto3" json:"total_volume_sats,omitempty"`
-	TotalTransactionCount int64                     `protobuf:"varint,7,opt,name=total_transaction_count,json=totalTransactionCount,proto3" json:"total_transaction_count,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	PartnerId string                 `protobuf:"bytes,1,opt,name=partner_id,json=partnerId,proto3" json:"partner_id,omitempty"`
+	StartDate string                 `protobuf:"bytes,2,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
+	EndDate   string                 `protobuf:"bytes,3,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
+	// One entry per (label, transaction type) pair. When the request specifies a
+	// label, entries are scoped to that label; otherwise they span all of the
+	// authenticated partner's labels.
+	Entries               []*TransactionVolumeEntry `protobuf:"bytes,4,rep,name=entries,proto3" json:"entries,omitempty"`
+	TotalVolumeSats       int64                     `protobuf:"varint,5,opt,name=total_volume_sats,json=totalVolumeSats,proto3" json:"total_volume_sats,omitempty"`
+	TotalTransactionCount int64                     `protobuf:"varint,6,opt,name=total_transaction_count,json=totalTransactionCount,proto3" json:"total_transaction_count,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -274,13 +287,6 @@ func (x *QuerySparkTransactionVolumesResponse) GetPartnerId() string {
 	return ""
 }
 
-func (x *QuerySparkTransactionVolumesResponse) GetLabel() string {
-	if x != nil {
-		return x.Label
-	}
-	return ""
-}
-
 func (x *QuerySparkTransactionVolumesResponse) GetStartDate() string {
 	if x != nil {
 		return x.StartDate
@@ -295,9 +301,9 @@ func (x *QuerySparkTransactionVolumesResponse) GetEndDate() string {
 	return ""
 }
 
-func (x *QuerySparkTransactionVolumesResponse) GetTransactionTypes() []*SparkTransactionVolume {
+func (x *QuerySparkTransactionVolumesResponse) GetEntries() []*TransactionVolumeEntry {
 	if x != nil {
-		return x.TransactionTypes
+		return x.Entries
 	}
 	return nil
 }
@@ -332,22 +338,22 @@ const file_spark_partner_proto_rawDesc = "" +
 	"\xfaB\a\x82\x01\x04\x10\x01 \x00H\x00R\anetwork\x88\x01\x01\x12\x1e\n" +
 	"\x05label\x18\x05 \x01(\tB\b\xfaB\x05r\x03\x18\xff\x01R\x05labelB\n" +
 	"\n" +
-	"\b_network\"\xb6\x01\n" +
-	"\x16SparkTransactionVolume\x12N\n" +
-	"\x10transaction_type\x18\x01 \x01(\x0e2#.spark_partner.SparkTransactionTypeR\x0ftransactionType\x12\x1f\n" +
-	"\vvolume_sats\x18\x02 \x01(\x03R\n" +
+	"\b_network\"\xcc\x01\n" +
+	"\x16TransactionVolumeEntry\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12N\n" +
+	"\x10transaction_type\x18\x02 \x01(\x0e2#.spark_partner.SparkTransactionTypeR\x0ftransactionType\x12\x1f\n" +
+	"\vvolume_sats\x18\x03 \x01(\x03R\n" +
 	"volumeSats\x12+\n" +
-	"\x11transaction_count\x18\x03 \x01(\x03R\x10transactionCount\"\xcd\x02\n" +
+	"\x11transaction_count\x18\x04 \x01(\x03R\x10transactionCount\"\xa4\x02\n" +
 	"$QuerySparkTransactionVolumesResponse\x12\x1d\n" +
 	"\n" +
-	"partner_id\x18\x01 \x01(\tR\tpartnerId\x12\x14\n" +
-	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1d\n" +
+	"partner_id\x18\x01 \x01(\tR\tpartnerId\x12\x1d\n" +
 	"\n" +
-	"start_date\x18\x03 \x01(\tR\tstartDate\x12\x19\n" +
-	"\bend_date\x18\x04 \x01(\tR\aendDate\x12R\n" +
-	"\x11transaction_types\x18\x05 \x03(\v2%.spark_partner.SparkTransactionVolumeR\x10transactionTypes\x12*\n" +
-	"\x11total_volume_sats\x18\x06 \x01(\x03R\x0ftotalVolumeSats\x126\n" +
-	"\x17total_transaction_count\x18\a \x01(\x03R\x15totalTransactionCount*\x8d\x02\n" +
+	"start_date\x18\x02 \x01(\tR\tstartDate\x12\x19\n" +
+	"\bend_date\x18\x03 \x01(\tR\aendDate\x12?\n" +
+	"\aentries\x18\x04 \x03(\v2%.spark_partner.TransactionVolumeEntryR\aentries\x12*\n" +
+	"\x11total_volume_sats\x18\x05 \x01(\x03R\x0ftotalVolumeSats\x126\n" +
+	"\x17total_transaction_count\x18\x06 \x01(\x03R\x15totalTransactionCount*\x8d\x02\n" +
 	"\x14SparkTransactionType\x12&\n" +
 	"\"SPARK_TRANSACTION_TYPE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fSPARK_TRANSACTION_TYPE_TRANSFER\x10\x01\x12)\n" +
@@ -375,15 +381,15 @@ var file_spark_partner_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_spark_partner_proto_goTypes = []any{
 	(SparkTransactionType)(0),                    // 0: spark_partner.SparkTransactionType
 	(*QuerySparkTransactionVolumesRequest)(nil),  // 1: spark_partner.QuerySparkTransactionVolumesRequest
-	(*SparkTransactionVolume)(nil),               // 2: spark_partner.SparkTransactionVolume
+	(*TransactionVolumeEntry)(nil),               // 2: spark_partner.TransactionVolumeEntry
 	(*QuerySparkTransactionVolumesResponse)(nil), // 3: spark_partner.QuerySparkTransactionVolumesResponse
 	(spark.Network)(0),                           // 4: spark.Network
 }
 var file_spark_partner_proto_depIdxs = []int32{
 	0, // 0: spark_partner.QuerySparkTransactionVolumesRequest.transaction_types:type_name -> spark_partner.SparkTransactionType
 	4, // 1: spark_partner.QuerySparkTransactionVolumesRequest.network:type_name -> spark.Network
-	0, // 2: spark_partner.SparkTransactionVolume.transaction_type:type_name -> spark_partner.SparkTransactionType
-	2, // 3: spark_partner.QuerySparkTransactionVolumesResponse.transaction_types:type_name -> spark_partner.SparkTransactionVolume
+	0, // 2: spark_partner.TransactionVolumeEntry.transaction_type:type_name -> spark_partner.SparkTransactionType
+	2, // 3: spark_partner.QuerySparkTransactionVolumesResponse.entries:type_name -> spark_partner.TransactionVolumeEntry
 	1, // 4: spark_partner.SparkPartnerService.query_spark_transaction_volumes:input_type -> spark_partner.QuerySparkTransactionVolumesRequest
 	3, // 5: spark_partner.SparkPartnerService.query_spark_transaction_volumes:output_type -> spark_partner.QuerySparkTransactionVolumesResponse
 	5, // [5:6] is the sub-list for method output_type

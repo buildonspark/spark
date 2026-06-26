@@ -13,6 +13,7 @@ import (
 
 // TransactionVolumeRow holds a single row from the materialized view query.
 type TransactionVolumeRow struct {
+	Label            string
 	TransactionType  string
 	VolumeSats       int64
 	TransactionCount int64
@@ -60,8 +61,9 @@ func (c *RisingWaveClient) Close() error {
 }
 
 // QueryTransactionVolumes queries the spark_transaction_volume_mv materialized view
-// for the given partner, date range, and optional filters.
-// label is empty string to aggregate across all labels.
+// for the given partner, date range, and optional filters. Rows are grouped by
+// label and transaction type.
+// label is empty string to return all labels; otherwise rows are scoped to that label.
 // txTypes is empty to include all transaction types; otherwise rows match any listed type.
 // network is nil to include all networks; otherwise scoped to the single value
 // (one of MAINNET, REGTEST, TESTNET, SIGNET).
@@ -114,10 +116,11 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 	}
 
 	query := fmt.Sprintf(
-		`SELECT transaction_type, SUM(volume_sats), SUM(transaction_count)
+		`SELECT label, transaction_type, SUM(volume_sats), SUM(transaction_count)
 		FROM spark_transaction_volume_mv
 		WHERE %s
-		GROUP BY transaction_type`,
+		GROUP BY label, transaction_type
+		ORDER BY label, transaction_type`,
 		strings.Join(conditions, " AND "),
 	)
 
@@ -130,7 +133,7 @@ func (c *RisingWaveClient) QueryTransactionVolumes(
 	var results []TransactionVolumeRow
 	for rows.Next() {
 		var row TransactionVolumeRow
-		if err := rows.Scan(&row.TransactionType, &row.VolumeSats, &row.TransactionCount); err != nil {
+		if err := rows.Scan(&row.Label, &row.TransactionType, &row.VolumeSats, &row.TransactionCount); err != nil {
 			return nil, fmt.Errorf("failed to scan risingwave row: %w", err)
 		}
 		results = append(results, row)

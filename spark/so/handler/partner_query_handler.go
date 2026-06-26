@@ -97,11 +97,11 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 
 	var totalVolume int64
 	var totalCount int64
-	var txTypes []*pbpartner.SparkTransactionVolume
+	var entries []*pbpartner.TransactionVolumeEntry
 	for _, row := range rows {
-		protoType := mapTransactionTypeToProto(row.TransactionType)
-		txTypes = append(txTypes, &pbpartner.SparkTransactionVolume{
-			TransactionType:  protoType,
+		entries = append(entries, &pbpartner.TransactionVolumeEntry{
+			Label:            row.Label,
+			TransactionType:  mapTransactionTypeToProto(row.TransactionType),
 			VolumeSats:       row.VolumeSats,
 			TransactionCount: row.TransactionCount,
 		})
@@ -111,10 +111,9 @@ func (h *PartnerQueryHandler) QuerySparkTransactionVolumes(
 
 	return &pbpartner.QuerySparkTransactionVolumesResponse{
 		PartnerId:             pInfo.PartnerID,
-		Label:                 req.GetLabel(),
 		StartDate:             req.GetStartDate(),
 		EndDate:               req.GetEndDate(),
-		TransactionTypes:      txTypes,
+		Entries:               entries,
 		TotalVolumeSats:       totalVolume,
 		TotalTransactionCount: totalCount,
 	}, nil

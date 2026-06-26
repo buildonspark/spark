@@ -33,24 +33,30 @@ message QuerySparkTransactionVolumesRequest {
     // If unset, results include all networks. When set, results are scoped to that
     // single network. All defined networks (MAINNET, REGTEST, TESTNET, SIGNET) are allowed.
     optional spark.Network network = 4 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
-    // Optional partner label (sub-account). If empty, results aggregate across all of
-    // the authenticated partner's labels; if set, results are scoped to that label.
+    // Optional partner label (sub-account). If empty, results contain one entry per
+    // (label, transaction_type) pair across all of the authenticated partner's labels;
+    // if set, results are scoped to that label (still one entry per transaction type).
     // Always scoped to the authenticated partner_id regardless of this value.
     string label = 5 [(validate.rules).string = {max_len: 255}];
 }
 
-message SparkTransactionVolume {
-    SparkTransactionType transaction_type = 1;
-    int64 volume_sats = 2;
-    int64 transaction_count = 3;
+// TransactionVolumeEntry holds the aggregated transaction volume for a single
+// (label, transaction type) pair over the requested date range.
+message TransactionVolumeEntry {
+    string label = 1;
+    SparkTransactionType transaction_type = 2;
+    int64 volume_sats = 3;
+    int64 transaction_count = 4;
 }
 
 message QuerySparkTransactionVolumesResponse {
     string partner_id = 1;
-    string label = 2;
-    string start_date = 3;
-    string end_date = 4;
-    repeated SparkTransactionVolume transaction_types = 5;
-    int64 total_volume_sats = 6;
-    int64 total_transaction_count = 7;
+    string start_date = 2;
+    string end_date = 3;
+    // One entry per (label, transaction type) pair. When the request specifies a
+    // label, entries are scoped to that label; otherwise they span all of the
+    // authenticated partner's labels.
+    repeated TransactionVolumeEntry entries = 4;
+    int64 total_volume_sats = 5;
+    int64 total_transaction_count = 6;
 }
