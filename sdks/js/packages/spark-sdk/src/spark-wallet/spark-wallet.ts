@@ -2002,16 +2002,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * pricing info and fulfillment plans indicating when funds will be available
    * based on confirmation probability.
    *
-   * @experimental This API is experimental and may change or be removed without notice.
-   *
    * @param {string} transactionId - The transaction ID of the deposit
    * @param {number} [outputIndex] - The output index (auto-detected if omitted)
    * @returns {Promise<InstantStaticDepositQuoteOutput>} The quote and fulfillment plans
    */
-  public async experimental_GetInstantStaticDepositQuote(
+  public async getInstantStaticDepositQuote(
     transactionId: string,
     outputIndex?: number,
-    partnerId?: string,
   ): Promise<InstantStaticDepositQuoteOutput> {
     const sspClient = this.getSspClient();
 
@@ -2030,7 +2027,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       transactionId,
       outputIndex,
       network,
-      partnerId,
     });
 
     if (!result) {
@@ -2048,20 +2044,18 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   /**
    * Claims an instant static deposit using a quote from {@link
-   * experimental_GetInstantStaticDepositQuote}. Supports both 0-conf (instant tagged hash
+   * getInstantStaticDepositQuote}. Supports both 0-conf (instant tagged hash
    * signature) and 1-conf (regular static deposit signature) paths based on the fulfillment plan's
    * confirmation requirement.
    *
-   * @experimental This API is experimental and may change or be removed without notice.
-   *
    * @param {Object} params - Claim parameters
-   * @param {StaticDepositQuote} params.quote - The quote from experimental_GetInstantStaticDepositQuote
+   * @param {StaticDepositQuote} params.quote - The quote from getInstantStaticDepositQuote
    * @param {InstantStaticDepositPlan} params.plan - The fulfillment plan to claim
    * @param {string} params.transactionId - The deposit transaction ID
    * @param {number} params.outputIndex - The deposit output index
    * @returns {Promise<{ claimId: string }>} The claim ID
    */
-  public async experimental_ClaimInstantStaticDeposit({
+  public async claimInstantStaticDeposit({
     quote,
     plan,
     transactionId,
@@ -2130,6 +2124,30 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     return { claimId: result.claimId };
+  }
+
+  /**
+   * @deprecated Use {@link getInstantStaticDepositQuote} instead. Retained for
+   * backwards compatibility; delegates to the official method.
+   */
+  public async experimental_GetInstantStaticDepositQuote(
+    transactionId: string,
+    outputIndex?: number,
+  ): Promise<InstantStaticDepositQuoteOutput> {
+    return this.getInstantStaticDepositQuote(transactionId, outputIndex);
+  }
+
+  /**
+   * @deprecated Use {@link claimInstantStaticDeposit} instead. Retained for
+   * backwards compatibility; delegates to the official method.
+   */
+  public async experimental_ClaimInstantStaticDeposit(params: {
+    quote: StaticDepositQuote;
+    plan: InstantStaticDepositPlan;
+    transactionId: string;
+    outputIndex: number;
+  }): Promise<{ claimId: string }> {
+    return this.claimInstantStaticDeposit(params);
   }
 
   /**
@@ -6417,6 +6435,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "checkTimelock",
   "claimDeposit",
   "claimMultiUtxoDeposit",
+  "claimInstantStaticDeposit",
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
   "experimental_ClaimInstantStaticDeposit",
@@ -6437,6 +6456,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "getCachedBalance",
   "getClaimStaticDepositQuote",
   "getCoopExitRequest",
+  "getInstantStaticDepositQuote",
   "experimental_GetInstantStaticDepositQuote",
   "getIdentityPublicKey",
   "getLeaves",

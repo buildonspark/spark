@@ -10,13 +10,11 @@ export const GetInstantStaticDepositQuote = `
     $transaction_id: String!
     $output_index: Int!
     $network: BitcoinNetwork!
-    $partner_id: String
   ) {
     create_instant_static_deposit_quote(input: {
       transaction_id: $transaction_id,
       output_index: $output_index,
-      network: $network,
-      partner_id: $partner_id
+      network: $network
     }) {
       ...InstantStaticDepositQuoteOutputFragment
     }
