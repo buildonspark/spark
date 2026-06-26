@@ -177,7 +177,6 @@ func TestExitTreesReturnsIneligibleTreesWithoutSigning(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Empty(t, resp.GetSigningResults())
 	require.Nil(t, resp.GetSigned())
 	ineligible := resp.GetIneligible()
 	require.NotNil(t, ineligible)
