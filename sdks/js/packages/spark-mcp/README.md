@@ -49,14 +49,15 @@ Then add to `~/.claude.json` (or `.mcp.json` in the project root). See [Configur
 
 ### Environment variables
 
-| Variable                   | Required | Description                                                                                                                                                                                                                                       |
-| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BITCOIN_NETWORK`          | No       | Bitcoin network: `LOCAL`, `REGTEST` (default), or `MAINNET`                                                                                                                                                                                       |
-| `SPARK_MNEMONIC`           | No       | Default BIP39 mnemonic (12 or 24 words). Omit to use `spark_create_wallet` or pass `mnemonic` per-tool call.                                                                                                                                      |
-| `SPARK_LOCAL_INGRESS_HOST` | No       | Set to your local Spark ingress host (for example `192.168.49.2` on minikube or `127.0.0.1` on kind) to route to `https://{i}.spark.minikube.local`. Omit when using `run-everything.sh` — the SDK routes to `localhost:8535-8539` automatically. |
-| `BITCOIN_RPC_URL`          | No       | Bitcoin JSON-RPC URL for `spark_fund_address`. Defaults to `http://{SPARK_LOCAL_INGRESS_HOST}:8332` or `http://127.0.0.1:8332`.                                                                                                                   |
-| `BITCOIN_RPC_USER`         | No       | Bitcoin RPC username (default: `testutil`)                                                                                                                                                                                                        |
-| `BITCOIN_RPC_PASSWORD`     | No       | Bitcoin RPC password (default: `testutilpassword`)                                                                                                                                                                                                |
+| Variable                                     | Required | Description                                                                                                                                                                                                                                                                             |
+| -------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BITCOIN_NETWORK`                            | No       | Bitcoin network: `LOCAL`, `REGTEST` (default), or `MAINNET`                                                                                                                                                                                                                             |
+| `SPARK_MNEMONIC`                             | No       | Default BIP39 mnemonic (12 or 24 words). Omit to use `spark_create_wallet` or pass `mnemonic` per-tool call.                                                                                                                                                                            |
+| `SPARK_LOCAL_INGRESS_HOST`                   | No       | Set to your local Spark ingress host (for example `192.168.49.2` on minikube or `127.0.0.1` on kind) to route to `https://{i}.spark.minikube.local`. Omit when using `run-everything.sh` — the SDK routes to `localhost:8535-8539` automatically.                                       |
+| `SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION` | No       | Set to `true` on **minikube LOCAL** so the SDK trusts the cluster's self-signed signing-operator/SSP certificates. Without it (or `NODE_EXTRA_CA_CERTS` pointing at the minikube CA), connections fail with `unable to verify the first certificate`. Never set on `REGTEST`/`MAINNET`. |
+| `BITCOIN_RPC_URL`                            | No       | Bitcoin JSON-RPC URL for `spark_fund_address`. Defaults to `http://{SPARK_LOCAL_INGRESS_HOST}:8332` or `http://127.0.0.1:8332`.                                                                                                                                                         |
+| `BITCOIN_RPC_USER`                           | No       | Bitcoin RPC username (default: `testutil`)                                                                                                                                                                                                                                              |
+| `BITCOIN_RPC_PASSWORD`                       | No       | Bitcoin RPC password (default: `testutilpassword`)                                                                                                                                                                                                                                      |
 
 ### Networks
 
@@ -117,12 +118,19 @@ Every tool accepts an optional `network` parameter (`LOCAL`, `REGTEST`, or `MAIN
       "args": ["/path/to/spark/sdks/js/packages/spark-mcp/dist/index.js"],
       "env": {
         "BITCOIN_NETWORK": "LOCAL",
-        "SPARK_LOCAL_INGRESS_HOST": "192.168.49.2"
+        "SPARK_LOCAL_INGRESS_HOST": "192.168.49.2",
+        "SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION": "true"
       }
     }
   }
 }
 ```
+
+> **minikube TLS:** the signing operators and SSP are served over HTTPS with the cluster's
+> self-signed certificates (`https://{i}.spark.minikube.local`). `SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION=true`
+> lets the SDK connect to them; without it (or `NODE_EXTRA_CA_CERTS` pointing at the minikube CA from the
+> `cert-manager/ca-tls` secret) every call fails with `unable to verify the first certificate`. Only use this
+> on LOCAL — never on `REGTEST`/`MAINNET`.
 
 **Local development (run-everything.sh):**
 
