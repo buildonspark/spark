@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -649,6 +650,52 @@ func consensusRollbackMessage(t *testing.T, executionID string) *pbgossip.Gossip
 	}
 }
 
+func TestClassifyConsensusOp(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	opType := int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
+
+	participant := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(participant).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(opType).SetCoordinatorIndex(1).Save(ctx)
+	require.NoError(t, err)
+
+	coordinator := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(coordinator).SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(opType).SetCoordinatorIndex(0).Save(ctx)
+	require.NoError(t, err)
+
+	unknown := uuid.New()
+
+	cases := []struct {
+		name string
+		id   string
+		want consensusOpDisposition
+	}{
+		{"participant row -> apply", participant.String(), applyOp},
+		{"coordinator row -> skip echo", coordinator.String(), skipCoordinatorEcho},
+		{"no row -> skip foreign", unknown.String(), skipForeignOp},
+		{"empty id -> apply (pre-upgrade)", "", applyOp},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := classifyConsensusOp(ctx, c.id)
+			require.NoError(t, err)
+			require.Equal(t, c.want, got)
+		})
+	}
+
+	t.Run("invalid flow id -> error, not applied", func(t *testing.T) {
+		got, err := classifyConsensusOp(ctx, "not-a-uuid")
+		require.Error(t, err)
+		require.NotEqual(t, applyOp, got)
+	})
+}
+
 func TestHandleGossipMessage_ConsensusCommit_TransitionsParticipantRowToCommitted(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	row := insertParticipantRow(t, ctx, uuid.New())
@@ -804,4 +851,98 @@ func TestRunConsensusRollback_AlreadyExists_MarksRowRolledBack(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, st.FlowExecutionStatusRolledBack, updated.Status,
 		"row must transition to ROLLED_BACK when the handler reports AlreadyExists")
+}
+
+func TestConsensusRollbackFenceThroughGossip(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{92})
+	gossipHandler := NewGossipHandler(setUpTestConfigWithRegtestNoAuthz(t))
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	opType := int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
+
+	newPreparedTransfer := func(t *testing.T, owner uuid.UUID) *ent.Transfer {
+		t.Helper()
+		transfer := createTestTransfer(t, ctx, rng, client, st.TransferStatusSenderKeyTweakPending)
+		_, err := client.FlowExecution.Create().
+			SetID(owner).SetRole(st.FlowExecutionRoleParticipant).
+			SetOpType(opType).SetCoordinatorIndex(1).Save(ctx)
+		require.NoError(t, err)
+		return transfer
+	}
+	rollbackGossip := func(t *testing.T, transferID uuid.UUID, flowID string) *pbgossip.GossipMessage {
+		t.Helper()
+		op, err := anypb.New(&pbinternal.SendTransferRollbackRequest{TransferId: transferID.String()})
+		require.NoError(t, err)
+		return &pbgossip.GossipMessage{
+			Message: &pbgossip.GossipMessage_ConsensusRollback{
+				ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
+					OpType:          pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+					Operation:       op,
+					FlowExecutionId: flowID,
+				},
+			},
+		}
+	}
+	commitGossip := func(t *testing.T, transferID uuid.UUID, flowID string) *pbgossip.GossipMessage {
+		t.Helper()
+		op, err := anypb.New(&pbinternal.SendTransferCommitRequest{TransferId: transferID.String()})
+		require.NoError(t, err)
+		return &pbgossip.GossipMessage{
+			Message: &pbgossip.GossipMessage_ConsensusCommit{
+				ConsensusCommit: &pbgossip.GossipMessageConsensusCommit{
+					OpType:          pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+					Operation:       op,
+					FlowExecutionId: flowID,
+				},
+			},
+		}
+	}
+	statusOf := func(t *testing.T, id uuid.UUID) st.TransferStatus {
+		t.Helper()
+		updated, err := client.Transfer.Get(ctx, id)
+		require.NoError(t, err)
+		return updated.Status
+	}
+
+	t.Run("foreign flow rollback is a no-op", func(t *testing.T) {
+		owner := uuid.New()
+		transfer := newPreparedTransfer(t, owner)
+		foreign := uuid.New().String()
+		require.NoError(t, gossipHandler.HandleGossipMessage(ctx, rollbackGossip(t, transfer.ID, foreign), false))
+		require.Equal(t, st.TransferStatusSenderKeyTweakPending, statusOf(t, transfer.ID))
+	})
+
+	t.Run("owning flow rollback proceeds", func(t *testing.T) {
+		owner := uuid.New()
+		transfer := newPreparedTransfer(t, owner)
+		require.NoError(t, gossipHandler.HandleGossipMessage(ctx, rollbackGossip(t, transfer.ID, owner.String()), false))
+		require.Equal(t, st.TransferStatusReturned, statusOf(t, transfer.ID))
+	})
+
+	t.Run("foreign flow commit is a no-op", func(t *testing.T) {
+		owner := uuid.New()
+		transfer := newPreparedTransfer(t, owner)
+		require.NoError(t, gossipHandler.HandleGossipMessage(ctx, commitGossip(t, transfer.ID, uuid.New().String()), false))
+		require.Equal(t, st.TransferStatusSenderKeyTweakPending, statusOf(t, transfer.ID))
+	})
+
+	t.Run("owning flow commit proceeds", func(t *testing.T) {
+		owner := uuid.New()
+		transfer := newPreparedTransfer(t, owner)
+		require.NoError(t, gossipHandler.HandleGossipMessage(ctx, commitGossip(t, transfer.ID, owner.String()), false))
+		require.Equal(t, st.TransferStatusSenderKeyTweaked, statusOf(t, transfer.ID))
+	})
+
+	t.Run("coordinator-role row commit is skipped (self-echo)", func(t *testing.T) {
+		coordinator := uuid.New()
+		transfer := createTestTransfer(t, ctx, rng, client, st.TransferStatusSenderKeyTweakPending)
+		_, err := client.FlowExecution.Create().
+			SetID(coordinator).SetRole(st.FlowExecutionRoleCoordinator).
+			SetOpType(opType).SetCoordinatorIndex(0).Save(ctx)
+		require.NoError(t, err)
+		require.NoError(t, gossipHandler.HandleGossipMessage(ctx, commitGossip(t, transfer.ID, coordinator.String()), false))
+		require.Equal(t, st.TransferStatusSenderKeyTweakPending, statusOf(t, transfer.ID))
+	})
 }
