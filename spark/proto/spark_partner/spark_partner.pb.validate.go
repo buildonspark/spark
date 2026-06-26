@@ -266,27 +266,29 @@ var _QuerySparkTransactionVolumesRequest_Network_NotInLookup = map[spark.Network
 	0: {},
 }
 
-// Validate checks the field values on SparkTransactionVolume with the rules
+// Validate checks the field values on TransactionVolumeEntry with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *SparkTransactionVolume) Validate() error {
+func (m *TransactionVolumeEntry) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on SparkTransactionVolume with the rules
+// ValidateAll checks the field values on TransactionVolumeEntry with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// SparkTransactionVolumeMultiError, or nil if none found.
-func (m *SparkTransactionVolume) ValidateAll() error {
+// TransactionVolumeEntryMultiError, or nil if none found.
+func (m *TransactionVolumeEntry) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *SparkTransactionVolume) validate(all bool) error {
+func (m *TransactionVolumeEntry) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
+
+	// no validation rules for Label
 
 	// no validation rules for TransactionType
 
@@ -295,19 +297,19 @@ func (m *SparkTransactionVolume) validate(all bool) error {
 	// no validation rules for TransactionCount
 
 	if len(errors) > 0 {
-		return SparkTransactionVolumeMultiError(errors)
+		return TransactionVolumeEntryMultiError(errors)
 	}
 
 	return nil
 }
 
-// SparkTransactionVolumeMultiError is an error wrapping multiple validation
-// errors returned by SparkTransactionVolume.ValidateAll() if the designated
+// TransactionVolumeEntryMultiError is an error wrapping multiple validation
+// errors returned by TransactionVolumeEntry.ValidateAll() if the designated
 // constraints aren't met.
-type SparkTransactionVolumeMultiError []error
+type TransactionVolumeEntryMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m SparkTransactionVolumeMultiError) Error() string {
+func (m TransactionVolumeEntryMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -316,11 +318,11 @@ func (m SparkTransactionVolumeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m SparkTransactionVolumeMultiError) AllErrors() []error { return m }
+func (m TransactionVolumeEntryMultiError) AllErrors() []error { return m }
 
-// SparkTransactionVolumeValidationError is the validation error returned by
-// SparkTransactionVolume.Validate if the designated constraints aren't met.
-type SparkTransactionVolumeValidationError struct {
+// TransactionVolumeEntryValidationError is the validation error returned by
+// TransactionVolumeEntry.Validate if the designated constraints aren't met.
+type TransactionVolumeEntryValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -328,24 +330,24 @@ type SparkTransactionVolumeValidationError struct {
 }
 
 // Field function returns field value.
-func (e SparkTransactionVolumeValidationError) Field() string { return e.field }
+func (e TransactionVolumeEntryValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e SparkTransactionVolumeValidationError) Reason() string { return e.reason }
+func (e TransactionVolumeEntryValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e SparkTransactionVolumeValidationError) Cause() error { return e.cause }
+func (e TransactionVolumeEntryValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e SparkTransactionVolumeValidationError) Key() bool { return e.key }
+func (e TransactionVolumeEntryValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e SparkTransactionVolumeValidationError) ErrorName() string {
-	return "SparkTransactionVolumeValidationError"
+func (e TransactionVolumeEntryValidationError) ErrorName() string {
+	return "TransactionVolumeEntryValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e SparkTransactionVolumeValidationError) Error() string {
+func (e TransactionVolumeEntryValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -357,14 +359,14 @@ func (e SparkTransactionVolumeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sSparkTransactionVolume.%s: %s%s",
+		"invalid %sTransactionVolumeEntry.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = SparkTransactionVolumeValidationError{}
+var _ error = TransactionVolumeEntryValidationError{}
 
 var _ interface {
 	Field() string
@@ -372,7 +374,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = SparkTransactionVolumeValidationError{}
+} = TransactionVolumeEntryValidationError{}
 
 // Validate checks the field values on QuerySparkTransactionVolumesResponse
 // with the rules defined in the proto definition for this message. If any
@@ -399,13 +401,11 @@ func (m *QuerySparkTransactionVolumesResponse) validate(all bool) error {
 
 	// no validation rules for PartnerId
 
-	// no validation rules for Label
-
 	// no validation rules for StartDate
 
 	// no validation rules for EndDate
 
-	for idx, item := range m.GetTransactionTypes() {
+	for idx, item := range m.GetEntries() {
 		_, _ = idx, item
 
 		if all {
@@ -413,7 +413,7 @@ func (m *QuerySparkTransactionVolumesResponse) validate(all bool) error {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, QuerySparkTransactionVolumesResponseValidationError{
-						field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+						field:  fmt.Sprintf("Entries[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -421,7 +421,7 @@ func (m *QuerySparkTransactionVolumesResponse) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, QuerySparkTransactionVolumesResponseValidationError{
-						field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+						field:  fmt.Sprintf("Entries[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -430,7 +430,7 @@ func (m *QuerySparkTransactionVolumesResponse) validate(all bool) error {
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return QuerySparkTransactionVolumesResponseValidationError{
-					field:  fmt.Sprintf("TransactionTypes[%v]", idx),
+					field:  fmt.Sprintf("Entries[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

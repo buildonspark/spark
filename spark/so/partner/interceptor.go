@@ -129,8 +129,13 @@ func (i *Interceptor) PartnerJWTInterceptor(ctx context.Context, req any, info *
 		return handler(ctx, req)
 	}
 
-	ctx = context.WithValue(ctx, partnerContextKey, pInfo)
-	return handler(ctx, req)
+	return handler(ContextWithPartnerInfo(ctx, pInfo), req)
+}
+
+// ContextWithPartnerInfo returns a copy of ctx carrying the verified partner info.
+// Set by the partner interceptors after authentication; read via GetPartnerInfoFromContext.
+func ContextWithPartnerInfo(ctx context.Context, info *PartnerInfo) context.Context {
+	return context.WithValue(ctx, partnerContextKey, info)
 }
 
 // GetPartnerInfoFromContext returns the verified partner info from the context, if present.

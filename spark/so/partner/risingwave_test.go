@@ -138,17 +138,34 @@ func TestRisingWaveClient_QueryTransactionVolumes_Postgres(t *testing.T) {
 	assert.Equal(t, "TRANSFER", rows[0].TransactionType)
 	assert.Equal(t, int64(7000), rows[0].VolumeSats)
 
-	// Query without label (aggregates across all labels for partner).
+	// Query without label returns rows grouped per label for the partner.
 	rows, err = client.QueryTransactionVolumes(
 		t.Context(), "partner-a", "", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 3, 31, 0, 0, 0, 0, time.UTC), nil, nil,
 	)
 	require.NoError(t, err)
 
+	volumeByLabelType := make(map[string]map[string]int64)
 	var totalVolume int64
+	var order [][2]string
 	for _, r := range rows {
+		if volumeByLabelType[r.Label] == nil {
+			volumeByLabelType[r.Label] = make(map[string]int64)
+		}
+		volumeByLabelType[r.Label][r.TransactionType] = r.VolumeSats
 		totalVolume += r.VolumeSats
+		order = append(order, [2]string{r.Label, r.TransactionType})
 	}
 	assert.Equal(t, int64(206999), totalVolume)
+	assert.Equal(t, int64(87000), volumeByLabelType["label-1"]["TRANSFER"])
+	assert.Equal(t, int64(20000), volumeByLabelType["label-1"]["LIGHTNING_SEND"])
+	assert.Equal(t, int64(99999), volumeByLabelType["label-2"]["TRANSFER"])
+
+	// Rows come back ordered by (label, transaction_type) per the query's ORDER BY.
+	assert.Equal(t, [][2]string{
+		{"label-1", "LIGHTNING_SEND"},
+		{"label-1", "TRANSFER"},
+		{"label-2", "TRANSFER"},
+	}, order)
 
 	// Query for different partner returns only their data.
 	rows, err = client.QueryTransactionVolumes(
@@ -157,4 +174,11 @@ func TestRisingWaveClient_QueryTransactionVolumes_Postgres(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, int64(88888), rows[0].VolumeSats)
+
+	// Query with a date range that matches no rows returns an empty slice, no error.
+	rows, err = client.QueryTransactionVolumes(
+		t.Context(), "partner-a", "", time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2030, 1, 31, 0, 0, 0, 0, time.UTC), nil, nil,
+	)
+	require.NoError(t, err)
+	assert.Empty(t, rows)
 }
