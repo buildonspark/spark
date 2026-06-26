@@ -546,7 +546,6 @@ export default class SspClient {
     transactionId,
     outputIndex,
     network,
-    partnerId,
   }: StaticDepositQuoteInput): Promise<InstantStaticDepositQuoteOutput | null> {
     return await this.executeRawQuery({
       queryPayload: GetInstantStaticDepositQuote,
@@ -554,7 +553,6 @@ export default class SspClient {
         transaction_id: transactionId,
         output_index: outputIndex,
         network: network,
-        partner_id: partnerId,
       },
       constructObject: (response: {
         create_instant_static_deposit_quote: unknown;

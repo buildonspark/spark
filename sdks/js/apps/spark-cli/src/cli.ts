@@ -73,7 +73,7 @@ export interface FeeRate {
 }
 
 type InstantStaticDepositClaimParams = Parameters<
-  IssuerSparkWallet["experimental_ClaimInstantStaticDeposit"]
+  IssuerSparkWallet["claimInstantStaticDeposit"]
 >[0];
 
 type InstantStaticDepositQuoteData = {
@@ -821,7 +821,7 @@ async function runCLI() {
   claimstaticdepositquote <txid> [outputIndex]                        - Get a quote for claiming a static deposit
   claimstaticdeposit <txid> <creditAmountSats> <sspSignature> [outputIndex] - Claim a static deposits
   claimstaticdepositwithmaxfee <txid> <maxFee> [outputIndex]          - Claim a static deposit with a max fee
-  instantstaticdepositquote <txid> [outputIndex] [partnerId]          - Get an instant static deposit quote
+  instantstaticdepositquote <txid> [outputIndex]                      - Get an instant static deposit quote
   claiminstantstaticdeposit <quoteJson> [planIndex] [txid] [outputIndex]  - Claim an instant static deposit (paste JSON from instantstaticdepositquote, override txid/vout for RBF)
   getutxosfordepositaddress <depositAddress> <excludeClaimed(true|false)> - Get all UTXOs for a deposit address
   refundstaticdepositlegacy <depositTransactionId> <destinationAddress> <fee> [outputIndex] - Refund a static deposit legacy
@@ -1492,13 +1492,10 @@ async function runCLI() {
             const txid = args[0];
             const outputIdx =
               args[1] !== undefined ? parseInt(args[1]) : undefined;
-            const partnerId = args[2];
-            const instantQuote =
-              await wallet.experimental_GetInstantStaticDepositQuote(
-                txid,
-                outputIdx,
-                partnerId,
-              );
+            const instantQuote = await wallet.getInstantStaticDepositQuote(
+              txid,
+              outputIdx,
+            );
             console.log(JSON.stringify(instantQuote, null, 2));
           }
           break;
@@ -1529,7 +1526,7 @@ async function runCLI() {
                 ? parseInt(args[3])
                 : quoteData.quote.outputIndex;
 
-            const result = await wallet.experimental_ClaimInstantStaticDeposit({
+            const result = await wallet.claimInstantStaticDeposit({
               quote: quoteData.quote,
               plan: quoteData.fulfillmentPlans[planIdx],
               transactionId: txid,

@@ -20,7 +20,7 @@ function findOutputVout(tx: Transaction, amount: bigint): number | undefined {
 
 describe("SSP instant static deposit integration", () => {
   describe("Quote flow", () => {
-    it("should get an instant static deposit quote", async () => {
+    it("should get an instant static deposit quote via the deprecated experimental alias", async () => {
       const faucet = BitcoinFaucet.getInstance();
       const { wallet: userWallet } =
         await SparkWalletTestingWithStream.initialize({
@@ -74,7 +74,7 @@ describe("SSP instant static deposit integration", () => {
   });
 
   describe("Claim flow", () => {
-    it("should claim an instant static deposit", async () => {
+    it("should claim an instant static deposit via the deprecated experimental alias", async () => {
       const faucet = BitcoinFaucet.getInstance();
       const { wallet: userWallet } =
         await SparkWalletTestingWithStream.initialize({
@@ -93,12 +93,10 @@ describe("SSP instant static deposit integration", () => {
       const transactionId = signedTx.id;
       const vout = findOutputVout(signedTx, DEPOSIT_AMOUNT);
 
-      const quoteResult =
-        await userWallet.experimental_GetInstantStaticDepositQuote(
-          transactionId,
-          vout,
-          "test-partner",
-        );
+      const quoteResult = await userWallet.getInstantStaticDepositQuote(
+        transactionId,
+        vout,
+      );
 
       const claimResult =
         await userWallet.experimental_ClaimInstantStaticDeposit({
@@ -137,22 +135,19 @@ describe("SSP instant static deposit integration", () => {
       const transactionId = signedTx.id;
       const vout = findOutputVout(signedTx, DEPOSIT_AMOUNT);
 
-      const quoteResult =
-        await userWallet.experimental_GetInstantStaticDepositQuote(
-          transactionId,
-          vout,
-          "test-partner",
-        );
+      const quoteResult = await userWallet.getInstantStaticDepositQuote(
+        transactionId,
+        vout,
+      );
 
       await faucet.mineBlocksAndWaitForMiningToComplete(1);
 
-      const claimResult =
-        await userWallet.experimental_ClaimInstantStaticDeposit({
-          quote: quoteResult.quote,
-          plan: quoteResult.fulfillmentPlans[0]!,
-          transactionId: transactionId,
-          outputIndex: vout!,
-        });
+      const claimResult = await userWallet.claimInstantStaticDeposit({
+        quote: quoteResult.quote,
+        plan: quoteResult.fulfillmentPlans[0]!,
+        transactionId: transactionId,
+        outputIndex: vout!,
+      });
 
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
@@ -185,21 +180,18 @@ describe("SSP instant static deposit integration", () => {
         expect(vout1).toBeDefined();
 
         // Get quote while tx1 is unconfirmed
-        const quoteResult =
-          await userWallet.experimental_GetInstantStaticDepositQuote(
-            tx1.id,
-            vout1,
-            "test-partner",
-          );
+        const quoteResult = await userWallet.getInstantStaticDepositQuote(
+          tx1.id,
+          vout1,
+        );
 
         // Claim while tx1 is still unconfirmed
-        const claimResult =
-          await userWallet.experimental_ClaimInstantStaticDeposit({
-            quote: quoteResult.quote,
-            plan: quoteResult.fulfillmentPlans[0]!,
-            transactionId: tx1.id,
-            outputIndex: vout1!,
-          });
+        const claimResult = await userWallet.claimInstantStaticDeposit({
+          quote: quoteResult.quote,
+          plan: quoteResult.fulfillmentPlans[0]!,
+          transactionId: tx1.id,
+          outputIndex: vout1!,
+        });
 
         expect(claimResult).toBeDefined();
         expect(claimResult.claimId).toBeDefined();
@@ -259,18 +251,12 @@ describe("SSP instant static deposit integration", () => {
       const vout = findOutputVout(tx, DEPOSIT_AMOUNT);
       expect(vout).toBeDefined();
 
-      await userWallet.experimental_GetInstantStaticDepositQuote(
-        transactionId,
-        vout,
-      );
+      await userWallet.getInstantStaticDepositQuote(transactionId, vout);
 
       await faucet.mineBlocks(1);
 
       const confirmedQuoteResult =
-        await userWallet.experimental_GetInstantStaticDepositQuote(
-          transactionId,
-          vout,
-        );
+        await userWallet.getInstantStaticDepositQuote(transactionId, vout);
 
       const oneConfPlan = confirmedQuoteResult.fulfillmentPlans.find(
         (p) => p.confirmations === 1,
@@ -283,13 +269,12 @@ describe("SSP instant static deposit integration", () => {
         return;
       }
 
-      const claimResult =
-        await userWallet.experimental_ClaimInstantStaticDeposit({
-          quote: confirmedQuoteResult.quote,
-          plan: oneConfPlan,
-          transactionId,
-          outputIndex: vout!,
-        });
+      const claimResult = await userWallet.claimInstantStaticDeposit({
+        quote: confirmedQuoteResult.quote,
+        plan: oneConfPlan,
+        transactionId,
+        outputIndex: vout!,
+      });
 
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
@@ -318,11 +303,10 @@ describe("SSP instant static deposit integration", () => {
       const vout1 = findOutputVout(tx1, ODD_DEPOSIT_AMOUNT);
       expect(vout1).toBeDefined();
 
-      const quoteResult =
-        await userWallet.experimental_GetInstantStaticDepositQuote(
-          tx1.id,
-          vout1,
-        );
+      const quoteResult = await userWallet.getInstantStaticDepositQuote(
+        tx1.id,
+        vout1,
+      );
 
       const oneConfPlan = quoteResult.fulfillmentPlans.find(
         (p) => p.confirmations === 1,
@@ -365,13 +349,12 @@ describe("SSP instant static deposit integration", () => {
 
       // 1-conf plan with same amount should succeed even after RBF,
       // because the replacement tx pays the same address and amount.
-      const claimResult =
-        await userWallet.experimental_ClaimInstantStaticDeposit({
-          quote: quoteResult.quote,
-          plan: oneConfPlan,
-          transactionId: tx2.id,
-          outputIndex: vout2!,
-        });
+      const claimResult = await userWallet.claimInstantStaticDeposit({
+        quote: quoteResult.quote,
+        plan: oneConfPlan,
+        transactionId: tx2.id,
+        outputIndex: vout2!,
+      });
 
       expect(claimResult).toBeDefined();
       expect(claimResult.claimId).toBeDefined();
@@ -400,11 +383,10 @@ describe("SSP instant static deposit integration", () => {
       const vout1 = findOutputVout(tx1, ODD_DEPOSIT_AMOUNT);
       expect(vout1).toBeDefined();
 
-      const quoteResult =
-        await userWallet.experimental_GetInstantStaticDepositQuote(
-          tx1.id,
-          vout1,
-        );
+      const quoteResult = await userWallet.getInstantStaticDepositQuote(
+        tx1.id,
+        vout1,
+      );
 
       const oneConfPlan = quoteResult.fulfillmentPlans.find(
         (p) => p.confirmations === 1,
@@ -448,7 +430,7 @@ describe("SSP instant static deposit integration", () => {
 
       // Claim with original quote (for ODD_DEPOSIT_AMOUNT) but RBF'd tx (for differentAmount)
       await expect(
-        userWallet.experimental_ClaimInstantStaticDeposit({
+        userWallet.claimInstantStaticDeposit({
           quote: quoteResult.quote,
           plan: oneConfPlan,
           transactionId: tx2.id,
@@ -483,12 +465,10 @@ describe("SSP instant static deposit integration", () => {
         const vout1 = findOutputVout(tx1, DEPOSIT_AMOUNT);
         expect(vout1).toBeDefined();
 
-        const quoteResult =
-          await userWallet.experimental_GetInstantStaticDepositQuote(
-            tx1.id,
-            vout1,
-            "test-partner",
-          );
+        const quoteResult = await userWallet.getInstantStaticDepositQuote(
+          tx1.id,
+          vout1,
+        );
 
         const zeroConfPlan = quoteResult.fulfillmentPlans.find(
           (p) => p.confirmations === 0,
@@ -537,13 +517,12 @@ describe("SSP instant static deposit integration", () => {
         const vout2 = findOutputVout(tx2, DEPOSIT_AMOUNT);
         expect(vout2).toBeDefined();
 
-        const claimResult =
-          await userWallet.experimental_ClaimInstantStaticDeposit({
-            quote: quoteResult.quote,
-            plan: zeroConfPlan,
-            transactionId: tx2.id,
-            outputIndex: vout2!,
-          });
+        const claimResult = await userWallet.claimInstantStaticDeposit({
+          quote: quoteResult.quote,
+          plan: zeroConfPlan,
+          transactionId: tx2.id,
+          outputIndex: vout2!,
+        });
 
         expect(claimResult).toBeDefined();
         expect(claimResult.claimId).toBeDefined();
@@ -576,12 +555,10 @@ describe("SSP instant static deposit integration", () => {
         const vout1 = findOutputVout(tx1, DEPOSIT_AMOUNT);
         expect(vout1).toBeDefined();
 
-        const quoteResult =
-          await userWallet.experimental_GetInstantStaticDepositQuote(
-            tx1.id,
-            vout1,
-            "test-partner",
-          );
+        const quoteResult = await userWallet.getInstantStaticDepositQuote(
+          tx1.id,
+          vout1,
+        );
 
         const zeroConfPlan = quoteResult.fulfillmentPlans.find(
           (p) => p.confirmations === 0,
@@ -632,7 +609,7 @@ describe("SSP instant static deposit integration", () => {
         expect(vout2).toBeDefined();
 
         await expect(
-          userWallet.experimental_ClaimInstantStaticDeposit({
+          userWallet.claimInstantStaticDeposit({
             quote: quoteResult.quote,
             plan: zeroConfPlan,
             transactionId: tx2.id,
