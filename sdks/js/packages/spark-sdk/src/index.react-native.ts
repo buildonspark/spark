@@ -4,11 +4,13 @@ import "../buffer.js";
 import { Platform } from "react-native";
 
 import { setReactNativeEnvDetails } from "./constants.js";
+import { createXHRFetch } from "./services/xhr-fetch.js";
 import { setSparkFrostOnce } from "./spark-bindings/spark-bindings.js";
 import { SparkFrost } from "./spark-bindings/spark-bindings.react-native.js";
 import { setSparkTokenPrimitivesOnce } from "./token-primitives-bindings/token-primitives-bindings.js";
 import { SparkTokenPrimitives } from "./token-primitives-bindings/token-primitives-bindings.react-native.js";
 import { setCrypto } from "./utils/crypto.js";
+import { setFetch, type SparkFetch } from "./utils/fetch.js";
 
 const rv = Platform.constants?.reactNativeVersion;
 if (rv) {
@@ -22,6 +24,14 @@ if (rv) {
 setCrypto(globalThis.crypto);
 setSparkFrostOnce(new SparkFrost());
 setSparkTokenPrimitivesOnce(new SparkTokenPrimitives());
+
+// Install an XMLHttpRequest-based fetch that reads responses as ArrayBuffers
+// instead of blobs, so React Native's BlobModule can never drop the response
+// body under memory pressure. This replaces the global `fetch` (via setFetch,
+// as the other entrypoints do) rather than scoping to SSP traffic: the
+// BlobModule issue affects any fetch that reads a binary response body, not just
+// the SSP/GraphQL path. See createXHRFetch.
+setFetch(createXHRFetch() as unknown as SparkFetch, globalThis.Headers);
 
 export * from "./index-shared.js";
 
