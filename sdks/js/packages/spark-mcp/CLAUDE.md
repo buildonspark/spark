@@ -80,6 +80,8 @@ The SDK determines endpoints based on its network config:
 
 `SPARK_ENDPOINT` does not exist — `ConfigOptions` has no such field. Pass `SPARK_LOCAL_INGRESS_HOST` via the MCP config `env` block; the SDK reads it from `process.env` automatically.
 
+On **minikube LOCAL** the SO/SSP endpoints are HTTPS with the cluster's self-signed certs, so the SDK needs to trust them: set `SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION=true` (or `NODE_EXTRA_CA_CERTS` → the minikube CA in the `cert-manager/ca-tls` secret) in the `env` block. Without it, calls fail with `unable to verify the first certificate`. LOCAL only — never `REGTEST`/`MAINNET`. (The `run-everything.sh` flow sets this for you — `with-local-routing.sh` defaults `SPARK_DANGEROUSLY_DISABLE_TLS_VERIFICATION=true`.)
+
 ## SDK type notes
 
 These SDK types have non-obvious shapes — don't guess, verify against the SDK source:
