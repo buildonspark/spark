@@ -40,6 +40,9 @@ import (
 var gossipMessageHandledTotal metric.Int64Counter
 var gossipMessageHandledDuration metric.Float64Histogram
 
+// consensusOpFencedTotal counts skipped consensus commit/rollback gossip ops; attribute "phase" = "commit" | "rollback".
+var consensusOpFencedTotal metric.Int64Counter
+
 func init() {
 	meter := otel.GetMeterProvider().Meter("spark.grpc")
 
@@ -69,6 +72,19 @@ func init() {
 		}
 	}
 	gossipMessageHandledDuration = histogram
+
+	fencedCounter, err := meter.Int64Counter(
+		"gossip.consensus_op_fenced_total",
+		metric.WithDescription("Total number of consensus commit/rollback gossip ops skipped by the SP-3336 FlowExecution fence"),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if fencedCounter == nil {
+			fencedCounter = noop.Int64Counter{}
+		}
+	}
+	consensusOpFencedTotal = fencedCounter
 }
 
 type GossipHandler struct {
@@ -784,16 +800,69 @@ func dispatchConsensusCommit(ctx context.Context, config *so.Config, opType pbgo
 	return runConsensusCommit(ctx, handler, opType, flowExecutionID, op)
 }
 
+type consensusOpDisposition int
+
+const (
+	dispositionUnknown consensusOpDisposition = iota
+	applyOp
+	skipForeignOp
+	skipCoordinatorEcho
+)
+
+// classifyConsensusOp returns the disposition for a gossip-delivered consensus op.
+// On error it fails closed (returns the error; the op is not applied) — recovery is
+// via gossip retry for retriable codes, otherwise via the participant reconciler.
+func classifyConsensusOp(ctx context.Context, flowExecutionID string) (consensusOpDisposition, error) {
+	if flowExecutionID == "" {
+		return applyOp, nil // pre-upgrade coordinator: no row to fence against
+	}
+	id, err := uuid.Parse(flowExecutionID)
+	if err != nil {
+		return dispositionUnknown, fmt.Errorf("invalid flow_execution_id in gossip: %w", err)
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return dispositionUnknown, err
+	}
+	row, err := db.FlowExecution.Get(ctx, id)
+	switch {
+	case ent.IsNotFound(err):
+		return skipForeignOp, nil
+	case err != nil:
+		return dispositionUnknown, fmt.Errorf("unable to load flow execution %s: %w", id, err)
+	case row.Role == st.FlowExecutionRoleParticipant:
+		return applyOp, nil
+	default: // FlowExecutionRoleCoordinator
+		return skipCoordinatorEcho, nil
+	}
+}
+
 // runConsensusCommit centralizes the post-handler logic so the
 // AlreadyExists-as-success rule is testable independently of the
 // production opType→handler mapping. handler is supplied by the caller.
 func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
+	disposition, err := classifyConsensusOp(ctx, flowExecutionID)
+	if err != nil {
+		return err
+	}
+	switch disposition {
+	case skipForeignOp:
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+			"consensus commit: no participant FlowExecution row for flow %s (op_type %d); skipping foreign commit",
+			flowExecutionID, opType)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "commit")))
+		return nil
+	case skipCoordinatorEcho:
+		return nil
+	case applyOp:
+	default:
+		return fmt.Errorf("unexpected consensus op disposition %d for flow %s", disposition, flowExecutionID)
+	}
 	if err := handler.Commit(ctx, op); err != nil {
 		if status.Code(err) != codes.AlreadyExists {
 			return err
 		}
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Sugar().Infof(
+		logging.GetLoggerFromContext(ctx).Sugar().Infof(
 			"consensus commit gossip: handler reports AlreadyExists for flow %s op_type %d — treating as success and marking participant row COMMITTED: %v",
 			flowExecutionID, opType, err)
 	}
@@ -818,12 +887,28 @@ func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pb
 
 // runConsensusRollback mirrors runConsensusCommit for the rollback path.
 func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
+	disposition, err := classifyConsensusOp(ctx, flowExecutionID)
+	if err != nil {
+		return err
+	}
+	switch disposition {
+	case skipForeignOp:
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+			"consensus rollback: no participant FlowExecution row for flow %s (op_type %d); skipping foreign rollback",
+			flowExecutionID, opType)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "rollback")))
+		return nil
+	case skipCoordinatorEcho:
+		return nil
+	case applyOp:
+	default:
+		return fmt.Errorf("unexpected consensus op disposition %d for flow %s", disposition, flowExecutionID)
+	}
 	if err := handler.Rollback(ctx, op); err != nil {
 		if status.Code(err) != codes.AlreadyExists {
 			return err
 		}
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Sugar().Infof(
+		logging.GetLoggerFromContext(ctx).Sugar().Infof(
 			"consensus rollback gossip: handler reports AlreadyExists for flow %s op_type %d — treating as success and marking participant row ROLLED_BACK: %v",
 			flowExecutionID, opType, err)
 	}
