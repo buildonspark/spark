@@ -73,18 +73,24 @@ func init() {
 	}
 	gossipMessageHandledDuration = histogram
 
-	fencedCounter, err := meter.Int64Counter(
+	consensusOpFencedTotal = newConsensusOpFencedCounter()
+}
+
+// newConsensusOpFencedCounter builds the fence-skip counter from the current global
+// meter provider; extracted so tests can rebind it to a manual reader.
+func newConsensusOpFencedCounter() metric.Int64Counter {
+	counter, err := otel.GetMeterProvider().Meter("spark.grpc").Int64Counter(
 		"gossip.consensus_op_fenced_total",
 		metric.WithDescription("Total number of consensus commit/rollback gossip ops skipped by the SP-3336 FlowExecution fence"),
 		metric.WithUnit("{count}"),
 	)
 	if err != nil {
 		otel.Handle(err)
-		if fencedCounter == nil {
-			fencedCounter = noop.Int64Counter{}
+		if counter == nil {
+			counter = noop.Int64Counter{}
 		}
 	}
-	consensusOpFencedTotal = fencedCounter
+	return counter
 }
 
 type GossipHandler struct {

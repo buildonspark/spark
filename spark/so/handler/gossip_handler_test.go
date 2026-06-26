@@ -24,6 +24,10 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	msdk "go.opentelemetry.io/otel/sdk/metric"
+	md "go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -945,4 +949,63 @@ func TestConsensusRollbackFenceThroughGossip(t *testing.T) {
 		require.NoError(t, gossipHandler.HandleGossipMessage(ctx, commitGossip(t, transfer.ID, coordinator.String()), false))
 		require.Equal(t, st.TransferStatusSenderKeyTweakPending, statusOf(t, transfer.ID))
 	})
+}
+
+func TestConsensusFenceMetricIncrements(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	gossipHandler := NewGossipHandler(sparktesting.TestConfig(t))
+
+	// The fence counter binds to the global meter provider in init(); rebind it to a
+	// manual reader so the skip-foreign increment is observable.
+	reader := msdk.NewManualReader()
+	prevProvider := otel.GetMeterProvider()
+	testProvider := msdk.NewMeterProvider(msdk.WithReader(reader))
+	otel.SetMeterProvider(testProvider)
+	prev := consensusOpFencedTotal
+	consensusOpFencedTotal = newConsensusOpFencedCounter()
+	t.Cleanup(func() {
+		consensusOpFencedTotal = prev
+		otel.SetMeterProvider(prevProvider)
+		_ = testProvider.Shutdown(t.Context())
+	})
+
+	// A foreign flow id has no FlowExecution row, so both ops are fenced (skip-foreign).
+	transferID := uuid.New().String()
+	commitOp, err := anypb.New(&pbinternal.SendTransferCommitRequest{TransferId: transferID})
+	require.NoError(t, err)
+	rollbackOp, err := anypb.New(&pbinternal.SendTransferRollbackRequest{TransferId: transferID})
+	require.NoError(t, err)
+	require.NoError(t, gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_ConsensusCommit{ConsensusCommit: &pbgossip.GossipMessageConsensusCommit{
+			OpType:          pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+			Operation:       commitOp,
+			FlowExecutionId: uuid.New().String(),
+		}},
+	}, false))
+	require.NoError(t, gossipHandler.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_ConsensusRollback{ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
+			OpType:          pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+			Operation:       rollbackOp,
+			FlowExecutionId: uuid.New().String(),
+		}},
+	}, false))
+
+	var rm md.ResourceMetrics
+	require.NoError(t, reader.Collect(ctx, &rm))
+	byPhase := map[string]int64{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "gossip.consensus_op_fenced_total" {
+				continue
+			}
+			sum, ok := m.Data.(md.Sum[int64])
+			require.True(t, ok, "expected Sum[int64] for %s", m.Name)
+			for _, dp := range sum.DataPoints {
+				phase, _ := dp.Attributes.Value(attribute.Key("phase"))
+				byPhase[phase.AsString()] += dp.Value
+			}
+		}
+	}
+	require.Equal(t, int64(1), byPhase["commit"], "commit-phase fence count")
+	require.Equal(t, int64(1), byPhase["rollback"], "rollback-phase fence count")
 }
