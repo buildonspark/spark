@@ -18,7 +18,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -102,9 +101,6 @@ func errorInfoLeafIDFrom(t *testing.T, st *status.Status) string {
 
 func TestLeafAvailableToTransferRejectsLeafOwnedByDifferentIdentity(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobReadMIMODataModelTransferSend: 100,
-	}))
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 

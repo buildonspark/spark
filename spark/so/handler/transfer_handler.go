@@ -1837,7 +1837,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	senderPubkey, err := mimo.GetSingleTransferSender(ctx, transfer)
+	senderPubkey, err := mimo.GetSingleTransferSender(transfer)
 	if err != nil {
 		return nil, err
 	}

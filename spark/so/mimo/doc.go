@@ -10,11 +10,11 @@
 //     subsets used by partial indexes and raw-SQL filters. Anything that
 //     reasons about "is this transfer/receiver still in flight?" reads
 //     these.
-//   - Compat helpers (compat.go) — read-from-edge-or-fall-back-to-column
-//     accessors for migration-phase code paths gated by
-//     KnobReadMIMODataModelTransferSend. These exist solely to bridge the
-//     pre- and post-edge-table worlds and should be deletable once the
-//     legacy columns are dropped.
+//   - Compat helpers (compat.go) — single-sender / single-receiver
+//     accessors that read participant identity from the (eager-loaded)
+//     TransferSenders and TransferReceivers edges. They centralize edge
+//     access during the MIMO migration and become deletable once
+//     multi-sender support (SP-2784) lets callers read the edges directly.
 //   - SQL fragment helpers (sql.go) — small, generic builders that emit
 //     parameterized SQL clauses (network/types/transfer-id filters, time
 //     bounds) for the raw-SQL pending/stuck-transfer queries. The query
