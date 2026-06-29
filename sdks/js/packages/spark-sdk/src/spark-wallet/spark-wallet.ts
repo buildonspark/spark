@@ -476,10 +476,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     // handleTransferEvent can identify sender events.
     await this.leafManager.initialize();
 
+    void this.setupBackgroundStream();
     if (isReactNative) {
       void this.startPeriodicClaimTransfers();
-    } else {
-      void this.setupBackgroundStream();
     }
 
     await this.syncWallet();

@@ -1,5 +1,11 @@
 import type { ConfigOptions } from '@buildonspark/spark-sdk';
 
+export const HERMETIC_BITCOIN_RPC = {
+  url: 'http://localhost:8332',
+  username: 'testutil',
+  password: 'testutilpassword',
+} as const;
+
 /**
  * Minikube operator configuration for hermetic Android tests.
  * Values sourced from spark-sdk wallet-config.ts (local/hermetic config).
@@ -42,5 +48,15 @@ export const HERMETIC_CONFIG: ConfigOptions = {
     identityPublicKey:
       '028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4',
     schemaEndpoint: 'graphql/spark/rc',
+  },
+  log: {
+    level: 'WARN',
+    services: {
+      connectionManager: { level: 'DEBUG' },
+      depositService: { level: 'DEBUG' },
+      leafManager: { level: 'DEBUG' },
+      sparkWallet: { level: 'DEBUG' },
+      transferService: { level: 'DEBUG' },
+    },
   },
 };
