@@ -969,6 +969,12 @@ func TestFinalizeTransferWithTransferPackageRejectsSessionSenderMismatch(t *test
 		SetExpiryTime(time.Now().Add(24 * time.Hour)).
 		Save(ctx)
 	require.NoError(t, err)
+	_, err = dbCtx.Client.TransferSender.Create().
+		SetTransferID(transferID).
+		SetIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetTransferType(st.TransferTypeTransfer).
+		Save(ctx)
+	require.NoError(t, err)
 
 	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionIdentityPrivKey.Public().Serialize()), time.Now().Add(time.Hour).Unix())
 	handler := NewTransferHandler(cfg)

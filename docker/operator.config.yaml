@@ -63,7 +63,6 @@ knobs:
     spark.so.lightning.allow_preimage_swap_without_transfer: 1
     spark.so.mimo_transfer_multi_receiver_enabled: 1
     spark.so.read_mimo_multi_participant_format: 1
-    spark.so.read_mimo_data_model_transfer_send: 1
     spark.so.read_mimo_data_model_query_pending_transfers: 100
     spark.so.read_mimo_data_model_get_stuck_transfers: 100
     spark.so.read_mimo_data_model_outgoing_in_flight: 100

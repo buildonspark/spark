@@ -513,7 +513,7 @@ func (h *BaseTransferHandler) createTransfer(
 			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId.String(), primaryTransfer.TotalValue, counterTransferAmount)
 		}
 		// Validate that the parties in the Swap V3 counter transfer are the reverse of the primary transfer to ensure atomic swap correctness
-		primarySender, primaryReceiver, err := mimo.GetSingleTransferSenderReceiver(ctx, primaryTransfer)
+		primarySender, primaryReceiver, err := mimo.GetSingleTransferSenderReceiver(primaryTransfer)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1017,7 +1017,7 @@ func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf 
 		return err
 	}
 	// SP-2784: update for multi-sender
-	senderPubkey, err := mimo.GetSingleTransferSender(ctx, transfer)
+	senderPubkey, err := mimo.GetSingleTransferSender(transfer)
 	if err != nil {
 		return err
 	}
@@ -1186,7 +1186,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		return &pbspark.CancelTransferResponse{}, nil
 	}
 	// SP-2784: update for multi-sender
-	senderPubkey, err := mimo.GetSingleTransferSender(ctx, transfer)
+	senderPubkey, err := mimo.GetSingleTransferSender(transfer)
 	if err != nil {
 		return nil, err
 	}

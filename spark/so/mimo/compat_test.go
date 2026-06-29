@@ -1,22 +1,14 @@
 package mimo_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/mimo"
 	"github.com/stretchr/testify/require"
 )
-
-func mimoSendCtx() context.Context {
-	return knobs.InjectKnobsService(context.Background(), knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobReadMIMODataModelTransferSend: 100,
-	}))
-}
 
 func TestGetSingleTransferSenderReceiver_Success(t *testing.T) {
 	senderPub := keys.GeneratePrivateKey().Public()
@@ -34,30 +26,27 @@ func TestGetSingleTransferSenderReceiver_Success(t *testing.T) {
 		},
 	}
 
-	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(transfer)
 	require.NoError(t, err)
 	require.True(t, senderPub.Equals(gotSender))
 	require.True(t, receiverPub.Equals(gotReceiver))
 }
 
-func TestGetSingleTransferSenderReceiver_ZeroSenders_FallsBack(t *testing.T) {
-	senderPub := keys.GeneratePrivateKey().Public()
+func TestGetSingleTransferSenderReceiver_ZeroSenders_ReturnsError(t *testing.T) {
 	receiverPub := keys.GeneratePrivateKey().Public()
 
 	transfer := &ent.Transfer{
-		ID:                     uuid.New(),
-		SenderIdentityPubkey:   senderPub,
-		ReceiverIdentityPubkey: receiverPub,
+		ID: uuid.New(),
 		Edges: ent.TransferEdges{
 			TransferSenders:   nil,
 			TransferReceivers: []*ent.TransferReceiver{{IdentityPubkey: receiverPub}},
 		},
 	}
 
-	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
-	require.NoError(t, err)
-	require.True(t, senderPub.Equals(gotSender))
-	require.True(t, receiverPub.Equals(gotReceiver))
+	_, _, err := mimo.GetSingleTransferSenderReceiver(transfer)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "transfer senders")
+	require.Contains(t, err.Error(), "expected 1")
 }
 
 func TestGetSingleTransferSenderReceiver_MultipleSenders_ReturnsError(t *testing.T) {
@@ -76,30 +65,27 @@ func TestGetSingleTransferSenderReceiver_MultipleSenders_ReturnsError(t *testing
 		},
 	}
 
-	_, _, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	_, _, err := mimo.GetSingleTransferSenderReceiver(transfer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "transfer senders")
 	require.Contains(t, err.Error(), "expected 1")
 }
 
-func TestGetSingleTransferSenderReceiver_ZeroReceivers_FallsBack(t *testing.T) {
+func TestGetSingleTransferSenderReceiver_ZeroReceivers_ReturnsError(t *testing.T) {
 	senderPub := keys.GeneratePrivateKey().Public()
-	receiverPub := keys.GeneratePrivateKey().Public()
 
 	transfer := &ent.Transfer{
-		ID:                     uuid.New(),
-		SenderIdentityPubkey:   senderPub,
-		ReceiverIdentityPubkey: receiverPub,
+		ID: uuid.New(),
 		Edges: ent.TransferEdges{
 			TransferSenders:   []*ent.TransferSender{{IdentityPubkey: senderPub}},
 			TransferReceivers: nil,
 		},
 	}
 
-	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
-	require.NoError(t, err)
-	require.True(t, senderPub.Equals(gotSender))
-	require.True(t, receiverPub.Equals(gotReceiver))
+	_, _, err := mimo.GetSingleTransferSenderReceiver(transfer)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "transfer receivers")
+	require.Contains(t, err.Error(), "expected 1")
 }
 
 func TestGetSingleTransferSenderReceiver_MultipleReceivers_ReturnsError(t *testing.T) {
@@ -118,21 +104,22 @@ func TestGetSingleTransferSenderReceiver_MultipleReceivers_ReturnsError(t *testi
 		},
 	}
 
-	_, _, err := mimo.GetSingleTransferSenderReceiver(mimoSendCtx(), transfer)
+	_, _, err := mimo.GetSingleTransferSenderReceiver(transfer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "transfer receivers")
 	require.Contains(t, err.Error(), "expected 1")
 }
 
-func TestGetSingleTransferSender_LegacyFallback(t *testing.T) {
+func TestGetSingleTransferSender_Success(t *testing.T) {
 	senderPub := keys.GeneratePrivateKey().Public()
 	transfer := &ent.Transfer{
-		ID:                   uuid.New(),
-		SenderIdentityPubkey: senderPub,
+		ID: uuid.New(),
+		Edges: ent.TransferEdges{
+			TransferSenders: []*ent.TransferSender{{IdentityPubkey: senderPub}},
+		},
 	}
 
-	// Knob off — should fall back to the deprecated column.
-	got, err := mimo.GetSingleTransferSender(t.Context(), transfer)
+	got, err := mimo.GetSingleTransferSender(transfer)
 	require.NoError(t, err)
 	require.True(t, senderPub.Equals(got))
 }
