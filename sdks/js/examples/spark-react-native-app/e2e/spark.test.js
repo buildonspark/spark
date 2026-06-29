@@ -1,26 +1,14 @@
-const TIMEOUT = 30 * 1000;
+const { createTestHelpers } = require('./helpers');
 
-async function waitForEither(successId, errorId, timeout) {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    try {
-      await expect(element(by.id(successId))).toBeVisible();
-      return 'success';
-    } catch {
-      // not visible yet
-    }
-    try {
-      await expect(element(by.id(errorId))).toBeVisible();
-      return 'error';
-    } catch {
-      // not visible yet
-    }
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  throw new Error(
-    `Timed out after ${timeout}ms waiting for "${successId}" or "${errorId}"`,
-  );
-}
+const TIMEOUT = 30 * 1000;
+const LONG_TIMEOUT = TIMEOUT * 3;
+const STARTUP_TIMEOUT = TIMEOUT * 6;
+const {
+  ensureConnectedWallet,
+  openTestScreen,
+  resetOperationResults,
+  runLongOperation,
+} = createTestHelpers({ timeout: TIMEOUT, longTimeout: LONG_TIMEOUT });
 
 describe('Spark React Native App', () => {
   beforeAll(async () => {
@@ -36,10 +24,9 @@ describe('Spark React Native App', () => {
 
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
-      .withTimeout(TIMEOUT * 6);
+      .withTimeout(STARTUP_TIMEOUT);
 
-    // Re-enable synchronization once the app is stable
-    await device.enableSynchronization();
+    await openTestScreen();
   });
 
   afterAll(async () => {
@@ -47,77 +34,51 @@ describe('Spark React Native App', () => {
   });
 
   it(
-    'should handle wallet operations in sequence',
+    'connects a wallet',
     async () => {
-      await waitFor(element(by.id('open-test-screen-button')))
-        .toBeVisible()
-        .withTimeout(TIMEOUT);
-
-      await expect(element(by.id('open-test-screen-button'))).toBeVisible();
-
-      await element(by.id('open-test-screen-button')).tap();
-
-      await waitFor(element(by.id('connect-wallet-button')))
-        .toBeVisible()
-        .withTimeout(TIMEOUT);
-
-      await expect(element(by.id('connect-wallet-button'))).toBeVisible();
-      await expect(element(by.id('create-invoice-button'))).toBeVisible();
-      await expect(element(by.id('test-bindings-button'))).toBeVisible();
-
-      await device.disableSynchronization();
-
-      await element(by.id('connect-wallet-button')).tap();
-
-      const result = await waitForEither(
-        'wallet-status',
-        'wallet-error',
-        TIMEOUT * 2,
-      );
-      if (result === 'error') {
-        const errorElement = element(by.id('wallet-error'));
-        const attrs = await errorElement.getAttributes();
-        throw new Error(`Wallet connection failed: ${attrs.text}`);
-      }
-
-      await device.enableSynchronization();
-
-      await expect(element(by.id('wallet-status'))).toBeVisible();
-
-      await expect(element(by.id('get-balance-button'))).toBeVisible();
-
-      await element(by.id('get-balance-button')).tap();
-
-      await waitFor(element(by.id('wallet-balance')))
-        .toBeVisible()
-        .withTimeout(TIMEOUT);
-
-      await expect(element(by.id('wallet-balance'))).toBeVisible();
-
-      await element(by.id('create-invoice-button')).tap();
-
-      await waitFor(element(by.id('invoice-display')))
-        .toBeVisible()
-        .withTimeout(TIMEOUT);
-
-      await expect(element(by.id('invoice-display'))).toBeVisible();
-
-      await element(by.id('test-bindings-button')).tap();
-
-      await waitFor(element(by.id('dummy-tx-display')))
-        .toBeVisible()
-        .withTimeout(TIMEOUT);
-
-      await expect(element(by.id('dummy-tx-display'))).toBeVisible();
-
-      await element(by.id('create-test-token-button')).tap();
-
-      await waitFor(element(by.id('test-token-tx-id-display')))
-        .toBeVisible()
-        .withTimeout(TIMEOUT);
-
-      await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
+      await resetOperationResults();
+      await ensureConnectedWallet();
     },
-    TIMEOUT * 12,
+    LONG_TIMEOUT + TIMEOUT,
   );
+
+  it('gets the wallet balance', async () => {
+    await runLongOperation({
+      buttonId: 'get-balance-button',
+      successId: 'balance-result',
+      timeout: TIMEOUT,
+    });
+  });
+
+  it('creates a single-use deposit address', async () => {
+    await runLongOperation({
+      buttonId: 'create-deposit-address-button',
+      successId: 'deposit-address-display',
+      timeout: TIMEOUT,
+    });
+  });
+
+  it('creates a Lightning invoice', async () => {
+    await runLongOperation({
+      buttonId: 'create-invoice-button',
+      successId: 'invoice-display',
+      timeout: LONG_TIMEOUT,
+    });
+  });
+
+  it('runs native FROST bindings', async () => {
+    await runLongOperation({
+      buttonId: 'test-bindings-button',
+      successId: 'dummy-tx-display',
+      timeout: TIMEOUT,
+    });
+  });
+
+  it('creates a test token', async () => {
+    await runLongOperation({
+      buttonId: 'create-test-token-button',
+      successId: 'test-token-tx-id-display',
+      timeout: LONG_TIMEOUT,
+    });
+  });
 });

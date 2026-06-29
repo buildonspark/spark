@@ -1,26 +1,14 @@
-const TIMEOUT = 60 * 1000;
+const { createTestHelpers } = require('./helpers');
 
-async function waitForEither(successId, errorId, timeout) {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    try {
-      await expect(element(by.id(successId))).toBeVisible();
-      return 'success';
-    } catch {
-      // not visible yet
-    }
-    try {
-      await expect(element(by.id(errorId))).toBeVisible();
-      return 'error';
-    } catch {
-      // not visible yet
-    }
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  throw new Error(
-    `Timed out after ${timeout}ms waiting for "${successId}" or "${errorId}"`,
-  );
-}
+const TIMEOUT = 60 * 1000;
+const LONG_TIMEOUT = TIMEOUT * 3;
+const TRANSFER_CLAIM_TIMEOUT = TIMEOUT * 5;
+const {
+  ensureConnectedWallet,
+  openTestScreen,
+  resetOperationResults,
+  runLongOperation,
+} = createTestHelpers({ timeout: TIMEOUT, longTimeout: LONG_TIMEOUT });
 
 describe('Spark React Native App (Hermetic)', () => {
   beforeAll(async () => {
@@ -36,84 +24,88 @@ describe('Spark React Native App (Hermetic)', () => {
 
     await waitFor(element(by.id('open-test-screen-button')))
       .toBeVisible()
-      .withTimeout(TIMEOUT * 3);
+      .withTimeout(LONG_TIMEOUT);
 
-    // Re-enable synchronization once the app is stable
-    await device.enableSynchronization();
+    await openTestScreen();
   });
 
   afterAll(async () => {
     await device.terminateApp();
   });
 
-  it('should handle wallet operations against minikube', async () => {
-    // Navigate to test screen
-    await waitFor(element(by.id('open-test-screen-button')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
+  it(
+    'connects a wallet',
+    async () => {
+      await resetOperationResults();
+      await ensureConnectedWallet();
+    },
+    LONG_TIMEOUT + TIMEOUT,
+  );
 
-    await expect(element(by.id('open-test-screen-button'))).toBeVisible();
-    await element(by.id('open-test-screen-button')).tap();
-
-    await waitFor(element(by.id('connect-wallet-button')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
-
-    await expect(element(by.id('connect-wallet-button'))).toBeVisible();
-    await expect(element(by.id('test-bindings-button'))).toBeVisible();
-
-    // Disable synchronization during wallet connect - the SDK makes many
-    // sequential network calls that can confuse Detox's idle tracking.
-    await device.disableSynchronization();
-
-    // Connect wallet to minikube operators
-    await element(by.id('connect-wallet-button')).tap();
-
-    // Wait for either success or error - fail fast on errors instead of
-    // waiting the full timeout blindly.
-    const result = await waitForEither(
-      'wallet-status',
-      'wallet-error',
-      TIMEOUT * 2,
-    );
-    if (result === 'error') {
-      const errorElement = element(by.id('wallet-error'));
-      const attrs = await errorElement.getAttributes();
-      throw new Error(`Wallet connection failed: ${attrs.text}`);
-    }
-
-    await device.enableSynchronization();
-
-    await expect(element(by.id('wallet-status'))).toBeVisible();
-
-    // Get balance
-    await expect(element(by.id('get-balance-button'))).toBeVisible();
-    await element(by.id('get-balance-button')).tap();
-
-    await waitFor(element(by.id('wallet-balance')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
-
-    await expect(element(by.id('wallet-balance'))).toBeVisible();
-
-    // Test FROST bindings (local crypto, no network)
-    await element(by.id('test-bindings-button')).tap();
-
-    await waitFor(element(by.id('dummy-tx-display')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
-
-    await expect(element(by.id('dummy-tx-display'))).toBeVisible();
-
-    // Create test token (goes to operators, not SSP)
-    await element(by.id('create-test-token-button')).tap();
-
-    await waitFor(element(by.id('test-token-tx-id-display')))
-      .toBeVisible()
-      .withTimeout(TIMEOUT * 2);
-
-    await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
-
-    // NOTE: createInvoice is skipped - it requires SSP which is not in minikube
+  it('gets the wallet balance', async () => {
+    await runLongOperation({
+      buttonId: 'get-balance-button',
+      successId: 'balance-result',
+      timeout: TIMEOUT,
+    });
   });
+
+  it('creates a single-use deposit address', async () => {
+    await runLongOperation({
+      buttonId: 'create-deposit-address-button',
+      successId: 'deposit-address-display',
+      timeout: TIMEOUT,
+    });
+  });
+
+  it(
+    'auto-claims a local deposit',
+    async () => {
+      await runLongOperation({
+        buttonId: 'fund-local-deposit-button',
+        successId: 'deposit-auto-claim-result-display',
+        timeout: LONG_TIMEOUT,
+      });
+    },
+    LONG_TIMEOUT + TIMEOUT,
+  );
+
+  it('skips Lightning invoice creation because hermetic CI lacks SSP', async () => {
+    console.log(
+      'Skipping Lightning invoice creation: the Spark-only hermetic CI profile does not deploy SSP.',
+    );
+  });
+
+  it(
+    'auto-claims an incoming Spark transfer',
+    async () => {
+      await runLongOperation({
+        buttonId: 'test-transfer-claim-button',
+        successId: 'transfer-claim-result-display',
+        errorId: 'transfer-claim-error-display',
+        timeout: TRANSFER_CLAIM_TIMEOUT,
+      });
+    },
+    TRANSFER_CLAIM_TIMEOUT + TIMEOUT,
+  );
+
+  it('runs native FROST bindings', async () => {
+    await runLongOperation({
+      buttonId: 'test-bindings-button',
+      successId: 'dummy-tx-display',
+      timeout: TIMEOUT,
+    });
+  });
+
+  it(
+    'creates a test token',
+    async () => {
+      await runLongOperation({
+        buttonId: 'create-test-token-button',
+        successId: 'test-token-tx-id-display',
+        timeout: LONG_TIMEOUT,
+      });
+    },
+    LONG_TIMEOUT + TIMEOUT,
+  );
 });

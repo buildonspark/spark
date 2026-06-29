@@ -1,4 +1,5 @@
 import type { WalletConfigService } from "../services/config.js";
+import type { ConnectionManager } from "../services/connection/connection.js";
 import { ConnectionManagerBrowser } from "../services/connection/connection.browser.js";
 import type { LoggingService } from "../utils/logging-service.js";
 import { SparkWallet as BaseSparkWallet } from "./spark-wallet.js";
@@ -12,7 +13,7 @@ export class SparkWalletReactNative extends BaseSparkWallet {
   protected buildConnectionManager(
     config: WalletConfigService,
     logging: LoggingService,
-  ) {
+  ): ConnectionManager {
     if (!hasNativeGrpcModule()) {
       return new ConnectionManagerBrowser(
         config,
@@ -23,6 +24,14 @@ export class SparkWalletReactNative extends BaseSparkWallet {
     }
 
     return new ConnectionManagerReactNative(config, "identity", logging);
+  }
+
+  protected override async setupBackgroundStream() {
+    if (!hasNativeGrpcModule()) {
+      return;
+    }
+
+    return super.setupBackgroundStream();
   }
 }
 

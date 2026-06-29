@@ -33,6 +33,7 @@ module.exports = [
         by: 'readonly',
         device: 'readonly',
         element: 'readonly',
+        expect: 'readonly',
         waitFor: 'readonly',
       },
     },

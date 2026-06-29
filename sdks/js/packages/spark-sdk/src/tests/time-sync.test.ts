@@ -2,6 +2,28 @@ import { describe, expect, it, jest } from "@jest/globals";
 import type { Logger } from "@lightsparkdev/core";
 import { getMonotonicTime, ServerTimeSync } from "../services/time-sync.js";
 
+function toHrtime(monotonicTimeMs: number): [number, number] {
+  const seconds = Math.floor(monotonicTimeMs / 1000);
+  const nanoseconds = Math.round(
+    (monotonicTimeMs - seconds * 1000) * 1_000_000,
+  );
+  return [seconds, nanoseconds];
+}
+
+function mockMonotonicClock(initialMs: number) {
+  let monotonicTimeMs = initialMs;
+  const spy = jest.spyOn(process, "hrtime").mockImplementation(() => {
+    return toHrtime(monotonicTimeMs);
+  });
+
+  return {
+    set: (nextMs: number) => {
+      monotonicTimeMs = nextMs;
+    },
+    restore: () => spy.mockRestore(),
+  };
+}
+
 describe("ServerTimeSync", () => {
   it("should return null when not yet synced", () => {
     const timeSync = new ServerTimeSync();
@@ -11,70 +33,83 @@ describe("ServerTimeSync", () => {
   });
 
   it("should record and calculate server time correctly", () => {
-    const timeSync = new ServerTimeSync();
+    const clock = mockMonotonicClock(1_000_000);
+    try {
+      const timeSync = new ServerTimeSync();
 
-    const serverTime = new Date("2024-01-01T12:00:00Z");
-    const now = getMonotonicTime();
-    const sendTime = now - 50;
-    const receiveTime = now;
-    const serverProcessingTimeMs = 4;
+      const serverTime = new Date("2024-01-01T12:00:00Z");
+      const now = getMonotonicTime();
+      const sendTime = now - 50;
+      const receiveTime = now;
+      const serverProcessingTimeMs = 4;
 
-    timeSync.recordSync(
-      serverTime.toUTCString(),
-      serverProcessingTimeMs,
-      sendTime,
-      receiveTime,
-    );
+      timeSync.recordSync(
+        serverTime.toUTCString(),
+        serverProcessingTimeMs,
+        sendTime,
+        receiveTime,
+      );
 
-    expect(timeSync.isSynced()).toBe(true);
+      expect(timeSync.isSynced()).toBe(true);
 
-    const currentServerTime = timeSync.getCurrentServerTime();
-    expect(currentServerTime).not.toBeNull();
+      const currentServerTime = timeSync.getCurrentServerTime();
+      expect(currentServerTime).not.toBeNull();
 
-    const roundTripTime = receiveTime - sendTime - serverProcessingTimeMs;
-    const expectedServerTime = Math.floor(
-      serverTime.getTime() + roundTripTime / 2,
-    );
-    expect(currentServerTime!.getTime()).toBeGreaterThanOrEqual(
-      expectedServerTime,
-    );
-    expect(currentServerTime!.getTime()).toBeLessThan(expectedServerTime + 100);
+      const roundTripTime = receiveTime - sendTime - serverProcessingTimeMs;
+      const expectedServerTime = Math.floor(
+        serverTime.getTime() + roundTripTime / 2,
+      );
+      expect(currentServerTime!.getTime()).toBeGreaterThanOrEqual(
+        expectedServerTime,
+      );
+      expect(currentServerTime!.getTime()).toBeLessThan(
+        expectedServerTime + 100,
+      );
 
-    const offset = timeSync.getOffset();
-    expect(offset).not.toBeNull();
-    const expectedOffset = expectedServerTime - receiveTime;
-    expect(offset).toBeCloseTo(expectedOffset, -1);
+      const offset = timeSync.getOffset();
+      expect(offset).not.toBeNull();
+      const expectedOffset = expectedServerTime - receiveTime;
+      expect(offset).toBeCloseTo(expectedOffset, -1);
+    } finally {
+      clock.restore();
+    }
   });
 
   it("should calculate current time based on monotonic clock progression", () => {
-    const timeSync = new ServerTimeSync();
+    const clock = mockMonotonicClock(1_000_000);
+    try {
+      const timeSync = new ServerTimeSync();
 
-    const serverTime = new Date("2024-01-01T12:00:00.000Z");
-    const now = getMonotonicTime();
-    const sendTime = now - 100;
-    const receiveTime = now;
-    const serverProcessingTimeMs = 13;
+      const serverTime = new Date("2024-01-01T12:00:00.000Z");
+      const now = getMonotonicTime();
+      const sendTime = now - 100;
+      const receiveTime = now;
+      const serverProcessingTimeMs = 13;
 
-    timeSync.recordSync(
-      serverTime.toUTCString(),
-      serverProcessingTimeMs,
-      sendTime,
-      receiveTime,
-    );
+      timeSync.recordSync(
+        serverTime.toUTCString(),
+        serverProcessingTimeMs,
+        sendTime,
+        receiveTime,
+      );
 
-    const currentServerTime1 = timeSync.getCurrentServerTime();
-    expect(currentServerTime1).not.toBeNull();
+      clock.set(now + 25);
+      const currentServerTime1 = timeSync.getCurrentServerTime();
+      expect(currentServerTime1).not.toBeNull();
 
-    const roundTripTime = receiveTime - sendTime - serverProcessingTimeMs;
-    const expectedServerTime = Math.floor(
-      serverTime.getTime() + roundTripTime / 2,
-    );
-    expect(currentServerTime1!.getTime()).toBeGreaterThanOrEqual(
-      expectedServerTime,
-    );
-    expect(currentServerTime1!.getTime()).toBeLessThan(
-      expectedServerTime + 100,
-    );
+      const roundTripTime = receiveTime - sendTime - serverProcessingTimeMs;
+      const expectedServerTime = Math.floor(
+        serverTime.getTime() + roundTripTime / 2,
+      );
+      expect(currentServerTime1!.getTime()).toBeGreaterThanOrEqual(
+        expectedServerTime + 25,
+      );
+      expect(currentServerTime1!.getTime()).toBeLessThan(
+        expectedServerTime + 125,
+      );
+    } finally {
+      clock.restore();
+    }
   });
 
   it("should handle invalid date headers gracefully", () => {
@@ -124,40 +159,44 @@ describe("ServerTimeSync", () => {
   });
 
   it("should be resistant to local time manipulation", () => {
-    const timeSync = new ServerTimeSync();
-
-    const serverTime = new Date("2024-01-01T12:00:00.000Z");
-    const now = getMonotonicTime();
-    const sendTime = now - 50;
-    const receiveTime = now;
-    const serverProcessingTimeMs = 4;
-
-    timeSync.recordSync(
-      serverTime.toUTCString(),
-      serverProcessingTimeMs,
-      sendTime,
-      receiveTime,
-    );
-
-    const time1 = timeSync.getCurrentServerTime();
-    expect(time1).not.toBeNull();
-
-    const roundTripTime = receiveTime - sendTime - serverProcessingTimeMs;
-    const expectedServerTime = Math.floor(
-      serverTime.getTime() + roundTripTime / 2,
-    );
-    expect(time1!.getTime()).toBeGreaterThanOrEqual(expectedServerTime);
-    expect(time1!.getTime()).toBeLessThan(expectedServerTime + 100);
-
+    const clock = mockMonotonicClock(1_000_000);
     const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(0);
+    try {
+      const timeSync = new ServerTimeSync();
 
-    const time2 = timeSync.getCurrentServerTime();
-    expect(time2).not.toBeNull();
+      const serverTime = new Date("2024-01-01T12:00:00.000Z");
+      const now = getMonotonicTime();
+      const sendTime = now - 50;
+      const receiveTime = now;
+      const serverProcessingTimeMs = 4;
 
-    expect(time2!.getTime()).toBeGreaterThanOrEqual(time1!.getTime());
-    const timeDiff = time2!.getTime() - time1!.getTime();
-    expect(timeDiff).toBeLessThan(100);
+      timeSync.recordSync(
+        serverTime.toUTCString(),
+        serverProcessingTimeMs,
+        sendTime,
+        receiveTime,
+      );
 
-    dateNowSpy.mockRestore();
+      const time1 = timeSync.getCurrentServerTime();
+      expect(time1).not.toBeNull();
+
+      const roundTripTime = receiveTime - sendTime - serverProcessingTimeMs;
+      const expectedServerTime = Math.floor(
+        serverTime.getTime() + roundTripTime / 2,
+      );
+      expect(time1!.getTime()).toBeGreaterThanOrEqual(expectedServerTime);
+      expect(time1!.getTime()).toBeLessThan(expectedServerTime + 100);
+
+      clock.set(now + 25);
+      const time2 = timeSync.getCurrentServerTime();
+      expect(time2).not.toBeNull();
+
+      expect(time2!.getTime()).toBeGreaterThanOrEqual(time1!.getTime());
+      const timeDiff = time2!.getTime() - time1!.getTime();
+      expect(timeDiff).toBe(25);
+    } finally {
+      dateNowSpy.mockRestore();
+      clock.restore();
+    }
   });
 });
