@@ -4202,7 +4202,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
           const swapResponse = await this.lightningService.swapNodesForPreimage(
             {
-              leaves: leavesToSend,
               receiverIdentityPubkey: hexToBytes(
                 this.config.getSspIdentityPublicKey(),
               ),
@@ -4212,8 +4211,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               feeSats: feeEstimate,
               amountSatsToSend: amountSatsToSend,
               startTransferRequest,
-              expiryTime,
-              transferID,
               idempotencyKey,
             },
           );
@@ -4307,13 +4304,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           );
 
         const swapResponse = await this.lightningService.swapNodesForPreimage({
-          leaves: leavesToSend,
           receiverIdentityPubkey: hexToBytes(receiverIdentityPubkey),
           paymentHash,
           isInboundPayment: false,
           startTransferRequest,
-          expiryTime,
-          transferID,
         });
         if (!swapResponse.transfer) {
           throw new Error("Failed to swap nodes for preimage");

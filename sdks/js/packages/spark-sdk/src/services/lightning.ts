@@ -6,11 +6,9 @@ import {
   numberToBytesBE,
 } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
-import { uuidv7 } from "uuidv7";
 import { SparkRequestError, SparkValidationError } from "../errors/types.js";
 import type LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import {
-  type GetSigningCommitmentsResponse,
   InitiatePreimageSwapRequest_Reason,
   type InitiatePreimageSwapResponse,
   type ProvidePreimageResponse,
@@ -32,7 +30,6 @@ import { decodeInvoice } from "./bolt11-spark.js";
 import { type WalletConfigService } from "./config.js";
 import { type ConnectionManager } from "./connection/connection.js";
 import { type SigningService } from "./signing.js";
-import type { LeafKeyTweak } from "./transfer.js";
 
 export type CreateLightningInvoiceParams = {
   invoiceCreator: (
@@ -53,7 +50,6 @@ export type CreateLightningInvoiceWithPreimageParams = {
 } & CreateLightningInvoiceParams;
 
 export type SwapNodesForPreimageParams = {
-  leaves: LeafKeyTweak[];
   receiverIdentityPubkey: Uint8Array;
   paymentHash: Uint8Array;
   invoiceString?: string;
@@ -61,8 +57,6 @@ export type SwapNodesForPreimageParams = {
   feeSats?: number;
   amountSatsToSend?: number;
   startTransferRequest?: StartTransferRequest;
-  expiryTime?: Date;
-  transferID?: string;
 } & IdempotencyOptions;
 
 export class LightningService {
@@ -195,63 +189,28 @@ export class LightningService {
 
   /**
    * Swap nodes for preimage
-   * @param leaves - The leaves to swap for preimage
    * @param receiverIdentityPubkey - The receiver identity public key
    * @param paymentHash - The payment hash
    * @param invoiceString - The invoice string
    * @param isInboundPayment - Whether the payment is inbound
    * @param feeSats - The fee in sats
    * @param amountSatsToSend - The amount in sats to send
-   * @param expiryTime - The expiry time
    * @param startTransferRequest - The start transfer request, do not populate if is inbound payment
-   * @param transferID - The transfer ID, do not populate if is inbound payment
    */
   async swapNodesForPreimage({
-    leaves,
     receiverIdentityPubkey,
     paymentHash,
     invoiceString,
     isInboundPayment,
     feeSats = 0,
     amountSatsToSend,
-    expiryTime,
     startTransferRequest,
-    transferID,
     idempotencyKey,
   }: SwapNodesForPreimageParams): Promise<InitiatePreimageSwapResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
-    // Get signing commitments for all transaction types in one coordinated call
-    let signingCommitments: GetSigningCommitmentsResponse;
-    try {
-      signingCommitments = await sparkClient.get_signing_commitments({
-        nodeIds: leaves.map((leaf) => leaf.leaf.id),
-        count: 3,
-      });
-    } catch (error) {
-      throw new SparkRequestError("Failed to get signing commitments", {
-        operation: "get_signing_commitments",
-        error,
-      });
-    }
-
-    const {
-      cpfpLeafSigningJobs,
-      directLeafSigningJobs,
-      directFromCpfpLeafSigningJobs,
-    } = await this.signingService.signRefunds(
-      leaves,
-      signingCommitments.signingCommitments.slice(0, leaves.length),
-      signingCommitments.signingCommitments.slice(
-        leaves.length,
-        2 * leaves.length,
-      ),
-      signingCommitments.signingCommitments.slice(2 * leaves.length),
-    );
-
-    const transferId = transferID ? transferID : uuidv7();
     let bolt11String = "";
     let amountSats: number = 0;
     if (invoiceString) {
@@ -300,7 +259,6 @@ export class LightningService {
       : InitiatePreimageSwapRequest_Reason.REASON_SEND;
 
     let response: InitiatePreimageSwapResponse;
-    // TODO(SP-3283): Remove transfer inputs once SDK upgrade is complete
     try {
       response = await sparkClient.initiate_preimage_swap_v3(
         {
@@ -312,20 +270,6 @@ export class LightningService {
             valueSats: amountSats,
           },
           reason,
-          transfer: {
-            transferId,
-            ownerIdentityPublicKey:
-              await this.config.signer.getIdentityPublicKey(),
-            leavesToSend: cpfpLeafSigningJobs,
-            directLeavesToSend: startTransferRequest
-              ? undefined
-              : directLeafSigningJobs,
-            directFromCpfpLeavesToSend: startTransferRequest
-              ? undefined
-              : directFromCpfpLeafSigningJobs,
-            receiverIdentityPublicKey: receiverIdentityPubkey,
-            expiryTime,
-          },
           receiverIdentityPublicKey: receiverIdentityPubkey,
           feeSats,
           transferRequest: startTransferRequest,
