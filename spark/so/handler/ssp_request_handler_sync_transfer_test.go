@@ -110,7 +110,7 @@ func TestUpdateTransferRejectsExistingRemoteLeafWhenNodeUnavailable(t *testing.T
 	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
 	remoteTransfer.Id = localTransfer.ID.String()
 	remoteTransfer.Leaves[0].SecretCipher = []byte("remote-secret")
-	remoteTransfer.Leaves[0].Signature = []byte("remote-signature")
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")}
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
@@ -322,7 +322,7 @@ func TestUpdateTransferRejectsMalformedExistingRemoteDirectRefundTxs(t *testing.
 		sparkconst.InitialTimeLock-sparkconst.TimeLockInterval+sparkconst.DirectTimelockOffset,
 	)
 	remoteTransfer.Leaves[0].SecretCipher = []byte("remote-secret")
-	remoteTransfer.Leaves[0].Signature = []byte("remote-signature")
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")}
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
@@ -373,7 +373,7 @@ func TestUpdateTransferRejectsOmittedRemoteDirectRefundsWhenLocalLeafHasThem(t *
 	remoteTransfer.Id = localTransfer.ID.String()
 	setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
 	remoteTransfer.Leaves[0].SecretCipher = []byte("remote-secret")
-	remoteTransfer.Leaves[0].Signature = []byte("remote-signature")
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")}
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
@@ -418,7 +418,7 @@ func TestUpdateTransferAcceptsOmittedRemoteDirectRefundsWhenLocalLeafLacksThem(t
 	remoteTransfer.Id = localTransfer.ID.String()
 	setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
 	remoteTransfer.Leaves[0].SecretCipher = []byte("remote-secret")
-	remoteTransfer.Leaves[0].Signature = []byte("remote-signature")
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")}
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
@@ -523,7 +523,7 @@ func TestUpdateTransferRejectsRemoteNonTerminalRegressionFromReturned(t *testing
 	remoteTransfer.Id = localTransfer.ID.String()
 	remoteTransfer.Status = pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING
 	remoteTransfer.Leaves[0].SecretCipher = []byte("remote-secret")
-	remoteTransfer.Leaves[0].Signature = []byte("remote-signature")
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")}
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
@@ -679,7 +679,7 @@ func syncTransferRemoteTransfer(t *testing.T, node *ent.TreeNode, sender keys.Pu
 		Leaves: []*pb.TransferLeaf{{
 			Leaf:                 &pb.TreeNode{Id: node.ID.String()},
 			SecretCipher:         []byte("remote-secret"),
-			Signature:            []byte("remote-signature"),
+			Sig:                  &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")},
 			IntermediateRefundTx: createTestTxBytes(t, 901),
 		}},
 	}

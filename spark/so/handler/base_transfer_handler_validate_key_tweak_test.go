@@ -45,7 +45,7 @@ func buildKeyTweakPackageForLeaves(
 			SecretShareTweak:  secretShare,
 			PubkeySharesTweak: pubkeySharesTweak,
 			SecretCipher:      secretCipher,
-			Signature:         []byte("mock_signature_for_testing"),
+			Sig:               &pb.SendLeafKeyTweak_Signature{Signature: []byte("mock_signature_for_testing")},
 		})
 		proofs[leafID.String()] = &pb.SecretProof{Proofs: secretShare.GetProofs()}
 	}
@@ -263,7 +263,7 @@ func buildKeyTweakPackageWithMismatchedPubkey(
 			SecretShareTweak:  secretShare,
 			PubkeySharesTweak: pubkeySharesTweak,
 			SecretCipher:      secretCipher,
-			Signature:         []byte("mock_signature_for_testing"),
+			Sig:               &pb.SendLeafKeyTweak_Signature{Signature: []byte("mock_signature_for_testing")},
 		})
 	}
 

@@ -181,7 +181,7 @@ func TestSettleSenderKeyTweak_Commit_PreimageSwapRequiresSharedPreimage(t *testi
 		SecretShareTweak:  secretShare,
 		PubkeySharesTweak: pubkeySharesTweak,
 		SecretCipher:      []byte("encrypted-secret-share"),
-		Signature:         []byte("mock-key-tweak-signature"),
+		Sig:               &sparkProto.SendLeafKeyTweak_Signature{Signature: []byte("mock-key-tweak-signature")},
 	})
 	require.NoError(t, err)
 
@@ -306,7 +306,7 @@ func TestSettleSenderKeyTweak_Commit_PreimageSwapRequiresStoredMatchingPreimage(
 				SecretShareTweak:  secretShare,
 				PubkeySharesTweak: pubkeySharesTweak,
 				SecretCipher:      []byte("encrypted-secret-share"),
-				Signature:         []byte("mock-key-tweak-signature"),
+				Sig:               &sparkProto.SendLeafKeyTweak_Signature{Signature: []byte("mock-key-tweak-signature")},
 			})
 			require.NoError(t, err)
 
@@ -477,7 +477,7 @@ func TestCommitSenderKeyTweaks_RejectsNilProofValue(t *testing.T) {
 		SecretShareTweak:  secretShare,
 		PubkeySharesTweak: pubkeySharesTweak,
 		SecretCipher:      []byte("encrypted-secret-share"),
-		Signature:         []byte("mock-key-tweak-signature"),
+		Sig:               &sparkProto.SendLeafKeyTweak_Signature{Signature: []byte("mock-key-tweak-signature")},
 	})
 	require.NoError(t, err)
 	_, err = client.TransferLeaf.Create().
@@ -672,7 +672,7 @@ func createSwapV3PendingSenderKeyTweakTransferForTest(
 		SecretShareTweak:  secretShare,
 		PubkeySharesTweak: pubkeySharesTweak,
 		SecretCipher:      []byte("encrypted-secret-share"),
-		Signature:         []byte("mock-key-tweak-signature"),
+		Sig:               &sparkProto.SendLeafKeyTweak_Signature{Signature: []byte("mock-key-tweak-signature")},
 	})
 	require.NoError(t, err)
 

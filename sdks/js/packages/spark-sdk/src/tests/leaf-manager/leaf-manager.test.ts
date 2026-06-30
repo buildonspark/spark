@@ -328,7 +328,7 @@ function createMockTransferLeaf(leaf: TreeNode): TransferLeaf {
   return {
     leaf,
     secretCipher: new Uint8Array(0),
-    signature: new Uint8Array(0),
+    sig: { $case: "signature", signature: new Uint8Array(0) },
     intermediateRefundTx: new Uint8Array(0),
     intermediateDirectRefundTx: new Uint8Array(0),
     intermediateDirectFromCpfpRefundTx: new Uint8Array(0),

@@ -119,7 +119,7 @@ func mustMarshalSimpleSendLeafKeyTweak(t *testing.T, rng *rand.ChaCha8, leafID s
 		},
 		PubkeySharesTweak: pubkeySharesTweak,
 		SecretCipher:      []byte("valid-secret-cipher"),
-		Signature:         []byte("valid-signature"),
+		Sig:               &pb.SendLeafKeyTweak_Signature{Signature: []byte("valid-signature")},
 	})
 	require.NoError(t, err)
 	return keyTweakBinary

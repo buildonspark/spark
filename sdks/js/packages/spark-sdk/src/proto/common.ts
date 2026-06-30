@@ -62,6 +62,48 @@ export function signatureIntentToJSON(object: SignatureIntent): string {
   }
 }
 
+/** The scheme used to produce a Signature. */
+export enum SignatureScheme {
+  SIGNATURE_SCHEME_UNSPECIFIED = 0,
+  /** SIGNATURE_SCHEME_ECDSA - secp256k1 ECDSA, strict DER encoding (variable length). */
+  SIGNATURE_SCHEME_ECDSA = 1,
+  /** SIGNATURE_SCHEME_SCHNORR - BIP-340 Schnorr over secp256k1, 64 bytes. */
+  SIGNATURE_SCHEME_SCHNORR = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function signatureSchemeFromJSON(object: any): SignatureScheme {
+  switch (object) {
+    case 0:
+    case "SIGNATURE_SCHEME_UNSPECIFIED":
+      return SignatureScheme.SIGNATURE_SCHEME_UNSPECIFIED;
+    case 1:
+    case "SIGNATURE_SCHEME_ECDSA":
+      return SignatureScheme.SIGNATURE_SCHEME_ECDSA;
+    case 2:
+    case "SIGNATURE_SCHEME_SCHNORR":
+      return SignatureScheme.SIGNATURE_SCHEME_SCHNORR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return SignatureScheme.UNRECOGNIZED;
+  }
+}
+
+export function signatureSchemeToJSON(object: SignatureScheme): string {
+  switch (object) {
+    case SignatureScheme.SIGNATURE_SCHEME_UNSPECIFIED:
+      return "SIGNATURE_SCHEME_UNSPECIFIED";
+    case SignatureScheme.SIGNATURE_SCHEME_ECDSA:
+      return "SIGNATURE_SCHEME_ECDSA";
+    case SignatureScheme.SIGNATURE_SCHEME_SCHNORR:
+      return "SIGNATURE_SCHEME_SCHNORR";
+    case SignatureScheme.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /** A map from a string to a bytes. It's a workaround to have map arrays in proto. */
 export interface PackageMap {
   packages: { [key: string]: Uint8Array };
@@ -85,6 +127,12 @@ export interface SigningCommitment {
 
 export interface SigningResult {
   signatureShare: Uint8Array;
+}
+
+/** A signature tagged with the scheme used to produce it, which determines how to verify it. */
+export interface Signature {
+  scheme: SignatureScheme;
+  signature: Uint8Array;
 }
 
 function createBasePackageMap(): PackageMap {
@@ -377,6 +425,82 @@ export const SigningResult: MessageFns<SigningResult> = {
   fromPartial(object: DeepPartial<SigningResult>): SigningResult {
     const message = createBaseSigningResult();
     message.signatureShare = object.signatureShare ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSignature(): Signature {
+  return { scheme: 0, signature: new Uint8Array(0) };
+}
+
+export const Signature: MessageFns<Signature> = {
+  encode(message: Signature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.scheme !== 0) {
+      writer.uint32(8).int32(message.scheme);
+    }
+    if (message.signature.length !== 0) {
+      writer.uint32(18).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Signature {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSignature();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.scheme = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Signature {
+    return {
+      scheme: isSet(object.scheme) ? signatureSchemeFromJSON(object.scheme) : 0,
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: Signature): unknown {
+    const obj: any = {};
+    if (message.scheme !== 0) {
+      obj.scheme = signatureSchemeToJSON(message.scheme);
+    }
+    if (message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Signature>): Signature {
+    return Signature.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Signature>): Signature {
+    const message = createBaseSignature();
+    message.scheme = object.scheme ?? 0;
+    message.signature = object.signature ?? new Uint8Array(0);
     return message;
   },
 };

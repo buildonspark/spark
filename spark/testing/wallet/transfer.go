@@ -809,7 +809,7 @@ func prepareSingleSendTransferKeyTweak(config *TestWalletConfig, transferID uuid
 			},
 			PubkeySharesTweak: pubkeySharesTweak,
 			SecretCipher:      secretCipher,
-			Signature:         signature.Serialize(),
+			Sig:               &pb.SendLeafKeyTweak_Signature{Signature: signature.Serialize()},
 			RefundSignature:   refundSignature,
 		}
 	}

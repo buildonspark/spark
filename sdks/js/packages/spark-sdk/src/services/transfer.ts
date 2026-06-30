@@ -900,7 +900,7 @@ export class BaseTransferService {
         },
         pubkeySharesTweak: Object.fromEntries(pubkeySharesTweak),
         secretCipher,
-        signature,
+        sig: { $case: "signature", signature },
         refundSignature: cpfpRefundSignature ?? new Uint8Array(),
         directRefundSignature: directRefundSignature ?? new Uint8Array(),
         directFromCpfpRefundSignature:
@@ -1253,9 +1253,13 @@ export class TransferService extends BaseTransferService {
 
         const payloadHash = sha256(payload);
 
+        const leafSignature =
+          leaf.sig?.$case === "signature"
+            ? leaf.sig.signature
+            : new Uint8Array();
         if (
           !secp256k1.verify(
-            leaf.signature,
+            leafSignature,
             payloadHash,
             transfer.senderIdentityPublicKey,
           )
