@@ -7,6 +7,7 @@
 package common
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -76,6 +77,58 @@ func (x SignatureIntent) Number() protoreflect.EnumNumber {
 // Deprecated: Use SignatureIntent.Descriptor instead.
 func (SignatureIntent) EnumDescriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{0}
+}
+
+// The scheme used to produce a Signature.
+type SignatureScheme int32
+
+const (
+	SignatureScheme_SIGNATURE_SCHEME_UNSPECIFIED SignatureScheme = 0
+	// secp256k1 ECDSA, strict DER encoding (variable length).
+	SignatureScheme_SIGNATURE_SCHEME_ECDSA SignatureScheme = 1
+	// BIP-340 Schnorr over secp256k1, 64 bytes.
+	SignatureScheme_SIGNATURE_SCHEME_SCHNORR SignatureScheme = 2
+)
+
+// Enum value maps for SignatureScheme.
+var (
+	SignatureScheme_name = map[int32]string{
+		0: "SIGNATURE_SCHEME_UNSPECIFIED",
+		1: "SIGNATURE_SCHEME_ECDSA",
+		2: "SIGNATURE_SCHEME_SCHNORR",
+	}
+	SignatureScheme_value = map[string]int32{
+		"SIGNATURE_SCHEME_UNSPECIFIED": 0,
+		"SIGNATURE_SCHEME_ECDSA":       1,
+		"SIGNATURE_SCHEME_SCHNORR":     2,
+	}
+)
+
+func (x SignatureScheme) Enum() *SignatureScheme {
+	p := new(SignatureScheme)
+	*p = x
+	return p
+}
+
+func (x SignatureScheme) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SignatureScheme) Descriptor() protoreflect.EnumDescriptor {
+	return file_common_proto_enumTypes[1].Descriptor()
+}
+
+func (SignatureScheme) Type() protoreflect.EnumType {
+	return &file_common_proto_enumTypes[1]
+}
+
+func (x SignatureScheme) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SignatureScheme.Descriptor instead.
+func (SignatureScheme) EnumDescriptor() ([]byte, []int) {
+	return file_common_proto_rawDescGZIP(), []int{1}
 }
 
 // A map from a string to a bytes. It's a workaround to have map arrays in proto.
@@ -223,11 +276,64 @@ func (x *SigningResult) GetSignatureShare() []byte {
 	return nil
 }
 
+// A signature tagged with the scheme used to produce it, which determines how to verify it.
+type Signature struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scheme        SignatureScheme        `protobuf:"varint,1,opt,name=scheme,proto3,enum=common.SignatureScheme" json:"scheme,omitempty"`
+	Signature     []byte                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Signature) Reset() {
+	*x = Signature{}
+	mi := &file_common_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Signature) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Signature) ProtoMessage() {}
+
+func (x *Signature) ProtoReflect() protoreflect.Message {
+	mi := &file_common_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Signature.ProtoReflect.Descriptor instead.
+func (*Signature) Descriptor() ([]byte, []int) {
+	return file_common_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Signature) GetScheme() SignatureScheme {
+	if x != nil {
+		return x.Scheme
+	}
+	return SignatureScheme_SIGNATURE_SCHEME_UNSPECIFIED
+}
+
+func (x *Signature) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
 var File_common_proto protoreflect.FileDescriptor
 
 const file_common_proto_rawDesc = "" +
 	"\n" +
-	"\fcommon.proto\x12\x06common\"\x87\x01\n" +
+	"\fcommon.proto\x12\x06common\x1a\x17validate/validate.proto\"\x87\x01\n" +
 	"\n" +
 	"PackageMap\x12<\n" +
 	"\bpackages\x18\x01 \x03(\v2 .common.PackageMap.PackagesEntryR\bpackages\x1a;\n" +
@@ -238,13 +344,21 @@ const file_common_proto_rawDesc = "" +
 	"\x06hiding\x18\x01 \x01(\fR\x06hiding\x12\x18\n" +
 	"\abinding\x18\x02 \x01(\fR\abinding\"8\n" +
 	"\rSigningResult\x12'\n" +
-	"\x0fsignature_share\x18\x01 \x01(\fR\x0esignatureShare*]\n" +
+	"\x0fsignature_share\x18\x01 \x01(\fR\x0esignatureShare\"o\n" +
+	"\tSignature\x12;\n" +
+	"\x06scheme\x18\x01 \x01(\x0e2\x17.common.SignatureSchemeB\n" +
+	"\xfaB\a\x82\x01\x04\x10\x01 \x00R\x06scheme\x12%\n" +
+	"\tsignature\x18\x02 \x01(\fB\a\xfaB\x04z\x02\x10\x01R\tsignature*]\n" +
 	"\x0fSignatureIntent\x12\f\n" +
 	"\bCREATION\x10\x00\x12\f\n" +
 	"\bTRANSFER\x10\x01\x12\r\n" +
 	"\tAGGREGATE\x10\x02\x12\x0f\n" +
 	"\aREFRESH\x10\x03\x1a\x02\b\x01\x12\x0e\n" +
-	"\x06EXTEND\x10\x04\x1a\x02\b\x01B-Z+github.com/lightsparkdev/spark/proto/commonb\x06proto3"
+	"\x06EXTEND\x10\x04\x1a\x02\b\x01*m\n" +
+	"\x0fSignatureScheme\x12 \n" +
+	"\x1cSIGNATURE_SCHEME_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16SIGNATURE_SCHEME_ECDSA\x10\x01\x12\x1c\n" +
+	"\x18SIGNATURE_SCHEME_SCHNORR\x10\x02B-Z+github.com/lightsparkdev/spark/proto/commonb\x06proto3"
 
 var (
 	file_common_proto_rawDescOnce sync.Once
@@ -258,22 +372,25 @@ func file_common_proto_rawDescGZIP() []byte {
 	return file_common_proto_rawDescData
 }
 
-var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_common_proto_goTypes = []any{
 	(SignatureIntent)(0),      // 0: common.SignatureIntent
-	(*PackageMap)(nil),        // 1: common.PackageMap
-	(*SigningCommitment)(nil), // 2: common.SigningCommitment
-	(*SigningResult)(nil),     // 3: common.SigningResult
-	nil,                       // 4: common.PackageMap.PackagesEntry
+	(SignatureScheme)(0),      // 1: common.SignatureScheme
+	(*PackageMap)(nil),        // 2: common.PackageMap
+	(*SigningCommitment)(nil), // 3: common.SigningCommitment
+	(*SigningResult)(nil),     // 4: common.SigningResult
+	(*Signature)(nil),         // 5: common.Signature
+	nil,                       // 6: common.PackageMap.PackagesEntry
 }
 var file_common_proto_depIdxs = []int32{
-	4, // 0: common.PackageMap.packages:type_name -> common.PackageMap.PackagesEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	6, // 0: common.PackageMap.packages:type_name -> common.PackageMap.PackagesEntry
+	1, // 1: common.Signature.scheme:type_name -> common.SignatureScheme
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }
@@ -286,8 +403,8 @@ func file_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_common_proto_rawDesc), len(file_common_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   4,
+			NumEnums:      2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

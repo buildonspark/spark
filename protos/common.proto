@@ -4,6 +4,8 @@ package common;
 
 option go_package = "github.com/lightsparkdev/spark/proto/common";
 
+import "validate/validate.proto";
+
 /*
  * A map from a string to a bytes. It's a workaround to have map arrays in proto.
  */
@@ -33,4 +35,19 @@ enum SignatureIntent {
     AGGREGATE = 2;
     REFRESH = 3 [deprecated = true];
     EXTEND = 4 [deprecated = true];
+}
+
+// The scheme used to produce a Signature.
+enum SignatureScheme {
+    SIGNATURE_SCHEME_UNSPECIFIED = 0;
+    // secp256k1 ECDSA, strict DER encoding (variable length).
+    SIGNATURE_SCHEME_ECDSA = 1;
+    // BIP-340 Schnorr over secp256k1, 64 bytes.
+    SIGNATURE_SCHEME_SCHNORR = 2;
+}
+
+// A signature tagged with the scheme used to produce it, which determines how to verify it.
+message Signature {
+    SignatureScheme scheme = 1 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+    bytes signature = 2 [(validate.rules).bytes.min_len = 1];
 }

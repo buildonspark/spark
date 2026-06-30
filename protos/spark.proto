@@ -779,8 +779,11 @@ message SendLeafKeyTweak {
     SecretShare secret_share_tweak = 2;
     map<string, bytes> pubkey_shares_tweak = 3;
     bytes secret_cipher = 4;
-    // Signature over Sha256(leaf_id||transfer_id||secret_cipher)
-    bytes signature = 5;
+    // Signature over Sha256(leaf_id||transfer_id||secret_cipher).
+    oneof sig {
+        bytes signature = 5;
+        common.Signature typed_signature = 9;
+    }
     bytes refund_signature = 6;
     bytes direct_refund_signature = 7;
     bytes direct_from_cpfp_refund_signature = 8;
@@ -884,7 +887,10 @@ message Transfer {
 message TransferLeaf {
     TreeNode leaf = 1;
     bytes secret_cipher = 2;
-    bytes signature = 3;
+    oneof sig {
+        bytes signature = 3;
+        common.Signature typed_signature = 10;
+    }
     bytes intermediate_refund_tx = 4;
     bytes intermediate_direct_refund_tx = 5;
     bytes intermediate_direct_from_cpfp_refund_tx = 6;

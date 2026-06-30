@@ -108,7 +108,9 @@ export function mapTransferLeafToWalletTransferLeaf(
   return {
     leaf: proto.leaf ? mapTreeNodeToWalletLeaf(proto.leaf) : undefined,
     secretCipher: bytesToHex(proto.secretCipher),
-    signature: bytesToHex(proto.signature),
+    signature: bytesToHex(
+      proto.sig?.$case === "signature" ? proto.sig.signature : new Uint8Array(),
+    ),
     intermediateRefundTx: bytesToHex(proto.intermediateRefundTx),
   };
 }

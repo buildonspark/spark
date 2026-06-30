@@ -41,11 +41,13 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 	pbLeaf := &pb.TransferLeaf{
 		Leaf:                               leafProto,
 		SecretCipher:                       secretCipher,
-		Signature:                          signature,
 		IntermediateRefundTx:               t.IntermediateRefundTx,
 		IntermediateDirectRefundTx:         t.IntermediateDirectRefundTx,
 		IntermediateDirectFromCpfpRefundTx: t.IntermediateDirectFromCpfpRefundTx,
 		PendingKeyTweakPublicKey:           keyTweakProof,
+	}
+	if len(signature) > 0 {
+		pbLeaf.Sig = &pb.TransferLeaf_Signature{Signature: signature}
 	}
 	if t.TransferReceiverID != nil {
 		pbLeaf.TransferReceiverId = t.TransferReceiverID.String()

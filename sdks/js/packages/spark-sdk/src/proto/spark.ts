@@ -7,7 +7,13 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import type { CallContext, CallOptions } from "nice-grpc-common";
-import { SignatureIntent, signatureIntentFromJSON, signatureIntentToJSON, SigningCommitment } from "./common.js";
+import {
+  Signature,
+  SignatureIntent,
+  signatureIntentFromJSON,
+  signatureIntentToJSON,
+  SigningCommitment,
+} from "./common.js";
 import { Empty } from "./google/protobuf/empty.js";
 import { Timestamp } from "./google/protobuf/timestamp.js";
 
@@ -1529,8 +1535,11 @@ export interface SendLeafKeyTweak {
   secretShareTweak: SecretShare | undefined;
   pubkeySharesTweak: { [key: string]: Uint8Array };
   secretCipher: Uint8Array;
-  /** Signature over Sha256(leaf_id||transfer_id||secret_cipher) */
-  signature: Uint8Array;
+  /** Signature over Sha256(leaf_id||transfer_id||secret_cipher). */
+  sig?:
+    | { $case: "signature"; signature: Uint8Array }
+    | { $case: "typedSignature"; typedSignature: Signature }
+    | undefined;
   refundSignature: Uint8Array;
   directRefundSignature: Uint8Array;
   directFromCpfpRefundSignature: Uint8Array;
@@ -1593,7 +1602,10 @@ export interface Transfer {
 export interface TransferLeaf {
   leaf: TreeNode | undefined;
   secretCipher: Uint8Array;
-  signature: Uint8Array;
+  sig?:
+    | { $case: "signature"; signature: Uint8Array }
+    | { $case: "typedSignature"; typedSignature: Signature }
+    | undefined;
   intermediateRefundTx: Uint8Array;
   intermediateDirectRefundTx: Uint8Array;
   intermediateDirectFromCpfpRefundTx: Uint8Array;
@@ -9463,7 +9475,7 @@ function createBaseSendLeafKeyTweak(): SendLeafKeyTweak {
     secretShareTweak: undefined,
     pubkeySharesTweak: {},
     secretCipher: new Uint8Array(0),
-    signature: new Uint8Array(0),
+    sig: undefined,
     refundSignature: new Uint8Array(0),
     directRefundSignature: new Uint8Array(0),
     directFromCpfpRefundSignature: new Uint8Array(0),
@@ -9484,8 +9496,13 @@ export const SendLeafKeyTweak: MessageFns<SendLeafKeyTweak> = {
     if (message.secretCipher.length !== 0) {
       writer.uint32(34).bytes(message.secretCipher);
     }
-    if (message.signature.length !== 0) {
-      writer.uint32(42).bytes(message.signature);
+    switch (message.sig?.$case) {
+      case "signature":
+        writer.uint32(42).bytes(message.sig.signature);
+        break;
+      case "typedSignature":
+        Signature.encode(message.sig.typedSignature, writer.uint32(74).fork()).join();
+        break;
     }
     if (message.refundSignature.length !== 0) {
       writer.uint32(50).bytes(message.refundSignature);
@@ -9546,7 +9563,15 @@ export const SendLeafKeyTweak: MessageFns<SendLeafKeyTweak> = {
             break;
           }
 
-          message.signature = reader.bytes();
+          message.sig = { $case: "signature", signature: reader.bytes() };
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.sig = { $case: "typedSignature", typedSignature: Signature.decode(reader, reader.uint32()) };
           continue;
         }
         case 6: {
@@ -9593,7 +9618,11 @@ export const SendLeafKeyTweak: MessageFns<SendLeafKeyTweak> = {
         }, {})
         : {},
       secretCipher: isSet(object.secretCipher) ? bytesFromBase64(object.secretCipher) : new Uint8Array(0),
-      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      sig: isSet(object.signature)
+        ? { $case: "signature", signature: bytesFromBase64(object.signature) }
+        : isSet(object.typedSignature)
+        ? { $case: "typedSignature", typedSignature: Signature.fromJSON(object.typedSignature) }
+        : undefined,
       refundSignature: isSet(object.refundSignature) ? bytesFromBase64(object.refundSignature) : new Uint8Array(0),
       directRefundSignature: isSet(object.directRefundSignature)
         ? bytesFromBase64(object.directRefundSignature)
@@ -9624,8 +9653,10 @@ export const SendLeafKeyTweak: MessageFns<SendLeafKeyTweak> = {
     if (message.secretCipher.length !== 0) {
       obj.secretCipher = base64FromBytes(message.secretCipher);
     }
-    if (message.signature.length !== 0) {
-      obj.signature = base64FromBytes(message.signature);
+    if (message.sig?.$case === "signature") {
+      obj.signature = base64FromBytes(message.sig.signature);
+    } else if (message.sig?.$case === "typedSignature") {
+      obj.typedSignature = Signature.toJSON(message.sig.typedSignature);
     }
     if (message.refundSignature.length !== 0) {
       obj.refundSignature = base64FromBytes(message.refundSignature);
@@ -9658,7 +9689,20 @@ export const SendLeafKeyTweak: MessageFns<SendLeafKeyTweak> = {
       {},
     );
     message.secretCipher = object.secretCipher ?? new Uint8Array(0);
-    message.signature = object.signature ?? new Uint8Array(0);
+    switch (object.sig?.$case) {
+      case "signature": {
+        if (object.sig?.signature !== undefined && object.sig?.signature !== null) {
+          message.sig = { $case: "signature", signature: object.sig.signature };
+        }
+        break;
+      }
+      case "typedSignature": {
+        if (object.sig?.typedSignature !== undefined && object.sig?.typedSignature !== null) {
+          message.sig = { $case: "typedSignature", typedSignature: Signature.fromPartial(object.sig.typedSignature) };
+        }
+        break;
+      }
+    }
     message.refundSignature = object.refundSignature ?? new Uint8Array(0);
     message.directRefundSignature = object.directRefundSignature ?? new Uint8Array(0);
     message.directFromCpfpRefundSignature = object.directFromCpfpRefundSignature ?? new Uint8Array(0);
@@ -10511,7 +10555,7 @@ function createBaseTransferLeaf(): TransferLeaf {
   return {
     leaf: undefined,
     secretCipher: new Uint8Array(0),
-    signature: new Uint8Array(0),
+    sig: undefined,
     intermediateRefundTx: new Uint8Array(0),
     intermediateDirectRefundTx: new Uint8Array(0),
     intermediateDirectFromCpfpRefundTx: new Uint8Array(0),
@@ -10529,8 +10573,13 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     if (message.secretCipher.length !== 0) {
       writer.uint32(18).bytes(message.secretCipher);
     }
-    if (message.signature.length !== 0) {
-      writer.uint32(26).bytes(message.signature);
+    switch (message.sig?.$case) {
+      case "signature":
+        writer.uint32(26).bytes(message.sig.signature);
+        break;
+      case "typedSignature":
+        Signature.encode(message.sig.typedSignature, writer.uint32(82).fork()).join();
+        break;
     }
     if (message.intermediateRefundTx.length !== 0) {
       writer.uint32(34).bytes(message.intermediateRefundTx);
@@ -10581,7 +10630,15 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
             break;
           }
 
-          message.signature = reader.bytes();
+          message.sig = { $case: "signature", signature: reader.bytes() };
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.sig = { $case: "typedSignature", typedSignature: Signature.decode(reader, reader.uint32()) };
           continue;
         }
         case 4: {
@@ -10645,7 +10702,11 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     return {
       leaf: isSet(object.leaf) ? TreeNode.fromJSON(object.leaf) : undefined,
       secretCipher: isSet(object.secretCipher) ? bytesFromBase64(object.secretCipher) : new Uint8Array(0),
-      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      sig: isSet(object.signature)
+        ? { $case: "signature", signature: bytesFromBase64(object.signature) }
+        : isSet(object.typedSignature)
+        ? { $case: "typedSignature", typedSignature: Signature.fromJSON(object.typedSignature) }
+        : undefined,
       intermediateRefundTx: isSet(object.intermediateRefundTx)
         ? bytesFromBase64(object.intermediateRefundTx)
         : new Uint8Array(0),
@@ -10671,8 +10732,10 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     if (message.secretCipher.length !== 0) {
       obj.secretCipher = base64FromBytes(message.secretCipher);
     }
-    if (message.signature.length !== 0) {
-      obj.signature = base64FromBytes(message.signature);
+    if (message.sig?.$case === "signature") {
+      obj.signature = base64FromBytes(message.sig.signature);
+    } else if (message.sig?.$case === "typedSignature") {
+      obj.typedSignature = Signature.toJSON(message.sig.typedSignature);
     }
     if (message.intermediateRefundTx.length !== 0) {
       obj.intermediateRefundTx = base64FromBytes(message.intermediateRefundTx);
@@ -10702,7 +10765,20 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     const message = createBaseTransferLeaf();
     message.leaf = (object.leaf !== undefined && object.leaf !== null) ? TreeNode.fromPartial(object.leaf) : undefined;
     message.secretCipher = object.secretCipher ?? new Uint8Array(0);
-    message.signature = object.signature ?? new Uint8Array(0);
+    switch (object.sig?.$case) {
+      case "signature": {
+        if (object.sig?.signature !== undefined && object.sig?.signature !== null) {
+          message.sig = { $case: "signature", signature: object.sig.signature };
+        }
+        break;
+      }
+      case "typedSignature": {
+        if (object.sig?.typedSignature !== undefined && object.sig?.typedSignature !== null) {
+          message.sig = { $case: "typedSignature", typedSignature: Signature.fromPartial(object.sig.typedSignature) };
+        }
+        break;
+      }
+    }
     message.intermediateRefundTx = object.intermediateRefundTx ?? new Uint8Array(0);
     message.intermediateDirectRefundTx = object.intermediateDirectRefundTx ?? new Uint8Array(0);
     message.intermediateDirectFromCpfpRefundTx = object.intermediateDirectFromCpfpRefundTx ?? new Uint8Array(0);

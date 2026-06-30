@@ -9220,13 +9220,69 @@ func (m *SendLeafKeyTweak) validate(all bool) error {
 
 	// no validation rules for SecretCipher
 
-	// no validation rules for Signature
-
 	// no validation rules for RefundSignature
 
 	// no validation rules for DirectRefundSignature
 
 	// no validation rules for DirectFromCpfpRefundSignature
+
+	switch v := m.Sig.(type) {
+	case *SendLeafKeyTweak_Signature:
+		if v == nil {
+			err := SendLeafKeyTweakValidationError{
+				field:  "Sig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Signature
+	case *SendLeafKeyTweak_TypedSignature:
+		if v == nil {
+			err := SendLeafKeyTweakValidationError{
+				field:  "Sig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTypedSignature()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SendLeafKeyTweakValidationError{
+						field:  "TypedSignature",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SendLeafKeyTweakValidationError{
+						field:  "TypedSignature",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTypedSignature()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SendLeafKeyTweakValidationError{
+					field:  "TypedSignature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
 
 	if len(errors) > 0 {
 		return SendLeafKeyTweakMultiError(errors)
@@ -10316,8 +10372,6 @@ func (m *TransferLeaf) validate(all bool) error {
 
 	// no validation rules for SecretCipher
 
-	// no validation rules for Signature
-
 	// no validation rules for IntermediateRefundTx
 
 	// no validation rules for IntermediateDirectRefundTx
@@ -10329,6 +10383,64 @@ func (m *TransferLeaf) validate(all bool) error {
 	// no validation rules for TransferReceiverId
 
 	// no validation rules for TransferSenderId
+
+	switch v := m.Sig.(type) {
+	case *TransferLeaf_Signature:
+		if v == nil {
+			err := TransferLeafValidationError{
+				field:  "Sig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Signature
+	case *TransferLeaf_TypedSignature:
+		if v == nil {
+			err := TransferLeafValidationError{
+				field:  "Sig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTypedSignature()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferLeafValidationError{
+						field:  "TypedSignature",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferLeafValidationError{
+						field:  "TypedSignature",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTypedSignature()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferLeafValidationError{
+					field:  "TypedSignature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
 
 	if len(errors) > 0 {
 		return TransferLeafMultiError(errors)

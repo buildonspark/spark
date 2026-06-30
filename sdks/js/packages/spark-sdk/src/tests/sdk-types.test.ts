@@ -240,7 +240,7 @@ describe("sdk-types mapping functions", () => {
       const proto: TransferLeaf = {
         leaf: undefined,
         secretCipher: hexToBytes("deadbeef"),
-        signature: hexToBytes("cafebabe"),
+        sig: { $case: "signature", signature: hexToBytes("cafebabe") },
         intermediateRefundTx: hexToBytes("123456"),
         intermediateDirectRefundTx: new Uint8Array(),
         intermediateDirectFromCpfpRefundTx: new Uint8Array(),

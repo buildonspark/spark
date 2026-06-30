@@ -343,3 +343,139 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SigningResultValidationError{}
+
+// Validate checks the field values on Signature with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Signature) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Signature with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SignatureMultiError, or nil
+// if none found.
+func (m *Signature) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Signature) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if _, ok := _Signature_Scheme_NotInLookup[m.GetScheme()]; ok {
+		err := SignatureValidationError{
+			field:  "Scheme",
+			reason: "value must not be in list [SIGNATURE_SCHEME_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := SignatureScheme_name[int32(m.GetScheme())]; !ok {
+		err := SignatureValidationError{
+			field:  "Scheme",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSignature()) < 1 {
+		err := SignatureValidationError{
+			field:  "Signature",
+			reason: "value length must be at least 1 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return SignatureMultiError(errors)
+	}
+
+	return nil
+}
+
+// SignatureMultiError is an error wrapping multiple validation errors returned
+// by Signature.ValidateAll() if the designated constraints aren't met.
+type SignatureMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SignatureMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SignatureMultiError) AllErrors() []error { return m }
+
+// SignatureValidationError is the validation error returned by
+// Signature.Validate if the designated constraints aren't met.
+type SignatureValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SignatureValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SignatureValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SignatureValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SignatureValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SignatureValidationError) ErrorName() string { return "SignatureValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SignatureValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSignature.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SignatureValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SignatureValidationError{}
+
+var _Signature_Scheme_NotInLookup = map[SignatureScheme]struct{}{
+	0: {},
+}
