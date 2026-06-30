@@ -32,12 +32,7 @@ const (
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 
 	KnobReadMIMODataModelQueryPendingTransfers = "spark.so.read_mimo_data_model_query_pending_transfers"
-	KnobReadMIMODataModelOutgoingInFlight      = "spark.so.read_mimo_data_model_outgoing_in_flight"
 	KnobReadMIMODataModelGetStuckTransfers     = "spark.so.read_mimo_data_model_get_stuck_transfers"
-	KnobReadMIMODataModelQueryByTypes          = "spark.so.read_mimo_data_model_query_by_types"
-	KnobReadMIMODataModelReceiverByTypeStatus  = "spark.so.read_mimo_data_model_receiver_by_type_status"
-	KnobReadMIMODataModelCounterSwap           = "spark.so.read_mimo_data_model_counter_swap"
-	KnobReadMIMODataModelByParticipantFallback = "spark.so.read_mimo_data_model_by_participant_fallback"
 
 	// Per-call sampling rate (0–100) for the "transfer query invoked" caller-attribution log.
 	// Default 0 = off; bump to 100 (or a small percentage) during diagnosis.

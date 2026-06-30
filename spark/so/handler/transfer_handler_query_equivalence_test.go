@@ -244,6 +244,16 @@ func (f *equivFixture) ctxForWallet(viewer keys.Public, mimoKnob float64) contex
 	}))
 }
 
+// ctxForViewer returns a context authenticated as the given pubkey with the
+// privacy knob enabled. QueryAllTransfers routing is purely filter-shape based,
+// so no routing knob is set.
+func (f *equivFixture) ctxForViewer(viewer keys.Public) context.Context {
+	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
+	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled: 100,
+	}))
+}
+
 // setupEquivalenceData populates the fixture with the data shape required by
 // the equivalence cases. Returns the slice of transfer IDs created (handy
 // for subset checks) but most assertions just look at handler output.
@@ -1168,31 +1178,19 @@ func TestQueryMIMOPendingTransferIDs_RequiresNow(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 // QueryAllTransfers equivalence — legacy queryTransfers vs the specialized
-// queryOutgoingInFlight path. Load-bearing for the safety of the
-// KnobReadMIMODataModelOutgoingInFlight rollout: per-request randomness means
-// a single caller can land on either path; the paths must return the same
-// transfer IDs, ordering, and per-transfer projections.
+// MIMO paths reached through QueryAllTransfers' shape-based routing. The paths
+// must return the same transfer IDs, ordering, and per-transfer projections.
 // -----------------------------------------------------------------------------
 
-func (f *equivFixture) ctxForOutgoingInFlight(viewer keys.Public, mimoKnob float64) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                    100,
-		knobs.KnobReadMIMODataModelOutgoingInFlight: mimoKnob,
-	}))
-}
-
-// runBothPathsAllTransfers invokes QueryAllTransfers twice with the same
-// filter — once with the outgoing-in-flight knob off (falls through to legacy
-// queryTransfers) and once with it on (routes to queryOutgoingInFlight when
-// the filter shape matches).
+// runBothPathsAllTransfers obtains the legacy result by calling queryTransfers
+// directly and the MIMO result by calling QueryAllTransfers (which routes to a
+// specialized path purely by filter shape) — both on the same authenticated
+// context and filter.
 func (f *equivFixture) runBothPathsAllTransfers(viewer keys.Public, filter *pb.TransferFilter) (legacyResp, mimoResp *pb.QueryTransfersResponse, legacyErr, mimoErr error) {
 	f.t.Helper()
-	ctxLegacy := f.ctxForOutgoingInFlight(viewer, 0)
-	legacyResp, legacyErr = f.handler.QueryAllTransfers(ctxLegacy, filter, false)
-
-	ctxMIMO := f.ctxForOutgoingInFlight(viewer, 100)
-	mimoResp, mimoErr = f.handler.QueryAllTransfers(ctxMIMO, filter, false)
+	ctx := f.ctxForViewer(viewer)
+	legacyResp, legacyErr = f.handler.queryTransfers(ctx, filter, false, false)
+	mimoResp, mimoErr = f.handler.QueryAllTransfers(ctx, filter, false)
 	return legacyResp, mimoResp, legacyErr, mimoErr
 }
 
@@ -1321,31 +1319,11 @@ func TestQueryAllTransfers_Equivalence_OutgoingInFlight_SelfTransfer(t *testing.
 
 // -----------------------------------------------------------------------------
 // QueryAllTransfers equivalence — legacy queryTransfers vs the specialized
-// queryByTypes path. Same rollout-safety contract as the outgoing-in-flight
-// suite above. The dominant prod shape (~75k/h post-#6521 ramp) is SR1 +
-// 4-type [TRANSFER, PREIMAGE_SWAP, COOPERATIVE_EXIT, UTXO_SWAP] + no status
-// filter — these tests pin equivalence for that shape and its sender / receiver
-// only variants, plus the fall-through cases that must continue to route to
-// legacy.
+// queryByTypes path. The dominant prod shape is SR1 + 4-type
+// [TRANSFER, PREIMAGE_SWAP, COOPERATIVE_EXIT, UTXO_SWAP] + no status filter —
+// these tests pin equivalence for that shape and its sender / receiver only
+// variants, plus the fall-through cases that must continue to route to legacy.
 // -----------------------------------------------------------------------------
-
-func (f *equivFixture) ctxForByTypes(viewer keys.Public, mimoKnob float64) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                100,
-		knobs.KnobReadMIMODataModelQueryByTypes: mimoKnob,
-	}))
-}
-
-func (f *equivFixture) runBothPathsAllTransfersByTypes(viewer keys.Public, filter *pb.TransferFilter) (legacyResp, mimoResp *pb.QueryTransfersResponse, legacyErr, mimoErr error) {
-	f.t.Helper()
-	ctxLegacy := f.ctxForByTypes(viewer, 0)
-	legacyResp, legacyErr = f.handler.QueryAllTransfers(ctxLegacy, filter, false)
-
-	ctxMIMO := f.ctxForByTypes(viewer, 100)
-	mimoResp, mimoErr = f.handler.QueryAllTransfers(ctxMIMO, filter, false)
-	return legacyResp, mimoResp, legacyErr, mimoErr
-}
 
 func TestQueryAllTransfers_Equivalence_ByTypes(t *testing.T) {
 	if !sparktesting.PostgresTestsEnabled() {
@@ -1518,7 +1496,7 @@ func TestQueryAllTransfers_Equivalence_ByTypes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			legacy, mimo, lerr, merr := f.runBothPathsAllTransfersByTypes(tc.viewer, tc.filter)
+			legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(tc.viewer, tc.filter)
 			assertResultsEquivalent(t, tc.name, legacy, mimo, lerr, merr)
 		})
 	}
@@ -1550,7 +1528,7 @@ func TestQueryAllTransfers_Equivalence_ByTypes_SelfTransfer(t *testing.T) {
 	})
 
 	filter := withTypes(senderOrReceiverFilter(self), pb.TransferType_TRANSFER)
-	legacy, mimo, lerr, merr := f.runBothPathsAllTransfersByTypes(self, filter)
+	legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(self, filter)
 	assertResultsEquivalent(t, "self_transfer_dedup", legacy, mimo, lerr, merr)
 }
 
@@ -1562,24 +1540,6 @@ func TestQueryAllTransfers_Equivalence_ByTypes_SelfTransfer(t *testing.T) {
 // 2-sender-pending), partial umbrellas (narrowing must fire), terminals, and
 // fall-through cases that must stay on legacy.
 // -----------------------------------------------------------------------------
-
-func (f *equivFixture) ctxForReceiverByTypeStatus(viewer keys.Public, mimoKnob float64) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                        100,
-		knobs.KnobReadMIMODataModelReceiverByTypeStatus: mimoKnob,
-	}))
-}
-
-func (f *equivFixture) runBothPathsAllTransfersReceiverByTypeStatus(viewer keys.Public, filter *pb.TransferFilter) (legacyResp, mimoResp *pb.QueryTransfersResponse, legacyErr, mimoErr error) {
-	f.t.Helper()
-	ctxLegacy := f.ctxForReceiverByTypeStatus(viewer, 0)
-	legacyResp, legacyErr = f.handler.QueryAllTransfers(ctxLegacy, filter, false)
-
-	ctxMIMO := f.ctxForReceiverByTypeStatus(viewer, 100)
-	mimoResp, mimoErr = f.handler.QueryAllTransfers(ctxMIMO, filter, false)
-	return legacyResp, mimoResp, legacyErr, mimoErr
-}
 
 func withStatuses(filter *pb.TransferFilter, statuses ...pb.TransferStatus) *pb.TransferFilter {
 	filter.Statuses = statuses
@@ -1776,7 +1736,7 @@ func TestQueryAllTransfers_Equivalence_ReceiverByTypeStatus(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			legacy, mimo, lerr, merr := f.runBothPathsAllTransfersReceiverByTypeStatus(tc.viewer, tc.filter)
+			legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(tc.viewer, tc.filter)
 			assertResultsEquivalent(t, tc.name, legacy, mimo, lerr, merr)
 		})
 	}
@@ -1810,7 +1770,7 @@ func TestQueryAllTransfers_Equivalence_ReceiverByTypeStatus_SelfTransfer(t *test
 		withTypes(receiverFilter(self), pb.TransferType_COUNTER_SWAP),
 		pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
 	)
-	legacy, mimo, lerr, merr := f.runBothPathsAllTransfersReceiverByTypeStatus(self, filter)
+	legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(self, filter)
 	assertResultsEquivalent(t, "self_transfer_receiver_by_type_status", legacy, mimo, lerr, merr)
 }
 
@@ -1849,7 +1809,7 @@ func TestQueryAllTransfers_ReceiverByTypeStatus_PerReceiverCompletedDivergence(t
 		withTypes(receiverFilter(completedReceiver), pb.TransferType_TRANSFER),
 		pb.TransferStatus_TRANSFER_STATUS_COMPLETED,
 	)
-	ctx := f.ctxForReceiverByTypeStatus(completedReceiver, 100)
+	ctx := f.ctxForViewer(completedReceiver)
 	resp, err := f.handler.QueryAllTransfers(ctx, filter, false)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -1927,7 +1887,7 @@ func TestQueryAllTransfers_ReceiverByTypeStatus_PerReceiverPostTweakDivergence(t
 				withTypes(receiverFilter(advancedReceiver), pb.TransferType_TRANSFER),
 				tc.filterStatus,
 			)
-			ctx := f.ctxForReceiverByTypeStatus(advancedReceiver, 100)
+			ctx := f.ctxForViewer(advancedReceiver)
 			resp, err := f.handler.QueryAllTransfers(ctx, filter, false)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
@@ -1935,24 +1895,6 @@ func TestQueryAllTransfers_ReceiverByTypeStatus_PerReceiverPostTweakDivergence(t
 			assert.Equal(t, transfer.ID.String(), resp.GetTransfers()[0].GetId())
 		})
 	}
-}
-
-func (f *equivFixture) ctxForCounterSwap(viewer keys.Public, mimoKnob float64) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:               100,
-		knobs.KnobReadMIMODataModelCounterSwap: mimoKnob,
-	}))
-}
-
-func (f *equivFixture) runBothPathsAllTransfersCounterSwap(viewer keys.Public, filter *pb.TransferFilter) (legacyResp, mimoResp *pb.QueryTransfersResponse, legacyErr, mimoErr error) {
-	f.t.Helper()
-	ctxLegacy := f.ctxForCounterSwap(viewer, 0)
-	legacyResp, legacyErr = f.handler.QueryAllTransfers(ctxLegacy, filter, false)
-
-	ctxMIMO := f.ctxForCounterSwap(viewer, 100)
-	mimoResp, mimoErr = f.handler.QueryAllTransfers(ctxMIMO, filter, false)
-	return legacyResp, mimoResp, legacyErr, mimoErr
 }
 
 // TestQueryAllTransfers_Equivalence_CounterSwap covers the queryCounterSwap
@@ -2084,15 +2026,17 @@ func TestQueryAllTransfers_Equivalence_CounterSwap(t *testing.T) {
 			f.sender,
 			withStatuses(withTypes(senderFilter(f.sender), counterSwapTypes...), activeCounterSwap...),
 		},
-		// Fall-through: receiver-only participant — routes to #6825's handler
-		// when its knob is on, or legacy when off (we leave it off via the ctx).
+		// Fall-through: receiver-only participant — the receiver-by-type-status
+		// path (checked before counter-swap) claims this shape; equivalent to
+		// legacy on these single-receiver fixtures.
 		{
 			"falls_through_when_receiver_only_participant",
 			f.medium,
 			withStatuses(withTypes(receiverFilter(f.medium), counterSwapTypes...), activeCounterSwap...),
 		},
-		// Fall-through: non-counter-swap type — routes to legacy (or #6825 if its
-		// knob is on; we leave it off).
+		// Fall-through: non-counter-swap type — no specialized path claims a
+		// sender-or-receiver + non-counter-swap-type shape, so it routes to the
+		// by-participant-fallback path.
 		{
 			"falls_through_when_type_not_counter_swap",
 			f.medium,
@@ -2156,7 +2100,7 @@ func TestQueryAllTransfers_Equivalence_CounterSwap(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			legacy, mimo, lerr, merr := f.runBothPathsAllTransfersCounterSwap(tc.viewer, tc.filter)
+			legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(tc.viewer, tc.filter)
 			assertResultsEquivalent(t, tc.name, legacy, mimo, lerr, merr)
 		})
 	}
@@ -2202,26 +2146,8 @@ func TestQueryAllTransfers_Equivalence_CounterSwap_SelfTransfer(t *testing.T) {
 			pb.TransferType_COUNTER_SWAP, pb.TransferType_COUNTER_SWAP_V3),
 		activeCounterSwap...,
 	)
-	legacy, mimo, lerr, merr := f.runBothPathsAllTransfersCounterSwap(self, filter)
+	legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(self, filter)
 	assertResultsEquivalent(t, "self_transfer_counter_swap", legacy, mimo, lerr, merr)
-}
-
-func (f *equivFixture) ctxForByParticipantFallback(viewer keys.Public, mimoKnob float64) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                         100,
-		knobs.KnobReadMIMODataModelByParticipantFallback: mimoKnob,
-	}))
-}
-
-func (f *equivFixture) runBothPathsAllTransfersByParticipantFallback(viewer keys.Public, filter *pb.TransferFilter) (legacyResp, mimoResp *pb.QueryTransfersResponse, legacyErr, mimoErr error) {
-	f.t.Helper()
-	ctxLegacy := f.ctxForByParticipantFallback(viewer, 0)
-	legacyResp, legacyErr = f.handler.QueryAllTransfers(ctxLegacy, filter, false)
-
-	ctxMIMO := f.ctxForByParticipantFallback(viewer, 100)
-	mimoResp, mimoErr = f.handler.QueryAllTransfers(ctxMIMO, filter, false)
-	return legacyResp, mimoResp, legacyErr, mimoErr
 }
 
 // TestQueryAllTransfers_Equivalence_ByParticipantFallback covers the shapes the
@@ -2332,7 +2258,7 @@ func TestQueryAllTransfers_Equivalence_ByParticipantFallback(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			legacy, mimo, lerr, merr := f.runBothPathsAllTransfersByParticipantFallback(tc.viewer, tc.filter)
+			legacy, mimo, lerr, merr := f.runBothPathsAllTransfers(tc.viewer, tc.filter)
 			assertResultsEquivalent(t, tc.name, legacy, mimo, lerr, merr)
 		})
 	}
@@ -2375,18 +2301,19 @@ func TestQueryAllTransfers_ByParticipantFallback_PerReceiverDivergence(t *testin
 	filter := withStatuses(receiverFilter(completedReceiver),
 		pb.TransferStatus_TRANSFER_STATUS_COMPLETED)
 
-	// Legacy (fallback knob off) returns 0 rows — t.status=RECEIVER_REFUND_SIGNED
+	ctx := f.ctxForViewer(completedReceiver)
+
+	// Legacy queryTransfers returns 0 rows — t.status=RECEIVER_REFUND_SIGNED
 	// fails the COMPLETED filter.
-	ctxLegacy := f.ctxForByParticipantFallback(completedReceiver, 0)
-	legacyResp, err := f.handler.QueryAllTransfers(ctxLegacy, filter, false)
+	legacyResp, err := f.handler.queryTransfers(ctx, filter, false, false)
 	require.NoError(t, err)
 	assert.Empty(t, legacyResp.GetTransfers(),
 		"legacy filters on t.status only and silently drops the completed receiver's row")
 
-	// Fallback (knob at 100) returns the transfer — r.status=COMPLETED on the
-	// completedReceiver's edge satisfies the receiver-axis predicate.
-	ctxMIMO := f.ctxForByParticipantFallback(completedReceiver, 100)
-	mimoResp, err := f.handler.QueryAllTransfers(ctxMIMO, filter, false)
+	// QueryAllTransfers routes to the fallback by shape and returns the transfer
+	// — r.status=COMPLETED on the completedReceiver's edge satisfies the
+	// receiver-axis predicate.
+	mimoResp, err := f.handler.QueryAllTransfers(ctx, filter, false)
 	require.NoError(t, err)
 	require.Len(t, mimoResp.GetTransfers(), 1,
 		"fallback surfaces the completed receiver despite parent t.status lag")

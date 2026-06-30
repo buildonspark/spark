@@ -2363,19 +2363,19 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.
 }
 
 func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (*pb.QueryTransfersResponse, error) {
-	if shouldRouteToByTypes(ctx, filter) {
+	if shouldRouteToByTypes(filter) {
 		return h.queryByTypes(ctx, filter, isSSP)
 	}
-	if shouldRouteToOutgoingInFlight(ctx, filter) {
+	if shouldRouteToOutgoingInFlight(filter) {
 		return h.queryOutgoingInFlight(ctx, filter, isSSP)
 	}
-	if shouldRouteToReceiverByTypeStatus(ctx, filter) {
+	if shouldRouteToReceiverByTypeStatus(filter) {
 		return h.queryReceiverByTypeStatus(ctx, filter, isSSP)
 	}
-	if shouldRouteToCounterSwap(ctx, filter) {
+	if shouldRouteToCounterSwap(filter) {
 		return h.queryCounterSwap(ctx, filter, isSSP)
 	}
-	if shouldRouteToByParticipantFallback(ctx, filter) {
+	if shouldRouteToByParticipantFallback(filter) {
 		return h.queryByParticipantFallback(ctx, filter, isSSP)
 	}
 	return h.queryTransfers(ctx, filter, false, isSSP)
