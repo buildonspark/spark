@@ -159,6 +159,13 @@ const (
 	KnobGossipLimit              = "spark.so.gossip.limit"
 	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
 
+	// KnobFinalizeRevealedTokenTransactionsBatchLimit caps how many revealed token
+	// transactions the finalize cron processes per query iteration as it drains the backlog.
+	KnobFinalizeRevealedTokenTransactionsBatchLimit = "spark.so.finalize_revealed_token_transactions.batch_limit"
+	// KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds bounds how long a single
+	// finalize cron run keeps draining batches before yielding to the next scheduled run.
+	KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds = "spark.so.finalize_revealed_token_transactions.max_runtime_seconds"
+
 	KnobEnablePartnerJWT = "spark.so.enable_partner_jwt"
 	// KnobUseConsensusTransfer routes StartTransferV3 through the 2PC engine
 	// instead of the legacy syncTransferV3Init + syncSettleSenderKeyTweaks fanout.
