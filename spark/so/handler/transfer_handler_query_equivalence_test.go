@@ -235,14 +235,12 @@ func (f *equivFixture) privacyEnabled(pubkeys ...keys.Public) {
 }
 
 // ctxForWallet returns a context authenticated as the given pubkey with the
-// path-selector knob set (legacy=0, MIMO=100). Other knobs match prod —
-// KnobReadMIMOMultiParticipantFormat=100 keeps the marshal layer in strict mode.
+// path-selector knob set (legacy=0, MIMO=100). Other knobs match prod.
 func (f *equivFixture) ctxForWallet(viewer keys.Public, mimoKnob float64) context.Context {
 	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
 	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobPrivacyEnabled:                         100,
 		knobs.KnobReadMIMODataModelQueryPendingTransfers: mimoKnob,
-		knobs.KnobReadMIMOMultiParticipantFormat:         100,
 	}))
 }
 
@@ -667,7 +665,6 @@ func TestQueryPendingTransfers_Equivalence_Access_NoSession(t *testing.T) {
 	noSessionKnobs := knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobPrivacyEnabled:                         100,
 		knobs.KnobReadMIMODataModelQueryPendingTransfers: 0,
-		knobs.KnobReadMIMOMultiParticipantFormat:         100,
 	})
 	ctxLegacy := knobs.InjectKnobsService(f.ctx, noSessionKnobs)
 	respLegacy, errLegacy := f.handler.QueryPendingTransfers(ctxLegacy, receiverFilter(f.light))
@@ -675,7 +672,6 @@ func TestQueryPendingTransfers_Equivalence_Access_NoSession(t *testing.T) {
 	mimoKnobs := knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobPrivacyEnabled:                         100,
 		knobs.KnobReadMIMODataModelQueryPendingTransfers: 100,
-		knobs.KnobReadMIMOMultiParticipantFormat:         100,
 	})
 	ctxMIMO := knobs.InjectKnobsService(f.ctx, mimoKnobs)
 	respMIMO, errMIMO := f.handler.QueryPendingTransfers(ctxMIMO, receiverFilter(f.light))
@@ -1183,7 +1179,6 @@ func (f *equivFixture) ctxForOutgoingInFlight(viewer keys.Public, mimoKnob float
 	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobPrivacyEnabled:                    100,
 		knobs.KnobReadMIMODataModelOutgoingInFlight: mimoKnob,
-		knobs.KnobReadMIMOMultiParticipantFormat:    100,
 	}))
 }
 
@@ -1337,9 +1332,8 @@ func TestQueryAllTransfers_Equivalence_OutgoingInFlight_SelfTransfer(t *testing.
 func (f *equivFixture) ctxForByTypes(viewer keys.Public, mimoKnob float64) context.Context {
 	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
 	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                 100,
-		knobs.KnobReadMIMODataModelQueryByTypes:  mimoKnob,
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+		knobs.KnobPrivacyEnabled:                100,
+		knobs.KnobReadMIMODataModelQueryByTypes: mimoKnob,
 	}))
 }
 
@@ -1574,7 +1568,6 @@ func (f *equivFixture) ctxForReceiverByTypeStatus(viewer keys.Public, mimoKnob f
 	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobPrivacyEnabled:                        100,
 		knobs.KnobReadMIMODataModelReceiverByTypeStatus: mimoKnob,
-		knobs.KnobReadMIMOMultiParticipantFormat:        100,
 	}))
 }
 
@@ -1947,9 +1940,8 @@ func TestQueryAllTransfers_ReceiverByTypeStatus_PerReceiverPostTweakDivergence(t
 func (f *equivFixture) ctxForCounterSwap(viewer keys.Public, mimoKnob float64) context.Context {
 	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
 	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                 100,
-		knobs.KnobReadMIMODataModelCounterSwap:   mimoKnob,
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+		knobs.KnobPrivacyEnabled:               100,
+		knobs.KnobReadMIMODataModelCounterSwap: mimoKnob,
 	}))
 }
 
@@ -2219,7 +2211,6 @@ func (f *equivFixture) ctxForByParticipantFallback(viewer keys.Public, mimoKnob 
 	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobPrivacyEnabled:                         100,
 		knobs.KnobReadMIMODataModelByParticipantFallback: mimoKnob,
-		knobs.KnobReadMIMOMultiParticipantFormat:         100,
 	}))
 }
 

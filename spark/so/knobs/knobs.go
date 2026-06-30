@@ -31,7 +31,6 @@ const (
 	KnobRateLimitMemcacheMaxIdleConns = "spark.so.ratelimit.memcache.max_idle_conns"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 
-	KnobReadMIMOMultiParticipantFormat         = "spark.so.read_mimo_multi_participant_format"
 	KnobReadMIMODataModelQueryPendingTransfers = "spark.so.read_mimo_data_model_query_pending_transfers"
 	KnobReadMIMODataModelOutgoingInFlight      = "spark.so.read_mimo_data_model_outgoing_in_flight"
 	KnobReadMIMODataModelGetStuckTransfers     = "spark.so.read_mimo_data_model_get_stuck_transfers"

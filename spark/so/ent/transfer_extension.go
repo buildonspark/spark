@@ -6,25 +6,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-// shouldEnforceParticipantEdges reports whether a missing participant edge is a
-// hard error (true) or a logged warning (false), gated by
-// KnobReadMIMOMultiParticipantFormat.
-func shouldEnforceParticipantEdges(ctx context.Context) bool {
-	return knobs.GetKnobsService(ctx).GetValue(knobs.KnobReadMIMOMultiParticipantFormat, 0) > 0
-}
 
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
 // To marshal the spark invoice, pre-load it via Transfer.WithSparkInvoice().
 // Callers must pre-load TransferSenders/TransferReceivers (they populate
-// Senders[]/Receivers[]); a missing edge errors or warns (knob-gated).
+// Senders[]/Receivers[]); a missing edge is an error.
 // If TransferLeaves (with nested Leaf→Tree/SigningKeyshare/Parent) is pre-loaded, that
 // slice is reused; otherwise leaves are lazy-loaded.
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
@@ -38,7 +29,7 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 			return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID, err)
 		}
 	}
-	if err := t.ensureParticipantEdgesLoaded(ctx, "MarshalProto", true); err != nil {
+	if err := t.ensureParticipantEdgesLoaded("MarshalProto", true); err != nil {
 		return nil, err
 	}
 	return t.marshalWithLeavesAndParticipants(ctx, leaves, t.Edges.TransferReceivers)
@@ -51,7 +42,7 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 // If TransferLeaves is pre-loaded, the receiver filter is applied in-memory;
 // otherwise leaves are lazy-loaded with a SQL-side filter.
 // Callers must pre-load TransferSenders (it populates Senders[]); a missing edge
-// errors or warns (knob-gated).
+// is an error.
 func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey keys.Public) (*pb.Transfer, error) {
 	if t.Edges.TransferReceivers == nil {
 		return nil, fmt.Errorf("TransferReceivers edge not pre-loaded for transfer %s", t.ID)
@@ -90,34 +81,21 @@ func (t *Transfer) MarshalProtoForReceiver(ctx context.Context, receiverPubkey k
 	}
 	// TransferReceivers is guaranteed loaded by the early return above; only
 	// Senders is worth checking here.
-	if err := t.ensureParticipantEdgesLoaded(ctx, "MarshalProtoForReceiver", false); err != nil {
+	if err := t.ensureParticipantEdgesLoaded("MarshalProtoForReceiver", false); err != nil {
 		return nil, err
 	}
 	return t.marshalWithLeavesAndParticipants(ctx, leaves, receiverOnly)
 }
 
-// ensureParticipantEdgesLoaded flags a participant edge that a query site forgot
-// to eager-load: a hard error in strict mode, a logged warning otherwise — never
-// silent. Pass checkReceivers=false when TransferReceivers is already known loaded.
-func (t *Transfer) ensureParticipantEdgesLoaded(ctx context.Context, caller string, checkReceivers bool) error {
-	enforce := shouldEnforceParticipantEdges(ctx)
-	report := func(edge string) error {
-		if enforce {
-			return fmt.Errorf("%s: %s not pre-loaded for transfer %s", caller, edge, t.ID)
-		}
-		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
-			"%s: %s not pre-loaded for transfer %s; emitting empty array", caller, edge, t.ID)
-		return nil
-	}
+// ensureParticipantEdgesLoaded errors if a query site forgot to eager-load a
+// participant edge. Pass checkReceivers=false when TransferReceivers is already
+// known loaded.
+func (t *Transfer) ensureParticipantEdgesLoaded(caller string, checkReceivers bool) error {
 	if checkReceivers && t.Edges.TransferReceivers == nil {
-		if err := report("TransferReceivers"); err != nil {
-			return err
-		}
+		return fmt.Errorf("%s: TransferReceivers not pre-loaded for transfer %s", caller, t.ID)
 	}
 	if t.Edges.TransferSenders == nil {
-		if err := report("TransferSenders"); err != nil {
-			return err
-		}
+		return fmt.Errorf("%s: TransferSenders not pre-loaded for transfer %s", caller, t.ID)
 	}
 	return nil
 }
