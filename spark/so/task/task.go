@@ -54,6 +54,11 @@ var (
 	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 
+	// Timeout stays under the 5-minute execution interval so runs don't overlap.
+	finalizeRevealedTokenTransactionsTimeout              = 4 * time.Minute
+	defaultFinalizeRevealedTokenTransactionsBatchLimit    = 50
+	defaultFinalizeRevealedTokenTransactionsMaxRuntimeSec = 180
+
 	meter                       = otel.Meter("gossip")
 	flowExecutionMeter          = otel.Meter("flow_execution")
 	oldestPendingGossipAgeGauge metric.Int64Gauge
@@ -491,48 +496,77 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "finalize_revealed_token_transactions",
 				RunInTestEnv: true,
+				Timeout:      &finalizeRevealedTokenTransactionsTimeout,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
-					dbTX, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("[cron] failed to get or create current tx for request: %w", err)
-					}
-					tokenTransactions, err := dbTX.TokenTransaction.Query().
-						Where(
-							tokentransaction.Or(
-								tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
-							),
-							tokentransaction.UpdateTimeLT(
-								time.Now().Add(-5*time.Minute).UTC(),
-							),
-							tokentransaction.HasSpentOutput(),
-						).
-						WithPeerSignatures().
-						WithSparkInvoice().
-						WithSpentOutput(func(q *ent.TokenOutputQuery) {
-							q.WithOutputCreatedTokenTransaction()
-							q.WithTokenPartialRevocationSecretShares()
-							q.WithRevocationKeyshare()
-							q.ForUpdate()
-						}).
-						WithCreatedOutput(func(q *ent.TokenOutputQuery) {
-							q.ForUpdate()
-						}).
-						ForUpdate().
-						All(ctx)
-					if err != nil {
-						return err
-					}
-					logger.Sugar().Infof("[cron] Found %d token transactions to finalize", len(tokenTransactions))
 
-					var errs []error
+					batchLimit := int(knobsService.GetValue(
+						knobs.KnobFinalizeRevealedTokenTransactionsBatchLimit,
+						float64(defaultFinalizeRevealedTokenTransactionsBatchLimit),
+					))
+					if batchLimit <= 0 {
+						batchLimit = defaultFinalizeRevealedTokenTransactionsBatchLimit
+					}
+					maxRuntime := time.Duration(knobsService.GetValue(
+						knobs.KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds,
+						float64(defaultFinalizeRevealedTokenTransactionsMaxRuntimeSec),
+					)) * time.Second
+
 					signTokenHandler := tokens.NewSignTokenHandler(config)
-
-					for _, tokenTransaction := range tokenTransactions {
-						ctx, _ = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
-						err := signTokenHandler.TryFinalizeRevealedTokenTransaction(ctx, tokenTransaction)
+					var errs []error
+					var cursor uuid.UUID
+					start := time.Now()
+					for {
+						// Finalization commits the session tx mid-run, so re-fetch the live
+						// client each iteration rather than reuse a committed one.
+						dbTX, err := ent.GetDbFromContext(ctx)
 						if err != nil {
-							errs = append(errs, fmt.Errorf("[cron] failed to finalize revealed token transaction %s: %w", tokenTransaction.ID, err))
+							errs = append(errs, fmt.Errorf("[cron] failed to get or create current tx for request: %w", err))
+							break
+						}
+						tokenTransactions, err := dbTX.TokenTransaction.Query().
+							Where(
+								tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
+								tokentransaction.UpdateTimeLT(
+									time.Now().Add(-5*time.Minute).UTC(),
+								),
+								tokentransaction.HasSpentOutput(),
+								tokentransaction.IDGT(cursor),
+							).
+							WithPeerSignatures().
+							WithSparkInvoice().
+							WithSpentOutput(func(q *ent.TokenOutputQuery) {
+								q.WithOutputCreatedTokenTransaction()
+								q.WithTokenPartialRevocationSecretShares()
+								q.WithRevocationKeyshare()
+								q.ForUpdate()
+							}).
+							WithCreatedOutput(func(q *ent.TokenOutputQuery) {
+								q.ForUpdate()
+							}).
+							Order(ent.Asc(tokentransaction.FieldID)).
+							Limit(batchLimit).
+							ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+							All(ctx)
+						if err != nil {
+							errs = append(errs, fmt.Errorf("[cron] failed to query revealed token transactions: %w", err))
+							break
+						}
+						if len(tokenTransactions) == 0 {
+							break
+						}
+						logger.Sugar().Infof("[cron] Finalizing batch of %d revealed token transactions", len(tokenTransactions))
+
+						for _, tokenTransaction := range tokenTransactions {
+							finalizeCtx, _ := logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+							if err := signTokenHandler.TryFinalizeRevealedTokenTransaction(finalizeCtx, tokenTransaction); err != nil {
+								errs = append(errs, fmt.Errorf("[cron] failed to finalize revealed token transaction %s: %w", tokenTransaction.ID, err))
+							}
+						}
+						cursor = tokenTransactions[len(tokenTransactions)-1].ID
+
+						if len(tokenTransactions) < batchLimit || time.Since(start) >= maxRuntime {
+							break
 						}
 					}
 					return errors.Join(errs...)
