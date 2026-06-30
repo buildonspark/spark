@@ -580,25 +580,17 @@ func extractParticipant(filter *pb.TransferFilter) (keys.Public, participantRole
 }
 
 // shouldRouteToOutgoingInFlight reports whether the request should dispatch
-// to queryOutgoingInFlight. Both the filter shape AND the knob must allow it:
-//
-//   - Filter shape: sender-only participant + non-empty status filter that's
-//     a subset of OutgoingInFlightSenderStatuses (the partial index's WHERE
-//     clause). sender_or_receiver and receiver-only participants fall
-//     through to legacy; mixed/wider status sets fall through too.
-//   - Knob: KnobReadMIMODataModelOutgoingInFlight is a per-call RolloutRandom
-//     probability (0–100). Bare value is the broad rollout percentage; no
-//     per-pubkey overrides — keep the dispatcher uniform and the routing
-//     decision simple.
+// to queryOutgoingInFlight when the filter shape allows it: sender-only
+// participant + non-empty status filter that's a subset of
+// OutgoingInFlightSenderStatuses (the partial index's WHERE clause).
+// sender_or_receiver and receiver-only participants fall through to legacy;
+// mixed/wider status sets fall through too.
 //
 // Caller shapes this routes (per the cross-axis audit):
 //   - queryPrimarySwapTransfers (TS1)
 //   - queryPendingOutgoingTransfers (TS3)
 //   - getOwnedBalance sender path (GOB1)
-func shouldRouteToOutgoingInFlight(ctx context.Context, filter *pb.TransferFilter) bool {
-	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelOutgoingInFlight, 0) {
-		return false
-	}
+func shouldRouteToOutgoingInFlight(filter *pb.TransferFilter) bool {
 	if filter.GetSenderIdentityPublicKey() == nil {
 		return false
 	}
@@ -626,7 +618,6 @@ func shouldRouteToOutgoingInFlight(ctx context.Context, filter *pb.TransferFilte
 // Routing in QueryAllTransfers guarantees:
 //   - filter.GetSenderIdentityPublicKey() != nil
 //   - filter.Statuses is a non-empty subset of OutgoingInFlightSenderStatuses
-//   - KnobReadMIMODataModelOutgoingInFlight is on
 func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryOutgoingInFlight")
 	defer span.End()
@@ -732,10 +723,7 @@ func (h *TransferHandler) queryOutgoingInFlight(ctx context.Context, filter *pb.
 // (identity_pubkey, transfer_type, create_time, transfer_id), and the
 // sender_or_receiver path is a straight UNION-DISTINCT with no
 // status-collapsing translation logic.
-func shouldRouteToByTypes(ctx context.Context, filter *pb.TransferFilter) bool {
-	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelQueryByTypes, 0) {
-		return false
-	}
+func shouldRouteToByTypes(filter *pb.TransferFilter) bool {
 	if len(filter.GetTypes()) == 0 {
 		return false
 	}
@@ -764,7 +752,6 @@ func shouldRouteToByTypes(ctx context.Context, filter *pb.TransferFilter) bool {
 //   - filter.Participant identifies one of sender / receiver / sender_or_receiver
 //   - len(filter.Types) > 0
 //   - filter.Statuses, filter.TransferIds are empty
-//   - KnobReadMIMODataModelQueryByTypes is on
 func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryByTypes")
 	defer span.End()
@@ -870,10 +857,7 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 //
 // This call surface is exposed publicly, but 100% of 7d traffic
 // is the SSP via gen_all_inbound_transfers
-func shouldRouteToReceiverByTypeStatus(ctx context.Context, filter *pb.TransferFilter) bool {
-	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelReceiverByTypeStatus, 0) {
-		return false
-	}
+func shouldRouteToReceiverByTypeStatus(filter *pb.TransferFilter) bool {
 	if len(filter.GetTransferIds()) != 0 {
 		return false
 	}
@@ -911,7 +895,6 @@ func shouldRouteToReceiverByTypeStatus(ctx context.Context, filter *pb.TransferF
 //   - len(filter.Types) > 0 and len(filter.Statuses) > 0
 //   - filter.TransferIds is empty
 //   - every requested status is receiver-axis translatable
-//   - KnobReadMIMODataModelReceiverByTypeStatus is on
 //
 // This call surface is exposed publicly, but 100% of 7d traffic
 // is the SSP via gen_all_inbound_transfers
@@ -1021,10 +1004,7 @@ func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter 
 // queryCounterSwapTransfers caller — broadening to arbitrary types lands
 // sender-or-receiver traffic on a path whose per-arm perf hasn't been
 // validated for that shape.
-func shouldRouteToCounterSwap(ctx context.Context, filter *pb.TransferFilter) bool {
-	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelCounterSwap, 0) {
-		return false
-	}
+func shouldRouteToCounterSwap(filter *pb.TransferFilter) bool {
 	if len(filter.GetTransferIds()) != 0 {
 		return false
 	}
@@ -1069,7 +1049,6 @@ func shouldRouteToCounterSwap(ctx context.Context, filter *pb.TransferFilter) bo
 //   - len(filter.Types) > 0 and every type is in {COUNTER_SWAP, COUNTER_SWAP_V3}
 //   - len(filter.Statuses) > 0 and every status is receiver-axis translatable
 //   - filter.TransferIds is empty
-//   - KnobReadMIMODataModelCounterSwap is on
 func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryCounterSwap")
 	defer span.End()
@@ -1172,10 +1151,7 @@ func (h *TransferHandler) queryCounterSwap(ctx context.Context, filter *pb.Trans
 // queryByParticipantFallback. Fallback only claims participant-bearing shapes —
 // nil-participant traffic stays on legacy queryTransfers, which has the
 // per-transfer access-check pass that this handler doesn't replicate.
-func shouldRouteToByParticipantFallback(ctx context.Context, filter *pb.TransferFilter) bool {
-	if !knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobReadMIMODataModelByParticipantFallback, 0) {
-		return false
-	}
+func shouldRouteToByParticipantFallback(filter *pb.TransferFilter) bool {
 	return filter.GetParticipant() != nil
 }
 
@@ -1189,7 +1165,6 @@ func shouldRouteToByParticipantFallback(ctx context.Context, filter *pb.Transfer
 //
 // Routing in QueryAllTransfers guarantees:
 //   - filter.GetParticipant() != nil
-//   - KnobReadMIMODataModelByParticipantFallback is on
 //   - No specialized handler claimed this shape upstream
 //
 // Not a hot-path handler — the correctness floor. Multi-second outliers
