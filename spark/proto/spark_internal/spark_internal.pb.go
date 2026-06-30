@@ -5793,7 +5793,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x04NONE\x10\x00\x12\n" +
 	"\n" +
 	"\x06COMMIT\x10\x01\x12\f\n" +
-	"\bROLLBACK\x10\x022\xae$\n" +
+	"\bROLLBACK\x10\x022\xf4$\n" +
 	"\x14SparkInternalService\x12^\n" +
 	"\x16mark_keyshares_as_used\x12*.spark_internal.MarkKeysharesAsUsedRequest\x1a\x16.google.protobuf.Empty\"\x00\x12\x92\x01\n" +
 	"!mark_keyshare_for_deposit_address\x124.spark_internal.MarkKeyshareForDepositAddressRequest\x1a5.spark_internal.MarkKeyshareForDepositAddressResponse\"\x00\x12^\n" +
@@ -5834,7 +5834,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x13fix_keyshare_round2\x12(.spark_internal.FixKeyshareRound2Request\x1a).spark_internal.FixKeyshareRound2Response\"\x00\x12\\\n" +
 	"\rget_transfers\x12#.spark_internal.GetTransfersRequest\x1a$.spark_internal.GetTransfersResponse\"\x00\x12\xa1\x01\n" +
 	"&generate_static_deposit_address_proofs\x129.spark_internal.GenerateStaticDepositAddressProofsRequest\x1a:.spark_internal.GenerateStaticDepositAddressProofsResponse\"\x00\x12F\n" +
-	"\tsync_node\x12\x1f.spark_internal.SyncNodeRequest\x1a\x16.google.protobuf.Empty\"\x00\x12h\n" +
+	"\tsync_node\x12\x1f.spark_internal.SyncNodeRequest\x1a\x16.google.protobuf.Empty\"\x00\x12D\n" +
+	"\vquery_nodes\x12\x18.spark.QueryNodesRequest\x1a\x19.spark.QueryNodesResponse\"\x00\x12h\n" +
 	"\x11consensus_prepare\x12'.spark_internal.ConsensusPrepareRequest\x1a(.spark_internal.ConsensusPrepareResponse\"\x00\x12x\n" +
 	"\x17consensus_query_outcome\x12,.spark_internal.ConsensusQueryOutcomeRequest\x1a-.spark_internal.ConsensusQueryOutcomeResponse\"\x00B5Z3github.com/lightsparkdev/spark/proto/spark_internalb\x06proto3"
 
@@ -5989,7 +5990,9 @@ var file_spark_internal_proto_goTypes = []any{
 	(*anypb.Any)(nil),                                    // 133: google.protobuf.Any
 	(*common.SigningResult)(nil),                         // 134: common.SigningResult
 	(*spark.SecretProof)(nil),                            // 135: spark.SecretProof
-	(*emptypb.Empty)(nil),                                // 136: google.protobuf.Empty
+	(*spark.QueryNodesRequest)(nil),                      // 136: spark.QueryNodesRequest
+	(*emptypb.Empty)(nil),                                // 137: google.protobuf.Empty
+	(*spark.QueryNodesResponse)(nil),                     // 138: spark.QueryNodesResponse
 }
 var file_spark_internal_proto_depIdxs = []int32{
 	89,  // 0: spark_internal.FrostRound1Request.public_keys:type_name -> spark_internal.FrostRound1Request.PublicKeysEntry
@@ -6126,52 +6129,54 @@ var file_spark_internal_proto_depIdxs = []int32{
 	67,  // 131: spark_internal.SparkInternalService.get_transfers:input_type -> spark_internal.GetTransfersRequest
 	69,  // 132: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:input_type -> spark_internal.GenerateStaticDepositAddressProofsRequest
 	71,  // 133: spark_internal.SparkInternalService.sync_node:input_type -> spark_internal.SyncNodeRequest
-	85,  // 134: spark_internal.SparkInternalService.consensus_prepare:input_type -> spark_internal.ConsensusPrepareRequest
-	87,  // 135: spark_internal.SparkInternalService.consensus_query_outcome:input_type -> spark_internal.ConsensusQueryOutcomeRequest
-	136, // 136: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
-	4,   // 137: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:output_type -> spark_internal.MarkKeyshareForDepositAddressResponse
-	136, // 138: spark_internal.SparkInternalService.reserve_entity_dkg_key:output_type -> google.protobuf.Empty
-	136, // 139: spark_internal.SparkInternalService.finalize_tree_creation:output_type -> google.protobuf.Empty
-	6,   // 140: spark_internal.SparkInternalService.frost_round1:output_type -> spark_internal.FrostRound1Response
-	9,   // 141: spark_internal.SparkInternalService.frost_round2:output_type -> spark_internal.FrostRound2Response
-	136, // 142: spark_internal.SparkInternalService.finalize_transfer:output_type -> google.protobuf.Empty
-	136, // 143: spark_internal.SparkInternalService.finalize_refresh_timelock:output_type -> google.protobuf.Empty
-	136, // 144: spark_internal.SparkInternalService.finalize_extend_leaf:output_type -> google.protobuf.Empty
-	136, // 145: spark_internal.SparkInternalService.finalize_renew_refund_timelock:output_type -> google.protobuf.Empty
-	136, // 146: spark_internal.SparkInternalService.finalize_renew_node_timelock:output_type -> google.protobuf.Empty
-	136, // 147: spark_internal.SparkInternalService.node_available_for_renew:output_type -> google.protobuf.Empty
-	19,  // 148: spark_internal.SparkInternalService.initiate_preimage_swap:output_type -> spark_internal.InitiatePreimageSwapResponse
-	19,  // 149: spark_internal.SparkInternalService.initiate_preimage_swap_v2:output_type -> spark_internal.InitiatePreimageSwapResponse
-	136, // 150: spark_internal.SparkInternalService.update_preimage_request:output_type -> google.protobuf.Empty
-	136, // 151: spark_internal.SparkInternalService.store_preimage_share:output_type -> google.protobuf.Empty
-	22,  // 152: spark_internal.SparkInternalService.prepare_tree_address:output_type -> spark_internal.PrepareTreeAddressResponse
-	136, // 153: spark_internal.SparkInternalService.initiate_transfer:output_type -> google.protobuf.Empty
-	136, // 154: spark_internal.SparkInternalService.initiate_transfer_v2:output_type -> google.protobuf.Empty
-	136, // 155: spark_internal.SparkInternalService.deliver_sender_key_tweak:output_type -> google.protobuf.Empty
-	136, // 156: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
-	136, // 157: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:output_type -> google.protobuf.Empty
-	136, // 158: spark_internal.SparkInternalService.settle_receiver_key_tweak:output_type -> google.protobuf.Empty
-	136, // 159: spark_internal.SparkInternalService.settle_sender_key_tweak:output_type -> google.protobuf.Empty
-	40,  // 160: spark_internal.SparkInternalService.create_static_deposit_utxo_swap:output_type -> spark_internal.CreateStaticDepositUtxoSwapResponse
-	42,  // 161: spark_internal.SparkInternalService.create_static_deposit_utxo_refund:output_type -> spark_internal.CreateStaticDepositUtxoRefundResponse
-	35,  // 162: spark_internal.SparkInternalService.create_instant_static_deposit_utxo_swap:output_type -> spark_internal.CreateInstantStaticDepositUtxoSwapResponse
-	37,  // 163: spark_internal.SparkInternalService.save_utxo_for_instant_static_deposit:output_type -> spark_internal.SaveUtxoForInstantStaticDepositResponse
-	50,  // 164: spark_internal.SparkInternalService.link_utxo_swap_transfer:output_type -> spark_internal.LinkUtxoSwapTransferResponse
-	44,  // 165: spark_internal.SparkInternalService.rollback_utxo_swap:output_type -> spark_internal.RollbackUtxoSwapResponse
-	46,  // 166: spark_internal.SparkInternalService.rollback_instant_utxo_swap:output_type -> spark_internal.RollbackInstantUtxoSwapResponse
-	48,  // 167: spark_internal.SparkInternalService.utxo_swap_completed:output_type -> spark_internal.UtxoSwapCompletedResponse
-	52,  // 168: spark_internal.SparkInternalService.query_leaf_signing_pubkeys:output_type -> spark_internal.QueryLeafSigningPubkeysResponse
-	136, // 169: spark_internal.SparkInternalService.resolve_leaf_investigation:output_type -> google.protobuf.Empty
-	136, // 170: spark_internal.SparkInternalService.fix_keyshare:output_type -> google.protobuf.Empty
-	64,  // 171: spark_internal.SparkInternalService.fix_keyshare_round1:output_type -> spark_internal.FixKeyshareRound1Response
-	66,  // 172: spark_internal.SparkInternalService.fix_keyshare_round2:output_type -> spark_internal.FixKeyshareRound2Response
-	68,  // 173: spark_internal.SparkInternalService.get_transfers:output_type -> spark_internal.GetTransfersResponse
-	70,  // 174: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:output_type -> spark_internal.GenerateStaticDepositAddressProofsResponse
-	136, // 175: spark_internal.SparkInternalService.sync_node:output_type -> google.protobuf.Empty
-	86,  // 176: spark_internal.SparkInternalService.consensus_prepare:output_type -> spark_internal.ConsensusPrepareResponse
-	88,  // 177: spark_internal.SparkInternalService.consensus_query_outcome:output_type -> spark_internal.ConsensusQueryOutcomeResponse
-	136, // [136:178] is the sub-list for method output_type
-	94,  // [94:136] is the sub-list for method input_type
+	136, // 134: spark_internal.SparkInternalService.query_nodes:input_type -> spark.QueryNodesRequest
+	85,  // 135: spark_internal.SparkInternalService.consensus_prepare:input_type -> spark_internal.ConsensusPrepareRequest
+	87,  // 136: spark_internal.SparkInternalService.consensus_query_outcome:input_type -> spark_internal.ConsensusQueryOutcomeRequest
+	137, // 137: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
+	4,   // 138: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:output_type -> spark_internal.MarkKeyshareForDepositAddressResponse
+	137, // 139: spark_internal.SparkInternalService.reserve_entity_dkg_key:output_type -> google.protobuf.Empty
+	137, // 140: spark_internal.SparkInternalService.finalize_tree_creation:output_type -> google.protobuf.Empty
+	6,   // 141: spark_internal.SparkInternalService.frost_round1:output_type -> spark_internal.FrostRound1Response
+	9,   // 142: spark_internal.SparkInternalService.frost_round2:output_type -> spark_internal.FrostRound2Response
+	137, // 143: spark_internal.SparkInternalService.finalize_transfer:output_type -> google.protobuf.Empty
+	137, // 144: spark_internal.SparkInternalService.finalize_refresh_timelock:output_type -> google.protobuf.Empty
+	137, // 145: spark_internal.SparkInternalService.finalize_extend_leaf:output_type -> google.protobuf.Empty
+	137, // 146: spark_internal.SparkInternalService.finalize_renew_refund_timelock:output_type -> google.protobuf.Empty
+	137, // 147: spark_internal.SparkInternalService.finalize_renew_node_timelock:output_type -> google.protobuf.Empty
+	137, // 148: spark_internal.SparkInternalService.node_available_for_renew:output_type -> google.protobuf.Empty
+	19,  // 149: spark_internal.SparkInternalService.initiate_preimage_swap:output_type -> spark_internal.InitiatePreimageSwapResponse
+	19,  // 150: spark_internal.SparkInternalService.initiate_preimage_swap_v2:output_type -> spark_internal.InitiatePreimageSwapResponse
+	137, // 151: spark_internal.SparkInternalService.update_preimage_request:output_type -> google.protobuf.Empty
+	137, // 152: spark_internal.SparkInternalService.store_preimage_share:output_type -> google.protobuf.Empty
+	22,  // 153: spark_internal.SparkInternalService.prepare_tree_address:output_type -> spark_internal.PrepareTreeAddressResponse
+	137, // 154: spark_internal.SparkInternalService.initiate_transfer:output_type -> google.protobuf.Empty
+	137, // 155: spark_internal.SparkInternalService.initiate_transfer_v2:output_type -> google.protobuf.Empty
+	137, // 156: spark_internal.SparkInternalService.deliver_sender_key_tweak:output_type -> google.protobuf.Empty
+	137, // 157: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
+	137, // 158: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:output_type -> google.protobuf.Empty
+	137, // 159: spark_internal.SparkInternalService.settle_receiver_key_tweak:output_type -> google.protobuf.Empty
+	137, // 160: spark_internal.SparkInternalService.settle_sender_key_tweak:output_type -> google.protobuf.Empty
+	40,  // 161: spark_internal.SparkInternalService.create_static_deposit_utxo_swap:output_type -> spark_internal.CreateStaticDepositUtxoSwapResponse
+	42,  // 162: spark_internal.SparkInternalService.create_static_deposit_utxo_refund:output_type -> spark_internal.CreateStaticDepositUtxoRefundResponse
+	35,  // 163: spark_internal.SparkInternalService.create_instant_static_deposit_utxo_swap:output_type -> spark_internal.CreateInstantStaticDepositUtxoSwapResponse
+	37,  // 164: spark_internal.SparkInternalService.save_utxo_for_instant_static_deposit:output_type -> spark_internal.SaveUtxoForInstantStaticDepositResponse
+	50,  // 165: spark_internal.SparkInternalService.link_utxo_swap_transfer:output_type -> spark_internal.LinkUtxoSwapTransferResponse
+	44,  // 166: spark_internal.SparkInternalService.rollback_utxo_swap:output_type -> spark_internal.RollbackUtxoSwapResponse
+	46,  // 167: spark_internal.SparkInternalService.rollback_instant_utxo_swap:output_type -> spark_internal.RollbackInstantUtxoSwapResponse
+	48,  // 168: spark_internal.SparkInternalService.utxo_swap_completed:output_type -> spark_internal.UtxoSwapCompletedResponse
+	52,  // 169: spark_internal.SparkInternalService.query_leaf_signing_pubkeys:output_type -> spark_internal.QueryLeafSigningPubkeysResponse
+	137, // 170: spark_internal.SparkInternalService.resolve_leaf_investigation:output_type -> google.protobuf.Empty
+	137, // 171: spark_internal.SparkInternalService.fix_keyshare:output_type -> google.protobuf.Empty
+	64,  // 172: spark_internal.SparkInternalService.fix_keyshare_round1:output_type -> spark_internal.FixKeyshareRound1Response
+	66,  // 173: spark_internal.SparkInternalService.fix_keyshare_round2:output_type -> spark_internal.FixKeyshareRound2Response
+	68,  // 174: spark_internal.SparkInternalService.get_transfers:output_type -> spark_internal.GetTransfersResponse
+	70,  // 175: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:output_type -> spark_internal.GenerateStaticDepositAddressProofsResponse
+	137, // 176: spark_internal.SparkInternalService.sync_node:output_type -> google.protobuf.Empty
+	138, // 177: spark_internal.SparkInternalService.query_nodes:output_type -> spark.QueryNodesResponse
+	86,  // 178: spark_internal.SparkInternalService.consensus_prepare:output_type -> spark_internal.ConsensusPrepareResponse
+	88,  // 179: spark_internal.SparkInternalService.consensus_query_outcome:output_type -> spark_internal.ConsensusQueryOutcomeResponse
+	137, // [137:180] is the sub-list for method output_type
+	94,  // [94:137] is the sub-list for method input_type
 	94,  // [94:94] is the sub-list for extension type_name
 	94,  // [94:94] is the sub-list for extension extendee
 	0,   // [0:94] is the sub-list for field type_name

@@ -257,6 +257,16 @@ func (s *SparkInternalServer) SyncNode(ctx context.Context, req *pb.SyncNodeRequ
 	return &emptypb.Empty{}, h.SyncTreeNodes(ctx, req)
 }
 
+// QueryNodes serves operator-to-operator node reads for sync/reconciliation.
+// It passes isSSP=true so the per-wallet privacy filter is bypassed: SO-to-SO
+// sync over this IP-restricted internal service is trusted and must see leaves
+// regardless of the owner's privacy setting. Callers like SyncTreeNodes use
+// this instead of the public SparkService.QueryNodes, which would filter out
+// privacy-enabled wallets' leaves and break the sync.
+func (s *SparkInternalServer) QueryNodes(ctx context.Context, req *pbspark.QueryNodesRequest) (*pbspark.QueryNodesResponse, error) {
+	return handler.NewTreeQueryHandler(s.config).QueryNodes(ctx, req, true)
+}
+
 func (s *SparkInternalServer) ConsensusPrepare(ctx context.Context, req *pb.ConsensusPrepareRequest) (*pb.ConsensusPrepareResponse, error) {
 	ch := handler.NewConsensusHandler(s.config)
 	result, err := ch.DispatchPrepare(ctx, pbgossip.ConsensusOperationType(req.GetOpType()), req.GetOperation(), req.GetFlowExecutionId(), uint(req.GetCoordinatorIndex()))

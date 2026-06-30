@@ -19,7 +19,30 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+// queryPeerNodesForSync reads tree nodes from a peer operator for SO-to-SO
+// reconciliation. It uses the internal SparkInternalService.QueryNodes so the
+// per-wallet privacy filter is bypassed — the public SparkService.QueryNodes
+// applies filterNodesByWalletAccess and strips privacy-enabled wallets' leaves,
+// failing the sync with "expected N, got 0".
+//
+// Operators deploy independently (the Flashnet operator is external and on its
+// own schedule), so a peer may not yet expose the internal RPC. On
+// codes.Unimplemented we fall back to the public SparkService.QueryNodes so
+// non-private syncs don't regress during the upgrade window; private nodes
+// self-heal once that peer is upgraded.
+// TODO: drop the fallback once every operator exposes SparkInternalService.QueryNodes.
+func queryPeerNodesForSync(ctx context.Context, conn grpc.ClientConnInterface, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
+	resp, err := pbin.NewSparkInternalServiceClient(conn).QueryNodes(ctx, req)
+	if status.Code(err) == codes.Unimplemented {
+		return pb.NewSparkServiceClient(conn).QueryNodes(ctx, req)
+	}
+	return resp, err
+}
 
 type SyncNodeHandler struct {
 	config *so.Config
@@ -64,8 +87,7 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 	}
 	defer conn.Close()
 
-	client := pb.NewSparkServiceClient(conn)
-	resp, err := client.QueryNodes(ctx, &pb.QueryNodesRequest{
+	resp, err := queryPeerNodesForSync(ctx, conn, &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_NodeIds{
 			NodeIds: &pb.TreeNodeIds{
 				NodeIds: req.GetNodeIds(),
