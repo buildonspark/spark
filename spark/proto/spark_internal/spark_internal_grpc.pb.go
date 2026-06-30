@@ -61,6 +61,7 @@ const (
 	SparkInternalService_GetTransfers_FullMethodName                       = "/spark_internal.SparkInternalService/get_transfers"
 	SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName = "/spark_internal.SparkInternalService/generate_static_deposit_address_proofs"
 	SparkInternalService_SyncNode_FullMethodName                           = "/spark_internal.SparkInternalService/sync_node"
+	SparkInternalService_QueryNodes_FullMethodName                         = "/spark_internal.SparkInternalService/query_nodes"
 	SparkInternalService_ConsensusPrepare_FullMethodName                   = "/spark_internal.SparkInternalService/consensus_prepare"
 	SparkInternalService_ConsensusQueryOutcome_FullMethodName              = "/spark_internal.SparkInternalService/consensus_query_outcome"
 )
@@ -124,6 +125,13 @@ type SparkInternalServiceClient interface {
 	// This method fixes bad leaves by querying a designated "good" SO for its
 	// leaves, and copying it over to this SO's DB.
 	SyncNode(ctx context.Context, in *SyncNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Query nodes by ID for operator-to-operator reconciliation. Unlike the
+	// public SparkService.query_nodes, this internal variant bypasses the
+	// per-wallet privacy filter: the filter exists to stop end users reading
+	// nodes for wallets they cannot access, which has no bearing on trusted,
+	// IP-restricted SO-to-SO sync. Without this, syncing leaves owned by a
+	// privacy-enabled wallet returns zero nodes ("expected N, got 0").
+	QueryNodes(ctx context.Context, in *spark.QueryNodesRequest, opts ...grpc.CallOption) (*spark.QueryNodesResponse, error)
 	// ConsensusPrepare is the generic prepare RPC for the 2PC consensus engine.
 	// The coordinator fans this out to all participants during Execute.
 	// Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
@@ -546,6 +554,16 @@ func (c *sparkInternalServiceClient) SyncNode(ctx context.Context, in *SyncNodeR
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) QueryNodes(ctx context.Context, in *spark.QueryNodesRequest, opts ...grpc.CallOption) (*spark.QueryNodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(spark.QueryNodesResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_QueryNodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) ConsensusPrepare(ctx context.Context, in *ConsensusPrepareRequest, opts ...grpc.CallOption) (*ConsensusPrepareResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConsensusPrepareResponse)
@@ -625,6 +643,13 @@ type SparkInternalServiceServer interface {
 	// This method fixes bad leaves by querying a designated "good" SO for its
 	// leaves, and copying it over to this SO's DB.
 	SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error)
+	// Query nodes by ID for operator-to-operator reconciliation. Unlike the
+	// public SparkService.query_nodes, this internal variant bypasses the
+	// per-wallet privacy filter: the filter exists to stop end users reading
+	// nodes for wallets they cannot access, which has no bearing on trusted,
+	// IP-restricted SO-to-SO sync. Without this, syncing leaves owned by a
+	// privacy-enabled wallet returns zero nodes ("expected N, got 0").
+	QueryNodes(context.Context, *spark.QueryNodesRequest) (*spark.QueryNodesResponse, error)
 	// ConsensusPrepare is the generic prepare RPC for the 2PC consensus engine.
 	// The coordinator fans this out to all participants during Execute.
 	// Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.
@@ -764,6 +789,9 @@ func (UnimplementedSparkInternalServiceServer) GenerateStaticDepositAddressProof
 }
 func (UnimplementedSparkInternalServiceServer) SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncNode not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) QueryNodes(context.Context, *spark.QueryNodesRequest) (*spark.QueryNodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QueryNodes not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) ConsensusPrepare(context.Context, *ConsensusPrepareRequest) (*ConsensusPrepareResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConsensusPrepare not implemented")
@@ -1512,6 +1540,24 @@ func _SparkInternalService_SyncNode_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_QueryNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.QueryNodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).QueryNodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_QueryNodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).QueryNodes(ctx, req.(*spark.QueryNodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_ConsensusPrepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConsensusPrepareRequest)
 	if err := dec(in); err != nil {
@@ -1714,6 +1760,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "sync_node",
 			Handler:    _SparkInternalService_SyncNode_Handler,
+		},
+		{
+			MethodName: "query_nodes",
+			Handler:    _SparkInternalService_QueryNodes_Handler,
 		},
 		{
 			MethodName: "consensus_prepare",

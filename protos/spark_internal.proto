@@ -87,6 +87,14 @@ service SparkInternalService {
     // leaves, and copying it over to this SO's DB.
     rpc sync_node(SyncNodeRequest) returns (google.protobuf.Empty) {}
 
+    // Query nodes by ID for operator-to-operator reconciliation. Unlike the
+    // public SparkService.query_nodes, this internal variant bypasses the
+    // per-wallet privacy filter: the filter exists to stop end users reading
+    // nodes for wallets they cannot access, which has no bearing on trusted,
+    // IP-restricted SO-to-SO sync. Without this, syncing leaves owned by a
+    // privacy-enabled wallet returns zero nodes ("expected N, got 0").
+    rpc query_nodes(spark.QueryNodesRequest) returns (spark.QueryNodesResponse) {}
+
     // ConsensusPrepare is the generic prepare RPC for the 2PC consensus engine.
     // The coordinator fans this out to all participants during Execute.
     // Each participant dispatches to the appropriate FlowHandler.Prepare based on op_type.

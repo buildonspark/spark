@@ -216,6 +216,7 @@ func sparkInternalServicePolicies() map[string]Policy {
 		pbinternal.SparkInternalService_GetTransfers_FullMethodName:                       unauthInternal,
 		pbinternal.SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName: unauthInternal,
 		pbinternal.SparkInternalService_SyncNode_FullMethodName:                           unauthInternal,
+		pbinternal.SparkInternalService_QueryNodes_FullMethodName:                         unauthInternal,
 		pbinternal.SparkInternalService_ConsensusPrepare_FullMethodName:                   unauthInternal,
 		pbinternal.SparkInternalService_ConsensusQueryOutcome_FullMethodName:              unauthInternal,
 	}

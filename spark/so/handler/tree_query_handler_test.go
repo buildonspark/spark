@@ -792,6 +792,39 @@ func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
 	assert.Equal(t, testData.Node.ID.String(), ownerResp.GetNodes()[testData.Node.ID.String()].GetId())
 }
 
+// TestQueryNodes_NodeIds_SSPBypassPrivacy locks in the contract the internal
+// SparkInternalService.QueryNodes depends on: the by-ID source must bypass the
+// per-wallet privacy filter when isSSP=true. SyncTreeNodes / sync_node read
+// peer leaves by ID over that internal RPC; without this bypass, leaves owned
+// by privacy-enabled wallets are filtered out and the sync fails with
+// "expected N, got 0". End-to-end SO-to-SO sync coverage lives in a
+// multi-operator integration test (follow-up).
+func TestQueryNodes_NodeIds_SSPBypassPrivacy(t *testing.T) {
+	// Privacy enabled, different requester, no session injected.
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, false, false)
+	handler := NewTreeQueryHandler(cfg)
+
+	req := &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: []string{testData.Node.ID.String()},
+			},
+		},
+	}
+
+	// Public path (isSSP=false) filters the private node out.
+	publicResp, err := handler.QueryNodes(ctx, req, false)
+	require.NoError(t, err)
+	assert.Empty(t, publicResp.GetNodes(), "public QueryNodes should filter a private wallet's node when queried by ID")
+
+	// Internal path (isSSP=true) must return it, which is what
+	// SparkInternalService.QueryNodes uses to unblock SO-to-SO sync.
+	internalResp, err := handler.QueryNodes(ctx, req, true)
+	require.NoError(t, err)
+	require.Len(t, internalResp.GetNodes(), 1, "internal QueryNodes (isSSP=true) must bypass the privacy filter for the by-ID source")
+	assert.Equal(t, testData.Node.ID.String(), internalResp.GetNodes()[testData.Node.ID.String()].GetId())
+}
+
 func TestQueryNodes_PrivacyDisabled_OwnerIdentityPubkey(t *testing.T) {
 	// Create test data with privacy disabled and different requester/owner
 	ctx, cfg, testData := createPrivacyTestData(t, false, false, true, false)
