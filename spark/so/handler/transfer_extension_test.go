@@ -8,18 +8,12 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMarshalProtoForReceiver(t *testing.T) {
 	ctx, dbCtx := db.ConnectToTestPostgres(t)
-	// Match prod: KnobReadMIMOMultiParticipantFormat on = strict mode, so a
-	// missing participant edge is a hard error rather than a silent empty array.
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
-	}))
 	client := dbCtx.Client
 
 	rng := rand.NewChaCha8([32]byte{1})

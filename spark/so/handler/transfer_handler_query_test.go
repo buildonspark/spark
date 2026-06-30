@@ -463,8 +463,7 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                 100,
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+		knobs.KnobPrivacyEnabled: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
@@ -562,8 +561,7 @@ func TestQueryTransfers_WithTransferIds_MultiReceiverAccess_MIMO(t *testing.T) {
 	otherReceiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                 100,
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+		knobs.KnobPrivacyEnabled: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
@@ -641,8 +639,7 @@ func TestQueryTransfers_WithTransferIds_MissingSendersEdges_MIMO(t *testing.T) {
 	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                 100,
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+		knobs.KnobPrivacyEnabled: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
@@ -692,8 +689,7 @@ func TestQueryTransfers_WithTransferIds_MissingReceiversEdges_MIMO(t *testing.T)
 	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                 100,
-		knobs.KnobReadMIMOMultiParticipantFormat: 100,
+		knobs.KnobPrivacyEnabled: 100,
 	})
 	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 

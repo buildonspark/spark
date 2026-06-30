@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -1971,12 +1970,6 @@ func TestQueryAllTransfersMIMO(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
-	// Enable the MIMO query path.
-	kc, err := sparktesting.NewKnobController(t)
-	require.NoError(t, err)
-	err = kc.SetKnob(t, knobs.KnobReadMIMOMultiParticipantFormat, 100)
-	require.NoError(t, err)
-
 	network, err := senderConfig.Network.ToProtoNetwork()
 	require.NoError(t, err)
 
@@ -2082,12 +2075,6 @@ func TestQueryPendingTransfersMIMO(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
-
-	// Enable the MIMO query path.
-	kc, err := sparktesting.NewKnobController(t)
-	require.NoError(t, err)
-	err = kc.SetKnob(t, knobs.KnobReadMIMOMultiParticipantFormat, 100)
-	require.NoError(t, err)
 
 	network, err := senderConfig.Network.ToProtoNetwork()
 	require.NoError(t, err)
