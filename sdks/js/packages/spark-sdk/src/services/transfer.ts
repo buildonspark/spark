@@ -18,7 +18,6 @@ import {
   type ClaimPackage,
   type ClaimTransferResponse,
   type ClaimTransferSignRefundsResponse,
-  type CounterLeafSwapResponse,
   type DeepPartial,
   HashVariant,
   type InitiateSwapPrimaryTransferResponse,
@@ -1385,7 +1384,7 @@ export class TransferService extends BaseTransferService {
       this.config.getCoordinatorAddress(),
     );
 
-    let response: CounterLeafSwapResponse;
+    let response: StartTransferResponse;
     try {
       response = await sparkClient.start_transfer_v2({
         transferId,
