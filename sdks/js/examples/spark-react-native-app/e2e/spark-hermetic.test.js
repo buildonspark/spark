@@ -3,6 +3,7 @@ const { createTestHelpers } = require('./helpers');
 const TIMEOUT = 60 * 1000;
 const LONG_TIMEOUT = TIMEOUT * 3;
 const TRANSFER_CLAIM_TIMEOUT = TIMEOUT * 5;
+const itAndroid = device.getPlatform() === 'android' ? it : it.skip;
 const {
   ensureConnectedWallet,
   openTestScreen,
@@ -58,8 +59,10 @@ describe('Spark React Native App (Hermetic)', () => {
     });
   });
 
-  it(
-    'auto-claims a local deposit',
+  // Android-only for now: this local funding path relies on Android CI's
+  // adb reverse bridge to the hermetic bitcoind RPC port.
+  itAndroid(
+    ':android: auto-claims a local deposit',
     async () => {
       await runLongOperation({
         buttonId: 'fund-local-deposit-button',
@@ -76,8 +79,10 @@ describe('Spark React Native App (Hermetic)', () => {
     );
   });
 
-  it(
-    'auto-claims an incoming Spark transfer',
+  // Android-only for now: this transfer setup relies on Android CI's
+  // adb reverse bridge to the hermetic bitcoind RPC port.
+  itAndroid(
+    ':android: auto-claims an incoming Spark transfer',
     async () => {
       await runLongOperation({
         buttonId: 'test-transfer-claim-button',
