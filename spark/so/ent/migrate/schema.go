@@ -542,6 +542,11 @@ var (
 				Columns: []*schema.Column{PreimageRequestsColumns[7]},
 			},
 			{
+				Name:    "preimagerequest_receiver_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{PreimageRequestsColumns[5]},
+			},
+			{
 				Name:    "preimagerequest_preimage_request_transfers",
 				Unique:  false,
 				Columns: []*schema.Column{PreimageRequestsColumns[8]},
