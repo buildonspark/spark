@@ -2301,14 +2301,14 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}, nil
 }
 
-// participantPubkeyHex returns a lowercase-hex representation of the
-// pubkey from filter.Participant, or "" if no participant is set. Used as
-// a knob target so RolloutRandomTarget below can be ramped per wallet.
+// participantPubkeyHex returns a lowercase-hex representation of the pubkey
+// from filter.Participant, or "" if no (non-empty) participant is set.
+// QueryPendingTransfers routes "" to legacy queryTransfers, since the MIMO
+// path requires a participant to scope the query.
 //
 // Each proto-generated Get* accessor returns nil if a different variant
 // is set, so we walk the three variants in order and hex-encode whichever
-// is non-nil. hex.EncodeToString(nil) returns "", which falls through to
-// the nil-participant audit branch.
+// is non-nil. hex.EncodeToString(nil) returns "".
 func participantPubkeyHex(filter *pb.TransferFilter) string {
 	pk := filter.GetReceiverIdentityPublicKey()
 	if pk == nil {
@@ -2321,44 +2321,22 @@ func participantPubkeyHex(filter *pb.TransferFilter) string {
 }
 
 func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
-	// Routing strategy:
-	//   - Bare knob value covers the broad rollout %.
-	//   - Per-pubkey overrides via @<pubkeyHex> let us pin specific wallets
-	//     (notably the SSP) above or below the broad rate during ramp-up,
-	//     including hard 0% killswitches per wallet.
-	//
-	// RolloutRandomTarget falls back to the defaultValue argument when no
-	// @target value is set; passing the bare knob value as the default
-	// gives "broad rate, with per-wallet overrides" semantics in a single
-	// call.
-	knobsSvc := knobs.GetKnobsService(ctx)
-	pubkeyHex := participantPubkeyHex(filter)
-	var useMIMO bool
-	if pubkeyHex != "" {
-		bareValue := knobsSvc.GetValue(knobs.KnobReadMIMODataModelQueryPendingTransfers, 0)
-		useMIMO = knobsSvc.RolloutRandomTarget(
-			knobs.KnobReadMIMODataModelQueryPendingTransfers, &pubkeyHex, bareValue)
+	// Validate pagination up front so both the MIMO and legacy paths reject
+	// malformed input identically (the MIMO path doesn't re-check).
+	if filter.GetLimit() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("limit must be non-negative"))
+	}
+	if filter.GetOffset() < 0 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("offset must be non-negative"))
 	}
 
-	if useMIMO {
+	// The MIMO path needs a participant to scope its per-participant query.
+	// Requests without one (e.g. by-transfer-id lookups) fall back to legacy
+	// queryTransfers.
+	if participantPubkeyHex(filter) != "" {
 		return h.queryPendingTransfersMIMO(ctx, filter)
 	}
-
-	// Nil-participant audit log: if the broad rollout would have routed this
-	// to MIMO, record that we couldn't (MIMO requires a participant). No
-	// production caller (JS SDK, sparkcore SSP) sends nil-participant on this
-	// RPC; any non-zero rate in prod warrants investigating the call surface.
-	if pubkeyHex == "" && knobsSvc.RolloutRandom(knobs.KnobReadMIMODataModelQueryPendingTransfers, 0) {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Sugar().Warnf(
-			"QueryPendingTransfers nil-participant fallback to legacy: transfer_ids=%d types=%d limit=%d offset=%d",
-			len(filter.GetTransferIds()), len(filter.GetTypes()), filter.GetLimit(), filter.GetOffset(),
-		)
-		queryPendingNilParticipantFallback.Add(ctx, 1)
-	}
-
-	// Legacy path also handles the (Participant != nil, knob off / not
-	// targeted) case for the safe transition from old to new behavior.
+	queryPendingNilParticipantFallback.Add(ctx, 1)
 	return h.queryTransfers(ctx, filter, true, false)
 }
 
@@ -2384,8 +2362,7 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.Tran
 // queryPendingTransfersMIMO is the MIMO-native implementation of
 // QueryPendingTransfers. The routing in QueryPendingTransfers guarantees:
 //   - filter.Participant is non-nil (caller-required; nil-participant traffic
-//     is logged + counted and routed to legacy queryTransfers)
-//   - KnobReadMIMODataModelQueryPendingTransfers is on
+//     is counted and routed to legacy queryTransfers)
 //   - this is the pendingOnly path; isSSP is irrelevant — the public RPC
 //     never sets it. SSP traffic lands here.
 //

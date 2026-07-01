@@ -23,7 +23,7 @@ var transferQueryResultCount metric.Float64Histogram
 
 // queryPendingNilParticipantFallback counts QueryPendingTransfers calls that
 // fell through to the legacy queryTransfers path because filter.Participant
-// was nil under KnobReadMIMODataModelQueryPendingTransfers.
+// was nil (the MIMO path requires a participant).
 var queryPendingNilParticipantFallback metric.Int64Counter
 
 func init() {
@@ -57,7 +57,7 @@ func init() {
 
 	queryPendingNilParticipantFallback, err = transferQueryMeter.Int64Counter(
 		"spark_query_pending_transfers_nil_participant_fallback",
-		metric.WithDescription("QueryPendingTransfers calls that fell through to legacy because Participant was nil under the MIMO knob"),
+		metric.WithDescription("QueryPendingTransfers calls that fell through to legacy because Participant was nil"),
 	)
 	if err != nil {
 		otel.Handle(err)
