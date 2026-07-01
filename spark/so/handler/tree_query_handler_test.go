@@ -45,7 +45,7 @@ func TestTreeQueryHandlersRejectNilRequests(t *testing.T) {
 	})
 
 	t.Run("QueryStaticDepositAddresses", func(t *testing.T) {
-		resp, err := handler.QueryStaticDepositAddresses(t.Context(), nil)
+		resp, err := handler.QueryStaticDepositAddresses(t.Context(), nil, false)
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "request is required")
 	})
@@ -121,7 +121,7 @@ func TestTreeQueryHandlersRejectNegativePagination(t *testing.T) {
 					IdentityPublicKey: identityPubKey,
 					Network:           pb.Network_REGTEST,
 					Limit:             -1,
-				})
+				}, false)
 				require.Nil(t, resp)
 				return err
 			},
@@ -134,7 +134,7 @@ func TestTreeQueryHandlersRejectNegativePagination(t *testing.T) {
 					Network:           pb.Network_REGTEST,
 					Limit:             1,
 					Offset:            -1,
-				})
+				}, false)
 				require.Nil(t, resp)
 				return err
 			},
@@ -914,6 +914,50 @@ func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, resp.GetNodes(), 1, "SSP should be able to see nodes even when owner has privacy enabled")
 	assert.Equal(t, testData.Node.ID.String(), resp.GetNodes()[testData.Node.ID.String()].GetId())
+}
+
+// TestQueryStaticDepositAddresses_PrivacyGate verifies the public endpoint
+// (isSSP=false) denies a caller without read access to a privacy-enabled wallet,
+// while the SSP-internal path (isSSP=true) bypasses the check.
+//
+// The returned-address path needs cross-SO proofs-of-possession infra, so it
+// isn't unit-testable here. Instead we observe the gate's short-circuit: it
+// returns empty before the request's network is validated, so a
+// network-unspecified request succeeds-empty for the public caller (gate fired)
+// but errors for the SSP (gate skipped, reaches the network check). End-to-end
+// coverage is left to integration.
+func TestQueryStaticDepositAddresses_PrivacyGate(t *testing.T) {
+	// Privacy enabled, requester != owner, no session injected → no read access.
+	// createPrivacyTestData's ctx has the global privacy knob on but the
+	// static-deposit knob OFF.
+	baseCtx, cfg, testData := createPrivacyTestData(t, true, false, false, false)
+	handler := NewTreeQueryHandler(cfg)
+
+	req := &pb.QueryStaticDepositAddressesRequest{
+		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		// Network intentionally UNSPECIFIED: the privacy gate short-circuits to an
+		// empty response before the network check, so reaching the "network must be
+		// specified" error means the gate did NOT fire.
+	}
+
+	// Knob OFF: gate is dark → proceeds past it to network validation.
+	_, err := handler.QueryStaticDepositAddresses(baseCtx, req, false)
+	require.ErrorContains(t, err, "network must be specified")
+
+	// Knob ON.
+	onCtx := knobs.InjectKnobsService(baseCtx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled:                     100,
+		knobs.KnobStaticDepositAddressPrivacyEnabled: 100,
+	}))
+
+	// Public caller without read access: privacy gate short-circuits to empty.
+	resp, err := handler.QueryStaticDepositAddresses(onCtx, req, false)
+	require.NoError(t, err)
+	assert.Empty(t, resp.GetDepositAddresses(), "private wallet's addresses must not be returned to a caller without read access")
+
+	// SSP bypasses the gate even with the knob on, so it proceeds to network validation.
+	_, err = handler.QueryStaticDepositAddresses(onCtx, req, true)
+	require.ErrorContains(t, err, "network must be specified")
 }
 
 func TestQueryBalance_PrivacyEnabled_DifferentRequester(t *testing.T) {

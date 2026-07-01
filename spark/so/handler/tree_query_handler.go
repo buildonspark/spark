@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -381,7 +382,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	}, nil
 }
 
-func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req *pb.QueryStaticDepositAddressesRequest) (*pb.QueryStaticDepositAddressesResponse, error) {
+func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req *pb.QueryStaticDepositAddressesRequest, isSSP bool) (*pb.QueryStaticDepositAddressesResponse, error) {
 	if req == nil {
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
@@ -403,6 +404,21 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse identity public key: %w", err))
+	}
+
+	// Non-SSP callers may only read static deposit addresses for a wallet they
+	// have access to; the SSP-internal endpoint passes isSSP=true to bypass this.
+	// Gated behind a knob (default off) so the public endpoint behaves as before
+	// until the SSP has switched to the internal endpoint; flip the knob on after.
+	knobService := knobs.GetKnobsService(ctx)
+	if !isSSP && knobService != nil && knobService.RolloutRandom(knobs.KnobStaticDepositAddressPrivacyEnabled, 0) {
+		hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, idPubKey)
+		if err != nil {
+			return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to check if privacy is enabled for owner: %w", err))
+		}
+		if !hasReadAccess {
+			return &pb.QueryStaticDepositAddressesResponse{DepositAddresses: nil}, nil
+		}
 	}
 
 	if req.GetNetwork() == pb.Network_UNSPECIFIED {
