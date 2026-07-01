@@ -1784,6 +1784,12 @@ export interface QueryTransfersResponse {
   offset: number;
 }
 
+/** Deliberately narrow by-ID shape; no participant/status/type/pagination filters. */
+export interface QueryTransfersByIdRequest {
+  transferIds: string[];
+  network: Network;
+}
+
 export interface ClaimLeafKeyTweak {
   leafId: string;
   secretShareTweak: SecretShare | undefined;
@@ -11818,6 +11824,84 @@ export const QueryTransfersResponse: MessageFns<QueryTransfersResponse> = {
     const message = createBaseQueryTransfersResponse();
     message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
     message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryTransfersByIdRequest(): QueryTransfersByIdRequest {
+  return { transferIds: [], network: 0 };
+}
+
+export const QueryTransfersByIdRequest: MessageFns<QueryTransfersByIdRequest> = {
+  encode(message: QueryTransfersByIdRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.transferIds) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.network !== 0) {
+      writer.uint32(16).int32(message.network);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTransfersByIdRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTransfersByIdRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTransfersByIdRequest {
+    return {
+      transferIds: globalThis.Array.isArray(object?.transferIds)
+        ? object.transferIds.map((e: any) => globalThis.String(e))
+        : [],
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+    };
+  },
+
+  toJSON(message: QueryTransfersByIdRequest): unknown {
+    const obj: any = {};
+    if (message.transferIds?.length) {
+      obj.transferIds = message.transferIds;
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTransfersByIdRequest>): QueryTransfersByIdRequest {
+    return QueryTransfersByIdRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTransfersByIdRequest>): QueryTransfersByIdRequest {
+    const message = createBaseQueryTransfersByIdRequest();
+    message.transferIds = object.transferIds?.map((e) => e) || [];
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -22135,6 +22219,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    query_transfers_by_id: {
+      name: "query_transfers_by_id",
+      requestType: QueryTransfersByIdRequest,
+      requestStream: false,
+      responseType: QueryTransfersResponse,
+      responseStream: false,
+      options: {},
+    },
     claim_transfer_tweak_keys: {
       name: "claim_transfer_tweak_keys",
       requestType: ClaimTransferTweakKeysRequest,
@@ -22457,6 +22549,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: TransferFilter,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryTransfersResponse>>;
+  query_transfers_by_id(
+    request: QueryTransfersByIdRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryTransfersResponse>>;
   claim_transfer_tweak_keys(
     request: ClaimTransferTweakKeysRequest,
     context: CallContext & CallContextExt,
@@ -22642,6 +22738,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
   ): Promise<QueryTransfersResponse>;
   query_all_transfers(
     request: DeepPartial<TransferFilter>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryTransfersResponse>;
+  query_transfers_by_id(
+    request: DeepPartial<QueryTransfersByIdRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryTransfersResponse>;
   claim_transfer_tweak_keys(

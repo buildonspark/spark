@@ -477,29 +477,15 @@ func loadAndMarshalTransfersByIDs(ctx context.Context, db *ent.Client, ids []uui
 		orderFn = ent.Asc(enttransfer.FieldCreateTime)
 		idOrderFn = ent.Asc(enttransfer.FieldID)
 	}
-	transfers, err := db.Transfer.Query().
-		Where(enttransfer.IDIn(ids...)).
-		WithSparkInvoice().
-		WithTransferSenders().
-		WithTransferReceivers().
-		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
-			q.WithLeaf(func(q *ent.TreeNodeQuery) {
-				q.WithTree().WithSigningKeyshare().WithParent()
-			})
-		}).
-		Order(orderFn, idOrderFn).
-		All(ctx)
+	transfers, err := withTransferQueryEdges(
+		db.Transfer.Query().Where(enttransfer.IDIn(ids...)),
+	).Order(orderFn, idOrderFn).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load transfers: %w", err)
 	}
 	protos := make([]*pb.Transfer, 0, len(transfers))
 	for _, t := range transfers {
-		var p *pb.Transfer
-		if t.HasReceiver(walletPubkey) {
-			p, err = t.MarshalProtoForReceiver(ctx, walletPubkey)
-		} else {
-			p, err = t.MarshalProto(ctx)
-		}
+		p, err := marshalTransferForWallet(ctx, t, &walletPubkey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal transfer %s: %w", t.ID, err)
 		}

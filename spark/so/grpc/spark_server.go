@@ -116,6 +116,12 @@ func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.Transfe
 	return transferHander.QueryPendingTransfers(ctx, req)
 }
 
+// QueryTransfersById fetches specific transfers by ID — a status-free point lookup.
+func (s *SparkServer) QueryTransfersById(ctx context.Context, req *pb.QueryTransfersByIdRequest) (*pb.QueryTransfersResponse, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return transferHandler.QueryTransfersByID(ctx, req)
+}
+
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
 	transferHander := handler.NewTransferHandler(s.config)

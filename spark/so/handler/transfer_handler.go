@@ -2026,6 +2026,109 @@ func (h *TransferHandler) checkTransferAccessMIMO(
 	return false, nil
 }
 
+// withTransferQueryEdges applies the eager-load graph shared by the transfer
+// read paths. Centralized so a new edge reaches every query path at once.
+func withTransferQueryEdges(q *ent.TransferQuery) *ent.TransferQuery {
+	return q.
+		WithSparkInvoice().
+		WithTransferSenders().
+		WithTransferReceivers().
+		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
+			q.WithLeaf(func(q *ent.TreeNodeQuery) {
+				q.WithTree().WithSigningKeyshare().WithParent()
+			})
+		})
+}
+
+// marshalTransferForWallet marshals a transfer with the receiver projection
+// (claim view) when wp is one of its receivers, and the full transfer otherwise.
+// wp == nil always marshals the full transfer — the by-id path has no
+// participant to scope to.
+func marshalTransferForWallet(ctx context.Context, t *ent.Transfer, wp *keys.Public) (*pb.Transfer, error) {
+	if wp != nil && t.HasReceiver(*wp) {
+		return t.MarshalProtoForReceiver(ctx, *wp)
+	}
+	return t.MarshalProto(ctx)
+}
+
+// QueryTransfersByID fetches transfers by ID with no status/type/pagination
+// filter — under MIMO a whole-transfer status filter is ambiguous, so the caller
+// reads per-participant status itself. Access is checked per transfer via
+// checkTransferAccessMIMO, matching the legacy by-id path.
+func (h *TransferHandler) QueryTransfersByID(ctx context.Context, req *pb.QueryTransfersByIdRequest) (resp *pb.QueryTransfersResponse, err error) {
+	ctx, span := tracer.Start(ctx, "TransferHandler.QueryTransfersByID")
+	defer span.End()
+
+	start := time.Now()
+	defer func() {
+		resultCount := 0
+		if resp != nil {
+			resultCount = len(resp.GetTransfers())
+		}
+		logQueryTransfersInvocation(ctx, "query_transfers_by_id",
+			&pb.TransferFilter{TransferIds: req.GetTransferIds(), Network: req.GetNetwork()},
+			time.Since(start),
+			zap.Int("result_count", resultCount),
+			zap.Error(err),
+		)
+	}()
+
+	// Non-empty / max-count / UUID / network validation is enforced at the gRPC
+	// boundary by ValidationInterceptor (generated Validate() from validate.rules).
+	network, err := btcnetwork.FromProtoNetwork(req.GetNetwork())
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert proto network to schema network: %w", err))
+	}
+	transferUUIDs, err := uuids.ParseSlice(req.GetTransferIds())
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer IDs as UUIDs: %w", err))
+	}
+
+	metrics := newTransferQueryRecorder(transferQueryAttrs{
+		QueryPath:      "query_transfers_by_id",
+		FilterType:     "none",
+		HasTransferIDs: true,
+	})
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get db from context: %w", err))
+	}
+
+	transfers, err := withTransferQueryEdges(
+		db.Transfer.Query().Where(
+			enttransfer.IDIn(transferUUIDs...),
+			enttransfer.NetworkEQ(network),
+		),
+	).Order(ent.Desc(enttransfer.FieldCreateTime), ent.Desc(enttransfer.FieldID)).All(ctx)
+	if err != nil {
+		metrics.record(ctx, 0, err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("unable to query transfers by id: %w", err))
+	}
+
+	transferProtos := make([]*pb.Transfer, 0, len(transfers))
+	accessMap := make(map[keys.Public]bool)
+	for _, transfer := range transfers {
+		hasReadAccess, accessErr := h.checkTransferAccessMIMO(ctx, transfer, accessMap)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		if !hasReadAccess {
+			continue
+		}
+		transferProto, marshalErr := marshalTransferForWallet(ctx, transfer, nil)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("unable to marshal transfer: %w", marshalErr)
+		}
+		transferProtos = append(transferProtos, transferProto)
+	}
+
+	// Record the returned count (after the per-transfer access filter), not the raw
+	// row count. offset is always -1 — a by-id fetch is a bounded, terminal set.
+	metrics.record(ctx, len(transferProtos), nil)
+	return &pb.QueryTransfersResponse{Transfers: transferProtos, Offset: -1}, nil
+}
+
 // queryTransfers is a critical customer-facing read endpoint. Traffic that
 // lands here either fell through the specialized handlers gated by per-RPC
 // MIMO knobs, or is a TransferIds-only fetch — the common shape, still
@@ -2222,15 +2325,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.CreateTimeLT(createdBefore))
 	}
 
-	baseQuery := db.Transfer.Query().
-		WithSparkInvoice().
-		WithTransferSenders().
-		WithTransferReceivers().
-		WithTransferLeaves(func(q *ent.TransferLeafQuery) {
-			q.WithLeaf(func(q *ent.TreeNodeQuery) {
-				q.WithTree().WithSigningKeyshare().WithParent()
-			})
-		})
+	baseQuery := withTransferQueryEdges(db.Transfer.Query())
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}
@@ -2276,14 +2371,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			}
 		}
 
-		var transferProto *pb.Transfer
-		if walletIdentityPubkey != nil && transfer.HasReceiver(*walletIdentityPubkey) {
-			transferProto, err = transfer.MarshalProtoForReceiver(ctx, *walletIdentityPubkey)
-		} else {
-			transferProto, err = transfer.MarshalProto(ctx)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal transfer: %w", err)
+		transferProto, marshalErr := marshalTransferForWallet(ctx, transfer, walletIdentityPubkey)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("unable to marshal transfer: %w", marshalErr)
 		}
 		transferProtos = append(transferProtos, transferProto)
 	}
