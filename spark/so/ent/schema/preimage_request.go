@@ -30,6 +30,12 @@ func (PreimageRequest) Indexes() []ent.Index {
 			Unique().
 			Annotations(entsql.IndexWhere("status != 'RETURNED'")),
 		index.Fields("sender_identity_pubkey"),
+		// query_htlc with match_role=RECEIVER_AND_SENDER filters on
+		// (sender_identity_pubkey = ? OR receiver_identity_pubkey = ?). The
+		// composite (payment_hash, receiver_identity_pubkey) index above can't
+		// serve a receiver-only predicate, so without this index Postgres can't
+		// BitmapOr the two branches and falls back to a full table scan.
+		index.Fields("receiver_identity_pubkey"),
 		index.Edges("transfers"),
 	}
 }
