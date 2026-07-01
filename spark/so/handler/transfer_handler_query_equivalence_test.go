@@ -27,15 +27,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Equivalence tests for QueryPendingTransfers MIMO vs legacy paths.
+// Equivalence tests for the pending-transfer MIMO vs legacy paths.
 //
-// These tests are load-bearing for the safety of the
-// KnobReadMIMODataModelQueryPendingTransfers RolloutRandom rollout strategy.
-// Per-request randomness means a single caller polling repeatedly can land on
-// EITHER path; if the paths returned semantically different results, callers
-// would see flapping. These tests prove that for the production-relevant
-// query shapes, both paths return the same set of transfer IDs, the same
-// pagination offsets, and equivalent per-transfer projections.
+// The two paths — legacy queryTransfers and queryPendingTransfersMIMO — must
+// return semantically identical results for the production-relevant pending
+// query shapes: the same set of transfer IDs, the same pagination offsets,
+// and equivalent per-transfer projections. This harness calls each path
+// directly (no routing knob) and asserts that equivalence.
 //
 // Query-shape legend (used in test names + the parent PR's perf table):
 //   - R1: receiver participant, bare predicate (network-only filter on
@@ -234,16 +232,6 @@ func (f *equivFixture) privacyEnabled(pubkeys ...keys.Public) {
 	}
 }
 
-// ctxForWallet returns a context authenticated as the given pubkey with the
-// path-selector knob set (legacy=0, MIMO=100). Other knobs match prod.
-func (f *equivFixture) ctxForWallet(viewer keys.Public, mimoKnob float64) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                         100,
-		knobs.KnobReadMIMODataModelQueryPendingTransfers: mimoKnob,
-	}))
-}
-
 // ctxForViewer returns a context authenticated as the given pubkey with the
 // privacy knob enabled. QueryAllTransfers routing is purely filter-shape based,
 // so no routing knob is set.
@@ -399,16 +387,14 @@ func (f *equivFixture) setupEquivalenceData() {
 	f.multiReceiverTransferID = multi.ID
 }
 
-// runBothPaths invokes QueryPendingTransfers twice on the same filter — once
-// with the MIMO knob off (legacy queryTransfers) and once with it on
-// (queryPendingTransfersMIMO). Returns both responses + errors.
+// runBothPaths invokes each pending path on the same filter — legacy
+// queryTransfers (pendingOnly) and queryPendingTransfersMIMO — under one
+// knob-free authenticated context. Returns both responses + errors.
 func (f *equivFixture) runBothPaths(viewer keys.Public, filter *pb.TransferFilter) (legacyResp, mimoResp *pb.QueryTransfersResponse, legacyErr, mimoErr error) {
 	f.t.Helper()
-	ctxLegacy := f.ctxForWallet(viewer, 0)
-	legacyResp, legacyErr = f.handler.QueryPendingTransfers(ctxLegacy, filter)
-
-	ctxMIMO := f.ctxForWallet(viewer, 100)
-	mimoResp, mimoErr = f.handler.QueryPendingTransfers(ctxMIMO, filter)
+	ctx := f.ctxForViewer(viewer)
+	legacyResp, legacyErr = f.handler.queryTransfers(ctx, filter, true, false)
+	mimoResp, mimoErr = f.handler.queryPendingTransfersMIMO(ctx, filter)
 	return legacyResp, mimoResp, legacyErr, mimoErr
 }
 
@@ -519,7 +505,7 @@ func TestQueryPendingTransfers_Equivalence(t *testing.T) {
 
 	// Pre-pick a real transfer ID for the singular cases. The light wallet
 	// has 5 pending receivers — one per pendingPair; any will do.
-	resp, err := f.handler.QueryPendingTransfers(f.ctxForWallet(f.light, 0), receiverFilter(f.light))
+	resp, err := f.handler.queryTransfers(f.ctxForViewer(f.light), receiverFilter(f.light), true, false)
 	require.NoError(t, err)
 	require.NotEmpty(t, resp.GetTransfers(), "fixture should produce light-pending transfers")
 	lightTransferID := resp.GetTransfers()[0].GetId()
@@ -655,10 +641,9 @@ func TestQueryPendingTransfers_Equivalence_Access_SessionMismatch(t *testing.T) 
 
 	// Authenticate as `other`, query for `light`. Privacy is on for `light`,
 	// so the access check must reject and both paths must return empty.
-	ctxLegacy := f.ctxForWallet(f.other, 0)
-	respLegacy, errLegacy := f.handler.QueryPendingTransfers(ctxLegacy, receiverFilter(f.light))
-	ctxMIMO := f.ctxForWallet(f.other, 100)
-	respMIMO, errMIMO := f.handler.QueryPendingTransfers(ctxMIMO, receiverFilter(f.light))
+	ctx := f.ctxForViewer(f.other)
+	respLegacy, errLegacy := f.handler.queryTransfers(ctx, receiverFilter(f.light), true, false)
+	respMIMO, errMIMO := f.handler.queryPendingTransfersMIMO(ctx, receiverFilter(f.light))
 
 	assertResultsEquivalent(t, "access_session_mismatch", respLegacy, respMIMO, errLegacy, errMIMO)
 	assert.Empty(t, respLegacy.GetTransfers(), "expected empty result on session mismatch")
@@ -672,19 +657,11 @@ func TestQueryPendingTransfers_Equivalence_Access_NoSession(t *testing.T) {
 	f := newEquivFixture(t)
 	f.setupEquivalenceData()
 
-	noSessionKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                         100,
-		knobs.KnobReadMIMODataModelQueryPendingTransfers: 0,
-	})
-	ctxLegacy := knobs.InjectKnobsService(f.ctx, noSessionKnobs)
-	respLegacy, errLegacy := f.handler.QueryPendingTransfers(ctxLegacy, receiverFilter(f.light))
-
-	mimoKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                         100,
-		knobs.KnobReadMIMODataModelQueryPendingTransfers: 100,
-	})
-	ctxMIMO := knobs.InjectKnobsService(f.ctx, mimoKnobs)
-	respMIMO, errMIMO := f.handler.QueryPendingTransfers(ctxMIMO, receiverFilter(f.light))
+	// No session injected — the whole point is no-session + privacy-on. Both
+	// paths must reject via the access check and return empty.
+	ctx := knobs.InjectKnobsService(f.ctx, knobs.NewFixedKnobs(map[string]float64{knobs.KnobPrivacyEnabled: 100}))
+	respLegacy, errLegacy := f.handler.queryTransfers(ctx, receiverFilter(f.light), true, false)
+	respMIMO, errMIMO := f.handler.queryPendingTransfersMIMO(ctx, receiverFilter(f.light))
 
 	assertResultsEquivalent(t, "access_no_session", respLegacy, respMIMO, errLegacy, errMIMO)
 	assert.Empty(t, respLegacy.GetTransfers(), "expected empty result with no session + privacy enabled")
@@ -724,17 +701,13 @@ func TestQueryPendingTransfers_Equivalence_MultiReceiver(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Pagination consistency across knob states
+// Pagination consistency across the legacy/MIMO handoff
 // -----------------------------------------------------------------------------
 
-// TestQueryPendingTransfers_Equivalence_PaginationCrossKnob proves that the
-// RolloutRandom rollout strategy is safe: a caller that pages with knob=0
-// (legacy) and then again with knob=100 (MIMO) sees no overlap, no drops,
-// and the union equals a single full-page call.
-//
-// This is the load-bearing check for the per-request randomness in
-// QueryPendingTransfers. If this test ever fails, the routing must be
-// tightened (e.g. always-on or always-off, deterministic per-caller).
+// TestQueryPendingTransfers_Equivalence_PaginationCrossKnob proves the paging
+// handoff is safe: a caller that pages via the legacy path and then again via
+// the MIMO path sees no overlap, no drops, and the union equals a single
+// full-page call. Both directions of the handoff are exercised.
 func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob(t *testing.T) {
 	if !sparktesting.PostgresTestsEnabled() {
 		t.Skip("equivalence tests require Postgres")
@@ -743,29 +716,31 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob(t *testing.T) {
 	f.setupEquivalenceData()
 
 	const pageSize = 5
+	ctx := f.ctxForViewer(f.medium)
 
 	// Single full-page query (limit=10, offset=0) under the legacy path —
 	// canonical reference for the union of two halves.
-	full, err := f.handler.QueryPendingTransfers(
-		f.ctxForWallet(f.medium, 0),
+	full, err := f.handler.queryTransfers(
+		ctx,
 		withLimitOffset(receiverFilter(f.medium), 2*pageSize, 0),
+		true, false,
 	)
 	require.NoError(t, err)
 	require.Len(t, full.GetTransfers(), 2*pageSize, "fixture should provide at least 10 medium-pending transfers")
 	fullIDs := transferIDsOf(full)
 
 	// Page 1 under legacy.
-	page1, err := f.handler.QueryPendingTransfers(
-		f.ctxForWallet(f.medium, 0),
+	page1, err := f.handler.queryTransfers(
+		ctx,
 		withLimitOffset(receiverFilter(f.medium), pageSize, 0),
+		true, false,
 	)
 	require.NoError(t, err)
 	page1IDs := transferIDsOf(page1)
 
-	// Page 2 under MIMO. RolloutRandom would let this happen for the same
-	// caller polling repeatedly; the contract must hold across paths.
-	page2, err := f.handler.QueryPendingTransfers(
-		f.ctxForWallet(f.medium, 100),
+	// Page 2 under MIMO — the contract must hold across the path handoff.
+	page2, err := f.handler.queryPendingTransfersMIMO(
+		ctx,
 		withLimitOffset(receiverFilter(f.medium), pageSize, pageSize),
 	)
 	require.NoError(t, err)
@@ -775,14 +750,15 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob(t *testing.T) {
 	assert.Equal(t, fullIDs[pageSize:], page2IDs, "page 2 (MIMO) does not match second half of full page")
 
 	// And the reverse direction — page1 MIMO + page2 legacy.
-	page1Mimo, err := f.handler.QueryPendingTransfers(
-		f.ctxForWallet(f.medium, 100),
+	page1Mimo, err := f.handler.queryPendingTransfersMIMO(
+		ctx,
 		withLimitOffset(receiverFilter(f.medium), pageSize, 0),
 	)
 	require.NoError(t, err)
-	page2Legacy, err := f.handler.QueryPendingTransfers(
-		f.ctxForWallet(f.medium, 0),
+	page2Legacy, err := f.handler.queryTransfers(
+		ctx,
 		withLimitOffset(receiverFilter(f.medium), pageSize, pageSize),
+		true, false,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, fullIDs[:pageSize], transferIDsOf(page1Mimo), "page 1 (MIMO) does not match first half of full page (reverse direction)")
@@ -790,42 +766,51 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Cross-knob pagination — one helper, three coverage extensions
+// Cross-path pagination — one helper, three coverage extensions
 // -----------------------------------------------------------------------------
 
 // crossKnobPaginationCheck verifies page-by-page pagination is consistent
-// across knob flips. For each page index, both knob=0 (legacy) and knob=100
-// (MIMO) must return the same window of transfer IDs as the corresponding
-// slice of a single full-sweep call under legacy. This load-bearing
-// property is what RolloutRandom relies on — a caller that pages with the
-// knob flipping between requests must see no overlap and no drops.
+// across the legacy/MIMO handoff. For each page index, both the legacy path
+// and the MIMO path must return the same window of transfer IDs as the
+// corresponding slice of a single full-sweep call under legacy — a caller
+// that pages with the path handoff between requests must see no overlap and
+// no drops.
 //
 // Caller is responsible for ensuring `viewer` has at least
 // pageSize*pageCount qualifying pending transfers under `filter`.
 func (f *equivFixture) crossKnobPaginationCheck(t *testing.T, viewer keys.Public, filter *pb.TransferFilter, pageSize, pageCount int) {
 	t.Helper()
 
-	full, err := f.handler.QueryPendingTransfers(
-		f.ctxForWallet(viewer, 0),
+	ctx := f.ctxForViewer(viewer)
+
+	full, err := f.handler.queryTransfers(
+		ctx,
 		withLimitOffset(filter, int64(pageSize*pageCount), 0),
+		true, false,
 	)
 	require.NoError(t, err)
 	require.Lenf(t, full.GetTransfers(), pageSize*pageCount,
-		"fixture must produce >= %d pending transfers for cross-knob pagination", pageSize*pageCount)
+		"fixture must produce >= %d pending transfers for cross-path pagination", pageSize*pageCount)
 	fullIDs := transferIDsOf(full)
+
+	paths := []struct {
+		label string
+		run   func(f2 *pb.TransferFilter) (*pb.QueryTransfersResponse, error)
+	}{
+		{"legacy", func(f2 *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+			return f.handler.queryTransfers(ctx, f2, true, false)
+		}},
+		{"MIMO", func(f2 *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+			return f.handler.queryPendingTransfersMIMO(ctx, f2)
+		}},
+	}
 
 	for page := range pageCount {
 		offset := int64(page * pageSize)
 		expected := fullIDs[page*pageSize : (page+1)*pageSize]
 
-		for _, kb := range []struct {
-			knob  float64
-			label string
-		}{{0, "legacy"}, {100, "MIMO"}} {
-			resp, err := f.handler.QueryPendingTransfers(
-				f.ctxForWallet(viewer, kb.knob),
-				withLimitOffset(filter, int64(pageSize), offset),
-			)
+		for _, kb := range paths {
+			resp, err := kb.run(withLimitOffset(filter, int64(pageSize), offset))
 			require.NoErrorf(t, err, "page %d (%s)", page, kb.label)
 			assert.Equalf(t, expected, transferIDsOf(resp),
 				"page %d (%s): pagination window does not match the full-sweep reference",
@@ -835,10 +820,10 @@ func (f *equivFixture) crossKnobPaginationCheck(t *testing.T, viewer keys.Public
 }
 
 // TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_Ascending locks
-// the C3 fix (matching secondary id sort direction) across the knob flip.
-// The within-knob ORDER_ascending case in the table-driven suite passes
-// only because the fixture spreads create_time across distinct minutes;
-// this test exercises the cross-knob pagination handoff in ASC mode.
+// the C3 fix (matching secondary id sort direction) across the legacy/MIMO
+// handoff. The single-path ORDER_ascending case in the table-driven suite
+// passes only because the fixture spreads create_time across distinct
+// minutes; this test exercises the cross-path pagination handoff in ASC mode.
 func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_Ascending(t *testing.T) {
 	if !sparktesting.PostgresTestsEnabled() {
 		t.Skip("equivalence tests require Postgres")
@@ -851,9 +836,9 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_Ascending(t *test
 }
 
 // TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_Sender locks
-// cross-knob pagination on the participant=Sender path. The PR's audit
+// cross-path pagination on the participant=Sender path. The PR's audit
 // confirmed no internal callers, but external SDK callers may pass
-// participant=Sender, so this path needs the same RolloutRandom safety
+// participant=Sender, so this path needs the same legacy/MIMO handoff
 // guarantees as Receiver and SenderOrReceiver.
 //
 // Uses a dedicated pubkey with 10 pending senders (the shared fixture's
@@ -886,7 +871,7 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_Sender(t *testing
 }
 
 // TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_SR1_DeepOffset
-// locks cross-knob pagination on the participant=SenderOrReceiver path at
+// locks cross-path pagination on the participant=SenderOrReceiver path at
 // 3 pages of size 5 (offset reaches 10). This exercises the
 // perArmLimit = offset+limit math in buildPendingIDsQuerySenderOrReceiver
 // — at offset=10 each arm must walk far enough that the merged stream has
@@ -948,7 +933,7 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_SR1_DeepOffset(t 
 //
 // This is the contract the step-1 raw SQL produces; step-2 ent must preserve
 // it. Pre-fix, step-2 hardcoded id DESC for both directions, so ASC mode
-// would silently reverse tied-row order across the knob flip.
+// would silently reverse tied-row order across the legacy/MIMO handoff.
 //
 // Legacy queryTransfers has no secondary sort on id; its behavior on ties is
 // Postgres-native (heap order, indeterminate). This test asserts MIMO
@@ -957,10 +942,10 @@ func TestQueryPendingTransfers_Equivalence_PaginationCrossKnob_SR1_DeepOffset(t 
 //
 // This asymmetry is intentional and pre-existing: legacy has been
 // non-deterministic on ties in production for as long as queryTransfers has
-// existed; MIMO is strictly better. Across knob flips during the ramp, a
-// caller polling tied rows could see them reorder between requests — that's
-// a known acknowledged consequence of replacing a non-deterministic path
-// with a deterministic one, not a regression introduced by this PR.
+// existed; MIMO is strictly better. Across the legacy/MIMO handoff, a caller
+// polling tied rows could see them reorder between requests — that's a known
+// acknowledged consequence of replacing a non-deterministic path with a
+// deterministic one, not a regression introduced by this PR.
 //
 // Future editors: do NOT tighten the legacy assertion to order-equivalence
 // without first adding a tiebreaker to queryTransfers' ORDER BY (and
@@ -990,15 +975,14 @@ func TestQueryPendingTransfers_Equivalence_TiedCreateTime(t *testing.T) {
 		})
 	}
 
-	mimoCtx := f.ctxForWallet(receiver, 100)
-	legacyCtx := f.ctxForWallet(receiver, 0)
+	ctx := f.ctxForViewer(receiver)
 
-	respASC, err := f.handler.QueryPendingTransfers(mimoCtx, withOrder(receiverFilter(receiver), pb.Order_ASCENDING))
+	respASC, err := f.handler.queryPendingTransfersMIMO(ctx, withOrder(receiverFilter(receiver), pb.Order_ASCENDING))
 	require.NoError(t, err)
 	require.Len(t, respASC.GetTransfers(), tieCount)
 	idsASC := transferIDsOf(respASC)
 
-	respDESC, err := f.handler.QueryPendingTransfers(mimoCtx, withOrder(receiverFilter(receiver), pb.Order_DESCENDING))
+	respDESC, err := f.handler.queryPendingTransfersMIMO(ctx, withOrder(receiverFilter(receiver), pb.Order_DESCENDING))
 	require.NoError(t, err)
 	require.Len(t, respDESC.GetTransfers(), tieCount)
 	idsDESC := transferIDsOf(respDESC)
@@ -1020,7 +1004,7 @@ func TestQueryPendingTransfers_Equivalence_TiedCreateTime(t *testing.T) {
 
 	// SET-equivalence with legacy on ties (order may differ — legacy has no
 	// secondary sort).
-	respLegacyDESC, err := f.handler.QueryPendingTransfers(legacyCtx, receiverFilter(receiver))
+	respLegacyDESC, err := f.handler.queryTransfers(ctx, receiverFilter(receiver), true, false)
 	require.NoError(t, err)
 	legacyIDs := transferIDsOf(respLegacyDESC)
 	require.Len(t, legacyIDs, tieCount)
