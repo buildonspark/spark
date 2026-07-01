@@ -90,4 +90,5 @@ knobs:
     # Read-only sessions
     spark.so.ro_session@/spark.SparkService/query_nodes: 100
     spark.so.ro_session@/spark.SparkService/query_pending_transfers: 100
+    spark.so.ro_session@/spark.SparkService/query_transfers_by_id: 100
     spark.so.ro_session@/spark_token.SparkTokenService/query_token_outputs: 100

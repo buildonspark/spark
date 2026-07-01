@@ -25,6 +25,7 @@ service SparkService {
 
     rpc query_pending_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc query_all_transfers(TransferFilter) returns (QueryTransfersResponse) {}
+    rpc query_transfers_by_id(QueryTransfersByIdRequest) returns (QueryTransfersResponse) {}
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
 
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
@@ -990,6 +991,12 @@ message TransferFilter {
 message QueryTransfersResponse {
     repeated Transfer transfers = 1;
     int64 offset = 2;
+}
+
+// Deliberately narrow by-ID shape; no participant/status/type/pagination filters.
+message QueryTransfersByIdRequest {
+    repeated string transfer_ids = 1 [(validate.rules).repeated = {min_items: 1, max_items: 1000, items: {string: {uuid: true}}}];
+    Network network = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
 }
 
 message ClaimLeafKeyTweak {

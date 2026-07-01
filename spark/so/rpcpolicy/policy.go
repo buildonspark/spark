@@ -136,6 +136,7 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_FinalizeTransferWithTransferPackage_FullMethodName: {AuthMode: AuthSession},
 		pbspark.SparkService_QueryPendingTransfers_FullMethodName:               {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_QueryAllTransfers_FullMethodName:                   {AuthMode: AuthUnauthenticated},
+		pbspark.SparkService_QueryTransfersById_FullMethodName:                  {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_ClaimTransferTweakKeys_FullMethodName:              {AuthMode: AuthSession},
 		pbspark.SparkService_StorePreimageShare_FullMethodName:                  {AuthMode: AuthSession},
 		pbspark.SparkService_StorePreimageShareV2_FullMethodName:                {AuthMode: AuthSession},

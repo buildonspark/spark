@@ -28,6 +28,7 @@ const (
 	SparkService_FinalizeTransferWithTransferPackage_FullMethodName = "/spark.SparkService/finalize_transfer_with_transfer_package"
 	SparkService_QueryPendingTransfers_FullMethodName               = "/spark.SparkService/query_pending_transfers"
 	SparkService_QueryAllTransfers_FullMethodName                   = "/spark.SparkService/query_all_transfers"
+	SparkService_QueryTransfersById_FullMethodName                  = "/spark.SparkService/query_transfers_by_id"
 	SparkService_ClaimTransferTweakKeys_FullMethodName              = "/spark.SparkService/claim_transfer_tweak_keys"
 	SparkService_StorePreimageShare_FullMethodName                  = "/spark.SparkService/store_preimage_share"
 	SparkService_StorePreimageShareV2_FullMethodName                = "/spark.SparkService/store_preimage_share_v2"
@@ -77,6 +78,7 @@ type SparkServiceClient interface {
 	FinalizeTransferWithTransferPackage(ctx context.Context, in *FinalizeTransferWithTransferPackageRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
+	QueryTransfersById(ctx context.Context, in *QueryTransfersByIdRequest, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StorePreimageShareV2(ctx context.Context, in *StorePreimageShareV2Request, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -210,6 +212,16 @@ func (c *sparkServiceClient) QueryAllTransfers(ctx context.Context, in *Transfer
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryTransfersResponse)
 	err := c.cc.Invoke(ctx, SparkService_QueryAllTransfers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) QueryTransfersById(ctx context.Context, in *QueryTransfersByIdRequest, opts ...grpc.CallOption) (*QueryTransfersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryTransfersResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryTransfersById_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -560,6 +572,7 @@ type SparkServiceServer interface {
 	FinalizeTransferWithTransferPackage(context.Context, *FinalizeTransferWithTransferPackageRequest) (*FinalizeTransferResponse, error)
 	QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
+	QueryTransfersById(context.Context, *QueryTransfersByIdRequest) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
 	StorePreimageShareV2(context.Context, *StorePreimageShareV2Request) (*emptypb.Empty, error)
@@ -642,6 +655,9 @@ func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *T
 }
 func (UnimplementedSparkServiceServer) QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryAllTransfers not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryTransfersById(context.Context, *QueryTransfersByIdRequest) (*QueryTransfersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QueryTransfersById not implemented")
 }
 func (UnimplementedSparkServiceServer) ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method ClaimTransferTweakKeys not implemented")
@@ -900,6 +916,24 @@ func _SparkService_QueryAllTransfers_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).QueryAllTransfers(ctx, req.(*TransferFilter))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_QueryTransfersById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryTransfersByIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryTransfersById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryTransfersById_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryTransfersById(ctx, req.(*QueryTransfersByIdRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1511,6 +1545,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_all_transfers",
 			Handler:    _SparkService_QueryAllTransfers_Handler,
+		},
+		{
+			MethodName: "query_transfers_by_id",
+			Handler:    _SparkService_QueryTransfersById_Handler,
 		},
 		{
 			MethodName: "claim_transfer_tweak_keys",

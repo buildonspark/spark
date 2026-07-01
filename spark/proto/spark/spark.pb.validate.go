@@ -11588,6 +11588,170 @@ var _ interface {
 	ErrorName() string
 } = QueryTransfersResponseValidationError{}
 
+// Validate checks the field values on QueryTransfersByIdRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryTransfersByIdRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryTransfersByIdRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryTransfersByIdRequestMultiError, or nil if none found.
+func (m *QueryTransfersByIdRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryTransfersByIdRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetTransferIds()); l < 1 || l > 1000 {
+		err := QueryTransfersByIdRequestValidationError{
+			field:  "TransferIds",
+			reason: "value must contain between 1 and 1000 items, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetTransferIds() {
+		_, _ = idx, item
+
+		if err := m._validateUuid(item); err != nil {
+			err = QueryTransfersByIdRequestValidationError{
+				field:  fmt.Sprintf("TransferIds[%v]", idx),
+				reason: "value must be a valid UUID",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if _, ok := _QueryTransfersByIdRequest_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := QueryTransfersByIdRequestValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := Network_name[int32(m.GetNetwork())]; !ok {
+		err := QueryTransfersByIdRequestValidationError{
+			field:  "Network",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return QueryTransfersByIdRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *QueryTransfersByIdRequest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// QueryTransfersByIdRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryTransfersByIdRequest.ValidateAll() if the
+// designated constraints aren't met.
+type QueryTransfersByIdRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryTransfersByIdRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryTransfersByIdRequestMultiError) AllErrors() []error { return m }
+
+// QueryTransfersByIdRequestValidationError is the validation error returned by
+// QueryTransfersByIdRequest.Validate if the designated constraints aren't met.
+type QueryTransfersByIdRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryTransfersByIdRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryTransfersByIdRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryTransfersByIdRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryTransfersByIdRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryTransfersByIdRequestValidationError) ErrorName() string {
+	return "QueryTransfersByIdRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryTransfersByIdRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryTransfersByIdRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryTransfersByIdRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryTransfersByIdRequestValidationError{}
+
+var _QueryTransfersByIdRequest_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
+
 // Validate checks the field values on ClaimLeafKeyTweak with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
