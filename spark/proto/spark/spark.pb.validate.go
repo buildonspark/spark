@@ -10519,6 +10519,702 @@ var _ interface {
 	ErrorName() string
 } = TransferLeafValidationError{}
 
+// Validate checks the field values on TransferManifest with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *TransferManifest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TransferManifest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// TransferManifestMultiError, or nil if none found.
+func (m *TransferManifest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TransferManifest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetVersion() <= 0 {
+		err := TransferManifestValidationError{
+			field:  "Version",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if err := m._validateUuid(m.GetTransferId()); err != nil {
+		err = TransferManifestValidationError{
+			field:  "TransferId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := _TransferManifest_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := TransferManifestValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetTransferExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferManifestValidationError{
+					field:  "TransferExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferManifestValidationError{
+					field:  "TransferExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransferExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferManifestValidationError{
+				field:  "TransferExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(m.GetEdges()) < 1 {
+		err := TransferManifestValidationError{
+			field:  "Edges",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetEdges() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferManifestValidationError{
+						field:  fmt.Sprintf("Edges[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferManifestValidationError{
+						field:  fmt.Sprintf("Edges[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferManifestValidationError{
+					field:  fmt.Sprintf("Edges[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetFees() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferManifestValidationError{
+						field:  fmt.Sprintf("Fees[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferManifestValidationError{
+						field:  fmt.Sprintf("Fees[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferManifestValidationError{
+					field:  fmt.Sprintf("Fees[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if all {
+		switch v := interface{}(m.GetQuoteExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferManifestValidationError{
+					field:  "QuoteExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferManifestValidationError{
+					field:  "QuoteExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetQuoteExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferManifestValidationError{
+				field:  "QuoteExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return TransferManifestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *TransferManifest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// TransferManifestMultiError is an error wrapping multiple validation errors
+// returned by TransferManifest.ValidateAll() if the designated constraints
+// aren't met.
+type TransferManifestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TransferManifestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TransferManifestMultiError) AllErrors() []error { return m }
+
+// TransferManifestValidationError is the validation error returned by
+// TransferManifest.Validate if the designated constraints aren't met.
+type TransferManifestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TransferManifestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TransferManifestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TransferManifestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TransferManifestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TransferManifestValidationError) ErrorName() string { return "TransferManifestValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TransferManifestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTransferManifest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TransferManifestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TransferManifestValidationError{}
+
+var _TransferManifest_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on ManifestAmount with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ManifestAmount) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ManifestAmount with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ManifestAmountMultiError,
+// or nil if none found.
+func (m *ManifestAmount) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ManifestAmount) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Amount.(type) {
+	case *ManifestAmount_Sats:
+		if v == nil {
+			err := ManifestAmountValidationError{
+				field:  "Amount",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Sats
+	case *ManifestAmount_Bps:
+		if v == nil {
+			err := ManifestAmountValidationError{
+				field:  "Amount",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Bps
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return ManifestAmountMultiError(errors)
+	}
+
+	return nil
+}
+
+// ManifestAmountMultiError is an error wrapping multiple validation errors
+// returned by ManifestAmount.ValidateAll() if the designated constraints
+// aren't met.
+type ManifestAmountMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ManifestAmountMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ManifestAmountMultiError) AllErrors() []error { return m }
+
+// ManifestAmountValidationError is the validation error returned by
+// ManifestAmount.Validate if the designated constraints aren't met.
+type ManifestAmountValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ManifestAmountValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ManifestAmountValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ManifestAmountValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ManifestAmountValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ManifestAmountValidationError) ErrorName() string { return "ManifestAmountValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ManifestAmountValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sManifestAmount.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ManifestAmountValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ManifestAmountValidationError{}
+
+// Validate checks the field values on ManifestEdge with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ManifestEdge) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ManifestEdge with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ManifestEdgeMultiError, or
+// nil if none found.
+func (m *ManifestEdge) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ManifestEdge) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetSenderIdentityPublicKey()) != 33 {
+		err := ManifestEdgeValidationError{
+			field:  "SenderIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetReceiverIdentityPublicKey()) != 33 {
+		err := ManifestEdgeValidationError{
+			field:  "ReceiverIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetAmount()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManifestEdgeValidationError{
+					field:  "Amount",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManifestEdgeValidationError{
+					field:  "Amount",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAmount()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManifestEdgeValidationError{
+				field:  "Amount",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ManifestEdgeMultiError(errors)
+	}
+
+	return nil
+}
+
+// ManifestEdgeMultiError is an error wrapping multiple validation errors
+// returned by ManifestEdge.ValidateAll() if the designated constraints aren't met.
+type ManifestEdgeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ManifestEdgeMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ManifestEdgeMultiError) AllErrors() []error { return m }
+
+// ManifestEdgeValidationError is the validation error returned by
+// ManifestEdge.Validate if the designated constraints aren't met.
+type ManifestEdgeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ManifestEdgeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ManifestEdgeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ManifestEdgeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ManifestEdgeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ManifestEdgeValidationError) ErrorName() string { return "ManifestEdgeValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ManifestEdgeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sManifestEdge.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ManifestEdgeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ManifestEdgeValidationError{}
+
+// Validate checks the field values on FeeComponent with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *FeeComponent) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FeeComponent with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in FeeComponentMultiError, or
+// nil if none found.
+func (m *FeeComponent) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FeeComponent) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Source
+
+	// no validation rules for Role
+
+	if all {
+		switch v := interface{}(m.GetAmount()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FeeComponentValidationError{
+					field:  "Amount",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FeeComponentValidationError{
+					field:  "Amount",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAmount()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FeeComponentValidationError{
+				field:  "Amount",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for RecipientIdentityPublicKey
+
+	if len(errors) > 0 {
+		return FeeComponentMultiError(errors)
+	}
+
+	return nil
+}
+
+// FeeComponentMultiError is an error wrapping multiple validation errors
+// returned by FeeComponent.ValidateAll() if the designated constraints aren't met.
+type FeeComponentMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FeeComponentMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FeeComponentMultiError) AllErrors() []error { return m }
+
+// FeeComponentValidationError is the validation error returned by
+// FeeComponent.Validate if the designated constraints aren't met.
+type FeeComponentValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FeeComponentValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FeeComponentValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FeeComponentValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FeeComponentValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FeeComponentValidationError) ErrorName() string { return "FeeComponentValidationError" }
+
+// Error satisfies the builtin error interface
+func (e FeeComponentValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFeeComponent.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FeeComponentValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FeeComponentValidationError{}
+
 // Validate checks the field values on TransferFilter with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
