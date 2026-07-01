@@ -280,7 +280,7 @@ func (s *SparkServer) QueryUnusedDepositAddresses(ctx context.Context, req *pb.Q
 
 func (s *SparkServer) QueryStaticDepositAddresses(ctx context.Context, req *pb.QueryStaticDepositAddressesRequest) (*pb.QueryStaticDepositAddressesResponse, error) {
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
-	return treeQueryHandler.QueryStaticDepositAddresses(ctx, req)
+	return treeQueryHandler.QueryStaticDepositAddresses(ctx, req, false)
 }
 
 func (s *SparkServer) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {

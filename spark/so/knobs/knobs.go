@@ -149,9 +149,14 @@ const (
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
 	KnobPrivacyEnabled           = "spark.so.privacy.enabled"
-	KnobReadOnlyEndpoints        = "spark.so.ro_session"
-	KnobGossipLimit              = "spark.so.gossip.limit"
-	KnobResumeSendTransferLimit  = "spark.so.resume_send_transfer.limit"
+	// KnobStaticDepositAddressPrivacyEnabled gates the per-wallet privacy filter on the
+	// public query_static_deposit_addresses endpoint. Default off so the endpoint behaves
+	// as before until the SSP has switched to the internal query_static_deposit_addresses
+	// RPC; flip on per environment once that's deployed.
+	KnobStaticDepositAddressPrivacyEnabled = "spark.so.privacy.static_deposit_addresses.enabled"
+	KnobReadOnlyEndpoints                  = "spark.so.ro_session"
+	KnobGossipLimit                        = "spark.so.gossip.limit"
+	KnobResumeSendTransferLimit            = "spark.so.resume_send_transfer.limit"
 
 	// KnobFinalizeRevealedTokenTransactionsBatchLimit caps how many revealed token
 	// transactions the finalize cron processes per query iteration as it drains the backlog.
