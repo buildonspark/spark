@@ -567,33 +567,27 @@ Run these commands from the `sparkcore/` directory:
 
 **Formatting** (Required):
 ```bash
-uv run ruff format .
-# OR via Makefile
-make run_black
+mise run format
 ```
 
 **Linting** (Required):
 ```bash
-uv run ruff check . --fix
-# OR via Makefile
-make run_ruff
+mise run lint
 ```
 
 **Type Checking** (Required):
 ```bash
-uv run pyre
+mise run typecheck
 ```
 
 **Unit Tests** (Required):
 ```bash
-env -u QUART_CONFIG pytest -m "not minikube"
+mise run test-sparkcore
 ```
 
 **GraphQL Schema Export** (When schema changes):
 ```bash
-uv run scripts/export-graphql.py
-# OR via Makefile
-make graphql
+mise run export-graphql
 ```
 
 ### Client SDK (TypeScript)
