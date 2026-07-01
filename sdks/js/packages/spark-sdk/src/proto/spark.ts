@@ -374,6 +374,101 @@ export function orderToJSON(object: Order): string {
   }
 }
 
+/** The kind of fee. */
+export enum FeeSource {
+  FEE_SOURCE_UNSPECIFIED = 0,
+  /** FEE_SOURCE_PARTNER_MARKUP - configurable markup */
+  FEE_SOURCE_PARTNER_MARKUP = 1,
+  /** FEE_SOURCE_BASE - platform usage fee */
+  FEE_SOURCE_BASE = 2,
+  /** FEE_SOURCE_NETWORK - network security fee */
+  FEE_SOURCE_NETWORK = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function feeSourceFromJSON(object: any): FeeSource {
+  switch (object) {
+    case 0:
+    case "FEE_SOURCE_UNSPECIFIED":
+      return FeeSource.FEE_SOURCE_UNSPECIFIED;
+    case 1:
+    case "FEE_SOURCE_PARTNER_MARKUP":
+      return FeeSource.FEE_SOURCE_PARTNER_MARKUP;
+    case 2:
+    case "FEE_SOURCE_BASE":
+      return FeeSource.FEE_SOURCE_BASE;
+    case 3:
+    case "FEE_SOURCE_NETWORK":
+      return FeeSource.FEE_SOURCE_NETWORK;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FeeSource.UNRECOGNIZED;
+  }
+}
+
+export function feeSourceToJSON(object: FeeSource): string {
+  switch (object) {
+    case FeeSource.FEE_SOURCE_UNSPECIFIED:
+      return "FEE_SOURCE_UNSPECIFIED";
+    case FeeSource.FEE_SOURCE_PARTNER_MARKUP:
+      return "FEE_SOURCE_PARTNER_MARKUP";
+    case FeeSource.FEE_SOURCE_BASE:
+      return "FEE_SOURCE_BASE";
+    case FeeSource.FEE_SOURCE_NETWORK:
+      return "FEE_SOURCE_NETWORK";
+    case FeeSource.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** Markup split role (for PARTNER_MARKUP). */
+export enum FeeRole {
+  FEE_ROLE_UNSPECIFIED = 0,
+  FEE_ROLE_AFFILIATE = 1,
+  FEE_ROLE_PARTNER = 2,
+  FEE_ROLE_LS = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function feeRoleFromJSON(object: any): FeeRole {
+  switch (object) {
+    case 0:
+    case "FEE_ROLE_UNSPECIFIED":
+      return FeeRole.FEE_ROLE_UNSPECIFIED;
+    case 1:
+    case "FEE_ROLE_AFFILIATE":
+      return FeeRole.FEE_ROLE_AFFILIATE;
+    case 2:
+    case "FEE_ROLE_PARTNER":
+      return FeeRole.FEE_ROLE_PARTNER;
+    case 3:
+    case "FEE_ROLE_LS":
+      return FeeRole.FEE_ROLE_LS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FeeRole.UNRECOGNIZED;
+  }
+}
+
+export function feeRoleToJSON(object: FeeRole): string {
+  switch (object) {
+    case FeeRole.FEE_ROLE_UNSPECIFIED:
+      return "FEE_ROLE_UNSPECIFIED";
+    case FeeRole.FEE_ROLE_AFFILIATE:
+      return "FEE_ROLE_AFFILIATE";
+    case FeeRole.FEE_ROLE_PARTNER:
+      return "FEE_ROLE_PARTNER";
+    case FeeRole.FEE_ROLE_LS:
+      return "FEE_ROLE_LS";
+    case FeeRole.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum PreimageRequestStatus {
   PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE = 0,
   PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED = 1,
@@ -1612,6 +1707,52 @@ export interface TransferLeaf {
   pendingKeyTweakPublicKey: Uint8Array;
   transferReceiverId: string;
   transferSenderId: string;
+}
+
+/** Describes how a transfer redistributes value across its senders and receivers. */
+export interface TransferManifest {
+  /** Manifest format version. */
+  version: number;
+  /** The transfer this manifest describes (uuid_v7). */
+  transferId: string;
+  /** The network this transfer operates within. */
+  network: Network;
+  /** The transfer's refund timelock. */
+  transferExpiryTime:
+    | Date
+    | undefined;
+  /** Directed (sender -> receiver) gross amounts — the value movement. */
+  edges: ManifestEdge[];
+  /** Per-component fee breakdown. */
+  fees: FeeComponent[];
+  /** When the SSP's quote expires. */
+  quoteExpiryTime: Date | undefined;
+}
+
+/** An amount as absolute sats or basis points of gross. */
+export interface ManifestAmount {
+  amount?: { $case: "sats"; sats: number } | //
+  /** basis points of gross */
+  { $case: "bps"; bps: number } | undefined;
+}
+
+/** One directed amount from a sender to a receiver. */
+export interface ManifestEdge {
+  senderIdentityPublicKey: Uint8Array;
+  receiverIdentityPublicKey: Uint8Array;
+  amount: ManifestAmount | undefined;
+}
+
+/** One fee: category, amount, and recipient. */
+export interface FeeComponent {
+  source: FeeSource;
+  /** markup split role */
+  role: FeeRole;
+  amount:
+    | ManifestAmount
+    | undefined;
+  /** empty if SSP-retained */
+  recipientIdentityPublicKey: Uint8Array;
 }
 
 export interface TransferFilter {
@@ -10785,6 +10926,476 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     message.pendingKeyTweakPublicKey = object.pendingKeyTweakPublicKey ?? new Uint8Array(0);
     message.transferReceiverId = object.transferReceiverId ?? "";
     message.transferSenderId = object.transferSenderId ?? "";
+    return message;
+  },
+};
+
+function createBaseTransferManifest(): TransferManifest {
+  return {
+    version: 0,
+    transferId: "",
+    network: 0,
+    transferExpiryTime: undefined,
+    edges: [],
+    fees: [],
+    quoteExpiryTime: undefined,
+  };
+}
+
+export const TransferManifest: MessageFns<TransferManifest> = {
+  encode(message: TransferManifest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.version !== 0) {
+      writer.uint32(8).uint32(message.version);
+    }
+    if (message.transferId !== "") {
+      writer.uint32(18).string(message.transferId);
+    }
+    if (message.network !== 0) {
+      writer.uint32(24).int32(message.network);
+    }
+    if (message.transferExpiryTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.transferExpiryTime), writer.uint32(34).fork()).join();
+    }
+    for (const v of message.edges) {
+      ManifestEdge.encode(v!, writer.uint32(42).fork()).join();
+    }
+    for (const v of message.fees) {
+      FeeComponent.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.quoteExpiryTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.quoteExpiryTime), writer.uint32(58).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferManifest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferManifest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.version = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.transferExpiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.edges.push(ManifestEdge.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.fees.push(FeeComponent.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.quoteExpiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferManifest {
+    return {
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      transferExpiryTime: isSet(object.transferExpiryTime) ? fromJsonTimestamp(object.transferExpiryTime) : undefined,
+      edges: globalThis.Array.isArray(object?.edges) ? object.edges.map((e: any) => ManifestEdge.fromJSON(e)) : [],
+      fees: globalThis.Array.isArray(object?.fees) ? object.fees.map((e: any) => FeeComponent.fromJSON(e)) : [],
+      quoteExpiryTime: isSet(object.quoteExpiryTime) ? fromJsonTimestamp(object.quoteExpiryTime) : undefined,
+    };
+  },
+
+  toJSON(message: TransferManifest): unknown {
+    const obj: any = {};
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
+    if (message.transferExpiryTime !== undefined) {
+      obj.transferExpiryTime = message.transferExpiryTime.toISOString();
+    }
+    if (message.edges?.length) {
+      obj.edges = message.edges.map((e) => ManifestEdge.toJSON(e));
+    }
+    if (message.fees?.length) {
+      obj.fees = message.fees.map((e) => FeeComponent.toJSON(e));
+    }
+    if (message.quoteExpiryTime !== undefined) {
+      obj.quoteExpiryTime = message.quoteExpiryTime.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferManifest>): TransferManifest {
+    return TransferManifest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferManifest>): TransferManifest {
+    const message = createBaseTransferManifest();
+    message.version = object.version ?? 0;
+    message.transferId = object.transferId ?? "";
+    message.network = object.network ?? 0;
+    message.transferExpiryTime = object.transferExpiryTime ?? undefined;
+    message.edges = object.edges?.map((e) => ManifestEdge.fromPartial(e)) || [];
+    message.fees = object.fees?.map((e) => FeeComponent.fromPartial(e)) || [];
+    message.quoteExpiryTime = object.quoteExpiryTime ?? undefined;
+    return message;
+  },
+};
+
+function createBaseManifestAmount(): ManifestAmount {
+  return { amount: undefined };
+}
+
+export const ManifestAmount: MessageFns<ManifestAmount> = {
+  encode(message: ManifestAmount, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    switch (message.amount?.$case) {
+      case "sats":
+        writer.uint32(8).uint64(message.amount.sats);
+        break;
+      case "bps":
+        writer.uint32(16).uint32(message.amount.bps);
+        break;
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ManifestAmount {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseManifestAmount();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.amount = { $case: "sats", sats: longToNumber(reader.uint64()) };
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.amount = { $case: "bps", bps: reader.uint32() };
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ManifestAmount {
+    return {
+      amount: isSet(object.sats)
+        ? { $case: "sats", sats: globalThis.Number(object.sats) }
+        : isSet(object.bps)
+        ? { $case: "bps", bps: globalThis.Number(object.bps) }
+        : undefined,
+    };
+  },
+
+  toJSON(message: ManifestAmount): unknown {
+    const obj: any = {};
+    if (message.amount?.$case === "sats") {
+      obj.sats = Math.round(message.amount.sats);
+    } else if (message.amount?.$case === "bps") {
+      obj.bps = Math.round(message.amount.bps);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ManifestAmount>): ManifestAmount {
+    return ManifestAmount.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ManifestAmount>): ManifestAmount {
+    const message = createBaseManifestAmount();
+    switch (object.amount?.$case) {
+      case "sats": {
+        if (object.amount?.sats !== undefined && object.amount?.sats !== null) {
+          message.amount = { $case: "sats", sats: object.amount.sats };
+        }
+        break;
+      }
+      case "bps": {
+        if (object.amount?.bps !== undefined && object.amount?.bps !== null) {
+          message.amount = { $case: "bps", bps: object.amount.bps };
+        }
+        break;
+      }
+    }
+    return message;
+  },
+};
+
+function createBaseManifestEdge(): ManifestEdge {
+  return {
+    senderIdentityPublicKey: new Uint8Array(0),
+    receiverIdentityPublicKey: new Uint8Array(0),
+    amount: undefined,
+  };
+}
+
+export const ManifestEdge: MessageFns<ManifestEdge> = {
+  encode(message: ManifestEdge, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.senderIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.senderIdentityPublicKey);
+    }
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.receiverIdentityPublicKey);
+    }
+    if (message.amount !== undefined) {
+      ManifestAmount.encode(message.amount, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ManifestEdge {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseManifestEdge();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.senderIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.receiverIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.amount = ManifestAmount.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ManifestEdge {
+    return {
+      senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
+        ? bytesFromBase64(object.senderIdentityPublicKey)
+        : new Uint8Array(0),
+      receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
+        ? bytesFromBase64(object.receiverIdentityPublicKey)
+        : new Uint8Array(0),
+      amount: isSet(object.amount) ? ManifestAmount.fromJSON(object.amount) : undefined,
+    };
+  },
+
+  toJSON(message: ManifestEdge): unknown {
+    const obj: any = {};
+    if (message.senderIdentityPublicKey.length !== 0) {
+      obj.senderIdentityPublicKey = base64FromBytes(message.senderIdentityPublicKey);
+    }
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
+    }
+    if (message.amount !== undefined) {
+      obj.amount = ManifestAmount.toJSON(message.amount);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ManifestEdge>): ManifestEdge {
+    return ManifestEdge.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ManifestEdge>): ManifestEdge {
+    const message = createBaseManifestEdge();
+    message.senderIdentityPublicKey = object.senderIdentityPublicKey ?? new Uint8Array(0);
+    message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
+    message.amount = (object.amount !== undefined && object.amount !== null)
+      ? ManifestAmount.fromPartial(object.amount)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseFeeComponent(): FeeComponent {
+  return { source: 0, role: 0, amount: undefined, recipientIdentityPublicKey: new Uint8Array(0) };
+}
+
+export const FeeComponent: MessageFns<FeeComponent> = {
+  encode(message: FeeComponent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.source !== 0) {
+      writer.uint32(8).int32(message.source);
+    }
+    if (message.role !== 0) {
+      writer.uint32(16).int32(message.role);
+    }
+    if (message.amount !== undefined) {
+      ManifestAmount.encode(message.amount, writer.uint32(26).fork()).join();
+    }
+    if (message.recipientIdentityPublicKey.length !== 0) {
+      writer.uint32(34).bytes(message.recipientIdentityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FeeComponent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFeeComponent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.source = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.role = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.amount = ManifestAmount.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.recipientIdentityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FeeComponent {
+    return {
+      source: isSet(object.source) ? feeSourceFromJSON(object.source) : 0,
+      role: isSet(object.role) ? feeRoleFromJSON(object.role) : 0,
+      amount: isSet(object.amount) ? ManifestAmount.fromJSON(object.amount) : undefined,
+      recipientIdentityPublicKey: isSet(object.recipientIdentityPublicKey)
+        ? bytesFromBase64(object.recipientIdentityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: FeeComponent): unknown {
+    const obj: any = {};
+    if (message.source !== 0) {
+      obj.source = feeSourceToJSON(message.source);
+    }
+    if (message.role !== 0) {
+      obj.role = feeRoleToJSON(message.role);
+    }
+    if (message.amount !== undefined) {
+      obj.amount = ManifestAmount.toJSON(message.amount);
+    }
+    if (message.recipientIdentityPublicKey.length !== 0) {
+      obj.recipientIdentityPublicKey = base64FromBytes(message.recipientIdentityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FeeComponent>): FeeComponent {
+    return FeeComponent.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FeeComponent>): FeeComponent {
+    const message = createBaseFeeComponent();
+    message.source = object.source ?? 0;
+    message.role = object.role ?? 0;
+    message.amount = (object.amount !== undefined && object.amount !== null)
+      ? ManifestAmount.fromPartial(object.amount)
+      : undefined;
+    message.recipientIdentityPublicKey = object.recipientIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };

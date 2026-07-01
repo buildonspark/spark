@@ -900,6 +900,70 @@ message TransferLeaf {
 }
 
 
+// Describes how a transfer redistributes value across its senders and receivers.
+message TransferManifest {
+    // Manifest format version.
+    uint32 version = 1 [(validate.rules).uint32 = {gt: 0}];
+
+    // The transfer this manifest describes (uuid_v7).
+    string transfer_id = 2 [(validate.rules).string.uuid = true];
+
+    // The network this transfer operates within.
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
+
+    // The transfer's refund timelock.
+    google.protobuf.Timestamp transfer_expiry_time = 4;
+
+    // Directed (sender -> receiver) gross amounts — the value movement.
+    repeated ManifestEdge edges = 5 [(validate.rules).repeated.min_items = 1];
+
+    // Per-component fee breakdown.
+    repeated FeeComponent fees = 6;
+
+    // When the SSP's quote expires.
+    google.protobuf.Timestamp quote_expiry_time = 7;
+}
+
+// An amount as absolute sats or basis points of gross.
+message ManifestAmount {
+    oneof amount {
+        uint64 sats = 1;
+        uint32 bps = 2;  // basis points of gross
+    }
+}
+
+// One directed amount from a sender to a receiver.
+message ManifestEdge {
+    bytes sender_identity_public_key = 1 [(validate.rules).bytes.len = 33];
+    bytes receiver_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    ManifestAmount amount = 3;
+}
+
+// One fee: category, amount, and recipient.
+message FeeComponent {
+    FeeSource source = 1;
+    FeeRole role = 2;  // markup split role
+    ManifestAmount amount = 3;
+    bytes recipient_identity_public_key = 4;  // empty if SSP-retained
+}
+
+// The kind of fee.
+enum FeeSource {
+    FEE_SOURCE_UNSPECIFIED = 0;
+    FEE_SOURCE_PARTNER_MARKUP = 1;  // configurable markup
+    FEE_SOURCE_BASE = 2;  // platform usage fee
+    FEE_SOURCE_NETWORK = 3;  // network security fee
+}
+
+// Markup split role (for PARTNER_MARKUP).
+enum FeeRole {
+    FEE_ROLE_UNSPECIFIED = 0;
+    FEE_ROLE_AFFILIATE = 1;
+    FEE_ROLE_PARTNER = 2;
+    FEE_ROLE_LS = 3;
+}
+
+
 message TransferFilter {
     oneof participant {
         bytes receiver_identity_public_key = 1;
