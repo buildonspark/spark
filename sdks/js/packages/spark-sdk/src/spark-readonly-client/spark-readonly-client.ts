@@ -487,14 +487,14 @@ export abstract class SparkReadonlyClient {
     );
 
     try {
-      const result = await sparkClient.query_all_transfers({
+      const result = await sparkClient.query_transfers_by_id({
         transferIds,
         network: this.config.getNetworkProto(),
       });
       return result.transfers;
     } catch (error) {
       throw new SparkRequestError("Failed to query transfers by IDs", {
-        operation: "query_all_transfers",
+        operation: "query_transfers_by_id",
         error,
       });
     }

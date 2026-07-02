@@ -1281,12 +1281,7 @@ export class TransferService extends BaseTransferService {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
-    const transferResp = await sparkClient.query_all_transfers({
-      participant: {
-        $case: "senderOrReceiverIdentityPublicKey",
-        senderOrReceiverIdentityPublicKey:
-          await this.config.signer.getIdentityPublicKey(),
-      },
+    const transferResp = await sparkClient.query_transfers_by_id({
       transferIds: [transferId],
       network: NetworkToProto[this.config.getNetwork()],
     });
