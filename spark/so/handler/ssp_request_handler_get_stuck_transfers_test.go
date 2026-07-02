@@ -24,7 +24,7 @@ import (
 )
 
 // Tests for GetStuckTransfers. These drive the public RPC handler (not the
-// internal queryMIMOStuckTransferIDs helper) so the tests survive refactors
+// internal queryStuckTransferIDs helper) so the tests survive refactors
 // of the query shape as long as the handler contract holds.
 //
 // All tests use Postgres because the handler's raw SQL relies on the partial

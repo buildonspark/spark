@@ -569,13 +569,12 @@ func extractParticipant(filter *pb.TransferFilter) (keys.Public, participantRole
 // to queryOutgoingInFlight when the filter shape allows it: sender-only
 // participant + non-empty status filter that's a subset of
 // OutgoingInFlightSenderStatuses (the partial index's WHERE clause).
-// sender_or_receiver and receiver-only participants fall through to legacy;
-// mixed/wider status sets fall through too.
+// sender_or_receiver and receiver-only participants fall through to the
+// remaining routes (ultimately queryByParticipantFallback); mixed/wider
+// status sets fall through too.
 //
-// Caller shapes this routes (per the cross-axis audit):
-//   - queryPrimarySwapTransfers (TS1)
-//   - queryPendingOutgoingTransfers (TS3)
-//   - getOwnedBalance sender path (GOB1)
+// Known caller shapes: the SDK's queryPrimarySwapTransfers and
+// queryPendingOutgoingTransfers, and getOwnedBalance's sender path.
 func shouldRouteToOutgoingInFlight(filter *pb.TransferFilter) bool {
 	if filter.GetSenderIdentityPublicKey() == nil {
 		return false
@@ -839,10 +838,8 @@ func (h *TransferHandler) queryByTypes(ctx context.Context, filter *pb.TransferF
 // to queryReceiverByTypeStatus. The shape requires receiver participant,
 // non-empty types AND statuses, no transfer-id filter, and every requested
 // status must translate to a receiver-axis equivalent. sender_or_receiver and
-// sender participants stay on legacy until per-caller handlers exist.
-//
-// This call surface is exposed publicly, but 100% of 7d traffic
-// is the SSP via gen_all_inbound_transfers
+// sender participants fall through to the remaining routes (ultimately
+// queryByParticipantFallback).
 func shouldRouteToReceiverByTypeStatus(filter *pb.TransferFilter) bool {
 	if len(filter.GetTransferIds()) != 0 {
 		return false
@@ -854,8 +851,8 @@ func shouldRouteToReceiverByTypeStatus(filter *pb.TransferFilter) bool {
 		return false
 	}
 	// Future-proofs against a new TransferStatus enum value landing without a
-	// translation entry; falls through to legacy rather than running an
-	// incomplete-coverage query.
+	// translation entry; falls through to the participant fallback rather than
+	// running an incomplete-coverage query.
 	for _, s := range filter.GetStatuses() {
 		schemaStatus, err := ent.TransferStatusSchema(s)
 		if err != nil {
@@ -873,8 +870,9 @@ func shouldRouteToReceiverByTypeStatus(filter *pb.TransferFilter) bool {
 // each requested t.status to its r.status equivalent, splits the translated
 // set across the receiver claim-pending partial index's WHERE coverage, and
 // emits per-type × per-bucket UNION ALL — driving
-// idx_transferreceiver_claim_pending_pubkey_time for post-tweak-active rows
-// and idx_transferreceiver_pubkey_type_time for INITIATED / terminal rows.
+// idx_transferreceiver_claim_pending_pubkey_time for post-tweak-active rows,
+// idx_transferreceiver_initiated_pubkey_type_time for INITIATED rows, and
+// idx_transferreceiver_pubkey_type_time for terminal rows.
 //
 // Routing in QueryAllTransfers guarantees:
 //   - filter.Participant is ReceiverIdentityPublicKey
@@ -882,8 +880,8 @@ func shouldRouteToReceiverByTypeStatus(filter *pb.TransferFilter) bool {
 //   - filter.TransferIds is empty
 //   - every requested status is receiver-axis translatable
 //
-// This call surface is exposed publicly, but 100% of 7d traffic
-// is the SSP via gen_all_inbound_transfers
+// The call surface is exposed publicly, but the dominant caller is the SSP's
+// gen_all_inbound_transfers.
 func (h *TransferHandler) queryReceiverByTypeStatus(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryReceiverByTypeStatus")
 	defer span.End()

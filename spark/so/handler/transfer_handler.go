@@ -2129,10 +2129,10 @@ func (h *TransferHandler) QueryTransfersByID(ctx context.Context, req *pb.QueryT
 	return &pb.QueryTransfersResponse{Transfers: transferProtos, Offset: -1}, nil
 }
 
-// queryTransfers is a critical customer-facing read endpoint. Traffic that
-// lands here either fell through the specialized handlers gated by per-RPC
-// MIMO knobs, or is a TransferIds-only fetch — the common shape, still
-// efficient through direct ID predicates regardless of MIMO rollout state.
+// queryTransfers is a critical customer-facing read endpoint — the catch-all
+// for shapes no specialized handler claims. With shape-based routing in
+// QueryAllTransfers, only nil-participant requests land here, and those must
+// carry TransferIds (enforced below) — efficient through direct ID predicates.
 func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, pendingOnly bool, isSSP bool) (resp *pb.QueryTransfersResponse, err error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
@@ -2311,12 +2311,10 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
 	}
 
-	// Validate time filter - both cannot be set simultaneously
 	if filter.GetCreatedAfter() != nil && filter.GetCreatedBefore() != nil {
 		return nil, status.Error(codes.InvalidArgument, "cannot specify both created_after and created_before filters")
 	}
 
-	// Apply time filter if provided (mutually exclusive - only one can be set)
 	if filter.GetCreatedAfter() != nil {
 		createdAfter := filter.GetCreatedAfter().AsTime().UTC()
 		transferPredicate = append(transferPredicate, enttransfer.CreateTimeGT(createdAfter))
@@ -2331,7 +2329,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 
 	// ORDER BY create_time only — tied rows return in indeterminate Postgres
-	// order. Pre-existing; MIMO path fixes this- orders by (create_time, id).
+	// order. Pre-existing; the MIMO paths fix this by ordering on (create_time, id).
 	var query *ent.TransferQuery
 	if filter.GetOrder() == pb.Order_ASCENDING {
 		query = baseQuery.Order(ent.Asc(enttransfer.FieldCreateTime))
@@ -2557,8 +2555,8 @@ func (h *TransferHandler) queryPendingTransfersMIMO(ctx context.Context, filter 
 
 	// Step 2: load transfers + edges by ID. Both ORDER BY columns must use the
 	// same direction as the step-1 SQL (`ORDER BY create_time <dir>, id <dir>`);
-	// mismatching the secondary sort reverses tied-row order across the knob
-	// flip, breaking equivalence on transfers that share a `create_time`.
+	// mismatching the secondary sort reverses tied-row order on transfers that
+	// share a `create_time`.
 	transferProtos, err := loadAndMarshalTransfersByIDs(ctx, db, transferIDs, walletIdentityPubkey, filter.GetOrder())
 	metrics.record(ctx, len(transferProtos), err)
 	if err != nil {
@@ -2594,8 +2592,7 @@ func timeOrZero(ts *timestamppb.Timestamp) time.Time {
 }
 
 // maxTransferPageSize caps the LIMIT on QueryPendingTransfers /
-// QueryAllTransfers responses. Mirrors the maxTokenTransactionPageSize
-// pattern in so/handler/tokens.
+// QueryAllTransfers responses.
 const maxTransferPageSize = 100
 
 // maxTransferIDFilterValues caps caller-provided transfer ID filters before

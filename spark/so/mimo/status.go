@@ -25,8 +25,8 @@ func PendingReceiverStatuses() []string {
 //
 // Note: this set deliberately excludes SENDER_INITIATED_COORDINATOR, which
 // IS included in StuckSenderStatuses. The pattern on the receiver side is
-// pending = stuck + INITIATED (clean superset); the sender side breaks
-// that pattern — pending is a strict subset of stuck, missing the
+// pending = stuck + RECEIVER_CLAIM_PENDING (clean superset); the sender side
+// breaks that pattern — pending is a strict subset of stuck, missing the
 // coordinator-side state. SENDER_INITIATED_COORDINATOR is transitional
 // and never set for more than a brief moment within a flow, so its
 // absence from user-facing pending queries is effectively a no-op.

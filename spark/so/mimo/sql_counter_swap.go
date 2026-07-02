@@ -53,11 +53,10 @@ type CounterSwapArgs struct {
 // Top-N pushdown is native via create_time DESC (3rd column of the composite),
 // merged across sub-queries via Merge Append. Per-type filter is a heap step
 // (type isn't on the composite). The per-status decomposition avoids the
-// multi-value-ANY pathology on the second column that defeats top-N pushdown
-// (skill: "Multi-value `ANY` on a non-leading composite column…").
+// multi-value-ANY pathology on the second column that defeats top-N pushdown.
 //
 // RECEIVER ARM SHAPE — per-type × per-bucket UNION ALL, mirroring
-// BuildReceiverByTypeStatusQuery (#6825):
+// BuildReceiverByTypeStatusQuery:
 //
 //   - Pure-postTweakActive bucket (1:1 receiver-axis statuses in the
 //     claim-pending partial WHERE): drives
@@ -79,18 +78,18 @@ type CounterSwapArgs struct {
 // the narrowing lets the planner drive directly from the INITIATED partial
 // without the expensive Hash Join against a global outgoing-in-flight walk
 // of transfers. The SDK's queryCounterSwapTransfers always sends
-// ACTIVE_COUNTER_SWAP_STATUSES which includes all 4 sender-pending values
-// — so this optimization fires on 100% of prod traffic. Partial-umbrella
-// callers (subset of sender-pending) keep the narrowing for correctness.
+// ACTIVE_COUNTER_SWAP_STATUSES, which includes all 4 sender-pending values,
+// so the fast path fires for all SDK traffic. Partial-umbrella callers
+// (subset of sender-pending) keep the narrowing for correctness.
 //
 // CROSS-ARM DEDUP — UNION (distinct) on the (id, ct) tuple collapses
 // self-transfer duplicates. Tuple stability across arms relies on the
 // app-layer invariant r.create_time = s.create_time = t.create_time.
 //
-// MIMO-CORRECTNESS — pure-1:1 receiver sub-queries omit t.status by design,
-// matching the divergence regression locked in by #6825. For multi-receiver
-// MIMO transfers, one receiver row can advance past parent.status; pure-1:1
-// sub-queries surface those rows for the advanced receiver.
+// MIMO-CORRECTNESS — pure-1:1 receiver sub-queries omit t.status by design
+// (see buildReceiverPureSubQuery). For multi-receiver MIMO transfers, one
+// receiver row can advance past parent.status; pure-1:1 sub-queries surface
+// those rows for the advanced receiver.
 //
 // [[REVISIT-MULTI-SENDER]] — when MIMO supports multiple senders, the sender
 // arm's column-based shortcut breaks: transfers.sender_identity_pubkey will
