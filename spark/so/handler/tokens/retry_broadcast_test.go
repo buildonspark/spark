@@ -337,3 +337,25 @@ func TestRetryTokenTransactionBroadcastRejectsFrozenSignedTransferBeforeReveal(t
 	require.NoError(t, err)
 	require.Equal(t, st.TokenTransactionStatusSigned, refetched.Status)
 }
+
+func TestRetryTokenTransactionBroadcastRejectsTransactionExpiredAfterSelection(t *testing.T) {
+	setup := setUpRetryBroadcastTest(t)
+	ctx := setup.ctx
+
+	hash := []byte("test-hash-expired-after-sele")
+	tx := setup.client.TokenTransaction.Create().
+		SetPartialTokenTransactionHash(hash).
+		SetFinalizedTokenTransactionHash(hash).
+		SetStatus(st.TokenTransactionStatusSigned).
+		SetOperatorSignature(ecdsa.Sign(setup.config.IdentityPrivateKey.ToBTCEC(), hash).Serialize()).
+		SetCoordinatorPublicKey(setup.config.IdentityPublicKey()).
+		SetVersion(st.TokenTransactionVersionV3).
+		SetExpiryTime(time.Now().Add(-1 * time.Minute)).
+		SetCreateTime(time.Now().Add(-2 * time.Minute)).
+		SetValidityDurationSeconds(300).
+		SaveX(ctx)
+
+	err := retryTokenTransactionBroadcast(ctx, setup.config, NewBroadcastTokenHandler(setup.config), tx.ID)
+
+	require.ErrorContains(t, err, "expired before retry could complete")
+}
