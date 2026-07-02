@@ -17,23 +17,21 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Tests for the GetStuckTransfers MIMO path. These drive the public RPC
-// handler (not the internal queryMIMOStuckTransferIDs helper) so the tests
-// survive refactors of the query shape as long as the handler contract
-// holds.
+// Tests for GetStuckTransfers. These drive the public RPC handler (not the
+// internal queryMIMOStuckTransferIDs helper) so the tests survive refactors
+// of the query shape as long as the handler contract holds.
 //
-// All tests use Postgres because the MIMO path's raw SQL relies on the
-// partial indexes + pq.Array bindings, neither of which SQLite supports.
+// All tests use Postgres because the handler's raw SQL relies on the partial
+// indexes + pq.Array bindings, neither of which SQLite supports.
 
 // stuckFixture is minimal test scaffolding — sets up ctx, a Postgres-backed
-// Ent client, the MIMO knob, and the handler under test.
+// Ent client, and the handler under test.
 type stuckFixture struct {
 	t       *testing.T
 	ctx     context.Context
@@ -48,10 +46,6 @@ func newStuckFixture(t *testing.T) *stuckFixture {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobReadMIMODataModelGetStuckTransfers: 100,
-	}))
 
 	return &stuckFixture{
 		t:       t,
@@ -930,31 +924,6 @@ func assertStuckTransferKeyshare(t *testing.T, f *stuckFixture, stuck *pbssp.Stu
 
 func TestGetStuckTransfers_MIMO_IncludesSigningKeyshares(t *testing.T) {
 	f := newStuckFixture(t)
-	user := f.newPubkey()
-
-	transfer := f.makeTransferWithLeaf(transferOpts{
-		transferState: st.TransferStatusReceiverKeyTweaked,
-		sender:        f.newPubkey(),
-		receiver:      user,
-		receiverState: st.TransferReceiverStatusKeyTweaked,
-	})
-
-	resp, err := f.handler.GetStuckTransfers(f.ctx, &pbssp.GetStuckTransfersRequest{
-		UserIdentityPublicKey: user.Serialize(),
-		Limit:                 50,
-	})
-	require.NoError(t, err)
-	require.Len(t, resp.GetTransfers(), 1)
-	require.Equal(t, transfer.ID.String(), resp.GetTransfers()[0].GetTransfer().GetId())
-	assertStuckTransferKeyshare(t, f, resp.GetTransfers()[0], transfer)
-}
-
-func TestGetStuckTransfers_Legacy_IncludesSigningKeyshares(t *testing.T) {
-	f := newStuckFixture(t)
-	// Override the MIMO knob to force the legacy code path.
-	f.ctx = knobs.InjectKnobsService(f.ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobReadMIMODataModelGetStuckTransfers: 0,
-	}))
 	user := f.newPubkey()
 
 	transfer := f.makeTransferWithLeaf(transferOpts{
