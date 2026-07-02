@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "breez-sdk-conformance"
+version = "0.1.0"
+description = "Runs the released breez-sdk-spark Python package against Lightspark's regtest stack."
+requires-python = ">=3.9"
+dependencies = [
+  # Floor only; the exact released version under test is pinned by CI / local install.
+  "breez-sdk-spark>=0.17",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
+
+[tool.setuptools.packages.find]
+include = ["breez_conformance*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+log_cli = true
+log_cli_level = "INFO"
