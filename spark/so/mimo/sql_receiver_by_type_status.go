@@ -34,9 +34,10 @@ type ReceiverByTypeStatusArgs struct {
 //
 //  1. Partial coverage — whether the r.status lies inside the partial WHERE
 //     of `idx_transferreceiver_claim_pending_pubkey_time` (the receiver
-//     claim-pending 5-state partial) or outside it (the REMAINDER, which
-//     drives `idx_transferreceiver_pubkey_type_time` via leading-equality on
-//     `(identity_pubkey, transfer_type)`).
+//     claim-pending 5-state partial) or outside it (the REMAINDER — INITIATED
+//     rows drive the `idx_transferreceiver_initiated_pubkey_type_time`
+//     partial, terminals drive `idx_transferreceiver_pubkey_type_time`, both
+//     via leading-equality on `(identity_pubkey, transfer_type)`).
 //  2. Translation provenance — whether the r.status came from a pure 1:1
 //     input mapping or from a collapsing input (4-sender-pending → INITIATED,
 //     EXPIRED+RETURNED → CANCELLED). Collapsing-bucket sub-queries add a
@@ -46,10 +47,9 @@ type ReceiverByTypeStatusArgs struct {
 //
 // The two output classes (pure r.statuses {RECEIVER_*, COMPLETED,
 // RECEIVER_CLAIM_PENDING} vs collapsing r.statuses {INITIATED, CANCELLED})
-// are disjoint by construction, so no sub-query needs both predicates. This
-// disjointness is what lets us drop the OR-of-two-tables predicate the
-// previous design carried; mixing r.status and t.status in a single
-// disjunction defeated the planner's selectivity estimate and tipped it
+// are disjoint by construction, so no sub-query needs both predicates. That
+// disjointness is load-bearing: mixing r.status and t.status in a single
+// disjunction defeats the planner's selectivity estimate and tips it
 // toward Parallel Bitmap Heap Scan with lossy heap recheck.
 //
 // UNION ALL (not UNION DISTINCT) relies on the (transfer_id, identity_pubkey)
@@ -229,8 +229,9 @@ func splitPureAndCollapsing(rIndexSet, rExactMatch []st.TransferReceiverStatus) 
 
 // splitByPartialCoverage splits a receiver-axis status set into the subset that
 // lies inside idx_transferreceiver_claim_pending_pubkey_time's partial WHERE
-// (drives that partial via subset-rule) and the remainder (drives the type
-// composite via leading-equality, with r.status as a Filter).
+// (drives that partial via subset-rule) and the remainder (INITIATED drives its
+// own partial; terminals drive the type composite with r.status as a residual
+// filter).
 func splitByPartialCoverage(rIndexSet []st.TransferReceiverStatus) (postTweakActive, remainder []st.TransferReceiverStatus) {
 	for _, s := range rIndexSet {
 		if _, ok := claimPendingPartialMembers[s]; ok {

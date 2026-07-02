@@ -47,8 +47,8 @@ var collapsingReceiverStatuses = map[st.TransferReceiverStatus]struct{}{
 }
 
 // IsReceiverAxisTranslatable reports whether s has a receiver-axis equivalent.
-// Used by the routing predicate to fall through to legacy queryTransfers when
-// a future enum value appears that our translation maps don't cover.
+// Used by the routing predicates to skip receiver-axis handlers when a future
+// enum value appears that the translation maps don't cover.
 func IsReceiverAxisTranslatable(s st.TransferStatus) bool {
 	if _, ok := transferStatusToReceiverStatusMap[s]; ok {
 		return true

@@ -13,8 +13,8 @@ import (
 
 // ByTypesArgs is the shape of an incoming queryByTypes request. The routing
 // predicate (shouldRouteToByTypes) requires len(filter.Types) > 0 and rejects
-// any request with filter.TransferIds set — by-id lookups stay on legacy
-// queryTransfers, which drives transfers_pkey directly.
+// any request with filter.TransferIds set — by-id filters are handled by
+// later routes rather than the by-types builder.
 type ByTypesArgs struct {
 	WalletPubkey     keys.Public
 	Network          pb.Network
