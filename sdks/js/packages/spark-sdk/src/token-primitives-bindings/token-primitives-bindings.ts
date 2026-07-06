@@ -14,6 +14,9 @@ export abstract class SparkTokenPrimitivesBase {
   abstract hashPartialTokenTransaction(
     partialTokenTransactionBytes: Uint8Array,
   ): Promise<Uint8Array>;
+  abstract hashTransferManifest(
+    transferManifestBytes: Uint8Array,
+  ): Promise<Uint8Array>;
   abstract buildBroadcastTransactionRequest(
     request: BroadcastBuildRequestBindingParams,
   ): Promise<Uint8Array>;

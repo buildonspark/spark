@@ -3,6 +3,7 @@ import {
   construct_partial_transfer_transaction,
   finalize_token_invoice,
   hash_partial_token_transaction,
+  hash_transfer_manifest,
   prepare_token_invoice,
 } from "./wasm/wasm-nodejs.js";
 import type {
@@ -33,6 +34,12 @@ class SparkTokenPrimitivesNodeJS extends SparkTokenPrimitivesBase {
   ): Promise<Uint8Array> {
     return new Promise((resolve) => {
       resolve(hash_partial_token_transaction(partialTokenTransactionBytes));
+    });
+  }
+
+  hashTransferManifest(transferManifestBytes: Uint8Array): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      resolve(hash_transfer_manifest(transferManifestBytes));
     });
   }
 

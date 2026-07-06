@@ -69,6 +69,13 @@ class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
     return new Uint8Array(32);
   }
 
+  async hashTransferManifest(
+    _transferManifestBytes: Uint8Array,
+  ): Promise<Uint8Array> {
+    await Promise.resolve();
+    throw new Error("not used in this test");
+  }
+
   async buildBroadcastTransactionRequest(
     _request: BroadcastBuildRequestBindingParams,
   ): Promise<Uint8Array> {

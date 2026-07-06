@@ -1,0 +1,4 @@
+src/spark_token_primitives/testdata/
+build/
+dist/
+*.egg-info/

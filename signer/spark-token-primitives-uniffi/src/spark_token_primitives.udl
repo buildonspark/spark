@@ -6,6 +6,9 @@ namespace spark_token_primitives {
     bytes hash_partial_token_transaction(bytes partial_token_transaction_bytes);
 
     [Throws=SparkTokenPrimitivesError]
+    bytes hash_transfer_manifest(bytes transfer_manifest_bytes);
+
+    [Throws=SparkTokenPrimitivesError]
     bytes build_broadcast_transaction_request(BroadcastBuildRequest request);
 
     [Throws=SparkTokenPrimitivesError]

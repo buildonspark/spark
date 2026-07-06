@@ -464,7 +464,13 @@ def _uniffi_check_api_checksums(lib):
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction() != 48271:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_spark_token_primitives_checksum_func_finalize_token_invoice() != 61372:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction() != 26626:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest() != 23619:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
 
 # A ctypes library to expose the extern-C FFI definitions.
@@ -582,11 +588,26 @@ _UniffiLib.uniffi_spark_token_primitives_fn_func_construct_partial_transfer_tran
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.uniffi_spark_token_primitives_fn_func_construct_partial_transfer_transaction.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_spark_token_primitives_fn_func_finalize_token_invoice.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_spark_token_primitives_fn_func_finalize_token_invoice.restype = _UniffiRustBuffer
 _UniffiLib.uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction.argtypes = (
     _UniffiRustBuffer,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_spark_token_primitives_fn_func_hash_transfer_manifest.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_spark_token_primitives_fn_func_hash_transfer_manifest.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_spark_token_primitives_fn_func_prepare_token_invoice.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_spark_token_primitives_fn_func_prepare_token_invoice.restype = _UniffiRustBuffer
 _UniffiLib.ffi_spark_token_primitives_rustbuffer_alloc.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
@@ -861,9 +882,18 @@ _UniffiLib.uniffi_spark_token_primitives_checksum_func_build_broadcast_transacti
 _UniffiLib.uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction.argtypes = (
 )
 _UniffiLib.uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction.restype = ctypes.c_uint16
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_finalize_token_invoice.argtypes = (
+)
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_finalize_token_invoice.restype = ctypes.c_uint16
 _UniffiLib.uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction.argtypes = (
 )
 _UniffiLib.uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction.restype = ctypes.c_uint16
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest.argtypes = (
+)
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest.restype = ctypes.c_uint16
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice.argtypes = (
+)
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice.restype = ctypes.c_uint16
 _UniffiLib.ffi_spark_token_primitives_uniffi_contract_version.argtypes = (
 )
 _UniffiLib.ffi_spark_token_primitives_uniffi_contract_version.restype = ctypes.c_uint32
@@ -1009,6 +1039,56 @@ class _UniffiConverterTypeBroadcastBuildRequest(_UniffiConverterRustBuffer):
         _UniffiConverterSequenceTypeSignatureWithIndexInput.write(value.owner_signatures, buf)
 
 
+class FinalizeTokenInvoiceRequest:
+    receiver_identity_public_key: "bytes"
+    network: "int"
+    spark_invoice_fields_bytes: "bytes"
+    signature: "typing.Optional[bytes]"
+    def __init__(self, *, receiver_identity_public_key: "bytes", network: "int", spark_invoice_fields_bytes: "bytes", signature: "typing.Optional[bytes]"):
+        self.receiver_identity_public_key = receiver_identity_public_key
+        self.network = network
+        self.spark_invoice_fields_bytes = spark_invoice_fields_bytes
+        self.signature = signature
+
+    def __str__(self):
+        return "FinalizeTokenInvoiceRequest(receiver_identity_public_key={}, network={}, spark_invoice_fields_bytes={}, signature={})".format(self.receiver_identity_public_key, self.network, self.spark_invoice_fields_bytes, self.signature)
+
+    def __eq__(self, other):
+        if self.receiver_identity_public_key != other.receiver_identity_public_key:
+            return False
+        if self.network != other.network:
+            return False
+        if self.spark_invoice_fields_bytes != other.spark_invoice_fields_bytes:
+            return False
+        if self.signature != other.signature:
+            return False
+        return True
+
+class _UniffiConverterTypeFinalizeTokenInvoiceRequest(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return FinalizeTokenInvoiceRequest(
+            receiver_identity_public_key=_UniffiConverterBytes.read(buf),
+            network=_UniffiConverterUInt32.read(buf),
+            spark_invoice_fields_bytes=_UniffiConverterBytes.read(buf),
+            signature=_UniffiConverterOptionalBytes.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiConverterBytes.check_lower(value.receiver_identity_public_key)
+        _UniffiConverterUInt32.check_lower(value.network)
+        _UniffiConverterBytes.check_lower(value.spark_invoice_fields_bytes)
+        _UniffiConverterOptionalBytes.check_lower(value.signature)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiConverterBytes.write(value.receiver_identity_public_key, buf)
+        _UniffiConverterUInt32.write(value.network, buf)
+        _UniffiConverterBytes.write(value.spark_invoice_fields_bytes, buf)
+        _UniffiConverterOptionalBytes.write(value.signature, buf)
+
+
 class PartialTransferBuildResult:
     partial_token_transaction_bytes: "bytes"
     partial_token_transaction_hash: "bytes"
@@ -1043,6 +1123,127 @@ class _UniffiConverterTypePartialTransferBuildResult(_UniffiConverterRustBuffer)
     def write(value, buf):
         _UniffiConverterBytes.write(value.partial_token_transaction_bytes, buf)
         _UniffiConverterBytes.write(value.partial_token_transaction_hash, buf)
+
+
+class PrepareTokenInvoiceRequest:
+    receiver_identity_public_key: "bytes"
+    network: "int"
+    token_identifier: "typing.Optional[bytes]"
+    token_amount: "typing.Optional[bytes]"
+    memo: "typing.Optional[str]"
+    sender_spark_address: "typing.Optional[str]"
+    expiry_time_unix_millis: "typing.Optional[int]"
+    invoice_id: "typing.Optional[bytes]"
+    def __init__(self, *, receiver_identity_public_key: "bytes", network: "int", token_identifier: "typing.Optional[bytes]", token_amount: "typing.Optional[bytes]", memo: "typing.Optional[str]", sender_spark_address: "typing.Optional[str]", expiry_time_unix_millis: "typing.Optional[int]", invoice_id: "typing.Optional[bytes]"):
+        self.receiver_identity_public_key = receiver_identity_public_key
+        self.network = network
+        self.token_identifier = token_identifier
+        self.token_amount = token_amount
+        self.memo = memo
+        self.sender_spark_address = sender_spark_address
+        self.expiry_time_unix_millis = expiry_time_unix_millis
+        self.invoice_id = invoice_id
+
+    def __str__(self):
+        return "PrepareTokenInvoiceRequest(receiver_identity_public_key={}, network={}, token_identifier={}, token_amount={}, memo={}, sender_spark_address={}, expiry_time_unix_millis={}, invoice_id={})".format(self.receiver_identity_public_key, self.network, self.token_identifier, self.token_amount, self.memo, self.sender_spark_address, self.expiry_time_unix_millis, self.invoice_id)
+
+    def __eq__(self, other):
+        if self.receiver_identity_public_key != other.receiver_identity_public_key:
+            return False
+        if self.network != other.network:
+            return False
+        if self.token_identifier != other.token_identifier:
+            return False
+        if self.token_amount != other.token_amount:
+            return False
+        if self.memo != other.memo:
+            return False
+        if self.sender_spark_address != other.sender_spark_address:
+            return False
+        if self.expiry_time_unix_millis != other.expiry_time_unix_millis:
+            return False
+        if self.invoice_id != other.invoice_id:
+            return False
+        return True
+
+class _UniffiConverterTypePrepareTokenInvoiceRequest(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return PrepareTokenInvoiceRequest(
+            receiver_identity_public_key=_UniffiConverterBytes.read(buf),
+            network=_UniffiConverterUInt32.read(buf),
+            token_identifier=_UniffiConverterOptionalBytes.read(buf),
+            token_amount=_UniffiConverterOptionalBytes.read(buf),
+            memo=_UniffiConverterOptionalString.read(buf),
+            sender_spark_address=_UniffiConverterOptionalString.read(buf),
+            expiry_time_unix_millis=_UniffiConverterOptionalUInt64.read(buf),
+            invoice_id=_UniffiConverterOptionalBytes.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiConverterBytes.check_lower(value.receiver_identity_public_key)
+        _UniffiConverterUInt32.check_lower(value.network)
+        _UniffiConverterOptionalBytes.check_lower(value.token_identifier)
+        _UniffiConverterOptionalBytes.check_lower(value.token_amount)
+        _UniffiConverterOptionalString.check_lower(value.memo)
+        _UniffiConverterOptionalString.check_lower(value.sender_spark_address)
+        _UniffiConverterOptionalUInt64.check_lower(value.expiry_time_unix_millis)
+        _UniffiConverterOptionalBytes.check_lower(value.invoice_id)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiConverterBytes.write(value.receiver_identity_public_key, buf)
+        _UniffiConverterUInt32.write(value.network, buf)
+        _UniffiConverterOptionalBytes.write(value.token_identifier, buf)
+        _UniffiConverterOptionalBytes.write(value.token_amount, buf)
+        _UniffiConverterOptionalString.write(value.memo, buf)
+        _UniffiConverterOptionalString.write(value.sender_spark_address, buf)
+        _UniffiConverterOptionalUInt64.write(value.expiry_time_unix_millis, buf)
+        _UniffiConverterOptionalBytes.write(value.invoice_id, buf)
+
+
+class PreparedTokenInvoice:
+    spark_invoice_fields_bytes: "bytes"
+    spark_invoice_hash: "bytes"
+    unsigned_spark_address: "str"
+    def __init__(self, *, spark_invoice_fields_bytes: "bytes", spark_invoice_hash: "bytes", unsigned_spark_address: "str"):
+        self.spark_invoice_fields_bytes = spark_invoice_fields_bytes
+        self.spark_invoice_hash = spark_invoice_hash
+        self.unsigned_spark_address = unsigned_spark_address
+
+    def __str__(self):
+        return "PreparedTokenInvoice(spark_invoice_fields_bytes={}, spark_invoice_hash={}, unsigned_spark_address={})".format(self.spark_invoice_fields_bytes, self.spark_invoice_hash, self.unsigned_spark_address)
+
+    def __eq__(self, other):
+        if self.spark_invoice_fields_bytes != other.spark_invoice_fields_bytes:
+            return False
+        if self.spark_invoice_hash != other.spark_invoice_hash:
+            return False
+        if self.unsigned_spark_address != other.unsigned_spark_address:
+            return False
+        return True
+
+class _UniffiConverterTypePreparedTokenInvoice(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return PreparedTokenInvoice(
+            spark_invoice_fields_bytes=_UniffiConverterBytes.read(buf),
+            spark_invoice_hash=_UniffiConverterBytes.read(buf),
+            unsigned_spark_address=_UniffiConverterString.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiConverterBytes.check_lower(value.spark_invoice_fields_bytes)
+        _UniffiConverterBytes.check_lower(value.spark_invoice_hash)
+        _UniffiConverterString.check_lower(value.unsigned_spark_address)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiConverterBytes.write(value.spark_invoice_fields_bytes, buf)
+        _UniffiConverterBytes.write(value.spark_invoice_hash, buf)
+        _UniffiConverterString.write(value.unsigned_spark_address, buf)
 
 
 class ReceiverTokenOutput:
@@ -1198,7 +1399,8 @@ class TransferBuildRequest:
     client_created_timestamp_unix_micros: "int"
     withdraw_bond_sats: "int"
     withdraw_relative_block_locktime: "int"
-    def __init__(self, *, identity_public_key: "bytes", selected_outputs: "typing.List[SelectedTokenOutput]", receiver_outputs: "typing.List[ReceiverTokenOutput]", operator_identity_public_keys: "typing.List[bytes]", network: "int", validity_duration_seconds: "int", client_created_timestamp_unix_micros: "int", withdraw_bond_sats: "int", withdraw_relative_block_locktime: "int"):
+    execute_before_unix_micros: "typing.Optional[int]"
+    def __init__(self, *, identity_public_key: "bytes", selected_outputs: "typing.List[SelectedTokenOutput]", receiver_outputs: "typing.List[ReceiverTokenOutput]", operator_identity_public_keys: "typing.List[bytes]", network: "int", validity_duration_seconds: "int", client_created_timestamp_unix_micros: "int", withdraw_bond_sats: "int", withdraw_relative_block_locktime: "int", execute_before_unix_micros: "typing.Optional[int]"):
         self.identity_public_key = identity_public_key
         self.selected_outputs = selected_outputs
         self.receiver_outputs = receiver_outputs
@@ -1208,9 +1410,10 @@ class TransferBuildRequest:
         self.client_created_timestamp_unix_micros = client_created_timestamp_unix_micros
         self.withdraw_bond_sats = withdraw_bond_sats
         self.withdraw_relative_block_locktime = withdraw_relative_block_locktime
+        self.execute_before_unix_micros = execute_before_unix_micros
 
     def __str__(self):
-        return "TransferBuildRequest(identity_public_key={}, selected_outputs={}, receiver_outputs={}, operator_identity_public_keys={}, network={}, validity_duration_seconds={}, client_created_timestamp_unix_micros={}, withdraw_bond_sats={}, withdraw_relative_block_locktime={})".format(self.identity_public_key, self.selected_outputs, self.receiver_outputs, self.operator_identity_public_keys, self.network, self.validity_duration_seconds, self.client_created_timestamp_unix_micros, self.withdraw_bond_sats, self.withdraw_relative_block_locktime)
+        return "TransferBuildRequest(identity_public_key={}, selected_outputs={}, receiver_outputs={}, operator_identity_public_keys={}, network={}, validity_duration_seconds={}, client_created_timestamp_unix_micros={}, withdraw_bond_sats={}, withdraw_relative_block_locktime={}, execute_before_unix_micros={})".format(self.identity_public_key, self.selected_outputs, self.receiver_outputs, self.operator_identity_public_keys, self.network, self.validity_duration_seconds, self.client_created_timestamp_unix_micros, self.withdraw_bond_sats, self.withdraw_relative_block_locktime, self.execute_before_unix_micros)
 
     def __eq__(self, other):
         if self.identity_public_key != other.identity_public_key:
@@ -1231,6 +1434,8 @@ class TransferBuildRequest:
             return False
         if self.withdraw_relative_block_locktime != other.withdraw_relative_block_locktime:
             return False
+        if self.execute_before_unix_micros != other.execute_before_unix_micros:
+            return False
         return True
 
 class _UniffiConverterTypeTransferBuildRequest(_UniffiConverterRustBuffer):
@@ -1246,6 +1451,7 @@ class _UniffiConverterTypeTransferBuildRequest(_UniffiConverterRustBuffer):
             client_created_timestamp_unix_micros=_UniffiConverterInt64.read(buf),
             withdraw_bond_sats=_UniffiConverterUInt64.read(buf),
             withdraw_relative_block_locktime=_UniffiConverterUInt64.read(buf),
+            execute_before_unix_micros=_UniffiConverterOptionalInt64.read(buf),
         )
 
     @staticmethod
@@ -1259,6 +1465,7 @@ class _UniffiConverterTypeTransferBuildRequest(_UniffiConverterRustBuffer):
         _UniffiConverterInt64.check_lower(value.client_created_timestamp_unix_micros)
         _UniffiConverterUInt64.check_lower(value.withdraw_bond_sats)
         _UniffiConverterUInt64.check_lower(value.withdraw_relative_block_locktime)
+        _UniffiConverterOptionalInt64.check_lower(value.execute_before_unix_micros)
 
     @staticmethod
     def write(value, buf):
@@ -1271,6 +1478,7 @@ class _UniffiConverterTypeTransferBuildRequest(_UniffiConverterRustBuffer):
         _UniffiConverterInt64.write(value.client_created_timestamp_unix_micros, buf)
         _UniffiConverterUInt64.write(value.withdraw_bond_sats, buf)
         _UniffiConverterUInt64.write(value.withdraw_relative_block_locktime, buf)
+        _UniffiConverterOptionalInt64.write(value.execute_before_unix_micros, buf)
 
 
 # SparkTokenPrimitivesError
@@ -1314,6 +1522,87 @@ class _UniffiConverterTypeSparkTokenPrimitivesError(_UniffiConverterRustBuffer):
     def write(value, buf):
         if isinstance(value, SparkTokenPrimitivesError.Spark):
             buf.write_i32(1)
+
+
+
+class _UniffiConverterOptionalUInt64(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiConverterUInt64.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiConverterUInt64.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiConverterUInt64.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+
+
+class _UniffiConverterOptionalInt64(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiConverterInt64.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiConverterInt64.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiConverterInt64.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+
+
+class _UniffiConverterOptionalString(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiConverterString.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiConverterString.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiConverterString.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
 
 
 
@@ -1458,6 +1747,13 @@ def construct_partial_transfer_transaction(request: "TransferBuildRequest") -> "
         _UniffiConverterTypeTransferBuildRequest.lower(request)))
 
 
+def finalize_token_invoice(request: "FinalizeTokenInvoiceRequest") -> "str":
+    _UniffiConverterTypeFinalizeTokenInvoiceRequest.check_lower(request)
+    
+    return _UniffiConverterString.lift(_uniffi_rust_call_with_error(_UniffiConverterTypeSparkTokenPrimitivesError,_UniffiLib.uniffi_spark_token_primitives_fn_func_finalize_token_invoice,
+        _UniffiConverterTypeFinalizeTokenInvoiceRequest.lower(request)))
+
+
 def hash_partial_token_transaction(partial_token_transaction_bytes: "bytes") -> "bytes":
     _UniffiConverterBytes.check_lower(partial_token_transaction_bytes)
     
@@ -1465,17 +1761,37 @@ def hash_partial_token_transaction(partial_token_transaction_bytes: "bytes") -> 
         _UniffiConverterBytes.lower(partial_token_transaction_bytes)))
 
 
+def hash_transfer_manifest(transfer_manifest_bytes: "bytes") -> "bytes":
+    _UniffiConverterBytes.check_lower(transfer_manifest_bytes)
+    
+    return _UniffiConverterBytes.lift(_uniffi_rust_call_with_error(_UniffiConverterTypeSparkTokenPrimitivesError,_UniffiLib.uniffi_spark_token_primitives_fn_func_hash_transfer_manifest,
+        _UniffiConverterBytes.lower(transfer_manifest_bytes)))
+
+
+def prepare_token_invoice(request: "PrepareTokenInvoiceRequest") -> "PreparedTokenInvoice":
+    _UniffiConverterTypePrepareTokenInvoiceRequest.check_lower(request)
+    
+    return _UniffiConverterTypePreparedTokenInvoice.lift(_uniffi_rust_call_with_error(_UniffiConverterTypeSparkTokenPrimitivesError,_UniffiLib.uniffi_spark_token_primitives_fn_func_prepare_token_invoice,
+        _UniffiConverterTypePrepareTokenInvoiceRequest.lower(request)))
+
+
 __all__ = [
     "InternalError",
     "SparkTokenPrimitivesError",
     "BroadcastBuildRequest",
+    "FinalizeTokenInvoiceRequest",
     "PartialTransferBuildResult",
+    "PrepareTokenInvoiceRequest",
+    "PreparedTokenInvoice",
     "ReceiverTokenOutput",
     "SelectedTokenOutput",
     "SignatureWithIndexInput",
     "TransferBuildRequest",
     "build_broadcast_transaction_request",
     "construct_partial_transfer_transaction",
+    "finalize_token_invoice",
     "hash_partial_token_transaction",
+    "hash_transfer_manifest",
+    "prepare_token_invoice",
 ]
 

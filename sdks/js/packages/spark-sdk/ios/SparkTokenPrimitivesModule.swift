@@ -182,6 +182,22 @@ class SparkTokenPrimitivesModule: NSObject, RCTBridgeModule {
         }
     }
 
+    @objc(hashTransferManifest:resolve:reject:)
+    func rn_hashTransferManifest(_ params: [String: Any],
+                                 resolve: @escaping RCTPromiseResolveBlock,
+                                 reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            guard let bytesArray = params["transferManifestBytes"] as? [Any],
+                  let bytes = arrayToData(bytesArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid transferManifestBytes format"])
+            }
+            let result = try hashTransferManifest(transferManifestBytes: bytes)
+            resolve(dataToArray(result))
+        } catch {
+            reject("ERROR_HASH_TRANSFER_MANIFEST", error.localizedDescription, error)
+        }
+    }
+
     @objc(buildBroadcastTransactionRequest:resolve:reject:)
     func rn_buildBroadcastTransactionRequest(_ params: [String: Any],
                                              resolve: @escaping RCTPromiseResolveBlock,

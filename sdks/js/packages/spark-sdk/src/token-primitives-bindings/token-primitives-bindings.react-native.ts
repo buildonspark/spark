@@ -25,6 +25,7 @@ type SparkTokenPrimitivesNativeModule = {
     params: unknown,
   ): Promise<NativePartialTransferBuildResult>;
   hashPartialTokenTransaction(params: unknown): Promise<number[]>;
+  hashTransferManifest(params: unknown): Promise<number[]>;
   buildBroadcastTransactionRequest(params: unknown): Promise<number[]>;
   prepareTokenInvoice(params: unknown): Promise<NativePreparedTokenInvoice>;
   finalizeTokenInvoice(params: unknown): Promise<string>;
@@ -93,6 +94,15 @@ class SparkTokenPrimitivesReactNative extends SparkTokenPrimitivesBase {
   ): Promise<Uint8Array> {
     const result = await getModule().hashPartialTokenTransaction({
       partialTokenTransactionBytes: toNumberArray(partialTokenTransactionBytes),
+    });
+    return toUint8Array(result);
+  }
+
+  async hashTransferManifest(
+    transferManifestBytes: Uint8Array,
+  ): Promise<Uint8Array> {
+    const result = await getModule().hashTransferManifest({
+      transferManifestBytes: toNumberArray(transferManifestBytes),
     });
     return toUint8Array(result);
   }

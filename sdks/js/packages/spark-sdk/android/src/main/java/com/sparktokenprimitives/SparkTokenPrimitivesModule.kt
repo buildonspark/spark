@@ -152,6 +152,18 @@ class SparkTokenPrimitivesModule(reactContext: ReactApplicationContext) : ReactC
     }
 
     @ReactMethod
+    fun hashTransferManifest(params: ReadableMap, promise: Promise) {
+        try {
+            val bytes = params.getArray("transferManifestBytes")?.toByteArray()
+                ?: throw Exception("Invalid transferManifestBytes format")
+            val result = uniffi.spark_token_primitives.hashTransferManifest(bytes)
+            promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR_HASH_TRANSFER_MANIFEST", e)
+        }
+    }
+
+    @ReactMethod
     fun buildBroadcastTransactionRequest(params: ReadableMap, promise: Promise) {
         try {
             val identityPublicKey = params.getArray("identityPublicKey")?.toByteArray()

@@ -7,24 +7,28 @@ const outputDir = "./src/token-primitives-bindings/wasm";
 
 const content = await readFile(`${generatedDir}/${name}.js`, "utf8");
 
-let patched = content.replace(
-  `${name}_bg.wasm`,
-  "./token-primitives-bindings/wasm/wasm-browser-bg.wasm",
-);
+let patched = `import { getCrypto } from "../../utils/crypto.js";
 
-patched = `import { getCrypto } from "../../utils/crypto.js";
-
-${patched}`.replace(
+${content}`.replace(
   "globalThis.crypto.getRandomValues(",
   "getCrypto().getRandomValues(",
 );
 
+// Drop the implicit import.meta.url fallback: the SDK always passes explicit
+// wasm bytes, and a surviving relative-URL reference breaks consumers'
+// bundlers (webpack tries to resolve it as a module asset).
 patched = patched.replace(
-  /if \(typeof module_or_path === 'undefined'\)\s*\{\s*module_or_path = new URL\('[^']+\.wasm', import\.meta\.url\);\s*\}/,
-  `if (typeof module_or_path === 'undefined') {
+  /if \((?:typeof module_or_path === 'undefined'|module_or_path === undefined)\)\s*\{\s*module_or_path = new URL\('[^']+\.wasm', import\.meta\.url\);\s*\}/,
+  `if (module_or_path === undefined) {
         throw new Error('WASM module path must be provided. This should be set automatically by the SDK.');
     }`,
 );
+
+if (/new URL\('[^']*\.wasm'/.test(patched)) {
+  throw new Error(
+    "patch-token-primitives-wasm-browser: an implicit .wasm URL survived patching — wasm-bindgen output format changed again; update this script",
+  );
+}
 
 fs.mkdirSync(outputDir, { recursive: true });
 

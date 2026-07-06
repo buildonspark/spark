@@ -13,4 +13,8 @@ cargo build --profile release-smaller
 echo "Copying linux library..."
 cp ../target/release-smaller/libspark_token_primitives.so spark-token-primitives-python/src/spark_token_primitives/libuniffi_spark_token_primitives.so
 
+echo "Bundling golden vectors..."
+mkdir -p spark-token-primitives-python/src/spark_token_primitives/testdata
+cp ../../spark/testdata/transfer_manifest_hash_cases.json spark-token-primitives-python/src/spark_token_primitives/testdata/
+
 echo "Done."
