@@ -130,3 +130,72 @@ describe("ConnectionManagerReactNative retry deadlines", () => {
     expect(nativeGrpcModule.grpcUnaryCall).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ConnectionManagerReactNative connection failures", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    nativeGrpcModule.grpcUnaryCallCancel.mockResolvedValue(undefined);
+    nativeGrpcModule.grpcCloseChannel.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  const makeClient = () =>
+    new TestConnectionManagerReactNative(
+      new WalletConfigService({ network: "REGTEST" }, new DefaultSparkSigner()),
+    ).createTestClient<{
+      testUnary: (
+        request: unknown,
+        options: {
+          retryBaseDelayMs: number;
+          retryMaxDelayMs: number;
+          retryMaxAttempts: number;
+        },
+      ) => Promise<unknown>;
+    }>({ address: "https://spark.test", isStreamClientType: false }, true);
+
+  test("retries a rejected (unprocessed) native call and recovers on a fresh connection", async () => {
+    // A rejected native call means the request never produced a server response
+    // (e.g. a pooled connection closed by the LB idle timeout was reused). It
+    // must be treated as UNAVAILABLE and retried, not surfaced as UNKNOWN.
+    nativeGrpcModule.grpcUnaryCall
+      .mockRejectedValueOnce(new Error("channel closed"))
+      .mockResolvedValueOnce({ statusCode: Status.OK });
+
+    const client = await makeClient();
+    const call = client.testUnary(
+      {},
+      { retryBaseDelayMs: 1_000, retryMaxDelayMs: 1_000, retryMaxAttempts: 3 },
+    );
+
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    await expect(call).resolves.toBeDefined();
+    expect(nativeGrpcModule.grpcUnaryCall).toHaveBeenCalledTimes(2);
+  });
+
+  test("surfaces a persistently rejecting native call as UNAVAILABLE after exhausting retries", async () => {
+    nativeGrpcModule.grpcUnaryCall.mockRejectedValue(
+      new Error("channel closed"),
+    );
+
+    const client = await makeClient();
+    const call = client.testUnary(
+      {},
+      { retryBaseDelayMs: 1_000, retryMaxDelayMs: 1_000, retryMaxAttempts: 3 },
+    );
+
+    const expectation = expect(call).rejects.toMatchObject({
+      code: Status.UNAVAILABLE,
+    });
+
+    await jest.advanceTimersByTimeAsync(2_000);
+
+    await expectation;
+    expect(nativeGrpcModule.grpcUnaryCall).toHaveBeenCalledTimes(3);
+  });
+});

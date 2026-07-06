@@ -409,6 +409,24 @@ function asClientError(path: string, error: unknown): ClientError {
   return new ClientError(path, Status.UNKNOWN, extractErrorMessage(error));
 }
 
+// A rejected native unary call (after aborts/deadlines are ruled out) means the
+// call failed before the server produced any gRPC response — e.g. a pooled
+// connection that had been closed by the load balancer's idle timeout or a
+// server GOAWAY was reused, or the channel could not be established. The request
+// was therefore not processed by the server, so we surface it as UNAVAILABLE
+// (rather than the ambiguous UNKNOWN) to let the retry middleware transparently
+// re-establish the connection and retry. This is safe for any operation because
+// an unprocessed request cannot have taken effect.
+function asUnprocessedConnectionError(
+  path: string,
+  error: unknown,
+): ClientError {
+  if (error instanceof ClientError) {
+    return error;
+  }
+  return new ClientError(path, Status.UNAVAILABLE, extractErrorMessage(error));
+}
+
 async function safeCancelServerStream(streamId: string) {
   try {
     await getNativeGrpcModule().grpcServerStreamCancel({ streamId });
@@ -729,7 +747,7 @@ export class ConnectionManagerReactNative extends ConnectionManager {
       });
     } catch (error) {
       callControl.throwIfAborted();
-      throw asClientError(descriptor.path, error);
+      throw asUnprocessedConnectionError(descriptor.path, error);
     } finally {
       callControl.signal?.removeEventListener("abort", onAbort);
       callControl.cleanup();
