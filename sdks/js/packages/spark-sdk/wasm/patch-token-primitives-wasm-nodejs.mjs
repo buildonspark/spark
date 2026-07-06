@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 
+// Converts wasm-bindgen's nodejs-target CJS glue (wasm-bindgen 0.2.120
+// format) to a self-contained ESM module: CJS exports become named ESM
+// exports, and the .wasm file read is replaced with inlined base64 bytes so
+// the module has no filesystem dependency.
+
 const name = "wasm_token_primitives_nodejs";
 const generatedDir = "./wasm/token-primitives/nodejs";
 const outputDir = "./src/token-primitives-bindings/wasm";
@@ -10,16 +15,9 @@ const content = await readFile(`${generatedDir}/${name}.js`, "utf8");
 const patched = `import { getCrypto } from "../../utils/crypto.js";
 
 ${content}`
-  .replace("require(`util`)", "globalThis")
-  .replace(/\nclass (.*?) \{/g, "\nclass $1Src {")
-  .replace(/\b(?!Uint8Array)(\w+)\.prototype/g, "$1Src.prototype")
-  .replace(/\nexports\.(.*?) = \1;/g, "\nexport const $1 = imports.$1 = $1Src ")
-  .replace("= exports", "= imports")
-  .replace("= module.exports", "= imports")
-  .replace(/\nexports\.(.*?)\s+/g, "\nexport const $1 = imports.$1 ")
-  .replace(/$/, "export default imports")
-  .replace(/\nconst\swasmPath\s=\s.*/g, "")
+  .replace(/\nexports\.(\w+) = \1;/g, "\nexport { $1 };")
   .replace("globalThis.crypto.getRandomValues(", "getCrypto().getRandomValues(")
+  .replace(/\nconst\swasmPath\s=\s.*/g, "")
   .replace(
     /\nconst wasmBytes.*\n/,
     `
@@ -45,6 +43,12 @@ const wasmBytes = __toBinary(${JSON.stringify(
     )});
 `,
   );
+
+if (/\bexports\.|\brequire\(|__dirname/.test(patched)) {
+  throw new Error(
+    "patch-token-primitives-wasm-nodejs: CJS constructs survived patching — wasm-bindgen output format changed again; update this script",
+  );
+}
 
 fs.mkdirSync(outputDir, { recursive: true });
 

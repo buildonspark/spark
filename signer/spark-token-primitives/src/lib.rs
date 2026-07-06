@@ -1,7 +1,9 @@
+mod hashstructure;
 mod invoice;
 pub mod proto;
 pub mod protohash;
 mod token_transaction;
+mod transfer_manifest;
 
 pub use protohash::{hash_proto, ProtoHasherError};
 
@@ -120,6 +122,12 @@ pub fn hash_final_token_transaction(
     final_token_transaction_bytes: Vec<u8>,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
     token_transaction::hash_final_token_transaction_impl(&final_token_transaction_bytes)
+}
+
+pub fn hash_transfer_manifest(
+    transfer_manifest_bytes: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    transfer_manifest::hash_transfer_manifest_impl(&transfer_manifest_bytes)
 }
 
 pub fn build_broadcast_transaction_request(

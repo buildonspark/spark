@@ -1,0 +1,755 @@
+{
+  "description": "Cross-language TransferManifest hash cases in canonical Protobuf JSON. Expected hash = tagged_hash([\"spark\",\"transfer\",\"manifest\"], protohash(canonicalized manifest)) as computed by common.HashTransferManifest. THIS FILE IS THE SOURCE OF TRUTH: downstream implementations keep byte-identical mirrors and assert these same vectors \u2014 any change here must be propagated to every mirror.",
+  "testCases": [
+    {
+      "name": "minimal_single_edge",
+      "description": "Smallest valid manifest: one sats edge, no fees, no timestamps",
+      "expectedHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multi_edge_shuffled",
+      "description": "Edges deliberately out of canonical (sender, receiver, amount) order; the hash pins canonicalization inside HashTransferManifest",
+      "expectedHash": "8e4926813809213bce15720ba4d9add84a8a2f9100af2f4d03195c4ccc66fa09",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "A7CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCw",
+            "amount": {
+              "sats": "1500"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA",
+            "amount": {
+              "sats": "2000"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "A7CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCw",
+            "amount": {
+              "sats": "500"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "fees_shuffled",
+      "description": "Fees deliberately out of canonical (source, role, recipient, amount) order; includes an SSP-retained fee (empty recipient) and an explicit partner payout",
+      "expectedHash": "f6f3a8f5c62a519cd417f68536f0a9e0cae38b3676ded5062446373008124bf4",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_BASE",
+            "amount": {
+              "sats": "10"
+            }
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "amount": {
+              "sats": "15"
+            },
+            "role": "FEE_ROLE_LS"
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "amount": {
+              "sats": "25"
+            },
+            "role": "FEE_ROLE_PARTNER",
+            "recipientIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+          }
+        ]
+      }
+    },
+    {
+      "name": "bps_amounts",
+      "description": "Basis-point amounts on an edge and a fee; bps and sats hash distinctly by oneof field number",
+      "expectedHash": "81d73d595b54689fd27765f42e5e266600e27bf1783652516c88da31ec9d3836",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "100000"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "receiverIdentityPublicKey": "A7CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCw",
+            "amount": {
+              "bps": 250
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_NETWORK",
+            "amount": {
+              "bps": 50
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "timestamps_ms",
+      "description": "Whole-millisecond expiry timestamps",
+      "expectedHash": "3d4e428c81a2366cc97a00733c0530ca3e1769905e92ca68821a2b2f32f35468",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "transferExpiryTime": "2026-07-15T12:30:45.123Z",
+        "quoteExpiryTime": "2026-07-15T12:00:00.500Z"
+      }
+    },
+    {
+      "name": "timestamps_sub_ms_floored",
+      "description": "Sub-millisecond timestamps; canonicalization floors nanos to whole milliseconds, so this MUST hash identically to timestamps_ms",
+      "expectedHash": "3d4e428c81a2366cc97a00733c0530ca3e1769905e92ca68821a2b2f32f35468",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "transferExpiryTime": "2026-07-15T12:30:45.123456789Z",
+        "quoteExpiryTime": "2026-07-15T12:00:00.500999Z"
+      }
+    },
+    {
+      "name": "mainnet",
+      "description": "Network variation over minimal_single_edge",
+      "expectedHash": "58922808897044d3855de82cb6a6b0de56e57a36aef4567e2f3044f31327f40a",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "MAINNET",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "whole_second_timestamp",
+      "description": "Whole-second timestamp (nanos exactly 0) \u2014 pins that protohash hashes Timestamp seconds/nanos unconditionally, even at zero",
+      "expectedHash": "a3a7190e7c1cfffb9acacfb3bc91d07c565ed08706988ac501d006cf62fe5878",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "transferExpiryTime": "2026-07-15T12:00:00Z"
+      }
+    },
+    {
+      "name": "duplicate_edges",
+      "description": "Two byte-identical edges \u2014 pins that objecthash list hashing preserves multiplicity (duplicates must not collapse)",
+      "expectedHash": "b9d87e643a19b85011cfc237b733868da9e3ea527743637c01359bb1fdb40696",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "kitchen_sink",
+      "description": "Shuffled multi-edge + all three fee sources + both timestamps, combined",
+      "expectedHash": "3b87caf3aee855878a5c1f52b0e2dffb5bd8beecc1d2cc72759877f585b2ceb8",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA",
+            "amount": {
+              "bps": 250
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "A7CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCw",
+            "amount": {
+              "sats": "1500"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA",
+            "amount": {
+              "sats": "2000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_NETWORK",
+            "amount": {
+              "bps": 50
+            }
+          },
+          {
+            "source": "FEE_SOURCE_BASE",
+            "amount": {
+              "sats": "10"
+            }
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "amount": {
+              "sats": "25"
+            },
+            "role": "FEE_ROLE_PARTNER",
+            "recipientIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "amount": {
+              "sats": "15"
+            },
+            "role": "FEE_ROLE_LS"
+          }
+        ],
+        "transferExpiryTime": "2026-07-15T12:30:45.123Z",
+        "quoteExpiryTime": "2026-07-15T12:00:00Z"
+      }
+    },
+    {
+      "name": "max_timestamp",
+      "description": "Last representable instant after millisecond flooring (9999-12-31T23:59:59.999Z) \u2014 pins the shared upper bound of the timestamp accept domain",
+      "expectedHash": "ad49857d915ad7be8c54677a51a98cf714ee3f3ada277586ea6ed7a28dec4561",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "transferExpiryTime": "9999-12-31T23:59:59.999Z"
+      }
+    },
+    {
+      "name": "sats_above_uint32",
+      "description": "Sats above uint32 range (~50 BTC) \u2014 pins the uint64 encoding path at realistic mainnet magnitudes",
+      "expectedHash": "bccaaf2ede845da714bef8fa60a56674d925f9d266d68df3e46d85bc81d3650b",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "5000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "sats_at_max_supply",
+      "description": "Sats at the enforced cap (total bitcoin supply, 21M BTC) \u2014 pins the largest amount any language may hash",
+      "expectedHash": "4925b71709381873d8d1b05d1eac382d59128250b7246b728b7f3e5f057b5a90",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "2100000000000000"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "invalidCases": [
+    {
+      "name": "unsupported_version_0",
+      "description": "version absent/zero \u2014 objecthash would omit it entirely",
+      "transferManifest": {
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "unsupported_version_2",
+      "description": "future format version \u2014 implementations must not vouch for fields they cannot see",
+      "transferManifest": {
+        "version": 2,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_transfer_id",
+      "description": "transfer_id absent",
+      "transferManifest": {
+        "version": 1,
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "unspecified_network",
+      "description": "network absent/zero",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "no_edges",
+      "description": "edges absent",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST"
+      }
+    },
+    {
+      "name": "empty_sender_key",
+      "description": "edge sender pubkey absent \u2014 would silently vanish from the digest",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_receiver_key",
+      "description": "edge receiver pubkey absent \u2014 would silently vanish from the digest",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_edge_amount",
+      "description": "edge amount oneof unset",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
+          }
+        ]
+      }
+    },
+    {
+      "name": "zero_edge_amount",
+      "description": "explicit zero amount \u2014 indistinguishable from absent under objecthash",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "fee_unspecified_source",
+      "description": "fee source absent/zero",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "amount": {
+              "sats": "10"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_fee_amount",
+      "description": "fee amount oneof unset \u2014 the fee-side twin of missing_edge_amount",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_BASE"
+          }
+        ]
+      }
+    },
+    {
+      "name": "markup_fee_without_role",
+      "description": "PARTNER_MARKUP fee requires a role",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "amount": {
+              "sats": "10"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "zero_fee_amount",
+      "description": "explicit zero fee amount",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_BASE",
+            "amount": {
+              "sats": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pre_epoch_timestamp",
+      "description": "negative-epoch timestamp \u2014 JS remainder would derive negative nanos, diverging from Go",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "transferExpiryTime": "1969-12-31T23:59:59.500Z"
+      }
+    },
+    {
+      "name": "unknown_network_value",
+      "description": "numeric enum value this build's descriptor cannot name \u2014 same hazard as an unknown manifest version",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": 999,
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown_fee_source_value",
+      "description": "unknown numeric fee source",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": 999,
+            "amount": {
+              "sats": "10"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown_fee_role_value",
+      "description": "unknown numeric fee role",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_BASE",
+            "role": 999,
+            "amount": {
+              "sats": "10"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "sats_beyond_max_supply",
+      "description": "One sat above total bitcoin supply \u2014 no real transfer can move it, and rejecting keeps amounts inside JS Number precision",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "2100000000000001"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "epoch_transfer_expiry",
+      "description": "present transfer_expiry_time at the epoch \u2014 implementations disagree on hashing present-but-zero message fields (presence-gated hashers emit list[0,0]; default-skipping hashers omit), so every language rejects it",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "transferExpiryTime": "1970-01-01T00:00:00Z"
+      }
+    },
+    {
+      "name": "sub_millisecond_epoch_quote_expiry",
+      "description": "present quote_expiry_time within 1ms of the epoch floors to the all-zero timestamp, which implementations hash inconsistently \u2014 rejected everywhere",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "quoteExpiryTime": "1970-01-01T00:00:00.000500Z"
+      }
+    }
+  ]
+}

@@ -721,6 +721,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -743,6 +745,8 @@ internal interface UniffiLib : Library {
     fun uniffi_spark_token_primitives_fn_func_finalize_token_invoice(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction(`partialTokenTransactionBytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_spark_token_primitives_fn_func_hash_transfer_manifest(`transferManifestBytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_spark_token_primitives_fn_func_prepare_token_invoice(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -866,6 +870,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction(
     ): Short
+    fun uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest(
+    ): Short
     fun uniffi_spark_token_primitives_checksum_func_prepare_token_invoice(
     ): Short
     fun ffi_spark_token_primitives_uniffi_contract_version(
@@ -895,6 +901,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction() != 26626.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest() != 23619.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985.toShort()) {
@@ -1788,6 +1797,16 @@ public object FfiConverterSequenceTypeSignatureWithIndexInput: FfiConverterRustB
     uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
     UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction(
         FfiConverterByteArray.lower(`partialTokenTransactionBytes`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SparkTokenPrimitivesException::class) fun `hashTransferManifest`(`transferManifestBytes`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_hash_transfer_manifest(
+        FfiConverterByteArray.lower(`transferManifestBytes`),_status)
 }
     )
     }

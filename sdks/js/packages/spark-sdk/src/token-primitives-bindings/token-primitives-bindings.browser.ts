@@ -4,6 +4,7 @@ import {
   default as initWasm,
   finalize_token_invoice,
   hash_partial_token_transaction,
+  hash_transfer_manifest,
   type InitOutput,
   prepare_token_invoice,
 } from "./wasm/wasm-browser.js";
@@ -68,6 +69,11 @@ class SparkTokenPrimitivesBrowser extends SparkTokenPrimitivesBase {
   async hashPartialTokenTransaction(partialTokenTransactionBytes: Uint8Array) {
     await this.init();
     return hash_partial_token_transaction(partialTokenTransactionBytes);
+  }
+
+  async hashTransferManifest(transferManifestBytes: Uint8Array) {
+    await this.init();
+    return hash_transfer_manifest(transferManifestBytes);
   }
 
   async buildBroadcastTransactionRequest(

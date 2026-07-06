@@ -1559,6 +1559,13 @@ public func hashPartialTokenTransaction(partialTokenTransactionBytes: Data)throw
     )
 })
 }
+public func hashTransferManifest(transferManifestBytes: Data)throws  -> Data {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+    uniffi_spark_token_primitives_fn_func_hash_transfer_manifest(
+        FfiConverterData.lower(transferManifestBytes),$0
+    )
+})
+}
 public func prepareTokenInvoice(request: PrepareTokenInvoiceRequest)throws  -> PreparedTokenInvoice {
     return try  FfiConverterTypePreparedTokenInvoice.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
     uniffi_spark_token_primitives_fn_func_prepare_token_invoice(
@@ -1592,6 +1599,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction() != 26626) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest() != 23619) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985) {

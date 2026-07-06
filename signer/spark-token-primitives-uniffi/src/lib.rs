@@ -27,6 +27,12 @@ pub fn hash_partial_token_transaction(
     spark_token_primitives::hash_partial_token_transaction(partial_token_transaction_bytes)
 }
 
+pub fn hash_transfer_manifest(
+    transfer_manifest_bytes: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    spark_token_primitives::hash_transfer_manifest(transfer_manifest_bytes)
+}
+
 pub fn build_broadcast_transaction_request(
     request: BroadcastBuildRequest,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
@@ -288,6 +294,12 @@ pub fn wasm_hash_partial_token_transaction(
     partial_token_transaction_bytes: Vec<u8>,
 ) -> Result<Vec<u8>, JsValue> {
     hash_partial_token_transaction(partial_token_transaction_bytes).map_err(js_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = hash_transfer_manifest)]
+pub fn wasm_hash_transfer_manifest(transfer_manifest_bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
+    hash_transfer_manifest(transfer_manifest_bytes).map_err(js_error)
 }
 
 #[cfg(target_arch = "wasm32")]
