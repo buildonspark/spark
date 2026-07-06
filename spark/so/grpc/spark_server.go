@@ -198,11 +198,6 @@ func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartTransferRe
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
-// StartLeafSwapV2 initiates a swap of leaves between two users.
-func (s *SparkServer) StartLeafSwapV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
-}
-
 // LeafSwap starts the reverse side of a swap of leaves between two users.
 // This is deprecated but remains for backwards compatibility,
 // CounterLeafSwap should be used instead.

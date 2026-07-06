@@ -911,10 +911,6 @@ func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartTransf
 	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, false, nil)
 }
 
-func (h *TransferHandler) StartLeafSwapV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, true, nil)
-}
-
 // Initiate a primary swap transfer in Swap V3 protocol. This will create a
 // transfer to the SSP with adapted refunds with key tweaks stored but not yet
 // applied, awaiting a counter swap transfer.

@@ -22425,14 +22425,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    start_leaf_swap_v2: {
-      name: "start_leaf_swap_v2",
-      requestType: StartTransferRequest,
-      requestStream: false,
-      responseType: StartTransferResponse,
-      responseStream: false,
-      options: {},
-    },
     start_transfer_v2: {
       name: "start_transfer_v2",
       requestType: StartTransferRequest,
@@ -22657,10 +22649,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiatePreimageSwapRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
-  start_leaf_swap_v2(
-    request: StartTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartTransferResponse>>;
   start_transfer_v2(
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
@@ -22854,10 +22842,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<InitiatePreimageSwapRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiatePreimageSwapResponse>;
-  start_leaf_swap_v2(
-    request: DeepPartial<StartTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<StartTransferResponse>;
   start_transfer_v2(
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,

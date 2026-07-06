@@ -159,7 +159,6 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_FinalizeNodeSignaturesV2_FullMethodName:            {AuthMode: AuthSession},
 		pbspark.SparkService_InitiatePreimageSwapV2_FullMethodName:              {AuthMode: AuthSession},
 		pbspark.SparkService_InitiatePreimageSwapV3_FullMethodName:              {AuthMode: AuthSession},
-		pbspark.SparkService_StartLeafSwapV2_FullMethodName:                     {AuthMode: AuthSession},
 		pbspark.SparkService_StartTransferV2_FullMethodName:                     {AuthMode: AuthSession},
 		pbspark.SparkService_StartTransferV3_FullMethodName:                     {AuthMode: AuthSession},
 		pbspark.SparkService_ClaimTransfer_FullMethodName:                       {AuthMode: AuthSession},

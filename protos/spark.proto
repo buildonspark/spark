@@ -76,7 +76,6 @@ service SparkService {
     rpc finalize_node_signatures_v2(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc initiate_preimage_swap_v3(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
-    rpc start_leaf_swap_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc start_transfer_v3(StartTransferV3Request) returns (StartTransferResponse) {}
 
