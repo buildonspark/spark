@@ -199,9 +199,8 @@ func TestSigningCommitment_MarshalProto(t *testing.T) {
 	nonce := GenerateSigningNonce()
 	commitment := nonce.SigningCommitment()
 
-	proto, err := commitment.MarshalProto()
+	proto := commitment.MarshalProto()
 
-	require.NoError(t, err)
 	require.NotNil(t, proto)
 	assert.Equal(t, commitment.binding.Serialize(), proto.GetBinding())
 	assert.Equal(t, commitment.hiding.Serialize(), proto.GetHiding())
@@ -281,7 +280,7 @@ func TestSigningCommitment_RoundTrip_Proto(t *testing.T) {
 	nonce := GenerateSigningNonce()
 	original := nonce.SigningCommitment()
 
-	proto, _ := original.MarshalProto()
+	proto := original.MarshalProto()
 
 	dest := SigningCommitment{}
 	err := dest.UnmarshalProto(proto)

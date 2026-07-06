@@ -203,13 +203,9 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 
 	var pbSigningResults []*pb.ExitSingleNodeTreeSigningResult
 	for id, root := range cachedRootsMap {
-		signingResultProto, err := jobIDToSigningResult[signingJobs[root.index].JobID].MarshalProto()
-		if err != nil {
-			return nil, err
-		}
 		pbSigningResults = append(pbSigningResults, &pb.ExitSingleNodeTreeSigningResult{
 			TreeId:        id.String(),
-			SigningResult: signingResultProto,
+			SigningResult: jobIDToSigningResult[signingJobs[root.index].JobID].MarshalProto(),
 			VerifyingKey:  root.value.VerifyingPubkey.Serialize(),
 		})
 	}

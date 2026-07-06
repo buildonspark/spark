@@ -214,9 +214,8 @@ func TestSigningNonce_UnmarshalBinary_InvalidInput_Errors(t *testing.T) {
 func TestSigningNonce_MarshalProto(t *testing.T) {
 	nonce := GenerateSigningNonce()
 
-	proto, err := nonce.MarshalProto()
+	proto := nonce.MarshalProto()
 
-	require.NoError(t, err)
 	require.NotNil(t, proto)
 	assert.Equal(t, nonce.binding.Serialize(), proto.GetBinding())
 	assert.Equal(t, nonce.hiding.Serialize(), proto.GetHiding())
@@ -294,7 +293,7 @@ func TestSigningNonce_RoundTrip_Binary(t *testing.T) {
 func TestSigningNonce_RoundTrip_Proto(t *testing.T) {
 	original := GenerateSigningNonce()
 
-	proto, _ := original.MarshalProto()
+	proto := original.MarshalProto()
 
 	dest := SigningNonce{}
 	err := dest.UnmarshalProto(proto)

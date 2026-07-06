@@ -1379,8 +1379,7 @@ func SignRefunds(
 		} else {
 			refundTxSighash, _ = sighash.FromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
 		}
-		nonceProto, _ := leafData.Nonce.MarshalProto()
-		nonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
+		nonceCommitmentProto := leafData.Nonce.SigningCommitment().MarshalProto()
 
 		refundJobID := uuid.NewString()
 		jobToMetadataMap[refundJobID] = &refundJobMetadata{
@@ -1392,7 +1391,7 @@ func SignRefunds(
 			Message:          refundTxSighash.Serialize(),
 			KeyPackage:       userKeyPackage,
 			VerifyingKey:     operatorSigningResult.GetVerifyingKey(),
-			Nonce:            nonceProto,
+			Nonce:            leafData.Nonce.MarshalProto(),
 			Commitments:      operatorSigningResult.GetRefundTxSigningResult().GetSigningNonceCommitments(),
 			UserCommitments:  nonceCommitmentProto,
 			AdaptorPublicKey: adaptorPublicKeyBytes,
@@ -1424,8 +1423,7 @@ func SignRefunds(
 			} else {
 				directRefundTxSighash, _ = sighash.FromTx(leafData.DirectRefundTx, 0, leafData.DirectTx.TxOut[0])
 			}
-			directRefundNonceProto, _ := leafData.DirectRefundNonce.MarshalProto()
-			directRefundNonceCommitmentProto, _ := leafData.DirectRefundNonce.SigningCommitment().MarshalProto()
+			directRefundNonceCommitmentProto := leafData.DirectRefundNonce.SigningCommitment().MarshalProto()
 
 			directRefundJobID := uuid.NewString()
 			jobToMetadataMap[directRefundJobID] = &refundJobMetadata{
@@ -1437,7 +1435,7 @@ func SignRefunds(
 				Message:          directRefundTxSighash.Serialize(),
 				KeyPackage:       userKeyPackage,
 				VerifyingKey:     operatorSigningResult.GetVerifyingKey(),
-				Nonce:            directRefundNonceProto,
+				Nonce:            leafData.DirectRefundNonce.MarshalProto(),
 				Commitments:      operatorSigningResult.GetDirectRefundTxSigningResult().GetSigningNonceCommitments(),
 				UserCommitments:  directRefundNonceCommitmentProto,
 				AdaptorPublicKey: adaptorPublicKeyBytes,
@@ -1469,8 +1467,7 @@ func SignRefunds(
 			} else {
 				directFromCpfpRefundTxSighash, _ = sighash.FromTx(leafData.DirectFromCpfpRefundTx, 0, leafData.Tx.TxOut[0])
 			}
-			directFromCpfpRefundNonceProto, _ := leafData.DirectFromCpfpRefundNonce.MarshalProto()
-			directFromCpfpRefundNonceCommitmentProto, _ := leafData.DirectFromCpfpRefundNonce.SigningCommitment().MarshalProto()
+			directFromCpfpRefundNonceCommitmentProto := leafData.DirectFromCpfpRefundNonce.SigningCommitment().MarshalProto()
 
 			directFromCpfpRefundJobID := uuid.NewString()
 			jobToMetadataMap[directFromCpfpRefundJobID] = &refundJobMetadata{
@@ -1482,7 +1479,7 @@ func SignRefunds(
 				Message:          directFromCpfpRefundTxSighash.Serialize(),
 				KeyPackage:       userKeyPackage,
 				VerifyingKey:     operatorSigningResult.GetVerifyingKey(),
-				Nonce:            directFromCpfpRefundNonceProto,
+				Nonce:            leafData.DirectFromCpfpRefundNonce.MarshalProto(),
 				Commitments:      operatorSigningResult.GetDirectFromCpfpRefundTxSigningResult().GetSigningNonceCommitments(),
 				UserCommitments:  directFromCpfpRefundNonceCommitmentProto,
 				AdaptorPublicKey: adaptorPublicKeyBytes,
@@ -1581,14 +1578,12 @@ func PrepareRefundSoSigningJobs(
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize refund tx: %w", err)
 		}
-		refundNonceCommitmentProto, _ := refundSigningData.Nonce.SigningCommitment().MarshalProto()
-
 		job := &pb.LeafRefundTxSigningJob{
 			LeafId: leaf.Leaf.GetId(),
 			RefundTxSigningJob: &pb.SigningJob{
 				SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
 				RawTx:                  refundBuf.Bytes(),
-				SigningNonceCommitment: refundNonceCommitmentProto,
+				SigningNonceCommitment: refundSigningData.Nonce.SigningCommitment().MarshalProto(),
 			},
 		}
 
@@ -1621,12 +1616,10 @@ func PrepareRefundSoSigningJobs(
 				// Generate nonce for DirectRefundTx
 				directRefundNonce := frost.GenerateSigningNonce()
 				refundSigningData.DirectRefundNonce = &directRefundNonce
-				directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
-
 				job.DirectRefundTxSigningJob = &pb.SigningJob{
 					SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
 					RawTx:                  directRefundBuf.Bytes(),
-					SigningNonceCommitment: directRefundNonceCommitmentProto,
+					SigningNonceCommitment: directRefundNonce.SigningCommitment().MarshalProto(),
 				}
 			}
 		}
@@ -1646,12 +1639,10 @@ func PrepareRefundSoSigningJobs(
 		// Generate nonce for DirectFromCpfpRefundTx
 		directFromCpfpRefundNonce := frost.GenerateSigningNonce()
 		refundSigningData.DirectFromCpfpRefundNonce = &directFromCpfpRefundNonce
-		directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpRefundNonce.SigningCommitment().MarshalProto()
-
 		job.DirectFromCpfpRefundTxSigningJob = &pb.SigningJob{
 			SigningPublicKey:       refundSigningData.SigningPrivKey.Public().Serialize(),
 			RawTx:                  directFromCpfpRefundBuf.Bytes(),
-			SigningNonceCommitment: directFromCpfpRefundNonceCommitmentProto,
+			SigningNonceCommitment: directFromCpfpRefundNonce.SigningCommitment().MarshalProto(),
 		}
 
 		signingJobs = append(signingJobs, job)

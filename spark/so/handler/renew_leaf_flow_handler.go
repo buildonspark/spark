@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/collections"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -267,21 +268,10 @@ func buildLocalSigningJobs(leafID uuid.UUID, entries []sigEntry, signingKeyshare
 // marshalSigningJobHelper converts a SigningJobWithPregeneratedNonce into
 // the internal SigningJob proto used for FrostRound2.
 func marshalSigningJobHelper(job *helper.SigningJobWithPregeneratedNonce) (*pbinternal.SigningJob, error) {
-	commitments := make(map[string]*pbcommon.SigningCommitment, len(job.Round1Packages))
-	for id, c := range job.Round1Packages {
-		cp, err := c.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal commitment for %s: %w", id, err)
-		}
-		commitments[id] = cp
-	}
+	commitments := collections.ConvertObjectMapToProtoMap(job.Round1Packages)
 	var userCommitments *pbcommon.SigningCommitment
 	if job.UserCommitment != nil {
-		uc, err := job.UserCommitment.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal user commitment: %w", err)
-		}
-		userCommitments = uc
+		userCommitments = job.UserCommitment.MarshalProto()
 	}
 	return &pbinternal.SigningJob{
 		JobId:           job.JobID.String(),

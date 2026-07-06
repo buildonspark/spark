@@ -157,8 +157,8 @@ type signingResult struct {
 	signatureShare []byte
 }
 
-func (s signingResult) MarshalProto() (*common.SigningResult, error) {
-	return &common.SigningResult{SignatureShare: s.signatureShare}, nil
+func (s signingResult) MarshalProto() *common.SigningResult {
+	return &common.SigningResult{SignatureShare: s.signatureShare}
 }
 
 func TestConvertObjectMapToProtoMap(t *testing.T) {
@@ -202,10 +202,7 @@ func TestConvertObjectMapToProtoMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ConvertObjectMapToProtoMap(tt.input)
-			if err != nil {
-				t.Fatalf("ConvertObjectMapToProtoMap() unexpected error: %v", err)
-			}
+			got := ConvertObjectMapToProtoMap(tt.input)
 			if diff := cmp.Diff(tt.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("ConvertObjectMapToProtoMap() mismatch (-want +got):\n%s", diff)
 			}

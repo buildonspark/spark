@@ -33,7 +33,7 @@ func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config,
 	operatorCommitments := signingResult[0].SigningCommitments
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorCommitments {
-		operatorCommitmentsProto[id], _ = commitment.MarshalProto()
+		operatorCommitmentsProto[id] = commitment.MarshalProto()
 	}
 
 	frostConn, err := config.NewFrostGRPCConnection()

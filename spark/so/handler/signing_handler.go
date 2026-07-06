@@ -164,12 +164,8 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 	requestedCommitments := make([]*pb.RequestedSigningCommitments, len(commitmentsArray))
 
 	for i, commitment := range commitmentsArray {
-		commitmentMapProto, err := collections.ConvertObjectMapToProtoMap(commitment)
-		if err != nil {
-			return nil, fmt.Errorf("unable to convert signing commitment to proto: %w", err)
-		}
 		requestedCommitments[i] = &pb.RequestedSigningCommitments{
-			SigningNonceCommitments: commitmentMapProto,
+			SigningNonceCommitments: collections.ConvertObjectMapToProtoMap(commitment),
 		}
 	}
 

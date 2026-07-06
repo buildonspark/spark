@@ -1196,20 +1196,11 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("expected at least 2 signing results, got %d", len(signingResults))
 	}
 
-	cpfpNodeTxSigningResult, err := signingResults[0].MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	cpfpRefundTxSigningResult, err := signingResults[1].MarshalProto()
-	if err != nil {
-		return nil, err
-	}
+	cpfpNodeTxSigningResult := signingResults[0].MarshalProto()
+	cpfpRefundTxSigningResult := signingResults[1].MarshalProto()
 	var directNodeTxSigningResult, directRefundTxSigningResult, directFromCpfpRefundTxSigningResult *pb.SigningResult
 	resultIndex := 2
-	directFromCpfpRefundTxSigningResult, err = signingResults[resultIndex].MarshalProto()
-	if err != nil {
-		return nil, err
-	}
+	directFromCpfpRefundTxSigningResult = signingResults[resultIndex].MarshalProto()
 
 	var root *ent.TreeNode
 	if existingRoot != nil {
@@ -1595,11 +1586,7 @@ func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddr
 		return keys.Public{}, nil, fmt.Errorf("no signing results returned for spend tx")
 	}
 
-	spendTxSigningResult, err := signingResults[0].MarshalProto()
-	if err != nil {
-		return keys.Public{}, nil, fmt.Errorf("failed to marshal spend tx signing result: %w", err)
-	}
-	return verifyingKey, spendTxSigningResult, nil
+	return verifyingKey, signingResults[0].MarshalProto(), nil
 }
 
 func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []byte) (sighash.Hash, uint64, error) {

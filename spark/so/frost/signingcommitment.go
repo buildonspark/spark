@@ -74,17 +74,16 @@ func (s *SigningCommitment) UnmarshalBinary(data []byte) error {
 	return s.unmarshalFromBytes(data[:33], data[33:])
 }
 
-// MarshalProto serializes the SigningCommitment into a proto.SigningCommitment. It never returns an error.
-// It's needed to implement [github.com/lightsparkdev/spark/common.ProtoConvertable].
-func (s SigningCommitment) MarshalProto() (*pbcommon.SigningCommitment, error) {
+// MarshalProto serializes the SigningCommitment into a proto.SigningCommitment.
+// It implements [github.com/lightsparkdev/spark/common.ProtoConvertable].
+func (s SigningCommitment) MarshalProto() *pbcommon.SigningCommitment {
 	return &pbcommon.SigningCommitment{
 		Binding: s.binding.Serialize(),
 		Hiding:  s.hiding.Serialize(),
-	}, nil
+	}
 }
 
 // UnmarshalProto deserializes the SigningCommitment from a proto.SigningCommitment.
-// It's needed to implement [github.com/lightsparkdev/spark/common.ProtoConvertable].
 func (s *SigningCommitment) UnmarshalProto(proto *pbcommon.SigningCommitment) error {
 	if proto == nil {
 		return errors.New("cannot unmarshal signing commitment: nil proto")

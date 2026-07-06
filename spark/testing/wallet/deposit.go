@@ -353,8 +353,7 @@ func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPub
 	}
 
 	nonce := frost.GenerateSigningNonce()
-	nonceProto, _ := nonce.MarshalProto()
-	commitmentProto, _ := nonce.SigningCommitment().MarshalProto()
+	commitmentProto := nonce.SigningCommitment().MarshalProto()
 
 	txSig, err := sighash.FromTx(tx, 0, prevTxOut)
 	if err != nil {
@@ -370,7 +369,7 @@ func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPub
 	return &preparedTxSigningArtifacts{
 		rawTx:      buf.Bytes(),
 		sighash:    txSig,
-		nonce:      nonceProto,
+		nonce:      nonce.MarshalProto(),
 		commitment: commitmentProto,
 		signingJob: job,
 	}, nil
@@ -781,9 +780,6 @@ func prepareTxSigningArtifactsMultiInput(
 	}
 
 	nonce := frost.GenerateSigningNonce()
-	nonceProto, _ := nonce.MarshalProto()
-	commitmentProto, _ := nonce.SigningCommitment().MarshalProto()
-
 	txSig, err := sighash.FromMultiPrevOutTx(tx, inputIndex, prevOutputs)
 	if err != nil {
 		return nil, err
@@ -792,8 +788,8 @@ func prepareTxSigningArtifactsMultiInput(
 	return &preparedTxSigningArtifacts{
 		rawTx:      buf.Bytes(),
 		sighash:    txSig,
-		nonce:      nonceProto,
-		commitment: commitmentProto,
+		nonce:      nonce.MarshalProto(),
+		commitment: nonce.SigningCommitment().MarshalProto(),
 	}, nil
 }
 
@@ -1344,9 +1340,8 @@ func RefundStaticDeposit(
 	}
 
 	userNonce := frost.GenerateSigningNonce()
-	userNonceProto, _ := userNonce.MarshalProto()
 	userNonceCommitment := userNonce.SigningCommitment()
-	userCommitmentProto, _ := userNonceCommitment.MarshalProto()
+	userCommitmentProto := userNonceCommitment.MarshalProto()
 
 	signingJob := &pb.SigningJob{
 		RawTx:                  spendTxBytes.Bytes(),
@@ -1400,7 +1395,7 @@ func RefundStaticDeposit(
 		Message:         spendTxSighash.Serialize(),
 		KeyPackage:      &userKeyPackage,
 		VerifyingKey:    swapResponse.GetDepositAddress().GetVerifyingPublicKey(),
-		Nonce:           userNonceProto,
+		Nonce:           userNonce.MarshalProto(),
 		Commitments:     operatorCommitments,
 		UserCommitments: userCommitmentProto,
 	}}
