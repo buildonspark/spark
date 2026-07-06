@@ -28,9 +28,9 @@ import (
 )
 
 var (
-	pubKey             = keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{})).Public()
-	commitment, _      = frost.NewSigningCommitment(pubKey, pubKey)
-	commitmentProto, _ = commitment.MarshalProto()
+	pubKey          = keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{})).Public()
+	commitment, _   = frost.NewSigningCommitment(pubKey, pubKey)
+	commitmentProto = commitment.MarshalProto()
 )
 
 func mockTxBuf(t *testing.T, values []int64) []byte {

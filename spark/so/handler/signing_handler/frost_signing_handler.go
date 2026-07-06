@@ -49,7 +49,7 @@ func (h *FrostSigningHandler) GenerateRandomNonces(ctx context.Context, count ui
 		entSigningNonces[i] = db.SigningNonce.Create().
 			SetNonce(nonce).
 			SetNonceCommitment(commitment)
-		commitments[i], _ = commitment.MarshalProto()
+		commitments[i] = commitment.MarshalProto()
 	}
 
 	if err := db.SigningNonce.CreateBulk(entSigningNonces...).Exec(ctx); err != nil {
@@ -214,15 +214,13 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 
 		nonceEnt := nonces[commitment]
 		nonceObject := nonceEnt.Nonce
-		nonceProto, _ := nonceObject.MarshalProto()
-
 		keyPackage := keyPackages[keyshareID]
 		signingJobProto := &pbfrost.FrostSigningJob{
 			JobId:            job.GetJobId(),
 			Message:          job.GetMessage(),
 			KeyPackage:       keyPackage,
 			VerifyingKey:     job.GetVerifyingKey(),
-			Nonce:            nonceProto,
+			Nonce:            nonceObject.MarshalProto(),
 			Commitments:      job.GetCommitments(),
 			UserCommitments:  job.GetUserCommitments(),
 			AdaptorPublicKey: job.GetAdaptorPublicKey(),

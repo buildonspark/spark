@@ -1072,22 +1072,13 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 		cpfpSigningResult := signingResults[signingResultIndex]
 		signingResultIndex++
 
-		cpfpSigningResultProto, err := cpfpSigningResult.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-
-		currentElement.node.NodeTxSigningResult = cpfpSigningResultProto
+		currentElement.node.NodeTxSigningResult = cpfpSigningResult.MarshalProto()
 
 		var directSigningResult *helper.SigningResult
 		if currentElement.creationNode.GetDirectNodeTxSigningJob() != nil {
 			directSigningResult = signingResults[signingResultIndex]
 			signingResultIndex++
-			directSigningResultProto, err := directSigningResult.MarshalProto()
-			if err != nil {
-				return nil, err
-			}
-			currentElement.node.DirectNodeTxSigningResult = directSigningResultProto
+			currentElement.node.DirectNodeTxSigningResult = directSigningResult.MarshalProto()
 
 		} else if requireDirectTx {
 			return nil, errors.New("directNodeTxSigningJob is required. Please upgrade to the latest SDK version")
@@ -1096,29 +1087,15 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
 		if currentElement.creationNode.GetRefundTxSigningJob() != nil {
 			cpfpSigningResult := signingResults[signingResultIndex]
 			signingResultIndex++
-
-			cpfpRefundSigningResultProto, err := cpfpSigningResult.MarshalProto()
-			if err != nil {
-				return nil, err
-			}
-
-			currentElement.node.RefundTxSigningResult = cpfpRefundSigningResultProto
+			currentElement.node.RefundTxSigningResult = cpfpSigningResult.MarshalProto()
 
 			if currentElement.creationNode.GetDirectRefundTxSigningJob() != nil && currentElement.creationNode.GetDirectFromCpfpRefundTxSigningJob() != nil {
 				directSigningResult := signingResults[signingResultIndex]
 				signingResultIndex++
 				directFromCpfpRefundSigningResult := signingResults[signingResultIndex]
 				signingResultIndex++
-				directRefundSigningResultProto, err := directSigningResult.MarshalProto()
-				if err != nil {
-					return nil, err
-				}
-				directFromCpfpRefundSigningResultProto, err := directFromCpfpRefundSigningResult.MarshalProto()
-				if err != nil {
-					return nil, err
-				}
-				currentElement.node.DirectRefundTxSigningResult = directRefundSigningResultProto
-				currentElement.node.DirectFromCpfpRefundTxSigningResult = directFromCpfpRefundSigningResultProto
+				currentElement.node.DirectRefundTxSigningResult = directSigningResult.MarshalProto()
+				currentElement.node.DirectFromCpfpRefundTxSigningResult = directFromCpfpRefundSigningResult.MarshalProto()
 			} else if requireDirectTx {
 				return nil, errors.New("directRefundTxSigningJob or DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}

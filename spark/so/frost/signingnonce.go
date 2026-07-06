@@ -86,18 +86,16 @@ func (s *SigningNonce) UnmarshalBinary(data []byte) error {
 	return s.unmarshalFromBytes(data[:32], data[32:])
 }
 
-// MarshalProto serializes the SigningNonce into a [pbfrost.SigningNonce]. It never returns an error.
-// It's needed to implement [github.com/lightsparkdev/spark/common.ProtoConvertable].
-func (s SigningNonce) MarshalProto() (*pbfrost.SigningNonce, error) {
+// MarshalProto serializes the SigningNonce into a [pbfrost.SigningNonce].
+// It implements [github.com/lightsparkdev/spark/common.ProtoConvertable].
+func (s SigningNonce) MarshalProto() *pbfrost.SigningNonce {
 	return &pbfrost.SigningNonce{
 		Binding: s.binding.Serialize(),
 		Hiding:  s.hiding.Serialize(),
-	}, nil
+	}
 }
 
-// UnmarshalProto deserializes the SigningNonce from a proto.SigningNonce.
-// It's needed to implement [github.com/lightsparkdev/spark/common.ProtoConvertable].
-// Not thread-safe.
+// UnmarshalProto deserializes the SigningNonce from a proto.SigningNonce. Not thread-safe.
 func (s *SigningNonce) UnmarshalProto(proto *pbfrost.SigningNonce) error {
 	if proto == nil {
 		return errors.New("cannot unmarshal signing nonce: nil proto")

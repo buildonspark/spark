@@ -67,15 +67,13 @@ func createCoopExitRefundTransactionSigningJob(
 		return nil, fmt.Errorf("failed to serialize refund tx: %w", err)
 	}
 	rawRefundTx := refundBuf.Bytes()
-	refundNonceCommitmentProto, _ := refundNonce.SigningCommitment().MarshalProto()
+	refundNonceCommitmentProto := refundNonce.SigningCommitment().MarshalProto()
 
 	var directFromCpfpRefundBuf bytes.Buffer
 	if err := directFromCpfpRefundTx.Serialize(&directFromCpfpRefundBuf); err != nil {
 		return nil, fmt.Errorf("failed to serialize direct from cpfp refund tx: %w", err)
 	}
 	rawDirectFromCpfpRefundTx := directFromCpfpRefundBuf.Bytes()
-	directFromCpfpRefundNonceCommitmentProto, _ := directFromCpfpNonce.SigningCommitment().MarshalProto()
-
 	job := &pb.LeafRefundTxSigningJob{
 		LeafId: leafID,
 		RefundTxSigningJob: &pb.SigningJob{
@@ -86,7 +84,7 @@ func createCoopExitRefundTransactionSigningJob(
 		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
 			RawTx:                  rawDirectFromCpfpRefundTx,
-			SigningNonceCommitment: directFromCpfpRefundNonceCommitmentProto,
+			SigningNonceCommitment: directFromCpfpNonce.SigningCommitment().MarshalProto(),
 		},
 	}
 
@@ -97,12 +95,10 @@ func createCoopExitRefundTransactionSigningJob(
 			return nil, fmt.Errorf("failed to serialize direct refund tx: %w", err)
 		}
 		rawDirectRefundTx := directRefundBuf.Bytes()
-		directRefundNonceCommitmentProto, _ := directRefundNonce.SigningCommitment().MarshalProto()
-
 		job.DirectRefundTxSigningJob = &pb.SigningJob{
 			SigningPublicKey:       signingPubKey.Serialize(),
 			RawTx:                  rawDirectRefundTx,
-			SigningNonceCommitment: directRefundNonceCommitmentProto,
+			SigningNonceCommitment: directRefundNonce.SigningCommitment().MarshalProto(),
 		}
 	}
 
@@ -582,9 +578,7 @@ func signCoopExitUserRefunds(
 		}
 
 		signingNonce := frost.GenerateSigningNonce()
-		signingNonceProto, _ := signingNonce.MarshalProto()
 		signingCommitment := signingNonce.SigningCommitment()
-		userCommitmentProto, _ := signingCommitment.MarshalProto()
 		userCommitments[i] = &signingCommitment
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
@@ -593,9 +587,9 @@ func signCoopExitUserRefunds(
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
-			Nonce:           signingNonceProto,
+			Nonce:           signingNonce.MarshalProto(),
 			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
-			UserCommitments: userCommitmentProto,
+			UserCommitments: signingCommitment.MarshalProto(),
 		})
 	}
 
@@ -646,9 +640,7 @@ func signCoopExitUserRefundsForDirect(
 		}
 
 		signingNonce := frost.GenerateSigningNonce()
-		signingNonceProto, _ := signingNonce.MarshalProto()
 		signingCommitment := signingNonce.SigningCommitment()
-		userCommitmentProto, _ := signingCommitment.MarshalProto()
 		userCommitments[i] = &signingCommitment
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
@@ -657,9 +649,9 @@ func signCoopExitUserRefundsForDirect(
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
-			Nonce:           signingNonceProto,
+			Nonce:           signingNonce.MarshalProto(),
 			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
-			UserCommitments: userCommitmentProto,
+			UserCommitments: signingCommitment.MarshalProto(),
 		})
 	}
 

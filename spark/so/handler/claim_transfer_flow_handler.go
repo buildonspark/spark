@@ -12,6 +12,7 @@ import (
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
@@ -1100,14 +1101,8 @@ func (f *claimTransferCoordinatorFlow) aggregateLeafSignature(
 	defer conn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(conn)
 
-	userCommitment, err := job.UserCommitment.MarshalProto()
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal user commitment: %w", err)
-	}
-	roundCommitments, err := marshalClaimRoundCommitments(job.Round1Packages)
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal round1 commitments: %w", err)
-	}
+	userCommitment := job.UserCommitment.MarshalProto()
+	roundCommitments := collections.ConvertObjectMapToProtoMap(job.Round1Packages)
 	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            job.Message.Serialize(),
 		SignatureShares:    shares,
@@ -1728,23 +1723,4 @@ func filterClaimJobsForThisOperator(jobs []*pbinternal.SigningJob, identifier st
 		}
 	}
 	return filtered
-}
-
-// marshalClaimRoundCommitments converts the in-memory round1 commitments map to
-// the AggregateFrost RPC's proto shape. Errors are returned rather than
-// silently dropped — a missing entry would produce a malformed Commitments
-// map and a cryptic FROST-side failure later.
-//
-// Local copy of send-transfer's marshalRoundCommitments; see comment on
-// filterClaimJobsForThisOperator.
-func marshalClaimRoundCommitments(round1 map[string]frost.SigningCommitment) (map[string]*pbcommon.SigningCommitment, error) {
-	out := make(map[string]*pbcommon.SigningCommitment, len(round1))
-	for id, c := range round1 {
-		m, err := c.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("marshal round1 commitment for %s: %w", id, err)
-		}
-		out[id] = m
-	}
-	return out, nil
 }

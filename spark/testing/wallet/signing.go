@@ -116,9 +116,7 @@ func prepareFrostSigningJobsForDirectRefund(
 		}
 
 		signingNonce := frost.GenerateSigningNonce()
-		signingNonceProto, _ := signingNonce.MarshalProto()
 		signingCommitment := signingNonce.SigningCommitment()
-		userCommitmentProto, _ := signingCommitment.MarshalProto()
 		userCommitments[i] = &signingCommitment
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
@@ -128,9 +126,9 @@ func prepareFrostSigningJobsForDirectRefund(
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
-			Nonce:           signingNonceProto,
+			Nonce:           signingNonce.MarshalProto(),
 			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
-			UserCommitments: userCommitmentProto,
+			UserCommitments: signingCommitment.MarshalProto(),
 		})
 	}
 	return signingJobs, refundTxs, userCommitments, nil
@@ -203,11 +201,8 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 		}
 
 		signingNonce := frost.GenerateSigningNonce()
-		signingNonceProto, _ := signingNonce.MarshalProto()
 		signingCommitment := signingNonce.SigningCommitment()
 		userCommitments[i] = &signingCommitment
-		userCommitmentProto, _ := signingCommitment.MarshalProto()
-
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
@@ -215,9 +210,9 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 			Message:          txSig.Serialize(),
 			KeyPackage:       userKeyPackage,
 			VerifyingKey:     leaf.Leaf.GetVerifyingPublicKey(),
-			Nonce:            signingNonceProto,
+			Nonce:            signingNonce.MarshalProto(),
 			Commitments:      signingCommitments[i].GetSigningNonceCommitments(),
-			UserCommitments:  userCommitmentProto,
+			UserCommitments:  signingCommitment.MarshalProto(),
 			AdaptorPublicKey: adaptorPublicKey.Serialize(),
 		})
 	}
@@ -311,9 +306,7 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 		}
 
 		signingNonce := frost.GenerateSigningNonce()
-		signingNonceProto, _ := signingNonce.MarshalProto()
 		signingCommitment := signingNonce.SigningCommitment()
-		userCommitmentProto, _ := signingCommitment.MarshalProto()
 		userCommitments[i] = &signingCommitment
 
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
@@ -323,9 +316,9 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 			Message:         txSig.Serialize(),
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    leaf.Leaf.GetVerifyingPublicKey(),
-			Nonce:           signingNonceProto,
+			Nonce:           signingNonce.MarshalProto(),
 			Commitments:     signingCommitments[i].GetSigningNonceCommitments(),
-			UserCommitments: userCommitmentProto,
+			UserCommitments: signingCommitment.MarshalProto(),
 		})
 	}
 	return signingJobs, refundTxs, userCommitments, nil
@@ -351,19 +344,18 @@ func prepareLeafSigningJobs(
 		return nil, fmt.Errorf("mismatched lengths: leaves: %d, commitments: %d", len(leaves), len(signingCommitments))
 	}
 
-	var leafSigningJobs []*pb.UserSignedTxSigningJob
+	leafSigningJobs := make([]*pb.UserSignedTxSigningJob, len(leaves))
 	for i, leaf := range leaves {
-		userCommitmentProto, _ := userCommitments[i].MarshalProto()
-		leafSigningJobs = append(leafSigningJobs, &pb.UserSignedTxSigningJob{
+		leafSigningJobs[i] = &pb.UserSignedTxSigningJob{
 			LeafId:                 leaf.Leaf.GetId(),
 			SigningPublicKey:       leaf.SigningPrivKey.Public().Serialize(),
 			RawTx:                  refundTxs[i],
-			SigningNonceCommitment: userCommitmentProto,
+			SigningNonceCommitment: userCommitments[i].MarshalProto(),
 			UserSignature:          signingResults[leaf.Leaf.GetId()].GetSignatureShare(),
 			SigningCommitments: &pb.SigningCommitments{
 				SigningCommitments: signingCommitments[i].GetSigningNonceCommitments(),
 			},
-		})
+		}
 	}
 	return leafSigningJobs, nil
 }
@@ -382,13 +374,11 @@ func CreateSigningJobFromTx(
 
 	signingNonce := frost.GenerateSigningNonce()
 
-	signingNonceCommitment, _ := signingNonce.SigningCommitment().MarshalProto()
-
 	signingNonces = append(signingNonces, &signingNonce)
 	signingJob := &pb.SigningJob{
 		SigningPublicKey:       signingPrivateKey.Public().Serialize(),
 		RawTx:                  txBuf.Bytes(),
-		SigningNonceCommitment: signingNonceCommitment,
+		SigningNonceCommitment: signingNonce.SigningCommitment().MarshalProto(),
 	}
 
 	return signingJob, signingNonces, nil
@@ -415,16 +405,14 @@ func SignTransactionWithFrost(
 		return nil, err
 	}
 
-	signingNonceCommitment, _ := signingNonce.SigningCommitment().MarshalProto()
-	signingNonceProto, _ := signingNonce.MarshalProto()
-
+	signingNonceCommitment := signingNonce.SigningCommitment().MarshalProto()
 	keyPackage := CreateUserKeyPackage(signingPrivateKey)
 	signingJob := &pbfrost.FrostSigningJob{
 		JobId:           uuid.NewString(),
 		Message:         txSig.Serialize(),
 		KeyPackage:      keyPackage,
 		VerifyingKey:    verificationKey.Serialize(),
-		Nonce:           signingNonceProto,
+		Nonce:           signingNonce.MarshalProto(),
 		Commitments:     signingResult.GetSigningNonceCommitments(),
 		UserCommitments: signingNonceCommitment,
 	}

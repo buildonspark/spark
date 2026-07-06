@@ -1892,10 +1892,9 @@ func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.S
 	var txBuf bytes.Buffer
 	require.NoError(t, tx.Serialize(&txBuf))
 
-	nonceCommitmentProto, _ := frost.GenerateSigningNonce().SigningCommitment().MarshalProto()
 	return &pb.SigningJob{
 		RawTx:                  txBuf.Bytes(),
 		SigningPublicKey:       publicKey.Serialize(),
-		SigningNonceCommitment: nonceCommitmentProto,
+		SigningNonceCommitment: frost.GenerateSigningNonce().SigningCommitment().MarshalProto(),
 	}
 }

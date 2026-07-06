@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"math/big"
 	"slices"
 	"strings"
@@ -107,25 +108,13 @@ func buildSigningResultProtos(
 		var directProto *pb.SigningResult
 		var directFromCpfpProto *pb.SigningResult
 		if res, ok := cpfpSigningResultMap[leafID]; ok {
-			cpfRes, err := res.MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("unable to marshal cpfp signing result: %w", err)
-			}
-			cpfpProto = cpfRes
+			cpfpProto = res.MarshalProto()
 		}
 		if res, ok := directSigningResultMap[leafID]; ok {
-			dirRes, err := res.MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("unable to marshal direct signing result: %w", err)
-			}
-			directProto = dirRes
+			directProto = res.MarshalProto()
 		}
 		if res, ok := directFromCpfpSigningResultMap[leafID]; ok {
-			dirFromCpfpRes, err := res.MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("unable to marshal direct from cpfp signing result: %w", err)
-			}
-			directFromCpfpProto = dirFromCpfpRes
+			directFromCpfpProto = res.MarshalProto()
 		}
 
 		results = append(results, &pb.LeafRefundTxSigningResult{
@@ -1340,14 +1329,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		leaf := leafJobMap[result.JobID]
 		leafID := leaf.ID.String()
 
-		cpfpSigningResultProto, err := result.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal cpfp signing result: %w", err)
-		}
-
 		resultsByLeafID[leafID] = &pb.LeafRefundTxSigningResult{
 			LeafId:                leafID,
-			RefundTxSigningResult: cpfpSigningResultProto,
+			RefundTxSigningResult: result.MarshalProto(),
 			VerifyingKey:          leaf.VerifyingPubkey.Serialize(),
 		}
 	}
@@ -1357,13 +1341,8 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		leaf := leafJobMap[result.JobID]
 		leafID := leaf.ID.String()
 
-		directSigningResultProto, err := result.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal direct signing result: %w", err)
-		}
-
 		if existing, ok := resultsByLeafID[leafID]; ok {
-			existing.DirectRefundTxSigningResult = directSigningResultProto
+			existing.DirectRefundTxSigningResult = result.MarshalProto()
 		}
 	}
 
@@ -1372,23 +1351,12 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		leaf := leafJobMap[result.JobID]
 		leafID := leaf.ID.String()
 
-		directFromCpfpSigningResultProto, err := result.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal direct from cpfp signing result: %w", err)
-		}
-
 		if existing, ok := resultsByLeafID[leafID]; ok {
-			existing.DirectFromCpfpRefundTxSigningResult = directFromCpfpSigningResultProto
+			existing.DirectFromCpfpRefundTxSigningResult = result.MarshalProto()
 		}
 	}
 
-	// Convert map to slice
-	pbSigningResults := make([]*pb.LeafRefundTxSigningResult, 0, len(resultsByLeafID))
-	for _, result := range resultsByLeafID {
-		pbSigningResults = append(pbSigningResults, result)
-	}
-
-	return pbSigningResults, nil
+	return slices.Collect(maps.Values(resultsByLeafID)), nil
 }
 
 func SignRefundsWithPregeneratedNonce(
@@ -4912,10 +4880,6 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	for _, signingResult := range signingResults {
 		leafID := jobToLeafMap[signingResult.JobID]
 		leaf := leaves[leafID.String()]
-		signingResultProto, err := signingResult.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
 
 		// Get or create the signing result for this leaf
 		leafResult, exists := leafSigningResults[leafID.String()]
@@ -4928,6 +4892,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 
 		// Set the appropriate field based on whether this is a direct signing job
+		signingResultProto := signingResult.MarshalProto()
 		if isDirectSigningJob[signingResult.JobID] {
 			leafResult.DirectRefundTxSigningResult = signingResultProto
 		} else if isDirectFromCpfpSigningJob[signingResult.JobID] {
@@ -4937,13 +4902,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 	}
 
-	// Convert map to slice
-	signingResultProtos := make([]*pb.LeafRefundTxSigningResult, 0, len(leafSigningResults))
-	for _, result := range leafSigningResults {
-		signingResultProtos = append(signingResultProtos, result)
-	}
-
-	return &pb.ClaimTransferSignRefundsResponse{SigningResults: signingResultProtos}, nil
+	return &pb.ClaimTransferSignRefundsResponse{SigningResults: slices.Collect(maps.Values(leafSigningResults))}, nil
 }
 
 func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.TreeNode, cpfpJob *pb.SigningJob, directJob *pb.SigningJob, directFromCpfpJob *pb.SigningJob) (*helper.SigningJob, *helper.SigningJob, *helper.SigningJob, error) {

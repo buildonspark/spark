@@ -53,11 +53,8 @@ type SigningResult struct {
 }
 
 // MarshalProto marshals the signing result to a proto.
-func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
-	signingCommitments, err := collections.ConvertObjectMapToProtoMap(s.SigningCommitments)
-	if err != nil {
-		return nil, err
-	}
+func (s *SigningResult) MarshalProto() *pbspark.SigningResult {
+	signingCommitments := collections.ConvertObjectMapToProtoMap(s.SigningCommitments)
 
 	signingKeyshare := &pbspark.SigningKeyshare{
 		OwnerIdentifiers: s.KeyshareOwnerIdentifiers,
@@ -68,7 +65,7 @@ func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
 		SignatureShares:         s.SignatureShares,
 		PublicKeys:              s.PublicKeys,
 		SigningKeyshare:         signingKeyshare,
-	}, nil
+	}
 }
 
 type SparkServiceFrostSigner interface {
@@ -185,11 +182,11 @@ func frostRound2(
 		for i, job := range jobs {
 			commitments := make(map[so.Identifier]*pbcommon.SigningCommitment)
 			for operatorID, commitment := range commitmentsArray[i] {
-				commitments[operatorID], _ = commitment.MarshalProto()
+				commitments[operatorID] = commitment.MarshalProto()
 			}
 			var userCommitmentProto *pbcommon.SigningCommitment
 			if job.UserCommitment != nil {
-				userCommitmentProto, _ = job.UserCommitment.MarshalProto()
+				userCommitmentProto = job.UserCommitment.MarshalProto()
 			}
 			var adaptorPublicKeyBytes []byte
 			if job.AdaptorPublicKey != nil {

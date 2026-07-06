@@ -64,14 +64,10 @@ func SwapMapKeys[K1 comparable, K2 comparable, V any](m map[K1]map[K2]V) map[K2]
 }
 
 // ConvertObjectMapToProtoMap converts a map of V to a map of T, where V is a ProtoConvertable[T].
-func ConvertObjectMapToProtoMap[K comparable, V common.ProtoConvertable[T], T proto.Message](m map[K]V) (map[K]T, error) {
+func ConvertObjectMapToProtoMap[K comparable, V common.ProtoConvertable[T], T proto.Message](m map[K]V) map[K]T {
 	results := make(map[K]T, len(m))
 	for k, v := range m {
-		marshalled, err := v.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		results[k] = marshalled
+		results[k] = v.MarshalProto()
 	}
-	return results, nil
+	return results
 }

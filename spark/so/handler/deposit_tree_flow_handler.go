@@ -3,9 +3,11 @@ package handler
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -208,7 +210,7 @@ func (f *depositTreeCoordinatorFlow) BuildCommitPayload(ctx context.Context, res
 	// results from different SOs can be correlated by position.
 	signingResults := make([]*helper.SigningResult, len(f.signingJobs))
 	for i, job := range f.signingJobs {
-		jobKey := fmt.Sprintf("%d", i)
+		jobKey := strconv.Itoa(i)
 		shares, ok := allShares[jobKey]
 		if !ok {
 			return nil, fmt.Errorf("missing signature shares for job index %d", i)
@@ -375,24 +377,13 @@ func collectDepositSignatureShares(results map[string]*anypb.Any) (map[string]ma
 func buildDepositInternalSigningJobs(jobs []*helper.SigningJobWithPregeneratedNonce) ([]*pbinternal.SigningJob, error) {
 	result := make([]*pbinternal.SigningJob, len(jobs))
 	for i, job := range jobs {
-		commitments := make(map[string]*pbcommon.SigningCommitment, len(job.Round1Packages))
-		for id, c := range job.Round1Packages {
-			cp, err := c.MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal commitment for %s: %w", id, err)
-			}
-			commitments[id] = cp
-		}
+		commitments := collections.ConvertObjectMapToProtoMap(job.Round1Packages)
 		var userCommitments *pbcommon.SigningCommitment
 		if job.UserCommitment != nil {
-			uc, err := job.UserCommitment.MarshalProto()
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal user commitment: %w", err)
-			}
-			userCommitments = uc
+			userCommitments = job.UserCommitment.MarshalProto()
 		}
 		result[i] = &pbinternal.SigningJob{
-			JobId:           fmt.Sprintf("%d", i),
+			JobId:           strconv.Itoa(i),
 			Message:         job.Message.Serialize(),
 			KeyshareId:      job.SigningKeyshareID.String(),
 			VerifyingKey:    job.VerifyingKey.Serialize(),

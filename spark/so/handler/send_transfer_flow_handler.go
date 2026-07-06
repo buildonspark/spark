@@ -10,11 +10,11 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/sighash"
 	"github.com/lightsparkdev/spark/common/uuids"
-	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -485,21 +485,14 @@ func aggregateLeafSignature(
 		publicShares[id] = share
 	}
 
-	userCommitment, err := job.UserCommitment.MarshalProto()
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal user commitment: %w", err)
-	}
-	roundCommitments, err := marshalRoundCommitments(job.Round1Packages)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal round1 commitments: %w", err)
-	}
+	roundCommitments := collections.ConvertObjectMapToProtoMap(job.Round1Packages)
 	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            job.Message.Serialize(),
 		SignatureShares:    shares,
 		PublicShares:       publicShares,
 		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
 		Commitments:        roundCommitments,
-		UserCommitments:    userCommitment,
+		UserCommitments:    job.UserCommitment.MarshalProto(),
 		UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
 		UserSignatureShare: userSignatureShare,
 	})
@@ -510,10 +503,7 @@ func aggregateLeafSignature(
 	// KeyshareOwnerIdentifiers lists every owner of the keyshare (not just
 	// this job's t-of-n contributors) — matches signing_coordinator.go.
 	// Sorted for deterministic response bytes.
-	keyshareOwnerIdentifiers := make([]string, 0, len(keyPackage.GetPublicShares()))
-	for id := range keyPackage.GetPublicShares() {
-		keyshareOwnerIdentifiers = append(keyshareOwnerIdentifiers, id)
-	}
+	keyshareOwnerIdentifiers := slices.Collect(maps.Keys(keyPackage.GetPublicShares()))
 	slices.Sort(keyshareOwnerIdentifiers)
 	signingResult := &helper.SigningResult{
 		JobID:                    job.JobID,
@@ -896,22 +886,6 @@ func filterJobsForThisOperator(jobs []*pbinternal.SigningJob, identifier string)
 		}
 	}
 	return filtered
-}
-
-// marshalRoundCommitments converts the in-memory round1 commitments map to
-// the AggregateFrost RPC's proto shape. Errors are returned rather than
-// silently dropped — a missing entry would produce a malformed Commitments
-// map and a cryptic FROST-side failure later.
-func marshalRoundCommitments(round1 map[string]frost.SigningCommitment) (map[string]*pbcommon.SigningCommitment, error) {
-	out := make(map[string]*pbcommon.SigningCommitment, len(round1))
-	for id, c := range round1 {
-		m, err := c.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("marshal round1 commitment for %s: %w", id, err)
-		}
-		out[id] = m
-	}
-	return out, nil
 }
 
 // splitLeafSignatures fans out the commit payload's per-leaf signatures into
