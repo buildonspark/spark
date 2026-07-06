@@ -150,8 +150,6 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 // requireDirectTx=true) so participants could trust it; under 2PC Prepare is the
 // only createTransfer call site, so the check lives here on every SO.
 func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapPreparedState, error) {
-	// No knob here: Prepare is the participant path; transfer-less acceptance is
-	// deploy-gated, the public coordinator entrypoint holds the knob.
 	inputs, normErr := preimageSwapInputsFromRequest(req)
 	if normErr != nil {
 		return nil, normErr
@@ -907,9 +905,6 @@ func preloadLeavesForTransferPackage(ctx context.Context, pkg *pbspark.TransferP
 func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
-	}
-	if req.GetTransfer() == nil && knobs.GetKnobsService(ctx).GetValue(knobs.KnobAllowPreimageSwapWithoutTransfer, 0) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
 	}
 	inputs, normErr := preimageSwapInputsFromRequest(req)
 	if normErr != nil {

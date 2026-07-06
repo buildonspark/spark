@@ -223,13 +223,6 @@ const (
 	// ProvidePreimage, not in this flow — matching legacy.
 	KnobUseConsensusInitiatePreimageSwap = "spark.so.use_consensus_initiate_preimage_swap"
 
-	// KnobAllowPreimageSwapWithoutTransfer lets InitiatePreimageSwap requests omit
-	// the legacy `transfer` object and carry only `transfer_request`. Binary (any
-	// non-zero value enables). Read ONLY at the public coordinator entrypoints —
-	// participant/internal paths accept both shapes once deployed, so enabling
-	// does not require a coordinated knob flip on third-party SOs.
-	KnobAllowPreimageSwapWithoutTransfer = "spark.so.lightning.allow_preimage_swap_without_transfer"
-
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
