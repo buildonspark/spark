@@ -1164,8 +1164,6 @@ func (h *LightningHandler) GetPreimageShare(
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	// No knob here: this is the internal participant path; transfer-less
-	// acceptance is deploy-gated, the public coordinator entrypoints hold the knob.
 	inputs, normErr := preimageSwapInputsFromRequest(req)
 	if normErr != nil {
 		return nil, normErr
@@ -1717,10 +1715,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	phaseStart := time.Now()
 	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.validate", spanOpt)
 	validateErr := func() error {
-		if req.GetTransfer() == nil && knobs.GetKnobsService(validateCtx).GetValue(knobs.KnobAllowPreimageSwapWithoutTransfer, 0) == 0 {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
-		}
-
 		var err error
 		inputs, err = preimageSwapInputsFromRequest(req)
 		if err != nil {
