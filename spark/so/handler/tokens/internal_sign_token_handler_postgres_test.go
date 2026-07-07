@@ -577,6 +577,65 @@ func (s *internalSignTokenPostgresTestSetup) createCreateTransaction(
 	return tx
 }
 
+func TestSignAndPersistTokenTransaction_DuplicateSignedMint(t *testing.T) {
+	tests := []struct {
+		name         string
+		outputStatus st.TokenOutputStatus
+		wantErr      string
+	}{
+		{name: "returns stored signature when outputs are created signed", outputStatus: st.TokenOutputStatusCreatedSigned},
+		{name: "returns stored signature when outputs are created finalized", outputStatus: st.TokenOutputStatusCreatedFinalized},
+		{name: "rejects when outputs are created started", outputStatus: st.TokenOutputStatusCreatedStarted, wantErr: "found invalid outputs"},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setup := setUpInternalSignTokenTestHandlerPostgres(t)
+
+			mintTx, output := setup.createMintTransactionWithOutput(
+				hash32(byte(0x50+i)),
+				st.TokenTransactionStatusSigned,
+			)
+
+			storedSignature := ecdsa.Sign(
+				setup.handler.config.IdentityPrivateKey.ToBTCEC(),
+				mintTx.FinalizedTokenTransactionHash,
+			).Serialize()
+			_, err := setup.client.TokenTransaction.UpdateOneID(mintTx.ID).
+				SetOperatorSignature(storedSignature).
+				Save(setup.ctx)
+			require.NoError(t, err)
+
+			_, err = setup.client.TokenOutput.UpdateOneID(output.ID).
+				SetStatus(tt.outputStatus).
+				Save(setup.ctx)
+			require.NoError(t, err)
+
+			tx, err := setup.client.TokenTransaction.Query().
+				Where(tokentransaction.IDEQ(mintTx.ID)).
+				WithMint().
+				WithCreatedOutput().
+				Only(setup.ctx)
+			require.NoError(t, err)
+
+			signature, err := setup.handler.SignAndPersistTokenTransaction(
+				setup.ctx,
+				tx,
+				nil,
+				tx.FinalizedTokenTransactionHash,
+				nil,
+			)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, storedSignature, signature)
+		})
+	}
+}
+
 func TestExchangeRevocationSecretsShares_MintTransaction(t *testing.T) {
 	setup := setUpInternalSignTokenTestHandlerPostgres(t)
 
