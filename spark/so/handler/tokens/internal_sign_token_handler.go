@@ -139,13 +139,15 @@ func (h *InternalSignTokenHandler) regenerateOperatorSignatureForDuplicateReques
 	logger.Debug("Regenerating response for a duplicate SignTokenTransaction() Call")
 
 	var invalidOutputs []error
-	isMint := tokenTransaction.Edges.Mint != nil
-	expectedCreatedOutputStatus := st.TokenOutputStatusCreatedSigned
-	if isMint {
-		expectedCreatedOutputStatus = st.TokenOutputStatusCreatedFinalized
+	expectedCreatedOutputStatuses := []st.TokenOutputStatus{st.TokenOutputStatusCreatedSigned}
+	if tokenTransaction.Edges.Mint != nil {
+		// A mint's outputs stay CREATED_SIGNED until the transaction finalizes, so a
+		// retried sign fanout must accept them; CREATED_FINALIZED covers operators
+		// that already finalized before the duplicate request arrived.
+		expectedCreatedOutputStatuses = append(expectedCreatedOutputStatuses, st.TokenOutputStatusCreatedFinalized)
 	}
 
-	invalidOutputs = validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatus)
+	invalidOutputs = validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatuses...)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
 		invalidOutputs = append(invalidOutputs, validateInputStatuses(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
 	}
