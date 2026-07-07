@@ -42,8 +42,8 @@ type CounterSwapArgs struct {
 //     shortcut needs to be revisited: see [[REVISIT-MULTI-SENDER]] below.
 //   - Receiver arm uses edge-based predicates on transfer_receivers. Multiple
 //     receivers can advance independently of the parent transfer's status
-//     (e.g. one receiver COMPLETED while parent.status lags at
-//     RECEIVER_KEY_TWEAKED for other receivers). Only the edge table gives
+//     (e.g. one receiver COMPLETED while the parent stays at SENDER_KEY_TWEAKED
+//     under receiver-authoritative status). Only the edge table gives
 //     us correct per-receiver state.
 //
 // SENDER ARM SHAPE — per-status UNION ALL:

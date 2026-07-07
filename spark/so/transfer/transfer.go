@@ -24,13 +24,14 @@ func IsTransferSent(transfer *ent.Transfer) bool {
 	}
 }
 
-// MapTransferToReceiverStatus is the dual-write contract: given a
-// transfers.status, returns the transfer_receivers.status that should
-// hold for receivers in the pre-claim window. Used by:
-//   - the dual-write mismatch monitor (so/task) to detect drift
-//   - the SSP sync-transfer recovery path (so/handler) to create receiver
-//     rows in the right initial state when reconstructing a transfer
-//     from a remote SSP at a non-INITIATED status
+// MapTransferToReceiverStatus maps a transfers.status to the
+// transfer_receivers.status a receiver should hold at that point. Valid only
+// for single-receiver transfers: under receiver-authoritative status a
+// multi-receiver parent stays at SENDER_KEY_TWEAKED while its receivers advance
+// independently, so no receiver status is derivable from the parent. The sole
+// caller — the SSP sync-transfer recovery path (so/handler), which recreates a
+// receiver row when reconstructing a transfer from a remote SSP at a
+// non-INITIATED status — is single-receiver-only, so the mapping is valid there.
 //
 // Returns SenderInitiated as a conservative default for unknown values.
 func MapTransferToReceiverStatus(s st.TransferStatus) st.TransferReceiverStatus {
