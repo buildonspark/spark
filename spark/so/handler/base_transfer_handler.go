@@ -1603,6 +1603,21 @@ func rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx context.Context, tra
 	)
 }
 
+// isMimoReceiverStatusAuthoritative reports whether the per-receiver
+// transfer_receivers.status is the authoritative status source for this transfer:
+// the knob is on AND it has >1 receiver. When true, callers leave the parent
+// transfers.status at SENDER_KEY_TWEAKED instead of advancing it.
+func isMimoReceiverStatusAuthoritative(ctx context.Context, transfer *ent.Transfer) (bool, error) {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoAuthoritativeReceiverStatusEnabled, 0) == 0 {
+		return false, nil
+	}
+	count, err := transfer.QueryTransferReceivers().Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("unable to count transfer receivers for transfer %s: %w", transfer.ID, err)
+	}
+	return count > 1, nil
+}
+
 // loadSingleTransferReceiver loads the sole TransferReceiver for a transfer, if one exists.
 // Returns an error if the transfer has multiple receivers (legacy endpoints do not support MIMO).
 func (h *BaseTransferHandler) loadSingleTransferReceiverForUnsupportedMimoPath(ctx context.Context, transfer *ent.Transfer) (*ent.TransferReceiver, error) {

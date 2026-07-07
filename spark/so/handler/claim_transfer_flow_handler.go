@@ -699,9 +699,15 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	// often already at ReceiverRefundSigned (from a prior receiver's claim)
 	// while THIS receiver row is still at KeyTweakApplied — the receiver
 	// update must still fire so each receiver passes through RefundSigned
-	// before reaching Completed (matches legacy dual-write at
-	// transfer_handler.go:3645-3655).
-	if transferEnt.Status != st.TransferStatusReceiverRefundSigned &&
+	// before reaching Completed (matches the legacy claim path's dual-write).
+	// The parent advance is skipped when receiver status is authoritative —
+	// parent stays SenderKeyTweaked until COMPLETED.
+	isReceiverAuthoritative, authErr := isMimoReceiverStatusAuthoritative(ctx, transferEnt)
+	if authErr != nil {
+		return authErr
+	}
+	if !isReceiverAuthoritative &&
+		transferEnt.Status != st.TransferStatusReceiverRefundSigned &&
 		transferEnt.Status != st.TransferStatusCompleted {
 		if _, err := transferEnt.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx); err != nil {
 			return fmt.Errorf("unable to update transfer status to RECEIVER_REFUND_SIGNED for %s: %w", transferID, err)

@@ -73,6 +73,7 @@ knobs:
     spark.so.shutdown_hodl_invoices: 0
     # MIMO
     spark.so.mimo_transfer_multi_receiver_enabled: 1
+    spark.so.mimo_authoritative_receiver_status_enabled: 1
     # Tokens
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
