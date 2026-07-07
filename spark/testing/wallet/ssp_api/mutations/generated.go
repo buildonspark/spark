@@ -63,38 +63,6 @@ func (v *CompleteCoopExitResponse) GetCompleteCoopExit() CompleteCoopExitComplet
 	return v.CompleteCoopExit
 }
 
-// CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutput includes the requested fields of the GraphQL type CompleteLeavesSwapOutput.
-type CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutput struct {
-	Request CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutputRequestLeavesSwapRequest `json:"request"`
-}
-
-// GetRequest returns CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutput.Request, and is useful for accessing the field via an interface.
-func (v *CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutput) GetRequest() CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutputRequestLeavesSwapRequest {
-	return v.Request
-}
-
-// CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutputRequestLeavesSwapRequest includes the requested fields of the GraphQL type LeavesSwapRequest.
-type CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutputRequestLeavesSwapRequest struct {
-	// The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
-	Id string `json:"id"`
-}
-
-// GetId returns CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutputRequestLeavesSwapRequest.Id, and is useful for accessing the field via an interface.
-func (v *CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutputRequestLeavesSwapRequest) GetId() string {
-	return v.Id
-}
-
-// CompleteLeavesSwapResponse is returned by CompleteLeavesSwap on success.
-type CompleteLeavesSwapResponse struct {
-	// For spark users to complete a leaves swap.
-	CompleteLeavesSwap CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutput `json:"complete_leaves_swap"`
-}
-
-// GetCompleteLeavesSwap returns CompleteLeavesSwapResponse.CompleteLeavesSwap, and is useful for accessing the field via an interface.
-func (v *CompleteLeavesSwapResponse) GetCompleteLeavesSwap() CompleteLeavesSwapCompleteLeavesSwapCompleteLeavesSwapOutput {
-	return v.CompleteLeavesSwap
-}
-
 // CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput includes the requested fields of the GraphQL type CompleteSeedReleaseOutput.
 type CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput struct {
 	Seed string `json:"seed"`
@@ -138,6 +106,74 @@ const (
 	CurrencyUnitGBP CurrencyUnit = "GBP"
 	// Indian Rupee.
 	CurrencyUnitINR CurrencyUnit = "INR"
+	// Brazilian Real.
+	CurrencyUnitBRL CurrencyUnit = "BRL"
+	// Canadian Dollar.
+	CurrencyUnitCAD CurrencyUnit = "CAD"
+	// Danish Krone.
+	CurrencyUnitDKK CurrencyUnit = "DKK"
+	// Hong Kong Dollar.
+	CurrencyUnitHKD CurrencyUnit = "HKD"
+	// Indonesian Rupiah.
+	CurrencyUnitIDR CurrencyUnit = "IDR"
+	// Malaysian Ringgit.
+	CurrencyUnitMYR CurrencyUnit = "MYR"
+	// Singapore Dollar.
+	CurrencyUnitSGD CurrencyUnit = "SGD"
+	// Thai Baht.
+	CurrencyUnitTHB CurrencyUnit = "THB"
+	// Vietnamese Dong.
+	CurrencyUnitVND CurrencyUnit = "VND"
+	// Nigerian Naira.
+	CurrencyUnitNGN CurrencyUnit = "NGN"
+	// South African Rand.
+	CurrencyUnitZAR CurrencyUnit = "ZAR"
+	// Kenyan Shilling.
+	CurrencyUnitKES CurrencyUnit = "KES"
+	// Tanzanian Shilling.
+	CurrencyUnitTZS CurrencyUnit = "TZS"
+	// Ugandan Shilling.
+	CurrencyUnitUGX CurrencyUnit = "UGX"
+	// Botswana Pula.
+	CurrencyUnitBWP CurrencyUnit = "BWP"
+	// West African CFA Franc.
+	CurrencyUnitXOF CurrencyUnit = "XOF"
+	// Central African CFA Franc.
+	CurrencyUnitXAF CurrencyUnit = "XAF"
+	// Malawian Kwacha.
+	CurrencyUnitMWK CurrencyUnit = "MWK"
+	// Rwandan Franc.
+	CurrencyUnitRWF CurrencyUnit = "RWF"
+	// Zambian Kwacha.
+	CurrencyUnitZMW CurrencyUnit = "ZMW"
+	// United Arab Emirates Dirham.
+	CurrencyUnitAED CurrencyUnit = "AED"
+	// Bangladeshi Taka.
+	CurrencyUnitBDT CurrencyUnit = "BDT"
+	// Colombian Peso.
+	CurrencyUnitCOP CurrencyUnit = "COP"
+	// Egyptian Pound.
+	CurrencyUnitEGP CurrencyUnit = "EGP"
+	// Ghanaian Cedi.
+	CurrencyUnitGHS CurrencyUnit = "GHS"
+	// Guatemalan Quetzal.
+	CurrencyUnitGTQ CurrencyUnit = "GTQ"
+	// Haitian Gourde.
+	CurrencyUnitHTG CurrencyUnit = "HTG"
+	// Jamaican Dollar.
+	CurrencyUnitJMD CurrencyUnit = "JMD"
+	// Pakistani Rupee.
+	CurrencyUnitPKR CurrencyUnit = "PKR"
+	// Argentine Peso.
+	CurrencyUnitARS CurrencyUnit = "ARS"
+	// Chinese Yuan.
+	CurrencyUnitCNY CurrencyUnit = "CNY"
+	// Tether
+	CurrencyUnitUSDT CurrencyUnit = "USDT"
+	// USDC
+	CurrencyUnitUSDC CurrencyUnit = "USDC"
+	// USDB
+	CurrencyUnitUSDB CurrencyUnit = "USDB"
 	// 0.000000001 (10e-9) Bitcoin or a billionth of a Bitcoin. We recommend using the Satoshi unit instead when possible.
 	CurrencyUnitNANOBITCOIN CurrencyUnit = "NANOBITCOIN"
 	// 0.000001 (10e-6) Bitcoin or a millionth of a Bitcoin. We recommend using the Satoshi unit instead when possible.
@@ -156,6 +192,40 @@ var AllCurrencyUnit = []CurrencyUnit{
 	CurrencyUnitEUR,
 	CurrencyUnitGBP,
 	CurrencyUnitINR,
+	CurrencyUnitBRL,
+	CurrencyUnitCAD,
+	CurrencyUnitDKK,
+	CurrencyUnitHKD,
+	CurrencyUnitIDR,
+	CurrencyUnitMYR,
+	CurrencyUnitSGD,
+	CurrencyUnitTHB,
+	CurrencyUnitVND,
+	CurrencyUnitNGN,
+	CurrencyUnitZAR,
+	CurrencyUnitKES,
+	CurrencyUnitTZS,
+	CurrencyUnitUGX,
+	CurrencyUnitBWP,
+	CurrencyUnitXOF,
+	CurrencyUnitXAF,
+	CurrencyUnitMWK,
+	CurrencyUnitRWF,
+	CurrencyUnitZMW,
+	CurrencyUnitAED,
+	CurrencyUnitBDT,
+	CurrencyUnitCOP,
+	CurrencyUnitEGP,
+	CurrencyUnitGHS,
+	CurrencyUnitGTQ,
+	CurrencyUnitHTG,
+	CurrencyUnitJMD,
+	CurrencyUnitPKR,
+	CurrencyUnitARS,
+	CurrencyUnitCNY,
+	CurrencyUnitUSDT,
+	CurrencyUnitUSDC,
+	CurrencyUnitUSDB,
 	CurrencyUnitNANOBITCOIN,
 	CurrencyUnitMICROBITCOIN,
 	CurrencyUnitMILLIBITCOIN,
@@ -178,23 +248,35 @@ var AllExitSpeed = []ExitSpeed{
 type LightningSendRequestStatus string
 
 const (
-	LightningSendRequestStatusCREATED                   LightningSendRequestStatus = "CREATED"
-	LightningSendRequestStatusREQUESTVALIDATED          LightningSendRequestStatus = "REQUEST_VALIDATED"
-	LightningSendRequestStatusLIGHTNINGPAYMENTINITIATED LightningSendRequestStatus = "LIGHTNING_PAYMENT_INITIATED"
-	LightningSendRequestStatusLIGHTNINGPAYMENTFAILED    LightningSendRequestStatus = "LIGHTNING_PAYMENT_FAILED"
-	LightningSendRequestStatusLIGHTNINGPAYMENTSUCCEEDED LightningSendRequestStatus = "LIGHTNING_PAYMENT_SUCCEEDED"
-	LightningSendRequestStatusPREIMAGEPROVIDED          LightningSendRequestStatus = "PREIMAGE_PROVIDED"
-	LightningSendRequestStatusTRANSFERCOMPLETED         LightningSendRequestStatus = "TRANSFER_COMPLETED"
+	LightningSendRequestStatusCREATED                      LightningSendRequestStatus = "CREATED"
+	LightningSendRequestStatusUSERTRANSFERVALIDATIONFAILED LightningSendRequestStatus = "USER_TRANSFER_VALIDATION_FAILED"
+	LightningSendRequestStatusLIGHTNINGPAYMENTINITIATED    LightningSendRequestStatus = "LIGHTNING_PAYMENT_INITIATED"
+	LightningSendRequestStatusLIGHTNINGPAYMENTFAILED       LightningSendRequestStatus = "LIGHTNING_PAYMENT_FAILED"
+	LightningSendRequestStatusLIGHTNINGPAYMENTSUCCEEDED    LightningSendRequestStatus = "LIGHTNING_PAYMENT_SUCCEEDED"
+	LightningSendRequestStatusPREIMAGEPROVIDED             LightningSendRequestStatus = "PREIMAGE_PROVIDED"
+	LightningSendRequestStatusPREIMAGEPROVIDINGFAILED      LightningSendRequestStatus = "PREIMAGE_PROVIDING_FAILED"
+	LightningSendRequestStatusTRANSFERCOMPLETED            LightningSendRequestStatus = "TRANSFER_COMPLETED"
+	LightningSendRequestStatusTRANSFERFAILED               LightningSendRequestStatus = "TRANSFER_FAILED"
+	LightningSendRequestStatusPENDINGUSERSWAPRETURN        LightningSendRequestStatus = "PENDING_USER_SWAP_RETURN"
+	LightningSendRequestStatusUSERSWAPRETURNED             LightningSendRequestStatus = "USER_SWAP_RETURNED"
+	LightningSendRequestStatusUSERSWAPRETURNFAILED         LightningSendRequestStatus = "USER_SWAP_RETURN_FAILED"
+	LightningSendRequestStatusREQUESTVALIDATED             LightningSendRequestStatus = "REQUEST_VALIDATED"
 )
 
 var AllLightningSendRequestStatus = []LightningSendRequestStatus{
 	LightningSendRequestStatusCREATED,
-	LightningSendRequestStatusREQUESTVALIDATED,
+	LightningSendRequestStatusUSERTRANSFERVALIDATIONFAILED,
 	LightningSendRequestStatusLIGHTNINGPAYMENTINITIATED,
 	LightningSendRequestStatusLIGHTNINGPAYMENTFAILED,
 	LightningSendRequestStatusLIGHTNINGPAYMENTSUCCEEDED,
 	LightningSendRequestStatusPREIMAGEPROVIDED,
+	LightningSendRequestStatusPREIMAGEPROVIDINGFAILED,
 	LightningSendRequestStatusTRANSFERCOMPLETED,
+	LightningSendRequestStatusTRANSFERFAILED,
+	LightningSendRequestStatusPENDINGUSERSWAPRETURN,
+	LightningSendRequestStatusUSERSWAPRETURNED,
+	LightningSendRequestStatusUSERSWAPRETURNFAILED,
+	LightningSendRequestStatusREQUESTVALIDATED,
 }
 
 // NotifyReceiverTransferResponse is returned by NotifyReceiverTransfer on success.
@@ -301,67 +383,6 @@ type RequestCoopExitResponse struct {
 // GetRequestCoopExit returns RequestCoopExitResponse.RequestCoopExit, and is useful for accessing the field via an interface.
 func (v *RequestCoopExitResponse) GetRequestCoopExit() RequestCoopExitRequestCoopExitRequestCoopExitOutput {
 	return v.RequestCoopExit
-}
-
-// RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutput includes the requested fields of the GraphQL type RequestLeavesSwapOutput.
-type RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutput struct {
-	Request RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest `json:"request"`
-}
-
-// GetRequest returns RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutput.Request, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutput) GetRequest() RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest {
-	return v.Request
-}
-
-// RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest includes the requested fields of the GraphQL type LeavesSwapRequest.
-type RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest struct {
-	// The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
-	Id string `json:"id"`
-	// The swap leaves returned to the user
-	SwapLeaves []RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf `json:"swap_leaves"`
-}
-
-// GetId returns RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest.Id, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest) GetId() string {
-	return v.Id
-}
-
-// GetSwapLeaves returns RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest.SwapLeaves, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequest) GetSwapLeaves() []RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf {
-	return v.SwapLeaves
-}
-
-// RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf includes the requested fields of the GraphQL type SwapLeaf.
-type RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf struct {
-	LeafId                       uuid.UUID `json:"leaf_id"`
-	RawUnsignedRefundTransaction string    `json:"raw_unsigned_refund_transaction"`
-	AdaptorSignedSignature       string    `json:"adaptor_signed_signature"`
-}
-
-// GetLeafId returns RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf.LeafId, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf) GetLeafId() uuid.UUID {
-	return v.LeafId
-}
-
-// GetRawUnsignedRefundTransaction returns RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf.RawUnsignedRefundTransaction, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf) GetRawUnsignedRefundTransaction() string {
-	return v.RawUnsignedRefundTransaction
-}
-
-// GetAdaptorSignedSignature returns RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf.AdaptorSignedSignature, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutputRequestLeavesSwapRequestSwapLeavesSwapLeaf) GetAdaptorSignedSignature() string {
-	return v.AdaptorSignedSignature
-}
-
-// RequestLeavesSwapResponse is returned by RequestLeavesSwap on success.
-type RequestLeavesSwapResponse struct {
-	// For spark users to initiate a leaves swap.
-	RequestLeavesSwap RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutput `json:"request_leaves_swap"`
-}
-
-// GetRequestLeavesSwap returns RequestLeavesSwapResponse.RequestLeavesSwap, and is useful for accessing the field via an interface.
-func (v *RequestLeavesSwapResponse) GetRequestLeavesSwap() RequestLeavesSwapRequestLeavesSwapRequestLeavesSwapOutput {
-	return v.RequestLeavesSwap
 }
 
 // RequestLightningReceiveRequestLightningReceiveRequestLightningReceiveOutput includes the requested fields of the GraphQL type RequestLightningReceiveOutput.
@@ -518,25 +539,45 @@ func (v *RequestLightningSendResponse) GetRequestLightningSend() RequestLightnin
 type SparkCoopExitRequestStatus string
 
 const (
-	SparkCoopExitRequestStatusINITIATED                SparkCoopExitRequestStatus = "INITIATED"
-	SparkCoopExitRequestStatusINBOUNDTRANSFERCHECKED   SparkCoopExitRequestStatus = "INBOUND_TRANSFER_CHECKED"
-	SparkCoopExitRequestStatusTXSIGNED                 SparkCoopExitRequestStatus = "TX_SIGNED"
-	SparkCoopExitRequestStatusTXBROADCASTED            SparkCoopExitRequestStatus = "TX_BROADCASTED"
-	SparkCoopExitRequestStatusWAITINGONTXCONFIRMATIONS SparkCoopExitRequestStatus = "WAITING_ON_TX_CONFIRMATIONS"
-	SparkCoopExitRequestStatusSUCCEEDED                SparkCoopExitRequestStatus = "SUCCEEDED"
-	SparkCoopExitRequestStatusEXPIRED                  SparkCoopExitRequestStatus = "EXPIRED"
-	SparkCoopExitRequestStatusFAILED                   SparkCoopExitRequestStatus = "FAILED"
+	SparkCoopExitRequestStatusINITIATED                        SparkCoopExitRequestStatus = "INITIATED"
+	SparkCoopExitRequestStatusCOMPLETEREQUESTRECEIVED          SparkCoopExitRequestStatus = "COMPLETE_REQUEST_RECEIVED"
+	SparkCoopExitRequestStatusINBOUNDTRANSFERCHECKED           SparkCoopExitRequestStatus = "INBOUND_TRANSFER_CHECKED"
+	SparkCoopExitRequestStatusTXBROADCASTINGSCHEDULED          SparkCoopExitRequestStatus = "TX_BROADCASTING_SCHEDULED"
+	SparkCoopExitRequestStatusTXBROADCASTINGFAILED             SparkCoopExitRequestStatus = "TX_BROADCASTING_FAILED"
+	SparkCoopExitRequestStatusTXBROADCASTED                    SparkCoopExitRequestStatus = "TX_BROADCASTED"
+	SparkCoopExitRequestStatusONCHAINTXCONFIRMED               SparkCoopExitRequestStatus = "ON_CHAIN_TX_CONFIRMED"
+	SparkCoopExitRequestStatusINBOUNDTRANSFERCLAIMINGFAILED    SparkCoopExitRequestStatus = "INBOUND_TRANSFER_CLAIMING_FAILED"
+	SparkCoopExitRequestStatusSUCCEEDED                        SparkCoopExitRequestStatus = "SUCCEEDED"
+	SparkCoopExitRequestStatusEXPIRINGSCHEDULED                SparkCoopExitRequestStatus = "EXPIRING_SCHEDULED"
+	SparkCoopExitRequestStatusEXPIRINGFAILED                   SparkCoopExitRequestStatus = "EXPIRING_FAILED"
+	SparkCoopExitRequestStatusEXPIRED                          SparkCoopExitRequestStatus = "EXPIRED"
+	SparkCoopExitRequestStatusFAILINGSCHEDULED                 SparkCoopExitRequestStatus = "FAILING_SCHEDULED"
+	SparkCoopExitRequestStatusFAILINGFAILED                    SparkCoopExitRequestStatus = "FAILING_FAILED"
+	SparkCoopExitRequestStatusFAILED                           SparkCoopExitRequestStatus = "FAILED"
+	SparkCoopExitRequestStatusTXSIGNED                         SparkCoopExitRequestStatus = "TX_SIGNED"
+	SparkCoopExitRequestStatusWAITINGONTXCONFIRMATIONS         SparkCoopExitRequestStatus = "WAITING_ON_TX_CONFIRMATIONS"
+	SparkCoopExitRequestStatusINBOUNDTRANSFERCLAIMINGSCHEDULED SparkCoopExitRequestStatus = "INBOUND_TRANSFER_CLAIMING_SCHEDULED"
 )
 
 var AllSparkCoopExitRequestStatus = []SparkCoopExitRequestStatus{
 	SparkCoopExitRequestStatusINITIATED,
+	SparkCoopExitRequestStatusCOMPLETEREQUESTRECEIVED,
 	SparkCoopExitRequestStatusINBOUNDTRANSFERCHECKED,
-	SparkCoopExitRequestStatusTXSIGNED,
+	SparkCoopExitRequestStatusTXBROADCASTINGSCHEDULED,
+	SparkCoopExitRequestStatusTXBROADCASTINGFAILED,
 	SparkCoopExitRequestStatusTXBROADCASTED,
-	SparkCoopExitRequestStatusWAITINGONTXCONFIRMATIONS,
+	SparkCoopExitRequestStatusONCHAINTXCONFIRMED,
+	SparkCoopExitRequestStatusINBOUNDTRANSFERCLAIMINGFAILED,
 	SparkCoopExitRequestStatusSUCCEEDED,
+	SparkCoopExitRequestStatusEXPIRINGSCHEDULED,
+	SparkCoopExitRequestStatusEXPIRINGFAILED,
 	SparkCoopExitRequestStatusEXPIRED,
+	SparkCoopExitRequestStatusFAILINGSCHEDULED,
+	SparkCoopExitRequestStatusFAILINGFAILED,
 	SparkCoopExitRequestStatusFAILED,
+	SparkCoopExitRequestStatusTXSIGNED,
+	SparkCoopExitRequestStatusWAITINGONTXCONFIRMATIONS,
+	SparkCoopExitRequestStatusINBOUNDTRANSFERCLAIMINGSCHEDULED,
 }
 
 // StartReleaseSeedResponse is returned by StartReleaseSeed on success.
@@ -547,45 +588,6 @@ type StartReleaseSeedResponse struct {
 
 // GetStartSeedRelease returns StartReleaseSeedResponse.StartSeedRelease, and is useful for accessing the field via an interface.
 func (v *StartReleaseSeedResponse) GetStartSeedRelease() any { return v.StartSeedRelease }
-
-type UserLeafInput struct {
-	LeafId                                     uuid.UUID `json:"leaf_id"`
-	RawUnsignedRefundTransaction               string    `json:"raw_unsigned_refund_transaction"`
-	AdaptorAddedSignature                      string    `json:"adaptor_added_signature"`
-	DirectRawUnsignedRefundTransaction         string    `json:"direct_raw_unsigned_refund_transaction"`
-	DirectFromCpfpRawUnsignedRefundTransaction string    `json:"direct_from_cpfp_raw_unsigned_refund_transaction"`
-	DirectAdaptorAddedSignature                string    `json:"direct_adaptor_added_signature"`
-	DirectFromCpfpAdaptorAddedSignature        string    `json:"direct_from_cpfp_adaptor_added_signature"`
-}
-
-// GetLeafId returns UserLeafInput.LeafId, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetLeafId() uuid.UUID { return v.LeafId }
-
-// GetRawUnsignedRefundTransaction returns UserLeafInput.RawUnsignedRefundTransaction, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetRawUnsignedRefundTransaction() string {
-	return v.RawUnsignedRefundTransaction
-}
-
-// GetAdaptorAddedSignature returns UserLeafInput.AdaptorAddedSignature, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetAdaptorAddedSignature() string { return v.AdaptorAddedSignature }
-
-// GetDirectRawUnsignedRefundTransaction returns UserLeafInput.DirectRawUnsignedRefundTransaction, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetDirectRawUnsignedRefundTransaction() string {
-	return v.DirectRawUnsignedRefundTransaction
-}
-
-// GetDirectFromCpfpRawUnsignedRefundTransaction returns UserLeafInput.DirectFromCpfpRawUnsignedRefundTransaction, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetDirectFromCpfpRawUnsignedRefundTransaction() string {
-	return v.DirectFromCpfpRawUnsignedRefundTransaction
-}
-
-// GetDirectAdaptorAddedSignature returns UserLeafInput.DirectAdaptorAddedSignature, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetDirectAdaptorAddedSignature() string { return v.DirectAdaptorAddedSignature }
-
-// GetDirectFromCpfpAdaptorAddedSignature returns UserLeafInput.DirectFromCpfpAdaptorAddedSignature, and is useful for accessing the field via an interface.
-func (v *UserLeafInput) GetDirectFromCpfpAdaptorAddedSignature() string {
-	return v.DirectFromCpfpAdaptorAddedSignature
-}
 
 // WalletUserIdentityPublicKeyResponse is returned by WalletUserIdentityPublicKey on success.
 type WalletUserIdentityPublicKeyResponse struct {
@@ -621,24 +623,6 @@ func (v *__CompleteCoopExitInput) GetUserOutboundTransferExternalId() uuid.UUID 
 
 // GetCoopExitRequestId returns __CompleteCoopExitInput.CoopExitRequestId, and is useful for accessing the field via an interface.
 func (v *__CompleteCoopExitInput) GetCoopExitRequestId() string { return v.CoopExitRequestId }
-
-// __CompleteLeavesSwapInput is used internally by genqlient
-type __CompleteLeavesSwapInput struct {
-	AdaptorSecretKey               string    `json:"adaptor_secret_key"`
-	UserOutboundTransferExternalId uuid.UUID `json:"user_outbound_transfer_external_id"`
-	LeavesSwapRequestId            string    `json:"leaves_swap_request_id"`
-}
-
-// GetAdaptorSecretKey returns __CompleteLeavesSwapInput.AdaptorSecretKey, and is useful for accessing the field via an interface.
-func (v *__CompleteLeavesSwapInput) GetAdaptorSecretKey() string { return v.AdaptorSecretKey }
-
-// GetUserOutboundTransferExternalId returns __CompleteLeavesSwapInput.UserOutboundTransferExternalId, and is useful for accessing the field via an interface.
-func (v *__CompleteLeavesSwapInput) GetUserOutboundTransferExternalId() uuid.UUID {
-	return v.UserOutboundTransferExternalId
-}
-
-// GetLeavesSwapRequestId returns __CompleteLeavesSwapInput.LeavesSwapRequestId, and is useful for accessing the field via an interface.
-func (v *__CompleteLeavesSwapInput) GetLeavesSwapRequestId() string { return v.LeavesSwapRequestId }
 
 // __CompleteReleaseSeedInput is used internally by genqlient
 type __CompleteReleaseSeedInput struct {
@@ -683,34 +667,6 @@ func (v *__RequestCoopExitInput) GetIdempotencyKey() string { return v.Idempoten
 
 // GetExitSpeed returns __RequestCoopExitInput.ExitSpeed, and is useful for accessing the field via an interface.
 func (v *__RequestCoopExitInput) GetExitSpeed() ExitSpeed { return v.ExitSpeed }
-
-// __RequestLeavesSwapInput is used internally by genqlient
-type __RequestLeavesSwapInput struct {
-	AdaptorPubkey    string          `json:"adaptor_pubkey"`
-	TotalAmountSats  int64           `json:"total_amount_sats"`
-	TargetAmountSats int64           `json:"target_amount_sats"`
-	FeeSats          int64           `json:"fee_sats"`
-	UserLeaves       []UserLeafInput `json:"user_leaves"`
-	IdempotencyKey   string          `json:"idempotency_key"`
-}
-
-// GetAdaptorPubkey returns __RequestLeavesSwapInput.AdaptorPubkey, and is useful for accessing the field via an interface.
-func (v *__RequestLeavesSwapInput) GetAdaptorPubkey() string { return v.AdaptorPubkey }
-
-// GetTotalAmountSats returns __RequestLeavesSwapInput.TotalAmountSats, and is useful for accessing the field via an interface.
-func (v *__RequestLeavesSwapInput) GetTotalAmountSats() int64 { return v.TotalAmountSats }
-
-// GetTargetAmountSats returns __RequestLeavesSwapInput.TargetAmountSats, and is useful for accessing the field via an interface.
-func (v *__RequestLeavesSwapInput) GetTargetAmountSats() int64 { return v.TargetAmountSats }
-
-// GetFeeSats returns __RequestLeavesSwapInput.FeeSats, and is useful for accessing the field via an interface.
-func (v *__RequestLeavesSwapInput) GetFeeSats() int64 { return v.FeeSats }
-
-// GetUserLeaves returns __RequestLeavesSwapInput.UserLeaves, and is useful for accessing the field via an interface.
-func (v *__RequestLeavesSwapInput) GetUserLeaves() []UserLeafInput { return v.UserLeaves }
-
-// GetIdempotencyKey returns __RequestLeavesSwapInput.IdempotencyKey, and is useful for accessing the field via an interface.
-func (v *__RequestLeavesSwapInput) GetIdempotencyKey() string { return v.IdempotencyKey }
 
 // __RequestLightningReceiveInput is used internally by genqlient
 type __RequestLightningReceiveInput struct {
@@ -791,46 +747,6 @@ func CompleteCoopExit(
 	}
 
 	data_ = &CompleteCoopExitResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by CompleteLeavesSwap.
-const CompleteLeavesSwap_Operation = `
-mutation CompleteLeavesSwap ($adaptor_secret_key: String!, $user_outbound_transfer_external_id: UUID!, $leaves_swap_request_id: ID!) {
-	complete_leaves_swap(input: {adaptor_secret_key:$adaptor_secret_key,user_outbound_transfer_external_id:$user_outbound_transfer_external_id,leaves_swap_request_id:$leaves_swap_request_id}) {
-		request {
-			id
-		}
-	}
-}
-`
-
-func CompleteLeavesSwap(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	adaptor_secret_key string,
-	user_outbound_transfer_external_id uuid.UUID,
-	leaves_swap_request_id string,
-) (data_ *CompleteLeavesSwapResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "CompleteLeavesSwap",
-		Query:  CompleteLeavesSwap_Operation,
-		Variables: &__CompleteLeavesSwapInput{
-			AdaptorSecretKey:               adaptor_secret_key,
-			UserOutboundTransferExternalId: user_outbound_transfer_external_id,
-			LeavesSwapRequestId:            leaves_swap_request_id,
-		},
-	}
-
-	data_ = &CompleteLeavesSwapResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -952,57 +868,6 @@ func RequestCoopExit(
 	}
 
 	data_ = &RequestCoopExitResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by RequestLeavesSwap.
-const RequestLeavesSwap_Operation = `
-mutation RequestLeavesSwap ($adaptor_pubkey: PublicKey!, $total_amount_sats: Long!, $target_amount_sats: Long!, $fee_sats: Long!, $user_leaves: [UserLeafInput!]!, $idempotency_key: String!) {
-	request_leaves_swap(input: {adaptor_pubkey:$adaptor_pubkey,total_amount_sats:$total_amount_sats,target_amount_sats:$target_amount_sats,idempotency_key:$idempotency_key,fee_sats:$fee_sats,user_leaves:$user_leaves}) {
-		request {
-			id
-			swap_leaves {
-				leaf_id
-				raw_unsigned_refund_transaction
-				adaptor_signed_signature
-			}
-		}
-	}
-}
-`
-
-func RequestLeavesSwap(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	adaptor_pubkey string,
-	total_amount_sats int64,
-	target_amount_sats int64,
-	fee_sats int64,
-	user_leaves []UserLeafInput,
-	idempotency_key string,
-) (data_ *RequestLeavesSwapResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "RequestLeavesSwap",
-		Query:  RequestLeavesSwap_Operation,
-		Variables: &__RequestLeavesSwapInput{
-			AdaptorPubkey:    adaptor_pubkey,
-			TotalAmountSats:  total_amount_sats,
-			TargetAmountSats: target_amount_sats,
-			FeeSats:          fee_sats,
-			UserLeaves:       user_leaves,
-			IdempotencyKey:   idempotency_key,
-		},
-	}
-
-	data_ = &RequestLeavesSwapResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
