@@ -1795,6 +1795,11 @@ var (
 				Columns: []*schema.Column{TreeNodesColumns[7], TreeNodesColumns[5]},
 			},
 			{
+				Name:    "treenode_owner_identity_pubkey_status_network_id",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[7], TreeNodesColumns[5], TreeNodesColumns[4], TreeNodesColumns[0]},
+			},
+			{
 				Name:    "treenode_node_confirmation_height",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[10]},

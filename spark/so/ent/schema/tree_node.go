@@ -172,6 +172,9 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Edges("signing_keyshare"),
 		index.Fields("owner_identity_pubkey"),
 		index.Fields("owner_identity_pubkey", "status"),
+		// Trailing id serves query_nodes' ORDER BY id LIMIT n, so the planner
+		// never defects to a full backward pkey scan for rare-status owners.
+		index.Fields("owner_identity_pubkey", "status", "network", "id"),
 		index.Fields("node_confirmation_height"),
 		index.Fields("update_time"),
 		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
