@@ -51,65 +51,6 @@ func (s *TypedSparkServiceAPI) PayInvoice(ctx context.Context, invoice string) (
 	return response.RequestLightningSend.Request.Id, nil
 }
 
-type SwapLeaf struct {
-	LeafID                       string `json:"leaf_id"`
-	RawUnsignedRefundTransaction string `json:"raw_unsigned_refund_transaction"`
-	AdaptorAddedSignature        string `json:"adaptor_added_signature"`
-}
-
-func (s *TypedSparkServiceAPI) RequestLeavesSwap(
-	ctx context.Context,
-	adaptorPubkey string,
-	totalAmountSats int64,
-	targetAmountSats int64,
-	feeSats int64,
-	userLeaves []SwapLeaf,
-) (string, []SwapLeaf, error) {
-	idempotencyKey := uuid.NewString()
-	asLeafInput := make([]mutations.UserLeafInput, len(userLeaves))
-	for i, leaf := range userLeaves {
-		id, err := uuid.Parse(leaf.LeafID)
-		if err != nil {
-			return "", nil, err
-		}
-		asLeafInput[i] = mutations.UserLeafInput{
-			LeafId:                       id,
-			RawUnsignedRefundTransaction: leaf.RawUnsignedRefundTransaction,
-			AdaptorAddedSignature:        leaf.AdaptorAddedSignature,
-		}
-	}
-
-	response, err := mutations.RequestLeavesSwap(ctx, s.requester, adaptorPubkey, totalAmountSats, targetAmountSats, feeSats, asLeafInput, idempotencyKey)
-	if err != nil {
-		return "", nil, err
-	}
-	request := response.RequestLeavesSwap.Request
-	requestID := request.Id
-	leavesJSON := request.SwapLeaves
-	leaves := make([]SwapLeaf, len(leavesJSON))
-	for i, leaf := range leavesJSON {
-		leaves[i] = SwapLeaf{
-			LeafID:                       leaf.LeafId.String(),
-			RawUnsignedRefundTransaction: leaf.RawUnsignedRefundTransaction,
-			AdaptorAddedSignature:        leaf.AdaptorSignedSignature,
-		}
-	}
-	return requestID, leaves, nil
-}
-
-func (s *TypedSparkServiceAPI) CompleteLeavesSwap(
-	ctx context.Context,
-	adaptorSecretKey string,
-	userOutboundTransferExternalID uuid.UUID,
-	leavesSwapRequestID string,
-) (string, error) {
-	response, err := mutations.CompleteLeavesSwap(ctx, s.requester, adaptorSecretKey, userOutboundTransferExternalID, leavesSwapRequestID)
-	if err != nil {
-		return "", err
-	}
-	return response.CompleteLeavesSwap.Request.Id, nil
-}
-
 func (s *TypedSparkServiceAPI) InitiateCoopExit(
 	ctx context.Context,
 	leafExternalIDs []uuid.UUID,
