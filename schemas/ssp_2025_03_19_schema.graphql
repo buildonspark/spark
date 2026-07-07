@@ -157,6 +157,18 @@ type CompleteCoopExitOutput {
   request: CoopExitRequest!
 }
 
+input CompleteLeavesSwapInput {
+  adaptor_secret_key: String!
+  user_outbound_transfer_external_id: UUID!
+  leaves_swap_request_id: ID!
+  direct_adaptor_secret_key: String = null
+  direct_from_cpfp_adaptor_secret_key: String = null
+}
+
+type CompleteLeavesSwapOutput {
+  request: LeavesSwapRequest!
+}
+
 input CompleteStuckLeavesSwapInput {
   swap_request_id: UUID!
 }
@@ -801,6 +813,9 @@ type Mutation {
   """This API will broadcast the coop exit transaction."""
   complete_coop_exit(input: CompleteCoopExitInput!): CompleteCoopExitOutput!
 
+  """For spark users to complete a leaves swap."""
+  complete_leaves_swap(input: CompleteLeavesSwapInput!): CompleteLeavesSwapOutput!
+
   """For spark users to complete a stuck leaves swap."""
   complete_stuck_leaves_swap(input: CompleteStuckLeavesSwapInput!): CompleteStuckLeavesSwapOutput!
 
@@ -823,6 +838,9 @@ type Mutation {
 
   """For spark users to receive through lightning invoices."""
   request_lightning_receive(input: RequestLightningReceiveInput!): RequestLightningReceiveOutput!
+
+  """For spark users to initiate a leaves swap."""
+  request_leaves_swap(input: RequestLeavesSwapInput!): RequestLeavesSwapOutput!
 
   """For spark users to initiate a swap."""
   request_swap(input: RequestSwapInput!): RequestSwapOutput!
@@ -923,6 +941,22 @@ input RequestCoopExitInput {
 
 type RequestCoopExitOutput {
   request: CoopExitRequest!
+}
+
+input RequestLeavesSwapInput {
+  adaptor_pubkey: PublicKey!
+  total_amount_sats: Long!
+  target_amount_sats: Long!
+  fee_sats: Long!
+  user_leaves: [UserLeafInput!]!
+  idempotency_key: String!
+  target_amount_sats_list: [Long!] = null
+  direct_adaptor_pubkey: PublicKey = null
+  direct_from_cpfp_adaptor_pubkey: PublicKey = null
+}
+
+type RequestLeavesSwapOutput {
+  request: LeavesSwapRequest!
 }
 
 input RequestLightningReceiveInput {
