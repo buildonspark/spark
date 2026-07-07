@@ -84,6 +84,57 @@ func createParentAndRefundTx(t *testing.T, outputScript []byte, value int64) (pa
 	return parentTxBytes, refundTxBytes
 }
 
+// createParentAndRefundTxWithOutputs creates a parent transaction with a single
+// output and a refund transaction spending it whose outputs are exactly
+// refundOuts. This lets tests exercise arbitrary refund output shapes while
+// still satisfying the outpoint validation against the parent tx.
+func createParentAndRefundTxWithOutputs(
+	t *testing.T,
+	parentScript []byte,
+	parentValue int64,
+	refundOuts []*wire.TxOut,
+) (parentTxBytes []byte, refundTxBytes []byte) {
+	t.Helper()
+
+	parentTx := wire.NewMsgTx(2)
+	parentTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	parentTx.AddTxOut(&wire.TxOut{Value: parentValue, PkScript: parentScript})
+
+	parentTxBytes, err := common.SerializeTx(parentTx)
+	require.NoError(t, err)
+
+	refundTx := wire.NewMsgTx(2)
+	refundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	for _, out := range refundOuts {
+		refundTx.AddTxOut(out)
+	}
+
+	refundTxBytes, err = common.SerializeTx(refundTx)
+	require.NoError(t, err)
+
+	return parentTxBytes, refundTxBytes
+}
+
+func createParentAndRefundTxWithExtraOutput(
+	t *testing.T,
+	destinationScript []byte,
+	extraScript []byte,
+	destinationValue int64,
+	extraValue int64,
+) (parentTxBytes []byte, refundTxBytes []byte) {
+	t.Helper()
+	return createParentAndRefundTxWithOutputs(t, destinationScript, destinationValue+extraValue, []*wire.TxOut{
+		{Value: destinationValue, PkScript: destinationScript},
+		{Value: extraValue, PkScript: extraScript},
+	})
+}
+
 // mockFrostServiceClient implements the FrostServiceClient interface for testing
 type mockFrostServiceClient struct{}
 
@@ -2285,6 +2336,403 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	code, reason := sparkerrors.CodeAndReasonFrom(err)
 	require.Equal(t, codes.InvalidArgument, code)
 	require.Equal(t, "OUT_OF_RANGE", reason)
+}
+
+func TestValidateGetPreimageRequestRejectsExtraValueOutput(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{2})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHash := []byte("test_payment_hash_32_bytes_long_")
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": destinationPubKey}).
+		SetPublicKey(destinationPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeID := uuid.New()
+	destinationScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+	attackerScript, err := common.P2TRScriptFromPubKey(attackerPubKey)
+	require.NoError(t, err)
+
+	parentTx, refundTx := createParentAndRefundTxWithExtraOutput(t, destinationScript, attackerScript, 500, 500)
+
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(nodeID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetOwnerSigningPubkey(destinationPubKey).
+		SetRawTx(parentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	testTx := &pb.UserSignedTxSigningJob{
+		LeafId: nodeID.String(),
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"test": {
+					Hiding:  []byte("test_hiding"),
+					Binding: []byte("test_binding"),
+				},
+			},
+		},
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  []byte("test_nonce_hiding"),
+			Binding: []byte("test_nonce_binding"),
+		},
+		UserSignature: []byte("test_signature"),
+		RawTx:         refundTx,
+	}
+
+	err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+		ctx,
+		&mockFrostServiceClientConnection{},
+		paymentHash,
+		[]*pb.UserSignedTxSigningJob{testTx},
+		[]*pb.UserSignedTxSigningJob{},
+		[]*pb.UserSignedTxSigningJob{},
+		500,
+		destinationPubKey,
+		0,
+		pb.InitiatePreimageSwapRequest_REASON_SEND,
+		false,
+	)
+
+	require.ErrorContains(t, err, "unexpected extra cpfp tx output 1")
+	code, reason := sparkerrors.CodeAndReasonFrom(err)
+	require.Equal(t, codes.InvalidArgument, code)
+	require.Equal(t, "MALFORMED_FIELD", reason)
+}
+
+// TestValidateGetPreimageRequestOutputShapes exercises the refund output-shape
+// rules through the full request-validation path for each transaction type:
+// only the cpfp refund may carry a single trailing ephemeral anchor, and no
+// other extra outputs are ever allowed.
+func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{7})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHashBytes := sha256.Sum256([]byte("refund output shapes"))
+	paymentHash := paymentHashBytes[:]
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": destinationPubKey}).
+		SetPublicKey(destinationPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	destinationScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+	attackerScript, err := common.P2TRScriptFromPubKey(attackerPubKey)
+	require.NoError(t, err)
+
+	destinationOut := func() *wire.TxOut { return &wire.TxOut{Value: 500, PkScript: destinationScript} }
+	anchorScript := common.EphemeralAnchorOutput().PkScript
+
+	for _, tc := range []struct {
+		name       string
+		refundOuts []*wire.TxOut
+		target     string // which signing-job list carries the refund
+		wantErr    string // empty means the request must validate successfully
+	}{
+		{
+			name:       "cpfp allows single destination output without anchor",
+			refundOuts: []*wire.TxOut{destinationOut()},
+			target:     "cpfp",
+		},
+		{
+			name:       "cpfp allows trailing ephemeral anchor",
+			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
+			target:     "cpfp",
+		},
+		{
+			// A valid trailing anchor must not open the door to a further value output.
+			name:       "cpfp rejects value output after valid anchor",
+			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput(), {Value: 500, PkScript: attackerScript}},
+			target:     "cpfp",
+			wantErr:    "unexpected extra cpfp tx output 2",
+		},
+		{
+			// The anchor script alone is not enough; the value must also be zero.
+			name:       "cpfp rejects anchor script with nonzero value",
+			refundOuts: []*wire.TxOut{destinationOut(), {Value: 1, PkScript: anchorScript}},
+			target:     "cpfp",
+			wantErr:    "unexpected extra cpfp tx output 1",
+		},
+		{
+			name:       "cpfp rejects negative value output",
+			refundOuts: []*wire.TxOut{destinationOut(), {Value: -1, PkScript: attackerScript}},
+			target:     "cpfp",
+			wantErr:    "cpfp tx output 1 has negative value",
+		},
+		{
+			name:       "direct rejects ephemeral anchor",
+			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
+			target:     "direct",
+			wantErr:    "unexpected extra direct tx output 1",
+		},
+		{
+			name:       "direct from cpfp rejects ephemeral anchor",
+			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
+			target:     "directFromCpfp",
+			wantErr:    "unexpected extra direct from cpfp tx output 1",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeID := uuid.New()
+			// Setting both raw_tx (CPFP source) and direct_tx to parentTx lets the
+			// same refund satisfy the outpoint check on every path.
+			parentTx, refundTx := createParentAndRefundTxWithOutputs(t, destinationScript, 1000, tc.refundOuts)
+
+			_, err := tx.TreeNode.Create().
+				SetTree(tree).
+				SetNetwork(tree.Network).
+				SetID(nodeID).
+				SetValue(1000).
+				SetStatus(st.TreeNodeStatusAvailable).
+				SetVerifyingPubkey(verifyingPubKey).
+				SetOwnerIdentityPubkey(destinationPubKey).
+				SetOwnerSigningPubkey(destinationPubKey).
+				SetRawTx(parentTx).
+				SetDirectTx(parentTx).
+				SetVout(0).
+				SetSigningKeyshare(keyshare).
+				Save(ctx)
+			require.NoError(t, err)
+
+			testTx := &pb.UserSignedTxSigningJob{
+				LeafId: nodeID.String(),
+				SigningCommitments: &pb.SigningCommitments{
+					SigningCommitments: map[string]*pbcommon.SigningCommitment{
+						"test": {
+							Hiding:  []byte("test_hiding"),
+							Binding: []byte("test_binding"),
+						},
+					},
+				},
+				SigningNonceCommitment: &pbcommon.SigningCommitment{
+					Hiding:  []byte("test_nonce_hiding"),
+					Binding: []byte("test_nonce_binding"),
+				},
+				UserSignature: []byte("test_signature"),
+				RawTx:         refundTx,
+			}
+
+			empty := []*pb.UserSignedTxSigningJob{}
+			cpfp, direct, directFromCpfp := empty, empty, empty
+			switch tc.target {
+			case "cpfp":
+				cpfp = []*pb.UserSignedTxSigningJob{testTx}
+			case "direct":
+				direct = []*pb.UserSignedTxSigningJob{testTx}
+			case "directFromCpfp":
+				directFromCpfp = []*pb.UserSignedTxSigningJob{testTx}
+			default:
+				t.Fatalf("unknown target %q", tc.target)
+			}
+
+			err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+				ctx,
+				&mockFrostServiceClientConnection{},
+				paymentHash,
+				cpfp,
+				direct,
+				directFromCpfp,
+				500,
+				destinationPubKey,
+				0,
+				pb.InitiatePreimageSwapRequest_REASON_SEND,
+				false,
+			)
+
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErr)
+			code, reason := sparkerrors.CodeAndReasonFrom(err)
+			require.Equal(t, codes.InvalidArgument, code)
+			require.Equal(t, "MALFORMED_FIELD", reason)
+		})
+	}
+}
+
+// TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths is the
+// direct / direct-from-cpfp counterpart to
+// TestValidateGetPreimageRequestRejectsExtraValueOutput, exercising the full
+// request-validation path (not just the helper) for the two non-CPFP refund
+// types, which carry no ephemeral anchor and must have exactly one output.
+func TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{3})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHash := []byte("test_payment_hash_32_bytes_long_")
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": destinationPubKey}).
+		SetPublicKey(destinationPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeID := uuid.New()
+	destinationScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	require.NoError(t, err)
+	attackerScript, err := common.P2TRScriptFromPubKey(attackerPubKey)
+	require.NoError(t, err)
+
+	// The refund spends from parentTx; setting both raw_tx (CPFP source) and
+	// direct_tx to parentTx lets the same refund satisfy the outpoint check on
+	// both the direct and direct-from-cpfp paths.
+	parentTx, refundTx := createParentAndRefundTxWithExtraOutput(t, destinationScript, attackerScript, 500, 500)
+
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(nodeID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(destinationPubKey).
+		SetOwnerSigningPubkey(destinationPubKey).
+		SetRawTx(parentTx).
+		SetDirectTx(parentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	testTx := &pb.UserSignedTxSigningJob{
+		LeafId: nodeID.String(),
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"test": {
+					Hiding:  []byte("test_hiding"),
+					Binding: []byte("test_binding"),
+				},
+			},
+		},
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  []byte("test_nonce_hiding"),
+			Binding: []byte("test_nonce_binding"),
+		},
+		UserSignature: []byte("test_signature"),
+		RawTx:         refundTx,
+	}
+	empty := []*pb.UserSignedTxSigningJob{}
+
+	for _, tc := range []struct {
+		name           string
+		direct         []*pb.UserSignedTxSigningJob
+		directFromCpfp []*pb.UserSignedTxSigningJob
+		wantErr        string
+	}{
+		{
+			name:           "direct",
+			direct:         []*pb.UserSignedTxSigningJob{testTx},
+			directFromCpfp: empty,
+			wantErr:        "unexpected extra direct tx output 1",
+		},
+		{
+			name:           "direct from cpfp",
+			direct:         empty,
+			directFromCpfp: []*pb.UserSignedTxSigningJob{testTx},
+			wantErr:        "unexpected extra direct from cpfp tx output 1",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+				ctx,
+				&mockFrostServiceClientConnection{},
+				paymentHash,
+				empty,
+				tc.direct,
+				tc.directFromCpfp,
+				500,
+				destinationPubKey,
+				0,
+				pb.InitiatePreimageSwapRequest_REASON_SEND,
+				false,
+			)
+
+			require.ErrorContains(t, err, tc.wantErr)
+			code, reason := sparkerrors.CodeAndReasonFrom(err)
+			require.Equal(t, codes.InvalidArgument, code)
+			require.Equal(t, "MALFORMED_FIELD", reason)
+		})
+	}
 }
 
 func TestValidateGetPreimageRequestAllowsUnspecifiedInvoiceAmount(t *testing.T) {

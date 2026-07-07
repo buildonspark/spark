@@ -505,6 +505,42 @@ func (h *LightningHandler) ValidateGetPreimageRequest(
 	return h.validateGetPreimageRequestWithFrostServiceClientFactory(ctx, &defaultFrostServiceClientConnection{}, paymentHash, cpfpTransactions, directTransactions, directFromCpfpTransactions, invoiceAmountSats, destinationPubKey, feeSats, reason, validateNodeOwnership)
 }
 
+func validatePreimageSwapDestinationOutputs(
+	tx *wire.MsgTx,
+	destinationPubKey keys.Public,
+	allowEphemeralAnchor bool,
+	transactionType string,
+	leafID string,
+) (uint64, error) {
+	pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
+	if err != nil {
+		return 0, sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx for %s leaf_id: %s: %w", transactionType, leafID, err))
+	}
+	if len(tx.TxOut) == 0 {
+		return 0, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s tx vout out of bounds for leaf_id: %s", transactionType, leafID))
+	}
+	if !bytes.Equal(pubkeyScript, tx.TxOut[0].PkScript) {
+		return 0, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid %s destination pubkey for leaf_id: %s", transactionType, leafID))
+	}
+	outputValueSats, err := validateLightningRefundOutputValue(tx.TxOut[0].Value, transactionType, leafID)
+	if err != nil {
+		return 0, err
+	}
+
+	for i, output := range tx.TxOut[1:] {
+		outputIndex := i + 1
+		if output.Value < 0 {
+			return 0, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s tx output %d has negative value for leaf_id: %s", transactionType, outputIndex, leafID))
+		}
+		if allowEphemeralAnchor && outputIndex == 1 && common.IsEphemeralAnchorOutput(output) {
+			continue
+		}
+		return 0, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unexpected extra %s tx output %d for leaf_id: %s", transactionType, outputIndex, leafID))
+	}
+
+	return outputValueSats, nil
+}
+
 func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFactory(
 	ctx context.Context,
 	frostServiceClientConnection frostServiceClientConnection,
@@ -880,27 +916,21 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get cpfp refund tx: %w", err))
 		}
 
-		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
-		if err != nil {
-			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx: %w", err))
-		}
-		if len(cpfpRefundTx.TxOut) == 0 {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp tx vout out of bounds"))
-		}
-		if !bytes.Equal(pubkeyScript, cpfpRefundTx.TxOut[0].PkScript) {
-			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid cpfp destination pubkey"))
-		}
-		outputValueSats, err := validateLightningRefundOutputValue(cpfpRefundTx.TxOut[0].Value, "cpfp", cpfpTransaction.GetLeafId())
+		amountSats, err := validatePreimageSwapDestinationOutputs(cpfpRefundTx, destinationPubKey, true, "cpfp", cpfpTransaction.GetLeafId())
 		if err != nil {
 			return err
 		}
-		if outputValueSats > math.MaxUint64-totalAmountSats {
+		if amountSats > math.MaxUint64-totalAmountSats {
 			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("cpfp refund output amount overflow"))
 		}
-		totalAmountSats += outputValueSats
+		totalAmountSats += amountSats
 	}
 
-	// Validate direct transactions
+	// Validate direct transactions. Direct and direct-from-cpfp refunds are
+	// alternative spend paths for the same leaves as the cpfp refunds, so their
+	// amounts are intentionally not accumulated into totalAmountSats (that would
+	// double-count leaf value); only their destination and output shape are
+	// validated here.
 	for i := range directTransactions {
 		directTransaction := directTransactions[i]
 		directRefundTx, err := common.TxFromRawTxBytes(directTransaction.GetRawTx())
@@ -908,17 +938,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct refund tx for directTransaction leaf_id: %s: %w", directTransaction.GetLeafId(), err))
 		}
 
-		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
-		if err != nil {
-			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx for directTransaction leaf_id: %s: %w", directTransaction.GetLeafId(), err))
-		}
-		if len(directRefundTx.TxOut) == 0 {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct tx vout out of bounds for directTransaction leaf_id: %s", directTransaction.GetLeafId()))
-		}
-		if !bytes.Equal(pubkeyScript, directRefundTx.TxOut[0].PkScript) {
-			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid direct destination pubkey for directTransaction leaf_id: %s", directTransaction.GetLeafId()))
-		}
-		if _, err := validateLightningRefundOutputValue(directRefundTx.TxOut[0].Value, "direct", directTransaction.GetLeafId()); err != nil {
+		if _, err := validatePreimageSwapDestinationOutputs(directRefundTx, destinationPubKey, false, "direct", directTransaction.GetLeafId()); err != nil {
 			return err
 		}
 	}
@@ -931,17 +951,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.GetLeafId(), err))
 		}
 
-		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
-		if err != nil {
-			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("unable to extract pubkey from tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.GetLeafId(), err))
-		}
-		if len(directFromCpfpRefundTx.TxOut) == 0 {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp tx vout out of bounds for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.GetLeafId()))
-		}
-		if !bytes.Equal(pubkeyScript, directFromCpfpRefundTx.TxOut[0].PkScript) {
-			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid direct from cpfp destination pubkey for directFromCpfpTransaction leaf_id: %s", directFromCpfpTransaction.GetLeafId()))
-		}
-		if _, err := validateLightningRefundOutputValue(directFromCpfpRefundTx.TxOut[0].Value, "direct from cpfp", directFromCpfpTransaction.GetLeafId()); err != nil {
+		if _, err := validatePreimageSwapDestinationOutputs(directFromCpfpRefundTx, destinationPubKey, false, "direct from cpfp", directFromCpfpTransaction.GetLeafId()); err != nil {
 			return err
 		}
 	}
@@ -1532,6 +1542,12 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		// We are not building the refund maps for receive preimage swap for now, the transactions are created from SSP.
 		// TODO: we still need to build the refund transaction from the SSP here to validate.
+		// NOTE: until then, the transfer_package refund bytes returned here replace the
+		// req.Transfer refund txs (which ARE output-shape validated in
+		// ValidateGetPreimageRequest) without any validation of their outputs. These are
+		// HTLC-shaped txs built by the SSP, so the destination/output checks applied to
+		// req.Transfer cannot be reused as-is; reconstruct-and-compare (as done below for
+		// REASON_SEND) is the intended fix.
 		return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
 	}
 

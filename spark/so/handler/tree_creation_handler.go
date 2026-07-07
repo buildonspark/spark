@@ -218,8 +218,7 @@ func validateTreeCreationLeafNodeOutput(tx *wire.MsgTx, verifyingKey keys.Public
 	switch {
 	case len(tx.TxOut) == 1:
 	case allowEphemeralAnchor && len(tx.TxOut) == 2:
-		anchor := common.EphemeralAnchorOutput()
-		if tx.TxOut[1].Value != anchor.Value || !bytes.Equal(tx.TxOut[1].PkScript, anchor.PkScript) {
+		if !common.IsEphemeralAnchorOutput(tx.TxOut[1]) {
 			return fmt.Errorf("%s output 1 must be an ephemeral anchor output", txName)
 		}
 	case allowEphemeralAnchor:
@@ -302,8 +301,7 @@ func (h *TreeCreationHandler) getOwnedSigningKeyshareFromOutput(ctx context.Cont
 // script) is treated as a regular output and rejected by the prepared-address
 // and count checks.
 func splitTxOutputsWithoutEphemeralAnchor(tx *wire.MsgTx) []*wire.TxOut {
-	anchor := common.EphemeralAnchorOutput()
-	if last := len(tx.TxOut) - 1; last >= 0 && tx.TxOut[last].Value == anchor.Value && bytes.Equal(tx.TxOut[last].PkScript, anchor.PkScript) {
+	if last := len(tx.TxOut) - 1; last >= 0 && common.IsEphemeralAnchorOutput(tx.TxOut[last]) {
 		return tx.TxOut[:last]
 	}
 	return tx.TxOut
