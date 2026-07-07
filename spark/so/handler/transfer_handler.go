@@ -2778,10 +2778,11 @@ func buildPendingIDsQuerySender(args queryMIMOPendingArgs) (string, []any, error
 //
 // The sender_or_receiver path returns each transfer at most once thanks to two invariants:
 //
-//  1. PendingSenderStatuses() ∩ PendingReceiverStatuses() = ∅ — a single
-//     transfer's t.status / r.status pair (kept consistent by the dual-write
-//     contract from SP-2923 Phase 2b) matches at most one arm's status
-//     filter. Locked by TestPendingStatusesDisjoint in so/mimo.
+//  1. PendingSenderStatuses() ∩ PendingReceiverStatuses() = ∅ — while t.status
+//     is sender-pending, receivers are still INITIATED (not receiver-pending);
+//     the sender→receiver handoff flips t.status out of PendingSenderStatuses
+//     as it marks receivers RECEIVER_CLAIM_PENDING. So a transfer matches at
+//     most one arm's filter. Locked by TestPendingStatusesDisjoint in so/mimo.
 //
 //  2. UNIQUE(transfer_id, identity_pubkey) on transfer_receivers + the
 //     single-sender-per-transfer invariant (MIMO MVP) — at most one row per
@@ -3230,11 +3231,11 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 		}
 	}
 
-	// Revert transfer status to sender key tweaked and transfer receiver to
-	// RECEIVER_CLAIM_PENDING so the receiver can try to claim again. This
-	// matches the dual-write contract: when transfers.status =
-	// SENDER_KEY_TWEAKED, all transfer_receivers in the pre-claim window are
-	// in RECEIVER_CLAIM_PENDING.
+	// Revert this receiver to RECEIVER_CLAIM_PENDING so it can retry, and the
+	// parent to SENDER_KEY_TWEAKED. Only the passed-in receiver is touched —
+	// for multi-receiver the others advance independently on their own edge
+	// rows, and under receiver-authoritative status the parent never left
+	// SENDER_KEY_TWEAKED (its revert is then a no-op).
 	// MIMO - Dual write status changes
 	_, err := transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {

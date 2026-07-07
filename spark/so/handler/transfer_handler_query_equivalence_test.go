@@ -107,9 +107,11 @@ func (f *equivFixture) newPubkey() keys.Public {
 	return keys.MustGeneratePrivateKeyFromRand(f.rng).Public()
 }
 
-// pendingPair pairs a transfers.status with a transfer_receivers.status that
-// dual-write keeps consistent in production. Both legacy and MIMO consider
-// the resulting transfer pending, so they should return equivalent results.
+// pendingPair pairs a transfers.status with the transfer_receivers.status a
+// single-receiver transfer holds alongside it in production (the two move in
+// lockstep only for single-receiver — a multi-receiver parent stays at
+// SENDER_KEY_TWEAKED). Both legacy and MIMO consider the resulting transfer
+// pending, so they should return equivalent results.
 type pendingPair struct {
 	transferStatus st.TransferStatus
 	receiverStatus st.TransferReceiverStatus
@@ -120,12 +122,13 @@ type pendingPair struct {
 // the legacy and MIMO predicates. Each spans one of the 5 receiver-pending
 // statuses.
 //
-// Post-Phase-4 dual-write contract (SP-2923): a transfer at SENDER_KEY_TWEAKED
-// has its receiver(s) at RECEIVER_CLAIM_PENDING (sender done, receiver hasn't
-// started claim). Legacy queryTransfers picks this up via t.status; MIMO
-// picks it up via r.status. INITIATED is no longer in either path's pending
-// set — it's the pre-tweak state, where the sender hasn't finished its
-// handoff and the receiver cannot act.
+// These pairs model single-receiver transfers, where parent and receiver
+// status move in lockstep: e.g. at SENDER_KEY_TWEAKED the receiver is at
+// RECEIVER_CLAIM_PENDING (sender done, receiver hasn't started claim). Legacy
+// queryTransfers picks this up via t.status; MIMO via r.status. (A
+// multi-receiver parent stays at SENDER_KEY_TWEAKED while its receivers advance
+// independently.) INITIATED is in neither path's pending set — the pre-tweak
+// state, where the sender hasn't finished its handoff and the receiver cannot act.
 var pendingPairs = []pendingPair{
 	{st.TransferStatusSenderKeyTweaked, st.TransferReceiverStatusReceiverClaimPending},
 	{st.TransferStatusReceiverKeyTweaked, st.TransferReceiverStatusKeyTweaked},
