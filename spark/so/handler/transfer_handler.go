@@ -3873,10 +3873,15 @@ func (h *TransferHandler) claimTransferLegacy(ctx context.Context, req *pb.Claim
 		}
 	}
 
-	// MIMO - Dual write status changes
-	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx)
+	// MIMO - Dual write status changes (parent skipped when receiver status is authoritative)
+	isReceiverAuthoritative, err := isMimoReceiverStatusAuthoritative(ctx, transfer)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+		return nil, err
+	}
+	if !isReceiverAuthoritative {
+		if _, err = transfer.Update().SetStatus(st.TransferStatusReceiverRefundSigned).Save(ctx); err != nil {
+			return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+		}
 	}
 	if receiver != nil {
 		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusRefundSigned).Save(ctx)
@@ -4228,10 +4233,14 @@ func (h *TransferHandler) persistCoordinatorClaimKeyTweak(
 		}
 	}
 
-	// Transition transfer.Status from SenderKeyTweaked to ReceiverKeyTweaked.
-	// If a racing attempt already advanced past SKT this is a no-op; we
-	// don't want to clobber its progress.
-	if transfer.Status == st.TransferStatusSenderKeyTweaked {
+	// Skip the parent SenderKeyTweaked → ReceiverKeyTweaked advance when receiver
+	// status is authoritative (parent stays at SenderKeyTweaked). Otherwise, if a
+	// racing attempt already advanced past SKT this is a no-op; don't clobber it.
+	isReceiverAuthoritative, authErr := isMimoReceiverStatusAuthoritative(ctx, transfer)
+	if authErr != nil {
+		return authErr
+	}
+	if !isReceiverAuthoritative && transfer.Status == st.TransferStatusSenderKeyTweaked {
 		if _, err := transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx); err != nil {
 			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
 		}
@@ -4993,6 +5002,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
+	isReceiverAuthoritative, err := isMimoReceiverStatusAuthoritative(ctx, transfer)
+	if err != nil {
+		return err
+	}
+
 	// Read logic determined by MIMO receive state
 	if isMimoReceiveEnabled {
 		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
@@ -5118,8 +5132,8 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			}
 		}
 
-		// Update status to ReceiverKeyTweaked if coming from SenderKeyTweaked.
-		if transfer.Status == st.TransferStatusSenderKeyTweaked {
+		// Skipped when receiver status is authoritative — parent stays at SenderKeyTweaked.
+		if !isReceiverAuthoritative && transfer.Status == st.TransferStatusSenderKeyTweaked {
 			_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
@@ -5154,9 +5168,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	}
 
 	// update transfer and transfer receiver states to TweakLocked
-	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakLocked).Save(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+	// (parent skipped when receiver status is authoritative)
+	if !isReceiverAuthoritative {
+		if _, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakLocked).Save(ctx); err != nil {
+			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID, err)
+		}
 	}
 	if receiver != nil {
 		_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweakLocked).Save(ctx)
@@ -5359,10 +5375,15 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			}
 		}
 
-		// MIMO - Dual write status changes
-		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to update transfer status %v: %w", transferID, err)
+		// MIMO - Dual write status changes (parent skipped when receiver status is authoritative)
+		isReceiverAuthoritative, authErr := isMimoReceiverStatusAuthoritative(ctx, transfer)
+		if authErr != nil {
+			return authErr
+		}
+		if !isReceiverAuthoritative {
+			if _, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx); err != nil {
+				return fmt.Errorf("unable to update transfer status %v: %w", transferID, err)
+			}
 		}
 		if receiver != nil {
 			_, err = receiver.Update().SetStatus(st.TransferReceiverStatusKeyTweakApplied).Save(ctx)

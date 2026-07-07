@@ -1908,3 +1908,56 @@ func TestSettleReceiverKeyTweak_AcceptsReceiverClaimPendingOnRollback(t *testing
 	assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending, updated.Status,
 		"ROLLBACK on RECEIVER_CLAIM_PENDING is a no-op; status must not change")
 }
+
+// TestMimoReceiverStatusAuthoritative covers the gate that decides whether a
+// claim skips advancing the parent transfers.status: knob on AND receiver count > 1.
+// Tested directly because the gate is otherwise only reachable through the full
+// claim/settle crypto paths; the end-to-end "parent stays SENDER_KEY_TWEAKED until
+// the last receiver completes" behavior is exercised via scenario testing.
+func TestMimoReceiverStatusAuthoritative(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{77})
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	buildTransfer := func(numReceivers int) *ent.Transfer {
+		receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusSenderKeyTweaked)
+		for range numReceivers {
+			_, err := sessionCtx.Client.TransferReceiver.Create().
+				SetTransferID(transfer.ID).
+				SetIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+				SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+				SetTransferType(transfer.Type).
+				Save(ctx)
+			require.NoError(t, err)
+		}
+		return transfer
+	}
+
+	withKnobs := func(values map[string]float64) context.Context {
+		return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(values))
+	}
+	knobOn := map[string]float64{
+		knobs.KnobMimoTransferMultiReceiverEnabled:       1,
+		knobs.KnobMimoAuthoritativeReceiverStatusEnabled: 1,
+	}
+	knobOff := map[string]float64{
+		knobs.KnobMimoTransferMultiReceiverEnabled: 1,
+	}
+
+	t.Run("knob on, multi-receiver is receiver-authoritative", func(t *testing.T) {
+		got, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(2))
+		require.NoError(t, err)
+		assert.True(t, got)
+	})
+	t.Run("knob on, single-receiver is not authoritative", func(t *testing.T) {
+		got, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(1))
+		require.NoError(t, err)
+		assert.False(t, got)
+	})
+	t.Run("knob off, multi-receiver is not authoritative", func(t *testing.T) {
+		got, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOff), buildTransfer(2))
+		require.NoError(t, err)
+		assert.False(t, got)
+	})
+}
