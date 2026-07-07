@@ -15,9 +15,15 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 )
 
-// TODO: replace all other code to use this function to create the ephemeral anchor output.
 func EphemeralAnchorOutput() *wire.TxOut {
 	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
+}
+
+// IsEphemeralAnchorOutput reports whether out is exactly the canonical
+// zero-value ephemeral anchor output (matching both value and script).
+func IsEphemeralAnchorOutput(out *wire.TxOut) bool {
+	anchor := EphemeralAnchorOutput()
+	return out.Value == anchor.Value && bytes.Equal(out.PkScript, anchor.PkScript)
 }
 
 func MaybeApplyFee(amount int64) int64 {
