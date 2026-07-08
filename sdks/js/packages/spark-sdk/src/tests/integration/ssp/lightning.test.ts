@@ -5,7 +5,9 @@ import { type ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
   CurrencyUnit,
+  type LightningSendRequest,
   LightningReceiveRequestStatus,
+  LightningSendRequestStatus,
 } from "../../../types/index.js";
 import {
   decodeSparkAddress,
@@ -14,7 +16,11 @@ import {
 } from "../../../utils/address.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
-import { waitForBalance, waitForClaim } from "../../utils/utils.js";
+import {
+  retryUntilSuccess,
+  waitForBalance,
+  waitForClaim,
+} from "../../utils/utils.js";
 
 const DEPOSIT_AMOUNT = 10000n;
 const INVOICE_AMOUNT = 1000;
@@ -594,5 +600,108 @@ describe("Lightning Network provider", () => {
       const { balance: bobBalance } = await bob.getBalance();
       expect(bobBalance).toBe(BigInt(1000));
     }, 120_000);
+  });
+
+  // A Spark wallet paying another Spark wallet's locally-issued invoice is an
+  // "internal" payment: both legs live on this SSP. The SSP may serve it via the
+  // unified internal-payment state machine (when the sparkcore knob
+  // spark.ssp.internal_lightning_payment.state_machine.enabled is on) or via the
+  // legacy split send/receive flow (when off). This test asserts only the
+  // user-visible outcome — the receiver is paid and the sender's send request
+  // reaches TRANSFER_COMPLETED — so it must pass identically in both knob states.
+  //
+  // The sender-status assertion is the load-bearing part. The internal flow never
+  // advances the SparkLightningSendRequest row itself (the internal-payment row is
+  // the source of truth), so the send request's status must be *surfaced* from
+  // that row. Without that surfacing the send request sits at CREATED forever even
+  // after the payment settles, and this poll times out — which is exactly why the
+  // status surfacing must land before the knob is enabled. Internal COMPLETED and
+  // the legacy flow both map onto TRANSFER_COMPLETED, so the assertion is
+  // knob-agnostic.
+  describe("internal (Spark-to-Spark) lightning payment", () => {
+    it("pays a locally-issued Spark invoice; receiver is paid and sender request completes", async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+      const { wallet: bobWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+
+      // Fund Alice so she has leaves to pay with.
+      const depositAddress = await aliceWallet.getSingleUseDepositAddress();
+      const signedTx = await faucet.sendToAddress(
+        depositAddress,
+        DEPOSIT_AMOUNT,
+      );
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
+      await aliceWallet.claimDeposit(signedTx.id);
+      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
+
+      // Bob issues a locally-issued Spark invoice (SIGNING_OPERATOR_SWAP
+      // receive), which is what makes Alice's payment eligible for the internal
+      // flow.
+      const invoice = await bobWallet.createLightningInvoice({
+        amountSats: INVOICE_AMOUNT,
+        memo: "internal payment test",
+        expirySeconds: 500,
+      });
+      expect(invoice.status).toEqual(
+        LightningReceiveRequestStatus.INVOICE_CREATED,
+      );
+
+      // Register the receiver's claim listener before paying so we don't miss it.
+      // throwOnTimeout so a missing claim surfaces as a clear timeout rather than a
+      // misleading "expected 1000n, got 0n" balance assertion downstream.
+      const bobClaimed = waitForClaim({
+        wallet: bobWallet,
+        throwOnTimeout: true,
+      });
+
+      const payResult = await aliceWallet.payLightningInvoice({
+        invoice: invoice.invoice.encodedInvoice,
+        maxFeeSats: 100,
+      });
+
+      // Paying over Lightning (no preferSpark, no embedded spark invoice)
+      // returns the SparkLightningSendRequest, not a settled Spark WalletTransfer
+      // (which uniquely carries transferDirection).
+      expect("transferDirection" in payResult).toBe(false);
+      const sendRequest = payResult as LightningSendRequest;
+      expect(sendRequest.id).toBeDefined();
+
+      // Receiver leg: Bob is credited the invoice amount.
+      await bobClaimed;
+      const { balance: bobBalance } = await bobWallet.getBalance();
+      expect(bobBalance).toBe(BigInt(INVOICE_AMOUNT));
+
+      // Sender leg: the send request surfaces terminal success. TRANSFER_COMPLETED
+      // is reached by both the legacy flow and the internal flow, so this holds
+      // regardless of the knob.
+      const completed = await retryUntilSuccess(
+        async () => {
+          const req = await aliceWallet.getLightningSendRequest(sendRequest.id);
+          if (req?.status !== LightningSendRequestStatus.TRANSFER_COMPLETED) {
+            throw new Error(
+              `send request ${sendRequest.id} not complete yet: ${req?.status}`,
+            );
+          }
+          return req;
+        },
+        { maxAttempts: 30, delayMs: 2000 },
+      );
+      expect(completed.status).toEqual(
+        LightningSendRequestStatus.TRANSFER_COMPLETED,
+      );
+
+      // Sender was debited the payment amount (plus the SSP fee).
+      const { balance: aliceBalance } = await aliceWallet.getBalance();
+      expect(aliceBalance).toBeLessThan(
+        DEPOSIT_AMOUNT - BigInt(INVOICE_AMOUNT),
+      );
+    }, 180_000);
   });
 });
