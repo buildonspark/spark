@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
+	"github.com/lightsparkdev/spark/common/bolt11"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -53,7 +54,6 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
-	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -109,18 +109,11 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate share: %w", err))
 	}
 
-	bolt11, err := decodepay.Decodepay(req.GetInvoiceString())
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode invoice: %w", err))
-	}
-
-	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode payment hash: %w", err))
-	}
-
-	if !bytes.Equal(paymentHash, req.GetPaymentHash()) {
-		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("payment hash mismatch"))
+	if _, err := bolt11.Parse(req.GetInvoiceString(), req.GetPaymentHash()); err != nil {
+		if errors.Is(err, bolt11.ErrPaymentHashMismatch) {
+			return sparkerrors.FailedPreconditionHashMismatch(err)
+		}
+		return sparkerrors.InvalidArgumentMalformedField(err)
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -256,18 +249,11 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate share: %w", err))
 	}
 
-	bolt11, err := decodepay.Decodepay(req.GetInvoiceString())
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode invoice: %w", err))
-	}
-
-	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode payment hash: %w", err))
-	}
-
-	if !bytes.Equal(paymentHash, req.GetPaymentHash()) {
-		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("payment hash mismatch"))
+	if _, err := bolt11.Parse(req.GetInvoiceString(), req.GetPaymentHash()); err != nil {
+		if errors.Is(err, bolt11.ErrPaymentHashMismatch) {
+			return sparkerrors.FailedPreconditionHashMismatch(err)
+		}
+		return sparkerrors.InvalidArgumentMalformedField(err)
 	}
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -1230,12 +1216,12 @@ func (h *LightningHandler) GetPreimageShare(
 
 		invoiceAmount = req.GetInvoiceAmount()
 		if preimageShare != nil {
-			bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
+			storedInvoice, err := bolt11.Parse(preimageShare.InvoiceString, preimageShare.PaymentHash)
 			if err != nil {
-				return fmt.Errorf("unable to decode invoice: %w", err)
+				return fmt.Errorf("unable to validate stored invoice: %w", err)
 			}
 			invoiceAmount = &pbspark.InvoiceAmount{
-				ValueSats: uint64(bolt11.MSatoshi / 1000),
+				ValueSats: uint64(storedInvoice.MilliSatoshi() / 1000),
 				InvoiceAmountProof: &pbspark.InvoiceAmountProof{
 					Bolt11Invoice: preimageShare.InvoiceString,
 				},
@@ -1819,13 +1805,13 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 
 		invoiceAmount = req.GetInvoiceAmount()
 		if preimageShare != nil {
-			bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
+			storedInvoice, err := bolt11.Parse(preimageShare.InvoiceString, preimageShare.PaymentHash)
 			if err != nil {
-				return fmt.Errorf("unable to decode invoice: %w", err)
+				return fmt.Errorf("unable to validate stored invoice: %w", err)
 			}
-			if bolt11.MSatoshi > 0 {
+			if storedInvoice.MilliSatoshi() > 0 {
 				invoiceAmount = &pbspark.InvoiceAmount{
-					ValueSats: uint64(bolt11.MSatoshi / 1000),
+					ValueSats: uint64(storedInvoice.MilliSatoshi() / 1000),
 					InvoiceAmountProof: &pbspark.InvoiceAmountProof{
 						Bolt11Invoice: preimageShare.InvoiceString,
 					},

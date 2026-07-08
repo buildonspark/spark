@@ -1,16 +1,15 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	dbSql "database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	eciesgo "github.com/ecies/go/v2"
+	"github.com/lightsparkdev/spark/common/bolt11"
 	"github.com/lightsparkdev/spark/common/keys"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -21,7 +20,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -154,18 +152,11 @@ func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Reques
 		return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to validate share: %w", err))
 	}
 
-	bolt11, err := decodepay.Decodepay(req.GetInvoiceString())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode invoice: %w", err))
-	}
-
-	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to decode payment hash: %w", err))
-	}
-
-	if !bytes.Equal(paymentHash, req.GetPaymentHash()) {
-		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("payment hash mismatch"))
+	if _, err := bolt11.Parse(req.GetInvoiceString(), req.GetPaymentHash()); err != nil {
+		if errors.Is(err, bolt11.ErrPaymentHashMismatch) {
+			return nil, sparkerrors.FailedPreconditionHashMismatch(err)
+		}
+		return nil, sparkerrors.InvalidArgumentMalformedField(err)
 	}
 
 	return secretShare, nil
