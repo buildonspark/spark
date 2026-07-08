@@ -938,28 +938,6 @@ func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLe
 	return &pb.CounterLeafSwapResponse{Transfer: startTransferResponse.GetTransfer(), SigningResults: startTransferResponse.GetSigningResults()}, nil
 }
 
-// CounterLeafSwapV2 initiates a leaf swap for the other side, signing refunds with an adaptor public key.
-func (h *TransferHandler) CounterLeafSwapV2(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	adaptorPublicKey, err := keys.ParsePublicKey(req.GetAdaptorPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse adaptor public key: %w", err)
-	}
-
-	directAdaptorPublicKey, err := parsePublicKeyIfPresent(req.GetDirectAdaptorPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse direct adaptor public key: %w", err)
-	}
-	directFromCpfpAdaptorPublicKey, err := parsePublicKeyIfPresent(req.GetDirectFromCpfpAdaptorPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
-	}
-	startTransferResponse, err := h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start counter leaf swap for request %s: %w", logging.FormatProto("counter_leaf_swap_request", req), err)
-	}
-	return &pb.CounterLeafSwapResponse{Transfer: startTransferResponse.GetTransfer(), SigningResults: startTransferResponse.GetSigningResults()}, nil
-}
-
 func parsePublicKeyIfPresent(raw []byte) (keys.Public, error) {
 	if len(raw) == 0 {
 		return keys.Public{}, nil
