@@ -31,8 +31,7 @@ func TestScalarPolynomialBasic(t *testing.T) {
 		xScalar := curve.ScalarFromInt(x)
 		result := poly.Eval(xScalar)
 		if !result.Equals(secret) {
-			t.Errorf("Constant polynomial should return %s at x=%d, got %s",
-				secret.String(), x, result.String())
+			t.Errorf("Constant polynomial should return %s at x=%d, got %s", secret, x, result)
 		}
 	}
 }
@@ -64,8 +63,7 @@ func TestScalarPolynomialDegrees(t *testing.T) {
 		zero := curve.ScalarFromInt(0)
 		result := poly.Eval(zero)
 		if !result.Equals(secret) {
-			t.Errorf("P(0) should equal secret for degree %d, got %s",
-				degree, result.String())
+			t.Errorf("P(0) should equal secret for degree %d, got %s", degree, result)
 		}
 	}
 }
@@ -98,7 +96,7 @@ func TestManualScalarPolynomial(t *testing.T) {
 		result := poly.Eval(x)
 
 		if !result.Equals(expected) {
-			t.Errorf("P(%d) expected %d, got %s", tc.x, tc.expected, result.String())
+			t.Errorf("P(%d) expected %d, got %s", tc.x, tc.expected, result)
 		}
 	}
 }
@@ -158,8 +156,8 @@ func TestScalarLagrangeInterpolation(t *testing.T) {
 
 	if !reconstructed.Equals(secret) {
 		t.Errorf("Scalar Lagrange interpolation failed")
-		t.Errorf("Expected: %s", secret.String())
-		t.Errorf("Got: %s", reconstructed.String())
+		t.Errorf("Expected: %s", secret)
+		t.Errorf("Got: %s", reconstructed)
 	}
 }
 
@@ -217,8 +215,7 @@ func TestThresholdSecretSharing(t *testing.T) {
 		require.NoError(t, err)
 
 		if !reconstructed.Equals(secret) {
-			t.Errorf("Failed to reconstruct secret with shares %d-%d",
-				i+1, i+threshold)
+			t.Errorf("Failed to reconstruct secret with shares %d-%d", i+1, i+threshold)
 		}
 	}
 
@@ -281,21 +278,21 @@ func TestLagrangeBasis(t *testing.T) {
 	require.NoError(t, err)
 
 	expected0 := curve.ScalarFromInt(3)
-	assert.True(t, expected0.Equals(basis0), "L_0(0) expected 3, got %s", basis0.String())
+	assert.Truef(t, expected0.Equals(basis0), "L_0(0) expected 3, got %s", basis0)
 
 	// L_1(0) = (0-1)(0-3) / ((2-1)(2-3)) = 3/(-1) = -3
 	basis1, err := LagrangeBasisAt(xs, 1, curve.ScalarFromInt(0))
 	require.NoError(t, err)
 
 	expected1 := curve.ScalarFromInt(3).Neg()
-	assert.True(t, expected1.Equals(basis1), "L_1(0) expected -3, got %s", basis1.String())
+	assert.Truef(t, expected1.Equals(basis1), "L_1(0) expected -3, got %s", basis1)
 
 	// L_2(0) = (0-1)(0-2) / ((3-1)(3-2)) = 2/2 = 1
 	basis2, err := LagrangeBasisAt(xs, 2, curve.ScalarFromInt(0))
 	require.NoError(t, err)
 
 	expected2 := curve.ScalarFromInt(1)
-	assert.True(t, expected2.Equals(basis2), "L_2(0) expected 1, got %s", basis2.String())
+	assert.Truef(t, expected2.Equals(basis2), "L_2(0) expected 1, got %s", basis2)
 }
 
 // Test consistency between scalar and point polynomials
@@ -309,7 +306,7 @@ func TestScalarPointConsistency(t *testing.T) {
 
 	pointCoefs := make([]curve.Point, len(scalarCoefs))
 	for i, coef := range scalarCoefs {
-		pointCoefs[i] = (coef).Point()
+		pointCoefs[i] = coef.Point()
 	}
 
 	scalarPoly := &ScalarPolynomial{Coefs: scalarCoefs}

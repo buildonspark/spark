@@ -53,7 +53,7 @@ func resolveTypeStrings(types []pb.TransferType) ([]string, error) {
 	for _, t := range types {
 		schemaType, err := st.TransferTypeFromProto(t.String())
 		if err != nil {
-			return nil, fmt.Errorf("invalid transfer type %s: %w", t.String(), err)
+			return nil, fmt.Errorf("invalid transfer type %s: %w", t, err)
 		}
 		s := string(schemaType)
 		if _, dup := seen[s]; dup {

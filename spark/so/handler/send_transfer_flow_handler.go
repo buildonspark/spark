@@ -684,7 +684,7 @@ var sendTransferSigningJobNamespace = uuid.MustParse("3d6b8c2a-7a9e-4a8d-9b1c-0c
 //
 // txKind values: "cpfp", "direct", "directFromCpfp".
 func sendTransferJobID(transferID uuid.UUID, leafID string, txKind string) uuid.UUID {
-	return uuid.NewSHA1(sendTransferSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID.String(), leafID, txKind))
+	return uuid.NewSHA1(sendTransferSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID, leafID, txKind))
 }
 
 // sendTransferLeafSigningJobs holds the pre-built signing-job helpers for one

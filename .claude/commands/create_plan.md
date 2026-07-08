@@ -361,7 +361,7 @@ After structure approval:
 #### Automated Verification:
 - [ ] Database migration runs successfully: `make migrate`
 - [ ] All unit tests pass: `go test ./...`
-- [ ] No linting errors: `golangci-lint run`
+- [ ] No linting errors: `mise lint`
 - [ ] API endpoint returns 200: `curl localhost:8080/api/new-endpoint`
 
 #### Manual Verification:

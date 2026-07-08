@@ -173,7 +173,7 @@ func (h *SendGossipHandler) CreateCommitAndSendGossipMessage(ctx context.Context
 
 func (h *SendGossipHandler) SendGossipMessage(ctx context.Context, gossip *ent.Gossip) (*ent.Gossip, error) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Sending gossip message %s", gossip.ID.String())
+	logger.Sugar().Infof("Sending gossip message %s", gossip.ID)
 	bitMap := common.NewBitMapFromBytes(*gossip.Receipts, len(gossip.Participants))
 
 	message := &pbgossip.GossipMessage{}

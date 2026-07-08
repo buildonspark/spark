@@ -573,7 +573,7 @@ func parseCoopExitRequest(req *pb.CooperativeExitRequest) (parsedCoopExitRequest
 var coopExitSigningJobNamespace = uuid.MustParse("8f2a1d4c-3b6e-4c9a-8d7f-1e0b2c5a6d3e")
 
 func coopExitJobID(transferID uuid.UUID, leafID string, txKind string) uuid.UUID {
-	return uuid.NewSHA1(coopExitSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID.String(), leafID, txKind))
+	return uuid.NewSHA1(coopExitSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID, leafID, txKind))
 }
 
 // buildCoopExitAggregationJobs constructs the per-leaf signing-job helpers the

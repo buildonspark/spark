@@ -1595,7 +1595,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 			return nil, nil, nil, fmt.Errorf("failed to serialize tx: %w", err)
 		}
 		if !bytes.Equal(serializedCpfpTx.Bytes(), cpfpLeafRefundMap[leaf.GetLeafId()]) {
-			return nil, nil, nil, fmt.Errorf("cpfp leaf refund tx mismatch, expected: %s, got: %s", hex.EncodeToString(cpfpLeafRefundMap[leaf.GetLeafId()]), hex.EncodeToString(serializedCpfpTx.Bytes()))
+			return nil, nil, nil, fmt.Errorf("cpfp leaf refund tx mismatch, expected: %x, got: %x", cpfpLeafRefundMap[leaf.GetLeafId()], serializedCpfpTx.Bytes())
 		}
 
 		// Build direct cpfphtlc tx.
@@ -1609,7 +1609,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 			return nil, nil, nil, fmt.Errorf("failed to serialize tx: %w", err)
 		}
 		if !bytes.Equal(serializedDirectFromCpfpTx.Bytes(), directFromCpfpLeafRefundMap[leaf.GetLeafId()]) {
-			return nil, nil, nil, fmt.Errorf("direct from cpfp leaf refund tx mismatch, expected: %s, got: %s", hex.EncodeToString(directFromCpfpLeafRefundMap[leaf.GetLeafId()]), hex.EncodeToString(serializedDirectFromCpfpTx.Bytes()))
+			return nil, nil, nil, fmt.Errorf("direct from cpfp leaf refund tx mismatch, expected: %x, got: %x", directFromCpfpLeafRefundMap[leaf.GetLeafId()], serializedDirectFromCpfpTx.Bytes())
 		}
 
 		// Build direct htlc tx.
@@ -1630,7 +1630,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 				return nil, nil, nil, fmt.Errorf("failed to serialize tx: %w", err)
 			}
 			if !bytes.Equal(serializedDirectTx.Bytes(), directLeafRefundMap[leaf.GetLeafId()]) {
-				return nil, nil, nil, fmt.Errorf("direct leaf refund tx mismatch, expected: %s, got: %s", hex.EncodeToString(directLeafRefundMap[leaf.GetLeafId()]), hex.EncodeToString(serializedDirectTx.Bytes()))
+				return nil, nil, nil, fmt.Errorf("direct leaf refund tx mismatch, expected: %x, got: %x", directLeafRefundMap[leaf.GetLeafId()], serializedDirectTx.Bytes())
 			}
 		}
 	}

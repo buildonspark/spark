@@ -153,8 +153,8 @@ func TestIssueProtocolFull(t *testing.T) {
 	expectedShare := sharingPoly.Eval(issueShareArg)
 	if !sIssue.Equals(expectedShare) {
 		t.Errorf("Issued share is incorrect")
-		t.Errorf("Expected: %s", expectedShare.String())
-		t.Errorf("Got: %s", sIssue.String())
+		t.Errorf("Expected: %s", expectedShare)
+		t.Errorf("Got: %s", sIssue)
 	}
 
 	// Verify that the polynomial commitment is correct
@@ -180,10 +180,10 @@ func TestIssueProtocolFull(t *testing.T) {
 
 	if !reconstructedSecret.Equals(secret) {
 		t.Errorf("Reconstruction with new share failed")
-		t.Errorf("Expected secret: %s", secret.String())
-		t.Errorf("Reconstructed: %s", reconstructedSecret.String())
+		t.Errorf("Expected secret: %s", secret)
+		t.Errorf("Reconstructed: %s", reconstructedSecret)
 	}
 
 	t.Logf("Issue protocol completed successfully")
-	t.Logf("New party %s received valid share: %s", req.IssueIndex, sIssue.String())
+	t.Logf("New party %s received valid share: %s", req.IssueIndex, sIssue)
 }

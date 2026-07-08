@@ -93,7 +93,7 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 	newTotalSupply := new(big.Int).Add(currentSupply, mintAmount)
 	if newTotalSupply.Cmp(maxSupply) > 0 {
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
-			newTotalSupply.String(), maxSupply.String()))
+			newTotalSupply, maxSupply))
 	}
 
 	return nil

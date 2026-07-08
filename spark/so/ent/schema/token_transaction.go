@@ -279,7 +279,7 @@ func validateTransferTransactionBalanceWithOutputs(
 	for _, balance := range balances {
 		if balance.inputSum.Cmp(balance.outputSum) != 0 {
 			return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction %s in %s state: token %s inputs (%s) must equal outputs (%s)",
-				txID, txStatus, balance.displayIdentifier, balance.inputSum.String(), balance.outputSum.String()))
+				txID, txStatus, balance.displayIdentifier, balance.inputSum, balance.outputSum))
 		}
 	}
 

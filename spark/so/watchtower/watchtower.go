@@ -418,5 +418,5 @@ func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.C
 		))
 	}
 	logger.With(zap.Error(broadcastErr)).Sugar().Infof("Failed to broadcast refund txs for transfer leaf %s", transferLeaf.ID)
-	return fmt.Errorf("watchtower failed to broadcast refund txs for transfer leaf %s: %w", transferLeaf.ID.String(), broadcastErr)
+	return fmt.Errorf("watchtower failed to broadcast refund txs for transfer leaf %s: %w", transferLeaf.ID, broadcastErr)
 }

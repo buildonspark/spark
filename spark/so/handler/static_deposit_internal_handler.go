@@ -260,14 +260,14 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 
 	// A sanity check to ensure that the total amount is not greater than the utxo amount.
 	if totalAmount > targetUtxo.inner.Amount {
-		return nil, fmt.Errorf("static deposit claim total amount %d is greater than utxo amount %d for utxo %s:%d", totalAmount, targetUtxo.inner.Amount, targetUtxo.Hash().String(), targetUtxo.Vout())
+		return nil, fmt.Errorf("static deposit claim total amount %d is greater than utxo amount %d for utxo %s:%d", totalAmount, targetUtxo.inner.Amount, targetUtxo.Hash(), targetUtxo.Vout())
 	}
 
 	logger.Sugar().Infof(
 		"Creating UTXO swap record (request type fixed, transfer id %s, receiver identity %s, txid %s, vout %d, network %s, credit amount %d)",
 		transferID,
 		reqTransferReceiverIdentityPubKey,
-		targetUtxo.Hash().String(),
+		targetUtxo.Hash(),
 		targetUtxo.Vout(),
 		network,
 		totalAmount,
@@ -742,7 +742,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	logger.Sugar().Infof(
 		"Creating UTXO swap record (request type refund, public key %s, txid %s, vout %d, network %s, credit amount %d)",
 		depositAddress.OwnerIdentityPubkey,
-		targetUtxo.Hash().String(),
+		targetUtxo.Hash(),
 		targetUtxo.Vout(),
 		network,
 		totalAmount,

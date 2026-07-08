@@ -25,6 +25,7 @@ require (
 	github.com/fergusstrange/embedded-postgres v1.32.0
 	github.com/goccy/go-yaml v1.18.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/golangci/plugin-module-register v0.1.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/grafana/pyroscope-go v1.2.7
@@ -53,6 +54,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.52.0
 	golang.org/x/sync v0.20.0
+	golang.org/x/tools v0.44.0
 	k8s.io/api v0.33.3
 	k8s.io/apimachinery v0.33.3
 )
@@ -201,7 +203,6 @@ require (
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.44.0 // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect

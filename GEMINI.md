@@ -43,10 +43,9 @@ go test -v ./path/to/package
 
 ### Linting
 ```bash
-# Run Go linter
+# Run Go linter (builds/runs ./bin/golangci-lint-spark, which bundles the in-repo fmtlint plugin;
+# plain `golangci-lint run` can't load the plugin and will error)
 mise lint
-# OR
-golangci-lint run
 
 # To fix linter issues
 mise format

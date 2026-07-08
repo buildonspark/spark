@@ -403,7 +403,7 @@ func ValidateUtxoIsNotSpent(bitcoinClient *rpcclient.Client, txidHash chainhash.
 		return fmt.Errorf("failed to call gettxout: %w", err)
 	}
 	if txOut == nil {
-		return fmt.Errorf("utxo is spent on blockchain: %s:%d", txidHash.String(), vout)
+		return fmt.Errorf("utxo is spent on blockchain: %s:%d", txidHash, vout)
 	}
 	return nil
 }
@@ -946,7 +946,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, err
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %s:%d cancelled", utxoSwap.ID, targetUtxo.Hash().String(), targetUtxo.Vout)
+	logger.Sugar().Infof("UTXO swap %s for %s:%d cancelled", utxoSwap.ID, targetUtxo.Hash(), targetUtxo.Vout)
 	return &pbinternal.RollbackUtxoSwapResponse{}, nil
 }
 
@@ -1077,7 +1077,7 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 		return nil, err
 	}
 
-	logger.Sugar().Infof("UTXO swap %s for %x:%d set to %s", utxoSwap.ID, req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), req.GetRollbackToStatus().String())
+	logger.Sugar().Infof("UTXO swap %s for %x:%d set to %s", utxoSwap.ID, req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), req.GetRollbackToStatus())
 	return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
 }
 
@@ -1102,7 +1102,7 @@ func protoToSchemaUtxoSwapStatus(p pb.UtxoSwapStatus) (st.UtxoSwapStatus, error)
 	case pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED:
 		return st.UtxoSwapStatusCancelled, nil
 	default:
-		return "", fmt.Errorf("invalid utxo swap status: %s", p.String())
+		return "", fmt.Errorf("invalid utxo swap status: %s", p)
 	}
 }
 

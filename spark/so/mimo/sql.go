@@ -52,7 +52,7 @@ func AppendPendingCommonFilters(
 		for i, t := range types {
 			schemaType, err := st.TransferTypeFromProto(t.String())
 			if err != nil {
-				return nil, "", fmt.Errorf("invalid transfer type %s: %w", t.String(), err)
+				return nil, "", fmt.Errorf("invalid transfer type %s: %w", t, err)
 			}
 			typeStrs[i] = string(schemaType)
 		}

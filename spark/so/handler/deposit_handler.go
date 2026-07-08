@@ -348,7 +348,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		).
 		Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey.Serialize(), err)
+		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey, err)
 	}
 
 	// If a default static deposit address already exists, return it.
@@ -753,7 +753,7 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 		).
 		Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey.Serialize(), err)
+		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey, err)
 	}
 
 	// If no existing address, either create a new one or return an error based on the knob.
@@ -1468,7 +1468,7 @@ func VerifiedTargetUtxoFromRequest(ctx context.Context, config *so.Config, db *e
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.NotFoundMissingEntity(fmt.Errorf("utxo not found: txid: %s vout: %d", reqUtxoTxid.String(), reqUtxo.GetVout()))
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("utxo not found: txid: %s vout: %d", reqUtxoTxid, reqUtxo.GetVout()))
 		}
 		return nil, fmt.Errorf("failed to get target utxo: %w", err)
 	}
@@ -1814,7 +1814,7 @@ func (o *DepositHandler) GetUtxosForIdentity(ctx context.Context, req *pb.GetUtx
 
 	hasReadAccess, err := NewWalletSettingHandler(o.config).HasReadAccessToWallet(ctx, identityPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if viewer has read access to wallet %s: %w", identityPubKey.String(), err)
+		return nil, fmt.Errorf("failed to check if viewer has read access to wallet %s: %w", identityPubKey, err)
 	}
 	if !hasReadAccess {
 		return &pb.GetUtxosForIdentityResponse{

@@ -61,11 +61,11 @@ func validateStatuses(
 		if !slices.Contains(expectedStatuses, output.Status) {
 			var expectedDesc string
 			if len(expectedStatuses) == 1 {
-				expectedDesc = fmt.Sprintf("%s", expectedStatuses[0])
+				expectedDesc = string(expectedStatuses[0])
 			} else {
 				parts := make([]string, len(expectedStatuses))
 				for i, s := range expectedStatuses {
-					parts[i] = fmt.Sprintf("%s", s)
+					parts[i] = string(s)
 				}
 				expectedDesc = fmt.Sprintf("one of [%s]", strings.Join(parts, " or "))
 			}

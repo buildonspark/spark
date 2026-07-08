@@ -307,7 +307,7 @@ func scanChainUpdates(
 		return fmt.Errorf("failed to get block hash at height %d: %w", latestBlockHeight, err)
 	}
 	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
-	logger.Sugar().Infof("Latest chain tip height: %d, hash: %s", latestBlockHeight, latestBlockHash.String())
+	logger.Sugar().Infof("Latest chain tip height: %d, hash: %s", latestBlockHeight, latestBlockHash)
 
 	dbBlockHeight, err := dbClient.BlockHeight.Query().
 		Where(blockheight.NetworkEQ(network)).
@@ -335,7 +335,7 @@ func scanChainUpdates(
 			return fmt.Errorf("failed to parse stored block hash at height %d: %w", dbBlockHeight.Height, err)
 		}
 		dbChainTip = NewTip(dbBlockHeight.Height, *storedHash)
-		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from stored hash)", dbBlockHeight.Height, storedHash.String())
+		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from stored hash)", dbBlockHeight.Height, storedHash)
 	} else {
 		// Backwards compatibility: fetch from node if hash not stored yet.
 		// After the next block is processed, the hash will be stored.
@@ -344,7 +344,7 @@ func scanChainUpdates(
 			return fmt.Errorf("failed to get block hash at db height %d: %w", dbBlockHeight.Height, err)
 		}
 		dbChainTip = NewTip(dbBlockHeight.Height, *dbBlockHash)
-		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from node, no stored hash)", dbBlockHeight.Height, dbBlockHash.String())
+		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from node, no stored hash)", dbBlockHeight.Height, dbBlockHash)
 	}
 	difference, err := findDifference(dbChainTip, latestChainTip, bitcoinClient)
 	if err != nil {
@@ -530,14 +530,14 @@ func commitBlockTransactions(
 			logger.With(zap.Error(commitErr)).Sugar().Errorf(
 				"Main database commit failed after ephemeral commit at block height %d (hash %s); ephemeral and main DB state have diverged",
 				chainTip.Height,
-				chainTip.Hash.String(),
+				chainTip.Hash,
 			)
 			return errors.Join(
 				commitErr,
 				fmt.Errorf(
 					"ephemeral and main DB state have diverged after main database commit failure at block height %d (hash %s)",
 					chainTip.Height,
-					chainTip.Hash.String(),
+					chainTip.Hash,
 				),
 				errEphemeralMainDBDiverged,
 			)
@@ -1124,7 +1124,7 @@ func markDepositAsAvailable(
 	}
 	baseTxidHash := nodeTree.BaseTxid.Hash()
 	if _, ok := confirmedTxHashSet[baseTxidHash]; !ok {
-		logger.Sugar().Debugf("Base txid %s not found in confirmed txids", baseTxidHash.String())
+		logger.Sugar().Debugf("Base txid %s not found in confirmed txids", baseTxidHash)
 		for txid := range confirmedTxHashSet {
 			logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid))
 		}
