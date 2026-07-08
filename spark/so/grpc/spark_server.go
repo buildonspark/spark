@@ -210,11 +210,6 @@ func (s *SparkServer) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSw
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
-// CounterLeafSwapV2 starts the reverse side of a swap of leaves between two users.
-func (s *SparkServer) CounterLeafSwapV2(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
-}
-
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
 func (s *SparkServer) RefreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)

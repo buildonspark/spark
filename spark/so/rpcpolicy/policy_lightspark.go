@@ -35,7 +35,6 @@ func sparkSspInternalServicePolicies() map[string]Policy {
 		pbssp.SparkSspInternalService_QueryNodes_FullMethodName:                  unauthInternal,
 		pbssp.SparkSspInternalService_SyncTreeNodes_FullMethodName:               unauthInternal,
 		pbssp.SparkSspInternalService_SyncTreeNodesCoordinator_FullMethodName:    unauthInternal,
-		pbssp.SparkSspInternalService_CounterLeafSwapV2_FullMethodName:           unauthInternal,
 		pbssp.SparkSspInternalService_InitiateCounterTransfer_FullMethodName:     unauthInternal,
 		pbssp.SparkSspInternalService_QueryTransfers_FullMethodName:              unauthInternal,
 		pbssp.SparkSspInternalService_QueryStaticDepositAddresses_FullMethodName: unauthInternal,
