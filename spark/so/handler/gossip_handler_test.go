@@ -673,6 +673,20 @@ func TestClassifyConsensusOp(t *testing.T) {
 		SetOpType(opType).SetCoordinatorIndex(0).Save(ctx)
 	require.NoError(t, err)
 
+	participantCommitted := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(participantCommitted).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(opType).SetCoordinatorIndex(1).
+		SetStatus(st.FlowExecutionStatusCommitted).Save(ctx)
+	require.NoError(t, err)
+
+	participantRolledBack := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(participantRolledBack).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(opType).SetCoordinatorIndex(1).
+		SetStatus(st.FlowExecutionStatusRolledBack).Save(ctx)
+	require.NoError(t, err)
+
 	unknown := uuid.New()
 
 	cases := []struct {
@@ -684,6 +698,8 @@ func TestClassifyConsensusOp(t *testing.T) {
 		{"coordinator row -> skip echo", coordinator.String(), skipCoordinatorEcho},
 		{"no row -> skip foreign", unknown.String(), skipForeignOp},
 		{"empty id -> apply (pre-upgrade)", "", applyOp},
+		{"participant row committed -> skip terminal", participantCommitted.String(), skipAlreadyTerminal},
+		{"participant row rolled back -> skip terminal", participantRolledBack.String(), skipAlreadyTerminal},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -855,6 +871,70 @@ func TestRunConsensusRollback_AlreadyExists_MarksRowRolledBack(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, st.FlowExecutionStatusRolledBack, updated.Status,
 		"row must transition to ROLLED_BACK when the handler reports AlreadyExists")
+}
+
+// TestHandleGossipMessage_ConsensusRollback_RedeliveredAfterTerminal_DoesNotCancelNewerSwap
+// pins the terminal-row fence against the concrete hazard it exists for: the
+// static-deposit refund rollback payload is keyed by on_chain_utxo, which does
+// not discriminate between attempts. Once attempt A's swap is CANCELLED (freeing
+// the (utxo, status != CANCELLED) unique slot) and a retry B creates a fresh
+// swap for the same UTXO, a redelivered rollback from A must NOT reach the
+// handler — it would find, and cancel, B's active swap.
+func TestHandleGossipMessage_ConsensusRollback_RedeliveredAfterTerminal_DoesNotCancelNewerSwap(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client := sessionClient(t, ctx)
+
+	// Attempt A: its swap is already CANCELLED and its participant FlowExecution
+	// row is terminal — the state after A's rollback was first delivered.
+	cancelledSwap, utxo := createTestRefundUtxoSwap(t, ctx, st.UtxoSwapStatusCancelled)
+	flowA := uuid.New()
+	_, err := client.FlowExecution.Create().
+		SetID(flowA).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND)).
+		SetCoordinatorIndex(1).
+		SetStatus(st.FlowExecutionStatusRolledBack).Save(ctx)
+	require.NoError(t, err)
+
+	// Retry attempt B: a fresh CREATED swap for the same UTXO.
+	rng := rand.NewChaCha8([32]byte{3})
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	newerSwap, err := client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetUtxo(utxo).
+		SetUtxoValueSats(utxo.Amount).
+		SetRequestType(st.UtxoSwapRequestTypeRefund).
+		SetCreditAmountSats(utxo.Amount).
+		SetSspSignature([]byte("test_spend_tx_sighash")).
+		SetSspIdentityPublicKey(identityKey).
+		SetUserIdentityPublicKey(identityKey).
+		SetCoordinatorIdentityPublicKey(identityKey).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Redeliver attempt A's rollback gossip.
+	opAny, err := anypb.New(&pbinternal.StaticDepositUtxoRefundRollbackRequest{
+		OnChainUtxo: &pb.UTXO{Txid: utxo.Txid, Vout: utxo.Vout, Network: pb.Network_REGTEST},
+	})
+	require.NoError(t, err)
+	h := NewGossipHandler(sparktesting.TestConfig(t))
+	require.NoError(t, h.HandleGossipMessage(ctx, &pbgossip.GossipMessage{
+		MessageId: uuid.NewString(),
+		Message: &pbgossip.GossipMessage_ConsensusRollback{
+			ConsensusRollback: &pbgossip.GossipMessageConsensusRollback{
+				OpType:          pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND,
+				Operation:       opAny,
+				FlowExecutionId: flowA.String(),
+			},
+		},
+	}, false))
+
+	survivor, err := client.UtxoSwap.Get(ctx, newerSwap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCreated, survivor.Status,
+		"retry attempt's active swap must survive a redelivered rollback from the earlier attempt")
+	unchanged, err := client.UtxoSwap.Get(ctx, cancelledSwap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCancelled, unchanged.Status)
 }
 
 func TestConsensusRollbackFenceThroughGossip(t *testing.T) {

@@ -24,6 +24,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/staticdeposit"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
@@ -319,6 +320,12 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("on_chain_utxo is required"))
 	}
 
+	// Route through the 2PC consensus engine when enabled; otherwise fall through
+	// to the legacy create_static_deposit_utxo_refund fanout below.
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusStaticDepositUtxoRefund, 0) > 0 {
+		return o.initiateStaticDepositUtxoRefundConsensus(ctx, config, req)
+	}
+
 	logger.Sugar().Infof("Start InitiateStaticDepositUtxoRefund request for on-chain utxo %x:%d with coordinator %s", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), config.Identifier)
 
 	// Check if the swap is already completed for the caller
@@ -348,44 +355,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		return nil, err
 	}
 	if utxoSwap != nil {
-		// Once a static deposit has been refunded it can no longer be used in a
-		// swap and must be claimed on L1. The owner can sign multiple refund
-		// transactions after this point.
-		depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get deposit address: %w", err)
-		}
-		userIDPubKey := utxoSwap.UserIdentityPublicKey
-
-		if utxoSwap.Status == st.UtxoSwapStatusCompleted && utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund && userIDPubKey.Equals(depositAddress.OwnerIdentityPubkey) {
-			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
-				return nil, fmt.Errorf("utxo swap is already completed by another user")
-			}
-			if err := authz.EnforceWalletNotKillSwitched(ctx, userIDPubKey); err != nil {
-				return nil, err
-			}
-			spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.GetRefundTxSigningJob().GetRawTx())
-			if err != nil {
-				return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
-			}
-			// Refund retries may use a different transaction, for example to adjust
-			// fees, but each distinct transaction still needs a fresh user
-			// authorization because the sighash is part of the signed statement.
-			if err := validateUserSignature(depositAddress.OwnerIdentityPubkey, req.GetUserSignature(), spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, schemaNetwork, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.GetHashVariant()); err != nil {
-				return nil, fmt.Errorf("user signature validation failed: %w", err)
-			}
-			spendTxSigningResult, depositAddressQueryResult, err := getSpendTxSigningResultForVerifiedTargetUtxo(ctx, config, targetUtxo, req.GetRefundTxSigningJob())
-			if err != nil {
-				return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
-			}
-
-			return &pb.InitiateStaticDepositUtxoRefundResponse{
-				RefundTxSigningResult: spendTxSigningResult,
-				DepositAddress:        depositAddressQueryResult,
-			}, nil
-		}
-		logger.Sugar().Infof("utxo swap %x:%d is already registered (request type %s)", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), utxoSwap.RequestType)
-		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
+		return o.handleAlreadyRegisteredSwapOnRefund(ctx, config, utxoSwap, targetUtxo, schemaNetwork, req)
 	}
 
 	// **********************************************************************************************
@@ -440,6 +410,53 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		RefundTxSigningResult: spendTxSigningResult,
 		DepositAddress:        depositAddressQueryResult,
 	}, nil
+}
+
+// handleAlreadyRegisteredSwapOnRefund resolves a refund request against a UTXO
+// whose swap is already registered. Once a static deposit has been refunded it
+// can no longer be used in a swap and must be claimed on L1, but the owner may
+// sign additional refund transactions after that point (e.g. to adjust fees) —
+// so a COMPLETED refund swap owned by the caller is re-signed and returned,
+// while any other registered swap is a conflict. Shared by the legacy and
+// consensus (2PC) entrypoints so the re-sign semantics cannot drift between
+// them.
+func (o *StaticDepositHandler) handleAlreadyRegisteredSwapOnRefund(ctx context.Context, config *so.Config, utxoSwap *ent.UtxoSwap, targetUtxo *VerifiedTargetUtxo, schemaNetwork btcnetwork.Network, req *pb.InitiateStaticDepositUtxoRefundRequest) (*pb.InitiateStaticDepositUtxoRefundResponse, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+	depositAddress, err := targetUtxo.inner.QueryDepositAddress().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deposit address: %w", err)
+	}
+	userIDPubKey := utxoSwap.UserIdentityPublicKey
+
+	if utxoSwap.Status == st.UtxoSwapStatusCompleted && utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund && userIDPubKey.Equals(depositAddress.OwnerIdentityPubkey) {
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
+			return nil, fmt.Errorf("utxo swap is already completed by another user")
+		}
+		if err := authz.EnforceWalletNotKillSwitched(ctx, userIDPubKey); err != nil {
+			return nil, err
+		}
+		spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo.inner, req.GetRefundTxSigningJob().GetRawTx())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
+		}
+		// Refund retries may use a different transaction, for example to adjust
+		// fees, but each distinct transaction still needs a fresh user
+		// authorization because the sighash is part of the signed statement.
+		if err := validateUserSignature(depositAddress.OwnerIdentityPubkey, req.GetUserSignature(), spendTxSighash.Serialize(), pb.UtxoSwapRequestType_Refund, schemaNetwork, targetUtxo.Hash().String(), targetUtxo.Vout(), totalAmount, req.GetHashVariant()); err != nil {
+			return nil, fmt.Errorf("user signature validation failed: %w", err)
+		}
+		spendTxSigningResult, depositAddressQueryResult, err := getSpendTxSigningResultForVerifiedTargetUtxo(ctx, config, targetUtxo, req.GetRefundTxSigningJob())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
+		}
+
+		return &pb.InitiateStaticDepositUtxoRefundResponse{
+			RefundTxSigningResult: spendTxSigningResult,
+			DepositAddress:        depositAddressQueryResult,
+		}, nil
+	}
+	logger.Sugar().Infof("utxo swap %x:%d is already registered (request type %s)", req.GetOnChainUtxo().GetTxid(), req.GetOnChainUtxo().GetVout(), utxoSwap.RequestType)
+	return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 }
 
 // createUtxoSwapRefundWithRollback creates a UTXO swap refund and handles rollback on failure.

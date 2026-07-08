@@ -3,6 +3,8 @@ package consensus
 import (
 	"context"
 	"fmt"
+
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // engineCtxKey is a private, typed context key under which the per-process
@@ -27,4 +29,28 @@ func GetEngine(ctx context.Context) (*TwoPCEngine, error) {
 		return engine, nil
 	}
 	return nil, fmt.Errorf("no consensus engine in context (engine interceptor missing?)")
+}
+
+// coordinatorIdentityCtxKey carries the identity public key of the SO that is
+// coordinating the in-flight 2PC operation, resolved from the engine's
+// authenticated coordinator_index on the participant side (DispatchPrepare).
+type coordinatorIdentityCtxKey struct{}
+
+// WithCoordinatorIdentity attaches the coordinating SO's identity public key to
+// ctx. Participant Prepare handlers read it via CoordinatorIdentityFromContext to
+// record the coordinator on durable state without trusting a self-declared
+// payload field — the key is derived from the engine's coordinator_index, so it
+// is always a real signing operator.
+func WithCoordinatorIdentity(ctx context.Context, identityPublicKey keys.Public) context.Context {
+	return context.WithValue(ctx, coordinatorIdentityCtxKey{}, identityPublicKey)
+}
+
+// CoordinatorIdentityFromContext returns the coordinating SO's identity public
+// key attached by WithCoordinatorIdentity. The second return is false on the
+// coordinator's own self-Prepare path, which the engine invokes directly without
+// going through the ConsensusPrepare RPC (the running SO is the coordinator
+// there).
+func CoordinatorIdentityFromContext(ctx context.Context) (keys.Public, bool) {
+	identityPublicKey, ok := ctx.Value(coordinatorIdentityCtxKey{}).(keys.Public)
+	return identityPublicKey, ok
 }

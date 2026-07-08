@@ -46,6 +46,8 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 		return NewCoopExitFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP:
 		return NewInitiatePreimageSwapFlowHandler(config), nil
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND:
+		return NewStaticDepositUtxoRefundFlowHandler(config), nil
 	default:
 		return nil, fmt.Errorf("unknown consensus operation type: %d", opType)
 	}
@@ -57,10 +59,17 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 // with coordinatorIndex) so the reconciliation task can later query the
 // coordinator for the outcome if commit/rollback gossip is lost.
 //
-// When flowExecutionID is empty the caller is a pre-upgrade coordinator that
-// does not supply a row id yet; the handler dispatches as before and skips
-// the FlowExecution write. Once all coordinators populate the field this
-// branch becomes unreachable, but the skip keeps rollout compatible.
+// All coordinators have populated flowExecutionID and coordinatorIndex since
+// the April 2026 rollout (#6288/#6293), so every request is expected to carry
+// a resolvable coordinator_index and the validation below runs
+// unconditionally. The empty-flowExecutionID skip on the FlowExecution write
+// is a dormant leftover of that rollout, kept only as a harmless guard and
+// paired with classifyConsensusOp's empty-flow_execution_id branch
+// (gossip_handler.go) — remove both together. Do not gate coordinator_index
+// validation on it — a request could omit the row id to dodge validation, and
+// with no coordinator identity on ctx, flow handlers would fall back to
+// recording the receiving SO as coordinator, breaking the
+// participant-rows-never-record-self invariant.
 func (h *ConsensusHandler) DispatchPrepare(
 	ctx context.Context,
 	opType pbgossip.ConsensusOperationType,
@@ -76,6 +85,28 @@ func (h *ConsensusHandler) DispatchPrepare(
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal prepare request for op type %d: %w", opType, err)
 	}
+	// Resolve the coordinator's identity from the caller-declared index and attach
+	// it to ctx so flow handlers can record the coordinator on durable state
+	// without trusting a self-declared payload field. Fail closed: an index that
+	// does not resolve to a known operator rejects the Prepare rather than letting
+	// a flow handler silently proceed (or fall back to recording itself as
+	// coordinator). Note the index proves membership, not possession — the
+	// IP-restricted channel bounds callers to operators, but a misbehaving
+	// operator can still declare another operator's index; cross-checking against
+	// the authenticated peer identity is tracked as an engine-wide follow-up.
+	coordinator, err := h.config.GetOperatorByID(uint64(coordinatorIndex))
+	if err != nil {
+		return nil, fmt.Errorf("consensus prepare for op type %d declares unknown coordinator_index %d: %w", opType, coordinatorIndex, err)
+	}
+	// A coordinator runs its own Prepare locally inside the engine (twopc.go) and
+	// never sends ConsensusPrepare to itself, so a request naming the receiving SO
+	// as coordinator is always forged or misrouted. Rejecting it also keeps
+	// UtxoSwap.CoordinatorIdentityPublicKey == self impossible on participant rows,
+	// which the complete_utxo_swap sweep relies on to never touch consensus swaps.
+	if coordinator.Identifier == h.config.Identifier {
+		return nil, fmt.Errorf("consensus prepare for op type %d declares the receiving SO (coordinator_index %d) as coordinator; coordinators prepare locally and never call ConsensusPrepare on themselves", opType, coordinatorIndex)
+	}
+	ctx = consensus.WithCoordinatorIdentity(ctx, coordinator.IdentityPublicKey)
 	result, err := handler.Prepare(ctx, msg)
 	if err != nil {
 		return nil, err
