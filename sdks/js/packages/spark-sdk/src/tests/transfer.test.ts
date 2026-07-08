@@ -11,16 +11,22 @@ import { KeyDerivationType } from "../signer/types.js";
 import {
   BaseTransferService,
   TransferService,
+  isReceiverLegComplete,
+  scopeTransferLeavesToReceiver,
   type LeafRefundSigningData,
 } from "../services/transfer.js";
 import type { WalletConfigService } from "../services/config.js";
 import type { ConnectionManager } from "../services/connection/connection.js";
 import type { SigningService } from "../services/signing.js";
-import type {
-  LeafRefundTxSigningResult,
-  QueryTransfersResponse,
-  SigningResult as ProtoSigningResult,
+import {
+  Transfer,
+  TransferReceiverStatus,
+  TransferStatus,
+  type LeafRefundTxSigningResult,
+  type QueryTransfersResponse,
+  type SigningResult as ProtoSigningResult,
 } from "../proto/spark.js";
+import { SparkValidationError } from "../errors/index.js";
 import { getSigHashFromTx, getTxFromRawTxHex } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
 import { createInitialTimelockRefundTxs } from "../utils/transaction.js";
@@ -478,5 +484,164 @@ describe("transfer", () => {
       timeFilter: undefined,
       network: Network.REGTEST,
     });
+  });
+});
+
+describe("scopeTransferLeavesToReceiver", () => {
+  const ownPk = new Uint8Array(33).fill(0x11);
+  const otherPk = new Uint8Array(33).fill(0x22);
+
+  function multiReceiverTransfer() {
+    return Transfer.fromPartial({
+      id: "transfer-1",
+      receivers: [
+        { identityPublicKey: ownPk, id: "rid-own" },
+        { identityPublicKey: otherPk, id: "rid-other" },
+      ],
+      leaves: [
+        { leaf: { id: "leaf-a" }, transferReceiverId: "rid-own" },
+        { leaf: { id: "leaf-b" }, transferReceiverId: "rid-other" },
+        { leaf: { id: "leaf-c" }, transferReceiverId: "rid-own" },
+      ],
+    });
+  }
+
+  it("is a no-op for a single-receiver transfer", () => {
+    const transfer = Transfer.fromPartial({
+      id: "t",
+      receivers: [{ identityPublicKey: ownPk, id: "rid-own" }],
+      leaves: [
+        { leaf: { id: "leaf-a" }, transferReceiverId: "rid-own" },
+        { leaf: { id: "leaf-b" }, transferReceiverId: "rid-own" },
+      ],
+    });
+    expect(scopeTransferLeavesToReceiver(transfer, ownPk)).toBe(transfer);
+  });
+
+  it("is a no-op when there are no receiver edges (legacy)", () => {
+    const transfer = Transfer.fromPartial({
+      id: "t",
+      receivers: [],
+      leaves: [{ leaf: { id: "leaf-a" }, transferReceiverId: "" }],
+    });
+    expect(scopeTransferLeavesToReceiver(transfer, ownPk)).toBe(transfer);
+  });
+
+  it("narrows a multi-receiver transfer to the caller's own leaves", () => {
+    const scoped = scopeTransferLeavesToReceiver(
+      multiReceiverTransfer(),
+      ownPk,
+    );
+    expect(scoped.leaves.map((leaf) => leaf.leaf?.id)).toEqual([
+      "leaf-a",
+      "leaf-c",
+    ]);
+  });
+
+  it("throws when the caller is not a receiver of a multi-receiver transfer", () => {
+    const strangerPk = new Uint8Array(33).fill(0x33);
+    expect(() =>
+      scopeTransferLeavesToReceiver(multiReceiverTransfer(), strangerPk),
+    ).toThrow(SparkValidationError);
+  });
+
+  it("throws when the caller's receiver edge has no assigned leaves", () => {
+    const t = Transfer.fromPartial({
+      id: "transfer-1",
+      receivers: [
+        { identityPublicKey: ownPk, id: "rid-own" },
+        { identityPublicKey: otherPk, id: "rid-other" },
+      ],
+      leaves: [
+        { leaf: { id: "leaf-a" }, transferReceiverId: "rid-other" },
+        { leaf: { id: "leaf-b" }, transferReceiverId: "" },
+      ],
+    });
+    expect(() => scopeTransferLeavesToReceiver(t, ownPk)).toThrow(
+      SparkValidationError,
+    );
+  });
+});
+
+describe("isReceiverLegComplete", () => {
+  const ownPk = new Uint8Array(33).fill(0x11);
+  const otherPk = new Uint8Array(33).fill(0x22);
+
+  function makeTransfer(
+    wholeStatus: TransferStatus,
+    receivers: { pk: Uint8Array; status: TransferReceiverStatus }[],
+  ) {
+    return Transfer.fromPartial({
+      id: "t",
+      status: wholeStatus,
+      receivers: receivers.map((r) => ({
+        identityPublicKey: r.pk,
+        status: r.status,
+      })),
+    });
+  }
+
+  it("single-receiver uses the whole-transfer status", () => {
+    const done = makeTransfer(TransferStatus.TRANSFER_STATUS_COMPLETED, [
+      {
+        pk: ownPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED,
+      },
+    ]);
+    const pending = makeTransfer(
+      TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
+      [
+        {
+          pk: ownPk,
+          status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_COMPLETED,
+        },
+      ],
+    );
+    expect(isReceiverLegComplete(done, ownPk)).toBe(true);
+    expect(isReceiverLegComplete(pending, ownPk)).toBe(false);
+  });
+
+  it("multi-receiver keys off the caller's own edge status", () => {
+    const t = makeTransfer(TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED, [
+      {
+        pk: ownPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_COMPLETED,
+      },
+      {
+        pk: otherPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED,
+      },
+    ]);
+    expect(isReceiverLegComplete(t, ownPk)).toBe(true);
+    expect(isReceiverLegComplete(t, otherPk)).toBe(false);
+  });
+
+  it("multi-receiver falls back to the whole status as a safety net", () => {
+    const t = makeTransfer(TransferStatus.TRANSFER_STATUS_COMPLETED, [
+      {
+        pk: ownPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED,
+      },
+      {
+        pk: otherPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED,
+      },
+    ]);
+    expect(isReceiverLegComplete(t, ownPk)).toBe(true);
+  });
+
+  it("a non-receiver is not complete even when the whole transfer is COMPLETED", () => {
+    const strangerPk = new Uint8Array(33).fill(0x33);
+    const t = makeTransfer(TransferStatus.TRANSFER_STATUS_COMPLETED, [
+      {
+        pk: ownPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_COMPLETED,
+      },
+      {
+        pk: otherPk,
+        status: TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_KEY_TWEAKED,
+      },
+    ]);
+    expect(isReceiverLegComplete(t, strangerPk)).toBe(false);
   });
 });
