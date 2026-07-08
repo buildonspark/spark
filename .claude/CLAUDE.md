@@ -527,9 +527,8 @@ Run these commands from the Spark repository root:
 
 **Linting** (Required):
 ```bash
-mise lint
-# OR
-golangci-lint run
+mise lint   # builds/runs ./bin/golangci-lint-spark, which bundles the in-repo fmtlint plugin
+# NOTE: plain `golangci-lint run` can't load the fmtlint plugin and will error ("plugin not found"). Use `mise lint`.
 ```
 
 **Unit Tests** (Required):

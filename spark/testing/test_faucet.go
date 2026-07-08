@@ -134,10 +134,9 @@ func (f *Faucet) scanForSpendableUTXOs() ([]uTXO, int64, error) {
 		return nil, 0, err
 	}
 
-	descriptor := fmt.Sprintf("addr(%s)", miningAddress)
 	params := []json.RawMessage{
 		json.RawMessage(`"start"`),
-		json.RawMessage(fmt.Sprintf(`["%s"]`, descriptor)),
+		json.RawMessage(fmt.Sprintf(`["addr(%s)"]`, miningAddress)),
 	}
 
 	result, err := f.client.RawRequest("scantxoutset", params)

@@ -163,7 +163,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		grpcError, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, grpcError.Code())
-		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", testTxid2.String()), grpcError.Message())
+		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", testTxid2), grpcError.Message())
 
 		// Create UTXO with insufficient confirmations
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 2

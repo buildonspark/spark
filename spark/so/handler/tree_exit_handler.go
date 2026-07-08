@@ -157,7 +157,7 @@ func (h *treeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 		}
 		root, err := tree.GetRoot(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get root of tree %s: %w", tree.ID.String(), err)
+			return nil, fmt.Errorf("unable to get root of tree %s: %w", tree.ID, err)
 		}
 
 		cachedRootsMap[tree.ID] = &cachedRoot{
@@ -227,10 +227,10 @@ func validateExitTreeStillSignable(ctx context.Context, tree *ent.Tree) (*ent.Tr
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to reload tree %s before exit signing: %w", tree.ID.String(), err)
+		return nil, fmt.Errorf("unable to reload tree %s before exit signing: %w", tree.ID, err)
 	}
 	if latest.Status != st.TreeStatusAvailable {
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("tree %s is in status %s and is not eligible for exit signing", tree.ID.String(), latest.Status))
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("tree %s is in status %s and is not eligible for exit signing", tree.ID, latest.Status))
 	}
 	return latest, nil
 }

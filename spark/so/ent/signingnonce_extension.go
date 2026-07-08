@@ -456,12 +456,12 @@ func PurgeAndCreateSigningNoncePartitions(
 		// future partitions and expected to be empty, so validation is fast.
 		attachQuery := fmt.Sprintf(
 			"ALTER TABLE signing_nonces ATTACH PARTITION %s FOR VALUES FROM ('%s') TO ('%s')",
-			pq.QuoteIdentifier(partitionName), fromUUID.String(), toUUID.String(),
+			pq.QuoteIdentifier(partitionName), fromUUID, toUUID,
 		)
 		if _, err = db.ExecContext(ctx, attachQuery); err != nil {
 			logging.GetLoggerFromContext(ctx).With(zap.Error(err)).Sugar().Errorf(
 				"failed to attach partition %s for date %s (FROM '%s' TO '%s')",
-				partitionName, dateStr, fromUUID.String(), toUUID.String(),
+				partitionName, dateStr, fromUUID, toUUID,
 			)
 			// Best-effort cleanup only for tables created in this run, to avoid creating
 			// a new orphan that blocks future partition management.
@@ -479,7 +479,7 @@ func PurgeAndCreateSigningNoncePartitions(
 
 		logging.GetLoggerFromContext(ctx).Sugar().Infof(
 			"created and attached signing_nonces partition %s for date %s (FROM '%s' TO '%s')",
-			partitionName, dateStr, fromUUID.String(), toUUID.String(),
+			partitionName, dateStr, fromUUID, toUUID,
 		)
 	}
 

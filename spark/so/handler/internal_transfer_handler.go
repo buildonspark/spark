@@ -776,7 +776,7 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 			nodeTx, err = common.TxFromRawTxBytes(leaf.RawTx)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID, err)
 		}
 		nodeOutPoint, nodeTxOut, err := getNodeTxOutputForRefundVerification(nodeTx, leaf.ID.String())
 		if err != nil {
@@ -784,7 +784,7 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 		}
 		updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, adaptorPublicKey, nodeOutPoint, nodeTxOut, leaf.VerifyingPubkey)
 		if err != nil {
-			return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID, err)
 		}
 		resultMap[leafID] = updatedTx
 	}
@@ -1027,7 +1027,7 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 			nodeTx, err = common.TxFromRawTxBytes(leaf.RawTx)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID, err)
 		}
 		nodeOutPoint, nodeTxOut, err := getNodeTxOutputForRefundVerification(nodeTx, leaf.ID.String())
 		if err != nil {
@@ -1036,25 +1036,25 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 
 		refundTx, err := common.TxFromRawTxBytes(leafRefund)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse refund tx for tree node %s: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("unable to parse refund tx for tree node %s: %w", leaf.ID, err)
 		}
 		if err := validateRefundInputCountForConnector(refundTx, connectorPrevOuts, "coop-exit"); err != nil {
-			return nil, fmt.Errorf("invalid refund tx for tree node %s: %w", leaf.ID.String(), err)
+			return nil, fmt.Errorf("invalid refund tx for tree node %s: %w", leaf.ID, err)
 		}
 
 		if len(refundTx.TxIn) > 1 && connectorPrevOuts != nil {
 			// Multi-input refund tx with connector: apply signature and verify with multi-input
 			updatedTx, err := common.UpdateTxWithSignature(leafRefund, 0, signature)
 			if err != nil {
-				return nil, fmt.Errorf("unable to update tx signature for tree node %s: %w", leaf.ID.String(), err)
+				return nil, fmt.Errorf("unable to update tx signature for tree node %s: %w", leaf.ID, err)
 			}
 
 			signedTx, err := common.TxFromRawTxBytes(updatedTx)
 			if err != nil {
-				return nil, fmt.Errorf("unable to deserialize signed tx for tree node %s: %w", leaf.ID.String(), err)
+				return nil, fmt.Errorf("unable to deserialize signed tx for tree node %s: %w", leaf.ID, err)
 			}
 			if signedTx.TxIn[0].PreviousOutPoint != nodeOutPoint {
-				return nil, fmt.Errorf("refund tx input 0 must spend node tx output 0 for tree node %s", leaf.ID.String())
+				return nil, fmt.Errorf("refund tx input 0 must spend node tx output 0 for tree node %s", leaf.ID)
 			}
 
 			prevOuts := make(map[wire.OutPoint]*wire.TxOut, 2)
@@ -1063,20 +1063,20 @@ func applySignaturesToCoopExitTransactionsAndVerify(ctx context.Context, leafRef
 			connectorOutpoint := signedTx.TxIn[1].PreviousOutPoint
 			connectorTxOut, connectorExists := connectorPrevOuts[connectorOutpoint]
 			if !connectorExists {
-				return nil, fmt.Errorf("refund tx input 1 does not reference a valid connector output for tree node %s: %v", leaf.ID.String(), connectorOutpoint)
+				return nil, fmt.Errorf("refund tx input 1 does not reference a valid connector output for tree node %s: %v", leaf.ID, connectorOutpoint)
 			}
 			prevOuts[connectorOutpoint] = connectorTxOut
 
 			prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
 			if err := common.VerifySignatureInput(signedTx, 0, prevOutFetcher); err != nil {
-				return nil, fmt.Errorf("unable to verify multi-input tx signature for tree node %s: %w", leaf.ID.String(), err)
+				return nil, fmt.Errorf("unable to verify multi-input tx signature for tree node %s: %w", leaf.ID, err)
 			}
 			resultMap[leafID] = updatedTx
 		} else {
 			// Single-input or no connector: use standard verification
 			updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, keys.Public{}, nodeOutPoint, nodeTxOut, leaf.VerifyingPubkey)
 			if err != nil {
-				return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID.String(), err)
+				return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID, err)
 			}
 			resultMap[leafID] = updatedTx
 		}

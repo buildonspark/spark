@@ -337,17 +337,17 @@ func (o *FinalizeSignatureHandler) verifyDepositBackedRootNodeSignature(ctx cont
 				continue
 			}
 			if ent.IsNotFound(err) {
-				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx input %d spends outpoint %s that is not recorded for deposit address %s", inputIndex, outpoint.String(), depositAddress.Address))
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx input %d spends outpoint %s that is not recorded for deposit address %s", inputIndex, outpoint, depositAddress.Address))
 			}
 			return fmt.Errorf("failed to query root node tx input %d utxo: %w", inputIndex, err)
 		}
 		if utxoEntity.Amount > uint64(math.MaxInt64) {
-			return sparkerrors.InternalDataInconsistency(fmt.Errorf("utxo %s value %d exceeds int64 max", outpoint.String(), utxoEntity.Amount))
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf("utxo %s value %d exceeds int64 max", outpoint, utxoEntity.Amount))
 		}
 		prevOuts[outpoint] = wire.NewTxOut(int64(utxoEntity.Amount), utxoEntity.PkScript)
 	}
 	if !spendsBaseOutpoint {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx for node %s must spend tree base outpoint %s", node.ID, baseOutpoint.String()))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("root node tx for node %s must spend tree base outpoint %s", node.ID, baseOutpoint))
 	}
 
 	if err := common.ValidateBitcoinTxVersion(signedRootTx); err != nil {
@@ -424,7 +424,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to find pending transfer for leaves %s", leafIDs))
 	}
 	if transfer.Status != st.TransferStatusReceiverRefundSigned {
-		return nil, fmt.Errorf("transfer %s is not in receiver refund signed status", transfer.ID.String())
+		return nil, fmt.Errorf("transfer %s is not in receiver refund signed status", transfer.ID)
 	}
 
 	session, err := authn.GetSessionFromContext(ctx)
@@ -432,7 +432,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		return nil, err
 	}
 	if !transfer.ReceiverIdentityPubkey.Equals(session.IdentityPublicKey()) {
-		return nil, fmt.Errorf("transfer %s is not owned by the authenticated identity public key %x", transfer.ID.String(), session.IdentityPublicKey())
+		return nil, fmt.Errorf("transfer %s is not owned by the authenticated identity public key %s", transfer.ID, session.IdentityPublicKey())
 	}
 
 	// Mirror the coop-exit confirmation guard that receiver SOs apply in
@@ -448,10 +448,10 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 	// Verify that every submitted leaf belongs to this transfer (set equality, not just count).
 	transferLeafIDs, err := transfer.QueryTransferLeaves().QueryLeaf().IDs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query transfer leaf IDs for transfer %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to query transfer leaf IDs for transfer %s: %w", transfer.ID, err)
 	}
 	if len(leafIDs) != len(transferLeafIDs) {
-		return nil, fmt.Errorf("signature count %d does not match transfer leaf count %d for transfer %s", len(leafIDs), len(transferLeafIDs), transfer.ID.String())
+		return nil, fmt.Errorf("signature count %d does not match transfer leaf count %d for transfer %s", len(leafIDs), len(transferLeafIDs), transfer.ID)
 	}
 	transferLeafIDSet := make(map[uuid.UUID]struct{}, len(transferLeafIDs))
 	for _, id := range transferLeafIDs {
@@ -459,7 +459,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 	}
 	for _, leafID := range leafIDs {
 		if _, ok := transferLeafIDSet[leafID]; !ok {
-			return nil, fmt.Errorf("leaf %s does not belong to transfer %s", leafID, transfer.ID.String())
+			return nil, fmt.Errorf("leaf %s does not belong to transfer %s", leafID, transfer.ID)
 		}
 	}
 	if err := validateFinalizeNodeSignatureTransferLeafStates(ctx, db, transfer.ID, leafIDs); err != nil {
@@ -468,20 +468,20 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 
 	receiverCount, err := transfer.QueryTransferReceivers().Count(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to count receivers for transfer %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to count receivers for transfer %s: %w", transfer.ID, err)
 	}
 	if receiverCount > 1 {
-		return nil, fmt.Errorf("transfer %s has %d receivers; FinalizeNodeSignatures does not support multi-receiver transfers", transfer.ID.String(), receiverCount)
+		return nil, fmt.Errorf("transfer %s has %d receivers; FinalizeNodeSignatures does not support multi-receiver transfers", transfer.ID, receiverCount)
 	}
 
 	completionTime := time.Now()
 	updatedTransfer, err := transfer.Update().SetStatus(st.TransferStatusCompleted).SetCompletionTime(completionTime).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update transfer %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to update transfer %s: %w", transfer.ID, err)
 	}
 
 	if err := syncReceiversToTerminalStatus(ctx, transfer.ID, st.TransferStatusCompleted, completionTime); err != nil {
-		return nil, fmt.Errorf("failed to sync receiver statuses for transfer %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to sync receiver statuses for transfer %s: %w", transfer.ID, err)
 	}
 
 	return updatedTransfer, nil
@@ -731,11 +731,11 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 
 	nodeSparkProto, err := node.MarshalSparkProto(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %w", node.ID.String(), err)
+		return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %w", node.ID, err)
 	}
 	internalNode, err := node.MarshalInternalProto(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %w", node.ID.String(), err)
+		return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %w", node.ID, err)
 	}
 	return nodeSparkProto, internalNode, nil
 }

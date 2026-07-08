@@ -429,7 +429,7 @@ func (h *BaseTransferHandler) createTransfer(
 
 	if transferType == st.TransferTypePrimarySwapV3 {
 		if expiryTime.Before(time.Now().Add(PrimaryTransferExpiryTimeSafetyBuffer)) {
-			return nil, nil, fmt.Errorf("invalid expiry_time for primary swap transfer %s: less than safety buffer: %s", transferID, expiryTime.String())
+			return nil, nil, fmt.Errorf("invalid expiry_time for primary swap transfer %s: less than safety buffer: %s", transferID, expiryTime)
 		}
 	}
 
@@ -490,27 +490,27 @@ func (h *BaseTransferHandler) createTransfer(
 			ForUpdate().
 			Only(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to find primary swap transfer id=%s", primaryTransferId.String())
+			return nil, nil, fmt.Errorf("unable to find primary swap transfer id=%s", primaryTransferId)
 		}
 		if primaryTransfer.Type != st.TransferTypePrimarySwapV3 {
-			return nil, nil, fmt.Errorf("primary swap transfer %s has invalid type %s", primaryTransferId.String(), primaryTransfer.Type)
+			return nil, nil, fmt.Errorf("primary swap transfer %s has invalid type %s", primaryTransferId, primaryTransfer.Type)
 		}
 		// Check that the SO holds the correct refunds for the primary transfer.
 		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending && primaryTransfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-			return nil, nil, fmt.Errorf("primary swap transfer %s is not in the right status, got %s", primaryTransferId.String(), primaryTransfer.Status)
+			return nil, nil, fmt.Errorf("primary swap transfer %s is not in the right status, got %s", primaryTransferId, primaryTransfer.Status)
 		}
 		// Add safety buffer to prevent counter transfer creation too close to expiry time
 		if primaryTransfer.ExpiryTime.Before(time.Now().Add(PrimaryTransferExpiryTimeSafetyBuffer)) {
-			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or is about to expire (within safety buffer of %v), expiry time is %s", primaryTransferId.String(), PrimaryTransferExpiryTimeSafetyBuffer, primaryTransfer.ExpiryTime.String())
+			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or is about to expire (within safety buffer of %v), expiry time is %s", primaryTransferId, PrimaryTransferExpiryTimeSafetyBuffer, primaryTransfer.ExpiryTime)
 		}
 		if primaryTransfer.Network != network {
-			return nil, nil, fmt.Errorf("primary swap transfer %s network %s does not match counter transfer network %s", primaryTransferId.String(), primaryTransfer.Network, network)
+			return nil, nil, fmt.Errorf("primary swap transfer %s network %s does not match counter transfer network %s", primaryTransferId, primaryTransfer.Network, network)
 		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 		// The counter transfer amount should be the same as the primary transfer amount until we implement fees. Then we should probably validate a statement from the user that they accepted the fees.
 		counterTransferAmount := getTotalTransferValue(leaves)
 		if primaryTransfer.TotalValue != counterTransferAmount {
-			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId.String(), primaryTransfer.TotalValue, counterTransferAmount)
+			return nil, nil, fmt.Errorf("primary swap transfer %s amount %d does not match counter transfer amount %d", primaryTransferId, primaryTransfer.TotalValue, counterTransferAmount)
 		}
 		// Validate that the parties in the Swap V3 counter transfer are the reverse of the primary transfer to ensure atomic swap correctness
 		primarySender, primaryReceiver, err := mimo.GetSingleTransferSenderReceiver(primaryTransfer)
@@ -1209,7 +1209,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 
 	// The expiry time is only checked for coordinator SO because the creation time of each SO could be different.
 	if transfer.Status != st.TransferStatusSenderInitiated && transfer.ExpiryTime.After(time.Now()) {
-		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", transferID, transfer.ExpiryTime.String())
+		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", transferID, transfer.ExpiryTime)
 	}
 
 	// Check to see if preimage has already been shared before cancelling
@@ -1497,7 +1497,7 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 
 		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
 		if err != nil || preimageRequest == nil {
-			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID.String())
+			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID)
 		}
 		// Clear the preimage_shares edge so a retry can re-link the share to a new
 		// preimage_request. The share is unique per payment_hash and must be reusable
@@ -1999,7 +1999,7 @@ func validateSingleLeafRefundTxs(
 		// If the node is not a zero node, enforce direct refund tx validation
 		if hasDirectRefundTx {
 			if isZeroNode {
-				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID.String()))
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID))
 			}
 			if err := bitcointransaction.VerifyTransactionWithDatabase(
 				ctx,
@@ -2012,7 +2012,7 @@ func validateSingleLeafRefundTxs(
 				return wrapLeafValidationError(err, "direct refund tx validation failed for leaf", node.ID)
 			}
 		} else if requireDirectFromCpfpRefund && hasDirectNodeTx && !isZeroNode {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID.String()))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("leaf %s does not have a direct refund tx and it is not a zero node, non-zero nodes must have a direct refund tx", node.ID))
 		}
 	}
 
@@ -2114,8 +2114,8 @@ func validateConnectorTxBindsToExitTxid(connectorTxBytes []byte, exitTxid st.TxI
 	if parent != expectedNormal && parent != expectedReversed {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 			"connector_tx parent %s does not match exit_txid %s",
-			parent.String(),
-			exitTxid.String(),
+			parent,
+			exitTxid,
 		))
 	}
 	return nil
@@ -2256,7 +2256,7 @@ func validateCoopExitConnectorLayout(
 		if otherLeafID, exists := usedConnectorOutpoints[cpfpConnectorOutpoint]; exists {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 				"connector output %s is used by multiple leaves: %s and %s",
-				cpfpConnectorOutpoint.String(),
+				cpfpConnectorOutpoint,
 				otherLeafID,
 				leafID,
 			))
@@ -2283,8 +2283,8 @@ func validateCoopExitConnectorLayout(
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 				"leaf %s refund transactions must spend the same connector output; CPFP spends %s, direct-from-CPFP spends %s",
 				leafID,
-				cpfpConnectorOutpoint.String(),
-				directFromCpfpConnectorOutpoint.String(),
+				cpfpConnectorOutpoint,
+				directFromCpfpConnectorOutpoint,
 			))
 		}
 
@@ -2300,8 +2300,8 @@ func validateCoopExitConnectorLayout(
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 				"leaf %s refund transactions must spend the same connector output; CPFP spends %s, direct spends %s",
 				leafID,
-				cpfpConnectorOutpoint.String(),
-				directConnectorOutpoint.String(),
+				cpfpConnectorOutpoint,
+				directConnectorOutpoint,
 			))
 		}
 	}
@@ -2877,23 +2877,23 @@ func (h *BaseTransferHandler) CommitSwapKeyTweaks(
 		return fmt.Errorf("unable to load primary transfer: %w", err)
 	}
 	if counterTransfer.Type != st.TransferTypeCounterSwapV3 {
-		return fmt.Errorf("counter transfer %s has invalid type %s", counterTransfer.ID.String(), counterTransfer.Type)
+		return fmt.Errorf("counter transfer %s has invalid type %s", counterTransfer.ID, counterTransfer.Type)
 	}
 	if primaryTransfer.Type != st.TransferTypePrimarySwapV3 {
-		return fmt.Errorf("primary transfer %s has invalid type %s", primaryTransfer.ID.String(), primaryTransfer.Type)
+		return fmt.Errorf("primary transfer %s has invalid type %s", primaryTransfer.ID, primaryTransfer.Type)
 	}
 	// Sanity check. This should never happen because key tweaking is atomic.
 	if primaryTransfer.Status == st.TransferStatusSenderKeyTweaked || counterTransfer.Status == st.TransferStatusSenderKeyTweaked {
 		if primaryTransfer.Status != st.TransferStatusSenderKeyTweaked || counterTransfer.Status != st.TransferStatusSenderKeyTweaked {
-			return fmt.Errorf("swap key tweaks must be committed atomically: primary transfer %s status %s, counter transfer %s status %s", primaryTransfer.ID.String(), primaryTransfer.Status, counterTransfer.ID.String(), counterTransfer.Status)
+			return fmt.Errorf("swap key tweaks must be committed atomically: primary transfer %s status %s, counter transfer %s status %s", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)
 		}
 		return nil
 	}
 	if !isSwapKeyTweakCommitStatus(primaryTransfer.Status) {
-		return fmt.Errorf("primary transfer %s is not in a committable swap key tweak status: %s", primaryTransfer.ID.String(), primaryTransfer.Status)
+		return fmt.Errorf("primary transfer %s is not in a committable swap key tweak status: %s", primaryTransfer.ID, primaryTransfer.Status)
 	}
 	if !isSwapKeyTweakCommitStatus(counterTransfer.Status) {
-		return fmt.Errorf("counter transfer %s is not in a committable swap key tweak status: %s", counterTransfer.ID.String(), counterTransfer.Status)
+		return fmt.Errorf("counter transfer %s is not in a committable swap key tweak status: %s", counterTransfer.ID, counterTransfer.Status)
 	}
 
 	logger.Sugar().Infof("Checking commitSwapKeyTweaks for primary transfer %s (status: %s) and counter transfer %s (status: %s)", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)

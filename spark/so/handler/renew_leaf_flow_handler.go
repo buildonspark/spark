@@ -222,12 +222,12 @@ func getParentLeaf(ctx context.Context, leaf *ent.TreeNode) (*ent.TreeNode, erro
 	parentLeaf, err := leaf.QueryParent().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID))
 		}
 		return nil, fmt.Errorf("failed to query parent node: %w", err)
 	}
 	if parentLeaf == nil {
-		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID))
 	}
 	return parentLeaf, nil
 }
@@ -241,7 +241,7 @@ var renewLeafSigningJobNamespace = uuid.MustParse("a1b2c3d4-e5f6-7890-abcd-ef123
 // All SOs compute the same ID for a given (leafID, index) pair, enabling the
 // coordinator to correlate FROST signature shares without distributing job IDs.
 func deterministicJobID(leafID uuid.UUID, index int) uuid.UUID {
-	return uuid.NewSHA1(renewLeafSigningJobNamespace, fmt.Appendf(nil, "%s-%d", leafID.String(), index))
+	return uuid.NewSHA1(renewLeafSigningJobNamespace, fmt.Appendf(nil, "%s-%d", leafID, index))
 }
 
 // buildLocalSigningJobs constructs internal SigningJob protos locally from

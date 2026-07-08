@@ -153,7 +153,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	for _, node := range nodes {
 		protoNodeMap[node.ID.String()], err = node.MarshalSparkProto(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to marshal node %s: %w", node.ID.String(), err)
+			return nil, fmt.Errorf("unable to marshal node %s: %w", node.ID, err)
 		}
 		if req.GetIncludeParents() {
 			err := getAncestorChain(ctx, db, node, protoNodeMap, isSSP)
@@ -263,7 +263,7 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 	// Parent exists, continue search
 	nodeMap[parent.ID.String()], err = parent.MarshalSparkProto(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to marshal node %s: %w", parent.ID.String(), err)
+		return fmt.Errorf("unable to marshal node %s: %w", parent.ID, err)
 	}
 
 	return getAncestorChain(ctx, db, parent, nodeMap, isSSP)

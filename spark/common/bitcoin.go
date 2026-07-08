@@ -428,7 +428,7 @@ func CompareTransactions(txA, txB *wire.MsgTx) error {
 			return fmt.Errorf("expected sequence %d on input %d, got %d", txInA.Sequence, i, txInB.Sequence)
 		}
 		if txInA.PreviousOutPoint != txInB.PreviousOutPoint {
-			return fmt.Errorf("expected previous outpoint %s on input %d, got %s", txInA.PreviousOutPoint.String(), i, txInB.PreviousOutPoint.String())
+			return fmt.Errorf("expected previous outpoint %s on input %d, got %s", txInA.PreviousOutPoint, i, txInB.PreviousOutPoint)
 		}
 	}
 	if len(txA.TxOut) != len(txB.TxOut) {

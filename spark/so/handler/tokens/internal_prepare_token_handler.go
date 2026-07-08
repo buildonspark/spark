@@ -205,7 +205,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 			return nil, tokens.FormatErrorWithTransactionProto(
 				"network mismatch",
 				finalTokenTx,
-				sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transaction network %s does not match token network %s", txNet.String(), tokenMetadata.Network.String())),
+				sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transaction network %s does not match token network %s", txNet, tokenMetadata.Network)),
 			)
 		}
 
@@ -658,7 +658,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		}
 		if balance.inputSum.Cmp(balance.outputSum) != 0 {
 			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s: input amount %s does not match output amount %s",
-				tokenKey, balance.inputSum.String(), balance.outputSum.String()))
+				tokenKey, balance.inputSum, balance.outputSum))
 		}
 	}
 
@@ -807,8 +807,8 @@ func validateOutputIsSpendable(ctx context.Context, index int, output *ent.Token
 			cannotPreemptErr := preemptOrRejectTransaction(ctx, tokenTransaction, spentTx)
 			canPreemptSpentTx := cannotPreemptErr == nil
 			if !canPreemptSpentTx {
-				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s) , or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
-					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, hex.EncodeToString(spentTx.FinalizedTokenTransactionHash), cannotPreemptErr))
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s) , or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %x, error: %w)",
+					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, spentTx.FinalizedTokenTransactionHash, cannotPreemptErr))
 			}
 		}
 	}

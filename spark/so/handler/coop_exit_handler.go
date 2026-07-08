@@ -181,7 +181,7 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 		// ConfirmationHeight is nil since the transaction is not confirmed yet.
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.GetExitId(), exitTxid.String(), err)
+		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.GetExitId(), exitTxid, err)
 	}
 
 	transferProto, err := transfer.MarshalProto(ctx)
@@ -326,7 +326,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 		SetExitTxid(exitTxid).
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.GetExitId(), exitTxid.String(), err)
+		return nil, fmt.Errorf("failed to create cooperative exit for exit id %s exit txid %s: %w", req.GetExitId(), exitTxid, err)
 	}
 
 	// Sign refunds with pregenerated nonces, aggregate, and update leaves.

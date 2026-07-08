@@ -1539,7 +1539,7 @@ const (
 // job for (transferID, leafID, txKind). Valid txKind values are the
 // claimTxKind* constants above.
 func claimTransferJobID(transferID uuid.UUID, leafID string, txKind string) uuid.UUID {
-	return uuid.NewSHA1(claimTransferSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID.String(), leafID, txKind))
+	return uuid.NewSHA1(claimTransferSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID, leafID, txKind))
 }
 
 // claimTransferLeafSigningJobs holds the pre-built signing-job helpers for one

@@ -106,7 +106,7 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 		return nil
 	}
 	if clientIP, _, err = net.SplitHostPort(p.Addr.String()); err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to split host and port from peer address %s", p.Addr.String())
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to split host and port from peer address %s", p.Addr)
 		if i.config.Mode == ModeEnforce {
 			return status.Error(codes.Internal, "failed to get peer information")
 		}
@@ -116,12 +116,12 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 	// Internal APIs must only be called from an internal IP on the VPC, even if
 	// that means going through a load balancer.
 	if !strings.HasPrefix(p.Addr.String(), "10.") {
-		logger.Sugar().Warnf("internal API call from peer address %s not internal to VPC", p.Addr.String())
+		logger.Sugar().Warnf("internal API call from peer address %s not internal to VPC", p.Addr)
 		switch i.config.Mode {
 		case ModeEnforce:
 			return status.Error(codes.PermissionDenied, "request not allowed from "+p.Addr.String())
 		case ModeWarn:
-			logger.Sugar().Warnf("warn authz mode - request would be denied - peer address %s is not internal to VPC", p.Addr.String())
+			logger.Sugar().Warnf("warn authz mode - request would be denied - peer address %s is not internal to VPC", p.Addr)
 		default:
 			break
 		}

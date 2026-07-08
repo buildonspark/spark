@@ -22,7 +22,7 @@ go test -v ./path/to/package              # Verbose output
 
 ### Linting
 ```bash
-mise lint         # or: golangci-lint run
+mise lint         # builds/runs ./bin/golangci-lint-spark (bundles the fmtlint plugin; plain `golangci-lint run` can't load it and will error)
 mise format       # or: golangci-lint fmt
 ```
 

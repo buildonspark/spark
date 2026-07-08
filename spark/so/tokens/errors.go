@@ -127,7 +127,7 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 	if err != nil {
 		return fmt.Errorf("%s (uuid: %s, partial_hash: %x, final_hash: %x%s): %w",
 			msg,
-			tokenTransaction.ID.String(),
+			tokenTransaction.ID,
 			tokenTransaction.PartialTokenTransactionHash,
 			tokenTransaction.FinalizedTokenTransactionHash,
 			outputMsg,
@@ -135,7 +135,7 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 	}
 	return fmt.Errorf("%s (uuid: %s, partial_hash: %x, final_hash: %x%s)",
 		msg,
-		tokenTransaction.ID.String(),
+		tokenTransaction.ID,
 		tokenTransaction.PartialTokenTransactionHash,
 		tokenTransaction.FinalizedTokenTransactionHash,
 		outputMsg)

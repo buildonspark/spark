@@ -252,7 +252,7 @@ func loadAndValidateDepositAddress(
 		addTxHash := addTx.TxHash()
 		outpoint := wire.OutPoint{Hash: addTxHash, Index: additionalUtxo.GetVout()}
 		if seenOutpoints[outpoint] {
-			err = fmt.Errorf("duplicate utxo %s:%d", addTxHash.String(), additionalUtxo.GetVout())
+			err = fmt.Errorf("duplicate utxo %s:%d", addTxHash, additionalUtxo.GetVout())
 			return
 		}
 		seenOutpoints[outpoint] = true
@@ -954,7 +954,7 @@ func createTreeAndNode(
 	}
 
 	if existingTree != nil {
-		logger.Sugar().Warnf("Tree already exists for txid %s vout %d", txid.String(), vout)
+		logger.Sugar().Warnf("Tree already exists for txid %s vout %d", txid, vout)
 
 		// Use the Tree→Root relationship to get the root node
 		if existingTree.Edges.Root != nil {

@@ -55,7 +55,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 			return nil, err
 		}
 	} else {
-		logging.GetLoggerFromContext(ctx).Sugar().Infof("authorized broadcaster bypassing sender identity check in CommitTransaction for target %s", ownerIDPubKey.ToHex())
+		logging.GetLoggerFromContext(ctx).Sugar().Infof("authorized broadcaster bypassing sender identity check in CommitTransaction for target %s", ownerIDPubKey)
 	}
 	// Enforce the wallet kill switch on the target identity even when a
 	// privileged broadcaster bypasses the session-identity check.
@@ -220,7 +220,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	}
 
 	if finalized {
-		logger.Sugar().Infof("Operator %s has finalized token transaction %s, exchanging full revocation secret shares with all operators", h.config.Identifier, hex.EncodeToString(tokenTransactionHash))
+		logger.Sugar().Infof("Operator %s has finalized token transaction %x, exchanging full revocation secret shares with all operators", h.config.Identifier, tokenTransactionHash)
 		_, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash, false)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to exchange revocation secret shares after finalization", tokenTransactionProto, err)
@@ -426,7 +426,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 		defer conn.Close()
 		client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
 
-		logger.Sugar().Infof("Operator %s is exchanging revocation secret shares with operator %s for token txHash: %s", h.config.Identifier, operator.Identifier, hex.EncodeToString(tokenTransactionHash))
+		logger.Sugar().Infof("Operator %s is exchanging revocation secret shares with operator %s for token txHash: %x", h.config.Identifier, operator.Identifier, tokenTransactionHash)
 		return client.ExchangeRevocationSecretsShares(ctx, &tokeninternalpb.ExchangeRevocationSecretsSharesRequest{
 			FinalTokenTransaction:         tokenTransaction,
 			FinalTokenTransactionHash:     tokenTransactionHash,
@@ -444,12 +444,12 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse request operator identity public key: %w", err))
 			}
 			reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
-			logger.Sugar().Infof("Operator %s received from operator %s, %d secret shares originating from operator %s for token txHash: %s",
+			logger.Sugar().Infof("Operator %s received from operator %s, %d secret shares originating from operator %s for token txHash: %x",
 				h.config.Identifier,
 				identifier,
 				len(operatorShares.GetShares()),
 				reqOperatorIdentifier,
-				hex.EncodeToString(tokenTransactionHash),
+				tokenTransactionHash,
 			)
 		}
 	}

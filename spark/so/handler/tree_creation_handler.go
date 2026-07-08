@@ -71,7 +71,7 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	}
 	if count > 0 {
 		// The only way to detect a parent is split is to check if the subtree of that tree node already exists.
-		return nil, fmt.Errorf("tree with base txid %s already exists", txHash.String())
+		return nil, fmt.Errorf("tree with base txid %s already exists", txHash)
 	}
 	return tx.TxOut[utxo.GetVout()], nil
 }
@@ -97,7 +97,7 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 		return nil, err
 	}
 	if lockParent && node.Status != st.TreeNodeStatusCreating && node.Status != st.TreeNodeStatusAvailable {
-		return nil, fmt.Errorf("node %s is not eligible for tree creation from status %s", nodeID.String(), node.Status)
+		return nil, fmt.Errorf("node %s is not eligible for tree creation from status %s", nodeID, node.Status)
 	}
 
 	tx, err := common.TxFromRawTxBytes(node.RawTx)
@@ -118,7 +118,7 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	}
 	if children > 0 {
 		// The only way to detect a child is split is to check if the subtree of that tree node already exists.
-		return nil, fmt.Errorf("node %s child vout %d already exists", nodeID.String(), nodeOutput.GetVout())
+		return nil, fmt.Errorf("node %s child vout %d already exists", nodeID, nodeOutput.GetVout())
 	}
 	return tx.TxOut[nodeOutput.GetVout()], nil
 }
@@ -153,7 +153,7 @@ func validateTreeCreationTxSpendsOutpoint(tx *wire.MsgTx, expectedOutPoint wire.
 		return fmt.Errorf("%s must have exactly one input, got %d", txName, len(tx.TxIn))
 	}
 	if tx.TxIn[0].PreviousOutPoint != expectedOutPoint {
-		return fmt.Errorf("%s input 0 must spend %s, got %s", txName, expectedOutPoint.String(), tx.TxIn[0].PreviousOutPoint.String())
+		return fmt.Errorf("%s input 0 must spend %s, got %s", txName, expectedOutPoint, tx.TxIn[0].PreviousOutPoint)
 	}
 	return nil
 }

@@ -33,7 +33,7 @@ func canBroadcastForSession(ctx context.Context) bool {
 func enforceBroadcastPolicy(ctx context.Context, config *so.Config, idPubKey keys.Public) error {
 	if canBroadcastForSession(ctx) {
 		logging.GetLoggerFromContext(ctx).Sugar().Infof(
-			"authorized broadcaster bypassing sender identity check for target %s", idPubKey.ToHex(),
+			"authorized broadcaster bypassing sender identity check for target %s", idPubKey,
 		)
 	} else {
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, idPubKey); err != nil {

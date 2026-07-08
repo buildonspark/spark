@@ -221,10 +221,10 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 				logger.With(zap.Error(err)).
 					Sugar().
 					Errorf(
-						"Failed to parse token announcement (txid: %s, idx: %v, script: %s)",
+						"Failed to parse token announcement (txid: %s, idx: %v, script: %x)",
 						tx.TxHash(),
 						txOutIdx,
-						hex.EncodeToString(txOut.PkScript),
+						txOut.PkScript,
 					)
 				continue
 			}
@@ -288,11 +288,11 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 		logger.With(zap.String("issuer_public_key", l1TokenCreate.IssuerPublicKey.ToHex())).
 			Sugar().
 			Infof(
-				"Successfully created L1 token entity (txid %s, output_idex %d, name %s, identifier %s)",
+				"Successfully created L1 token entity (txid %s, output_idex %d, name %s, identifier %x)",
 				ann.txHash,
 				ann.outputIdx,
 				l1TokenCreate.TokenName,
-				hex.EncodeToString(l1TokenCreate.TokenIdentifier),
+				l1TokenCreate.TokenIdentifier,
 			)
 
 		if !config.Token.DisableSparkTokenCreationForL1TokenAnnouncements {

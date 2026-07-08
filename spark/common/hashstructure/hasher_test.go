@@ -121,7 +121,7 @@ func TestHasher_TestVectors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			expectedBytes, err := hex.DecodeString(tc.expected)
 			require.NoError(t, err, "invalid expected hex")
-			assert.Equal(t, expectedBytes, tc.actual, "mismatch for test vector %q, got %s", tc.name, hex.EncodeToString(tc.actual))
+			assert.Equal(t, expectedBytes, tc.actual, "mismatch for test vector %q, got %x", tc.name, tc.actual)
 		})
 	}
 }
