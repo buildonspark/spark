@@ -34,6 +34,7 @@ import {
   type Transfer,
   type TransferFilter,
   TransferPackage,
+  TransferReceiverStatus,
   TransferStatus,
   TransferType,
   type TreeNode,
@@ -993,6 +994,67 @@ export class BaseTransferService {
   }
 }
 
+/**
+ * Narrow a transfer to the caller's own leaves before claiming. The SO returns
+ * only the receiver's leaves when using legacy query endpoints like
+ * `query_all_transfers` for backwards compatibility purposes. Going forward,
+ * every query endpoint will return the full transfer (all receivers' leaves), so
+ * scoping client-side is the expected behavior for all claimants. No-op unless
+ * the transfer has multiple receivers.
+ */
+export function scopeTransferLeavesToReceiver(
+  transfer: Transfer,
+  receiverIdentityPublicKey: Uint8Array,
+): Transfer {
+  if (transfer.receivers.length <= 1) {
+    return transfer;
+  }
+  const ownReceiver = transfer.receivers.find((receiver) =>
+    equalBytes(receiver.identityPublicKey, receiverIdentityPublicKey),
+  );
+  if (!ownReceiver?.id) {
+    throw new SparkValidationError(
+      "Cannot scope claim: wallet is not a receiver of this multi-receiver transfer",
+    );
+  }
+  const ownLeaves = transfer.leaves.filter(
+    (leaf) => leaf.transferReceiverId === ownReceiver.id,
+  );
+  if (ownLeaves.length === 0) {
+    throw new SparkValidationError(
+      "Cannot scope claim: no leaves assigned to this wallet's receiver edge",
+    );
+  }
+  return { ...transfer, leaves: ownLeaves };
+}
+
+/**
+ * Whether the caller's own receiver leg is complete. The whole-transfer status only
+ * flips to COMPLETED once every receiver claims, so a multi-receiver claimant keys
+ * completion off its own receiver-edge status (whole == COMPLETED as a safety net).
+ * Single-receiver and legacy transfers use the whole-transfer status.
+ */
+export function isReceiverLegComplete(
+  transfer: Transfer,
+  receiverIdentityPublicKey: Uint8Array,
+): boolean {
+  const wholeComplete =
+    transfer.status === TransferStatus.TRANSFER_STATUS_COMPLETED;
+  if (transfer.receivers.length <= 1) {
+    return wholeComplete;
+  }
+  const ownReceiver = transfer.receivers.find((receiver) =>
+    equalBytes(receiver.identityPublicKey, receiverIdentityPublicKey),
+  );
+  if (!ownReceiver) {
+    return false;
+  }
+  return (
+    ownReceiver.status ===
+      TransferReceiverStatus.TRANSFER_RECEIVER_STATUS_COMPLETED || wholeComplete
+  );
+}
+
 export class TransferService extends BaseTransferService {
   constructor(
     config: WalletConfigService,
@@ -1011,12 +1073,17 @@ export class TransferService extends BaseTransferService {
   }
 
   async claimTransferCore(transfer: Transfer): Promise<TreeNode[]> {
-    const leafPubKeyMap = await this.verifyPendingTransfer(transfer);
     const selfIdentityPubkey = await this.config.signer.getIdentityPublicKey();
+    const scopedTransfer = scopeTransferLeavesToReceiver(
+      transfer,
+      selfIdentityPubkey,
+    );
+
+    const leafPubKeyMap = await this.verifyPendingTransfer(scopedTransfer);
 
     const leaves: LeafKeyTweak[] = [];
 
-    for (const leaf of transfer.leaves) {
+    for (const leaf of scopedTransfer.leaves) {
       if (leaf.leaf) {
         const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
         if (leafPubKey) {
@@ -1041,15 +1108,18 @@ export class TransferService extends BaseTransferService {
       }
     }
 
-    const claimPackage = await this.prepareClaimPackage(transfer.id, leaves);
+    const claimPackage = await this.prepareClaimPackage(
+      scopedTransfer.id,
+      leaves,
+    );
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
     let response: ClaimTransferResponse;
     try {
       response = await sparkClient.claim_transfer({
-        transferId: transfer.id,
-        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        transferId: scopedTransfer.id,
+        ownerIdentityPublicKey: selfIdentityPubkey,
         claimPackage,
       });
     } catch (error: unknown) {
@@ -1063,7 +1133,14 @@ export class TransferService extends BaseTransferService {
         "No transfer response from claim_transfer",
       );
     }
-    const nodes = response.transfer.leaves.flatMap((leaf) =>
+    // Claim responses are only receiver-scoped when the SO's multi-receiver knob
+    // is on; scope defensively so a full response never registers another
+    // receiver's leaves as ours. No-op for single-receiver/legacy.
+    const scopedResponse = scopeTransferLeavesToReceiver(
+      response.transfer,
+      selfIdentityPubkey,
+    );
+    const nodes = scopedResponse.leaves.flatMap((leaf) =>
       leaf.leaf ? [leaf.leaf] : [],
     );
     return nodes;
@@ -2428,17 +2505,20 @@ export class TransferService extends BaseTransferService {
       ) {
         const transferToUse = context.data || transfer;
         const updatedTransfer = await this.queryTransfer(transferToUse.id);
-
-        if (
-          !updatedTransfer ||
-          updatedTransfer.status !== TransferStatus.TRANSFER_STATUS_COMPLETED
-        ) {
+        if (!updatedTransfer) {
           return undefined;
         }
 
-        const leaves = updatedTransfer.leaves.flatMap((leaf) =>
-          leaf.leaf ? [leaf.leaf] : [],
-        );
+        const selfIdentityPubkey =
+          await this.config.signer.getIdentityPublicKey();
+        if (!isReceiverLegComplete(updatedTransfer, selfIdentityPubkey)) {
+          return undefined;
+        }
+
+        const leaves = scopeTransferLeavesToReceiver(
+          updatedTransfer,
+          selfIdentityPubkey,
+        ).leaves.flatMap((leaf) => (leaf.leaf ? [leaf.leaf] : []));
 
         return leaves;
       }
