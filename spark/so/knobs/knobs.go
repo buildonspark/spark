@@ -229,6 +229,15 @@ const (
 	// ProvidePreimage, not in this flow — matching legacy.
 	KnobUseConsensusInitiatePreimageSwap = "spark.so.use_consensus_initiate_preimage_swap"
 
+	// KnobPreimageSwapIgnoreLegacyTransfer nils req.Transfer at the coordinator
+	// entrypoints when a caller sends it, forcing every preimage swap to resolve
+	// inputs from transfer_request — a live, reversible dry-run of dropping the
+	// legacy field (SP-3285). Binary (any non-zero value enables). Coordinator-only:
+	// the stripped request fans out to participants by reference, so enabling needs
+	// no coordinated flip on third-party SOs.
+	// TODO(SP-3285): remove with the legacy transfer field.
+	KnobPreimageSwapIgnoreLegacyTransfer = "spark.so.lightning.preimage_swap_ignore_legacy_transfer"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)

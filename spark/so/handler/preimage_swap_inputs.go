@@ -47,7 +47,7 @@ func preimageSwapInputsFromRequest(req *pbspark.InitiatePreimageSwapRequest) (*p
 	case req.GetTransferRequest() != nil:
 		return preimageSwapInputsFromTransferRequest(req)
 	default:
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer is required"))
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request is required"))
 	}
 }
 
