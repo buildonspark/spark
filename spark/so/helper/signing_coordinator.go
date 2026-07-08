@@ -552,6 +552,23 @@ func prepareResults(
 	return results, nil
 }
 
+// BuildSigningResults assembles the per-job SigningResult (round-1 commitments +
+// round-2 shares + public shares) that a client aggregates with its own share.
+// Exported so 2PC flows that split the FROST rounds across engine phases (collect
+// round-1 before Execute, produce round-2 shares in Prepare) can build the same
+// result SignFrost produces internally — guaranteeing byte-identical output to the
+// non-consensus path. `selection` must be the round-1 signing set.
+func BuildSigningResults(
+	config *so.Config,
+	selection *OperatorSelection,
+	jobs []*SigningJob,
+	signingKeyshares map[uuid.UUID]*pbfrost.KeyPackage,
+	round1Array []map[so.Identifier]frost.SigningCommitment,
+	round2 map[uuid.UUID]map[so.Identifier][]byte,
+) ([]*SigningResult, error) {
+	return prepareResults(config, selection, jobs, signingKeyshares, round1Array, round2)
+}
+
 // GetSigningCommitments gets the signing commitments for the given keyshare ids.
 func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDcount uint32, count uint32) (map[string][]frost.SigningCommitment, error) {
 	return GetSigningCommitmentsInternal(ctx, config, keyshareIDcount, count, &SparkServiceFrostSignerFactoryImpl{})

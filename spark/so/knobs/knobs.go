@@ -238,6 +238,36 @@ const (
 	// TODO(SP-3285): remove with the legacy transfer field.
 	KnobPreimageSwapIgnoreLegacyTransfer = "spark.so.lightning.preimage_swap_ignore_legacy_transfer"
 
+	// KnobUseConsensusStaticDepositUtxoRefund routes InitiateStaticDepositUtxoRefund
+	// through the 2PC engine instead of the legacy create_static_deposit_utxo_refund
+	// fanout + RollbackUtxoSwap gossip + best-effort UtxoSwapCompleted. Interpreted
+	// as binary (any non-zero value enables) — not a percentage rollout.
+	//
+	// The coordinator collects FROST round-1 commitments before Execute (keeping the
+	// public RPC a single call); Prepare validates + creates the UtxoSwap CREATED row
+	// on every SO and produces round-2 shares; BuildCommitPayload builds the
+	// user-aggregated SigningResult, stores it, and completes the coordinator swap;
+	// Commit completes participant swaps; Rollback cancels (REFUND swaps skip the
+	// SP-3261 transfer-sent guard). The engine records the COMMITTED decision
+	// atomically with the coordinator's domain commit (single request-tx DbCommit).
+	//
+	// Only first-time refunds go through 2PC. A refund against an already-COMPLETED
+	// swap (the owner re-signing additional refund txs / fee-bumping) takes the
+	// shared handleAlreadyRegisteredSwapOnRefund re-sign path regardless of this
+	// knob — no FlowExecution row is written for those, so a "consensus-routed"
+	// refund retry legitimately shows no consensus row when debugging.
+	//
+	// Rollout ordering: enable only after every SO runs a binary that dispatches
+	// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND (consensusFlowHandler) —
+	// an SO without the handler fails prepare/commit/rollback for op type 9, and
+	// the coordinator entrypoint has no legacy fallback, so a premature flip breaks
+	// (not just degrades) all static-deposit refunds. Before flipping, let pending
+	// legacy refund rollback gossip drain: a stray pre-flip RollbackUtxoSwap is
+	// utxo+coordinator-keyed and can cancel a fresh consensus-created swap for the
+	// same UTXO mid-flight (surfaces as a stuck flow_execution alert, needs manual
+	// repair).
+	KnobUseConsensusStaticDepositUtxoRefund = "spark.so.use_consensus_static_deposit_utxo_refund"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)

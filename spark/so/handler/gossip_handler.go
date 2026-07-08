@@ -40,7 +40,11 @@ import (
 var gossipMessageHandledTotal metric.Int64Counter
 var gossipMessageHandledDuration metric.Float64Histogram
 
-// consensusOpFencedTotal counts skipped consensus commit/rollback gossip ops; attribute "phase" = "commit" | "rollback".
+// consensusOpFencedTotal counts skipped consensus commit/rollback gossip ops.
+// Attribute "phase" = "commit" | "rollback"; attribute "disposition" =
+// "foreign" (no participant row — unexpected) | "already_terminal" (benign
+// redelivery of a flow whose effect was already applied). On-call should treat
+// a "foreign" spike as more concerning than "already_terminal".
 var consensusOpFencedTotal metric.Int64Counter
 
 func init() {
@@ -813,14 +817,30 @@ const (
 	applyOp
 	skipForeignOp
 	skipCoordinatorEcho
+	skipAlreadyTerminal
 )
 
 // classifyConsensusOp returns the disposition for a gossip-delivered consensus op.
 // On error it fails closed (returns the error; the op is not applied) — recovery is
 // via gossip retry for retriable codes, otherwise via the participant reconciler.
+//
+// A participant row that is already terminal yields skipAlreadyTerminal: the
+// handler effect and the row's terminal transition commit in the same request
+// transaction, so a terminal row proves this flow's effect was already applied
+// and the handler must not run again. This fence is what makes redelivery safe
+// for op payloads keyed on non-per-attempt identifiers (e.g. the static-deposit
+// refund rollback keyed by on_chain_utxo): without it, a redelivered rollback
+// whose own swap was already cancelled would find — and cancel — a newer
+// attempt's active swap for the same UTXO.
 func classifyConsensusOp(ctx context.Context, flowExecutionID string) (consensusOpDisposition, error) {
+	// Dormant pre-April-2026 leftover (#6288): every live coordinator populates
+	// flow_execution_id, so this branch is unreachable today. It is kept (rather
+	// than made an error) because a gossip handler error loops redelivery
+	// forever, which is worse than applying unfenced for a message that could
+	// only come from a pre-rollout binary. Paired with DispatchPrepare's
+	// empty-flowExecutionID skip (consensus_handler.go) — remove both together.
 	if flowExecutionID == "" {
-		return applyOp, nil // pre-upgrade coordinator: no row to fence against
+		return applyOp, nil
 	}
 	id, err := uuid.Parse(flowExecutionID)
 	if err != nil {
@@ -837,6 +857,12 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string) (consensus
 	case err != nil:
 		return dispositionUnknown, fmt.Errorf("unable to load flow execution %s: %w", id, err)
 	case row.Role == st.FlowExecutionRoleParticipant:
+		if row.Status != st.FlowExecutionStatusInFlight {
+			logging.GetLoggerFromContext(ctx).Sugar().Infof(
+				"consensus op fence: participant FlowExecution row %s already terminal (%s); skipping handler",
+				flowExecutionID, row.Status)
+			return skipAlreadyTerminal, nil
+		}
 		return applyOp, nil
 	default: // FlowExecutionRoleCoordinator
 		return skipCoordinatorEcho, nil
@@ -856,9 +882,12 @@ func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opTy
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
 			"consensus commit: no participant FlowExecution row for flow %s (op_type %d); skipping foreign commit",
 			flowExecutionID, opType)
-		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "commit")))
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "commit"), attribute.String("disposition", "foreign")))
 		return nil
 	case skipCoordinatorEcho:
+		return nil
+	case skipAlreadyTerminal:
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "commit"), attribute.String("disposition", "already_terminal")))
 		return nil
 	case applyOp:
 	default:
@@ -902,9 +931,12 @@ func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, op
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
 			"consensus rollback: no participant FlowExecution row for flow %s (op_type %d); skipping foreign rollback",
 			flowExecutionID, opType)
-		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "rollback")))
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "rollback"), attribute.String("disposition", "foreign")))
 		return nil
 	case skipCoordinatorEcho:
+		return nil
+	case skipAlreadyTerminal:
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "rollback"), attribute.String("disposition", "already_terminal")))
 		return nil
 	case applyOp:
 	default:
