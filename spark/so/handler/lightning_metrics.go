@@ -64,6 +64,7 @@ var (
 	lightningShapeKey               = attribute.Key("shape")
 	lightningReasonKey              = attribute.Key("reason")
 	lightningEndpointKey            = attribute.Key("endpoint")
+	lightningLegacyIgnoredKey       = attribute.Key("legacy_transfer_ignored")
 )
 
 var lightningMetricBuckets = []float64{
@@ -242,13 +243,17 @@ func preimageSwapReason(reason pbspark.InitiatePreimageSwapRequest_Reason) strin
 
 // observePreimageSwapShape records at flow completion so the drain read can
 // key on result=success; endpoint ("v2"/"v3") names which caller population
-// still sends the legacy field.
+// still sends the legacy field. shape is the as-received shape (captured before
+// KnobPreimageSwapIgnoreLegacyTransfer may strip it) so the drain census stays
+// truthful; legacyTransferIgnored marks the requests that knob forced onto the
+// transfer_request path — its result= split is the SEND package-path bake signal.
 // TODO(SP-3285): drain scaffolding — remove with the legacy transfer field.
-func observePreimageSwapShape(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, endpoint string, err error) {
+func observePreimageSwapShape(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, shape string, legacyTransferIgnored bool, endpoint string, err error) {
 	getLightningMetricInstruments().preimageSwapShape.Add(ctx, 1, metric.WithAttributes(
-		lightningShapeKey.String(preimageSwapShape(req)),
+		lightningShapeKey.String(shape),
 		lightningReasonKey.String(preimageSwapReason(req.GetReason())),
 		lightningEndpointKey.String(endpoint),
+		lightningLegacyIgnoredKey.Bool(legacyTransferIgnored),
 		lightningResultKey.String(classifyLightningMetricResult(err)),
 	))
 }

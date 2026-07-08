@@ -1659,6 +1659,33 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 	return AggregateSignatures(ctx, h.config, transferRequest.GetTransferId(), transferRequest.GetTransferPackage(), keys.Public{}, keys.Public{}, keys.Public{}, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
 }
 
+// ignoreLegacyTransfer nils req.Transfer when KnobPreimageSwapIgnoreLegacyTransfer is
+// on and the caller sent it, reporting whether it stripped. Coordinator-only dry-run of
+// dropping the legacy field (SP-3285): the stripped req fans out to participants by
+// reference, so downstream sees a transfer_request-only request with no participant knob
+// read. Stripping also no-ops the dual-shape cross-check (a nil transfer makes
+// validateIdenticalLeavesInTransferAndTransferRequest return early) — intended, since the
+// field drop removes that cross-check entirely.
+// TODO(SP-3285): remove with the legacy transfer field.
+func ignoreLegacyTransfer(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) bool {
+	if req.GetTransfer() == nil || knobs.GetKnobsService(ctx).GetValue(knobs.KnobPreimageSwapIgnoreLegacyTransfer, 0) == 0 {
+		return false
+	}
+	req.Transfer = nil
+	return true
+}
+
+// captureShapeAndStripLegacyTransfer records the as-received request shape, then applies
+// ignoreLegacyTransfer, returning both for the caller's deferred observePreimageSwapShape.
+// The order is load-bearing: the shape census must report what the caller sent, not the
+// knob-forced package shape, so the capture must precede the strip.
+// TODO(SP-3285): remove with the legacy transfer field.
+func captureShapeAndStripLegacyTransfer(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (shape string, legacyIgnored bool) {
+	shape = preimageSwapShape(req)
+	legacyIgnored = ignoreLegacyTransfer(ctx, req)
+	return shape, legacyIgnored
+}
+
 // InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.
 //
 // Gated on KnobUseConsensusInitiatePreimageSwap: when enabled, routes through the
@@ -1669,7 +1696,8 @@ func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbsp
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	defer func() { observePreimageSwapShape(ctx, req, "v3", retErr) }()
+	shape, legacyIgnored := captureShapeAndStripLegacyTransfer(ctx, req)
+	defer func() { observePreimageSwapShape(ctx, req, shape, legacyIgnored, "v3", retErr) }()
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusInitiatePreimageSwap, 0) > 0 {
 		return h.initiatePreimageSwapV3Consensus(ctx, req)
 	}
@@ -1681,7 +1709,8 @@ func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbsp
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	defer func() { observePreimageSwapShape(ctx, req, "v2", retErr) }()
+	shape, legacyIgnored := captureShapeAndStripLegacyTransfer(ctx, req)
+	defer func() { observePreimageSwapShape(ctx, req, shape, legacyIgnored, "v2", retErr) }()
 
 	var expireTimeOverride *time.Time
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND {

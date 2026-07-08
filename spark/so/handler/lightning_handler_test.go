@@ -283,7 +283,7 @@ func TestGetPreimageShareRejectsMissingTransfer(t *testing.T) {
 	}, nil, nil, nil)
 
 	require.Nil(t, resp)
-	require.ErrorContains(t, err, "transfer is required")
+	require.ErrorContains(t, err, "transfer_request is required")
 }
 
 func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
@@ -1072,6 +1072,19 @@ func TestValidateIdenticalLeavesRejectsNilTransferPackage(t *testing.T) {
 	require.Equal(t, "MISSING_FIELD", reason)
 }
 
+// A request whose legacy transfer was stripped (KnobPreimageSwapIgnoreLegacyTransfer)
+// must pass the dual-shape cross-check untouched, since the field-drop dry-run leaves
+// only transfer_request.
+func TestValidateIdenticalLeavesNoOpsWhenTransferStripped(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	lightningHandler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
+
+	req := &pb.InitiatePreimageSwapRequest{
+		TransferRequest: &pb.StartTransferRequest{TransferId: uuid.NewString()},
+	}
+	require.NoError(t, lightningHandler.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req))
+}
+
 func TestValidateIdenticalLeavesRejectsMalformedTransferPackage(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{61})
 	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -1801,7 +1814,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{Transfer: nil}
 			},
-			expectedErrMsg: "transfer is required",
+			expectedErrMsg: "transfer_request is required",
 		},
 		{
 			name: "empty leaves to send",

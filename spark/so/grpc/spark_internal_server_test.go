@@ -61,7 +61,7 @@ func TestSparkInternalServerInitiatePreimageSwapRejectsNilRequests(t *testing.T)
 				})
 				return err
 			},
-			wantErr: "transfer is required",
+			wantErr: "transfer_request is required",
 		},
 	}
 
