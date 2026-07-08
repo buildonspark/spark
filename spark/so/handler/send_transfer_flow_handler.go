@@ -28,6 +28,7 @@ import (
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/partner"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -419,6 +420,11 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 	if err := f.applySendTransferCommit(ctx, commitReq); err != nil {
 		return nil, fmt.Errorf("failed to apply commit on coordinator: %w", err)
 	}
+
+	// Coordinator-only partner attribution, mirroring the coop-exit consensus
+	// flow: runs in the request ctx (carries the partner JWT) and tx before the
+	// engine's DbCommit; a no-op on participants.
+	partner.SaveTransferPartner(ctx, f.parsed.transferID, st.TransferPartnerTypeTransfer)
 
 	// Build the response StartTransferV3 returns to the client.
 	transferEnt, err := f.loadTransferForUpdate(ctx, f.parsed.transferID)

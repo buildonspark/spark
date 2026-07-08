@@ -1,22 +1,30 @@
 package grpctest
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	jwtkeys "github.com/lightsparkdev/spark/common/keys/jwt"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	partnerent "github.com/lightsparkdev/spark/so/ent/partner"
+	partnerkeyent "github.com/lightsparkdev/spark/so/ent/partnerkey"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	transferent "github.com/lightsparkdev/spark/so/ent/transfer"
+	transferpartnerent "github.com/lightsparkdev/spark/so/ent/transferpartner"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
 )
 
 // opTypeSendTransfer is the int32 value of CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
@@ -121,6 +129,103 @@ func TestSendTransferV3_Consensus_HappyPath(t *testing.T) {
 	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
 	require.NoError(t, err, "receiver claim should succeed against consensus-path transfer")
 	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus())
+}
+
+// TestSendTransferV3_Consensus_RecordsTransferPartner is the consensus-path
+// counterpart to TestTransferWithPartnerAttribution_ES256: a transfer routed
+// through the 2PC engine must still write a type=TRANSFER transfer_partner row.
+// The consensus path had no such coverage, which is how the missing attribution
+// shipped when KnobUseConsensusTransfer was enabled.
+func TestSendTransferV3_Consensus_RecordsTransferPartner(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	}
+	enableConsensusTransferKnobs(t, kc)
+	require.NoError(t, kc.SetKnob(t, knobs.KnobEnablePartnerJWT, 100))
+
+	// Partner JWT setup (ES256), mirroring TestTransferWithPartnerAttribution.
+	partnerPrivKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	compressedKey := elliptic.MarshalCompressed(elliptic.P256(), partnerPrivKey.PublicKey.X, partnerPrivKey.PublicKey.Y)
+	p256Key, err := keys.ParseP256PublicKey(compressedKey)
+	require.NoError(t, err)
+	jwtPubKey := jwtkeys.PublicFromP256(p256Key)
+
+	testPartnerID := "test-partner-" + uuid.New().String()[:8]
+	testLabel := "client-1"
+
+	senderConfig := wallet.NewTestWalletConfig(t)
+
+	// Provision the partner + key on the coordinator; no public API exists for
+	// it, as in partner_transfer_test.go.
+	coordSetupClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
+	defer coordSetupClient.Close()
+	pk, err := coordSetupClient.PartnerKey.Create().
+		SetPartnerID(testPartnerID).
+		SetPartnerName("Integration Test Partner").
+		SetJwtPublicKey(jwtPubKey).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner key on coordinator")
+	_, err = coordSetupClient.Partner.Create().
+		SetLabel(testLabel).
+		SetPartnerKeyID(pk.ID).
+		Save(t.Context())
+	require.NoError(t, err, "failed to create partner on coordinator")
+
+	token := signJWT(t, "ES256", testPartnerID, testLabel, func(digest []byte) []byte {
+		r, s, err := ecdsa.Sign(rand.Reader, partnerPrivKey, digest)
+		require.NoError(t, err)
+		sig := make([]byte, 64)
+		r.FillBytes(sig[:32])
+		s.FillBytes(sig[32:])
+		return sig
+	})
+
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+	leavesToTransfer := []wallet.LeafKeyTweak{{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
+
+	// Drive the transfer through the public SDK with the partner JWT in context —
+	// the caller path that regressed.
+	ctx := metadata.AppendToOutgoingContext(t.Context(), "x-partner-jwt", token)
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		ctx, senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer via consensus path")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
+
+	transferID, err := uuid.Parse(senderTransfer.GetId())
+	require.NoError(t, err)
+
+	// Assert the side effect: a type=TRANSFER transfer_partners row on the
+	// coordinator (what the downstream RisingWave->BigQuery pipeline consumes).
+	coordClient := db.NewPostgresEntClientForIntegrationTest(t, senderConfig.CoordinatorDatabaseURI)
+	defer coordClient.Close()
+	tp, err := coordClient.TransferPartner.Query().
+		Where(
+			transferpartnerent.HasTransferWith(transferent.IDEQ(transferID)),
+			transferpartnerent.HasPartnerWith(
+				partnerent.HasPartnerKeyWith(partnerkeyent.PartnerIDEQ(testPartnerID)),
+				partnerent.LabelEQ(testLabel),
+			),
+		).
+		Only(t.Context())
+	require.NoError(t, err, "transfer_partners record not found on coordinator for consensus transfer %s", transferID)
+	require.Equal(t, st.TransferPartnerTypeTransfer, tp.Type)
 }
 
 // TestSendTransferV3_Consensus_WritesFlowExecutionRows asserts that every
