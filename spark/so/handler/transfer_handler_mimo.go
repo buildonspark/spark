@@ -31,6 +31,7 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/mimo"
+	"github.com/lightsparkdev/spark/so/partner"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -203,6 +204,10 @@ func (h *TransferHandler) startTransferV3Internal(
 
 	// After this point, the transfer send is considered successful.
 	needsRollback = false
+
+	// Attribute the transfer to the partner before committing, mirroring the
+	// TransferTypeTransfer case in startTransferInternal.
+	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeTransfer)
 
 	// Commit and settle key tweaks.
 	entTx, err := ent.GetTxFromContext(ctx)
