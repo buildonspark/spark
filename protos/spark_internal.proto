@@ -591,6 +591,53 @@ message InitiatePreimageSwapRollbackRequest {
     string transfer_id = 1;
 }
 
+// StaticDepositUtxoRefundPrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND 2PC flow. Wraps the public
+// InitiateStaticDepositUtxoRefundRequest plus the FROST round-1 commitments the
+// coordinator collected (via GetSigningCommitments) before invoking the engine,
+// keyed by operator identifier. Every SO validates the request and creates the
+// UtxoSwap (CREATED) row; SOs whose identifier appears in signing_commitments
+// also produce their round-2 share over the refund-tx sighash. Collecting
+// round-1 on the coordinator keeps the public RPC a single call (the client
+// supplies only its own nonce, as today).
+//
+// The coordinator identity recorded on each SO's UtxoSwap row
+// (coordinator_identity_public_key) is deliberately NOT carried here, so it can
+// never be a self-declared payload value. Each SO instead derives it from the
+// engine's coordinator_index (ConsensusPrepareRequest), resolved against the
+// static operator config, so the stored key is always a real signing
+// operator's.
+message StaticDepositUtxoRefundPrepareRequest {
+    spark.InitiateStaticDepositUtxoRefundRequest original_request = 1;
+    map<string, common.SigningCommitment> signing_commitments = 2;
+}
+
+// StaticDepositUtxoRefundCommitRequest is the 2PC commit payload. Each SO marks
+// its UtxoSwap for the utxo COMPLETED (the signing result is coordinator-local,
+// matching legacy). on_chain_utxo locates the swap row.
+message StaticDepositUtxoRefundCommitRequest {
+    spark.UTXO on_chain_utxo = 1;
+}
+
+// StaticDepositUtxoRefundRollbackRequest is the 2PC rollback payload. Each SO
+// cancels (CancelUtxoSwap -> CANCELLED) the swap it created in Prepare; REFUND
+// swaps skip the SP-3261 transfer-sent guard. Idempotent: NotFound / already
+// terminal is a no-op.
+//
+// on_chain_utxo alone does not discriminate between attempts: once a cancelled
+// swap frees the (utxo, status != CANCELLED) unique slot, a retry can create a
+// new swap for the same UTXO, and a redelivered rollback from the earlier
+// attempt would otherwise cancel the newer swap. Redelivery safety therefore
+// comes from the engine, not this payload: consensus commit/rollback dispatch
+// is fenced on the participant FlowExecution row (keyed by the gossip
+// envelope's flow_execution_id) and skips the handler once that row is
+// terminal. Handler effects and the row's terminal transition commit in the
+// same request transaction, so a terminal row proves this flow's effect was
+// already applied.
+message StaticDepositUtxoRefundRollbackRequest {
+    spark.UTXO on_chain_utxo = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }
