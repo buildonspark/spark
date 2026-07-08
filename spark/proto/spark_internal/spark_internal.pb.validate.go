@@ -8064,6 +8064,455 @@ var _ interface {
 	ErrorName() string
 } = InitiatePreimageSwapRollbackRequestValidationError{}
 
+// Validate checks the field values on StaticDepositUtxoRefundPrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *StaticDepositUtxoRefundPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StaticDepositUtxoRefundPrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// StaticDepositUtxoRefundPrepareRequestMultiError, or nil if none found.
+func (m *StaticDepositUtxoRefundPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositUtxoRefundPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StaticDepositUtxoRefundPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StaticDepositUtxoRefundPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StaticDepositUtxoRefundPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSigningCommitments()))
+		i := 0
+		for key := range m.GetSigningCommitments() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSigningCommitments()[key]
+			_ = val
+
+			// no validation rules for SigningCommitments[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, StaticDepositUtxoRefundPrepareRequestValidationError{
+							field:  fmt.Sprintf("SigningCommitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, StaticDepositUtxoRefundPrepareRequestValidationError{
+							field:  fmt.Sprintf("SigningCommitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return StaticDepositUtxoRefundPrepareRequestValidationError{
+						field:  fmt.Sprintf("SigningCommitments[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return StaticDepositUtxoRefundPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositUtxoRefundPrepareRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// StaticDepositUtxoRefundPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StaticDepositUtxoRefundPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositUtxoRefundPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositUtxoRefundPrepareRequestMultiError) AllErrors() []error { return m }
+
+// StaticDepositUtxoRefundPrepareRequestValidationError is the validation error
+// returned by StaticDepositUtxoRefundPrepareRequest.Validate if the
+// designated constraints aren't met.
+type StaticDepositUtxoRefundPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositUtxoRefundPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositUtxoRefundPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositUtxoRefundPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositUtxoRefundPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositUtxoRefundPrepareRequestValidationError) ErrorName() string {
+	return "StaticDepositUtxoRefundPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositUtxoRefundPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositUtxoRefundPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositUtxoRefundPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositUtxoRefundPrepareRequestValidationError{}
+
+// Validate checks the field values on StaticDepositUtxoRefundCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *StaticDepositUtxoRefundCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StaticDepositUtxoRefundCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// StaticDepositUtxoRefundCommitRequestMultiError, or nil if none found.
+func (m *StaticDepositUtxoRefundCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositUtxoRefundCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StaticDepositUtxoRefundCommitRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StaticDepositUtxoRefundCommitRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StaticDepositUtxoRefundCommitRequestValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return StaticDepositUtxoRefundCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositUtxoRefundCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// StaticDepositUtxoRefundCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StaticDepositUtxoRefundCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositUtxoRefundCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositUtxoRefundCommitRequestMultiError) AllErrors() []error { return m }
+
+// StaticDepositUtxoRefundCommitRequestValidationError is the validation error
+// returned by StaticDepositUtxoRefundCommitRequest.Validate if the designated
+// constraints aren't met.
+type StaticDepositUtxoRefundCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositUtxoRefundCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositUtxoRefundCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositUtxoRefundCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositUtxoRefundCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositUtxoRefundCommitRequestValidationError) ErrorName() string {
+	return "StaticDepositUtxoRefundCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositUtxoRefundCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositUtxoRefundCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositUtxoRefundCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositUtxoRefundCommitRequestValidationError{}
+
+// Validate checks the field values on StaticDepositUtxoRefundRollbackRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *StaticDepositUtxoRefundRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// StaticDepositUtxoRefundRollbackRequest with the rules defined in the proto
+// definition for this message. If any rules are violated, the result is a
+// list of violation errors wrapped in
+// StaticDepositUtxoRefundRollbackRequestMultiError, or nil if none found.
+func (m *StaticDepositUtxoRefundRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositUtxoRefundRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StaticDepositUtxoRefundRollbackRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StaticDepositUtxoRefundRollbackRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StaticDepositUtxoRefundRollbackRequestValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return StaticDepositUtxoRefundRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositUtxoRefundRollbackRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// StaticDepositUtxoRefundRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StaticDepositUtxoRefundRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositUtxoRefundRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositUtxoRefundRollbackRequestMultiError) AllErrors() []error { return m }
+
+// StaticDepositUtxoRefundRollbackRequestValidationError is the validation
+// error returned by StaticDepositUtxoRefundRollbackRequest.Validate if the
+// designated constraints aren't met.
+type StaticDepositUtxoRefundRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositUtxoRefundRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositUtxoRefundRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositUtxoRefundRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositUtxoRefundRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositUtxoRefundRollbackRequestValidationError) ErrorName() string {
+	return "StaticDepositUtxoRefundRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositUtxoRefundRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositUtxoRefundRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositUtxoRefundRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositUtxoRefundRollbackRequestValidationError{}
+
 // Validate checks the field values on ReserveEntityDkgKeyRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
