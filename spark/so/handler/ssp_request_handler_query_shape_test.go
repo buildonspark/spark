@@ -19,13 +19,6 @@ func TestSspQueryHandlersRejectNilRequestsWithoutPanic(t *testing.T) {
 		call func() error
 	}{
 		{
-			name: "query magic swap nodes",
-			call: func() error {
-				_, err := handler.QueryMagicSwapNodes(t.Context(), nil)
-				return err
-			},
-		},
-		{
 			name: "return stuck transfers",
 			call: func() error {
 				_, err := handler.ReturnStuckTransfers(t.Context(), nil)
@@ -95,13 +88,6 @@ func TestSspQueryHandlersRejectNegativeOffsetsBeforeDatabase(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{
-			name: "query magic swap nodes",
-			call: func() error {
-				_, err := handler.QueryMagicSwapNodes(t.Context(), &pbssp.QueryMagicSwapNodesRequest{Offset: -1})
-				return err
-			},
-		},
 		{
 			name: "get stuck lightning payments",
 			call: func() error {

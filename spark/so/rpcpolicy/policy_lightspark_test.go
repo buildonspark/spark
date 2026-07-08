@@ -29,7 +29,7 @@ func TestLightsparkSparkSspInternalPoliciesPresent(t *testing.T) {
 		},
 		{
 			name:         "session-required SSP flow",
-			method:       pbssp.SparkSspInternalService_MagicSwap_FullMethodName,
+			method:       pbssp.SparkSspInternalService_QueryLightningSwapTransfer_FullMethodName,
 			wantAuthMode: AuthSession,
 		},
 	}

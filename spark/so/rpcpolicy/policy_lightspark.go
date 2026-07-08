@@ -19,7 +19,6 @@ func sparkSspInternalServicePolicies() map[string]Policy {
 	return map[string]Policy{
 		// Anonymous, IP-restricted ops RPCs.
 		pbssp.SparkSspInternalService_QueryLostNodes_FullMethodName:              unauthInternal,
-		pbssp.SparkSspInternalService_QueryMagicSwapNodes_FullMethodName:         unauthInternal,
 		pbssp.SparkSspInternalService_GetStuckTransfers_FullMethodName:           unauthInternal,
 		pbssp.SparkSspInternalService_QueryStuckTransfer_FullMethodName:          unauthInternal,
 		pbssp.SparkSspInternalService_CancelStuckTransfer_FullMethodName:         unauthInternal,
@@ -40,9 +39,7 @@ func sparkSspInternalServicePolicies() map[string]Policy {
 		pbssp.SparkSspInternalService_QueryStaticDepositAddresses_FullMethodName: unauthInternal,
 
 		// Session-authenticated, IP-restricted SSP flows.
-		pbssp.SparkSspInternalService_MagicSwap_FullMethodName:                           sessionInternal,
 		pbssp.SparkSspInternalService_QueryLightningSwapTransfer_FullMethodName:          sessionInternal,
-		pbssp.SparkSspInternalService_QueryMagicSwapWallets_FullMethodName:               sessionInternal,
 		pbssp.SparkSspInternalService_ExitTrees_FullMethodName:                           sessionInternal,
 		pbssp.SparkSspInternalService_TweakKeysForCoopExit_FullMethodName:                sessionInternal,
 		pbssp.SparkSspInternalService_InitiateStaticDepositUtxoSwap_FullMethodName:       sessionInternal,
