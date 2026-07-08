@@ -1220,11 +1220,15 @@ func (h *LightningHandler) GetPreimageShare(
 			if err != nil {
 				return fmt.Errorf("unable to validate stored invoice: %w", err)
 			}
-			invoiceAmount = &pbspark.InvoiceAmount{
-				ValueSats: uint64(storedInvoice.MilliSatoshi() / 1000),
-				InvoiceAmountProof: &pbspark.InvoiceAmountProof{
-					Bolt11Invoice: preimageShare.InvoiceString,
-				},
+			// For an amountless invoice, keep the caller-claimed amount, matching the
+			// coordinator paths (initiatePreimageSwap and the 2PC flow handler).
+			if storedInvoice.MilliSatoshi() > 0 {
+				invoiceAmount = &pbspark.InvoiceAmount{
+					ValueSats: uint64(storedInvoice.MilliSatoshi() / 1000),
+					InvoiceAmountProof: &pbspark.InvoiceAmountProof{
+						Bolt11Invoice: preimageShare.InvoiceString,
+					},
+				}
 			}
 		}
 		// No-op for a package-only send (validation* lists empty); ValidateTransferPackage
