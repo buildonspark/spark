@@ -12,6 +12,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/bolt11"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
@@ -34,7 +35,6 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
-	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -191,13 +191,13 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 	// amount) whenever a preimage share exists, matching legacy.
 	invoiceAmount := req.GetInvoiceAmount()
 	if preimageShare != nil {
-		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
+		storedInvoice, err := bolt11.Parse(preimageShare.InvoiceString, preimageShare.PaymentHash)
 		if err != nil {
-			return nil, fmt.Errorf("unable to decode invoice: %w", err)
+			return nil, fmt.Errorf("unable to validate stored invoice: %w", err)
 		}
-		if bolt11.MSatoshi > 0 {
+		if storedInvoice.MilliSatoshi() > 0 {
 			invoiceAmount = &pbspark.InvoiceAmount{
-				ValueSats: uint64(bolt11.MSatoshi / 1000),
+				ValueSats: uint64(storedInvoice.MilliSatoshi() / 1000),
 				InvoiceAmountProof: &pbspark.InvoiceAmountProof{
 					Bolt11Invoice: preimageShare.InvoiceString,
 				},
