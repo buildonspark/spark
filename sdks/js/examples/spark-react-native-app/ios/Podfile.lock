@@ -1803,7 +1803,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - Yoga
   - SocketRocket (0.7.1)
-  - spark-sdk (0.6.4):
+  - spark-sdk (0.8.8):
     - gRPC-Swift
     - React
     - React-Core
@@ -2225,7 +2225,7 @@ SPEC CHECKSUMS:
   gRPC-Swift: 74adcaaa62ac5e0a018938840328cb1fdfb09e7b
   hermes-engine: 8b5a5eb386b990287d072fd7b6f6ebd9544dd251
   Logging: beeb016c9c80cf77042d62e83495816847ef108b
-  RCT-Folly: e78785aa9ba2ed998ea4151e314036f6c49e6d82
+  RCT-Folly: 36fe2295e44b10d831836cc0d1daec5f8abcf809
   RCTDeprecation: 0418ac97b9f53b2e37f473da1663ef3061e46beb
   RCTRequired: b9fde7f981b11aa898f03a70d3d4d36b80f1b16d
   RCTTypeSafety: 397515ea9a8122b62a7a310adf30205f0a5e3bfc
@@ -2291,7 +2291,7 @@ SPEC CHECKSUMS:
   ReactCommon: 2bc79208d91eda74edeff759d82c93460b07612f
   RNScreens: ff9b889ead6100d019d236599741efc1c4586128
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  spark-sdk: d2d49f5480c05235e9416f74a35f5ac957751b2f
+  spark-sdk: f1178388224433dd6a536d0ffc5a5831f6e0df07
   SwiftNIO: 829958aab300642625091f82fc2f49cb7cf4ef24
   SwiftNIOConcurrencyHelpers: 697370136789b1074e4535eaae75cbd7f900370e
   SwiftNIOCore: 473fdfe746534d7aa25766916459eeaf6f92ef49
@@ -2306,8 +2306,8 @@ SPEC CHECKSUMS:
   SwiftNIOTLS: 598af547490133e9aac52aed0c23c4a90c31dcfc
   SwiftNIOTransportServices: 0b2b407819d82eb63af558c5396e33c945759503
   SwiftProtobuf: 24536165ff31bd2bd1aa8ad9307a128dc0a06dd0
-  Yoga: 9cb1d1ce8507db40a1821da861bde88bf9fa060c
+  Yoga: a6cb833e04fb8c59a012b49fb1d040fcb0cbb633
 
 PODFILE CHECKSUM: b350718a4117f8243a2fc2bd003dd0e76db8fd56
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2
