@@ -29,6 +29,7 @@ import (
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -618,7 +619,13 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 		return err
 	}
 
-	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.GetTransferPackage())
+	pkg, err := transferpkg.ParsePackage(senderPkg.GetTransferPackage())
+	if err != nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
+	}
+	cpfpLeafRefundMap := stringKeyedRefundMap(pkg.CPFPRefundTxByLeafID())
+	directLeafRefundMap := stringKeyedRefundMap(pkg.DirectRefundTxByLeafID())
+	directFromCpfpLeafRefundMap := stringKeyedRefundMap(pkg.DirectFromCPFPRefundTxByLeafID())
 
 	// Apply refund signatures to transactions and verify.
 	cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = applyRefundSignatures(

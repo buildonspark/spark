@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
@@ -123,7 +124,13 @@ func (h *TransferHandler) startTransferV3Internal(
 		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
 	}
 
-	leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap := loadLeafRefundMapsFromTransferPackage(senderPkg.GetTransferPackage())
+	pkg, err := transferpkg.ParsePackage(senderPkg.GetTransferPackage())
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
+	}
+	leafCpfpRefundMap := stringKeyedRefundMap(pkg.CPFPRefundTxByLeafID())
+	leafDirectRefundMap := stringKeyedRefundMap(pkg.DirectRefundTxByLeafID())
+	leafDirectFromCpfpRefundMap := stringKeyedRefundMap(pkg.DirectFromCPFPRefundTxByLeafID())
 
 	// Mutual exclusivity
 	if err := createPendingSendTransferAndCommit(ctx, transferID); err != nil {

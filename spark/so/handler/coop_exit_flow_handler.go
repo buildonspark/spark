@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 
 	"github.com/btcsuite/btcd/wire"
@@ -12,7 +11,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/sighash"
-	"github.com/lightsparkdev/spark/common/uuids"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -24,10 +22,10 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/partner"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -98,7 +96,9 @@ func (h *CoopExitFlowHandler) Prepare(ctx context.Context, op proto.Message) (pr
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer package contains no key tweaks"))
 	}
 
-	cpfpMap, directMap, dfcMap := loadLeafRefundMaps(orig.GetTransfer())
+	cpfpMap := stringKeyedRefundMap(parsed.pkg.CPFPRefundTxByLeafID())
+	directMap := stringKeyedRefundMap(parsed.pkg.DirectRefundTxByLeafID())
+	dfcMap := stringKeyedRefundMap(parsed.pkg.DirectFromCPFPRefundTxByLeafID())
 
 	// TransferRoleParticipant on every SO (including the coordinator): the
 	// engine's FlowExecution row tracks role, so we don't need the legacy
@@ -152,7 +152,7 @@ func (h *CoopExitFlowHandler) Prepare(ctx context.Context, op proto.Message) (pr
 		return nil, fmt.Errorf("unable to parse connector tx: %w", err)
 	}
 
-	jobs, err := buildCoopExitLocalSigningJobs(ctx, parsed.transferID, orig.GetTransfer().GetTransferPackage(), leafMap, connectorPrevOuts)
+	jobs, err := buildCoopExitLocalSigningJobs(ctx, parsed.transferID, parsed.pkg, leafMap, connectorPrevOuts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build local signing jobs: %w", err)
 	}
@@ -454,18 +454,9 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 		return nil, err
 	}
 
-	pkg := req.GetTransfer().GetTransferPackage()
-	cpfpMap, directMap, dfcMap := loadLeafRefundMapsFromTransferPackage(pkg)
-	// Union of all three refund maps so direct/dfc-only leaves are still loaded;
-	// values are last-writer-wins, but only the keys are consumed downstream.
-	leafRefundUnion := make(map[string][]byte, len(cpfpMap))
-	maps.Copy(leafRefundUnion, cpfpMap)
-	maps.Copy(leafRefundUnion, directMap)
-	maps.Copy(leafRefundUnion, dfcMap)
-	leafUUIDs, err := uuids.ParseSeq(maps.Keys(leafRefundUnion))
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse leaf IDs for coop exit coordinator flow: %w", err)
-	}
+	// pkg.LeafIDs() is the distinct union across all three refund variants, so direct/dfc-only
+	// leaves are still loaded.
+	leafUUIDs := parsed.pkg.LeafIDs()
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -480,8 +471,8 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 	if err != nil {
 		return nil, fmt.Errorf("unable to preload leaves for coop exit coordinator flow: %w", err)
 	}
-	if len(leaves) != len(leafRefundUnion) {
-		return nil, fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafRefundUnion))
+	if len(leaves) != len(leafUUIDs) {
+		return nil, fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafUUIDs))
 	}
 	leafMap := make(map[string]*ent.TreeNode, len(leaves))
 	for _, leaf := range leaves {
@@ -493,7 +484,7 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 		return nil, fmt.Errorf("unable to parse connector tx: %w", err)
 	}
 
-	jobsByLeaf, err := buildCoopExitAggregationJobs(ctx, parsed.transferID, pkg, leafMap, connectorPrevOuts)
+	jobsByLeaf, err := buildCoopExitAggregationJobs(ctx, parsed.transferID, parsed.pkg, leafMap, connectorPrevOuts)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build coop exit signing-job helpers: %w", err)
 	}
@@ -514,6 +505,7 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 type parsedCoopExitRequest struct {
 	transferID   uuid.UUID
 	exitID       uuid.UUID
+	pkg          *transferpkg.Package
 	senderIDPK   keys.Public
 	receiverIDPK keys.Public
 }
@@ -532,6 +524,10 @@ func parseCoopExitRequest(req *pb.CooperativeExitRequest) (parsedCoopExitRequest
 	}
 	if req.GetTransfer().GetTransferPackage() == nil {
 		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required for consensus coop exit"))
+	}
+	pkg, err := transferpkg.ParsePackage(req.GetTransfer().GetTransferPackage())
+	if err != nil {
+		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
 	}
 	if len(req.GetConnectorTx()) == 0 {
 		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("connector_tx is required for cooperative exit"))
@@ -558,6 +554,7 @@ func parseCoopExitRequest(req *pb.CooperativeExitRequest) (parsedCoopExitRequest
 	return parsedCoopExitRequest{
 		transferID:   transferID,
 		exitID:       exitID,
+		pkg:          pkg,
 		senderIDPK:   senderIDPK,
 		receiverIDPK: receiverIDPK,
 	}, nil
@@ -582,7 +579,7 @@ func coopExitJobID(transferID uuid.UUID, leafID string, txKind string) uuid.UUID
 func buildCoopExitAggregationJobs(
 	ctx context.Context,
 	transferID uuid.UUID,
-	pkg *pb.TransferPackage,
+	pkg *transferpkg.Package,
 	leafMap map[string]*ent.TreeNode,
 	connectorPrevOuts map[wire.OutPoint]*wire.TxOut,
 ) (map[string]*sendTransferLeafSigningJobs, error) {
@@ -590,41 +587,44 @@ func buildCoopExitAggregationJobs(
 	for _, leaf := range leafMap {
 		out[leaf.ID.String()] = &sendTransferLeafSigningJobs{leaf: leaf}
 	}
-	for _, req := range pkg.GetLeavesToSend() {
-		leaf, ok := leafMap[req.GetLeafId()]
+	for _, job := range pkg.LeavesToSend() {
+		leafID := job.LeafID().String()
+		leaf, ok := leafMap[leafID]
 		if !ok {
-			return nil, fmt.Errorf("cpfp leaf %s not found in leaf map", req.GetLeafId())
+			return nil, fmt.Errorf("cpfp leaf %s not found in leaf map", leafID)
 		}
-		job, err := buildCoopExitSigningJobForRefund(ctx, req, leaf, leaf.RawTx, coopExitJobID(transferID, leaf.ID.String(), "cpfp"), connectorPrevOuts)
+		signingJob, err := buildCoopExitSigningJobForRefund(ctx, job, leaf, leaf.RawTx, coopExitJobID(transferID, leafID, "cpfp"), connectorPrevOuts)
 		if err != nil {
-			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
+			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", leafID, err)
 		}
-		out[req.GetLeafId()].cpfp = job
-		out[req.GetLeafId()].cpfpUserSig = req.GetUserSignature()
+		out[leafID].cpfp = signingJob
+		out[leafID].cpfpUserSig = job.Inputs()[0].UserSignature()
 	}
-	for _, req := range pkg.GetDirectLeavesToSend() {
-		leaf, ok := leafMap[req.GetLeafId()]
+	for _, job := range pkg.DirectLeavesToSend() {
+		leafID := job.LeafID().String()
+		leaf, ok := leafMap[leafID]
 		if !ok {
-			return nil, fmt.Errorf("direct leaf %s not found in leaf map", req.GetLeafId())
+			return nil, fmt.Errorf("direct leaf %s not found in leaf map", leafID)
 		}
-		job, err := buildCoopExitSigningJobForRefund(ctx, req, leaf, leaf.DirectTx, coopExitJobID(transferID, leaf.ID.String(), "direct"), connectorPrevOuts)
+		signingJob, err := buildCoopExitSigningJobForRefund(ctx, job, leaf, leaf.DirectTx, coopExitJobID(transferID, leafID, "direct"), connectorPrevOuts)
 		if err != nil {
-			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", req.GetLeafId(), err)
+			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", leafID, err)
 		}
-		out[req.GetLeafId()].direct = job
-		out[req.GetLeafId()].directUserSig = req.GetUserSignature()
+		out[leafID].direct = signingJob
+		out[leafID].directUserSig = job.Inputs()[0].UserSignature()
 	}
-	for _, req := range pkg.GetDirectFromCpfpLeavesToSend() {
-		leaf, ok := leafMap[req.GetLeafId()]
+	for _, job := range pkg.DirectFromCPFPLeavesToSend() {
+		leafID := job.LeafID().String()
+		leaf, ok := leafMap[leafID]
 		if !ok {
-			return nil, fmt.Errorf("direct-from-cpfp leaf %s not found in leaf map", req.GetLeafId())
+			return nil, fmt.Errorf("direct-from-cpfp leaf %s not found in leaf map", leafID)
 		}
-		job, err := buildCoopExitSigningJobForRefund(ctx, req, leaf, leaf.RawTx, coopExitJobID(transferID, leaf.ID.String(), "directFromCpfp"), connectorPrevOuts)
+		signingJob, err := buildCoopExitSigningJobForRefund(ctx, job, leaf, leaf.RawTx, coopExitJobID(transferID, leafID, "directFromCpfp"), connectorPrevOuts)
 		if err != nil {
-			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
+			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", leafID, err)
 		}
-		out[req.GetLeafId()].dfc = job
-		out[req.GetLeafId()].dfcUserSig = req.GetUserSignature()
+		out[leafID].dfc = signingJob
+		out[leafID].dfcUserSig = job.Inputs()[0].UserSignature()
 	}
 	return out, nil
 }
@@ -635,7 +635,7 @@ func buildCoopExitAggregationJobs(
 func buildCoopExitLocalSigningJobs(
 	ctx context.Context,
 	transferID uuid.UUID,
-	pkg *pb.TransferPackage,
+	pkg *transferpkg.Package,
 	leafMap map[string]*ent.TreeNode,
 	connectorPrevOuts map[wire.OutPoint]*wire.TxOut,
 ) ([]*pbinternal.SigningJob, error) {
@@ -643,8 +643,8 @@ func buildCoopExitLocalSigningJobs(
 	// addJob takes the already-resolved leaf and the parent tx bytes whose vout 0
 	// the refund spends (leaf.RawTx for cpfp/direct-from-cpfp, leaf.DirectTx for
 	// direct) — the caller selects parentTxBytes per variant.
-	addJob := func(req *pb.UserSignedTxSigningJob, txKind string, leaf *ent.TreeNode, parentTxBytes []byte) error {
-		helperJob, err := buildCoopExitSigningJobForRefund(ctx, req, leaf, parentTxBytes, coopExitJobID(transferID, leaf.ID.String(), txKind), connectorPrevOuts)
+	addJob := func(job *transferpkg.RefundSigningJob, txKind string, leaf *ent.TreeNode, parentTxBytes []byte) error {
+		helperJob, err := buildCoopExitSigningJobForRefund(ctx, job, leaf, parentTxBytes, coopExitJobID(transferID, leaf.ID.String(), txKind), connectorPrevOuts)
 		if err != nil {
 			return err
 		}
@@ -655,31 +655,34 @@ func buildCoopExitLocalSigningJobs(
 		jobs = append(jobs, marshalled)
 		return nil
 	}
-	for _, req := range pkg.GetLeavesToSend() {
-		leaf, ok := leafMap[req.GetLeafId()]
+	for _, job := range pkg.LeavesToSend() {
+		leafID := job.LeafID().String()
+		leaf, ok := leafMap[leafID]
 		if !ok {
-			return nil, fmt.Errorf("cpfp leaf %s not found", req.GetLeafId())
+			return nil, fmt.Errorf("cpfp leaf %s not found", leafID)
 		}
-		if err := addJob(req, "cpfp", leaf, leaf.RawTx); err != nil {
-			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
+		if err := addJob(job, "cpfp", leaf, leaf.RawTx); err != nil {
+			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", leafID, err)
 		}
 	}
-	for _, req := range pkg.GetDirectLeavesToSend() {
-		leaf, ok := leafMap[req.GetLeafId()]
+	for _, job := range pkg.DirectLeavesToSend() {
+		leafID := job.LeafID().String()
+		leaf, ok := leafMap[leafID]
 		if !ok {
-			return nil, fmt.Errorf("direct leaf %s not found", req.GetLeafId())
+			return nil, fmt.Errorf("direct leaf %s not found", leafID)
 		}
-		if err := addJob(req, "direct", leaf, leaf.DirectTx); err != nil {
-			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", req.GetLeafId(), err)
+		if err := addJob(job, "direct", leaf, leaf.DirectTx); err != nil {
+			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", leafID, err)
 		}
 	}
-	for _, req := range pkg.GetDirectFromCpfpLeavesToSend() {
-		leaf, ok := leafMap[req.GetLeafId()]
+	for _, job := range pkg.DirectFromCPFPLeavesToSend() {
+		leafID := job.LeafID().String()
+		leaf, ok := leafMap[leafID]
 		if !ok {
-			return nil, fmt.Errorf("direct-from-cpfp leaf %s not found", req.GetLeafId())
+			return nil, fmt.Errorf("direct-from-cpfp leaf %s not found", leafID)
 		}
-		if err := addJob(req, "directFromCpfp", leaf, leaf.RawTx); err != nil {
-			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
+		if err := addJob(job, "directFromCpfp", leaf, leaf.RawTx); err != nil {
+			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", leafID, err)
 		}
 	}
 	return jobs, nil
@@ -694,16 +697,13 @@ func buildCoopExitLocalSigningJobs(
 // leaf.DirectTx for direct).
 func buildCoopExitSigningJobForRefund(
 	ctx context.Context,
-	req *pb.UserSignedTxSigningJob,
+	job *transferpkg.RefundSigningJob,
 	leaf *ent.TreeNode,
 	parentTxBytes []byte,
 	jobID uuid.UUID,
 	connectorPrevOuts map[wire.OutPoint]*wire.TxOut,
 ) (*helper.SigningJobWithPregeneratedNonce, error) {
-	refundTx, err := common.TxFromRawTxBytes(req.GetRawTx())
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse refund tx: %w", err)
-	}
+	refundTx := job.RefundTx()
 	parentTx, err := common.TxFromRawTxBytes(parentTxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse parent tx: %w", err)
@@ -737,25 +737,17 @@ func buildCoopExitSigningJobForRefund(
 		return nil, fmt.Errorf("compute sighash: %w", err)
 	}
 
-	userCommitment := frost.SigningCommitment{}
-	if err := userCommitment.UnmarshalProto(req.GetSigningNonceCommitment()); err != nil {
-		return nil, fmt.Errorf("unmarshal user nonce commitment: %w", err)
-	}
+	input := job.Inputs()[0]
+	userCommitment := input.SigningNonceCommitment()
 
-	round1 := make(map[string]frost.SigningCommitment)
-	signingCommitments := req.GetSigningCommitments()
-	if signingCommitments == nil {
+	round1 := input.SigningCommitments()
+	if len(round1) == 0 {
 		return nil, fmt.Errorf("missing signing_commitments")
 	}
-	for opID, commitment := range signingCommitments.GetSigningCommitments() {
-		c := frost.SigningCommitment{}
-		if err := c.UnmarshalProto(commitment); err != nil {
-			return nil, fmt.Errorf("unmarshal round1 commitment for %s: %w", opID, err)
-		}
+	for opID, c := range round1 {
 		if c.IsZero() {
 			return nil, fmt.Errorf("round1 commitment for %s is zero", opID)
 		}
-		round1[opID] = c
 	}
 
 	signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)

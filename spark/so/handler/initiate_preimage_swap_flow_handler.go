@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
-	"github.com/lightsparkdev/spark/common/uuids"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
@@ -35,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -117,7 +117,10 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 	// (buildHTLCRefundMaps reconstructed and byte-matched them against the
 	// package in prepareState), so the SEND signing-job builder applies directly.
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND && req.GetTransferRequest() != nil {
-		pkg := req.GetTransferRequest().GetTransferPackage()
+		pkg, err := transferpkg.ParsePackage(req.GetTransferRequest().GetTransferPackage())
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
+		}
 		jobs, err := buildSendTransferLocalSigningJobs(ctx, state.transferID, pkg, state.leafMap)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build local signing jobs: %w", err)
@@ -838,7 +841,10 @@ func buildInitiatePreimageSwapCoordinatorFlow(ctx context.Context, config *so.Co
 	}
 
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND && req.GetTransferRequest() != nil {
-		pkg := req.GetTransferRequest().GetTransferPackage()
+		pkg, err := transferpkg.ParsePackage(req.GetTransferRequest().GetTransferPackage())
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
+		}
 		leafMap, err := preloadLeavesForTransferPackage(ctx, pkg)
 		if err != nil {
 			return nil, err
@@ -864,16 +870,8 @@ func buildInitiatePreimageSwapCoordinatorFlow(ctx context.Context, config *so.Co
 // a sighash divergence reaching signing. Locking here would hold row locks on
 // every leaf for the entire Prepare RPC fan-out plus FROST aggregation, blocking
 // concurrent transfers/claims/exits on the same leaves.
-func preloadLeavesForTransferPackage(ctx context.Context, pkg *pbspark.TransferPackage) (map[string]*ent.TreeNode, error) {
-	cpfpMap, directMap, dfcMap := loadLeafRefundMapsFromTransferPackage(pkg)
-	leafRefundUnion := make(map[string][]byte, len(cpfpMap))
-	maps.Copy(leafRefundUnion, cpfpMap)
-	maps.Copy(leafRefundUnion, directMap)
-	maps.Copy(leafRefundUnion, dfcMap)
-	leafUUIDs, err := uuids.ParseSeq(maps.Keys(leafRefundUnion))
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse leaf IDs for coordinator flow: %w", err)
-	}
+func preloadLeavesForTransferPackage(ctx context.Context, pkg *transferpkg.Package) (map[string]*ent.TreeNode, error) {
+	leafUUIDs := pkg.LeafIDs()
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -882,8 +880,8 @@ func preloadLeavesForTransferPackage(ctx context.Context, pkg *pbspark.TransferP
 	if err != nil {
 		return nil, fmt.Errorf("unable to preload leaves for coordinator flow: %w", err)
 	}
-	if len(leaves) != len(leafRefundUnion) {
-		return nil, fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafRefundUnion))
+	if len(leaves) != len(leafUUIDs) {
+		return nil, fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafUUIDs))
 	}
 	leafMap := make(map[string]*ent.TreeNode, len(leaves))
 	for _, leaf := range leaves {
