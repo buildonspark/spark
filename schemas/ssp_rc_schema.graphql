@@ -1232,7 +1232,9 @@ type SparkWalletWebhookEntry {
   event_types: [SparkWalletWebhookEventType!]!
 }
 
-"""Event types supported by Spark wallet webhooks."""
+"""
+Event types supported by Spark wallet webhooks. A *_FINISHED event is sent when the flow reaches a terminal state; read `request_status` (SUCCEEDED / FAILED / CANCELED) and `status` from the payload to determine the outcome.
+"""
 enum SparkWalletWebhookEventType {
   SPARK_LIGHTNING_RECEIVE_FINISHED
   SPARK_LIGHTNING_SEND_FINISHED
