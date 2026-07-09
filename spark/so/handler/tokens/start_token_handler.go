@@ -176,7 +176,7 @@ func callPrepareTokenTransactionInternal(ctx context.Context, operator *so.Signi
 ) error {
 	ctx, span := GetTracer().Start(ctx, "StartTokenTransactionHandler.callPrepareTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, finalTokenTransaction))
 	defer span.End()
-	conn, err := operator.NewOperatorGRPCConnection()
+	conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 	if err != nil {
 		return sparkerrors.UnavailableExternalOperator(tokens.FormatErrorWithTransactionProto(fmt.Sprintf(tokens.ErrFailedToConnectToOperator, operator.Identifier), finalTokenTransaction, err))
 	}

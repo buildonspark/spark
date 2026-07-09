@@ -857,7 +857,7 @@ func (h *TransferHandler) settleSenderKeyTweaks(ctx context.Context, transferID 
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1019,7 +1019,7 @@ func (h *TransferHandler) syncTransferInit(
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1060,7 +1060,7 @@ func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -3264,7 +3264,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 	action := pbinternal.SettleKeyTweakAction_COMMIT
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -3317,7 +3317,7 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 
 	// Phase 2: COMMIT - Settle the receiver's key tweak request to all SOs
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}

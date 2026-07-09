@@ -79,7 +79,7 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 	if !ok {
 		return fmt.Errorf("operator %s not found", participant)
 	}
-	conn, err := operator.NewOperatorGRPCConnection()
+	conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 	if err != nil {
 		return err
 	}

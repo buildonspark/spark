@@ -108,7 +108,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 			if requireInputSignatures && foundOperatorSignatures == nil {
 				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signatures found for operator %s", operator.Identifier))
 			}
-			conn, err := operator.NewOperatorGRPCConnection()
+			conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 			if err != nil {
 				return nil, sparkerrors.UnavailableExternalOperator(fmt.Errorf("failed to connect to operator %s: %w", operator.Identifier, err))
 			}
@@ -419,7 +419,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	// exchange the revocation secret shares with all other operators
 	opSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	response, errorExchangingWithAllOperators := helper.ExecuteTaskWithAllOperators(ctx, h.config, &opSelection, func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, sparkerrors.UnavailableExternalOperator(fmt.Errorf("failed to connect to operator %s: %w for token txHash: %x", operator.Identifier, err, tokenTransactionHash))
 		}

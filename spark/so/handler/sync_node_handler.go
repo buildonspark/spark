@@ -58,7 +58,7 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUUIDsToFix, err)
 	}
 
-	conn, err := operator.NewOperatorGRPCConnection()
+	conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get operator grpc connection: %w", err)
 	}

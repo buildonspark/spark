@@ -1,7 +1,7 @@
 package so
 
 import (
-	"encoding/hex"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -22,6 +23,23 @@ type OperatorClientConn interface {
 	Close() error
 }
 
+// connTransport distinguishes the credential flavor a pool dials with, so pools for different transports never
+// collide even when they target the same address.
+type connTransport string
+
+const (
+	// transportTLS is a plain-TLS dial via OperatorConnectionFactory (public listener).
+	transportTLS connTransport = "tls"
+	// transportBrontide is a brontide dial via internalConnFactory (internal-only listener).
+	transportBrontide connTransport = "brontide"
+)
+
+// connPoolKey identifies a connection pool by both transport and target address.
+type connPoolKey struct {
+	transport connTransport
+	address   string
+}
+
 // SigningOperator is the information about a signing operator.
 type SigningOperator struct {
 	// ID is the index of the signing operator.
@@ -29,10 +47,13 @@ type SigningOperator struct {
 	// Identifier is the identifier of the signing operator, which will be index + 1 in 32 bytes big endian hex string.
 	// Used as shamir secret share identifier in DKG key shares.
 	Identifier string
-	// AddressRpc is the address of the signing operator.
+	// AddressRpc is the address of the signing operator on the public listener.
 	AddressRpc string
 	// Address is the address of the signing operator used for serving the DKG service.
 	AddressDkg string
+	// InternalAddress is the address of the brontide-protected internal listener (host:port).
+	// Required when this operator is dialed using brontide credentials; unused otherwise.
+	InternalAddress string
 	// IdentityPublicKey is the identity public key of the signing operator.
 	IdentityPublicKey keys.Public
 	// ServerCertPath is the path to the server certificate.
@@ -49,10 +70,24 @@ type SigningOperator struct {
 	Logger *zap.Logger
 	// connPoolConfig holds the pool configuration for outbound gRPC connections.
 	connPoolConfig OperatorConnectionPoolConfig
-	// connPools caches pools per gRPC target address (RPC vs DKG).
-	connPools map[string]*operatorConnPool
+	// connPools caches pools per (transport, target address). Keying on transport as well as address keeps the
+	// plain-TLS and brontide pools separate even if InternalAddress aliases AddressRpc/AddressDkg (e.g. via the
+	// AddressDkg defaulting in UnmarshalJSON or a misconfiguration) — otherwise the first dial's factory would be
+	// silently reused for the other transport.
+	connPools map[connPoolKey]*operatorConnPool
 	// connPoolsMu guards connPools access.
 	connPoolsMu sync.Mutex
+	// internalConnFactory, if non-nil, is used by NewOperatorInternalGRPCConnection and NewOperatorGRPCConnectionForDKG
+	// to dial this peer's internal-only listener. EnableBrontideClient installs it; otherwise nil and internal-flavored
+	// callers fall through to OperatorConnectionFactory + AddressRpc.
+	//
+	// Kept separate from OperatorConnectionFactory because that factory is also used by cross-operator SparkService
+	// calls and must keep dialing AddressRpc with plain TLS regardless of brontide mode.
+	internalConnFactory OperatorConnectionFactory
+	// brontideAvailable is true when brontide has been provisioned for this peer. It's a necessary but not sufficient
+	// condition for dialing over brontide: the internal-flavored connection methods additionally require the
+	// KnobInternalRPCBrontideEnabled knob to be on.
+	brontideAvailable bool
 }
 
 type OperatorConnectionFactory interface {
@@ -86,11 +121,21 @@ func NewOperatorConnectionFactorySecure(operator *SigningOperator) OperatorConne
 	return &operatorConnectionFactorySecure{operator: operator}
 }
 
+// SetInternalConnectionFactory installs the factory used for internal-flavored dials
+// (NewOperatorInternalGRPCConnection, NewOperatorGRPCConnectionForDKG) when brontide is enabled. It's a seam for
+// tests that inject a mock connection factory: without it, a test that flips brontide on would route around the
+// injected OperatorConnectionFactory and dial the real InternalAddress. It does not set brontideAvailable — that
+// remains gated by brontide provisioning.
+func (s *SigningOperator) SetInternalConnectionFactory(factory OperatorConnectionFactory) {
+	s.internalConnFactory = factory
+}
+
 // jsonSigningOperator is used for JSON unmarshaling
 type jsonSigningOperator struct {
 	ID                uint32  `json:"id"`
 	Address           string  `json:"address"`
 	AddressDkg        *string `json:"address_dkg"`
+	InternalAddress   string  `json:"internal_address"`
 	IdentityPublicKey string  `json:"identity_public_key"`
 	CertPath          string  `json:"cert_path"`
 	ExternalAddress   string  `json:"external_address"`
@@ -103,12 +148,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Decode hex string to bytes
-	pubKey, err := hex.DecodeString(js.IdentityPublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to decode public key hex: %w", err)
-	}
-	identityPubKey, err := keys.ParsePublicKey(pubKey)
+	identityPubKey, err := keys.ParsePublicKeyHex(js.IdentityPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}
@@ -122,6 +162,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 	} else {
 		s.AddressDkg = js.Address // Use the same address for DKG if not specified
 	}
+	s.InternalAddress = js.InternalAddress
 	s.CertPath = js.CertPath
 	s.ExternalAddress = js.ExternalAddress
 	s.OperatorConnectionFactory = NewOperatorConnectionFactorySecure(s)
@@ -140,49 +181,117 @@ func (s *SigningOperator) MarshalProto() *pb.SigningOperatorInfo {
 }
 
 func (s *SigningOperator) newGrpcConnection(address string) (OperatorClientConn, error) {
-	pool, err := s.getOrCreateConnectionPool(address)
+	return s.newGrpcConnectionVia(transportTLS, s.OperatorConnectionFactory, address)
+}
+
+// newGrpcConnectionVia is the same as newGrpcConnection but lets pool creators pick the transport and factory used for
+// first-time dials on a given address.
+func (s *SigningOperator) newGrpcConnectionVia(transport connTransport, factory OperatorConnectionFactory, address string) (OperatorClientConn, error) {
+	pool, err := s.getOrCreateConnectionPool(transport, factory, address)
 	if err != nil {
 		return nil, err
 	}
 	return pool.getConnection()
 }
 
-func (s *SigningOperator) getOrCreateConnectionPool(address string) (*operatorConnPool, error) {
+func (s *SigningOperator) getOrCreateConnectionPool(transport connTransport, factory OperatorConnectionFactory, address string) (*operatorConnPool, error) {
 	s.connPoolsMu.Lock()
 	defer s.connPoolsMu.Unlock()
 
 	if s.connPools == nil {
-		s.connPools = make(map[string]*operatorConnPool)
+		s.connPools = make(map[connPoolKey]*operatorConnPool)
 	}
 
-	if pool, ok := s.connPools[address]; ok {
+	key := connPoolKey{transport: transport, address: address}
+	if pool, ok := s.connPools[key]; ok {
 		return pool, nil
 	}
 
-	ocf := s.OperatorConnectionFactory
-	if ocf == nil {
-		ocf = &operatorConnectionFactorySecure{operator: s}
+	if factory == nil {
+		factory = &operatorConnectionFactorySecure{operator: s}
 	}
 
-	factory := func() (*grpc.ClientConn, error) {
-		return ocf.NewGRPCConnection(address, nil, &s.ClientTimeoutConfig)
+	dial := func() (*grpc.ClientConn, error) {
+		return factory.NewGRPCConnection(address, nil, &s.ClientTimeoutConfig)
 	}
 
-	pool := newOperatorConnPool(factory, s.connPoolConfig, s.Logger)
-	s.connPools[address] = pool
+	pool := newOperatorConnPool(dial, s.connPoolConfig, s.Logger)
+	s.connPools[key] = pool
 	return pool, nil
 }
 
-// NewOperatorGRPCConnection returns a pooled gRPC connection to the operator's RPC endpoint.
+// NewOperatorGRPCConnection returns a pooled plain-TLS gRPC connection to the peer's public listener (AddressRpc).
+// This is the right method for cross-operator calls into SparkService (e.g. QueryNodes during tree-sync) and for any
+// other RPC that targets a service registered on the public listener. Internal-only services should use
+// NewOperatorInternalGRPCConnection.
+//
 // Callers MUST close the returned connection to release it back to the pool.
 func (s *SigningOperator) NewOperatorGRPCConnection() (OperatorClientConn, error) {
 	return s.newGrpcConnection(s.AddressRpc)
 }
 
-// NewOperatorGRPCConnectionForDKG creates a DKG connection to the AddressDkg endpoint.
+// NewOperatorInternalGRPCConnection returns a pooled gRPC connection for SO-to-SO internal-only services. It routes
+// over brontide when enabled; otherwise it falls back to plain TLS against the public listener.
+//
 // Callers MUST close the returned connection to release it back to the pool.
-func (s *SigningOperator) NewOperatorGRPCConnectionForDKG() (OperatorClientConn, error) {
+func (s *SigningOperator) NewOperatorInternalGRPCConnection(ctx context.Context) (OperatorClientConn, error) {
+	if s.brontideEnabled(ctx) {
+		return s.newGrpcConnectionVia(transportBrontide, s.internalConnFactory, s.InternalAddress)
+	}
+	s.evictBrontidePoolIfDisabled(ctx)
+	return s.NewOperatorGRPCConnection()
+}
+
+// NewOperatorGRPCConnectionForDKG creates a connection for the DKG service. Like NewOperatorInternalGRPCConnection, it
+// routes over brontide only when brontide is provisioned and the KnobInternalRPCBrontideEnabled knob is on.
+//
+// Callers MUST close the returned connection to release it back to the pool.
+func (s *SigningOperator) NewOperatorGRPCConnectionForDKG(ctx context.Context) (OperatorClientConn, error) {
+	if s.brontideEnabled(ctx) {
+		return s.newGrpcConnectionVia(transportBrontide, s.internalConnFactory, s.InternalAddress)
+	}
+	s.evictBrontidePoolIfDisabled(ctx)
 	return s.newGrpcConnection(s.AddressDkg)
+}
+
+// brontideEnabled reports whether internal RPCs to this peer should be dialed over brontide right now.
+func (s *SigningOperator) brontideEnabled(ctx context.Context) bool {
+	return s.brontideAvailable && knobs.GetKnobsService(ctx).GetValue(knobs.KnobInternalRPCBrontideEnabled, 0) > 0
+}
+
+// evictBrontidePoolIfDisabled tears down a previously-created brontide pool once the kill-switch has routed internal
+// RPCs back to plain TLS. Without this, the brontide pool and its open connections would linger for the process
+// lifetime — nothing acquires from it after the flip, and the pool only reaps connections on access, so even idle
+// ones (with their keepalive pings) would never be closed. That defeats the point of a kill-switch flipped because
+// brontide connections are hanging or broken.
+//
+// Only the brontide pool is evicted: the plain-TLS AddressRpc pool is shared with cross-operator SparkService calls
+// and must survive. Gated on brontideAvailable so plain-TLS-only deployments never take the lock.
+func (s *SigningOperator) evictBrontidePoolIfDisabled(ctx context.Context) {
+	if !s.brontideAvailable {
+		return
+	}
+	// Re-check the knob: brontideEnabled is (available && knob), and we're on the not-enabled branch, so the knob is
+	// off here — but read it directly to stay correct if brontideEnabled's definition changes.
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobInternalRPCBrontideEnabled, 0) > 0 {
+		return
+	}
+	s.evictConnPool(connPoolKey{transport: transportBrontide, address: s.InternalAddress})
+}
+
+// evictConnPool removes the pool for key, if present, and closes it in the background (its graceful drain waits for
+// in-flight borrowers, so it must not block the acquisition path).
+func (s *SigningOperator) evictConnPool(key connPoolKey) {
+	s.connPoolsMu.Lock()
+	pool, ok := s.connPools[key]
+	if ok {
+		delete(s.connPools, key)
+	}
+	s.connPoolsMu.Unlock()
+
+	if ok && pool != nil {
+		go pool.Close()
+	}
 }
 
 // SetTimeoutProvider sets the timeout provider for this signing operator.

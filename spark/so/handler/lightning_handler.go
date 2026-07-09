@@ -2053,7 +2053,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			observeOperatorFanoutRPC(ctx, lightningOperationGetPreimageShare, operator.Identifier, rpcStart, retErr)
 		}()
 
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}

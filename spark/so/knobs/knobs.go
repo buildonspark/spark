@@ -85,6 +85,13 @@ const (
 
 	KnobSoDkgBatchSize = "spark.so.dkg.batch_size"
 
+	// KnobInternalRPCBrontideEnabled gates whether outbound SO-to-SO internal RPCs actually route over brontide
+	// (TLS + Noise_XK) at dial time. Brontide must first be provisioned via the internal_grpc_port config
+	// flag, which validates peer metadata and installs the client factory at startup; this knob then flips the live
+	// routing without a redeploy (and serves as a runtime kill-switch back to plain TLS). Default 0 = off, so a
+	// provisioned-but-not-yet-enabled operator keeps dialing plain TLS until the knob is set > 0.
+	KnobInternalRPCBrontideEnabled = "spark.so.internal_rpc.brontide_enabled"
+
 	// Task / gocron related knobs.
 	KnobSoTaskEnabled = "spark.so.task.enabled"
 	KnobSoTaskTimeout = "spark.so.task.timeout"

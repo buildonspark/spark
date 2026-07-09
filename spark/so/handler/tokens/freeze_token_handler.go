@@ -84,7 +84,7 @@ func (h *FreezeTokenHandler) fanOutFreezeToOtherOperators(ctx context.Context, r
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	results, err := helper.ExecuteTaskWithAllOperatorsWithAllResponses(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.InternalFreezeTokensResponse, error) {
-			conn, err := operator.NewOperatorGRPCConnection()
+			conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 			if err != nil {
 				return nil, err
 			}

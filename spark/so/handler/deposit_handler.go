@@ -193,7 +193,7 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -243,7 +243,7 @@ func (o *DepositHandler) generateDepositAddress(ctx context.Context, config *so.
 	}
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -467,7 +467,7 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -527,7 +527,7 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 	// record on other operators and return a proof of possession signature.
 	isStatic := true
 	addressSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -614,7 +614,7 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 	// Get proofs from other operators.
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	responses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.GenerateStaticDepositAddressProofsResponse, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get operator grpc connection: %w", err)
 		}

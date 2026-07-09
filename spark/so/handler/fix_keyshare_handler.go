@@ -134,7 +134,7 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 	// === Round 1 ===
 
 	responses1, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, senders, func(ctx context.Context, operator *so.SigningOperator) (*pb.FixKeyshareRound1Response, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +177,7 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 	// === Round 2 ===
 
 	responses2, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, senders, func(ctx context.Context, operator *so.SigningOperator) (*pb.FixKeyshareRound2Response, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}

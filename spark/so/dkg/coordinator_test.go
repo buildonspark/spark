@@ -305,9 +305,13 @@ func updateConfigWithMockConnections(config *so.Config, mockServers []*mockServe
 	for _, op := range config.SigningOperatorMap {
 		if op.ID != config.Index {
 			if i < len(mockServers) {
-				op.OperatorConnectionFactory = &mockOperatorConnectionFactory{
+				mockFactory := &mockOperatorConnectionFactory{
 					address: mockServers[i].address,
 				}
+				op.OperatorConnectionFactory = mockFactory
+				// Also route brontide/internal dials (NewOperatorGRPCConnectionForDKG) through the mock, so the
+				// test still hits the mock server if brontide is ever enabled rather than dialing InternalAddress.
+				op.SetInternalConnectionFactory(mockFactory)
 				i++
 			}
 		}
