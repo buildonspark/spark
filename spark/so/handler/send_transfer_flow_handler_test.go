@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -165,7 +166,7 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			ExpiryTime: timestamppb.New(time.Now().Add(time.Hour)),
 			SenderPackages: []*pb.SenderTransferPackage{{
 				OwnerIdentityPublicKey: validSenderPK,
-				TransferPackage:        &pb.TransferPackage{},
+				TransferPackage:        withDummyPackageAuth(&pb.TransferPackage{}),
 				ReceiverIdentityPublicKeys: map[string][]byte{
 					"leaf-1": validReceiverPK,
 				},
@@ -260,7 +261,7 @@ func TestParseSendTransferRequest_Happy(t *testing.T) {
 		ExpiryTime: timestamppb.New(time.Now().Add(time.Hour)),
 		SenderPackages: []*pb.SenderTransferPackage{{
 			OwnerIdentityPublicKey: validSenderPK,
-			TransferPackage:        &pb.TransferPackage{},
+			TransferPackage:        withDummyPackageAuth(&pb.TransferPackage{}),
 			ReceiverIdentityPublicKeys: map[string][]byte{
 				"leaf-1": receiverA,
 				"leaf-2": receiverB,
@@ -315,7 +316,7 @@ func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {
 	validRefundRaw := createSendTransferSigningJobTestTx(t, parentOutPoint, 900, refundScript, nil)
 	_, err = buildSigningJobForRefund(
 		ctx,
-		createSendTransferUserSignedJob(t, rng, leaf.ID.String(), validRefundRaw),
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), validRefundRaw)),
 		leaf,
 		leaf.RawTx,
 		uuid.New(),
@@ -326,17 +327,20 @@ func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {
 	wrongOutpointRaw := createSendTransferSigningJobTestTx(t, wrongOutPoint, 900, refundScript, nil)
 	_, err = buildSigningJobForRefund(
 		ctx,
-		createSendTransferUserSignedJob(t, rng, leaf.ID.String(), wrongOutpointRaw),
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), wrongOutpointRaw)),
 		leaf,
 		leaf.RawTx,
 		uuid.New(),
 	)
 	require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
 
+	// A send-transfer refund must spend exactly one input; the second input is
+	// rejected by buildSigningJobForRefund (ParsePackage permits trailing
+	// unsigned inputs, which only the coop-exit connector flow uses).
 	extraInputRaw := createSendTransferSigningJobTestTx(t, parentOutPoint, 900, refundScript, &wrongOutPoint)
 	_, err = buildSigningJobForRefund(
 		ctx,
-		createSendTransferUserSignedJob(t, rng, leaf.ID.String(), extraInputRaw),
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), extraInputRaw)),
 		leaf,
 		leaf.RawTx,
 		uuid.New(),
@@ -386,28 +390,28 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 		{
 			name: "cpfp leaves",
 			pkg: func() *pb.TransferPackage {
-				return &pb.TransferPackage{LeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()}}
+				return withDummyPackageAuth(&pb.TransferPackage{LeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()}})
 			},
 			wantErr: "build cpfp signing job",
 		},
 		{
 			name: "direct leaves",
 			pkg: func() *pb.TransferPackage {
-				return &pb.TransferPackage{
+				return withDummyPackageAuth(&pb.TransferPackage{
 					LeavesToSend:       []*pb.UserSignedTxSigningJob{makeValidJob(cpfpParentTx)},
 					DirectLeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()},
-				}
+				})
 			},
 			wantErr: "build direct signing job",
 		},
 		{
 			name: "direct from cpfp leaves",
 			pkg: func() *pb.TransferPackage {
-				return &pb.TransferPackage{
+				return withDummyPackageAuth(&pb.TransferPackage{
 					LeavesToSend:               []*pb.UserSignedTxSigningJob{makeValidJob(cpfpParentTx)},
 					DirectLeavesToSend:         []*pb.UserSignedTxSigningJob{makeValidJob(directParentTx)},
 					DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()},
-				}
+				})
 			},
 			wantErr: "build direct-from-cpfp signing job",
 		},
@@ -416,11 +420,32 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 	leafMap := map[string]*ent.TreeNode{leaf.ID.String(): leaf}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := buildSendTransferAggregationJobs(ctx, uuid.New(), tt.pkg(), leafMap)
+			pkg, err := transferpkg.ParsePackage(tt.pkg())
+			require.NoError(t, err)
+			_, err = buildSendTransferAggregationJobs(ctx, uuid.New(), pkg, leafMap)
 			require.ErrorContains(t, err, tt.wantErr)
 			require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
 		})
 	}
+}
+
+// withDummyPackageAuth sets the package-level key-tweak package and user
+// signature to non-empty placeholders so ParsePackage accepts the package.
+// These fields are unrelated to the refund-outpoint validation under test, but
+// ParsePackage rejects a package that omits them.
+func withDummyPackageAuth(pkg *pb.TransferPackage) *pb.TransferPackage {
+	pkg.KeyTweakPackage = map[string][]byte{"op": {0x1}}
+	pkg.UserSignature = []byte{0x1}
+	return pkg
+}
+
+// parseSendRefundJob parses a single proto signing job into the typed refund job buildSigningJobForRefund consumes.
+func parseSendRefundJob(t *testing.T, protoJob *pb.UserSignedTxSigningJob) *transferpkg.RefundSigningJob {
+	t.Helper()
+	jobs, err := transferpkg.ParseRefundSigningJobs([]*pb.UserSignedTxSigningJob{protoJob}, 0)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	return jobs[0]
 }
 
 func createSendTransferSigningJobTestLeaf(t *testing.T, rng io.Reader) (context.Context, *ent.TreeNode, *wire.MsgTx) {
