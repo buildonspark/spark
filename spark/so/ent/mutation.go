@@ -122,19 +122,21 @@ const (
 // BlockHeightMutation represents an operation that mutates the BlockHeight nodes in the graph.
 type BlockHeightMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *uuid.UUID
-	create_time   *time.Time
-	update_time   *time.Time
-	height        *int64
-	addheight     *int64
-	network       *btcnetwork.Network
-	block_hash    *[]byte
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*BlockHeight, error)
-	predicates    []predicate.BlockHeight
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	height                 *int64
+	addheight              *int64
+	network                *btcnetwork.Network
+	block_hash             *[]byte
+	chain_action_height    *int64
+	addchain_action_height *int64
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*BlockHeight, error)
+	predicates             []predicate.BlockHeight
 }
 
 var _ ent.Mutation = (*BlockHeightMutation)(nil)
@@ -454,6 +456,76 @@ func (m *BlockHeightMutation) ResetBlockHash() {
 	delete(m.clearedFields, blockheight.FieldBlockHash)
 }
 
+// SetChainActionHeight sets the "chain_action_height" field.
+func (m *BlockHeightMutation) SetChainActionHeight(i int64) {
+	m.chain_action_height = &i
+	m.addchain_action_height = nil
+}
+
+// ChainActionHeight returns the value of the "chain_action_height" field in the mutation.
+func (m *BlockHeightMutation) ChainActionHeight() (r int64, exists bool) {
+	v := m.chain_action_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChainActionHeight returns the old "chain_action_height" field's value of the BlockHeight entity.
+// If the BlockHeight object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BlockHeightMutation) OldChainActionHeight(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChainActionHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChainActionHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChainActionHeight: %w", err)
+	}
+	return oldValue.ChainActionHeight, nil
+}
+
+// AddChainActionHeight adds i to the "chain_action_height" field.
+func (m *BlockHeightMutation) AddChainActionHeight(i int64) {
+	if m.addchain_action_height != nil {
+		*m.addchain_action_height += i
+	} else {
+		m.addchain_action_height = &i
+	}
+}
+
+// AddedChainActionHeight returns the value that was added to the "chain_action_height" field in this mutation.
+func (m *BlockHeightMutation) AddedChainActionHeight() (r int64, exists bool) {
+	v := m.addchain_action_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearChainActionHeight clears the value of the "chain_action_height" field.
+func (m *BlockHeightMutation) ClearChainActionHeight() {
+	m.chain_action_height = nil
+	m.addchain_action_height = nil
+	m.clearedFields[blockheight.FieldChainActionHeight] = struct{}{}
+}
+
+// ChainActionHeightCleared returns if the "chain_action_height" field was cleared in this mutation.
+func (m *BlockHeightMutation) ChainActionHeightCleared() bool {
+	_, ok := m.clearedFields[blockheight.FieldChainActionHeight]
+	return ok
+}
+
+// ResetChainActionHeight resets all changes to the "chain_action_height" field.
+func (m *BlockHeightMutation) ResetChainActionHeight() {
+	m.chain_action_height = nil
+	m.addchain_action_height = nil
+	delete(m.clearedFields, blockheight.FieldChainActionHeight)
+}
+
 // Where appends a list predicates to the BlockHeightMutation builder.
 func (m *BlockHeightMutation) Where(ps ...predicate.BlockHeight) {
 	m.predicates = append(m.predicates, ps...)
@@ -488,7 +560,7 @@ func (m *BlockHeightMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BlockHeightMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, blockheight.FieldCreateTime)
 	}
@@ -503,6 +575,9 @@ func (m *BlockHeightMutation) Fields() []string {
 	}
 	if m.block_hash != nil {
 		fields = append(fields, blockheight.FieldBlockHash)
+	}
+	if m.chain_action_height != nil {
+		fields = append(fields, blockheight.FieldChainActionHeight)
 	}
 	return fields
 }
@@ -522,6 +597,8 @@ func (m *BlockHeightMutation) Field(name string) (ent.Value, bool) {
 		return m.Network()
 	case blockheight.FieldBlockHash:
 		return m.BlockHash()
+	case blockheight.FieldChainActionHeight:
+		return m.ChainActionHeight()
 	}
 	return nil, false
 }
@@ -541,6 +618,8 @@ func (m *BlockHeightMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldNetwork(ctx)
 	case blockheight.FieldBlockHash:
 		return m.OldBlockHash(ctx)
+	case blockheight.FieldChainActionHeight:
+		return m.OldChainActionHeight(ctx)
 	}
 	return nil, fmt.Errorf("unknown BlockHeight field %s", name)
 }
@@ -585,6 +664,13 @@ func (m *BlockHeightMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBlockHash(v)
 		return nil
+	case blockheight.FieldChainActionHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChainActionHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown BlockHeight field %s", name)
 }
@@ -596,6 +682,9 @@ func (m *BlockHeightMutation) AddedFields() []string {
 	if m.addheight != nil {
 		fields = append(fields, blockheight.FieldHeight)
 	}
+	if m.addchain_action_height != nil {
+		fields = append(fields, blockheight.FieldChainActionHeight)
+	}
 	return fields
 }
 
@@ -606,6 +695,8 @@ func (m *BlockHeightMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case blockheight.FieldHeight:
 		return m.AddedHeight()
+	case blockheight.FieldChainActionHeight:
+		return m.AddedChainActionHeight()
 	}
 	return nil, false
 }
@@ -622,6 +713,13 @@ func (m *BlockHeightMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddHeight(v)
 		return nil
+	case blockheight.FieldChainActionHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddChainActionHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown BlockHeight numeric field %s", name)
 }
@@ -632,6 +730,9 @@ func (m *BlockHeightMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(blockheight.FieldBlockHash) {
 		fields = append(fields, blockheight.FieldBlockHash)
+	}
+	if m.FieldCleared(blockheight.FieldChainActionHeight) {
+		fields = append(fields, blockheight.FieldChainActionHeight)
 	}
 	return fields
 }
@@ -649,6 +750,9 @@ func (m *BlockHeightMutation) ClearField(name string) error {
 	switch name {
 	case blockheight.FieldBlockHash:
 		m.ClearBlockHash()
+		return nil
+	case blockheight.FieldChainActionHeight:
+		m.ClearChainActionHeight()
 		return nil
 	}
 	return fmt.Errorf("unknown BlockHeight nullable field %s", name)
@@ -672,6 +776,9 @@ func (m *BlockHeightMutation) ResetField(name string) error {
 		return nil
 	case blockheight.FieldBlockHash:
 		m.ResetBlockHash()
+		return nil
+	case blockheight.FieldChainActionHeight:
+		m.ResetChainActionHeight()
 		return nil
 	}
 	return fmt.Errorf("unknown BlockHeight field %s", name)
