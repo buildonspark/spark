@@ -191,7 +191,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 		go func(identifier string) {
 			operator := s.config.SigningOperatorMap[identifier]
 			defer wg.Done()
-			connection, err := operator.NewOperatorGRPCConnectionForDKG()
+			connection, err := operator.NewOperatorGRPCConnectionForDKG(ctx)
 			if err != nil {
 				return
 			}

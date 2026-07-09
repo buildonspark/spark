@@ -478,7 +478,7 @@ func (h *TransferHandler) syncCoopExitInit(
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		logger := logging.GetLoggerFromContext(ctx)
 
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			logger.Error("Failed to connect to operator", zap.Error(err))
 			return nil, err

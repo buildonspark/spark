@@ -1324,7 +1324,7 @@ func AllStartupTasks() []StartupTaskSpec {
 					logger.Sugar().Infof("Found available signing keyshare %s, proceeding with reservation on other SOs", keyshare.ID)
 					selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 					_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-						conn, err := operator.NewOperatorGRPCConnection()
+						conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 						if err != nil {
 							return nil, err
 						}

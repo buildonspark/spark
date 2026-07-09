@@ -487,7 +487,7 @@ func (e *TwoPCEngine) rollback(ctx context.Context, opType pbgossip.ConsensusOpe
 // flow does the same thing, just with a different opType, prepareOp,
 // executionID, and coordinatorIndex.
 func DefaultPrepareTask(ctx context.Context, operator *so.SigningOperator, opType pbgossip.ConsensusOperationType, prepareOp proto.Message, executionID string, coordinatorIndex uint32) (proto.Message, error) {
-	conn, err := operator.NewOperatorGRPCConnection()
+	conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 	if err != nil {
 		return nil, err
 	}

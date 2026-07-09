@@ -245,7 +245,7 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	fanoutResults, fanoutErr := helper.ExecuteTaskWithAllOperatorsWithAllResponses(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionResponse, error) {
-			conn, err := operator.NewOperatorGRPCConnection()
+			conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -378,7 +378,7 @@ func (h *BroadcastTokenHandler) FanoutBroadcastAndFinalize(
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	internalSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionResponse, error) {
-			conn, err := operator.NewOperatorGRPCConnection()
+			conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -665,7 +665,7 @@ func (h *BroadcastTokenHandler) fanoutFinalizeMintOrCreateToNonCoordinators(
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
-			conn, err := operator.NewOperatorGRPCConnection()
+			conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 			if err != nil {
 				return nil, err
 			}

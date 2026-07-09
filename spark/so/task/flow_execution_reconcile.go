@@ -441,7 +441,7 @@ func (r *participantReconciler) dispatchPresumedAbort(ctx context.Context, row *
 // coordinator. Split out from reconcileOne so tests can inject a stub via
 // participantReconciler.query.
 func defaultQueryOutcome(ctx context.Context, operator *so.SigningOperator, flowExecutionID string) (*pbinternal.ConsensusQueryOutcomeResponse, error) {
-	conn, err := operator.NewOperatorGRPCConnection()
+	conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 	if err != nil {
 		return nil, err
 	}

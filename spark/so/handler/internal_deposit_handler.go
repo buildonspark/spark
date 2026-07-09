@@ -1248,7 +1248,7 @@ func CompleteSwapForUtxoWithOtherOperators(ctx context.Context, config *so.Confi
 	logger := logging.GetLoggerFromContext(ctx)
 
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
 			return nil, err

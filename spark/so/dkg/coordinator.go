@@ -28,7 +28,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 	// Init clients
 	clientMap := make(map[string]pbdkg.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
-		connection, err := operator.NewOperatorGRPCConnectionForDKG()
+		connection, err := operator.NewOperatorGRPCConnectionForDKG(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to connect to signing operator %s: %w", identifier, err)
 		}
@@ -154,7 +154,7 @@ func ConfirmAndMarkAvailableKeys(ctx context.Context, config *so.Config, keyIDs 
 	// Query each operator for which keys are unavailable (no lock needed - each goroutine writes to its own result)
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	unavailablePerOperator, _ := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]string, error) {
-		conn, err := operator.NewOperatorGRPCConnectionForDKG()
+		conn, err := operator.NewOperatorGRPCConnectionForDKG(ctx)
 		if err != nil {
 			// Connection error - all keys unavailable for this operator
 			return keyIDsStr, nil

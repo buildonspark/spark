@@ -117,7 +117,7 @@ func TestOperatorConnPoolDifferentTargets(t *testing.T) {
 
 	for _, addr := range addresses {
 		s := &SigningOperator{AddressRpc: addr, connPoolConfig: pool.cfg}
-		s.connPools = map[string]*operatorConnPool{addr: pool}
+		s.connPools = map[connPoolKey]*operatorConnPool{{transport: transportTLS, address: addr}: pool}
 		conn, err := s.NewOperatorGRPCConnection()
 		if err != nil {
 			t.Fatalf("failed to get connection: %v", err)

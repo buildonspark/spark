@@ -95,7 +95,7 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound1(ctx context.Context, opera
 		handler := signing_handler.NewFrostSigningHandler(c.config)
 		return handler.FrostRound1(ctx, req)
 	} else {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound2(ctx context.Context, opera
 		handler := signing_handler.NewFrostSigningHandler(c.config)
 		return handler.FrostRound2(ctx, req)
 	} else {
-		conn, err := operator.NewOperatorGRPCConnection()
+		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
 		if err != nil {
 			return nil, err
 		}

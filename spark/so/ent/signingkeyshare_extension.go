@@ -1448,7 +1448,7 @@ func RunDKG(ctx context.Context, config *so.Config) error {
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	connection, err := config.SigningOperatorMap[config.Identifier].NewOperatorGRPCConnectionForDKG()
+	connection, err := config.SigningOperatorMap[config.Identifier].NewOperatorGRPCConnectionForDKG(ctx)
 	if err != nil {
 		logger.Error("Failed to create connection to DKG coordinator", zap.Error(err))
 		return err
