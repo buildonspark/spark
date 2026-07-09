@@ -28,8 +28,10 @@ type BlockHeight struct {
 	// The bitcoin network to which this block height belongs.
 	Network btcnetwork.Network `json:"network,omitempty"`
 	// The hash of the most recent block processed by the chain watcher. Used to detect chain reorganizations.
-	BlockHash    *[]byte `json:"block_hash,omitempty"`
-	selectValues sql.SelectValues
+	BlockHash *[]byte `json:"block_hash,omitempty"`
+	// The block height through which Spark chain actions (watchtower broadcasts, coop exit key tweaks) last completed successfully. Lagging behind height means a failed or interrupted run that will be retried.
+	ChainActionHeight *int64 `json:"chain_action_height,omitempty"`
+	selectValues      sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -41,7 +43,7 @@ func (*BlockHeight) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case blockheight.FieldNetwork:
 			values[i] = new(btcnetwork.Network)
-		case blockheight.FieldHeight:
+		case blockheight.FieldHeight, blockheight.FieldChainActionHeight:
 			values[i] = new(sql.NullInt64)
 		case blockheight.FieldCreateTime, blockheight.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -98,6 +100,13 @@ func (bh *BlockHeight) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				bh.BlockHash = value
 			}
+		case blockheight.FieldChainActionHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field chain_action_height", values[i])
+			} else if value.Valid {
+				bh.ChainActionHeight = new(int64)
+				*bh.ChainActionHeight = value.Int64
+			}
 		default:
 			bh.selectValues.Set(columns[i], values[i])
 		}
@@ -148,6 +157,11 @@ func (bh *BlockHeight) String() string {
 	builder.WriteString(", ")
 	if v := bh.BlockHash; v != nil {
 		builder.WriteString("block_hash=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := bh.ChainActionHeight; v != nil {
+		builder.WriteString("chain_action_height=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteByte(')')

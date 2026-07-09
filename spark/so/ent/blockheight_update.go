@@ -83,6 +83,33 @@ func (bhu *BlockHeightUpdate) ClearBlockHash() *BlockHeightUpdate {
 	return bhu
 }
 
+// SetChainActionHeight sets the "chain_action_height" field.
+func (bhu *BlockHeightUpdate) SetChainActionHeight(i int64) *BlockHeightUpdate {
+	bhu.mutation.ResetChainActionHeight()
+	bhu.mutation.SetChainActionHeight(i)
+	return bhu
+}
+
+// SetNillableChainActionHeight sets the "chain_action_height" field if the given value is not nil.
+func (bhu *BlockHeightUpdate) SetNillableChainActionHeight(i *int64) *BlockHeightUpdate {
+	if i != nil {
+		bhu.SetChainActionHeight(*i)
+	}
+	return bhu
+}
+
+// AddChainActionHeight adds i to the "chain_action_height" field.
+func (bhu *BlockHeightUpdate) AddChainActionHeight(i int64) *BlockHeightUpdate {
+	bhu.mutation.AddChainActionHeight(i)
+	return bhu
+}
+
+// ClearChainActionHeight clears the value of the "chain_action_height" field.
+func (bhu *BlockHeightUpdate) ClearChainActionHeight() *BlockHeightUpdate {
+	bhu.mutation.ClearChainActionHeight()
+	return bhu
+}
+
 // Mutation returns the BlockHeightMutation object of the builder.
 func (bhu *BlockHeightUpdate) Mutation() *BlockHeightMutation {
 	return bhu.mutation
@@ -175,6 +202,15 @@ func (bhu *BlockHeightUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if bhu.mutation.BlockHashCleared() {
 		_spec.ClearField(blockheight.FieldBlockHash, field.TypeBytes)
 	}
+	if value, ok := bhu.mutation.ChainActionHeight(); ok {
+		_spec.SetField(blockheight.FieldChainActionHeight, field.TypeInt64, value)
+	}
+	if value, ok := bhu.mutation.AddedChainActionHeight(); ok {
+		_spec.AddField(blockheight.FieldChainActionHeight, field.TypeInt64, value)
+	}
+	if bhu.mutation.ChainActionHeightCleared() {
+		_spec.ClearField(blockheight.FieldChainActionHeight, field.TypeInt64)
+	}
 	_spec.AddModifiers(bhu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, bhu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -247,6 +283,33 @@ func (bhuo *BlockHeightUpdateOne) SetBlockHash(b []byte) *BlockHeightUpdateOne {
 // ClearBlockHash clears the value of the "block_hash" field.
 func (bhuo *BlockHeightUpdateOne) ClearBlockHash() *BlockHeightUpdateOne {
 	bhuo.mutation.ClearBlockHash()
+	return bhuo
+}
+
+// SetChainActionHeight sets the "chain_action_height" field.
+func (bhuo *BlockHeightUpdateOne) SetChainActionHeight(i int64) *BlockHeightUpdateOne {
+	bhuo.mutation.ResetChainActionHeight()
+	bhuo.mutation.SetChainActionHeight(i)
+	return bhuo
+}
+
+// SetNillableChainActionHeight sets the "chain_action_height" field if the given value is not nil.
+func (bhuo *BlockHeightUpdateOne) SetNillableChainActionHeight(i *int64) *BlockHeightUpdateOne {
+	if i != nil {
+		bhuo.SetChainActionHeight(*i)
+	}
+	return bhuo
+}
+
+// AddChainActionHeight adds i to the "chain_action_height" field.
+func (bhuo *BlockHeightUpdateOne) AddChainActionHeight(i int64) *BlockHeightUpdateOne {
+	bhuo.mutation.AddChainActionHeight(i)
+	return bhuo
+}
+
+// ClearChainActionHeight clears the value of the "chain_action_height" field.
+func (bhuo *BlockHeightUpdateOne) ClearChainActionHeight() *BlockHeightUpdateOne {
+	bhuo.mutation.ClearChainActionHeight()
 	return bhuo
 }
 
@@ -371,6 +434,15 @@ func (bhuo *BlockHeightUpdateOne) sqlSave(ctx context.Context) (_node *BlockHeig
 	}
 	if bhuo.mutation.BlockHashCleared() {
 		_spec.ClearField(blockheight.FieldBlockHash, field.TypeBytes)
+	}
+	if value, ok := bhuo.mutation.ChainActionHeight(); ok {
+		_spec.SetField(blockheight.FieldChainActionHeight, field.TypeInt64, value)
+	}
+	if value, ok := bhuo.mutation.AddedChainActionHeight(); ok {
+		_spec.AddField(blockheight.FieldChainActionHeight, field.TypeInt64, value)
+	}
+	if bhuo.mutation.ChainActionHeightCleared() {
+		_spec.ClearField(blockheight.FieldChainActionHeight, field.TypeInt64)
 	}
 	_spec.AddModifiers(bhuo.modifiers...)
 	_node = &BlockHeight{config: bhuo.config}

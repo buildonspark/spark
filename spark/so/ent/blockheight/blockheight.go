@@ -26,6 +26,8 @@ const (
 	FieldNetwork = "network"
 	// FieldBlockHash holds the string denoting the block_hash field in the database.
 	FieldBlockHash = "block_hash"
+	// FieldChainActionHeight holds the string denoting the chain_action_height field in the database.
+	FieldChainActionHeight = "chain_action_height"
 	// Table holds the table name of the blockheight in the database.
 	Table = "block_heights"
 )
@@ -38,6 +40,7 @@ var Columns = []string{
 	FieldHeight,
 	FieldNetwork,
 	FieldBlockHash,
+	FieldChainActionHeight,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -99,4 +102,9 @@ func ByHeight(opts ...sql.OrderTermOption) OrderOption {
 // ByNetwork orders the results by the network field.
 func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
+}
+
+// ByChainActionHeight orders the results by the chain_action_height field.
+func ByChainActionHeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldChainActionHeight, opts...).ToFunc()
 }

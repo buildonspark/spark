@@ -37,6 +37,11 @@ func (BlockHeight) Fields() []ent.Field {
 			Annotations(entexample.Default(
 				"00000000000000000001bcb0c9fede3f8863b077acc30e312377e6580ceb831b",
 			)),
+		field.Int64("chain_action_height").
+			Optional().
+			Nillable().
+			Comment("The block height through which Spark chain actions (watchtower broadcasts, coop exit key tweaks) last completed successfully. Lagging behind height means a failed or interrupted run that will be retried.").
+			Annotations(entexample.Default(100)),
 	}
 }
 

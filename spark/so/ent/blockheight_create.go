@@ -71,6 +71,20 @@ func (bhc *BlockHeightCreate) SetBlockHash(b []byte) *BlockHeightCreate {
 	return bhc
 }
 
+// SetChainActionHeight sets the "chain_action_height" field.
+func (bhc *BlockHeightCreate) SetChainActionHeight(i int64) *BlockHeightCreate {
+	bhc.mutation.SetChainActionHeight(i)
+	return bhc
+}
+
+// SetNillableChainActionHeight sets the "chain_action_height" field if the given value is not nil.
+func (bhc *BlockHeightCreate) SetNillableChainActionHeight(i *int64) *BlockHeightCreate {
+	if i != nil {
+		bhc.SetChainActionHeight(*i)
+	}
+	return bhc
+}
+
 // SetID sets the "id" field.
 func (bhc *BlockHeightCreate) SetID(u uuid.UUID) *BlockHeightCreate {
 	bhc.mutation.SetID(u)
@@ -214,6 +228,10 @@ func (bhc *BlockHeightCreate) createSpec() (*BlockHeight, *sqlgraph.CreateSpec) 
 		_spec.SetField(blockheight.FieldBlockHash, field.TypeBytes, value)
 		_node.BlockHash = &value
 	}
+	if value, ok := bhc.mutation.ChainActionHeight(); ok {
+		_spec.SetField(blockheight.FieldChainActionHeight, field.TypeInt64, value)
+		_node.ChainActionHeight = &value
+	}
 	return _node, _spec
 }
 
@@ -323,6 +341,30 @@ func (u *BlockHeightUpsert) UpdateBlockHash() *BlockHeightUpsert {
 // ClearBlockHash clears the value of the "block_hash" field.
 func (u *BlockHeightUpsert) ClearBlockHash() *BlockHeightUpsert {
 	u.SetNull(blockheight.FieldBlockHash)
+	return u
+}
+
+// SetChainActionHeight sets the "chain_action_height" field.
+func (u *BlockHeightUpsert) SetChainActionHeight(v int64) *BlockHeightUpsert {
+	u.Set(blockheight.FieldChainActionHeight, v)
+	return u
+}
+
+// UpdateChainActionHeight sets the "chain_action_height" field to the value that was provided on create.
+func (u *BlockHeightUpsert) UpdateChainActionHeight() *BlockHeightUpsert {
+	u.SetExcluded(blockheight.FieldChainActionHeight)
+	return u
+}
+
+// AddChainActionHeight adds v to the "chain_action_height" field.
+func (u *BlockHeightUpsert) AddChainActionHeight(v int64) *BlockHeightUpsert {
+	u.Add(blockheight.FieldChainActionHeight, v)
+	return u
+}
+
+// ClearChainActionHeight clears the value of the "chain_action_height" field.
+func (u *BlockHeightUpsert) ClearChainActionHeight() *BlockHeightUpsert {
+	u.SetNull(blockheight.FieldChainActionHeight)
 	return u
 }
 
@@ -444,6 +486,34 @@ func (u *BlockHeightUpsertOne) UpdateBlockHash() *BlockHeightUpsertOne {
 func (u *BlockHeightUpsertOne) ClearBlockHash() *BlockHeightUpsertOne {
 	return u.Update(func(s *BlockHeightUpsert) {
 		s.ClearBlockHash()
+	})
+}
+
+// SetChainActionHeight sets the "chain_action_height" field.
+func (u *BlockHeightUpsertOne) SetChainActionHeight(v int64) *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.SetChainActionHeight(v)
+	})
+}
+
+// AddChainActionHeight adds v to the "chain_action_height" field.
+func (u *BlockHeightUpsertOne) AddChainActionHeight(v int64) *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.AddChainActionHeight(v)
+	})
+}
+
+// UpdateChainActionHeight sets the "chain_action_height" field to the value that was provided on create.
+func (u *BlockHeightUpsertOne) UpdateChainActionHeight() *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.UpdateChainActionHeight()
+	})
+}
+
+// ClearChainActionHeight clears the value of the "chain_action_height" field.
+func (u *BlockHeightUpsertOne) ClearChainActionHeight() *BlockHeightUpsertOne {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.ClearChainActionHeight()
 	})
 }
 
@@ -732,6 +802,34 @@ func (u *BlockHeightUpsertBulk) UpdateBlockHash() *BlockHeightUpsertBulk {
 func (u *BlockHeightUpsertBulk) ClearBlockHash() *BlockHeightUpsertBulk {
 	return u.Update(func(s *BlockHeightUpsert) {
 		s.ClearBlockHash()
+	})
+}
+
+// SetChainActionHeight sets the "chain_action_height" field.
+func (u *BlockHeightUpsertBulk) SetChainActionHeight(v int64) *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.SetChainActionHeight(v)
+	})
+}
+
+// AddChainActionHeight adds v to the "chain_action_height" field.
+func (u *BlockHeightUpsertBulk) AddChainActionHeight(v int64) *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.AddChainActionHeight(v)
+	})
+}
+
+// UpdateChainActionHeight sets the "chain_action_height" field to the value that was provided on create.
+func (u *BlockHeightUpsertBulk) UpdateChainActionHeight() *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.UpdateChainActionHeight()
+	})
+}
+
+// ClearChainActionHeight clears the value of the "chain_action_height" field.
+func (u *BlockHeightUpsertBulk) ClearChainActionHeight() *BlockHeightUpsertBulk {
+	return u.Update(func(s *BlockHeightUpsert) {
+		s.ClearChainActionHeight()
 	})
 }
 

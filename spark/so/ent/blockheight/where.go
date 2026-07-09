@@ -76,6 +76,11 @@ func BlockHash(v []byte) predicate.BlockHeight {
 	return predicate.BlockHeight(sql.FieldEQ(FieldBlockHash, v))
 }
 
+// ChainActionHeight applies equality check predicate on the "chain_action_height" field. It's identical to ChainActionHeightEQ.
+func ChainActionHeight(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldEQ(FieldChainActionHeight, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.BlockHeight {
 	return predicate.BlockHeight(sql.FieldEQ(FieldCreateTime, v))
@@ -264,6 +269,56 @@ func BlockHashIsNil() predicate.BlockHeight {
 // BlockHashNotNil applies the NotNil predicate on the "block_hash" field.
 func BlockHashNotNil() predicate.BlockHeight {
 	return predicate.BlockHeight(sql.FieldNotNull(FieldBlockHash))
+}
+
+// ChainActionHeightEQ applies the EQ predicate on the "chain_action_height" field.
+func ChainActionHeightEQ(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldEQ(FieldChainActionHeight, v))
+}
+
+// ChainActionHeightNEQ applies the NEQ predicate on the "chain_action_height" field.
+func ChainActionHeightNEQ(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldNEQ(FieldChainActionHeight, v))
+}
+
+// ChainActionHeightIn applies the In predicate on the "chain_action_height" field.
+func ChainActionHeightIn(vs ...int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldIn(FieldChainActionHeight, vs...))
+}
+
+// ChainActionHeightNotIn applies the NotIn predicate on the "chain_action_height" field.
+func ChainActionHeightNotIn(vs ...int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldNotIn(FieldChainActionHeight, vs...))
+}
+
+// ChainActionHeightGT applies the GT predicate on the "chain_action_height" field.
+func ChainActionHeightGT(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldGT(FieldChainActionHeight, v))
+}
+
+// ChainActionHeightGTE applies the GTE predicate on the "chain_action_height" field.
+func ChainActionHeightGTE(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldGTE(FieldChainActionHeight, v))
+}
+
+// ChainActionHeightLT applies the LT predicate on the "chain_action_height" field.
+func ChainActionHeightLT(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldLT(FieldChainActionHeight, v))
+}
+
+// ChainActionHeightLTE applies the LTE predicate on the "chain_action_height" field.
+func ChainActionHeightLTE(v int64) predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldLTE(FieldChainActionHeight, v))
+}
+
+// ChainActionHeightIsNil applies the IsNil predicate on the "chain_action_height" field.
+func ChainActionHeightIsNil() predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldIsNull(FieldChainActionHeight))
+}
+
+// ChainActionHeightNotNil applies the NotNil predicate on the "chain_action_height" field.
+func ChainActionHeightNotNil() predicate.BlockHeight {
+	return predicate.BlockHeight(sql.FieldNotNull(FieldChainActionHeight))
 }
 
 // And groups predicates with the AND operator between them.
