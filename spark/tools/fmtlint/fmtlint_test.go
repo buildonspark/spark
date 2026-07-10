@@ -79,6 +79,8 @@ func TestParseVerbsUnreliable(t *testing.T) {
 		{name: "trailing percent", format: "done %"},
 		{name: "flags then end of string", format: "value %+"},
 		{name: "flags then end after real verb", format: "%s then %#"},
+		{name: "non-verb byte", format: "improved by 5%!"},
+		{name: "prose percent with flag then non-verb", format: "20%-ish"},
 	}
 
 	for _, tt := range tests {

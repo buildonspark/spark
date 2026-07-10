@@ -4,7 +4,21 @@ package zap
 
 type SugaredLogger struct{}
 
+// Level stands in for zapcore.Level. Log and Logf carry it before the message, unlike the per-level methods, which
+// exercises the message-index computation for a variadic slot that isn't the first parameter.
+type Level int8
+
+const InfoLevel Level = 0
+
+func (*SugaredLogger) Log(lvl Level, args ...interface{})                   {}
+func (*SugaredLogger) Logf(lvl Level, template string, args ...interface{}) {}
+
 func (*SugaredLogger) Debugf(template string, args ...interface{}) {}
 func (*SugaredLogger) Infof(template string, args ...interface{})  {}
 func (*SugaredLogger) Warnf(template string, args ...interface{})  {}
 func (*SugaredLogger) Errorf(template string, args ...interface{}) {}
+
+func (*SugaredLogger) Debug(args ...interface{}) {}
+func (*SugaredLogger) Info(args ...interface{})  {}
+func (*SugaredLogger) Warn(args ...interface{})  {}
+func (*SugaredLogger) Error(args ...interface{}) {}

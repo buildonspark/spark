@@ -17,6 +17,13 @@
 //	fmt.Errorf("refund tx mismatch, got: %x", b)                     // equivalent
 //
 // Both patterns also apply inside testify assert/require calls, whose trailing message is formatted the same way.
+//
+// 3. A print-style (non-formatting) function called with a format string and further arguments: these functions
+// concatenate their arguments via fmt.Sprint, so the verbs print literally and the author almost certainly meant the
+// printf variant.
+//
+//	logger.Sugar().Info("querying transfer with ID: %s", id)  // logs "querying transfer with ID: %s<id>"
+//	logger.Sugar().Infof("querying transfer with ID: %s", id) // intended
 package fmtlint
 
 import (
@@ -52,7 +59,7 @@ func (p *Plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 	return []*analysis.Analyzer{
 		{
 			Name: "fmtlint",
-			Doc:  "reports redundant formatting of printf-style arguments (.String() under %s/%v/%q, hex.EncodeToString under %s/%v), including inside testify assert/require calls",
+			Doc:  "reports incorrect formatting of printf-style arguments",
 			Run:  run,
 		},
 	}, nil
@@ -69,6 +76,9 @@ func (p *Plugin) GetLoadMode() string {
 // There are too many testify functions to list here, so they're handled in formatCallArgIndex.
 //
 // Excludes scanning functions (Sscanf, Fscanf, …) whose arguments are scan targets rather than values to format.
+//
+// The entries also anchor the print-style check: a call to a function whose name plus "f" appears here (e.g.
+// SugaredLogger.Info) is checked for format verbs that belong in the f-variant — see printfVariant.
 var formatFuncs = map[string]bool{
 	"fmt.Errorf":  true,
 	"fmt.Sprintf": true,
@@ -124,6 +134,11 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 		if fn == nil {
 			return
 		}
+	}
+
+	if fVariant, ok := printfVariant(fn); ok {
+		checkPrintCall(pass, call, fn, fVariant)
+		return
 	}
 
 	fmtIdx, ok := formatCallArgIndex(fn)
@@ -243,6 +258,81 @@ func formatArgIndex(fn *types.Func) (int, bool) {
 	return idx, true
 }
 
+// printfVariant reports whether fn is the print-style counterpart of a registered printf-style function — that is,
+// appending "f" to its name yields a formatFuncs entry (`Info` -> `Infof`) and returns the counterpart's name. The fmt
+// and testing packages are excluded: govet's printf check already reports formatting directives passed to their print
+// functions, so flagging them here would double-report.
+func printfVariant(fn *types.Func) (string, bool) {
+	if pkg := fn.Pkg(); pkg == nil || pkg.Path() == "fmt" || pkg.Path() == "testing" {
+		return "", false
+	}
+	if !formatFuncs[fn.FullName()+"f"] {
+		return "", false
+	}
+	return fn.Name() + "f", true
+}
+
+// checkPrintCall flags a print-style call whose first variadic argument is a constant string containing format verbs
+// followed by more arguments. Print-style functions concatenate via fmt.Sprint, so the verbs print literally — the
+// author almost certainly intended the printf variant.
+func checkPrintCall(pass *analysis.Pass, call *ast.CallExpr, fn *types.Func, fVariant string) {
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || !sig.Variadic() {
+		return
+	}
+	strIdx := sig.Params().Len() - 1
+	// Require arguments after the candidate format string: verbs with nothing to consume print literally, which may
+	// well be intentional (e.g. logging a template).
+	if len(call.Args) <= strIdx+1 {
+		return
+	}
+	format, ok := constStringValue(pass, call.Args[strIdx])
+	if !ok {
+		return
+	}
+	verbs, reliable := parseVerbs(format)
+	if !reliable {
+		return
+	}
+	for _, v := range verbs {
+		// A '%' in prose followed by a space and a word starting with a verb letter ("100% done") parses as a valid
+		// space-flagged verb. The space flag is vanishingly rare in real format strings, so don't count it as evidence
+		// that formatting was intended.
+		if v.spaceFlag {
+			continue
+		}
+		reportPrintWithVerb(pass, call, fn.Name(), fVariant, v.verb)
+		return
+	}
+}
+
+func reportPrintWithVerb(pass *analysis.Pass, call *ast.CallExpr, name, fVariant string, verb byte) {
+	diag := analysis.Diagnostic{
+		Pos:      call.Fun.Pos(),
+		End:      call.Fun.End(),
+		Category: "fmtlint",
+		Message:  fmt.Sprintf("%s call has format directive %%%c: use %s", name, verb, fVariant),
+	}
+	if ident := calleeNameIdent(call); ident != nil {
+		diag.SuggestedFixes = []analysis.SuggestedFix{{
+			Message:   fmt.Sprintf("rename to %s", fVariant),
+			TextEdits: []analysis.TextEdit{{Pos: ident.Pos(), End: ident.End(), NewText: []byte(fVariant)}},
+		}}
+	}
+	pass.Report(diag)
+}
+
+// calleeNameIdent returns the identifier naming the called function, so a suggested fix can rewrite it.
+func calleeNameIdent(call *ast.CallExpr) *ast.Ident {
+	switch fun := call.Fun.(type) {
+	case *ast.SelectorExpr:
+		return fun.Sel
+	case *ast.Ident:
+		return fun
+	}
+	return nil
+}
+
 func constStringValue(pass *analysis.Pass, expr ast.Expr) (string, bool) {
 	tv, ok := pass.TypesInfo.Types[expr]
 	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
@@ -275,8 +365,10 @@ func (v verbArg) invokesStringer() bool {
 
 // parseVerbs maps each format verb to the variadic argument it consumes.
 //
-// reliable is false if the format string uses argument-indexed width or precision (%*d) or explicit argument indexes (%[2]s).
-// In those cases the simple positional mapping doesn't work, so callers shouldn't act on the result.
+// reliable is false if the format string uses argument-indexed width or precision (%*d), explicit argument indexes
+// (%[2]s), or a byte that isn't a fmt verb where a verb is expected. The former break the simple positional mapping;
+// the latter means the string is either a broken format or prose containing a '%' (e.g. "improved by 5%!"). In all
+// cases the parse isn't meaningful, so callers shouldn't act on the result.
 func parseVerbs(format string) (verbs []verbArg, reliable bool) {
 	argNum := 0
 	end := len(format)
@@ -325,11 +417,19 @@ func parseVerbs(format string) (verbs []verbArg, reliable bool) {
 			// Flags/width consumed the rest of the string with no verb: malformed, so don't trust the parse.
 			return nil, false
 		}
+		if !isFmtVerb(format[i]) {
+			return nil, false
+		}
 
 		verbs = append(verbs, verbArg{verb: format[i], argIndex: argNum, offset: i, sharpFlag: sharp, spaceFlag: space, hasPrecision: precision})
 		argNum++
 	}
 	return verbs, true
+}
+
+// isFmtVerb reports whether b is a formatting verb documented by the fmt package (plus %w from fmt.Errorf).
+func isFmtVerb(b byte) bool {
+	return strings.IndexByte("vTtbcdoOqxXUeEfFgGspw", b) >= 0
 }
 
 // redundantStringCall reports whether arg is an `x.String()` call where x's type (as it would be boxed into the `any`
