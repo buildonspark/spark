@@ -277,7 +277,7 @@ func dbPartnerLookup(dbClient *ent.Client) func(ctx context.Context, partnerKeyI
 				return uuid.Nil, fmt.Errorf("unknown label %s for partner key %s", label, partnerKeyID)
 			}
 			logging.GetLoggerFromContext(ctx).Error("failed to look up partner from database",
-				zap.String("partner_key_id", partnerKeyID.String()),
+				zap.Stringer("partner_key_id", partnerKeyID),
 				zap.String("label", label),
 				zap.Error(err))
 			return uuid.Nil, fmt.Errorf("partner lookup failed for key %s / label %s: %w", partnerKeyID, label, err)

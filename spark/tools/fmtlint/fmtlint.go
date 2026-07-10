@@ -24,6 +24,13 @@
 //
 //	logger.Sugar().Info("querying transfer with ID: %s", id)  // logs "querying transfer with ID: %s<id>"
 //	logger.Sugar().Infof("querying transfer with ID: %s", id) // intended
+//
+// 4. zap.String("key", v.String()) where v implements fmt.Stringer: zap.Stringer produces identical output but defers
+// the String() call until the entry is actually encoded, skipping it entirely when the level is disabled, and
+// recovers typed-nil panics at encode time instead of crashing at the call site. keys.ToHex is covered as in pattern 1.
+//
+//	zap.String("transfer_id", id.String()) // eagerly builds the string
+//	zap.Stringer("transfer_id", id)        // equivalent, lazy
 package fmtlint
 
 import (
@@ -59,7 +66,7 @@ func (p *Plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 	return []*analysis.Analyzer{
 		{
 			Name: "fmtlint",
-			Doc:  "reports incorrect formatting of printf-style arguments",
+			Doc:  "reports incorrect or redundant formatting of printf-style and zap field arguments",
 			Run:  run,
 		},
 	}, nil
@@ -134,6 +141,11 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 		if fn == nil {
 			return
 		}
+	}
+
+	if fn.FullName() == "go.uber.org/zap.String" {
+		checkZapStringField(pass, call)
+		return
 	}
 
 	if fVariant, ok := printfVariant(fn); ok {
@@ -322,6 +334,40 @@ func reportPrintWithVerb(pass *analysis.Pass, call *ast.CallExpr, name, fVariant
 	pass.Report(diag)
 }
 
+// checkZapStringField flags zap.String("key", v.String()) where v implements fmt.Stringer. zap.Stringer produces the
+// same output but defers the String() call until the entry is actually encoded, skipping it when the level is
+// disabled.
+//
+// Unlike the verb checks, this doesn't exclude types implementing fmt.Formatter or error: zap.Stringer calls String()
+// directly rather than going through fmt, so fmt's method precedence never applies and the output always matches the
+// eager call.
+func checkZapStringField(pass *analysis.Pass, call *ast.CallExpr) {
+	if len(call.Args) != 2 {
+		return
+	}
+	sel, inner, ok := stringerMethodCall(pass, call.Args[1])
+	if !ok {
+		return
+	}
+
+	diag := analysis.Diagnostic{
+		Pos:      sel.Sel.Pos(),
+		End:      inner.End(),
+		Category: "fmtlint",
+		Message:  fmt.Sprintf("unnecessary eager .%s() call: zap.Stringer on the bare value defers it until the entry is encoded", sel.Sel.Name),
+	}
+	if ident := calleeNameIdent(call); ident != nil {
+		diag.SuggestedFixes = []analysis.SuggestedFix{{
+			Message: "replace with zap.Stringer",
+			TextEdits: []analysis.TextEdit{
+				{Pos: ident.Pos(), End: ident.End(), NewText: []byte("Stringer")},
+				{Pos: sel.X.End(), End: inner.End(), NewText: nil}, // Delete the trailing method call
+			},
+		}}
+	}
+	pass.Report(diag)
+}
+
 // calleeNameIdent returns the identifier naming the called function, so a suggested fix can rewrite it.
 func calleeNameIdent(call *ast.CallExpr) *ast.Ident {
 	switch fun := call.Fun.(type) {
@@ -432,9 +478,10 @@ func isFmtVerb(b byte) bool {
 	return strings.IndexByte("vTtbcdoOqxXUeEfFgGspw", b) >= 0
 }
 
-// redundantStringCall reports whether arg is an `x.String()` call where x's type (as it would be boxed into the `any`
-// passed to fmt) implements fmt.Stringer, or a `x.ToHex()` call where x is a key.
-func redundantStringCall(pass *analysis.Pass, arg ast.Expr) (*ast.SelectorExpr, *ast.CallExpr, bool) {
+// stringerMethodCall reports whether arg is an `x.String()` call where x's type (as it would be boxed into an
+// interface) implements fmt.Stringer, or an `x.ToHex()` call where x is a key. Such a call can be replaced by handing
+// the bare value to something that invokes the Stringer itself (a %s/%v/%q verb, or zap.Stringer).
+func stringerMethodCall(pass *analysis.Pass, arg ast.Expr) (*ast.SelectorExpr, *ast.CallExpr, bool) {
 	call, ok := arg.(*ast.CallExpr)
 	if !ok || len(call.Args) != 0 || call.Ellipsis != token.NoPos {
 		return nil, nil, false
@@ -443,31 +490,39 @@ func redundantStringCall(pass *analysis.Pass, arg ast.Expr) (*ast.SelectorExpr, 
 	if !ok {
 		return nil, nil, false
 	}
+	t := pass.TypesInfo.TypeOf(sel.X)
 
 	switch sel.Sel.Name {
 	case "String":
-		if !fmtInvokesStringer(pass.TypesInfo.TypeOf(sel.X)) {
-			return nil, nil, false
-		}
-		return sel, call, true
 	case "ToHex":
-		// fmt doesn't auto-invoke ToHex, so this is only redundant because the keys types implement fmt.Stringer with
-		// String()==ToHex(): %s/%v/%q on the bare receiver yields the same hex. Require both before flagging.
-		t := pass.TypesInfo.TypeOf(sel.X)
-		if !isKey(t) || !fmtInvokesStringer(t) {
+		// Nothing auto-invokes ToHex, so it's only removable because the keys types implement fmt.Stringer with
+		// String()==ToHex(): invoking the Stringer on the bare receiver yields the same hex.
+		if !isKey(t) {
 			return nil, nil, false
 		}
-		return sel, call, true
+	default:
+		return nil, nil, false
 	}
-	return nil, nil, false
+	if !implementsStringer(t) {
+		return nil, nil, false
+	}
+	return sel, call, true
 }
 
-// fmtInvokesStringer reports whether fmt would actually call t's String() method for a Stringer-invoking verb. fmt's
-// precedence is Formatter, then error, then Stringer (see the fmt package docs), so a type that also implements
-// fmt.Formatter or error formats via one of those instead — its output can diverge from String(), meaning .String() is
-// not redundant.
-func fmtInvokesStringer(t types.Type) bool {
-	return implementsStringer(t) && !implementsFmtFormatter(t) && !implementsError(t)
+// redundantStringCall reports whether arg is a stringer method call that a Stringer-invoking fmt verb makes redundant.
+// Beyond stringerMethodCall, types implementing fmt.Formatter or error are excluded: fmt's precedence is Formatter,
+// then error, then Stringer (see the fmt package docs), so such a type formats via one of those instead — its output
+// can diverge from String(), meaning .String() is not redundant.
+func redundantStringCall(pass *analysis.Pass, arg ast.Expr) (*ast.SelectorExpr, *ast.CallExpr, bool) {
+	sel, call, ok := stringerMethodCall(pass, arg)
+	if !ok {
+		return nil, nil, false
+	}
+	t := pass.TypesInfo.TypeOf(sel.X)
+	if implementsFmtFormatter(t) || implementsError(t) {
+		return nil, nil, false
+	}
+	return sel, call, true
 }
 
 // isKey reports whether typ is one of the github.com/lightsparkdev/spark/common/keys types or a pointer to one.

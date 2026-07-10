@@ -189,7 +189,7 @@ func logQueryTransfersInvocation(ctx context.Context, queryPath string, filter *
 		}
 
 		fields = append(fields,
-			zap.String("network", filter.GetNetwork().String()),
+			zap.Stringer("network", filter.GetNetwork()),
 			zap.String("participant_type", participantType),
 			zap.String("participant_pubkey_hash", participantPubkeyHash),
 			zap.Strings("types", types),
@@ -197,7 +197,7 @@ func logQueryTransfersInvocation(ctx context.Context, queryPath string, filter *
 			zap.Int("transfer_ids_count", len(filter.GetTransferIds())),
 			zap.Int64("limit", filter.GetLimit()),
 			zap.Int64("offset", filter.GetOffset()),
-			zap.String("order", filter.GetOrder().String()),
+			zap.Stringer("order", filter.GetOrder()),
 			zap.Bool("has_created_after", filter.GetCreatedAfter() != nil),
 			zap.Bool("has_created_before", filter.GetCreatedBefore() != nil),
 		)
