@@ -127,6 +127,8 @@ type Config struct {
 	// internal APIs, as opposed to authzEnabled which gates client
 	// authorization.
 	ServiceAuthz ServiceAuthzConfig
+	// InternalRPC controls how this operator dials peer SOs for internal RPCs.
+	InternalRPC InternalRPCConfig
 	// Different load balancers may append the client IP earlier or later in the
 	// X-Forwarded-For header. This configuration specifies the position from
 	// the end of the header to use.
@@ -201,6 +203,8 @@ type OperatorConfig struct {
 	Token TokenConfig `yaml:"token"`
 	// Configuration for authorization of internal service APIs.
 	ServiceAuthz ServiceAuthzConfig `yaml:"service_authz"`
+	// Configuration for SO-to-SO outbound RPC transport (tls | brontide).
+	InternalRPC InternalRPCConfig `yaml:"internal_rpc"`
 	// XffClientIPPosition specifies the position from the end of the X-Forwarded-For header to use for the client IP.
 	XffClientIpPosition int `yaml:"xff_client_ip_position"`
 	// Knobs is the configuration for the knobs
@@ -322,6 +326,37 @@ type ServiceAuthzConfig struct {
 	IPAllowlist []string `yaml:"ip_allowlist"`
 }
 
+// InternalRPCTransport selects how outbound SO-to-SO dials are secured.
+type InternalRPCTransport string
+
+const (
+	// InternalRPCTransportTLS uses one-way TLS against the public listener.
+	InternalRPCTransportTLS InternalRPCTransport = "tls"
+	// InternalRPCTransportBrontide wraps TLS with Noise_XK mutual auth and targets each peer's InternalAddress.
+	InternalRPCTransportBrontide InternalRPCTransport = "brontide"
+)
+
+// InternalRPCConfig configures how this operator dials peer SOs.
+type InternalRPCConfig struct {
+	// Transport selects between "tls" (default) and "brontide".
+	Transport InternalRPCTransport `yaml:"transport"`
+}
+
+// normalize defaults an empty transport to tls and rejects unrecognized values. Fail-closed: a typo'd transport is a
+// config error rather than a silent fallback to plain TLS.
+func (c *InternalRPCConfig) normalize() error {
+	switch c.Transport {
+	case "":
+		c.Transport = InternalRPCTransportTLS
+		return nil
+	case InternalRPCTransportTLS, InternalRPCTransportBrontide:
+		return nil
+	default:
+		return fmt.Errorf("internal_rpc.transport must be %q or %q, got %q",
+			InternalRPCTransportTLS, InternalRPCTransportBrontide, c.Transport)
+	}
+}
+
 // NewConfig creates a new config for the signing operator.
 func NewConfig(
 	ctx context.Context,
@@ -399,6 +434,24 @@ func NewConfig(
 		operatorConfig.XffClientIpPosition = 0
 	}
 
+	if err := operatorConfig.InternalRPC.normalize(); err != nil {
+		return nil, err
+	}
+
+	if operatorConfig.InternalRPC.Transport == InternalRPCTransportBrontide {
+		// SigningOperatorMap includes this operator's own entry, and we do dial ourselves in some flows (notably DKG:
+		// RunDKG fetches a conn via SigningOperatorMap[config.Identifier].NewOperatorGRPCConnectionForDKG(ctx)).
+		// Under brontide that self-dial targets our own InternalAddress, so the local entry needs valid
+		// internal_address + identity_public_key metadata too. EnableBrontideClient validates both, so a missing self
+		// InternalAddress fails fast here instead of at first DKG run.
+		for _, op := range signingOperatorMap {
+			if err := op.EnableBrontideClient(identityPrivateKey); err != nil {
+				return nil, fmt.Errorf("internal_rpc.transport=brontide: %w", err)
+			}
+		}
+		logger.Sugar().Infof("SO-to-SO brontide transport provisioned (TLS + Noise_XK); activate at runtime with knob %s > 0", knobs.KnobInternalRPCBrontideEnabled)
+	}
+
 	// We need to be able to set the rate limiter both from the command line and
 	// from the operator config. If either says "enable", then we enable. Then
 	// we take the values from whichever said "enable." If they both say
@@ -437,6 +490,7 @@ func NewConfig(
 		Database:                   operatorConfig.Database,
 		Token:                      operatorConfig.Token,
 		ServiceAuthz:               operatorConfig.ServiceAuthz,
+		InternalRPC:                operatorConfig.InternalRPC,
 		XffClientIpPosition:        operatorConfig.XffClientIpPosition,
 		Knobs:                      operatorConfig.Knobs,
 		FrostGRPCConnectionFactory: frost.NewFrostGRPCConnectionFactorySecure(),

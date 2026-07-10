@@ -70,10 +70,9 @@ type SigningOperator struct {
 	Logger *zap.Logger
 	// connPoolConfig holds the pool configuration for outbound gRPC connections.
 	connPoolConfig OperatorConnectionPoolConfig
-	// connPools caches pools per (transport, target address). Keying on transport as well as address keeps the
-	// plain-TLS and brontide pools separate even if InternalAddress aliases AddressRpc/AddressDkg (e.g. via the
-	// AddressDkg defaulting in UnmarshalJSON or a misconfiguration) — otherwise the first dial's factory would be
-	// silently reused for the other transport.
+	// connPools caches pools per (transport, target address). Keying on transport as well as address keeps the plain-TLS
+	// and brontide pools separate even if InternalAddress aliases AddressRpc/AddressDkg. Otherwise, the first dial's
+	// factory would be silently reused for the other transport.
 	connPools map[connPoolKey]*operatorConnPool
 	// connPoolsMu guards connPools access.
 	connPoolsMu sync.Mutex
@@ -99,7 +98,13 @@ type operatorConnectionFactorySecure struct {
 }
 
 func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error) {
-	extraOpts := []grpc.DialOption{
+	return common.NewGRPCConnectionWithOptions(address, o.operator.CertPath, retryPolicy, clientTimeoutConfig, defaultOperatorDialOpts()...)
+}
+
+// defaultOperatorDialOpts returns the gRPC dial options shared by all operator connection factories.
+func defaultOperatorDialOpts() []grpc.DialOption {
+	const MiB = 1024 * 1024
+	return []grpc.DialOption{
 		// Spec-compliant client pings; server currently has no enforcement policy.
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                30 * time.Second,
@@ -107,25 +112,22 @@ func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retr
 			PermitWithoutStream: true,
 		}),
 		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(10*1024*1024),
-			grpc.MaxCallSendMsgSize(10*1024*1024),
+			grpc.MaxCallRecvMsgSize(10*MiB),
+			grpc.MaxCallSendMsgSize(10*MiB),
 		),
-		grpc.WithInitialWindowSize(1 << 20),      // 1 MB
-		grpc.WithInitialConnWindowSize(16 << 20), // 16 MB
+		grpc.WithInitialWindowSize(MiB),
+		grpc.WithInitialConnWindowSize(16 * MiB),
 		grpc.WithChainUnaryInterceptor(common.IdempotencyKeyClientInterceptor()),
 	}
-	return common.NewGRPCConnectionWithOptions(address, o.operator.CertPath, retryPolicy, clientTimeoutConfig, extraOpts...)
 }
 
 func NewOperatorConnectionFactorySecure(operator *SigningOperator) OperatorConnectionFactory {
 	return &operatorConnectionFactorySecure{operator: operator}
 }
 
-// SetInternalConnectionFactory installs the factory used for internal-flavored dials
-// (NewOperatorInternalGRPCConnection, NewOperatorGRPCConnectionForDKG) when brontide is enabled. It's a seam for
-// tests that inject a mock connection factory: without it, a test that flips brontide on would route around the
-// injected OperatorConnectionFactory and dial the real InternalAddress. It does not set brontideAvailable — that
-// remains gated by brontide provisioning.
+// SetInternalConnectionFactory installs the factory used for internal-flavored dials when brontide is enabled. It's a
+// seam for tests that inject a mock connection factory: without it, a test that flips brontide on would route around the
+// injected OperatorConnectionFactory and dial the real InternalAddress. It does not set brontideAvailable.
 func (s *SigningOperator) SetInternalConnectionFactory(factory OperatorConnectionFactory) {
 	s.internalConnFactory = factory
 }
