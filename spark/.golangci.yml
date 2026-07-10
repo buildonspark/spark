@@ -36,6 +36,9 @@ linters:
       - linters:
           - govet
         text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
+      - linters:
+          - forbidigo
+        path: tools/entfieldlint/cmd/entfieldlint/main.go
   settings:
     custom:
       # Module plugin built into a custom golangci-lint binary via .custom-gcl.yml.
