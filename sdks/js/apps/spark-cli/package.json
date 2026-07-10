@@ -4,7 +4,7 @@
   "description": "Spark CLI",
   "type": "module",
   "bin": {
-    "spark-cli": "./dist/cli.js"
+    "spark-cli": "./dist/cli.mjs"
   },
   "files": [
     "dist",
@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "prepack": "yarn build",
     "cli": "cross-env NODE_ENV=production NETWORK=regtest tsx src/cli.ts",
     "cli:local": "cross-env NODE_ENV=development NETWORK=local ../../scripts/with-local-routing.sh tsx src/cli.ts",
     "cli:mainnet": "cross-env NODE_ENV=production NETWORK=mainnet tsx src/cli.ts",
@@ -27,6 +28,8 @@
     "format": "prettier . --check",
     "lint:fix": "eslint --fix .",
     "lint": "eslint .",
+    "package:checks": "yarn publint && yarn test:package",
+    "test:package": "node --test test/package.test.mjs",
     "types": "tsc --noEmit"
   },
   "author": "",
@@ -39,7 +42,7 @@
     "@noble/hashes": "^1.7.0",
     "@scure/base": "^1.2.4",
     "@scure/btc-signer": "^1.5.0",
-    "yargs": "^18.0.0"
+    "yargs": "npm:yargs@^17.7.3"
   },
   "devDependencies": {
     "@lightsparkdev/eslint-config": "^0.0.1",
@@ -47,11 +50,12 @@
     "cross-env": "^7.0.3",
     "eslint": "^9.25.0",
     "prettier": "^3.7.4",
+    "publint": "^0.3.9",
     "tsdown": "^0.20.3",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   }
 }

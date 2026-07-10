@@ -1,0 +1,12 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    /* Turbo has this really odd behavior where it runs dependent tasks of workspaces even when
+       the script doesn't exist there. There's a long running discussion to change this here, but
+       until then it's easiest to declare dependencies in the workspace turbo config itself
+       https://github.com/vercel/turborepo/issues/937 */
+    "package:checks": {
+      "dependsOn": ["build", "^build"]
+    }
+  }
+}
