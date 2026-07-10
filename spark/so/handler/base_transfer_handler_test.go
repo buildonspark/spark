@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -224,6 +225,127 @@ func TestValidateSendLeafRefundTxsRejectsPartialDirectRefundPair(t *testing.T) {
 	require.ErrorContains(t, err, "both direct refund txs are required")
 
 	require.NoError(t, validateSendLeafRefundTxs(senderLeaf, canonicalCpfpRefund, canonicalDirectRefund, canonicalDirectFromCpfpRefund, receiverPub, 1, false))
+}
+
+// TestLoadLeaves_NegativeBranches pins loadLeaves' failure modes for both lock
+// variants: a leaf id absent from the DB and leaves spanning two networks.
+// These branches guard the non-locking fast-fail call sites (signature-amount
+// pre-checks) as well as the locking createTransferV3 path.
+func TestLoadLeaves_NegativeBranches(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	_, regtestLeaf := createTestTreeInternal(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable, rand.NewChaCha8([32]byte{41}))
+	_, mainnetLeaf := createTestTreeInternal(t, ctx, btcnetwork.Mainnet, st.TreeStatusAvailable, rand.NewChaCha8([32]byte{42}))
+
+	for _, forUpdate := range []bool{false, true} {
+		t.Run(fmt.Sprintf("forUpdate=%t", forUpdate), func(t *testing.T) {
+			_, _, err := loadLeaves(ctx, client, map[string][]byte{uuid.NewString(): nil}, forUpdate)
+			require.ErrorContains(t, err, "some leaves not found")
+
+			_, _, err = loadLeaves(ctx, client, map[string][]byte{
+				regtestLeaf.ID.String(): nil,
+				mainnetLeaf.ID.String(): nil,
+			}, forUpdate)
+			require.ErrorContains(t, err, "same network")
+
+			leaves, network, err := loadLeaves(ctx, client, map[string][]byte{regtestLeaf.ID.String(): nil}, forUpdate)
+			require.NoError(t, err)
+			require.Len(t, leaves, 1)
+			require.Equal(t, btcnetwork.Regtest, network)
+		})
+	}
+}
+
+// TestValidateUtxoSwapLeafRefundTxsV3 pins the consensus-path utxo-swap refund
+// validation: direct refund txs are optional (requireDirectTx=false wire
+// contract) but must pay the receiver when present — every submitted tx is
+// FROST-signed, so accepting an arbitrary output would let the sender hijack
+// the receiver's direct unilateral-exit path.
+func TestValidateUtxoSwapLeafRefundTxsV3(t *testing.T) {
+	receiverPub := keys.GeneratePrivateKey().Public()
+	attackerPub := keys.GeneratePrivateKey().Public()
+	receiverScript, err := common.P2TRScriptFromPubKey(receiverPub)
+	require.NoError(t, err)
+	attackerScript, err := common.P2TRScriptFromPubKey(attackerPub)
+	require.NoError(t, err)
+
+	nodeTx := wire.NewMsgTx(3)
+	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	nodeTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
+	nodeHash := nodeTx.TxHash()
+
+	directTx := wire.NewMsgTx(3)
+	directTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	directTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
+	directHash := directTx.TxHash()
+
+	const oldTimelock uint32 = 600
+	senderRefundTx := wire.NewMsgTx(3)
+	senderRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
+		Sequence:         oldTimelock,
+	})
+
+	leaf := &ent.TreeNode{
+		RawTx:       mustSerializeTx(t, nodeTx),
+		DirectTx:    mustSerializeTx(t, directTx),
+		RawRefundTx: mustSerializeTx(t, senderRefundTx),
+	}
+	leafID := leaf.ID.String()
+
+	buildRefundTxBytes := func(outPoint wire.OutPoint, sequence uint32, pkScript []byte) []byte {
+		tx := wire.NewMsgTx(3)
+		tx.AddTxIn(&wire.TxIn{PreviousOutPoint: outPoint, Sequence: sequence})
+		tx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: pkScript})
+		return mustSerializeTx(t, tx)
+	}
+	cpfpSeq := oldTimelock - spark.TimeLockInterval
+	directSeq := oldTimelock - spark.TimeLockInterval + spark.DirectTimelockOffset
+	goodCpfp := buildRefundTxBytes(wire.OutPoint{Hash: nodeHash, Index: 0}, cpfpSeq, receiverScript)
+	goodDirect := buildRefundTxBytes(wire.OutPoint{Hash: directHash, Index: 0}, directSeq, receiverScript)
+	goodDfc := buildRefundTxBytes(wire.OutPoint{Hash: nodeHash, Index: 0}, directSeq, receiverScript)
+	attackerDirect := buildRefundTxBytes(wire.OutPoint{Hash: directHash, Index: 0}, directSeq, attackerScript)
+
+	leaves := []*ent.TreeNode{leaf}
+
+	t.Run("valid direct refunds pass", func(t *testing.T) {
+		require.NoError(t, validateUtxoSwapLeafRefundTxsV3(
+			leaves,
+			map[string][]byte{leafID: goodCpfp},
+			map[string][]byte{leafID: goodDirect},
+			map[string][]byte{leafID: goodDfc},
+			receiverPub, false))
+	})
+
+	t.Run("direct refunds are optional", func(t *testing.T) {
+		require.NoError(t, validateUtxoSwapLeafRefundTxsV3(
+			leaves,
+			map[string][]byte{leafID: goodCpfp},
+			map[string][]byte{},
+			map[string][]byte{},
+			receiverPub, false))
+	})
+
+	t.Run("direct refund paying the wrong key is rejected", func(t *testing.T) {
+		err := validateUtxoSwapLeafRefundTxsV3(
+			leaves,
+			map[string][]byte{leafID: goodCpfp},
+			map[string][]byte{leafID: attackerDirect},
+			map[string][]byte{leafID: goodDfc},
+			receiverPub, false)
+		require.Error(t, err, "attacker-destination direct refund tx must not pass validation")
+	})
+
+	t.Run("missing cpfp refund is rejected", func(t *testing.T) {
+		err := validateUtxoSwapLeafRefundTxsV3(
+			leaves,
+			map[string][]byte{},
+			map[string][]byte{},
+			map[string][]byte{},
+			receiverPub, false)
+		require.ErrorContains(t, err, "not found in cpfp refund map")
+	})
 }
 
 func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *testing.T) {
