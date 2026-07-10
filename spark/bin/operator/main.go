@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -70,6 +73,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
@@ -111,6 +115,13 @@ type args struct {
 }
 
 const operatorPoolKnobRefreshInterval = time.Minute
+
+// requestBodyReadTimeout bounds how long the server spends reading a single request body on the
+// ServeHTTP multiplex path. It is sized to let a large (~MaxRequestSize) upload complete over a
+// slow mobile link while still cutting off a client that dribbles a body indefinitely. See the
+// usage site for why neither ReadHeaderTimeout, IdleTimeout, ReadTimeout, nor grpc-go's
+// MaxConnectionAge covers this case.
+const requestBodyReadTimeout = 60 * time.Second
 
 func (a *args) SupportedNetworksList() []btcnetwork.Network {
 	var networks []btcnetwork.Network
@@ -222,20 +233,29 @@ func createRateLimiter(config *so.Config, opts ...middleware.RateLimiterOption) 
 }
 
 type BufferedBody struct {
-	BodyReader io.ReadCloser
-	Body       []byte
-	Position   int
+	bodyReader io.ReadCloser
+	body       []byte
+	position   int
+	readErr    error
+	loaded     bool
 }
 
 func (body *BufferedBody) Read(p []byte) (n int, err error) {
-	err = nil
-	if body.Body == nil {
-		body.Body, err = io.ReadAll(body.BodyReader)
+	if !body.loaded {
+		body.body, body.readErr = io.ReadAll(body.bodyReader)
+		body.loaded = true
 	}
 
-	n = copy(p, body.Body[body.Position:])
-	body.Position += n
-	if err == nil && body.Position == len(body.Body) {
+	// The read error is sticky: surface it on every call rather than only on the read that triggered buffering.
+	// Otherwise, a caller that retries after a partial read would drain the buffered prefix and see a clean io.EOF,
+	// mistaking a truncated body for a complete one.
+	if body.readErr != nil {
+		return 0, body.readErr
+	}
+
+	n = copy(p, body.body[body.position:])
+	body.position += n
+	if body.position == len(body.body) {
 		err = io.EOF
 	}
 
@@ -243,11 +263,46 @@ func (body *BufferedBody) Read(p []byte) (n int, err error) {
 }
 
 func (body *BufferedBody) Close() error {
-	return body.BodyReader.Close()
+	return body.bodyReader.Close()
 }
 
 func NewBufferedBody(bodyReader io.ReadCloser) *BufferedBody {
-	return &BufferedBody{bodyReader, nil, 0}
+	return &BufferedBody{bodyReader: bodyReader}
+}
+
+// writeGrpcResourceExhausted writes a terminal ResourceExhausted status directly to w in the wire format
+// matching contentType, without invoking the gRPC server. gRPC-web carries the status in a trailer frame in
+// the response body (base64-encoded for the "-text" variants); native gRPC uses a Trailers-Only response
+// where the status rides in the header frame. In all cases the HTTP status is 200 — the gRPC status is the
+// real result.
+func writeGrpcResourceExhausted(w http.ResponseWriter, contentType, msg string) {
+	code := strconv.Itoa(int(codes.ResourceExhausted))
+	lowerCT := strings.ToLower(contentType)
+
+	if strings.HasPrefix(lowerCT, "application/grpc-web") {
+		trailers := fmt.Sprintf("grpc-status:%s\r\ngrpc-message:%s\r\n", code, msg)
+		var frame bytes.Buffer
+		frame.WriteByte(1 << 7) // high bit marks a trailer frame
+		// A trailer block this small cannot overflow uint32.
+		_ = binary.Write(&frame, binary.BigEndian, uint32(len(trailers)))
+		frame.WriteString(trailers)
+
+		body := frame.Bytes()
+		if strings.HasPrefix(lowerCT, "application/grpc-web-text") {
+			encoded := make([]byte, base64.StdEncoding.EncodedLen(len(body)))
+			base64.StdEncoding.Encode(encoded, body)
+			body = encoded
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/grpc")
+	w.Header().Set("Grpc-Status", code)
+	w.Header().Set("Grpc-Message", msg)
+	w.WriteHeader(http.StatusOK)
 }
 
 func main() {
@@ -684,6 +739,13 @@ func main() {
 		grpc.StatsHandler(
 			sparkgrpc.NewInstrumentedStatsHandler(otelgrpc.NewServerHandler()),
 		),
+		// Align the gRPC transport receive limit with the MaxRequestSize validation cap. gRPC's default is 4MB, so a
+		// message larger than 4MB but within MaxRequestSize would be rejected at the transport layer before the
+		// ValidationInterceptor's MaxRequestSize check ever runs. This lives in the shared serverOpts deliberately: it
+		// applies to both the public server and the brontide-authenticated internal (SO-to-SO) server, which run the
+		// same ValidationInterceptor, so both surfaces enforce one consistent ceiling rather than leaving the internal
+		// server on the 4MB transport default beneath a 10MB validation cap.
+		grpc.MaxRecvMsgSize(sparkgrpc.MaxRequestSize),
 	}
 
 	// Establish base values from config, then allow runtime knobs to override.
@@ -1004,13 +1066,55 @@ func main() {
 			otelhttp.NewHandler(
 				http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
-						// The gRPC server doesn't read the request body until EOF before processing
-						// the request. This can result in the HTTP server receiving a DATA(END_FRAME)
-						// frame after sending the response, which elicits a RST_STREAM(STREAM_CLOSED)
-						// frame. ALB and nginx then respond to the client with RST_STREAM(INTERNAL_ERROR)
-						// which causes the request to fail. The workaround is to buffer the entire
-						// request body before passing to the gRPC server.
-						r.Body = NewBufferedBody(r.Body)
+						// Reject an over-large body up front when the client declares its size. If we instead let it
+						// reach the gRPC server, MaxBytesReader (below) trips mid-body-read and grpc-go maps that to a
+						// transport.ConnectionError -> codes.Unknown (or, if the truncation surfaces as a connection
+						// reset, a client-side codes.Unavailable that retry-configured SDKs re-send indefinitely),
+						// masking what is really a permanent size violation. Returning ResourceExhausted here gives the
+						// client a terminal code. Content-Length is absent (-1) for native gRPC streaming, so this only
+						// fires for unary gRPC-web requests (the SDK's transport), which is exactly the retry-loop case.
+						contentType := r.Header.Get("Content-Type")
+						if r.ContentLength > sparkgrpc.MaxHTTPBodySize && strings.HasPrefix(strings.ToLower(contentType), "application/grpc") {
+							writeGrpcResourceExhausted(w, contentType, fmt.Sprintf(
+								"request body of %d bytes exceeds max of %d", r.ContentLength, sparkgrpc.MaxHTTPBodySize))
+							return
+						}
+
+						// Bound the time spent reading the request body. ReadHeaderTimeout only covers headers and
+						// IdleTimeout only fires on connections with no open streams, so neither caps body-read time.
+						// ReadTimeout is intentionally unset because it's a whole-request deadline that would cut off
+						// long-lived server-streaming responses (e.g. subscribe_to_events). On this ServeHTTP multiplex
+						// path the HTTP/2 layer is net/http's, so grpc-go's MaxConnectionAge doesn't govern these
+						// connections either. Without a bound, a client can send headers quickly then dribble a body
+						// just under MaxHTTPBodySize indefinitely, pinning a goroutine and buffer per stream. A read
+						// deadline closes this for native gRPC and gRPC-web-over-HTTP: it bounds only request reads,
+						// not response writes, and is safe because Spark RPCs send the whole request body upfront
+						// (no client-streaming). This does not cut off long-lived server-streams (e.g.
+						// subscribe_to_events), including over an HTTP/1.1 hop: although h1 read deadlines are
+						// connection-level, net/http clears the deadline once the request body reaches EOF (see
+						// connReader.startBackgroundRead), so it only ever governs the body-read window.
+						//
+						// Caveat: this does NOT cover the grpc-web websocket transport (WithWebsockets, above). Once
+						// a request is upgraded, the library hijacks the connection and replaces r.Body with its own
+						// frame reader, discarding both this deadline and the MaxBytesReader/BufferedBody wrap below.
+						// Websocket frame reads are bounded only by nhooyr's default 32KB per-message read limit —
+						// there is no total-byte or time bound on that path.
+						rc := http.NewResponseController(w)
+						if err := rc.SetReadDeadline(time.Now().Add(requestBodyReadTimeout)); err != nil {
+							logger.Error("could not set request body read deadline", zap.Error(err))
+						}
+
+						// The gRPC server doesn't read the request body until EOF before processing the request. This
+						// can result in the HTTP server receiving a DATA(END_FRAME) frame after sending the response,
+						// which elicits a RST_STREAM(STREAM_CLOSED) frame. ALB and nginx then respond to the client
+						// with RST_STREAM(INTERNAL_ERROR) which causes the request to fail. The workaround is to buffer
+						// the entire request body before passing to the gRPC server.
+						//
+						// Since we're now reading the whole body into memory on first read, we have to cap it before
+						// buffering to avoid giant requests. The gRPC MaxRequestSize check only runs after message
+						// parsing, meaning the message will already have been buffered in memory here. Spark RPCs don't
+						// use client-streaming, so a single per-request cap is safe.
+						r.Body = NewBufferedBody(http.MaxBytesReader(w, r.Body, sparkgrpc.MaxHTTPBodySize))
 
 						if strings.ToLower(r.Header.Get("Content-Type")) == "application/grpc" {
 							grpcServer.ServeHTTP(w, r)
@@ -1029,6 +1133,13 @@ func main() {
 		Addr:      fmt.Sprintf(":%d", args.HttpPort),
 		Handler:   mux,
 		TLSConfig: &tlsConfig,
+		// Prevent a slowloris attack where a peer opens a connection and dribbles headers to pin server resources.
+		//
+		// We deliberately don't set ReadTimeout or WriteTimeout, which are whole-request/response deadlines applied to
+		// every connection, since this server multiplexes long-lived HTTP/2 gRPC server streams, like subscribe_to_events,
+		// whose response stays open indefinitely.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	errGrp.Go(func() error {
