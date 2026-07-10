@@ -9,7 +9,7 @@ linters:
     - errorlint # Checks for incorrect wrapping of errors
     - exhaustive
     - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions
-    - fmtlint # Custom: reports redundant .String() calls on printf-style arguments (requires custom-built binary)
+    - fmtlint # Custom: reports redundant/incorrect formatting of printf-style arguments and zap fields (requires custom-built binary)
     - forbidigo # Checks for forbidden identifiers
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid
     - govet
@@ -45,7 +45,7 @@ linters:
       # The standard `golangci-lint` binary will not load this; use the custom build.
       fmtlint:
         type: module
-        description: Reports redundant .String() calls on arguments to printf-style functions.
+        description: Reports redundant or incorrect formatting of printf-style arguments and zap fields.
     depguard:
       rules:
         logging:

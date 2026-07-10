@@ -103,7 +103,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	//      payload is stale and must not be applied.
 	if leafFieldsMatchNodeFinalize(extendedLeafNode, req.GetNode()) {
 		logger.Info("FinalizeRenewNodeTimelock: leaf already at target state, treating as idempotent",
-			zap.String("extended_leaf_id", extendedLeafID.String()))
+			zap.Stringer("extended_leaf_id", extendedLeafID))
 		return nil
 	}
 	if err := checkNodeRenewPrecondition(extendedLeafNode.RawTx, extendedLeafID); err != nil {
@@ -195,7 +195,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		}
 		return fmt.Errorf("failed to create split node %s: %w", splitNodeID, err)
 	}
-	logger.Info("Created split node", zap.String("split_node_id", splitNodeID.String()))
+	logger.Info("Created split node", zap.Stringer("split_node_id", splitNodeID))
 
 	extendedLeaf := req.GetNode()
 	_, err = extendedLeafNode.Update().
@@ -212,8 +212,8 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		return fmt.Errorf("failed to update extended leaf %s: %w", extendedLeafID, err)
 	}
 	logger.Info("Updated extended leaf",
-		zap.String("extended_leaf_id", extendedLeafID.String()),
-		zap.String("split_node_id", splitNodeID.String()))
+		zap.Stringer("extended_leaf_id", extendedLeafID),
+		zap.Stringer("split_node_id", splitNodeID))
 	return nil
 }
 
@@ -309,7 +309,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 	//      AlreadyExists-as-success rule) still marks the row COMMITTED.
 	if leafFieldsMatchRefundFinalize(leafNode, leaf) {
 		logger.Info("FinalizeRenewRefundTimelock: leaf already at target state, treating as idempotent",
-			zap.String("leaf_id", leafID.String()))
+			zap.Stringer("leaf_id", leafID))
 		return nil
 	}
 	if err := checkRefundTimelockMonotonicity(leafNode.RawTx, leaf.GetRawTx(), leafID); err != nil {
@@ -328,7 +328,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 		return fmt.Errorf("failed to update leaf %s: %w", leafID, err)
 	}
 
-	logger.Info("Updated leaf for refund timelock renewal", zap.String("leaf_id", leafID.String()))
+	logger.Info("Updated leaf for refund timelock renewal", zap.Stringer("leaf_id", leafID))
 	return nil
 }
 

@@ -22,3 +22,11 @@ func (*SugaredLogger) Debug(args ...interface{}) {}
 func (*SugaredLogger) Info(args ...interface{})  {}
 func (*SugaredLogger) Warn(args ...interface{})  {}
 func (*SugaredLogger) Error(args ...interface{}) {}
+
+type Field struct{}
+
+func String(key string, val string) Field { return Field{} }
+
+// Stringer has a parameter that's declared structurally rather than as fmt.Stringer, matching the real signature without
+// pulling fmt into the stub.
+func Stringer(key string, val interface{ String() string }) Field { return Field{} }

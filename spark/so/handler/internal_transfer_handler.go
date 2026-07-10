@@ -262,11 +262,11 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 				if err != nil {
 					return fmt.Errorf("failed to mark transfer completed for %s: %w", transferID, err)
 				}
-				logger.With(zap.String("transfer_id", transferID.String())).
+				logger.With(zap.Stringer("transfer_id", transferID)).
 					Info("Promoted transfer to completed, all receivers done")
 			}
 		}
-		logger.With(zap.String("transfer_id", transferID.String())).
+		logger.With(zap.Stringer("transfer_id", transferID)).
 			Info("Receiver already completed, accepting gossip idempotently")
 		return nil
 	}
@@ -389,8 +389,8 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		// Idempotency: receiver already completed. Node data was verified above.
 		if !receiver.CompletionTime.Equal(req.GetCompletionTimestamp().AsTime()) {
 			logger.With(
-				zap.String("transfer_id", transferID.String()),
-				zap.String("receiver_id", receiver.ID.String()),
+				zap.Stringer("transfer_id", transferID),
+				zap.Stringer("receiver_id", receiver.ID),
 				zap.Time("existing_completion_time", receiver.CompletionTime),
 				zap.Time("gossip_completion_time", req.GetCompletionTimestamp().AsTime()),
 			).Warn("receiver already completed with different timestamp, accepting idempotently")
@@ -422,7 +422,7 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		}
 	}
 
-	logger.With(zap.String("transfer_id", transferID.String())).Sugar().Infof("Finalized receiver %s for transfer", receiver.ID)
+	logger.With(zap.Stringer("transfer_id", transferID)).Sugar().Infof("Finalized receiver %s for transfer", receiver.ID)
 	return nil
 }
 

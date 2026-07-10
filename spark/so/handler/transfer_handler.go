@@ -5224,7 +5224,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			// ROLLBACK always proceeds even when the transfer is not ready for receiver claim,
 			// to prevent resource leaks in the two-phase commit protocol.
 			logging.GetLoggerFromContext(ctx).Warn("SettleReceiverKeyTweak ROLLBACK proceeding despite transfer not ready for receiver claim",
-				zap.String("transfer_id", transferID.String()),
+				zap.Stringer("transfer_id", transferID),
 				zap.String("transfer_status", string(transfer.Status)),
 				zap.Error(err),
 			)

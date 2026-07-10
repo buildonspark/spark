@@ -285,7 +285,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to create l1 token create entity (txid %s)", ann.txHash)
 			continue
 		}
-		logger.With(zap.String("issuer_public_key", l1TokenCreate.IssuerPublicKey.ToHex())).
+		logger.With(zap.Stringer("issuer_public_key", l1TokenCreate.IssuerPublicKey)).
 			Sugar().
 			Infof(
 				"Successfully created L1 token entity (txid %s, output_idex %d, name %s, identifier %x)",

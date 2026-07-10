@@ -1069,8 +1069,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					errorCount := 0
 					for _, pendingSendTransfer := range pendingSendTransfers {
 						transferLogger := logger.With(
-							zap.String("transfer_id", pendingSendTransfer.TransferID.String()),
-							zap.String("pending_send_transfer_id", pendingSendTransfer.ID.String()),
+							zap.Stringer("transfer_id", pendingSendTransfer.TransferID),
+							zap.Stringer("pending_send_transfer_id", pendingSendTransfer.ID),
 						)
 						stuckDuration := now.Sub(pendingSendTransfer.UpdateTime)
 						transferLogger.Sugar().Warnf("stuck for %s (since %s)",

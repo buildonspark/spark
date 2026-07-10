@@ -103,8 +103,8 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 			// restriction when retrying a legitimately failed or expired request.
 			logger.Warn(
 				"Found existing partial token transaction that isn't in started state or doesn't have a matching coordinator as the original. Rejecting request.",
-				zap.String("prev_tx_coordinator_pubkey", coordinatorPubKey.String()),
-				zap.String("prev_tx_status", fmt.Sprintf("%v", previouslyCreatedTokenTransaction.Status)),
+				zap.Stringer("prev_tx_coordinator_pubkey", coordinatorPubKey),
+				zap.String("prev_tx_status", string(previouslyCreatedTokenTransaction.Status)),
 			)
 			return nil, sparkerrors.AlreadyExistsDuplicateOperation(tokens.FormatErrorWithTransactionProto(tokens.ErrTransactionAlreadyBroadcasted, req.GetPartialTokenTransaction(), err))
 		}
