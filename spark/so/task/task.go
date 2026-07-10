@@ -704,18 +704,21 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						Order(utxoswap.ByCreateTime(sql.OrderDesc())).
 						Limit(100)
 
-					// Consensus (2PC) refund rows structurally never match this query,
-					// even with KnobUseConsensusStaticDepositUtxoRefund on: participant
-					// rows carry the coordinator's key (DispatchPrepare rejects a
-					// prepare naming the receiver as coordinator), and the coordinator's
-					// own row is created and completed within the same request
-					// transaction, so it is only ever visible COMPLETED or CANCELLED —
-					// never CREATED under this SO's key. Any CREATED refund row matched
-					// here is therefore a legacy stray (coordinator died between
-					// create-fanout and complete), and sweeping it keeps the legacy
-					// self-heal path alive across the knob flip: refund retries only
-					// re-sign against a COMPLETED swap, so an unswept stray would block
-					// the UTXO's active-swap slot indefinitely.
+					// Consensus (2PC) swap rows — refunds under
+					// KnobUseConsensusStaticDepositUtxoRefund and fixed-amount swaps
+					// under KnobUseConsensusStaticDepositUtxoSwap — structurally never
+					// match this query: participant rows carry the coordinator's key
+					// (DispatchPrepare rejects a prepare naming the receiver as
+					// coordinator), and the coordinator's own row is created and
+					// completed within the same request transaction, so it is only
+					// ever visible COMPLETED or CANCELLED — never CREATED under this
+					// SO's key. Any CREATED refund or fixed-amount row matched here is
+					// therefore a legacy stray (coordinator died between create-fanout
+					// and complete), and sweeping it keeps the legacy self-heal path
+					// alive across the knob flips: refund retries only re-sign against
+					// a COMPLETED swap, and fixed swaps have no re-sign path at all,
+					// so an unswept stray would block the UTXO's active-swap slot
+					// indefinitely.
 					utxoSwaps, err := query.All(ctx)
 					if err != nil {
 						return err

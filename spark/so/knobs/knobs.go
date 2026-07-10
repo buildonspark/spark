@@ -275,6 +275,13 @@ const (
 	// repair).
 	KnobUseConsensusStaticDepositUtxoRefund = "spark.so.use_consensus_static_deposit_utxo_refund"
 
+	// KnobUseConsensusStaticDepositUtxoSwap routes the fixed-amount static deposit claim
+	// through the 2PC consensus engine (0 = legacy, >0 = consensus). Enable only after every
+	// SO dispatches CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP. HARD gate until the
+	// SP-3495 structural fence lands: keep canary-only and drain pending legacy RollbackUtxoSwap
+	// gossip first (no FlowExecution fence, so a stray rollback can wedge a fresh consensus swap).
+	KnobUseConsensusStaticDepositUtxoSwap = "spark.so.use_consensus_static_deposit_utxo_swap"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)

@@ -48,6 +48,8 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 		return NewInitiatePreimageSwapFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND:
 		return NewStaticDepositUtxoRefundFlowHandler(config), nil
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP:
+		return NewStaticDepositUtxoSwapFlowHandler(config), nil
 	default:
 		return nil, fmt.Errorf("unknown consensus operation type: %d", opType)
 	}
