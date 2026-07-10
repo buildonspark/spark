@@ -389,6 +389,12 @@ func main() {
 		logger.Fatal("Failed to create config", zap.Error(err))
 	}
 
+	// The operator map includes our own entry and some flows self-dial it (e.g. DKG), so brontide client transport
+	// without the local brontide listener would fail on the first self-dial once the knob flips on. Fail at boot instead.
+	if config.InternalRPC.Transport == so.InternalRPCTransportBrontide && args.InternalGrpcPort == 0 {
+		logger.Fatal("internal_rpc.transport=brontide requires --internal-grpc-port so the local brontide listener is running")
+	}
+
 	config.RisingWaveDSN = args.RisingWaveDatabasePath
 
 	// OBSERVABILITY

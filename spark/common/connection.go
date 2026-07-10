@@ -180,17 +180,25 @@ func newGRPCConnection(address string, certPath string, retryPolicy *RetryPolicy
 		return newGRPCConnectionUnixDomainSocket(address, retryPolicy, clientTimeoutConfig, extra)
 	}
 
-	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
-	if len(extra) > 0 {
-		clientOpts = append(clientOpts, extra...)
+	creds, err := BuildTLSCredentialsFromCert(address, certPath)
+	if err != nil {
+		return nil, err
 	}
+	return NewGRPCConnectionWithCredentials(address, creds, retryPolicy, clientTimeoutConfig, extra...)
+}
 
+// BuildTLSCredentialsFromCert loads a PEM-encoded server certificate from certPath and returns gRPC TransportCredentials
+// configured to verify the server using it. The address is parsed for its hostname, with a localhost-skip fallback for
+// tests.
+//
+// Exposed so callers that need to wrap the TLS credentials in a higher-level transport can reuse the same trust-anchor
+// loading logic without duplicating it.
+func BuildTLSCredentialsFromCert(address string, certPath string) (credentials.TransportCredentials, error) {
 	certPool := x509.NewCertPool()
 	serverCert, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, err
 	}
-
 	if !certPool.AppendCertsFromPEM(serverCert) {
 		return nil, errors.New("failed to append certificate")
 	}
@@ -204,15 +212,19 @@ func newGRPCConnection(address string, certPath string, retryPolicy *RetryPolicy
 		host = "localhost"
 	}
 
-	clientOpts = append(
-		clientOpts,
-		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-			InsecureSkipVerify: host == "localhost",
-			RootCAs:            certPool,
-			ServerName:         host,
-		})),
-	)
+	return credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: host == "localhost",
+		RootCAs:            certPool,
+		ServerName:         host,
+	}), nil
+}
 
+// NewGRPCConnectionWithCredentials dials address with the supplied TransportCredentials, layering on the same basic
+// client options used by the cert-based helpers. Use this when the caller has already constructed credentials.
+func NewGRPCConnectionWithCredentials(address string, creds credentials.TransportCredentials, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig, extra ...grpc.DialOption) (*grpc.ClientConn, error) {
+	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
+	clientOpts = append(clientOpts, extra...)
+	clientOpts = append(clientOpts, grpc.WithTransportCredentials(creds))
 	return grpc.NewClient(address, clientOpts...)
 }
 
@@ -231,9 +243,7 @@ func newGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyC
 	}
 
 	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
-	if len(extra) > 0 {
-		clientOpts = append(clientOpts, extra...)
-	}
+	clientOpts = append(clientOpts, extra...)
 	// This is safe because we verified above that we are only connecting to a
 	// unix domain socket, which are always secure, local connections.
 	clientOpts = append(clientOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
