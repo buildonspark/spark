@@ -442,11 +442,11 @@ func (p *operatorConnPool) closeWithContext(ctx context.Context) {
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
+drain:
 	for p.activeBorrowers() != 0 {
-
 		select {
 		case <-ctx.Done():
-			break
+			break drain
 		case <-ticker.C:
 		}
 	}

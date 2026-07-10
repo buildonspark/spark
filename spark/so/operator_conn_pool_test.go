@@ -1,10 +1,12 @@
 package so
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -168,5 +170,78 @@ func TestOperatorConnPoolGracefulClose(t *testing.T) {
 	case <-closedCh:
 	case <-time.After(time.Second):
 		t.Fatalf("pool did not close after borrower released connection")
+	}
+}
+
+func TestOperatorConnPoolCloseStopsDrainingOnContextTimeout(t *testing.T) {
+	factory := func() (*grpc.ClientConn, error) {
+		return createTestConnection(t), nil
+	}
+
+	pool := newOperatorConnPool(factory, OperatorConnectionPoolConfig{
+		MinConnections:        1,
+		MaxConnections:        2,
+		UsersPerConnectionCap: 5,
+		IdleTimeout:           time.Hour,
+		MaxLifetime:           time.Hour,
+	}, nil)
+
+	// Borrow a connection and never release it, forcing the drain loop to give up via the context deadline, not borrower count.
+	handle, err := pool.getConnection()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	t.Cleanup(cancel)
+
+	closedCh := make(chan struct{})
+	go func() {
+		pool.closeWithContext(ctx)
+		close(closedCh)
+	}()
+
+	select {
+	case <-closedCh:
+	case <-time.After(time.Second):
+		t.Fatalf("closeWithContext did not return after context deadline with an active borrower")
+	}
+
+	pool.mu.Lock()
+	remaining := len(pool.conns)
+	pool.mu.Unlock()
+
+	require.Zerof(t, remaining, "expected all connections to be closed after forced shutdown, got %d", remaining)
+	require.NoError(t, handle.Close())
+}
+
+func TestOperatorConnPoolCloseWithCancelledContext(t *testing.T) {
+	factory := func() (*grpc.ClientConn, error) {
+		return createTestConnection(t), nil
+	}
+
+	pool := newOperatorConnPool(factory, OperatorConnectionPoolConfig{
+		MinConnections:        1,
+		MaxConnections:        2,
+		UsersPerConnectionCap: 5,
+		IdleTimeout:           time.Hour,
+		MaxLifetime:           time.Hour,
+	}, nil)
+
+	handle, err := pool.getConnection()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = handle.Close() })
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	closedCh := make(chan struct{})
+	go func() {
+		pool.closeWithContext(ctx)
+		close(closedCh)
+	}()
+
+	select {
+	case <-closedCh:
+	case <-time.After(time.Second):
+		t.Fatalf("closeWithContext did not return promptly with an already-cancelled context")
 	}
 }
