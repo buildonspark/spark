@@ -1,5 +1,8 @@
 // Command entfieldlint checks for Ent schema field removal without deprecation.
 //
+// It compares the current schema against a base revision, so it needs whichever version-control system tracks the
+// checkout. It supports both git working trees and jj workspaces.
+//
 // Usage:
 //
 //	entfieldlint check --base=HEAD^ --schema-dir=spark/so/ent/schema
@@ -36,14 +39,13 @@ func main() {
 		printUsage()
 		os.Exit(0)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
+		_, _ = fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
 		os.Exit(1)
 	}
 }
 
 func printUsage() {
-	//nolint:forbidigo // CLI tool needs to print to stdout
 	fmt.Println(`entfieldlint - Check Ent schema field deprecation before removal
 
 Commands:
@@ -52,39 +54,41 @@ Commands:
   diff     Show difference between base ref and current schema
 
 Flags:
-  --base         Git ref to compare against (default: HEAD^)
+  --base         Revision to compare against (default: HEAD^ for git, @- for jj)
   --schema-dir   Path to ent/schema directory relative to repo root (default: spark/so/ent/schema)
   --json         Output in JSON format`)
 }
 
 func runCheck(args []string) int {
 	fs := flag.NewFlagSet("check", flag.ExitOnError)
-	baseRef := fs.String("base", "HEAD^", "Git ref to compare against")
+	baseRef := fs.String("base", "", "Revision to compare against (default: HEAD^ for git, @- for jj)")
 	schemaDir := fs.String("schema-dir", "spark/so/ent/schema", "Path to ent/schema directory relative to repo root")
 	jsonOutput := fs.Bool("json", false, "Output in JSON format")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
 
-	// Get repo root
-	repoRoot, err := getRepoRoot()
+	vc, err := detectVCS()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: not in a git repository: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
+	}
+	if *baseRef == "" {
+		*baseRef = vc.defaultBase()
 	}
 
 	// Parse current schema
-	currentSchemaPath := filepath.Join(repoRoot, *schemaDir)
+	currentSchemaPath := filepath.Join(vc.root(), *schemaDir)
 	currentSchemas, err := entfieldlint.ParseSchemaDir(currentSchemaPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing current schema: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error parsing current schema: %v\n", err)
 		return 1
 	}
 
-	// Parse base schema from git ref
-	baseSchemas, err := parseSchemasFromRef(*baseRef, *schemaDir, repoRoot)
+	// Parse base schema from the base revision
+	baseSchemas, err := parseSchemasFromRef(vc, *baseRef, *schemaDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing base schema: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error parsing base schema: %v\n", err)
 		return 1
 	}
 
@@ -108,7 +112,6 @@ func runCheck(args []string) int {
 
 	if len(violations) == 0 {
 		if !*jsonOutput {
-			//nolint:forbidigo // CLI tool needs to print to stdout
 			fmt.Println("✓ No field removal violations found")
 		}
 		return 0
@@ -116,17 +119,12 @@ func runCheck(args []string) int {
 
 	if *jsonOutput {
 		data, _ := json.MarshalIndent(violations, "", "  ")
-		//nolint:forbidigo // CLI tool needs to print to stdout
 		fmt.Println(string(data))
 	} else {
-		//nolint:forbidigo // CLI tool needs to print to stdout
 		fmt.Printf("✗ Found %d field removal violation(s):\n\n", len(violations))
 		for _, v := range violations {
-			//nolint:forbidigo // CLI tool needs to print to stdout
 			fmt.Printf("  • %s\n", v.Message)
-			//nolint:forbidigo // CLI tool needs to print to stdout
 			fmt.Printf("    To fix: Add .Deprecated() to the field in %s schema, merge that change,\n", v.SchemaName)
-			//nolint:forbidigo // CLI tool needs to print to stdout
 			fmt.Printf("    then remove the field in a follow-up PR.\n\n")
 		}
 	}
@@ -142,38 +140,34 @@ func runList(args []string) int {
 		return 1
 	}
 
-	repoRoot, err := getRepoRoot()
+	v, err := detectVCS()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: not in a git repository: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-
-	schemaPath := filepath.Join(repoRoot, *schemaDir)
+	schemaPath := filepath.Join(v.root(), *schemaDir)
 	schemas, err := entfieldlint.ParseSchemaDir(schemaPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing schema: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error parsing schema: %v\n", err)
 		return 1
 	}
 
 	if *jsonOutput {
 		data, _ := json.MarshalIndent(schemas, "", "  ")
-		//nolint:forbidigo // CLI tool needs to print to stdout
 		fmt.Println(string(data))
-	} else {
-		for _, schema := range schemas {
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Printf("%s:\n", schema.Name)
-			for _, field := range schema.Fields {
-				deprecated := ""
-				if field.Deprecated {
-					deprecated = " [DEPRECATED]"
-				}
-				//nolint:forbidigo // CLI tool needs to print to stdout
-				fmt.Printf("  - %s%s\n", field.FieldName, deprecated)
+		return 0
+	}
+
+	for _, schema := range schemas {
+		fmt.Printf("%s:\n", schema.Name)
+		for _, field := range schema.Fields {
+			deprecated := ""
+			if field.Deprecated {
+				deprecated = " [DEPRECATED]"
 			}
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println()
+			fmt.Printf("  - %s%s\n", field.FieldName, deprecated)
 		}
+		fmt.Println()
 	}
 
 	return 0
@@ -181,29 +175,33 @@ func runList(args []string) int {
 
 func runDiff(args []string) int {
 	fs := flag.NewFlagSet("diff", flag.ExitOnError)
-	baseRef := fs.String("base", "HEAD^", "Git ref to compare against")
+	baseRef := fs.String("base", "", "Revision to compare against (default: HEAD^ for git, @- for jj)")
 	schemaDir := fs.String("schema-dir", "spark/so/ent/schema", "Path to ent/schema directory relative to repo root")
 	jsonOutput := fs.Bool("json", false, "Output in JSON format")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
 
-	repoRoot, err := getRepoRoot()
+	v, err := detectVCS()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: not in a git repository: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
+	}
+	repoRoot := v.root()
+	if *baseRef == "" {
+		*baseRef = v.defaultBase()
 	}
 
 	currentSchemaPath := filepath.Join(repoRoot, *schemaDir)
 	currentSchemas, err := entfieldlint.ParseSchemaDir(currentSchemaPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing current schema: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error parsing current schema: %v\n", err)
 		return 1
 	}
 
-	baseSchemas, err := parseSchemasFromRef(*baseRef, *schemaDir, repoRoot)
+	baseSchemas, err := parseSchemasFromRef(v, *baseRef, *schemaDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing base schema: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "error parsing base schema: %v\n", err)
 		return 1
 	}
 
@@ -248,49 +246,37 @@ func runDiff(args []string) int {
 
 	if *jsonOutput {
 		data, _ := json.MarshalIndent(diff, "", "  ")
-		//nolint:forbidigo // CLI tool needs to print to stdout
 		fmt.Println(string(data))
-	} else {
-		if len(diff.Added) > 0 {
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println("Added fields:")
-			for _, f := range diff.Added {
-				//nolint:forbidigo // CLI tool needs to print to stdout
-				fmt.Printf("  + %s.%s\n", f.SchemaName, f.FieldName)
-			}
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println()
-		}
-		if len(diff.DeprecationAdded) > 0 {
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println("Newly deprecated fields:")
-			for _, f := range diff.DeprecationAdded {
-				//nolint:forbidigo // CLI tool needs to print to stdout
-				fmt.Printf("  ~ %s.%s\n", f.SchemaName, f.FieldName)
-			}
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println()
-		}
-		if len(diff.Removed) > 0 {
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println("Removed fields:")
-			for _, f := range diff.Removed {
-				status := "✓ was deprecated"
-				if f.RemovedWithoutDep {
-					status = "✗ NOT deprecated first"
-				}
-				//nolint:forbidigo // CLI tool needs to print to stdout
-				fmt.Printf("  - %s.%s (%s)\n", f.SchemaName, f.FieldName, status)
-			}
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println()
-		}
-		if len(diff.Added) == 0 && len(diff.Removed) == 0 && len(diff.DeprecationAdded) == 0 {
-			//nolint:forbidigo // CLI tool needs to print to stdout
-			fmt.Println("No schema field changes detected")
-		}
+		return 0
 	}
-
+	if len(diff.Added) > 0 {
+		fmt.Println("Added fields:")
+		for _, f := range diff.Added {
+			fmt.Printf("  + %s.%s\n", f.SchemaName, f.FieldName)
+		}
+		fmt.Println()
+	}
+	if len(diff.DeprecationAdded) > 0 {
+		fmt.Println("Newly deprecated fields:")
+		for _, f := range diff.DeprecationAdded {
+			fmt.Printf("  ~ %s.%s\n", f.SchemaName, f.FieldName)
+		}
+		fmt.Println()
+	}
+	if len(diff.Removed) > 0 {
+		fmt.Println("Removed fields:")
+		for _, f := range diff.Removed {
+			status := "✓ was deprecated"
+			if f.RemovedWithoutDep {
+				status = "✗ NOT deprecated first"
+			}
+			fmt.Printf("  - %s.%s (%s)\n", f.SchemaName, f.FieldName, status)
+		}
+		fmt.Println()
+	}
+	if len(diff.Added) == 0 && len(diff.Removed) == 0 && len(diff.DeprecationAdded) == 0 {
+		fmt.Println("No schema field changes detected")
+	}
 	return 0
 }
 
@@ -313,13 +299,91 @@ type SchemaDiff struct {
 	DeprecationAdded []FieldInfo `json:"deprecation_added"`
 }
 
-func getRepoRoot() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
+// vcs abstracts the version-control operations entfieldlint needs: locating the repo root and reading schema files at a
+// base revision. It's implemented for both git and jj so the tool works in a plain git checkout and in a (possibly
+// non-colocated) jj workspace, where there is no .git and git commands fail.
+type vcs interface {
+	// root returns the absolute path of the repository/workspace root. Paths from listSchemaFiles and passed to
+	// showFile are relative to it.
+	root() string
+	// listSchemaFiles returns the .go files under schemaDir (relative to root) present at ref.
+	listSchemaFiles(ref, schemaDir string) ([]string, error)
+	// showFile returns the contents of a file (relative to root) at ref.
+	showFile(ref, path string) ([]byte, error)
+	// defaultBase is the revision compared against when --base is not supplied.
+	defaultBase() string
+}
+
+// detectVCS picks git if the current directory is a git working tree, otherwise jj. git is tried first so behavior is
+// unchanged wherever git already works (CI, colocated repos); jj is the fallback for non-colocated workspaces.
+func detectVCS() (vcs, error) {
+	if root, err := runOutput("", "git", "rev-parse", "--show-toplevel"); err == nil {
+		return &gitVCS{repoRoot: strings.TrimSpace(root)}, nil
 	}
-	return strings.TrimSpace(string(out)), nil
+	if root, err := runOutput("", "jj", "root", "--ignore-working-copy"); err == nil {
+		return &jjVCS{repoRoot: strings.TrimSpace(root)}, nil
+	}
+	return nil, fmt.Errorf("not inside a git repository or jj workspace")
+}
+
+type gitVCS struct{ repoRoot string }
+
+func (g *gitVCS) root() string        { return g.repoRoot }
+func (g *gitVCS) defaultBase() string { return "HEAD^" }
+
+func (g *gitVCS) listSchemaFiles(ref, schemaDir string) ([]string, error) {
+	out, err := runOutput(g.repoRoot, "git", "ls-tree", "-r", "--name-only", ref, schemaDir)
+	if err != nil {
+		return nil, err
+	}
+	return goFiles(out), nil
+}
+
+func (g *gitVCS) showFile(ref, path string) ([]byte, error) {
+	cmd := exec.Command("git", "show", fmt.Sprintf("%s:%s", ref, path))
+	cmd.Dir = g.repoRoot
+	return cmd.Output()
+}
+
+type jjVCS struct{ repoRoot string }
+
+func (j *jjVCS) root() string { return j.repoRoot }
+
+// defaultBase is @-, the parent of the working-copy commit — the jj analog of git's HEAD^.
+func (j *jjVCS) defaultBase() string { return "@-" }
+
+func (j *jjVCS) listSchemaFiles(ref, schemaDir string) ([]string, error) {
+	// --ignore-working-copy keeps this read-only: jj otherwise snapshots the working copy on every command.
+	out, err := runOutput(j.repoRoot, "jj", "file", "list", "--ignore-working-copy", "-r", ref, schemaDir)
+	if err != nil {
+		return nil, err
+	}
+	return goFiles(out), nil
+}
+
+func (j *jjVCS) showFile(ref, path string) ([]byte, error) {
+	cmd := exec.Command("jj", "file", "show", "--ignore-working-copy", "-r", ref, path)
+	cmd.Dir = j.repoRoot
+	return cmd.Output()
+}
+
+// runOutput runs a command in dir (or the current directory if dir is empty) and returns its stdout.
+func runOutput(dir, name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	return string(out), err
+}
+
+// goFiles splits newline-separated command output into the .go paths it contains.
+func goFiles(out string) []string {
+	var files []string
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
+		if strings.HasSuffix(line, ".go") {
+			files = append(files, line)
+		}
+	}
+	return files
 }
 
 func buildFieldMap(schemas []entfieldlint.Schema) map[string]entfieldlint.Field {
@@ -332,48 +396,32 @@ func buildFieldMap(schemas []entfieldlint.Schema) map[string]entfieldlint.Field 
 	return fields
 }
 
-func parseSchemasFromRef(ref, schemaDir, repoRoot string) ([]entfieldlint.Schema, error) {
-	// Create temp directory
+func parseSchemasFromRef(v vcs, ref, schemaDir string) ([]entfieldlint.Schema, error) {
 	tmpDir, err := os.MkdirTemp("", "entfieldlint-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// Get list of schema files from git
-	cmd := exec.Command("git", "ls-tree", "-r", "--name-only", ref, schemaDir)
-	cmd.Dir = repoRoot
-	out, err := cmd.Output()
+	files, err := v.listSchemaFiles(ref, schemaDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list files from %s: %w", ref, err)
 	}
-
-	files := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(files) == 0 || (len(files) == 1 && files[0] == "") {
+	if len(files) == 0 {
 		return nil, fmt.Errorf("no schema files found in %s at ref %s", schemaDir, ref)
 	}
 
-	// Extract each file
 	for _, file := range files {
-		if file == "" || !strings.HasSuffix(file, ".go") {
-			continue
-		}
-
-		// Get file contents from git
-		cmd := exec.Command("git", "show", fmt.Sprintf("%s:%s", ref, file))
-		cmd.Dir = repoRoot
-		content, err := cmd.Output()
+		content, err := v.showFile(ref, file)
 		if err != nil {
-			continue // Skip files that don't exist
+			continue // Skip files that don't exist at this revision.
 		}
 
-		// Write to temp directory
 		tmpFile := filepath.Join(tmpDir, filepath.Base(file))
 		if err := os.WriteFile(tmpFile, content, 0o644); err != nil {
 			return nil, fmt.Errorf("failed to write temp file: %w", err)
 		}
 	}
 
-	// Parse the temp directory
 	return entfieldlint.ParseSchemaDir(tmpDir)
 }
