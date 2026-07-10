@@ -17,6 +17,12 @@ const (
 	// MaxRequestSize is the maximum allowed size for incoming requests in bytes
 	MaxRequestSize = 10 * 1024 * 1024 // 10MB
 
+	// MaxHTTPBodySize bounds how many bytes of an incoming HTTP request body the server buffers into memory before
+	// handing it to the gRPC server (see BufferedBody in bin/operator). It must exceed MaxRequestSize because the HTTP
+	// body carries gRPC wire framing on top of the decoded protobuf. The extra space means that all requests that can
+	// pass the MaxRequestSize proto check should also pass the HTTP body size check, while still capping memory.
+	MaxHTTPBodySize = 16 * 1024 * 1024 // 16MB
+
 	// MaxArrayLength is the maximum allowed length for arrays/slices in requests
 	MaxArrayLength = 1000
 )
