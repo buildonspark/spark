@@ -27,7 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: ["18.x", "22.x"]
+        include:
+          # 20 is the minimum supported workspace build runtime.
+          # TODO: Restore 24.x once the native dependency build hang on 24.16 is resolved.
+          - node-version: "20.x"
+          - node-version: "24.15.0"
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
