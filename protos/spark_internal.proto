@@ -638,6 +638,65 @@ message StaticDepositUtxoRefundRollbackRequest {
     spark.UTXO on_chain_utxo = 1;
 }
 
+// StaticDepositUtxoSwapPrepareRequest is the prepare op for the
+// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP 2PC flow (the fixed-amount
+// static deposit claim). Wraps the internal-mirror
+// InitiateStaticDepositUtxoSwapRequest plus the FROST round-1 commitments the
+// coordinator collected (via GetSigningCommitments) for the SPEND TX before
+// invoking the engine, keyed by operator identifier. Every SO validates the
+// request, creates the UtxoSwap (CREATED) row, and creates the
+// Transfer/TransferLeaf rows (SenderKeyTweakPending) by delegating to the
+// send-transfer prepare; SOs whose identifier appears in a signing set also
+// produce round-2 shares (leaf refund txs and/or the spend tx). Collecting
+// round-1 on the coordinator keeps the public RPC a single call.
+//
+// The coordinator identity recorded on each SO's UtxoSwap row
+// (coordinator_identity_public_key) is deliberately NOT carried here, so it can
+// never be a self-declared payload value. Each SO instead derives it from the
+// engine's coordinator_index (ConsensusPrepareRequest), resolved against the
+// static operator config, so the stored key is always a real signing
+// operator's.
+message StaticDepositUtxoSwapPrepareRequest {
+    InitiateStaticDepositUtxoSwapRequest original_request = 1;
+    map<string, common.SigningCommitment> spend_tx_signing_commitments = 2;
+}
+
+// StaticDepositUtxoSwapCommitRequest is the 2PC commit payload: the embedded
+// send-transfer commit (aggregated leaf refund signatures + transfer id) plus
+// the utxo locating the swap row. Participants apply the transfer commit FIRST
+// (transfer -> SENDER_KEY_TWEAKED), then complete the swap — CompleteUtxoSwap
+// on a non-refund swap requires the associated transfer to be sent, so this
+// ordering is load-bearing, not stylistic.
+message StaticDepositUtxoSwapCommitRequest {
+    spark.UTXO on_chain_utxo = 1;
+    SendTransferCommitRequest transfer_commit = 2;
+}
+
+// StaticDepositUtxoSwapRollbackRequest is the 2PC rollback payload. Each SO
+// locates its own UtxoSwap row by on_chain_utxo, rolls back the transfer that
+// row names FIRST (rollbackSendTransfer -> RETURNED), then cancels the swap
+// (CancelUtxoSwap -> CANCELLED); this ordering satisfies the SP-3261 guard,
+// which refuses to cancel a swap whose transfer is sent and fails closed when
+// the transfer state is unreadable.
+//
+// The transfer id is deliberately NOT carried in this payload: each
+// participant derives it from its own swap row (requested_transfer_id, written
+// by its own Prepare), so a buggy or compromised coordinator cannot name an
+// unrelated transfer and have it rolled back. Prepare creates the swap row
+// strictly before the transfer, so no active swap row means no transfer to
+// roll back. Idempotent: a missing/terminal swap is a no-op.
+//
+// on_chain_utxo alone does not discriminate between attempts: once a
+// cancelled swap frees the (utxo, status != CANCELLED) unique slot, a retry
+// can create a new swap for the same UTXO, and a redelivered rollback from the
+// earlier attempt would otherwise cancel the newer swap. Redelivery safety
+// comes from the engine, not this payload: consensus commit/rollback dispatch
+// is fenced on the participant FlowExecution row and skips the handler once
+// that row is terminal.
+message StaticDepositUtxoSwapRollbackRequest {
+    spark.UTXO on_chain_utxo = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }

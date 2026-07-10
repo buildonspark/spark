@@ -207,6 +207,7 @@ enum ConsensusOperationType {
     CONSENSUS_OPERATION_TYPE_COOP_EXIT = 7;
     CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP = 8;
     CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND = 9;
+    CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP = 10;
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.
