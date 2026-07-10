@@ -606,6 +606,7 @@ func (h *BaseTransferHandler) createTransfer(
 func (h *BaseTransferHandler) createTransferV3(
 	ctx context.Context,
 	transferID uuid.UUID,
+	transferType st.TransferType,
 	pkg *pbspark.TransferPackage,
 	expiryTime time.Time,
 	senderIdentityPubKey keys.Public,
@@ -619,8 +620,6 @@ func (h *BaseTransferHandler) createTransferV3(
 	requireDirectTx bool,
 	sparkInvoice string,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
-	transferType := st.TransferTypeTransfer
-
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry_time %v", expiryTime))
 	}
@@ -686,8 +685,21 @@ func (h *BaseTransferHandler) createTransferV3(
 		}
 	}
 
-	// Validate bitcoin transactions per-receiver group (refund outputs must pay to the correct receiver).
+	// Validate bitcoin transactions per-receiver group (refund outputs must pay
+	// to the correct receiver). UtxoSwap dispatches to its own validator, same
+	// split the legacy createTransfer makes: validateAndConstructBitcoinTransactions
+	// has no UtxoSwap case (utxo swaps don't require direct refund txs), but the
+	// legacy path's validateUtxoSwapLeaves still output-validates direct refund
+	// txs when the sender supplies them — every submitted tx gets FROST-signed,
+	// so an unvalidated output would let the sender redirect the receiver's
+	// direct unilateral-exit path to itself.
 	for _, g := range groupsByReceiver {
+		if transferType == st.TransferTypeUtxoSwap {
+			if err := validateUtxoSwapLeafRefundTxsV3(g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, requireDirectTx); err != nil {
+				return nil, nil, fmt.Errorf("unable to validate utxo swap refund txs for receiver %s: %w", g.receiverPubKey, err)
+			}
+			continue
+		}
 		if err := h.validateAndConstructBitcoinTransactions(ctx, pkg, transferType, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, nil); err != nil {
 			return nil, nil, fmt.Errorf("unable to validate bitcoin transactions for receiver %s: %w", g.receiverPubKey, err)
 		}
@@ -843,16 +855,29 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 }
 
 func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, btcnetwork.Network, error) {
+	return loadLeaves(ctx, db, leafRefundMap, true)
+}
+
+// loadLeaves loads the leaves named by leafRefundMap with tree edges and the
+// same presence/network consistency checks as loadLeavesWithLock. forUpdate
+// selects FOR UPDATE row locks; pass false for read-only pre-checks (e.g.
+// summing immutable leaf values for a signature fast-fail) where holding row
+// locks across subsequent network round trips would block concurrent
+// transfers/claims/exits touching the same leaves — the mutating path must
+// still take the locking variant before any state change.
+func loadLeaves(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte, forUpdate bool) ([]*ent.TreeNode, btcnetwork.Network, error) {
 	leafUUIDs, err := uuids.ParseSeq(maps.Keys(leafRefundMap))
 	if err != nil {
 		return nil, btcnetwork.Unspecified, fmt.Errorf("unable to parse leaf IDs: %w", err)
 	}
 
-	leaves, err := db.TreeNode.Query().
+	query := db.TreeNode.Query().
 		Where(treenode.IDIn(leafUUIDs...)).
-		WithTree().
-		ForUpdate().
-		All(ctx)
+		WithTree()
+	if forUpdate {
+		query = query.ForUpdate()
+	}
+	leaves, err := query.All(ctx)
 	if err != nil {
 		return nil, btcnetwork.Unspecified, fmt.Errorf("unable to find leaves: %w", err)
 	}
@@ -945,6 +970,34 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 		err = h.LeafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
+		}
+	}
+	return nil
+}
+
+// validateUtxoSwapLeafRefundTxsV3 is the v3 (consensus-path) counterpart of
+// validateUtxoSwapLeaves' refund-tx validation: cpfp refund txs are required,
+// direct/direct-from-cpfp refund txs are optional for utxo swaps
+// (requireDirectTx=false on the legacy wire contract) but MUST be
+// output-validated when present, since every submitted tx is FROST-signed.
+// LeafAvailableToTransfer is intentionally not repeated here — createTransferV3
+// runs it via validateTransferLeaves after the transfer row exists.
+func validateUtxoSwapLeafRefundTxsV3(
+	leaves []*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	receiverIdentityPubKey keys.Public,
+	requireDirectTx bool,
+) error {
+	for _, leaf := range leaves {
+		leafID := leaf.ID.String()
+		rawRefundTx, exist := leafCpfpRefundMap[leafID]
+		if !exist {
+			return fmt.Errorf("leaf %s not found in cpfp refund map", leafID)
+		}
+		if err := validateSendLeafRefundTxs(leaf, rawRefundTx, leafDirectRefundMap[leafID], leafDirectFromCpfpRefundMap[leafID], receiverIdentityPubKey, 1, requireDirectTx); err != nil {
+			return fmt.Errorf("unable to validate refund txs for utxo swap leaf %s: %w", leafID, err)
 		}
 	}
 	return nil

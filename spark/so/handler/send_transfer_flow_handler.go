@@ -47,12 +47,36 @@ import (
 // KnobUseConsensusTransfer).
 type SendTransferFlowHandler struct {
 	*TransferHandler
+
+	// transferType is written on the Transfer rows Prepare creates; partnerType
+	// is the attribution the coordinator flow records in BuildCommitPayload.
+	// Plain sends use Transfer/Transfer; flows that embed a send-transfer inside
+	// a larger consensus op (e.g. the static deposit utxo swap) construct the
+	// handler with their own pair via NewSendTransferFlowHandlerForType.
+	transferType st.TransferType
+	partnerType  st.TransferPartnerType
+	// requireDirectRefunds is passed to both ValidateTransferPackage
+	// (requireDirectFromCpfpLeaves) and createTransferV3 (requireDirectTx).
+	// Plain v3 sends require direct refund txs; the utxo-swap transfer's legacy
+	// path accepts packages without them (initiateUtxoSwapTransfer →
+	// startTransferInternal passes requireDirectTx=false), so embedding flows
+	// choose per type to preserve their wire contract.
+	requireDirectRefunds bool
 }
 
 var _ consensus.FlowHandler = (*SendTransferFlowHandler)(nil)
 
 func NewSendTransferFlowHandler(config *so.Config) *SendTransferFlowHandler {
-	return &SendTransferFlowHandler{TransferHandler: NewTransferHandler(config)}
+	return NewSendTransferFlowHandlerForType(config, st.TransferTypeTransfer, st.TransferPartnerTypeTransfer, true)
+}
+
+func NewSendTransferFlowHandlerForType(config *so.Config, transferType st.TransferType, partnerType st.TransferPartnerType, requireDirectRefunds bool) *SendTransferFlowHandler {
+	return &SendTransferFlowHandler{
+		TransferHandler:      NewTransferHandler(config),
+		transferType:         transferType,
+		partnerType:          partnerType,
+		requireDirectRefunds: requireDirectRefunds,
+	}
 }
 
 // Prepare runs on every SO. It validates the transfer package, decrypts this SO's
@@ -76,7 +100,7 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, err
 	}
 
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), parsed.senderIDPK, true)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), parsed.senderIDPK, h.requireDirectRefunds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package: %w", err)
 	}
@@ -134,12 +158,12 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 	//     this is where the check has to live to preserve legacy coord
 	//     behavior.
 	_, leafMap, err := h.createTransferV3(
-		ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), orig.GetExpiryTime().AsTime(),
+		ctx, parsed.transferID, h.transferType, parsed.senderPkg.GetTransferPackage(), orig.GetExpiryTime().AsTime(),
 		parsed.senderIDPK, parsed.receivers, parsed.leafReceiverMap,
 		cpfpMap, directMap, dfcMap,
 		keyTweakMap,
 		TransferRoleParticipant,
-		true, /* requireDirectTx */
+		h.requireDirectRefunds,
 		req.GetSparkInvoice(),
 	)
 	if err != nil {
@@ -425,7 +449,7 @@ func (f *sendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, re
 	// Coordinator-only partner attribution, mirroring the coop-exit consensus
 	// flow: runs in the request ctx (carries the partner JWT) and tx before the
 	// engine's DbCommit; a no-op on participants.
-	partner.SaveTransferPartner(ctx, f.parsed.transferID, st.TransferPartnerTypeTransfer)
+	partner.SaveTransferPartner(ctx, f.parsed.transferID, f.partnerType)
 
 	// Build the response StartTransferV3 returns to the client.
 	transferEnt, err := f.loadTransferForUpdate(ctx, f.parsed.transferID)
@@ -528,7 +552,22 @@ func aggregateLeafSignature(
 // signing-job helpers the coordinator needs during BuildCommitPayload's
 // aggregation. The coordinator's own DB writes (createTransferV3, FROST round-2)
 // happen inside engine.Execute via the engine-driven Prepare phase.
-func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request, sparkInvoice string) (*sendTransferCoordinatorFlow, error) {
+//
+// handler supplies the transfer semantics (transferType/partnerType/
+// requireDirectRefunds) the flow applies — plain sends pass
+// NewSendTransferFlowHandler; embedding flows (e.g. the static deposit utxo
+// swap) pass their own typed handler so the flow is correctly typed from
+// construction rather than patched afterwards.
+//
+// Contract for embedding flows: remote participants and commit/rollback
+// redelivery construct their handler from the OP TYPE (consensusFlowHandler),
+// not from this coordinator-side value — SEND_TRANSFER always dispatches the
+// plain-send defaults. A flow that needs non-default transfer semantics must
+// therefore register its own op type whose dispatcher builds the same typed
+// handler on every SO (the static deposit utxo swap does exactly this via
+// NewStaticDepositUtxoSwapFlowHandler), never reuse SEND_TRANSFER with a
+// customized handler.
+func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request, sparkInvoice string, handler *SendTransferFlowHandler) (*sendTransferCoordinatorFlow, error) {
 	parsed, err := parseSendTransferRequest(req)
 	if err != nil {
 		return nil, err
@@ -574,7 +613,6 @@ func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, re
 		return nil, fmt.Errorf("unable to build signing-job helpers: %w", err)
 	}
 
-	handler := NewSendTransferFlowHandler(config)
 	return &sendTransferCoordinatorFlow{
 		SendTransferFlowHandler: handler,
 		req:                     req,

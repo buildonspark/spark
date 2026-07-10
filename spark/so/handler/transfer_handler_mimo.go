@@ -155,6 +155,7 @@ func (h *TransferHandler) startTransferV3Internal(
 	transfer, leafMap, err := h.createTransferV3(
 		ctx,
 		transferID,
+		st.TransferTypeTransfer,
 		senderPkg.GetTransferPackage(),
 		req.GetExpiryTime().AsTime(),
 		senderIDPK,
@@ -365,7 +366,7 @@ func (h *TransferHandler) startTransferV3Consensus(
 	// rolls back, and the participant reconciler cleans up. Other consensus
 	// flows (renew_leaf) follow the same pattern.
 
-	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req, sparkInvoice)
+	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req, sparkInvoice, NewSendTransferFlowHandler(h.config))
 	if err != nil {
 		return nil, err
 	}
