@@ -90,17 +90,17 @@ input ClaimStaticDepositInput {
   """The bitcoin network of the deposit."""
   network: BitcoinNetwork!
 
-  """The amount of sats to claim for FIXED_AMOUNT quote."""
-  credit_amount_sats: Long
-
-  """The amount of sats to deduct from the UTXO value for MAX_FEE quote."""
-  max_fee_sats: Long
-
   """The signature of the claim provided by the user."""
   signature: String!
 
   """The signature of the quote provided by the SSP."""
   quote_signature: String!
+
+  """The amount of sats to claim for FIXED_AMOUNT quote."""
+  credit_amount_sats: Long = null
+
+  """The amount of sats to deduct from the UTXO value for MAX_FEE quote."""
+  max_fee_sats: Long = null
 
   """
   The deposit key of the user, hex-encoded. May be omitted if encrypted_deposit_secret_key is provided, or if the SSP has a key stored from a previous claim for the same static deposit address.
