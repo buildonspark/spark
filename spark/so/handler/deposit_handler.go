@@ -402,7 +402,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 // Creates a static deposit address record. Attempts to insert with is_default=true
 // using ON CONFLICT DO NOTHING so the transaction is not aborted if a default
 // already exists. If the conflict fires, inserts again with is_default=false.
-func saveStaticDepositAddress(ctx context.Context, db *ent.Client, keyshareID uuid.UUID, ownerIdentityPubKey, ownerSigningPubKey keys.Public, network btcnetwork.Network, address string, force bool) (*ent.DepositAddress, error) {
+func saveStaticDepositAddress(ctx context.Context, db *ent.Client, keyshareID uuid.UUID, ownerIdentityPubKey, ownerSigningPubKey keys.Public, network btcnetwork.Network, address string) (*ent.DepositAddress, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Closure to stamp out a fresh builder each time, since OnConflict()
@@ -417,9 +417,6 @@ func saveStaticDepositAddress(ctx context.Context, db *ent.Client, keyshareID uu
 			SetIsStatic(true)
 	}
 
-	if !force {
-		return newCreate().SetIsDefault(true).Save(ctx)
-	}
 	id, err := newCreate().
 		SetIsDefault(true).
 		OnConflict(
@@ -492,8 +489,7 @@ func createStaticDepositAddress(ctx context.Context, config *so.Config, network 
 		return nil, fmt.Errorf("failed to get or create current tx: %w", err)
 	}
 
-	gracefulConcurrent := knobs.GetKnobsService(ctx).GetValue(knobs.KnobGracefulConcurrentStaticDeposit, 0) > 0
-	depositAddressRecord, err := saveStaticDepositAddress(ctx, db, keyshare.ID, identityPublicKey, signingPublicKey, network, depositAddressString, gracefulConcurrent)
+	depositAddressRecord, err := saveStaticDepositAddress(ctx, db, keyshare.ID, identityPublicKey, signingPublicKey, network, depositAddressString)
 	if err != nil {
 		if sqlgraph.IsUniqueConstraintError(err) {
 			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already exists: %w", err))
