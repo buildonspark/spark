@@ -113,7 +113,6 @@ const (
 	// By default (0) the check is skipped (preserving prior behavior); flip to 1
 	// after observing in dry-run logs that no legitimate caller would be
 	// rejected. When 0, the alibi-tx claim vulnerability is open.
-	KnobEnforceCoopExitConnectorBinding = "spark.so.coop_exit.enforce_connector_binding"
 
 	// Tokens
 	KnobTokenTransactionV3Enabled = "spark.so.tokens.token_transaction_v3_enabled"

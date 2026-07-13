@@ -105,7 +105,7 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 
 	// Validate exit_txid <-> connector_tx binding before any DB write, leaf
 	// lookup, or FROST work. See parseAndValidateCoopExitTxid.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (h *CooperativeExitHandler) cooperativeExitWithTransferPackage(ctx context.
 	// Validate exit_txid <-> connector_tx binding before any expensive work
 	// (transfer-package validation, leaf lookup, DB writes). See
 	// parseAndValidateCoopExitTxid.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
 	if err != nil {
 		return nil, err
 	}
