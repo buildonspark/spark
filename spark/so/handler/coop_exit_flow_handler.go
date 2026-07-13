@@ -83,7 +83,7 @@ func (h *CoopExitFlowHandler) Prepare(ctx context.Context, op proto.Message) (pr
 	}
 
 	// exit_txid + connector binding before any DB write or FROST work.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, orig.GetTransfer().GetTransferId(), orig.GetExitTxid(), orig.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(orig.GetTransfer().GetTransferId(), orig.GetExitTxid(), orig.GetConnectorTx())
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +450,7 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 	// (it's the authoritative gate, before any DB write), but rejecting a
 	// malformed/malicious binding here avoids a wasted RPC round-trip across the
 	// cluster. Mirrors send transfer's fast-fail structural validation.
-	if _, err := parseAndValidateCoopExitTxid(ctx, req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx()); err != nil {
+	if _, err := parseAndValidateCoopExitTxid(req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx()); err != nil {
 		return nil, err
 	}
 

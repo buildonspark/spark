@@ -877,7 +877,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 
 	// Validate exit_txid <-> connector_tx binding before any leaf or chain
 	// work. See parseAndValidateCoopExitTxid.
-	exitTxid, err := parseAndValidateCoopExitTxid(ctx, transferReq.GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
+	exitTxid, err := parseAndValidateCoopExitTxid(transferReq.GetTransferId(), req.GetExitTxid(), req.GetConnectorTx())
 	if err != nil {
 		return err
 	}

@@ -2123,14 +2123,14 @@ func removeTxIn(rawTx []byte, vin int) ([]byte, error) {
 
 // parseAndValidateCoopExitTxid runs the cheap, request-only validation that
 // must succeed before any coop-exit DB write, leaf lookup, or FROST signing.
-// It (1) parses req.ExitTxid into a typed TxID and (2) if the knob is
-// enabled, verifies that connector_tx.TxIn[0].PreviousOutPoint.Hash binds to
+// It (1) parses req.ExitTxid into a typed TxID and (2) verifies that
+// connector_tx.TxIn[0].PreviousOutPoint.Hash binds to
 // exit_txid -- the invariant that prevents a malicious SSP from pairing a
 // structurally-valid connector_tx with an unrelated alibi exit_txid.
 //
 // Errors are returned with InvalidArgument codes so callers can rely on gRPC
 // status mapping without re-wrapping.
-func parseAndValidateCoopExitTxid(ctx context.Context, transferID string, exitTxidBytes []byte, connectorTxBytes []byte) (st.TxID, error) {
+func parseAndValidateCoopExitTxid(transferID string, exitTxidBytes []byte, connectorTxBytes []byte) (st.TxID, error) {
 	if len(exitTxidBytes) != 32 {
 		return st.TxID{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("exit_txid %x is not 32 bytes", exitTxidBytes))
 	}
@@ -2138,10 +2138,8 @@ func parseAndValidateCoopExitTxid(ctx context.Context, transferID string, exitTx
 	if err != nil {
 		return st.TxID{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse exit txid for transfer id %s exit txid %x: %w", transferID, exitTxidBytes, err))
 	}
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnforceCoopExitConnectorBinding, 0) > 0 {
-		if err := validateConnectorTxBindsToExitTxid(connectorTxBytes, exitTxid); err != nil {
-			return st.TxID{}, fmt.Errorf("coop exit %s: %w", transferID, err)
-		}
+	if err := validateConnectorTxBindsToExitTxid(connectorTxBytes, exitTxid); err != nil {
+		return st.TxID{}, fmt.Errorf("coop exit %s: %w", transferID, err)
 	}
 	return exitTxid, nil
 }

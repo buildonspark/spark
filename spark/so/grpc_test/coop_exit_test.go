@@ -211,17 +211,14 @@ func TestCoopExitBasic(t *testing.T) {
 
 // TestCoopExit_RejectsMismatchedExitTxid reproduces the Immunefi attack at the
 // gRPC layer: a malicious SSP supplies a structurally-valid connector_tx but
-// pairs it with an unrelated exit_txid. With KnobEnforceCoopExitConnectorBinding
-// enabled, the SO must reject at parseAndValidateCoopExitTxid before any leaf,
+// pairs it with an unrelated exit_txid. The SO must reject at
+// parseAndValidateCoopExitTxid before any leaf,
 // chain, or DB work.
 //
 // Isolation: this test does NOT call setupUsers, broadcast deposits, or mine
 // blocks. The validator runs in the request handler before any leaf lookup,
 // so it rejects on a hand-built minimal request with a fake leaf. Zero
 // chain-watcher footprint means zero impact on downstream integration tests.
-//
-// KnobEnforceCoopExitConnectorBinding is set to 1 in tilt/spark/Tiltfile so
-// this test does not mutate any ConfigMap.
 func TestCoopExit_RejectsMismatchedExitTxid(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
