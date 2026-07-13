@@ -889,7 +889,7 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 	})
 }
 
-func TestRotateStaticDepositAddressCreateIfNotExistsKnob(t *testing.T) {
+func TestRotateStaticDepositAddressCreatesIfNotExists(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -910,28 +910,14 @@ func TestRotateStaticDepositAddressCreateIfNotExistsKnob(t *testing.T) {
 		Network:          pb.Network_REGTEST,
 	}
 
-	t.Run("returns NotFound when knob is off", func(t *testing.T) {
-		ctxWithKnob := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{}))
-		_, err := handler.RotateStaticDepositAddress(ctxWithKnob, config, req)
-		require.Error(t, err)
-		st, ok := status.FromError(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, st.Code())
-	})
-
-	t.Run("attempts create when knob is on", func(t *testing.T) {
-		ctxWithKnob := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobRotateStaticDepositCreateIfNotExists: 100,
-		}))
-		_, err := handler.RotateStaticDepositAddress(ctxWithKnob, config, req)
-		// The call will fail downstream (no operator setup for key generation),
-		// but it should NOT be a NotFound error — it passed the knob gate.
-		require.Error(t, err)
-		st, ok := status.FromError(err)
-		if ok {
-			assert.NotEqual(t, codes.NotFound, st.Code())
-		}
-	})
+	_, err := handler.RotateStaticDepositAddress(ctx, config, req)
+	// The call fails downstream because this unit test has no operator setup for
+	// key generation, but it must reach address creation instead of NotFound.
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	if ok {
+		assert.NotEqual(t, codes.NotFound, st.Code())
+	}
 }
 
 func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
