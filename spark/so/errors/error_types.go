@@ -100,14 +100,23 @@ func InternalDataInconsistency(err error) error {
 }
 
 func InternalDatabaseTransactionLifecycleError(err error) error {
+	if IsTransientDBContention(err) {
+		return AbortedLockConflict(err)
+	}
 	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseTransactionLifecycle)
 }
 
 func InternalDatabaseWriteError(err error) error {
+	if IsTransientDBContention(err) {
+		return AbortedLockConflict(err)
+	}
 	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseWrite)
 }
 
 func InternalDatabaseReadError(err error) error {
+	if IsTransientDBContention(err) {
+		return AbortedLockConflict(err)
+	}
 	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseRead)
 }
 
