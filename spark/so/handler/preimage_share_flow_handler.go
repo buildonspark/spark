@@ -154,7 +154,7 @@ func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Reques
 
 	if _, err := bolt11.Parse(req.GetInvoiceString(), req.GetPaymentHash()); err != nil {
 		if errors.Is(err, bolt11.ErrPaymentHashMismatch) {
-			return nil, sparkerrors.FailedPreconditionHashMismatch(err)
+			return nil, sparkerrors.InvalidArgumentHashMismatch(err)
 		}
 		return nil, sparkerrors.InvalidArgumentMalformedField(err)
 	}

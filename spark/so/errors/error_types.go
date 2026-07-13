@@ -41,6 +41,7 @@ const (
 	ReasonInvalidArgumenMalformedKey         = "MALFORMED_KEY"
 	ReasonInvalidArgumentInvalidVersion      = "INVALID_VERSION"
 	ReasonInvalidArgumentPublicKeyMismatch   = "PUBLIC_KEY_MISMATCH"
+	ReasonInvalidArgumentHashMismatch        = "HASH_MISMATCH"
 	ReasonInvalidArgumentOutOfRange          = "OUT_OF_RANGE"
 	ReasonInvalidArgumentNetworkNotSupported = "NETWORK_NOT_SUPPORTED"
 	ReasonInvalidArgumentLeafRenewalRequired = "LEAF_RENEWAL_REQUIRED"
@@ -185,6 +186,15 @@ func InvalidArgumentPublicKeyMismatch(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentPublicKeyMismatch)
 }
 
+// Use when a hash inside the request disagrees with another part of the same
+// request (e.g. an invoice's payment hash vs the request's payment_hash field,
+// or a claimed transaction hash vs the hash recomputed from the request body).
+// Such a request can never succeed, no matter the system state. For a hash
+// checked against server-side state, use FailedPreconditionHashMismatch.
+func InvalidArgumentHashMismatch(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentHashMismatch)
+}
+
 func InvalidArgumentOutOfRange(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentOutOfRange)
 }
@@ -240,6 +250,9 @@ func FailedPreconditionReplay(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionReplay)
 }
 
+// Use when a hash from the request disagrees with server-side state (e.g. a
+// provided preimage vs the payment hash stored for the swap). For a hash that
+// is inconsistent within the request itself, use InvalidArgumentHashMismatch.
 func FailedPreconditionHashMismatch(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionHashMismatch)
 }

@@ -111,7 +111,7 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 
 	if _, err := bolt11.Parse(req.GetInvoiceString(), req.GetPaymentHash()); err != nil {
 		if errors.Is(err, bolt11.ErrPaymentHashMismatch) {
-			return sparkerrors.FailedPreconditionHashMismatch(err)
+			return sparkerrors.InvalidArgumentHashMismatch(err)
 		}
 		return sparkerrors.InvalidArgumentMalformedField(err)
 	}
@@ -251,7 +251,7 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 
 	if _, err := bolt11.Parse(req.GetInvoiceString(), req.GetPaymentHash()); err != nil {
 		if errors.Is(err, bolt11.ErrPaymentHashMismatch) {
-			return sparkerrors.FailedPreconditionHashMismatch(err)
+			return sparkerrors.InvalidArgumentHashMismatch(err)
 		}
 		return sparkerrors.InvalidArgumentMalformedField(err)
 	}

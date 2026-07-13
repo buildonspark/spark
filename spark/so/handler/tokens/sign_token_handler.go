@@ -68,7 +68,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return nil, err
 	}
 	if !bytes.Equal(calculatedHash, req.GetFinalTokenTransactionHash()) {
-		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.GetFinalTokenTransactionHash()))
+		return nil, sparkerrors.InvalidArgumentHashMismatch(fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.GetFinalTokenTransactionHash()))
 	}
 
 	tokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, req.GetFinalTokenTransactionHash())
