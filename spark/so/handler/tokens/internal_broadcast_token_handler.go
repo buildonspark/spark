@@ -128,7 +128,7 @@ func (h *SignTokenTransactionHandler) createSignedTokenTransactionEntitiesAndSig
 		return nil, err
 	}
 	if !bytes.Equal(calculatedHash, finalTokenTransactionHash) {
-		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("final transaction hash mismatch: expected %x, got %x", calculatedHash, finalTokenTransactionHash))
+		return nil, sparkerrors.InvalidArgumentHashMismatch(fmt.Errorf("final transaction hash mismatch: expected %x, got %x", calculatedHash, finalTokenTransactionHash))
 	}
 
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash).Serialize()

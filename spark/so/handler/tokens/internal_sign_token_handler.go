@@ -107,7 +107,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		return nil, tokens.FormatErrorWithTransactionEnt(
 			"final token transaction hash mismatch",
 			tokenTransaction,
-			sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("expected %x, got %x", calculatedHash, finalTokenTransactionHash)),
+			sparkerrors.InvalidArgumentHashMismatch(fmt.Errorf("expected %x, got %x", calculatedHash, finalTokenTransactionHash)),
 		)
 	}
 
@@ -474,7 +474,7 @@ func (h *InternalSignTokenHandler) validateTransactionHashAndSpentOutputsInReque
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to hash token transaction: %w", err))
 	}
 	if !bytes.Equal(hash, finalTokenTransactionHash) {
-		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("final transaction hash mismatch: expected %x, got %x", hash, finalTokenTransactionHash))
+		return sparkerrors.InvalidArgumentHashMismatch(fmt.Errorf("final transaction hash mismatch: expected %x, got %x", hash, finalTokenTransactionHash))
 	}
 
 	finalTokenTransactionOutputsToSpend := finalTokenTransaction.GetTransferInput().GetOutputsToSpend()
