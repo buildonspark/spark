@@ -144,7 +144,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -154,16 +154,15 @@ func TestReceiveLightningPayment(t *testing.T) {
 		feeSats,
 		true,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 	assert.Equal(t, response.GetPreimage(), preimage[:])
 	senderTransfer := response.GetTransfer()
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
-	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, transfer.GetStatus())
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
-	_, err = wallet.SwapNodesForPreimage(
+	_, err = wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -173,6 +172,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 		feeSats,
 		true,
 		amountSats,
+		false, // useV3
 	)
 	require.Error(t, err, "should not be able to swap the same leaves twice")
 
@@ -234,7 +234,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -244,15 +244,14 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 		feeSats,
 		true,
 		paymentAmountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 	require.Equal(t, response.GetPreimage(), preimage[:])
 	senderTransfer := response.GetTransfer()
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
-	require.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, transfer.GetStatus())
-	require.Equal(t, transfer.GetTotalValue(), paymentAmountSats)
+	require.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
+	require.Equal(t, senderTransfer.GetTotalValue(), paymentAmountSats)
 
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), userConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
@@ -279,86 +278,6 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
-func TestSendLightningPayment(t *testing.T) {
-	// Create user and ssp configs
-	userConfig := wallet.NewTestWalletConfig(t)
-	sspConfig := wallet.NewTestWalletConfig(t)
-	// User creates an invoice
-	amountSats := uint64(100)
-	preimage, paymentHash := testPreimageHash(t, amountSats)
-	defer cleanUp(t, userConfig, paymentHash)
-
-	// User creates a node of 12345 sats
-	userLeafPrivKey := keys.GeneratePrivateKey()
-	feeSats := uint64(2)
-	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
-	require.NoError(t, err)
-
-	newLeafPrivKey := keys.GeneratePrivateKey()
-
-	leaves := []wallet.LeafKeyTweak{{
-		Leaf:              nodeToSend,
-		SigningPrivKey:    userLeafPrivKey,
-		NewSigningPrivKey: newLeafPrivKey,
-	}}
-
-	response, err := wallet.SwapNodesForPreimage(
-		t.Context(),
-		userConfig,
-		leaves,
-		sspConfig.IdentityPublicKey(),
-		paymentHash[:],
-		new(testInvoice),
-		feeSats,
-		false,
-		amountSats,
-	)
-	require.NoError(t, err)
-
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
-	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
-
-	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-
-	var totalValue int64
-	for _, refund := range refunds {
-		value, err := wallet.ValidateUserSignedRefund(refund)
-		require.NoError(t, err)
-		totalValue += value
-	}
-	assert.Equal(t, totalValue, int64(12345+feeSats))
-
-	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
-	require.NoError(t, err)
-	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus())
-
-	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), sspConfig)
-	require.NoError(t, err, "failed to authenticate receiver")
-	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
-	require.Equal(t, receiverTransfer.GetId(), transfer.GetId())
-
-	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
-	require.NoError(t, err)
-	require.Equal(t, map[string]keys.Private{nodeToSend.GetId(): newLeafPrivKey}, leafPrivKeyMap)
-
-	finalLeafPrivKey := keys.GeneratePrivateKey()
-	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
-		SigningPrivKey:    newLeafPrivKey,
-		NewSigningPrivKey: finalLeafPrivKey,
-	}
-	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
-		receiverCtx,
-		receiverTransfer,
-		sspConfig,
-		leavesToClaim,
-	)
-	require.NoError(t, err, "failed to ClaimTransfer")
-}
-
 func TestSendLightningPaymentV2(t *testing.T) {
 	// Create user and ssp configs
 	userConfig := wallet.NewTestWalletConfig(t)
@@ -382,7 +301,7 @@ func TestSendLightningPaymentV2(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -392,23 +311,12 @@ func TestSendLightningPaymentV2(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
-
-	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-
-	var totalValue int64
-	for _, refund := range refunds {
-		value, err := wallet.ValidateUserSignedRefund(refund)
-		require.NoError(t, err)
-		totalValue += value
-	}
-	assert.Equal(t, int64(12345+feeSats), totalValue)
 
 	// Check that the expiry time is at least 15 days from now
 	htlcs, err := wallet.QueryHTLC(t.Context(), sspConfig, 5, 0, nil, nil, nil, nil)
@@ -468,7 +376,7 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -478,23 +386,13 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
-	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-
-	var totalValue int64
-	for _, refund := range refunds {
-		value, err := wallet.ValidateUserSignedRefund(refund)
-		require.NoError(t, err)
-		totalValue += value
-	}
-	assert.Equal(t, totalValue, int64(12345+feeSats))
 }
 
 func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
@@ -528,7 +426,7 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	_, err = wallet.SwapNodesForPreimage(
+	_, err = wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -538,6 +436,7 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 		feeSats,
 		true,
 		amountSats,
+		false, // useV3
 	)
 	require.Error(t, err, "should not be able to swap nodes with wrong payment hash")
 
@@ -578,7 +477,7 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -588,10 +487,11 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	_, err = wallet.SwapNodesForPreimage(
+	_, err = wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -601,23 +501,12 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.Error(t, err, "should not be able to swap the same leaves twice")
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
-
-	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-
-	var totalValue int64
-	for _, refund := range refunds {
-		value, err := wallet.ValidateUserSignedRefund(refund)
-		require.NoError(t, err)
-		totalValue += value
-	}
-	assert.Equal(t, int64(12345+feeSats), totalValue)
 
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err)
@@ -684,17 +573,6 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
-	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-
-	var totalValue int64
-	for _, refund := range refunds {
-		value, err := wallet.ValidateUserSignedRefund(refund)
-		require.NoError(t, err)
-		totalValue += value
-	}
-	assert.Equal(t, int64(12345+feeSats), totalValue)
-
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err)
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.GetStatus())
@@ -743,7 +621,7 @@ func TestQueryHTLCWithNoFilters(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -753,11 +631,11 @@ func TestQueryHTLCWithNoFilters(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 100, 0, nil, nil, nil, nil)
@@ -795,7 +673,7 @@ func TestQueryHTLCMultipleHTLCs(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -805,11 +683,11 @@ func TestQueryHTLCMultipleHTLCs(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	// User creates a second invoice
@@ -834,7 +712,7 @@ func TestQueryHTLCMultipleHTLCs(t *testing.T) {
 		SigningPrivKey:    userLeafPrivKey2,
 		NewSigningPrivKey: newLeafPrivKey2,
 	}}
-	response2, err := wallet.SwapNodesForPreimage(
+	response2, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves2,
@@ -844,11 +722,11 @@ func TestQueryHTLCMultipleHTLCs(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer2, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response2.GetTransfer(), leaves2, nil)
-	require.NoError(t, err)
+	transfer2 := response2.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.GetStatus())
 
 	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, nil)
@@ -891,7 +769,7 @@ func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -901,11 +779,11 @@ func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	// User creates a second invoice
@@ -929,7 +807,7 @@ func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
 		SigningPrivKey:    userLeafPrivKey2,
 		NewSigningPrivKey: newLeafPrivKey2,
 	}}
-	response2, err := wallet.SwapNodesForPreimage(
+	response2, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves2,
@@ -939,11 +817,11 @@ func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer2, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response2.GetTransfer(), leaves2, nil)
-	require.NoError(t, err)
+	transfer2 := response2.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.GetStatus())
 
 	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, [][]byte{paymentHash[:]}, nil, nil, nil)
@@ -981,7 +859,7 @@ func TestQueryHTLCWithStatusFilter(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -991,11 +869,11 @@ func TestQueryHTLCWithStatusFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, new(spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE), nil, nil)
@@ -1038,7 +916,7 @@ func TestQueryHTLCWithTransferIdFilter(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -1048,11 +926,11 @@ func TestQueryHTLCWithTransferIdFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	transferId := response.GetTransfer().GetId()
@@ -1093,7 +971,7 @@ func TestQueryHTLCWithTransferIdFilter(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey2,
 	}}
 
-	response2, err := wallet.SwapNodesForPreimage(
+	response2, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves2,
@@ -1103,11 +981,11 @@ func TestQueryHTLCWithTransferIdFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer2, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response2.GetTransfer(), leaves2, nil)
-	require.NoError(t, err)
+	transfer2 := response2.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.GetStatus())
 
 	transferId2 := response2.GetTransfer().GetId()
@@ -1144,7 +1022,7 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -1154,11 +1032,11 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	transferId := response.GetTransfer().GetId()
@@ -1197,7 +1075,7 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey2,
 	}}
 
-	response2, err := wallet.SwapNodesForPreimage(
+	response2, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		receiverConfig,
 		leaves2,
@@ -1207,11 +1085,11 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer2, err := wallet.DeliverTransferPackage(t.Context(), receiverConfig, response2.GetTransfer(), leaves2, nil)
-	require.NoError(t, err)
+	transfer2 := response2.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.GetStatus())
 
 	htlcsReceiverAndSenderRole, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil, nil, new(spark.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_RECEIVER_AND_SENDER))

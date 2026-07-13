@@ -49,7 +49,7 @@ func TestProvidePreimage_Consensus_HappyPath(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -59,11 +59,11 @@ func TestProvidePreimage_Consensus_HappyPath(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
@@ -116,7 +116,7 @@ func TestProvidePreimage_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		SigningPrivKey:    userLeafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
-	response, err := wallet.SwapNodesForPreimage(
+	_, err = wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		userConfig,
 		leaves,
@@ -126,9 +126,8 @@ func TestProvidePreimage_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
-	require.NoError(t, err)
-	_, err = wallet.DeliverTransferPackage(t.Context(), userConfig, response.GetTransfer(), leaves, nil)
 	require.NoError(t, err)
 
 	// Snapshot pre-provide flow_execution ids per operator so the assertion

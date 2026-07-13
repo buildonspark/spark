@@ -20,231 +20,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// SwapNodesForPreimage swaps a node for a preimage of a Lightning invoice.
-//
-// useV3 (optional, defaults to false) routes through InitiatePreimageSwapV3
-// instead of V2 — used by the consensus-path integration tests. The request
-// shape is identical; only the routing/expiry semantics differ on the SO side
-// (and V3 is knob-gated behind KnobUseConsensusInitiatePreimageSwap). Variadic
-// so the ~two dozen existing V2 callers don't need updating.
-func SwapNodesForPreimage(
-	ctx context.Context,
-	config *TestWalletConfig,
-	leaves []LeafKeyTweak,
-	receiverIdentityPubKey keys.Public,
-	paymentHash []byte,
-	invoiceString *string,
-	feeSats uint64,
-	isInboundPayment bool,
-	amountSats uint64,
-	useV3 ...bool,
-) (*pb.InitiatePreimageSwapResponse, error) {
-	// SSP asks for signing commitment
-	conn, err := config.NewCoordinatorGRPCConnection()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to coordinator: %w", err)
-	}
-	defer conn.Close()
-
-	token, err := AuthenticateWithConnection(ctx, config, conn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to authenticate with server: %w", err)
-	}
-	tmpCtx := ContextWithToken(ctx, token)
-
-	client := pb.NewSparkServiceClient(conn)
-	nodeIDs := make([]string, len(leaves))
-	for i, leaf := range leaves {
-		nodeIDs[i] = leaf.Leaf.GetId()
-	}
-
-	// For RECEIVE, we need 3 commitments per leaf (CPFP, direct-from-cpfp, direct)
-	// For SEND, we only need 1 commitment per leaf (CPFP)
-	commitmentCount := 1
-	if isInboundPayment {
-		commitmentCount = 3
-	}
-	signingCommitments, err := client.GetSigningCommitments(tmpCtx, &pb.GetSigningCommitmentsRequest{
-		NodeIds: nodeIDs,
-		Count:   uint32(commitmentCount),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// SSP signs partial refund tx to receiver
-	signerConn, err := config.NewFrostGRPCConnection()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to frost signer: %w", err)
-	}
-	defer signerConn.Close()
-
-	signerClient := pbfrost.NewFrostServiceClient(signerConn)
-
-	// SSP calls SO to get the preimage
-	transferID, err := uuid.NewV7()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate transfer id: %w", err)
-	}
-	expireTime := time.Now().Add(2 * time.Minute)
-
-	bolt11String := ""
-	if invoiceString != nil {
-		bolt11String = *invoiceString
-		bolt11, err := decodepay.Decodepay(bolt11String)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode invoice: %w", err)
-		}
-		if bolt11.MSatoshi > 0 {
-			amountSats = uint64(bolt11.MSatoshi / 1000)
-		}
-	}
-
-	reason := pb.InitiatePreimageSwapRequest_REASON_SEND
-	var userSignedTransfer *pb.StartUserSignedTransferRequest
-
-	if isInboundPayment {
-		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
-
-		// For RECEIVE, create P2TR refund txs with complete exit paths
-		cpfpSigningCommitments := signingCommitments.GetSigningCommitments()[:len(leaves)]
-		directFromCpfpSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves) : len(leaves)*2]
-		directSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves)*2 : len(leaves)*3]
-
-		// 1. CPFP refund txs
-		cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
-			leaves, cpfpSigningCommitments, receiverIdentityPubKey, keys.Public{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare CPFP signing jobs: %w", err)
-		}
-
-		cpfpSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
-			SigningJobs: cpfpSigningJobs,
-			Role:        pbfrost.SigningRole_USER,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign CPFP refund txs: %w", err)
-		}
-
-		cpfpLeafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, cpfpRefundTxs, cpfpSigningResults.GetResults(), cpfpUserCommitments, cpfpSigningCommitments)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare CPFP leaf signing jobs: %w", err)
-		}
-
-		// 2. Direct-from-CPFP refund txs (spends from NodeTx with fee deduction)
-		directFromCpfpSigningJobs, directFromCpfpRefundTxs, directFromCpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefundDirect(
-			leaves, directFromCpfpSigningCommitments, receiverIdentityPubKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare direct-from-cpfp signing jobs: %w", err)
-		}
-
-		directFromCpfpSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
-			SigningJobs: directFromCpfpSigningJobs,
-			Role:        pbfrost.SigningRole_USER,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign direct-from-cpfp refund txs: %w", err)
-		}
-
-		directFromCpfpLeafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, directFromCpfpRefundTxs, directFromCpfpSigningResults.GetResults(), directFromCpfpUserCommitments, directFromCpfpSigningCommitments)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare direct-from-cpfp leaf signing jobs: %w", err)
-		}
-
-		// 3. Direct refund txs (spends from DirectTx) - only for leaves that have DirectTx
-		var directLeafSigningJobs []*pb.UserSignedTxSigningJob
-		leavesWithDirect := filterLeavesWithDirectTx(leaves)
-		if len(leavesWithDirect) > 0 {
-			directSigningJobsFiltered, directRefundTxs, directUserCommitments, err := prepareFrostSigningJobsForDirectRefund(
-				leavesWithDirect, directSigningCommitments[:len(leavesWithDirect)], receiverIdentityPubKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to prepare direct signing jobs: %w", err)
-			}
-
-			directSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
-				SigningJobs: directSigningJobsFiltered,
-				Role:        pbfrost.SigningRole_USER,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to sign direct refund txs: %w", err)
-			}
-
-			directLeafSigningJobs, err = prepareLeafSigningJobs(
-				leavesWithDirect, directRefundTxs, directSigningResults.GetResults(), directUserCommitments, directSigningCommitments[:len(leavesWithDirect)])
-			if err != nil {
-				return nil, fmt.Errorf("failed to prepare direct leaf signing jobs: %w", err)
-			}
-		}
-
-		userSignedTransfer = &pb.StartUserSignedTransferRequest{
-			TransferId:                 transferID.String(),
-			OwnerIdentityPublicKey:     config.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey:  receiverIdentityPubKey.Serialize(),
-			LeavesToSend:               cpfpLeafSigningJobs,
-			DirectFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
-			DirectLeavesToSend:         directLeafSigningJobs,
-			ExpiryTime:                 timestamppb.New(expireTime),
-		}
-	} else {
-		// For SEND, only need CPFP refund txs
-		signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
-			leaves, signingCommitments.GetSigningCommitments(), receiverIdentityPubKey, keys.Public{})
-		if err != nil {
-			return nil, err
-		}
-
-		signingResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
-			SigningJobs: signingJobs,
-			Role:        pbfrost.SigningRole_USER,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		leafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, refundTxs, signingResults.GetResults(), userCommitments, signingCommitments.GetSigningCommitments())
-		if err != nil {
-			return nil, err
-		}
-
-		userSignedTransfer = &pb.StartUserSignedTransferRequest{
-			TransferId:                transferID.String(),
-			OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-			LeavesToSend:              leafSigningJobs,
-			ExpiryTime:                timestamppb.New(expireTime),
-		}
-	}
-
-	swapReq := &pb.InitiatePreimageSwapRequest{
-		PaymentHash: paymentHash,
-		Reason:      reason,
-		InvoiceAmount: &pb.InvoiceAmount{
-			InvoiceAmountProof: &pb.InvoiceAmountProof{
-				Bolt11Invoice: bolt11String,
-			},
-			ValueSats: amountSats,
-		},
-		Transfer:                  userSignedTransfer,
-		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-		FeeSats:                   feeSats,
-	}
-	if len(useV3) > 0 && useV3[0] {
-		response, err := client.InitiatePreimageSwapV3(tmpCtx, swapReq)
-		if err != nil {
-			return nil, err
-		}
-		return response, nil
-	}
-	response, err := client.InitiatePreimageSwapV2(tmpCtx, swapReq)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
 func QueryHTLC(
 	ctx context.Context,
 	config *TestWalletConfig,
@@ -298,7 +73,21 @@ func QueryHTLC(
 	return response, nil
 }
 
-// SwapNodesForPreimage swaps a node for a preimage of a Lightning invoice.
+// PreimageSwapOption customizes SwapNodesForPreimageWithHTLC for negative tests.
+type PreimageSwapOption func(*preimageSwapOptions)
+
+type preimageSwapOptions struct {
+	omitTransferPackage bool
+}
+
+// WithoutTransferPackage drops the committed transfer_request package (and the
+// legacy transfer field) from the swap request, reproducing a caller that
+// initiates a preimage swap without committing key tweaks. The SO rejects it at
+// input resolution — an uncommitted preimage-swap transfer must never be created.
+func WithoutTransferPackage() PreimageSwapOption {
+	return func(o *preimageSwapOptions) { o.omitTransferPackage = true }
+}
+
 func SwapNodesForPreimageWithHTLC(
 	ctx context.Context,
 	config *TestWalletConfig,
@@ -310,7 +99,13 @@ func SwapNodesForPreimageWithHTLC(
 	isInboundPayment bool,
 	amountSats uint64,
 	useV3 bool,
+	opts ...PreimageSwapOption,
 ) (*pb.InitiatePreimageSwapResponse, error) {
+	var swapOpts preimageSwapOptions
+	for _, opt := range opts {
+		opt(&swapOpts)
+	}
+
 	// SSP asks for signing commitment
 	conn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
@@ -452,6 +247,13 @@ func SwapNodesForPreimageWithHTLC(
 			DirectLeavesToSend:         directLeafSigningJobs,
 			ExpiryTime:                 timestamppb.New(expireTime),
 		}
+
+		transfer, err = buildPreimageSwapTransferRequest(
+			config, transferID, receiverIdentityPubKey, leaves,
+			cpfpLeafSigningJobs, directLeafSigningJobs, directFromCpfpLeafSigningJobs, expireTime)
+		if err != nil {
+			return nil, fmt.Errorf("unable to build receive transfer request: %w", err)
+		}
 	} else {
 		// For SEND, use HTLC transactions
 		originalRefundSigningCommitments := signingCommitments.GetSigningCommitments()[:len(leaves)]
@@ -488,6 +290,13 @@ func SwapNodesForPreimageWithHTLC(
 			LeavesToSend:              leafSigningJobs,
 			ExpiryTime:                timestamppb.New(expireTime),
 		}
+	}
+
+	if swapOpts.omitTransferPackage {
+		// Null the legacy field too so the swap is rejected regardless of the
+		// ignore-legacy-transfer knob's strip.
+		transfer.TransferPackage = nil
+		userSignedTransfer = nil
 	}
 
 	swapReq := &pb.InitiatePreimageSwapRequest{
@@ -661,6 +470,62 @@ func buildLightningHTLCTransfer(
 		KeyTweakPackage:            encryptedKeyTweaks,
 	}
 
+	transferPackageSigningPayload := common.GetTransferPackageSigningPayload(transferID, transferPackage)
+	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), transferPackageSigningPayload)
+	transferPackage.UserSignature = signature.Serialize()
+
+	return &pb.StartTransferRequest{
+		TransferId:                transferID.String(),
+		OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
+		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+		TransferPackage:           transferPackage,
+		ExpiryTime:                timestamppb.New(expireTime),
+	}, nil
+}
+
+// buildPreimageSwapTransferRequest wraps already-signed refund leaf jobs plus the
+// per-operator encrypted key tweaks into a signed TransferPackage / StartTransferRequest.
+// The RECEIVE preimage swap uses it to send the transfer_request shape, which the
+// coordinator requires once the legacy Transfer field is stripped.
+func buildPreimageSwapTransferRequest(
+	config *TestWalletConfig,
+	transferID uuid.UUID,
+	receiverIdentityPubKey keys.Public,
+	leaves []LeafKeyTweak,
+	cpfpLeafSigningJobs []*pb.UserSignedTxSigningJob,
+	directLeafSigningJobs []*pb.UserSignedTxSigningJob,
+	directFromCpfpLeafSigningJobs []*pb.UserSignedTxSigningJob,
+	expireTime time.Time,
+) (*pb.StartTransferRequest, error) {
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID, receiverIdentityPubKey, leaves, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to prepare send transfer key tweaks: %w", err)
+	}
+
+	encryptedKeyTweaks := make(map[string][]byte)
+	for identifier, keyTweaks := range keyTweakInputMap {
+		protoToEncrypt := pb.SendLeafKeyTweaks{LeavesToSend: keyTweaks}
+		protoToEncryptBinary, err := proto.Marshal(&protoToEncrypt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal proto to encrypt: %w", err)
+		}
+		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(config.SigningOperators[identifier].IdentityPublicKey.Serialize())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse encryption key: %w", err)
+		}
+		encryptedProto, err := eciesgo.Encrypt(encryptionKey, protoToEncryptBinary)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt proto: %w", err)
+		}
+		encryptedKeyTweaks[identifier] = encryptedProto
+	}
+
+	transferPackage := &pb.TransferPackage{
+		LeavesToSend:               cpfpLeafSigningJobs,
+		DirectLeavesToSend:         directLeafSigningJobs,
+		DirectFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
+		KeyTweakPackage:            encryptedKeyTweaks,
+	}
 	transferPackageSigningPayload := common.GetTransferPackageSigningPayload(transferID, transferPackage)
 	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), transferPackageSigningPayload)
 	transferPackage.UserSignature = signature.Serialize()

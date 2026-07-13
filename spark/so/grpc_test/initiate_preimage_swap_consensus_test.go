@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	spark "github.com/lightsparkdev/spark/proto/spark"
@@ -44,8 +45,11 @@ const preimageSwapNodeValueSats = int64(12347)
 //   - InitiatePreimageSwapV3 returns a transfer in SENDER_KEY_TWEAK_PENDING
 //     (key tweaks are deferred to ProvidePreimage, matching legacy)
 //   - every operator's DB has the transfer row in SENDER_KEY_TWEAK_PENDING
-//   - the SSP's user-signed refund query returns the SO-aggregated refund
-//     signatures (proves Prepare→aggregate→Commit applied them on every SO)
+//     (proves Prepare ran on every SO — it creates the row in this status)
+//   - every operator's stored cpfp refund carries a valid aggregated signature
+//     (the Commit-phase check: BuildCommitPayload→UpdateTransferLeavesSignatures
+//     applied the FROST signature on every SO; a Commit no-op would leave an
+//     unverifiable refund and fail this)
 //   - the downstream ProvidePreimage settles the transfer to SENDER_KEY_TWEAKED
 //     and the receiver can claim it
 //
@@ -104,25 +108,29 @@ func TestInitiatePreimageSwapV3_Consensus_SendHappyPath(t *testing.T) {
 	for _, i := range operatorIndicesFromConfig(userConfig) {
 		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
 		t.Cleanup(func() { _ = entClient.Close() })
-		row, err := entClient.Transfer.Query().Where(transferent.IDEQ(transferUUID)).Only(t.Context())
+		row, err := entClient.Transfer.Query().
+			Where(transferent.IDEQ(transferUUID)).
+			WithTransferLeaves(func(q *ent.TransferLeafQuery) { q.WithLeaf() }).
+			Only(t.Context())
 		require.NoError(t, err, "operator %d missing transfer row", i)
 		assert.Equal(t, st.TransferStatusSenderKeyTweakPending, row.Status,
 			"operator %d transfer status mismatch after consensus initiate preimage swap", i)
-	}
 
-	// The SO-aggregated refund signatures must be applied (Commit ran on every
-	// SO). QueryUserSignedRefunds validates the signed refund txs; their output
-	// values sum to the full node value (value is conserved — the fee is taken
-	// out of the receiver's share, not added on top of the node value).
-	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-	var totalValue int64
-	for _, refund := range refunds {
-		value, err := wallet.ValidateUserSignedRefund(refund)
-		require.NoError(t, err)
-		totalValue += value
+		// Commit-phase check: the status above only proves Prepare ran (it creates
+		// the row already at SENDER_KEY_TWEAK_PENDING). The applied cpfp refund
+		// signature is what proves Commit ran — mirror the handler's own
+		// VerifySignatureSingleInput against the node output the refund spends.
+		require.NotEmpty(t, row.Edges.TransferLeaves, "operator %d has no transfer leaves", i)
+		for _, tl := range row.Edges.TransferLeaves {
+			refundTx, err := common.TxFromRawTxBytes(tl.IntermediateRefundTx)
+			require.NoError(t, err, "operator %d leaf %s: unparseable cpfp refund tx", i, tl.ID)
+			nodeTx, err := common.TxFromRawTxBytes(tl.Edges.Leaf.RawTx)
+			require.NoError(t, err, "operator %d leaf %s: unparseable node tx", i, tl.ID)
+			require.NoError(t,
+				common.VerifySignatureSingleInput(refundTx, 0, nodeTx.TxOut[0]),
+				"operator %d leaf %s: cpfp refund signature not applied (Commit-phase no-op?)", i, tl.ID)
+		}
 	}
-	assert.Equal(t, preimageSwapNodeValueSats, totalValue)
 
 	// Downstream settlement: ProvidePreimage advances the transfer to
 	// SENDER_KEY_TWEAKED, and the receiver claims it — proving the consensus
@@ -279,7 +287,7 @@ func TestInitiatePreimageSwapV3_Consensus_ReceiveHappyPath(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -307,10 +315,7 @@ func TestInitiatePreimageSwapV3_Consensus_ReceiveHappyPath(t *testing.T) {
 		require.NoError(t, err, "operator %d missing transfer row after consensus receive swap", i)
 	}
 
-	// Delivery + claim complete the flow against the consensus-initiated transfer.
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, senderTransfer, leaves, nil)
-	require.NoError(t, err)
-	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, transfer.GetStatus())
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), userConfig)
 	require.NoError(t, err)
