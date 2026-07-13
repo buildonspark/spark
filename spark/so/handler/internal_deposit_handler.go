@@ -91,10 +91,7 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 	}
 
 	if req.GetIsStatic() {
-		// Always handle conflicts gracefully on operators. The coordinator
-		// controls user-facing error semantics via its own knob check;
-		// operators only receive this call after the coordinator succeeded.
-		_, err = saveStaticDepositAddress(ctx, db, keyshareID, ownerIDPubKey, ownerSigningPubKey, network, req.GetAddress(), true)
+		_, err = saveStaticDepositAddress(ctx, db, keyshareID, ownerIDPubKey, ownerSigningPubKey, network, req.GetAddress())
 
 	} else {
 		_, err = db.DepositAddress.Create().
