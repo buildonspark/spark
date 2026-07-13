@@ -252,13 +252,17 @@ func TestRotateStaticDepositAddressWithoutExistingAddress(t *testing.T) {
 
 	pubKey := keys.MustParsePublicKeyHex("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
 
-	// Try to rotate without having generated a static deposit address first
-	_, err = wallet.RotateStaticDepositAddress(ctx, config, pubKey)
-	require.Error(t, err)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.NotFound, grpcStatus.Code())
-	assert.Contains(t, grpcStatus.Message(), "no default static deposit address found")
+	// Rotating without an existing address creates the first default address.
+	resp, err := wallet.RotateStaticDepositAddress(ctx, config, pubKey)
+	require.NoError(t, err)
+	require.NotNil(t, resp.GetNewDepositAddress())
+	assert.True(t, resp.GetNewDepositAddress().GetIsStatic())
+	assert.Nil(t, resp.GetArchivedDepositAddress())
+
+	addresses, err := wallet.QueryStaticDepositAddresses(ctx, config, pubKey)
+	require.NoError(t, err)
+	require.Len(t, addresses.GetDepositAddresses(), 1)
+	assert.Equal(t, resp.GetNewDepositAddress().GetAddress(), addresses.GetDepositAddresses()[0].GetDepositAddress())
 }
 
 func TestStartDepositTreeCreationBasic(t *testing.T) {

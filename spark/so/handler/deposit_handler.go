@@ -756,13 +756,8 @@ func (o *DepositHandler) RotateStaticDepositAddress(ctx context.Context, config 
 		return nil, fmt.Errorf("failed to query static deposit address for user id %s: %w", idPubKey, err)
 	}
 
-	// If no existing address, either create a new one or return an error based on the knob.
+	// If no existing address, create the first default static deposit address.
 	if existingDefaultAddress == nil {
-		createIfNotExists := knobs.GetKnobsService(ctx).GetValue(knobs.KnobRotateStaticDepositCreateIfNotExists, 0) > 0
-		if !createIfNotExists {
-			return nil, errors.NotFoundMissingEntity(fmt.Errorf("no default static deposit address found for user; generate one first using generate_static_deposit_address"))
-		}
-
 		depositAddressInfo, err := createStaticDepositAddress(ctx, config, network, idPubKey, reqSigningPubKey, req.GetHashVariant())
 		if err != nil {
 			return nil, err
