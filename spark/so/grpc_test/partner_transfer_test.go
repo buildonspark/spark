@@ -218,7 +218,7 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		t.Context(),
 		sspConfig,
 		leaves,
@@ -228,11 +228,11 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 		feeSats,
 		false,
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 
-	transfer, err := wallet.DeliverTransferPackage(t.Context(), sspConfig, response.GetTransfer(), leaves, nil)
-	require.NoError(t, err)
+	transfer := response.GetTransfer()
 
 	// User provides preimage WITH partner JWT header.
 	token := signToken(testPartnerID, testLabel)
@@ -321,11 +321,11 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		NewSigningPrivKey: newLeafPrivKey,
 	}}
 
-	// User calls SwapNodesForPreimage with REASON_SEND and partner JWT.
+	// User calls SwapNodesForPreimageWithHTLC with REASON_SEND and partner JWT.
 	token := signToken(testPartnerID, testLabel)
 	ctx := metadata.AppendToOutgoingContext(t.Context(), "x-partner-jwt", token)
 
-	response, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
 		ctx,
 		userConfig,
 		leaves,
@@ -335,6 +335,7 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		feeSats,
 		false, // REASON_SEND
 		amountSats,
+		false, // useV3
 	)
 	require.NoError(t, err)
 	require.NotNil(t, response.GetTransfer())

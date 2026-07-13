@@ -1204,6 +1204,65 @@ func TestCancelTransferInternal_PreimageSwap(t *testing.T) {
 	})
 }
 
+// TestCancelTransfer_PreimageSwapRejectsAfterPreimageShared pins the external
+// CancelTransfer preimage-shared guard: a preimage swap whose preimage has
+// already been revealed must not be cancellable, otherwise the SSP could learn
+// the preimage and then reclaim the leaves. The realistic window is an expired
+// swap still at SENDER_KEY_TWEAK_PENDING (a partial ProvidePreimage settle) with
+// the PreimageRequest at PREIMAGE_SHARED: the status guard admits it, then the
+// preimage-revealed guard rejects it. Unlike CancelTransferInternal, the external
+// path enforces this guard. A past expiry is required so the flow reaches it
+// rather than short-circuiting on the "not expired" check.
+func TestCancelTransfer_PreimageSwapRejectsAfterPreimageShared(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	senderPub := keys.GeneratePrivateKey().Public()
+	receiverPub := keys.GeneratePrivateKey().Public()
+
+	transfer, err := client.Transfer.Create().
+		SetSenderIdentityPubkey(senderPub).
+		SetReceiverIdentityPubkey(receiverPub).
+		SetStatus(st.TransferStatusSenderKeyTweakPending).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(-10 * time.Minute)).
+		SetType(st.TransferTypePreimageSwap).
+		SetNetwork(btcnetwork.Regtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = client.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(senderPub).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = client.PreimageRequest.Create().
+		SetPaymentHash([]byte("cancel_after_reveal_hash_32bytes")).
+		SetStatus(st.PreimageRequestStatusPreimageShared).
+		SetReceiverIdentityPubkey(receiverPub).
+		SetTransfers(transfer).
+		Save(ctx)
+	require.NoError(t, err)
+
+	h := NewBaseTransferHandler(config)
+	_, err = h.CancelTransfer(ctx, &pbspark.CancelTransferRequest{
+		TransferId:              transfer.ID.String(),
+		SenderIdentityPublicKey: senderPub.Serialize(),
+	})
+	require.Error(t, err)
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+	require.ErrorContains(t, err, "cannot cancel an invoice whose preimage has already been revealed")
+
+	// The transfer must be left untouched — never advanced to RETURNED.
+	updated, err := client.Transfer.Query().Where(enttransfer.ID(transfer.ID)).Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, st.TransferStatusSenderKeyTweakPending, updated.Status)
+}
+
 func TestCancelTransferInternal_UpdatesReceiverStatus(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.ConnectToTestPostgres(t)
