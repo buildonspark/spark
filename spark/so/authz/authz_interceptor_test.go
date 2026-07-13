@@ -9,8 +9,12 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/authn"
+	"github.com/lightsparkdev/spark/so/rpcauth/brontide"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	msdk "go.opentelemetry.io/otel/sdk/metric"
+	md "go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -442,6 +446,170 @@ func TestAuthzInterceptor(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestInternalAuthzPathMetric pins the auth-path labels the interceptor emits on each protected request.
+func TestInternalAuthzPathMetric(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	brontidePeer := &brontide.Peer{
+		Identifier:        "operator-2",
+		IdentityPublicKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
+	}
+
+	cases := []struct {
+		name     string
+		mode     Mode
+		ctx      func(*testing.T) context.Context
+		wantPath string
+	}{
+		{
+			name: "brontide AuthInfo records path=brontide",
+			mode: ModeEnforce,
+			ctx: func(t *testing.T) context.Context {
+				return peer.NewContext(t.Context(), &peer.Peer{
+					Addr:     &mockAddr{addr: TestIPDisallowed + ":12345"},
+					AuthInfo: brontide.AuthInfo{Peer: brontidePeer},
+				})
+			},
+			wantPath: authPathBrontide,
+		},
+		{
+			name: "internal VPC peer + VPC client IP records path=vpc-ip",
+			mode: ModeEnforce,
+			ctx: func(t *testing.T) context.Context {
+				return peer.NewContext(metadata.NewIncomingContext(t.Context(), metadata.MD{
+					"x-forwarded-for": []string{"10.1.2.3"},
+				}), &peer.Peer{Addr: &mockAddr{addr: "10.0.0.1:12345"}})
+			},
+			wantPath: authPathVPCIP,
+		},
+		{
+			name: "internal VPC peer + allowlisted client IP records path=allowlist-ip",
+			mode: ModeEnforce,
+			ctx: func(t *testing.T) context.Context {
+				return peer.NewContext(metadata.NewIncomingContext(t.Context(), metadata.MD{
+					"x-forwarded-for": []string{TestIPAllowed1},
+				}), &peer.Peer{Addr: &mockAddr{addr: "10.0.0.1:12345"}})
+			},
+			wantPath: authPathAllowlistIP,
+		},
+		{
+			name: "non-VPC peer records path=ip-rejected",
+			mode: ModeEnforce,
+			ctx: func(t *testing.T) context.Context {
+				return peer.NewContext(t.Context(), &peer.Peer{
+					Addr: &mockAddr{addr: TestIPDisallowed + ":12345"},
+				})
+			},
+			wantPath: authPathIPRejected,
+		},
+		{
+			name: "LogOnly mode still records path=ip-rejected for non-allowlisted client IP",
+			mode: ModeLogOnly,
+			ctx: func(t *testing.T) context.Context {
+				return peer.NewContext(metadata.NewIncomingContext(t.Context(), metadata.MD{
+					"x-forwarded-for": []string{TestIPDisallowed},
+				}), &peer.Peer{Addr: &mockAddr{addr: "10.0.0.1:12345"}})
+			},
+			wantPath: authPathIPRejected,
+		},
+		{
+			// The external XFF client IP would also be ip-rejected by the later allowlist switch, but the non-VPC
+			// peer check returns first — the "exactly one increment" assertion below pins that only one site records.
+			name: "LogOnly mode still records path=ip-rejected exactly once for non-VPC peer with external client IP",
+			mode: ModeLogOnly,
+			ctx: func(t *testing.T) context.Context {
+				return peer.NewContext(metadata.NewIncomingContext(t.Context(), metadata.MD{
+					"x-forwarded-for": []string{TestIPDisallowed},
+				}), &peer.Peer{
+					Addr: &mockAddr{addr: TestIPDisallowed + ":12345"},
+				})
+			},
+			wantPath: authPathIPRejected,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := msdk.NewManualReader()
+			provider := msdk.NewMeterProvider(msdk.WithReader(reader))
+			otel.SetMeterProvider(provider)
+
+			cfg := NewAuthzConfig(
+				WithMode(tc.mode),
+				WithAllowedIPs([]string{TestIPAllowed1}),
+				WithIsProtectedMethod(onlyProtectedTestService),
+			)
+			interceptor := NewAuthzInterceptor(cfg)
+
+			// We only care that the path label is recorded
+			_, _ = interceptor.UnaryServerInterceptor(tc.ctx(t), "request",
+				&grpc.UnaryServerInfo{FullMethod: ProtectedTestMethod}, unaryHandler)
+
+			var rm md.ResourceMetrics
+			require.NoError(t, reader.Collect(t.Context(), &rm))
+
+			found := false
+			for _, sm := range rm.ScopeMetrics {
+				for _, m := range sm.Metrics {
+					if m.Name != "internal_authz_decisions_total" {
+						continue
+					}
+					sum, ok := m.Data.(md.Sum[int64])
+					require.Truef(t, ok, "expected Sum[int64], got %T", m.Data)
+					for _, dp := range sum.DataPoints {
+						gotPath, _ := dp.Attributes.Value("path")
+						if gotPath.AsString() == tc.wantPath {
+							assert.EqualValuesf(t, 1, dp.Value, "exactly one increment expected for path=%s", tc.wantPath)
+							found = true
+						}
+					}
+				}
+			}
+			assert.Truef(t, found, "expected counter increment with path=%q", tc.wantPath)
+		})
+	}
+}
+
+// TestBrontideAuthInfoBypassesIPAllowlist verifies that a request that arrives with a resolved brontide peer in its
+// AuthInfo is admitted regardless of source IP.
+func TestBrontideAuthInfoBypassesIPAllowlist(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	peerPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	brontidePeer := &brontide.Peer{Identifier: "operator-2", IdentityPublicKey: peerPub}
+
+	cfg := NewAuthzConfig(
+		WithMode(ModeEnforce),
+		WithAllowedIPs([]string{TestIPAllowed1}),
+		WithIsProtectedMethod(onlyProtectedTestService),
+	)
+	interceptor := NewAuthzInterceptor(cfg)
+
+	t.Run("no brontide AuthInfo still falls through to IP gate", func(t *testing.T) {
+		ctx := peer.NewContext(t.Context(), &peer.Peer{Addr: &mockAddr{addr: TestIPDisallowed + ":12345"}})
+		_, err := interceptor.UnaryServerInterceptor(ctx, "request", &grpc.UnaryServerInfo{FullMethod: ProtectedTestMethod}, unaryHandler)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.PermissionDenied, st.Code())
+	})
+
+	t.Run("brontide AuthInfo admits the call from a disallowed IP", func(t *testing.T) {
+		ctx := peer.NewContext(t.Context(), &peer.Peer{
+			Addr:     &mockAddr{addr: TestIPDisallowed + ":12345"},
+			AuthInfo: brontide.AuthInfo{Peer: brontidePeer},
+		})
+		_, err := interceptor.UnaryServerInterceptor(ctx, "request", &grpc.UnaryServerInfo{FullMethod: ProtectedTestMethod}, unaryHandler)
+		require.NoError(t, err)
+	})
+
+	t.Run("brontide AuthInfo with nil Peer falls back to IP gate", func(t *testing.T) {
+		ctx := peer.NewContext(t.Context(), &peer.Peer{
+			Addr:     &mockAddr{addr: TestIPDisallowed + ":12345"},
+			AuthInfo: brontide.AuthInfo{Peer: nil},
+		})
+		_, err := interceptor.UnaryServerInterceptor(ctx, "request", &grpc.UnaryServerInfo{FullMethod: ProtectedTestMethod}, unaryHandler)
+		require.Error(t, err)
+	})
 }
 
 func TestAuthzConfig(t *testing.T) {
