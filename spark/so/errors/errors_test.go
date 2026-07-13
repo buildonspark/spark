@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -312,6 +313,71 @@ func TestToGRPCError(t *testing.T) {
 	}
 }
 
+func requireAbortedLockConflict(t *testing.T, err error) {
+	t.Helper()
+	st, ok := status.FromError(err)
+	require.True(t, ok, "expected a gRPC status error")
+	assert.Equal(t, codes.Aborted, st.Code())
+
+	code, reason := CodeAndReasonFrom(err)
+	assert.Equal(t, codes.Aborted, code)
+	assert.Equal(t, ReasonAbortedLockConflict, reason)
+
+	var retryInfo *errdetails.RetryInfo
+	for _, d := range st.Details() {
+		if v, ok := d.(*errdetails.RetryInfo); ok {
+			retryInfo = v
+		}
+	}
+	require.NotNil(t, retryInfo, "expected RetryInfo detail")
+}
+
+func TestDatabaseErrorHelpers_ClassifyTransientContention(t *testing.T) {
+	lockTimeoutErr := fmt.Errorf("failed to get token metadata for token identifier: abc123: ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)")
+	deadlockErr := fmt.Errorf("ERROR: deadlock detected (SQLSTATE 40P01)")
+	serializationErr := fmt.Errorf("ERROR: could not serialize access due to concurrent update (SQLSTATE 40001)")
+	typedLockErr := fmt.Errorf("failed to query token create: %w", &pgconn.PgError{Code: "55P03", Message: "canceling statement due to lock timeout"})
+	typedConstraintErr := fmt.Errorf("failed to insert: %w", &pgconn.PgError{Code: "23505", Message: "duplicate key value violates unique constraint"})
+
+	t.Run("read helper upgrades lock timeout", func(t *testing.T) {
+		requireAbortedLockConflict(t, InternalDatabaseReadError(lockTimeoutErr))
+	})
+	t.Run("read helper upgrades typed pg lock error", func(t *testing.T) {
+		requireAbortedLockConflict(t, InternalDatabaseReadError(typedLockErr))
+	})
+	t.Run("write helper upgrades deadlock", func(t *testing.T) {
+		requireAbortedLockConflict(t, InternalDatabaseWriteError(deadlockErr))
+	})
+	t.Run("write helper upgrades serialization failure", func(t *testing.T) {
+		requireAbortedLockConflict(t, InternalDatabaseWriteError(serializationErr))
+	})
+	t.Run("transaction lifecycle helper upgrades commit-time serialization failure", func(t *testing.T) {
+		requireAbortedLockConflict(t, InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit transaction: %w", serializationErr)))
+	})
+	t.Run("transaction lifecycle helper keeps internal code for non-contention errors", func(t *testing.T) {
+		code, reason := CodeAndReasonFrom(InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context")))
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, ReasonInternalDatabaseTransactionLifecycle, reason)
+	})
+	t.Run("read helper keeps internal code for non-contention errors", func(t *testing.T) {
+		code, reason := CodeAndReasonFrom(InternalDatabaseReadError(fmt.Errorf("connection refused")))
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, ReasonInternalDatabaseRead, reason)
+	})
+	t.Run("write helper keeps internal code for typed constraint violations", func(t *testing.T) {
+		code, reason := CodeAndReasonFrom(InternalDatabaseWriteError(typedConstraintErr))
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, ReasonInternalDatabaseWrite, reason)
+	})
+	t.Run("toGRPCError upgrades uncoded contention errors", func(t *testing.T) {
+		requireAbortedLockConflict(t, toGRPCError(fmt.Errorf("failed to commit transaction: %w", serializationErr)))
+	})
+	t.Run("toGRPCError keeps internal code for uncoded non-contention errors", func(t *testing.T) {
+		code, _ := CodeAndReasonFrom(toGRPCError(fmt.Errorf("failed to commit transaction: connection reset")))
+		assert.Equal(t, codes.Internal, code)
+	})
+}
+
 func TestCodeAndReasonFrom_InternalError_NoDefaultReason(t *testing.T) {
 	err := newGRPCError(codes.InvalidArgument, errors.New("boom"), "")
 	code, reason := CodeAndReasonFrom(err)
@@ -495,6 +561,53 @@ func TestIsTransientPeerError(t *testing.T) {
 		{name: "wrapped Unavailable preserves code", err: fmt.Errorf("outer: %w", status.Error(codes.Unavailable, "down")), expected: true},
 		{name: "plain error is not transient", err: fmt.Errorf("some random error"), expected: false},
 		{name: "nil is not transient", err: nil, expected: false},
+		{
+			name:     "Internal with lock timeout SQLSTATE in message is not transient",
+			err:      status.Error(codes.Internal, "failed to get token metadata for token identifier: abc123: ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)"),
+			expected: false,
+		},
+		{
+			name:     "AbortedLockConflict is transient",
+			err:      AbortedLockConflict(fmt.Errorf("could not obtain lock on row")),
+			expected: true,
+		},
+		{
+			name: "Aborted with LOCK_CONFLICT reason over the wire is transient",
+			err: func() error {
+				st, err := status.New(codes.Aborted, "could not obtain lock on row").WithDetails(&errdetails.ErrorInfo{Reason: ReasonAbortedLockConflict})
+				if err != nil {
+					panic(err)
+				}
+				return st.Err()
+			}(),
+			expected: true,
+		},
+		{
+			name:     "Aborted transaction preempted is not transient",
+			err:      AbortedTransactionPreempted(fmt.Errorf("output already spent by a finalized transaction")),
+			expected: false,
+		},
+		{
+			name: "LOCK_CONFLICT reason on a non-Aborted code is not transient",
+			err: func() error {
+				st, err := status.New(codes.Internal, "mismatched code and reason").WithDetails(&errdetails.ErrorInfo{Reason: ReasonAbortedLockConflict})
+				if err != nil {
+					panic(err)
+				}
+				return st.Err()
+			}(),
+			expected: false,
+		},
+		{
+			name:     "lock conflict wrapped with external coordinator prefix is transient",
+			err:      WrapErrorWithReasonPrefix(AbortedLockConflict(fmt.Errorf("could not obtain lock on row")), ErrorReasonPrefixFailedWithExternalCoordinator),
+			expected: true,
+		},
+		{
+			name:     "FailedPrecondition mentioning a SQLSTATE is not transient",
+			err:      status.Error(codes.FailedPrecondition, "validation failed for statement aborted earlier (SQLSTATE 55P03)"),
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {

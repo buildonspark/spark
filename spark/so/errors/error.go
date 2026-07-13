@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -132,8 +135,40 @@ func toGRPCError(err error) error {
 		return &grpcError{Code: codes.DeadlineExceeded, Cause: err, Reason: ""}
 	}
 
+	// Uncoded errors from transaction commit/rollback paths can carry database
+	// contention that should surface as retryable rather than Internal.
+	if IsTransientDBContention(err) {
+		return AbortedLockConflict(err)
+	}
+
 	// Default to Internal error with no reason.
 	return &grpcError{Code: codes.Internal, Cause: err, Reason: ""}
+}
+
+// transientPostgresCodes are Postgres contention errors that resolve on retry:
+// lock_not_available (55P03), deadlock_detected (40P01), and serialization_failure (40001).
+var transientPostgresCodes = []string{"55P03", "40P01", "40001"}
+
+// IsTransientDBContention returns true if err is a local database error caused by
+// transient Postgres contention. Layers that stringify the pg error (e.g. ent) drop
+// the typed *pgconn.PgError from the chain, so the SQLSTATE in the message is
+// checked as a fallback. Only meaningful for errors produced in-process — a peer's
+// error message must not be inspected; peers signal contention via ReasonAbortedLockConflict.
+func IsTransientDBContention(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return slices.Contains(transientPostgresCodes, pgErr.Code)
+	}
+	msg := err.Error()
+	for _, code := range transientPostgresCodes {
+		if strings.Contains(msg, "SQLSTATE "+code) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsTransientPeerError returns true if an error from a peer/external SO indicates an
@@ -141,8 +176,20 @@ func toGRPCError(err error) error {
 // validation or business-rule failure. Callers can use this to decide whether to surface
 // the error or fall back to a partial-success path that defers to a retry mechanism.
 func IsTransientPeerError(err error) bool {
-	code := status.Code(err)
-	return code == codes.Unavailable || code == codes.DeadlineExceeded || code == codes.ResourceExhausted
+	if err == nil {
+		return false
+	}
+	switch status.Code(err) {
+	case codes.Unavailable, codes.DeadlineExceeded, codes.ResourceExhausted:
+		return true
+	case codes.Aborted:
+		// The reason may carry a wrap prefix such as FAILED_WITH_EXTERNAL_COORDINATOR:LOCK_CONFLICT.
+		_, reason := CodeAndReasonFrom(err)
+		return reason == ReasonAbortedLockConflict ||
+			strings.HasSuffix(reason, ":"+ReasonAbortedLockConflict)
+	default:
+		return false
+	}
 }
 
 // WrapErrorWithCode should be used to convert a standard Go error into a gRPC error with a specific code.
