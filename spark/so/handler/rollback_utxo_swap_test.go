@@ -477,6 +477,111 @@ func TestRollbackInstantUtxoSwap_SuccessfulRollback(t *testing.T) {
 	assert.Equal(t, st.UtxoSwapStatusCancelled, updatedUtxoSwap.Status)
 }
 
+// buildInstantRollbackFixture creates the on-chain UTXO, deposit address, and an
+// INSTANT UtxoSwap (CREATED) linked to a UTXO_SWAP transfer in the given
+// status, returning everything the RollbackInstantUtxoSwap fence needs. The
+// transfer carries a RequestedTransferID so the SP-3261 fence block actually
+// runs (every pre-existing test left it nil, skipping the block).
+func buildInstantRollbackFixture(t *testing.T, ctx context.Context, client *ent.Client, cfg *so.Config, rngSeed byte, transferStatus st.TransferStatus) ([]byte, chainhash.Hash, *ent.UtxoSwap) {
+	t.Helper()
+	rng := rand.NewChaCha8([32]byte{rngSeed})
+	depositKeyPair := keys.MustGeneratePrivateKeyFromRand(rng)
+	const txAmount int64 = 50000
+	rawTx, txHash, addrStr := createTestP2TRTx(t, depositKeyPair.Public(), txAmount, btcnetwork.Regtest)
+
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	keyshare := createTestSigningKeyshare(t, ctx, rng, client)
+	depositAddress, err := client.DepositAddress.Create().
+		SetAddress(addrStr).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetSigningKeyshare(keyshare).
+		SetIsStatic(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = client.Utxo.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetTxid(txHash[:]).
+		SetVout(0).
+		SetBlockHeight(50).
+		SetAmount(uint64(txAmount)).
+		SetPkScript([]byte("test_pk_script")).
+		SetDepositAddress(depositAddress).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transfer := createTestUtxoSwapTransfer(t, ctx, ownerIdentityPubKey, ownerIdentityPubKey, client, transferStatus, uint64(txAmount))
+	utxoSwap, err := client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetUtxoValueSats(uint64(txAmount)).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetCreditAmountSats(uint64(txAmount)).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transfer.ID).
+		SetTransfer(transfer).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = depositAddress.Update().AddUtxoswaps(utxoSwap).Save(ctx)
+	require.NoError(t, err)
+	return rawTx, txHash, utxoSwap
+}
+
+// TestRollbackInstantUtxoSwap_RefusesWhenTransferSent pins the SP-3261 fence:
+// a legacy instant rollback must NOT cancel a reservation whose transfer is
+// already sent (SENDER_KEY_TWEAKED) — this is the structural guard that keeps a
+// stray pre-flip legacy rollback from cancelling a committed consensus
+// reservation. The rollback returns success (idempotent) but leaves the swap
+// CREATED.
+func TestRollbackInstantUtxoSwap_RefusesWhenTransferSent(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalDepositHandler(cfg)
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 4, st.TransferStatusSenderKeyTweaked)
+	req := generateRollbackInstantRequest(t, ctx, cfg, &pb.UTXO{Txid: txHash[:], Vout: 0, Network: pb.Network_REGTEST},
+		rawTx, []pb.UtxoSwapStatus{pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CREATED}, pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED)
+
+	_, err := handler.RollbackInstantUtxoSwap(ctx, cfg, req)
+	require.NoError(t, err)
+	entTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, entTx.Commit())
+
+	updated, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCreated, updated.Status, "must not cancel a reservation whose transfer is already sent")
+}
+
+// TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent confirms the fence is
+// a no-op on the legitimate legacy path: when the transfer is not sent (its
+// creation failed), the rollback still cancels the reservation as before.
+func TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalDepositHandler(cfg)
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 6, st.TransferStatusSenderInitiated)
+	req := generateRollbackInstantRequest(t, ctx, cfg, &pb.UTXO{Txid: txHash[:], Vout: 0, Network: pb.Network_REGTEST},
+		rawTx, []pb.UtxoSwapStatus{pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CREATED}, pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED)
+
+	_, err := handler.RollbackInstantUtxoSwap(ctx, cfg, req)
+	require.NoError(t, err)
+	entTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, entTx.Commit())
+
+	updated, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCancelled, updated.Status, "an unsent-transfer reservation must still cancel")
+}
+
 func TestRollbackInstantUtxoSwap_StatusNotMatching(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)

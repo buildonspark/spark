@@ -1070,6 +1070,26 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 		return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
 	}
 
+	// Structural fence (SP-3261): never cancel a reservation whose transfer is already sent
+	// (SENDER_KEY_TWEAKED) — the receiver can claim those leaves. Matters most for consensus
+	// reservations, which stay CREATED after commit with a sent transfer; without this, the raw
+	// SetUtxoSwapStatus below would bypass CancelUtxoSwap's own SP-3261 check. Treated as an
+	// idempotent success (the legitimate legacy caller only fires this when the transfer never sent).
+	if utxoSwap.RequestedTransferID != uuid.Nil {
+		transfer, _, err := GetTransferFromUtxoSwap(ctx, utxoSwap)
+		switch {
+		case err == nil:
+			if transfer != nil && transferHelper.IsTransferSent(transfer) {
+				logger.Sugar().Infof("instant rollback: refusing to cancel utxo swap %s — transfer %s already sent (%s); leaving CREATED for claim", utxoSwap.ID, transfer.ID, transfer.Status)
+				return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
+			}
+		case ent.IsNotFound(err):
+			// No transfer associated yet — nothing claimable to orphan, safe to cancel.
+		default:
+			return nil, fmt.Errorf("cannot determine transfer state before instant rollback of utxo swap %s: %w", utxoSwap.ID, err)
+		}
+	}
+
 	if err := SetUtxoSwapStatus(ctx, utxoSwap, rollbackToStatus); err != nil {
 		return nil, err
 	}

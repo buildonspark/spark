@@ -280,6 +280,14 @@ const (
 	// gossip first (no FlowExecution fence, so a stray rollback can wedge a fresh consensus swap).
 	KnobUseConsensusStaticDepositUtxoSwap = "spark.so.use_consensus_static_deposit_utxo_swap"
 
+	// KnobUseConsensusReserveInstantStaticDepositUtxoSwap routes phase one of the instant
+	// static deposit claim through the 2PC consensus engine (0 = legacy, >0 = consensus).
+	// Enable only after every SO dispatches the op type. HARD gate until the SP-3495 fence
+	// lands: canary-only, and BOTH flip directions are unsafe (a stray legacy rollback with no
+	// FlowExecution fence can cancel an in-flight consensus reservation — which stays CREATED
+	// post-commit, so it diverges from its sent transfer). Drain legacy rollback gossip first.
+	KnobUseConsensusReserveInstantStaticDepositUtxoSwap = "spark.so.use_consensus_reserve_instant_static_deposit_utxo_swap"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
