@@ -18,7 +18,6 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -1906,9 +1905,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 		_, err = create.Save(env.ctx)
 		require.NoError(t, err)
 
-		return knobs.InjectKnobsService(env.ctx, knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobPrivacyEnabled: 100,
-		}))
+		return env.ctx
 	}
 
 	t.Run("default behavior returns only confirmed static utxos for the identity", func(t *testing.T) {

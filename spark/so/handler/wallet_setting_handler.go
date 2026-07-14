@@ -17,7 +17,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -189,13 +188,6 @@ func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.
 }
 
 func (h *WalletSettingHandler) HasReadAccessToWallet(ctx context.Context, walletIdentityPublicKey keys.Public) (bool, error) {
-	knobService := knobs.GetKnobsService(ctx)
-	if knobService != nil {
-		if !knobService.RolloutRandom(knobs.KnobPrivacyEnabled, 0) {
-			return true, nil
-		}
-	}
-
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get database from context: %w", err)

@@ -19,7 +19,6 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -235,14 +234,10 @@ func (f *equivFixture) privacyEnabled(pubkeys ...keys.Public) {
 	}
 }
 
-// ctxForViewer returns a context authenticated as the given pubkey with the
-// privacy knob enabled. QueryAllTransfers routing is purely filter-shape based,
-// so no routing knob is set.
+// ctxForViewer returns a context authenticated as the given pubkey.
+// QueryAllTransfers routing is purely filter-shape based, so no routing knob is set.
 func (f *equivFixture) ctxForViewer(viewer keys.Public) context.Context {
-	ctx := authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
-	return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	}))
+	return authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
 }
 
 // setupEquivalenceData populates the fixture with the data shape required by
@@ -660,9 +655,9 @@ func TestQueryPendingTransfers_Equivalence_Access_NoSession(t *testing.T) {
 	f := newEquivFixture(t)
 	f.setupEquivalenceData()
 
-	// No session injected — the whole point is no-session + privacy-on. Both
+	// No session injected — the whole point is no-session + privacy enforced. Both
 	// paths must reject via the access check and return empty.
-	ctx := knobs.InjectKnobsService(f.ctx, knobs.NewFixedKnobs(map[string]float64{knobs.KnobPrivacyEnabled: 100}))
+	ctx := f.ctx
 	respLegacy, errLegacy := f.handler.queryTransfers(ctx, receiverFilter(f.light), true, false)
 	respMIMO, errMIMO := f.handler.queryPendingTransfersMIMO(ctx, receiverFilter(f.light))
 

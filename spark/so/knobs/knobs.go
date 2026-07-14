@@ -157,7 +157,6 @@ const (
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
-	KnobPrivacyEnabled           = "spark.so.privacy.enabled"
 	// KnobStaticDepositAddressPrivacyEnabled gates the per-wallet privacy filter on the
 	// public query_static_deposit_addresses endpoint. Default off so the endpoint behaves
 	// as before until the SSP has switched to the internal query_static_deposit_addresses

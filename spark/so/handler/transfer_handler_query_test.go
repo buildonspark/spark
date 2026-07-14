@@ -15,7 +15,6 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,12 +129,6 @@ func TestQueryTransfers_NotSSP_RequiresAuthz_Mismatch(t *testing.T) {
 		SetPrivateEnabled(true).
 		Save(ctx)
 	require.NoError(t, err)
-
-	// Inject knobs to enable privacy feature
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100, // 100% rollout = always enabled
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
 	// Inject session for a different identity (not the receiver)
 	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(differentIDPubKey.Serialize()), 9999999999)
@@ -256,13 +249,6 @@ func TestQueryTransfers_NotSSP_NoSession(t *testing.T) {
 		SetPrivateEnabled(true).
 		Save(ctx)
 	require.NoError(t, err)
-
-	// Inject knobs to enable privacy feature
-	// This ensures the privacy check actually runs
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100, // 100% rollout = always enabled
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
 	// Don't inject any session
 
@@ -462,11 +448,6 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 	senderIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
-
 	_, err = dbTx.WalletSetting.Create().
 		SetOwnerIdentityPublicKey(senderIdentityPubKey).
 		SetPrivateEnabled(true).
@@ -560,11 +541,6 @@ func TestQueryTransfers_WithTransferIds_MultiReceiverAccess_MIMO(t *testing.T) {
 	senderPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	otherReceiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
-
 	for _, pk := range []keys.Public{senderPubkey, otherReceiverPubkey, viewerPubkey} {
 		_, err = dbTx.WalletSetting.Create().
 			SetOwnerIdentityPublicKey(pk).
@@ -638,11 +614,6 @@ func TestQueryTransfers_WithTransferIds_MissingSendersEdges_MIMO(t *testing.T) {
 	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
-
 	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
 
@@ -687,11 +658,6 @@ func TestQueryTransfers_WithTransferIds_MissingReceiversEdges_MIMO(t *testing.T)
 	rng := rand.NewChaCha8([32]byte{3})
 	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
 
 	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)

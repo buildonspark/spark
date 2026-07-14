@@ -35,11 +35,11 @@ describe("private wallet access", () => {
       expect(balance).toBe(10_000n);
     });
 
-    it("public SSP client still sees balance for a private wallet", async () => {
+    it("public client sees no balance for a private wallet", async () => {
       const balance = await publicClient.getAvailableBalance(
         funded.sparkAddress,
       );
-      expect(balance).toBe(10_000n);
+      expect(balance).toBe(0n);
     });
   });
 
@@ -49,9 +49,9 @@ describe("private wallet access", () => {
       expect(balance).toBe(10_000n);
     });
 
-    it("public SSP client still sees owned balance for a private wallet", async () => {
+    it("public client sees no owned balance for a private wallet", async () => {
       const balance = await publicClient.getOwnedBalance(funded.sparkAddress);
-      expect(balance).toBe(10_000n);
+      expect(balance).toBe(0n);
     });
   });
 
