@@ -253,7 +253,7 @@ func (h *TreeCreationHandler) getDepositAddressFromOutput(ctx context.Context, n
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(addressString)).Only(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -740,7 +740,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	if err != nil {
 		return nil, nil, err
 	}
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).WithTree().ForUpdate().Only(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(addressString)).WithTree().ForUpdate().Only(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

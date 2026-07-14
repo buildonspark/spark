@@ -935,18 +935,18 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).Where(depositaddress.IsStatic(false)).WithTree().ForUpdate().Only(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(utxoAddress)).Where(depositaddress.IsStatic(false)).WithTree().ForUpdate().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found for address: %s", *utxoAddress))
+			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found for address: %s", utxoAddress))
 		}
 		if ent.IsNotSingular(err) {
-			return nil, fmt.Errorf("multiple deposit addresses found for address: %s", *utxoAddress)
+			return nil, fmt.Errorf("multiple deposit addresses found for address: %s", utxoAddress)
 		}
 		return nil, err
 	}
 	if !depositAddress.OwnerIdentityPubkey.Equals(reqIDPubKey) {
-		return nil, fmt.Errorf("requested public key does not match public key found for address: %s", *utxoAddress)
+		return nil, fmt.Errorf("requested public key does not match public key found for address: %s", utxoAddress)
 	}
 	rootSigningPubKey, err := keys.ParsePublicKey(req.GetRootTxSigningJob().GetSigningPublicKey())
 	if err != nil {

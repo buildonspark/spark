@@ -72,29 +72,29 @@ func P2TRAddressFromPublicKey(pubKey keys.Public, network btcnetwork.Network) (s
 }
 
 // P2TRAddressFromPkScript returns a P2TR address from a public script.
-func P2TRAddressFromPkScript(pkScript []byte, network btcnetwork.Network) (*string, error) {
+func P2TRAddressFromPkScript(pkScript []byte, network btcnetwork.Network) (string, error) {
 	parsedScript, err := txscript.ParsePkScript(pkScript)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	networkParams, err := network.Params()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if parsedScript.Class() == txscript.WitnessV1TaprootTy {
 		address, err := parsedScript.Address(networkParams)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		taprootAddress, err := btcutil.NewAddressTaproot(address.ScriptAddress(), networkParams)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		return new(taprootAddress.String()), nil
+		return taprootAddress.String(), nil
 	}
 
-	return nil, fmt.Errorf("not a Taproot address")
+	return "", fmt.Errorf("not a Taproot address")
 }
 
 // TxFromRawTxHex returns a btcd MsgTx from a raw tx hex.
