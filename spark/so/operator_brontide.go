@@ -19,6 +19,9 @@ func (s *SigningOperator) EnableBrontideClient(localPriv keys.Private) error {
 	if s.InternalAddress == "" {
 		return fmt.Errorf("operator %s: internal_address required when internal_rpc.transport is brontide", s.Identifier)
 	}
+	if s.InternalAddressDkg == "" {
+		return fmt.Errorf("operator %s: internal_address_dkg required when internal_rpc.transport is brontide", s.Identifier)
+	}
 	if s.IdentityPublicKey.IsZero() {
 		return fmt.Errorf("operator %s: identity_public_key required when internal_rpc.transport is brontide", s.Identifier)
 	}
@@ -30,11 +33,18 @@ func (s *SigningOperator) EnableBrontideClient(localPriv keys.Private) error {
 		return fmt.Errorf("operator %s: internal_address host %q must match address host %q so the cert at cert_path verifies for brontide dials",
 			s.Identifier, internalHost, rpcHost)
 	}
+	internalDkgHost, dkgHost := addressHost(s.InternalAddressDkg), addressHost(s.AddressDkg)
+	if !strings.EqualFold(internalDkgHost, dkgHost) {
+		return fmt.Errorf("operator %s: internal_address_dkg host %q must match address_dkg host %q so the cert at cert_path verifies for brontide dials",
+			s.Identifier, internalDkgHost, dkgHost)
+	}
 	// Exercise the same trust-anchor loading NewGRPCConnection performs on every dial, so a missing or malformed cert
-	// (or an unparseable internal_address) fails at provisioning time instead of on the first internal RPC after the
-	// knob flips on.
+	// fails at provisioning time instead of on the first internal RPC after the knob flips on.
 	if _, err := common.BuildTLSCredentialsFromCert(s.InternalAddress, s.CertPath); err != nil {
 		return fmt.Errorf("operator %s: load TLS cert %q: %w", s.Identifier, s.CertPath, err)
+	}
+	if _, err := common.BuildTLSCredentialsFromCert(s.InternalAddressDkg, s.CertPath); err != nil {
+		return fmt.Errorf("operator %s: load TLS cert %q for internal_address_dkg: %w", s.Identifier, s.CertPath, err)
 	}
 	s.brontideAvailable = true
 	// Install the brontide factory on the SEPARATE internal slot so that cross-operator SparkService calls keep working
@@ -62,9 +72,7 @@ type operatorConnectionFactoryBrontide struct {
 }
 
 func (o *operatorConnectionFactoryBrontide) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error) {
-	// address is InternalAddress, but CertPath is the operator's public-listener cert. BuildTLSCredentialsFromCert
-	// derives the TLS ServerName from address, so the cert at CertPath must carry a SAN covering the InternalAddress
-	// hostname. EnableBrontideClient enforces at provisioning time that both listeners share a hostname.
+	// address is one of the operator's internal addresses, while CertPath is shared with its public listener.
 	tlsCreds, err := common.BuildTLSCredentialsFromCert(address, o.operator.CertPath)
 	if err != nil {
 		return nil, fmt.Errorf("brontide client: build TLS credentials: %w", err)
