@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"math/rand/v2"
 	"slices"
 	"sync"
@@ -136,7 +137,8 @@ func TestEventRouterConcurrency(t *testing.T) {
 			stream := makeStream(idx)
 
 			err := router.SubscribeToEvents(identityKey, stream)
-			if err != nil {
+			// Stream cancellation may race the wallet-access query; only cancellation errors are expected.
+			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				t.Errorf("Failed to register stream: %v", err)
 			}
 		}(i)
@@ -328,11 +330,6 @@ func TestMasterWalletHasReadAccess(t *testing.T) {
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
 	cfg := sparktesting.TestConfig(t)
 
-	// Enable privacy knob
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100, // 100% rollout = always enabled
-	})
-
 	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -355,8 +352,7 @@ func TestMasterWalletHasReadAccess(t *testing.T) {
 	streamCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	// Inject knobs and session into stream context
-	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
+	// Inject the master session into the stream context.
 	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(masterPubKey.Serialize()), 9999999999)
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
@@ -390,11 +386,6 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
 	cfg := sparktesting.TestConfig(t)
 
-	// Enable privacy knob
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-
 	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -412,7 +403,6 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	streamCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
 	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(walletOwnerPubKey.Serialize()), 9999999999)
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
@@ -513,11 +503,6 @@ func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
 	cfg := sparktesting.TestConfig(t)
 
-	// Enable privacy knob
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-
 	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -536,7 +521,6 @@ func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
 	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
-	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
 	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(otherUserPubKey.Serialize()), 9999999999)
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
@@ -563,11 +547,6 @@ func TestEventRouter_PrivacyEnabled_NoSession(t *testing.T) {
 	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
 	cfg := sparktesting.TestConfig(t)
 
-	// Enable privacy knob
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100,
-	})
-
 	router := NewEventRouter(t.Context(), dbClient, dbEvents, logger, cfg)
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -581,11 +560,10 @@ func TestEventRouter_PrivacyEnabled_NoSession(t *testing.T) {
 		Save(t.Context())
 	require.NoError(t, err)
 
-	// Set up stream context with knobs but NO session
+	// Set up stream context with no session.
 	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
-	streamCtx = knobs.InjectKnobsService(streamCtx, fixedKnobs)
 	// Note: No authn session injected
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}

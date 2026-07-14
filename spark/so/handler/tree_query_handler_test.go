@@ -624,17 +624,9 @@ func TestGetAncestorChain_RootInclusion(t *testing.T) {
 	}
 }
 
-// createTestContextWithKnobsBypassed creates a test context with knobs that always return true for privacy
-func createTestContextWithKnobsBypassed(t *testing.T) (context.Context, *so.Config) {
+func createTreeQueryTestContext(t *testing.T) (context.Context, *so.Config) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	cfg := sparktesting.TestConfig(t)
-
-	// Create fixed knobs that always enable privacy (bypass knob check)
-	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled: 100, // 100% rollout = always enabled
-	})
-	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
-
 	return ctx, cfg
 }
 
@@ -650,7 +642,7 @@ type PrivacyTestData struct {
 // createPrivacyTestData creates all the necessary test data for privacy tests
 func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOwner bool, injectSession bool, setMasterKey bool) (context.Context, *so.Config, *PrivacyTestData) {
 	// Create test context and config
-	ctx, cfg := createTestContextWithKnobsBypassed(t)
+	ctx, cfg := createTreeQueryTestContext(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -928,8 +920,8 @@ func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
 // coverage is left to integration.
 func TestQueryStaticDepositAddresses_PrivacyGate(t *testing.T) {
 	// Privacy enabled, requester != owner, no session injected → no read access.
-	// createPrivacyTestData's ctx has the global privacy knob on but the
-	// static-deposit knob OFF.
+	// Global wallet privacy is enforced, while the static-deposit-specific knob
+	// is off in the base context.
 	baseCtx, cfg, testData := createPrivacyTestData(t, true, false, false, false)
 	handler := NewTreeQueryHandler(cfg)
 
@@ -940,13 +932,12 @@ func TestQueryStaticDepositAddresses_PrivacyGate(t *testing.T) {
 		// specified" error means the gate did NOT fire.
 	}
 
-	// Knob OFF: gate is dark → proceeds past it to network validation.
+	// Static-deposit knob OFF: gate is dark → proceeds past it to network validation.
 	_, err := handler.QueryStaticDepositAddresses(baseCtx, req, false)
 	require.ErrorContains(t, err, "network must be specified")
 
-	// Knob ON.
+	// Static-deposit knob ON.
 	onCtx := knobs.InjectKnobsService(baseCtx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPrivacyEnabled:                     100,
 		knobs.KnobStaticDepositAddressPrivacyEnabled: 100,
 	}))
 

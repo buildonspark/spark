@@ -12,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,8 +26,6 @@ func TestQueryTransfersByID_FiltersByAccessAndMarshalsFull(t *testing.T) {
 	viewer := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	otherSender := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	otherReceiver := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{knobs.KnobPrivacyEnabled: 100}))
 
 	// Privacy-enabled wallets the viewer has no access to: the third transfer's
 	// participants, so its access check fails.
