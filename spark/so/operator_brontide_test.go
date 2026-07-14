@@ -46,12 +46,14 @@ func TestBrontidePoolEvictedWhenKnobFlipsOff(t *testing.T) {
 	op := &SigningOperator{
 		AddressRpc:                "rpc-addr",
 		InternalAddress:           "internal-addr",
+		InternalAddressDkg:        "internal-dkg-addr",
 		brontideAvailable:         true,
 		internalConnFactory:       factory,
 		OperatorConnectionFactory: factory,
 		connPoolConfig:            DefaultOperatorConnPoolConfig(),
 	}
 	brontideKey := connPoolKey{transport: transportBrontide, address: op.InternalAddress}
+	brontideDkgKey := connPoolKey{transport: transportBrontide, address: op.InternalAddressDkg}
 
 	onCtx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobInternalRPCBrontideEnabled: 1,
@@ -60,12 +62,17 @@ func TestBrontidePoolEvictedWhenKnobFlipsOff(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, conn.Close())
 	require.True(t, op.hasPool(brontideKey), "brontide pool should exist while the knob is on")
+	dkgConn, err := op.NewOperatorGRPCConnectionForDKG(onCtx)
+	require.NoError(t, err)
+	require.NoError(t, dkgConn.Close())
+	require.True(t, op.hasPool(brontideDkgKey), "DKG brontide pool should use the dedicated DKG address")
 
 	offCtx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{}))
 	conn, err = op.NewOperatorInternalGRPCConnection(offCtx)
 	require.NoError(t, err)
 	require.NoError(t, conn.Close())
 	require.False(t, op.hasPool(brontideKey), "brontide pool should be evicted once the knob is off")
+	require.False(t, op.hasPool(brontideDkgKey), "DKG brontide pool should be evicted once the knob is off")
 }
 
 // TestBrontidePoolNotEvictedWhenUnavailable ensures the eviction path is inert for plain-TLS-only operators: with
@@ -75,6 +82,7 @@ func TestBrontidePoolNotEvictedWhenUnavailable(t *testing.T) {
 	op := &SigningOperator{
 		AddressRpc:                "rpc-addr",
 		InternalAddress:           "internal-addr",
+		InternalAddressDkg:        "internal-dkg-addr",
 		OperatorConnectionFactory: factory,
 		connPoolConfig:            DefaultOperatorConnPoolConfig(),
 	}
@@ -93,13 +101,14 @@ func newTestOperator(t *testing.T, rng io.Reader) *SigningOperator {
 	t.Helper()
 	peer := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	return &SigningOperator{
-		ID:                1,
-		Identifier:        "operator-1",
-		AddressRpc:        "operator.example:9000",
-		AddressDkg:        "operator.example:9001",
-		InternalAddress:   "operator.example:9999",
-		IdentityPublicKey: peer,
-		CertPath:          writeTestCertPEM(t, rng),
+		ID:                 1,
+		Identifier:         "operator-1",
+		AddressRpc:         "operator.example:9000",
+		AddressDkg:         "operator.example:9001",
+		InternalAddress:    "operator.example:9999",
+		InternalAddressDkg: "operator.example:9998",
+		IdentityPublicKey:  peer,
+		CertPath:           writeTestCertPEM(t, rng),
 	}
 }
 
@@ -144,11 +153,27 @@ func TestEnableBrontideClient(t *testing.T) {
 		assert.False(t, op.brontideAvailable)
 	})
 
+	t.Run("rejects when internal DKG address is missing", func(t *testing.T) {
+		op := newTestOperator(t, rng)
+		op.InternalAddressDkg = ""
+
+		require.ErrorContains(t, op.EnableBrontideClient(local), "internal_address_dkg required")
+		assert.False(t, op.brontideAvailable)
+	})
+
 	t.Run("rejects when internal_address host differs from public address host", func(t *testing.T) {
 		op := newTestOperator(t, rng)
 		op.InternalAddress = "other.example:9999"
 
 		require.ErrorContains(t, op.EnableBrontideClient(local), "must match address host")
+		assert.False(t, op.brontideAvailable)
+	})
+
+	t.Run("rejects when internal_address_dkg host differs from DKG address host", func(t *testing.T) {
+		op := newTestOperator(t, rng)
+		op.InternalAddressDkg = "other.example:9998"
+
+		require.ErrorContains(t, op.EnableBrontideClient(local), "must match address_dkg host")
 		assert.False(t, op.brontideAvailable)
 	})
 

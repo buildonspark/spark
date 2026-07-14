@@ -332,7 +332,7 @@ type InternalRPCTransport string
 const (
 	// InternalRPCTransportTLS uses one-way TLS against the public listener.
 	InternalRPCTransportTLS InternalRPCTransport = "tls"
-	// InternalRPCTransportBrontide wraps TLS with Noise_XK mutual auth and targets each peer's InternalAddress.
+	// InternalRPCTransportBrontide wraps TLS with Noise_XK mutual auth and targets each peer's internal addresses.
 	InternalRPCTransportBrontide InternalRPCTransport = "brontide"
 )
 
@@ -441,9 +441,9 @@ func NewConfig(
 	if operatorConfig.InternalRPC.Transport == InternalRPCTransportBrontide {
 		// SigningOperatorMap includes this operator's own entry, and we do dial ourselves in some flows (notably DKG:
 		// RunDKG fetches a conn via SigningOperatorMap[config.Identifier].NewOperatorGRPCConnectionForDKG(ctx)).
-		// Under brontide that self-dial targets our own InternalAddress, so the local entry needs valid
-		// internal_address + identity_public_key metadata too. EnableBrontideClient validates both, so a missing self
-		// InternalAddress fails fast here instead of at first DKG run.
+		// Under brontide those self-dials target our own internal service addresses, so the local entry needs valid
+		// internal_address, internal_address_dkg, and identity_public_key metadata too. EnableBrontideClient validates
+		// them here instead of failing on the first internal call.
 		for _, op := range signingOperatorMap {
 			if err := op.EnableBrontideClient(identityPrivateKey); err != nil {
 				return nil, fmt.Errorf("internal_rpc.transport=brontide: %w", err)

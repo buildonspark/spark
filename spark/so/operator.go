@@ -52,8 +52,10 @@ type SigningOperator struct {
 	// Address is the address of the signing operator used for serving the DKG service.
 	AddressDkg string
 	// InternalAddress is the address of the brontide-protected internal listener (host:port).
-	// Required when this operator is dialed using brontide credentials; unused otherwise.
+	// Used for non-DKG internal services when this operator is dialed using brontide credentials.
 	InternalAddress string
+	// InternalAddressDkg is the address of the brontide-protected DKG listener (host:port).
+	InternalAddressDkg string
 	// IdentityPublicKey is the identity public key of the signing operator.
 	IdentityPublicKey keys.Public
 	// ServerCertPath is the path to the server certificate.
@@ -71,7 +73,7 @@ type SigningOperator struct {
 	// connPoolConfig holds the pool configuration for outbound gRPC connections.
 	connPoolConfig OperatorConnectionPoolConfig
 	// connPools caches pools per (transport, target address). Keying on transport as well as address keeps the plain-TLS
-	// and brontide pools separate even if InternalAddress aliases AddressRpc/AddressDkg. Otherwise, the first dial's
+	// and brontide pools separate even if an internal address aliases a public address. Otherwise, the first dial's
 	// factory would be silently reused for the other transport.
 	connPools map[connPoolKey]*operatorConnPool
 	// connPoolsMu guards connPools access.
@@ -127,20 +129,21 @@ func NewOperatorConnectionFactorySecure(operator *SigningOperator) OperatorConne
 
 // SetInternalConnectionFactory installs the factory used for internal-flavored dials when brontide is enabled. It's a
 // seam for tests that inject a mock connection factory: without it, a test that flips brontide on would route around the
-// injected OperatorConnectionFactory and dial the real InternalAddress. It does not set brontideAvailable.
+// injected OperatorConnectionFactory and dial the real internal addresses. It does not set brontideAvailable.
 func (s *SigningOperator) SetInternalConnectionFactory(factory OperatorConnectionFactory) {
 	s.internalConnFactory = factory
 }
 
 // jsonSigningOperator is used for JSON unmarshaling
 type jsonSigningOperator struct {
-	ID                uint32  `json:"id"`
-	Address           string  `json:"address"`
-	AddressDkg        *string `json:"address_dkg"`
-	InternalAddress   string  `json:"internal_address"`
-	IdentityPublicKey string  `json:"identity_public_key"`
-	CertPath          string  `json:"cert_path"`
-	ExternalAddress   string  `json:"external_address"`
+	ID                 uint32  `json:"id"`
+	Address            string  `json:"address"`
+	AddressDkg         *string `json:"address_dkg"`
+	InternalAddress    string  `json:"internal_address"`
+	InternalAddressDkg string  `json:"internal_address_dkg"`
+	IdentityPublicKey  string  `json:"identity_public_key"`
+	CertPath           string  `json:"cert_path"`
+	ExternalAddress    string  `json:"external_address"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface
@@ -165,6 +168,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 		s.AddressDkg = js.Address // Use the same address for DKG if not specified
 	}
 	s.InternalAddress = js.InternalAddress
+	s.InternalAddressDkg = js.InternalAddressDkg
 	s.CertPath = js.CertPath
 	s.ExternalAddress = js.ExternalAddress
 	s.OperatorConnectionFactory = NewOperatorConnectionFactorySecure(s)
@@ -250,7 +254,7 @@ func (s *SigningOperator) NewOperatorInternalGRPCConnection(ctx context.Context)
 // Callers MUST close the returned connection to release it back to the pool.
 func (s *SigningOperator) NewOperatorGRPCConnectionForDKG(ctx context.Context) (OperatorClientConn, error) {
 	if s.brontideEnabled(ctx) {
-		return s.newGrpcConnectionVia(transportBrontide, s.internalConnFactory, s.InternalAddress)
+		return s.newGrpcConnectionVia(transportBrontide, s.internalConnFactory, s.InternalAddressDkg)
 	}
 	s.evictBrontidePoolIfDisabled(ctx)
 	return s.newGrpcConnection(s.AddressDkg)
@@ -279,6 +283,7 @@ func (s *SigningOperator) evictBrontidePoolIfDisabled(ctx context.Context) {
 		return
 	}
 	s.evictConnPool(connPoolKey{transport: transportBrontide, address: s.InternalAddress})
+	s.evictConnPool(connPoolKey{transport: transportBrontide, address: s.InternalAddressDkg})
 }
 
 // evictConnPool removes the pool for key, if present, and closes it in the background (its graceful drain waits for
