@@ -39,7 +39,7 @@ func sparkSspInternalServicePolicies() map[string]Policy {
 		pbssp.SparkSspInternalService_QueryStaticDepositAddresses_FullMethodName: unauthInternal,
 
 		// Session-authenticated, IP-restricted SSP flows.
-		pbssp.SparkSspInternalService_QueryLightningSwapTransfer_FullMethodName:          sessionInternal,
+		pbssp.SparkSspInternalService_QueryPendingPreimageSwapTransfer_FullMethodName:    sessionInternal,
 		pbssp.SparkSspInternalService_ExitTrees_FullMethodName:                           sessionInternal,
 		pbssp.SparkSspInternalService_TweakKeysForCoopExit_FullMethodName:                sessionInternal,
 		pbssp.SparkSspInternalService_InitiateStaticDepositUtxoSwap_FullMethodName:       sessionInternal,

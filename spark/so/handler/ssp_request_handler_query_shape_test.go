@@ -61,9 +61,9 @@ func TestSspQueryHandlersRejectNilRequestsWithoutPanic(t *testing.T) {
 			},
 		},
 		{
-			name: "query lightning swap transfer",
+			name: "query pending preimage swap transfer",
 			call: func() error {
-				_, err := handler.QueryLightningSwapTransfer(t.Context(), nil)
+				_, err := handler.QueryPendingPreimageSwapTransfer(t.Context(), nil)
 				return err
 			},
 		},
