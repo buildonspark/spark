@@ -56,7 +56,7 @@ func TestP2TRAddressFromPkScript(t *testing.T) {
 		addr, err := P2TRAddressFromPkScript(pkScript, tv.network)
 		require.NoError(t, err)
 
-		assert.Equal(t, tv.p2trAddr, *addr)
+		assert.Equal(t, tv.p2trAddr, addr)
 	}
 }
 

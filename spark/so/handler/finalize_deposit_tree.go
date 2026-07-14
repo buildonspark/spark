@@ -266,13 +266,13 @@ func loadAndValidateDepositAddress(
 		}
 
 		// Verify additional UTXO pays to the same deposit address
-		var addAddress *string
+		var addAddress string
 		addAddress, err = common.P2TRAddressFromPkScript(addOutput.PkScript, network)
 		if err != nil {
 			err = fmt.Errorf("invalid additional utxo %d address: %w", i, err)
 			return
 		}
-		if *addAddress != *utxoAddress {
+		if addAddress != utxoAddress {
 			err = fmt.Errorf("additional utxo %d pays to different address than primary utxo", i)
 			return
 		}
@@ -292,7 +292,7 @@ func loadAndValidateDepositAddress(
 	}
 
 	depositAddress, err = db.DepositAddress.Query().
-		Where(depositaddress.Address(*utxoAddress)).
+		Where(depositaddress.Address(utxoAddress)).
 		Where(depositaddress.IsStatic(false)).
 		Where(depositaddress.NetworkEQ(network)).
 		WithTree().
@@ -301,11 +301,11 @@ func loadAndValidateDepositAddress(
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found: %s", *utxoAddress))
+			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found: %s", utxoAddress))
 			return
 		}
 		if ent.IsNotSingular(err) {
-			err = fmt.Errorf("multiple deposit addresses found for: %s", *utxoAddress)
+			err = fmt.Errorf("multiple deposit addresses found for: %s", utxoAddress)
 			return
 		}
 		return

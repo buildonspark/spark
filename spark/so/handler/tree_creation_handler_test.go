@@ -151,7 +151,7 @@ func createTreeCreationTestDepositAddress(
 	address, err := common.P2TRAddressFromPkScript(output.PkScript, btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*address).
+		SetAddress(address).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
 		SetSigningKeyshare(signingKeyshare).
@@ -288,7 +288,7 @@ func createTreeCreationRefundValidationFixture(t *testing.T, ctx context.Context
 	parentAddress, err := common.P2TRAddressFromPkScript(parentOutput.PkScript, btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*parentAddress).
+		SetAddress(parentAddress).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
 		SetSigningKeyshare(keyshare).
@@ -1013,7 +1013,7 @@ func TestPrepareSigningJobsRejectsParentNodeOutputChangedWhileWaitingForLock(t *
 	require.NoError(t, err)
 
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*parentAddress).
+		SetAddress(parentAddress).
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetOwnerSigningPubkey(signingPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare).
@@ -1422,7 +1422,7 @@ func TestPrepareSigningJobsRejectsDepositAddressOwnerMismatch(t *testing.T) {
 	txid := parsedTx.TxHash()
 
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*depositAddress).
+		SetAddress(depositAddress).
 		SetOwnerIdentityPubkey(depositOwner).
 		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 		SetSigningKeyshare(signingKeyshare).
@@ -1468,7 +1468,7 @@ func TestPrepareTreeAddressRejectsDepositAddressOwnerMismatch(t *testing.T) {
 	txid := parsedTx.TxHash()
 
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*depositAddress).
+		SetAddress(depositAddress).
 		SetOwnerIdentityPubkey(depositOwner).
 		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 		SetSigningKeyshare(signingKeyshare).
@@ -1516,7 +1516,7 @@ func TestPrepareSigningJobsRejectsChildDepositAddressOwnerMismatch(t *testing.T)
 	parentTxid := parentTx.TxHash()
 
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*parentAddress).
+		SetAddress(parentAddress).
 		SetOwnerIdentityPubkey(requestOwner).
 		SetOwnerSigningPubkey(parentOwnerSigningPubkey).
 		SetSigningKeyshare(parentKeyshare).
@@ -1531,7 +1531,7 @@ func TestPrepareSigningJobsRejectsChildDepositAddressOwnerMismatch(t *testing.T)
 	require.NoError(t, err)
 
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*childAddress).
+		SetAddress(childAddress).
 		SetOwnerIdentityPubkey(childOwner).
 		SetOwnerSigningPubkey(parentOwnerSigningPubkey).
 		SetSigningKeyshare(parentKeyshare).
@@ -2252,7 +2252,7 @@ func createTreeCreationSplitDepositAddress(
 	address, err := common.P2TRAddressFromPkScript(output.PkScript, btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*address).
+		SetAddress(address).
 		SetOwnerIdentityPubkey(ownerIdentityPubkey).
 		SetOwnerSigningPubkey(ownerSigningPubkey).
 		SetSigningKeyshare(signingKeyshare).
@@ -2675,7 +2675,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 
 	// Create a deposit address that's confirmed with the LEGITIMATE transaction
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*outputAddress).
+		SetAddress(outputAddress).
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetOwnerSigningPubkey(signingPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare).
@@ -2776,7 +2776,7 @@ func TestPrepareSigningJobsRejectsUtxoRawTxidMismatch(t *testing.T) {
 	outputAddress, err := common.P2TRAddressFromPkScript(depositScript, btcnetwork.Regtest)
 	require.NoError(t, err)
 	_, err = dbTX.DepositAddress.Create().
-		SetAddress(*outputAddress).
+		SetAddress(outputAddress).
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetOwnerSigningPubkey(signingPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare).
@@ -3503,7 +3503,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = dbTx.DepositAddress.Create().
-				SetAddress(*parentAddress).
+				SetAddress(parentAddress).
 				SetOwnerIdentityPubkey(identityPrivkey.Public()).
 				SetOwnerSigningPubkey(signingPrivkey.Public()).
 				SetSigningKeyshare(signingKeyshare).
@@ -3548,7 +3548,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				require.NoError(t, err)
 
 				_, err = dbTx.DepositAddress.Create().
-					SetAddress(*childAddress).
+					SetAddress(childAddress).
 					SetOwnerIdentityPubkey(identityPrivkey.Public()).
 					SetOwnerSigningPubkey(childKeyshare.PublicKey).
 					SetSigningKeyshare(childKeyshare).
