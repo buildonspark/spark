@@ -68,11 +68,11 @@ func mimoReceiverFanOutHook() ent.Hook {
 				return value, nil
 			}
 
-			primaryPubkey := transfer.ReceiverIdentityPubkey.String()
+			primaryPubkey := transfer.ReceiverIdentityPubkey
 			status := string(transfer.Status)
 
 			for _, r := range receivers {
-				receiverPubkey := r.IdentityPubkey.String()
+				receiverPubkey := r.IdentityPubkey
 				// Already covered by the standard NotifyMixin event.
 				if receiverPubkey == primaryPubkey {
 					continue
@@ -84,7 +84,7 @@ func mimoReceiverFanOutHook() ent.Hook {
 					Channel: "transfer",
 					Payload: map[string]any{
 						"id":                       transfer.ID.String(),
-						"receiver_identity_pubkey": receiverPubkey,
+						"receiver_identity_pubkey": receiverPubkey.String(),
 						"status":                   status,
 					},
 				}); err != nil {

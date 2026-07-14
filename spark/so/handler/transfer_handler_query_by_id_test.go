@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -34,7 +33,7 @@ func TestQueryTransfersByID_FiltersByAccessAndMarshalsFull(t *testing.T) {
 	_, err = dbTx.WalletSetting.Create().SetOwnerIdentityPublicKey(otherReceiver).SetPrivateEnabled(true).Save(ctx)
 	require.NoError(t, err)
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, viewer, 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewer, dbTx)
 
 	asSender := addByIDTestTransfer(t, ctx, rng, dbTx, tree, schematype.TransferStatusSenderInitiated, viewer, otherReceiver)
@@ -78,7 +77,7 @@ func TestQueryTransfersByID_ReturnsRegardlessOfStatus(t *testing.T) {
 	viewer := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	sender := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, viewer, 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewer, dbTx)
 
 	completed := addByIDTestTransfer(t, ctx, rng, dbTx, tree, schematype.TransferStatusCompleted, sender, viewer)

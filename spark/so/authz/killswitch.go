@@ -34,9 +34,7 @@ func EnforceWalletNotKillSwitched(ctx context.Context, identityPublicKey keys.Pu
 	if !IsWalletKillSwitched(ctx, identityPublicKey) {
 		return nil
 	}
-	logging.GetLoggerFromContext(ctx).
-		With(zap.Stringer("identity_public_key", identityPublicKey)).
-		Sugar().Warn("wallet kill switch enforced")
+	logging.GetLoggerFromContext(ctx).Warn("wallet kill switch enforced", zap.Stringer("identity_public_key", identityPublicKey))
 	incrementKillSwitchBlockedMetric(ctx)
 	return &Error{
 		Code:    ErrorCodeWalletKillSwitched,

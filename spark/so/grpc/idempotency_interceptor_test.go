@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -298,8 +299,8 @@ func TestIdempotencyInterceptor_DifferentIdentitiesSeparateCaches(t *testing.T) 
 
 	idempotencyKey := "cross-user-key"
 	methodName := "my_method"
-	identityA := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
-	identityB := "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+	identityA := keys.MustParsePublicKeyHex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+	identityB := keys.MustParsePublicKeyHex("02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5")
 
 	// User A caches a response
 	handlerA := func(ctx context.Context, req any) (any, error) {
@@ -331,7 +332,7 @@ func TestIdempotencyInterceptor_SameIdentityCacheHit(t *testing.T) {
 
 	idempotencyKey := "same-user-key"
 	methodName := "my_method"
-	identity := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	identity := keys.MustParsePublicKeyHex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
 
 	handler := func(ctx context.Context, req any) (any, error) {
 		return structpb.NewStruct(map[string]any{"user": "A"})
@@ -383,7 +384,7 @@ func TestIdempotencyInterceptor_IdentityDoesNotMatchNoIdentity(t *testing.T) {
 
 	idempotencyKey := "mixed-key"
 	methodName := "my_method"
-	identity := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	identity := keys.MustParsePublicKeyHex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
 
 	// Internal call (no identity) caches a response
 	handler := func(ctx context.Context, req any) (any, error) {
@@ -417,11 +418,11 @@ func callInterceptor(_ *testing.T, ctx context.Context, key string, methodName s
 	return interceptor(ctx, nil, info, handler)
 }
 
-func callInterceptorWithIdentity(_ *testing.T, ctx context.Context, key string, methodName string, identityHex string, handler grpc.UnaryHandler) (any, error) {
+func callInterceptorWithIdentity(_ *testing.T, ctx context.Context, key string, methodName string, identityPubKey keys.Public, handler grpc.UnaryHandler) (any, error) {
 	md := metadata.Pairs(common.IdempotencyKeyHeader, key)
 	ctx = metadata.NewIncomingContext(ctx, md)
-	if identityHex != "" {
-		ctx = authn.InjectSessionForTests(ctx, identityHex, 9999999999)
+	if !identityPubKey.IsZero() {
+		ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 	}
 
 	info := &grpc.UnaryServerInfo{FullMethod: methodName}

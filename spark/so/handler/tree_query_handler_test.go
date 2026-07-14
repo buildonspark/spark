@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -375,7 +374,7 @@ func TestQueryNodes_StatusField(t *testing.T) {
 		createdNodes[tt.status] = node
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	// Create handler
 	handler := NewTreeQueryHandler(&so.Config{})
@@ -634,7 +633,7 @@ func createTreeQueryTestContext(t *testing.T) (context.Context, *so.Config) {
 type PrivacyTestData struct {
 	OwnerIdentityPubKey     keys.Public
 	RequesterIdentityPubKey keys.Public
-	MasterIdentityPubKey    *keys.Public
+	MasterIdentityPubKey    keys.Public
 	Node                    *ent.TreeNode
 	WalletSetting           *ent.WalletSetting
 }
@@ -657,9 +656,9 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 	} else {
 		requesterIdentityPubKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	}
-	var masterIdentityPubKey *keys.Public
+	var masterIdentityPubKey keys.Public
 	if setMasterKey {
-		masterIdentityPubKey = new(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+		masterIdentityPubKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	}
 	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -716,15 +715,15 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 		Create().
 		SetOwnerIdentityPublicKey(ownerIdentityPubKey).
 		SetPrivateEnabled(privacyEnabled)
-	if masterIdentityPubKey != nil {
-		walletSettingCreate = walletSettingCreate.SetMasterIdentityPublicKey(*masterIdentityPubKey)
+	if !masterIdentityPubKey.IsZero() {
+		walletSettingCreate = walletSettingCreate.SetMasterIdentityPublicKey(masterIdentityPubKey)
 	}
 	walletSetting, err := walletSettingCreate.Save(ctx)
 	require.NoError(t, err)
 
 	// Set up session context for the requester if requested
 	if injectSession {
-		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(requesterIdentityPubKey.Serialize()), 9999999999)
+		ctx = authn.InjectSessionForTests(ctx, requesterIdentityPubKey, 9999999999)
 	}
 
 	return ctx, cfg, &PrivacyTestData{
@@ -771,7 +770,7 @@ func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, resp.GetNodes(), "Should not reveal a private node by ID when requester doesn't have read access")
 
-	ownerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.OwnerIdentityPubKey.Serialize()), 9999999999)
+	ownerCtx := authn.InjectSessionForTests(ctx, testData.OwnerIdentityPubKey, 9999999999)
 	ownerResp, err := handler.QueryNodes(ownerCtx, &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_NodeIds{
 			NodeIds: &pb.TreeNodeIds{
@@ -866,7 +865,7 @@ func TestQueryNodes_MasterCanSeeNodes(t *testing.T) {
 	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, true)
 
 	// Set up session context as the master (not the owner)
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.MasterIdentityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, testData.MasterIdentityPubKey, 9999999999)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
@@ -1015,7 +1014,7 @@ func TestQueryBalance_MasterCanSeeBalance(t *testing.T) {
 	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, true)
 
 	// Set up session context as the master (not the owner)
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.MasterIdentityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, testData.MasterIdentityPubKey, 9999999999)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)

@@ -655,14 +655,13 @@ func (h *BaseTransferHandler) createTransferV3(
 		directMap      map[string][]byte
 		directCpfpMap  map[string][]byte
 	}
-	groupsByReceiver := make(map[string]*receiverGroup)
+	groupsByReceiver := make(map[keys.Public]*receiverGroup)
 	for _, leaf := range leaves {
 		recvPK, ok := leafReceiverMap[leaf.ID.String()]
 		if !ok {
 			return nil, nil, fmt.Errorf("leaf %s not found in leaf-receiver map", leaf.ID)
 		}
-		recvKey := string(recvPK.Serialize())
-		group, ok := groupsByReceiver[recvKey]
+		group, ok := groupsByReceiver[recvPK]
 		if !ok {
 			group = &receiverGroup{
 				receiverPubKey: recvPK,
@@ -670,7 +669,7 @@ func (h *BaseTransferHandler) createTransferV3(
 				directMap:      make(map[string][]byte),
 				directCpfpMap:  make(map[string][]byte),
 			}
-			groupsByReceiver[recvKey] = group
+			groupsByReceiver[recvPK] = group
 		}
 		group.leaves = append(group.leaves, leaf)
 		leafID := leaf.ID.String()

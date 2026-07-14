@@ -33,7 +33,7 @@ func TestQueryPendingPreimageSwapTransfer(t *testing.T) {
 	sspPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	otherReceiverPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	sessionCtx := authn.InjectSessionForTests(ctx, sspPub.ToHex(), time.Now().Add(time.Hour).Unix())
+	sessionCtx := authn.InjectSessionForTests(ctx, sspPub, time.Now().Add(time.Hour).Unix())
 	sspHandler := NewSspRequestHandler(&so.Config{Identifier: "test-operator"})
 
 	paymentHashFor := func(label string) []byte {

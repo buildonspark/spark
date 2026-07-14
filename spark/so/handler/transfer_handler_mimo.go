@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -80,27 +81,13 @@ func (h *TransferHandler) startTransferV3Internal(
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
 
-	// Parse receivers from the leaf→receiver map.
-	leafReceiverMap := make(map[string]keys.Public)
-	receiverSet := make(map[string]keys.Public)
-	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
-		recvPK, err := keys.ParsePublicKey(receiverBytes)
-		if err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
-		}
-		leafReceiverMap[leafID] = recvPK
-		receiverSet[string(recvPK.Serialize())] = recvPK
+	leafReceiverMap, receivers, err := parseReceivers(senderPkg)
+	if err != nil {
+		return nil, err
 	}
-	if len(receiverSet) == 0 {
+	if len(receivers) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
 	}
-	receivers := make([]keys.Public, 0, len(receiverSet))
-	for _, pk := range receiverSet {
-		receivers = append(receivers, pk)
-	}
-	slices.SortFunc(receivers, func(a, b keys.Public) int {
-		return bytes.Compare(a.Serialize(), b.Serialize())
-	})
 
 	// Multi-receiver transfers require the MIMO knob to be enabled.
 	if len(receivers) > 1 {
@@ -253,6 +240,24 @@ func (h *TransferHandler) startTransferV3Internal(
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
 }
 
+func parseReceivers(senderPkg *pb.SenderTransferPackage) (map[string]keys.Public, []keys.Public, error) {
+	// Parse receivers from the leaf→receiver map.
+	leafReceiverMap := make(map[string]keys.Public)
+	receiverSet := make(map[keys.Public]struct{})
+	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
+		recvPK, err := keys.ParsePublicKey(receiverBytes)
+		if err != nil {
+			return nil, nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
+		}
+		leafReceiverMap[leafID] = recvPK
+		receiverSet[recvPK] = struct{}{}
+	}
+	receivers := slices.SortedFunc(maps.Keys(receiverSet), func(a, b keys.Public) int {
+		return bytes.Compare(a.Serialize(), b.Serialize())
+	})
+	return leafReceiverMap, receivers, nil
+}
+
 // convertV2ToV3SendTransferRequest maps a v2 StartTransferRequest onto the v3
 // StartTransferV3Request shape consumed by the consensus engine. A v2 request
 // targets a single receiver for the whole transfer, so every leaf in the
@@ -336,18 +341,15 @@ func (h *TransferHandler) startTransferV3Consensus(
 	// Count distinct receivers (canonical-serialization dedup) for the MIMO
 	// multi-receiver guard. Parsing here also fails fast on malformed
 	// receiver keys before paying for the engine fan-out.
-	receiverSet := make(map[string]struct{})
-	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
-		recvPK, err := keys.ParsePublicKey(receiverBytes)
-		if err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
-		}
-		receiverSet[string(recvPK.Serialize())] = struct{}{}
+	_, receivers, err := parseReceivers(senderPkg)
+	if err != nil {
+		return nil, err
 	}
-	if len(receiverSet) == 0 {
+	if len(receivers) == 0 {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
 	}
-	if len(receiverSet) > 1 {
+
+	if len(receivers) > 1 {
 		// Coordinator-only by design (matches legacy InitiateTransferV2).
 		// Participants don't re-check this — during the multi-receiver
 		// rollout, set KnobMimoTransferMultiReceiverEnabled on every SO

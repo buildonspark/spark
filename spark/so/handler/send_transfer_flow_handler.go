@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"maps"
@@ -676,22 +675,13 @@ func parseSendTransferRequest(req *pb.StartTransferV3Request) (parsedSendTransfe
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner identity public key: %w", err))
 	}
-	leafReceiverMap := make(map[string]keys.Public, len(senderPkg.GetReceiverIdentityPublicKeys()))
-	receiverSet := make(map[string]keys.Public)
-	for leafID, recvBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
-		recvPK, err := keys.ParsePublicKey(recvBytes)
-		if err != nil {
-			return empty, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid receiver pubkey for leaf %s: %w", leafID, err))
-		}
-		leafReceiverMap[leafID] = recvPK
-		receiverSet[string(recvPK.Serialize())] = recvPK
+	leafReceiverMap, receivers, err := parseReceivers(senderPkg)
+	if err != nil {
+		return empty, err
 	}
-	if len(receiverSet) == 0 {
+	if len(receivers) == 0 {
 		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
 	}
-	receivers := slices.SortedFunc(maps.Values(receiverSet), func(a, b keys.Public) int {
-		return bytes.Compare(a.Serialize(), b.Serialize())
-	})
 
 	return parsedSendTransferRequest{
 		transferID:      transferID,

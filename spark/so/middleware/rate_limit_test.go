@@ -31,10 +31,9 @@ func (c *testClock) Now() time.Time {
 	return c.Time
 }
 
-func newIdentityHex(t *testing.T) string {
+func newIdentityPubKey(t *testing.T) keys.Public {
 	t.Helper()
-	priv := keys.GeneratePrivateKey()
-	return priv.Public().ToHex()
+	return keys.GeneratePrivateKey().Public()
 }
 
 type testMemoryStore struct {
@@ -260,7 +259,7 @@ func TestRateLimiter(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 		store := newTestMemoryStore(clock)
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		ip := "9.9.9.9"
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			// method
@@ -283,7 +282,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": ip,
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		interceptor := rl.UnaryServerInterceptor()
 		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
@@ -406,7 +405,7 @@ func TestRateLimiter(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 		store := newTestMemoryStore(clock)
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		ip := "8.8.8.8"
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			knobs.KnobRateLimitLimit + "@/test.Service/Method:ip#1s":     2,
@@ -419,7 +418,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": ip,
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		interceptor := rl.UnaryServerInterceptor()
 		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
@@ -434,14 +433,14 @@ func TestRateLimiter(t *testing.T) {
 		require.ErrorContains(t, err, "rate limit exceeded")
 
 		// Changing the pubkey (same IP) should allow one more request, then fail due to IP limit
-		identityHex2 := newIdentityHex(t)
+		identityKey2 := newIdentityPubKey(t)
 		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
-		ctx2 = authn.InjectSessionForTests(ctx2, identityHex2, time.Now().Add(time.Hour).Unix())
+		ctx2 = authn.InjectSessionForTests(ctx2, identityKey2, time.Now().Add(time.Hour).Unix())
 		_, err = interceptor(ctx2, "request", info, handler)
 		require.NoError(t, err)
-		identityHex3 := newIdentityHex(t)
+		identityKey3 := newIdentityPubKey(t)
 		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
-		ctx3 = authn.InjectSessionForTests(ctx3, identityHex3, time.Now().Add(time.Hour).Unix())
+		ctx3 = authn.InjectSessionForTests(ctx3, identityKey3, time.Now().Add(time.Hour).Unix())
 		_, err = interceptor(ctx3, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 	})
@@ -450,7 +449,7 @@ func TestRateLimiter(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 		store := newTestMemoryStore(clock)
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		ip := "7.7.7.7"
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			knobs.KnobRateLimitLimit + "@/test.Service/:ip#1s":     2,
@@ -463,7 +462,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": ip,
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		interceptor := rl.UnaryServerInterceptor()
 		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
@@ -478,14 +477,14 @@ func TestRateLimiter(t *testing.T) {
 		require.ErrorContains(t, err, "rate limit exceeded")
 
 		// Changing the pubkey (same IP) should allow one more request, then fail due to IP service limit
-		identityHex2 := newIdentityHex(t)
+		identityKey2 := newIdentityPubKey(t)
 		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
-		ctx2 = authn.InjectSessionForTests(ctx2, identityHex2, time.Now().Add(time.Hour).Unix())
+		ctx2 = authn.InjectSessionForTests(ctx2, identityKey2, time.Now().Add(time.Hour).Unix())
 		_, err = interceptor(ctx2, "request", info, handler)
 		require.NoError(t, err)
-		identityHex3 := newIdentityHex(t)
+		identityKey3 := newIdentityPubKey(t)
 		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
-		ctx3 = authn.InjectSessionForTests(ctx3, identityHex3, time.Now().Add(time.Hour).Unix())
+		ctx3 = authn.InjectSessionForTests(ctx3, identityKey3, time.Now().Add(time.Hour).Unix())
 		_, err = interceptor(ctx3, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 	})
@@ -494,7 +493,7 @@ func TestRateLimiter(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 		store := newTestMemoryStore(clock)
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		ip := "7.7.7.7"
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			knobs.KnobRateLimitLimit + "@global:ip#1s":     2,
@@ -507,7 +506,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": ip,
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		interceptor := rl.UnaryServerInterceptor()
 		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
@@ -522,14 +521,14 @@ func TestRateLimiter(t *testing.T) {
 		require.ErrorContains(t, err, "rate limit exceeded")
 
 		// Changing the pubkey (same IP) should allow one more request, then fail due to IP service limit
-		identityHex2 := newIdentityHex(t)
+		identityKey2 := newIdentityPubKey(t)
 		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
-		ctx2 = authn.InjectSessionForTests(ctx2, identityHex2, time.Now().Add(time.Hour).Unix())
+		ctx2 = authn.InjectSessionForTests(ctx2, identityKey2, time.Now().Add(time.Hour).Unix())
 		_, err = interceptor(ctx2, "request", info, handler)
 		require.NoError(t, err)
-		identityHex3 := newIdentityHex(t)
+		identityKey3 := newIdentityPubKey(t)
 		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
-		ctx3 = authn.InjectSessionForTests(ctx3, identityHex3, time.Now().Add(time.Hour).Unix())
+		ctx3 = authn.InjectSessionForTests(ctx3, identityKey3, time.Now().Add(time.Hour).Unix())
 		_, err = interceptor(ctx3, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 	})
@@ -1165,10 +1164,10 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("Pubkey excluded via knobs", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		mockKnobsMap := map[string]float64{
-			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 1,
-			knobs.KnobRateLimitExcludePubkeys + "@" + identityHex:     1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s":      1,
+			knobs.KnobRateLimitExcludePubkeys + "@" + identityKey.String(): 1,
 		}
 		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
 
@@ -1181,7 +1180,7 @@ func TestRateLimiter(t *testing.T) {
 
 		// Build context with identity only (no x-forwarded-for so only pubkey dimension would apply)
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		// Should not rate limit due to exclusion
 		for range 3 {
@@ -1193,7 +1192,7 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("IP address excluded via dimension-only exclusion", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 
 		mockKnobsMap := map[string]float64{
 			knobs.KnobRateLimitExcludeIpsOnly + "@1.2.3.4":                   1,
@@ -1216,7 +1215,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "1.2.3.4",
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		// IP is excluded from IP-based rate limiting, but pubkey limits should still apply
 		// Make 2 requests that should succeed (within pubkey limit of 2)
@@ -1236,13 +1235,13 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("Pubkey excluded via dimension-only exclusion", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 
 		mockKnobsMap := map[string]float64{
-			knobs.KnobRateLimitExcludePubkeysOnly + "@" + identityHex:        1,
-			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s":        2,
-			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:ip#1s":     2,
-			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:pubkey#1s": 2,
+			knobs.KnobRateLimitExcludePubkeysOnly + "@" + identityKey.String(): 1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s":          2,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:ip#1s":       2,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:pubkey#1s":   2,
 		}
 		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
 
@@ -1259,7 +1258,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "1.2.3.4",
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		// Pubkey is excluded from pubkey-based rate limiting, but IP limits should still apply
 		// Make 2 requests that should succeed (within IP limit of 2)
@@ -1310,11 +1309,11 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("Pubkey dimension-only exclusion with only pubkey present", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 
 		mockKnobsMap := map[string]float64{
-			knobs.KnobRateLimitExcludePubkeysOnly + "@" + identityHex: 1,
-			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 2,
+			knobs.KnobRateLimitExcludePubkeysOnly + "@" + identityKey.String(): 1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s":          2,
 		}
 		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
 
@@ -1329,7 +1328,7 @@ func TestRateLimiter(t *testing.T) {
 
 		// Build context with only pubkey (no IP)
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		// Pubkey is excluded, and no IP is present, so rate limiting should be bypassed
 		for range 5 {
@@ -1341,7 +1340,7 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("Full exclusion takes precedence over dimension-only exclusion", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 
 		mockKnobsMap := map[string]float64{
 			knobs.KnobRateLimitExcludeIps + "@1.2.3.4":                1, // Full exclusion
@@ -1363,7 +1362,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "1.2.3.4",
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		// Full exclusion should bypass all rate limiting, even if dimension-only exclusion is also set
 		for range 5 {
@@ -1406,7 +1405,7 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("prefix dimension-specific overrides base", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			knobs.KnobRateLimitLimit + "@/test.Service/^Foo#1s":        5,
 			knobs.KnobRateLimitLimit + "@/test.Service/^Foo:pubkey#1s": 1,
@@ -1417,7 +1416,7 @@ func TestRateLimiter(t *testing.T) {
 		interceptor := rl.UnaryServerInterceptor()
 		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "8.8.4.4"}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 
 		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/FooBar"}
 		_, err = interceptor(ctx, "request", info, handler)
@@ -1662,7 +1661,7 @@ func TestStreamServerInterceptor(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 		store := newTestMemoryStore(clock)
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		ip := "8.8.8.8"
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
 			knobs.KnobRateLimitLimit + "@/test.Service/Stream:ip#1s":     2,
@@ -1674,7 +1673,7 @@ func TestStreamServerInterceptor(t *testing.T) {
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": ip,
 		}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 		stream := &mockServerStream{ctx: ctx}
 
 		interceptor := rl.StreamServerInterceptor()
@@ -1773,10 +1772,10 @@ func TestStreamServerInterceptor(t *testing.T) {
 
 	t.Run("Pubkey excluded via knobs", func(t *testing.T) {
 		config := &RateLimiterConfig{}
-		identityHex := newIdentityHex(t)
+		identityKey := newIdentityPubKey(t)
 		mockKnobsMap := map[string]float64{
-			knobs.KnobRateLimitLimit + "@/test.Service/TestStream#1s": 1,
-			knobs.KnobRateLimitExcludePubkeys + "@" + identityHex:     1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestStream#1s":      1,
+			knobs.KnobRateLimitExcludePubkeys + "@" + identityKey.String(): 1,
 		}
 		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
 
@@ -1788,7 +1787,7 @@ func TestStreamServerInterceptor(t *testing.T) {
 		info := &grpc.StreamServerInfo{FullMethod: "/test.Service/TestStream"}
 
 		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
-		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+		ctx = authn.InjectSessionForTests(ctx, identityKey, time.Now().Add(time.Hour).Unix())
 		stream := &mockServerStream{ctx: ctx}
 
 		// Should not rate limit due to exclusion

@@ -5,7 +5,6 @@ package handler
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -976,7 +975,7 @@ func TestFinalizeTransferWithTransferPackageRejectsSessionSenderMismatch(t *test
 		Save(ctx)
 	require.NoError(t, err)
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionIdentityPrivKey.Public().Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, sessionIdentityPrivKey.Public(), time.Now().Add(time.Hour).Unix())
 	handler := NewTransferHandler(cfg)
 	_, err = handler.FinalizeTransferWithTransferPackage(ctx, &sparkProto.FinalizeTransferWithTransferPackageRequest{
 		TransferId: transferID.String(),

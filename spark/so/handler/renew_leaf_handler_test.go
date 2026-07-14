@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"io"
 	"math/rand/v2"
 	"strings"
@@ -206,7 +205,7 @@ func TestRenewLeafRejectsSessionMismatchBeforeConsensus(t *testing.T) {
 
 	leaf := createTestNodeForFlowHandler(t, ctx, st.TreeNodeStatusAvailable)
 	sessionIdentity := keys.GeneratePrivateKey().Public()
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionIdentity.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, sessionIdentity, 9999999999)
 
 	cfg := sparktesting.TestConfig(t)
 	cfg.AuthzEnforced = true

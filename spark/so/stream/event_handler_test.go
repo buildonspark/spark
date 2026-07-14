@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"math/rand/v2"
 	"slices"
@@ -353,7 +352,7 @@ func TestMasterWalletHasReadAccess(t *testing.T) {
 	defer cancel()
 
 	// Inject the master session into the stream context.
-	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(masterPubKey.Serialize()), 9999999999)
+	streamCtx = authn.InjectSessionForTests(streamCtx, masterPubKey, 9999999999)
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 
@@ -403,7 +402,7 @@ func TestEventRouter_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	streamCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(walletOwnerPubKey.Serialize()), 9999999999)
+	streamCtx = authn.InjectSessionForTests(streamCtx, walletOwnerPubKey, 9999999999)
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 
@@ -521,7 +520,7 @@ func TestEventRouter_PrivacyEnabled_NoAccess(t *testing.T) {
 	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
-	streamCtx = authn.InjectSessionForTests(streamCtx, hex.EncodeToString(otherUserPubKey.Serialize()), 9999999999)
+	streamCtx = authn.InjectSessionForTests(streamCtx, otherUserPubKey, 9999999999)
 
 	stream := &mockStream{ctx: streamCtx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 

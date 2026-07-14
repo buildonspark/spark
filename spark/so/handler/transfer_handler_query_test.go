@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -93,7 +92,7 @@ func TestQueryTransfers_NotSSP_RequiresAuthz(t *testing.T) {
 	receiverIDPubKey := keys.GeneratePrivateKey().Public()
 
 	// Inject session for the receiver
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverIDPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, receiverIDPubKey, 9999999999)
 
 	// Create a transfer filter with receiver identity
 	filter := &pb.TransferFilter{
@@ -131,7 +130,7 @@ func TestQueryTransfers_NotSSP_RequiresAuthz_Mismatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// Inject session for a different identity (not the receiver)
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(differentIDPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, differentIDPubKey, 9999999999)
 
 	// Create a transfer filter with receiver identity
 	filter := &pb.TransferFilter{
@@ -382,7 +381,7 @@ func TestQueryTransfers_WithTransferIds_MasterKeyAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Inject session for the master (viewer)
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(masterIdentityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, masterIdentityPubKey, 9999999999)
 
 	// Create a tree for network filtering
 	tree := createTestTreeForClaim(t, ctx, walletOwnerIdentityPubKey, dbTx)
@@ -459,7 +458,7 @@ func TestQueryTransfers_WithTransferIds_AccessCheck_MIMO(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerIdentityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, viewerIdentityPubKey, 9999999999)
 
 	tree := createTestTreeForClaim(t, ctx, viewerIdentityPubKey, dbTx)
 
@@ -549,7 +548,7 @@ func TestQueryTransfers_WithTransferIds_MultiReceiverAccess_MIMO(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, viewerPubkey, 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
 
 	// Multi-receiver transfer: viewer is one of two receivers. The deprecated
@@ -614,7 +613,7 @@ func TestQueryTransfers_WithTransferIds_MissingSendersEdges_MIMO(t *testing.T) {
 	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, viewerPubkey, 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
 
 	transfer, err := dbTx.Transfer.Create().
@@ -659,7 +658,7 @@ func TestQueryTransfers_WithTransferIds_MissingReceiversEdges_MIMO(t *testing.T)
 	viewerPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(viewerPubkey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, viewerPubkey, 9999999999)
 	tree := createTestTreeForClaim(t, ctx, viewerPubkey, dbTx)
 
 	transfer, err := dbTx.Transfer.Create().

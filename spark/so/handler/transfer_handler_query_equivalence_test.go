@@ -4,7 +4,6 @@ package handler
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand/v2"
 	"sort"
 	"testing"
@@ -237,7 +236,7 @@ func (f *equivFixture) privacyEnabled(pubkeys ...keys.Public) {
 // ctxForViewer returns a context authenticated as the given pubkey.
 // QueryAllTransfers routing is purely filter-shape based, so no routing knob is set.
 func (f *equivFixture) ctxForViewer(viewer keys.Public) context.Context {
-	return authn.InjectSessionForTests(f.ctx, hex.EncodeToString(viewer.Serialize()), 9999999999)
+	return authn.InjectSessionForTests(f.ctx, viewer, 9999999999)
 }
 
 // setupEquivalenceData populates the fixture with the data shape required by

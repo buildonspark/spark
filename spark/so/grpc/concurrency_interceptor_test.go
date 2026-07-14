@@ -452,10 +452,10 @@ func TestConcurrencyInterceptor_NonExcludedIP_EnforcesGuard(t *testing.T) {
 func TestConcurrencyInterceptor_ExcludedPubkey_BypassesGuard(t *testing.T) {
 	// Generate a test identity pubkey hex and exclude it via knob
 	priv := keys.GeneratePrivateKey()
-	identityHex := priv.Public().ToHex()
+	pub := priv.Public()
 
 	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyExcludePubkeys, identityHex): 1,
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyExcludePubkeys, pub): 1,
 	})
 	guard := &spyGuard{failAcquire: true}
 	interceptor := ConcurrencyInterceptor(guard, nil, mockKnobs)
@@ -468,7 +468,7 @@ func TestConcurrencyInterceptor_ExcludedPubkey_BypassesGuard(t *testing.T) {
 
 	info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
 	// Context with identity only
-	ctx := authn.InjectSessionForTests(t.Context(), identityHex, time.Now().Add(time.Hour).Unix())
+	ctx := authn.InjectSessionForTests(t.Context(), pub, time.Now().Add(time.Hour).Unix())
 
 	resp, err := interceptor(ctx, nil, info, handler)
 	require.NoError(t, err)
@@ -880,10 +880,10 @@ func TestConcurrencyStreamInterceptor_NonExcludedIP_EnforcesGuard(t *testing.T) 
 func TestConcurrencyStreamInterceptor_ExcludedPubkey_BypassesGuard(t *testing.T) {
 	// Generate a test identity pubkey hex and exclude it via knob
 	priv := keys.GeneratePrivateKey()
-	identityHex := priv.Public().ToHex()
+	pub := priv.Public()
 
 	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyExcludePubkeys, identityHex): 1,
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyExcludePubkeys, pub): 1,
 	})
 	guard := &spyGuard{failAcquire: true}
 	interceptor := ConcurrencyStreamInterceptor(guard, nil, mockKnobs)
@@ -896,7 +896,7 @@ func TestConcurrencyStreamInterceptor_ExcludedPubkey_BypassesGuard(t *testing.T)
 
 	info := &grpc.StreamServerInfo{FullMethod: "/test.Service/TestStream"}
 	// Context with identity only
-	ctx := authn.InjectSessionForTests(t.Context(), identityHex, time.Now().Add(time.Hour).Unix())
+	ctx := authn.InjectSessionForTests(t.Context(), pub, time.Now().Add(time.Hour).Unix())
 	ss := &mockServerStream{ctx: ctx}
 
 	err := interceptor(nil, ss, info, handler)

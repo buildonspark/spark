@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -311,9 +312,8 @@ func createTransactionEntities(
 	// For multi-token transactions, batch fetch all TokenCreate entities to minimize database roundtrips
 	// Collect unique token_identifiers and token_public_keys
 	tokenIdentifiersToFetch := make([][]byte, 0)
-	tokenPublicKeysToFetch := make([]keys.Public, 0)
 	tokenIdentifierMap := make(map[string]struct{})
-	tokenPublicKeyMap := make(map[string]struct{})
+	tokenPublicKeyMap := make(map[keys.Public]struct{})
 
 	for _, output := range tokenTransaction.GetTokenOutputs() {
 		if output.TokenIdentifier != nil {
@@ -327,17 +327,14 @@ func createTransactionEntities(
 			if err != nil {
 				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key: %w", err))
 			}
-			key := string(tokenPubKey.Serialize())
-			if _, exists := tokenPublicKeyMap[key]; !exists {
-				tokenPublicKeysToFetch = append(tokenPublicKeysToFetch, tokenPubKey)
-				tokenPublicKeyMap[key] = struct{}{}
-			}
+			tokenPublicKeyMap[tokenPubKey] = struct{}{}
 		}
 	}
+	tokenPublicKeysToFetch := slices.Collect(maps.Keys(tokenPublicKeyMap))
 
 	// Batch fetch TokenCreate entities
 	var tokenCreatesByIdentifier map[string]*TokenCreate
-	var tokenCreatesByIssuerPubKey map[string]*TokenCreate
+	var tokenCreatesByIssuerPubKey map[keys.Public]*TokenCreate
 
 	if len(tokenIdentifiersToFetch) > 0 {
 		tokenCreates, err := db.TokenCreate.Query().
@@ -359,9 +356,9 @@ func createTransactionEntities(
 		if err != nil {
 			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to batch fetch token creates by issuer public key: %w", err))
 		}
-		tokenCreatesByIssuerPubKey = make(map[string]*TokenCreate, len(tokenCreates))
+		tokenCreatesByIssuerPubKey = make(map[keys.Public]*TokenCreate, len(tokenCreates))
 		for _, tc := range tokenCreates {
-			tokenCreatesByIssuerPubKey[string(tc.IssuerPublicKey.Serialize())] = tc
+			tokenCreatesByIssuerPubKey[tc.IssuerPublicKey] = tc
 		}
 	}
 
@@ -400,7 +397,7 @@ func createTransactionEntities(
 				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key for output %d: %w", outputIndex, err))
 			}
 			var found bool
-			tokenCreateEnt, found = tokenCreatesByIssuerPubKey[string(tokenPubKey.Serialize())]
+			tokenCreateEnt, found = tokenCreatesByIssuerPubKey[tokenPubKey]
 			if !found {
 				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for issuer public key %x at output %d", output.GetTokenPublicKey(), outputIndex))
 			}
