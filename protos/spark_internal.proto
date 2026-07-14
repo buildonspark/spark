@@ -697,6 +697,62 @@ message StaticDepositUtxoSwapRollbackRequest {
     spark.UTXO on_chain_utxo = 1;
 }
 
+// ReserveInstantStaticDepositUtxoSwapPrepareRequest is the prepare op for the
+// CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP 2PC flow
+// (phase one of the instant static deposit claim; the spend-tx signing and
+// swap completion happen at claim time, after the UTXO confirms). Wraps the
+// internal-mirror ReserveInstantStaticDepositUtxoSwapRequest. Every SO
+// validates the request (instant amounts, destination-address ownership,
+// instant user signature over the actual leaf total), creates the INSTANT
+// UtxoSwap row in CREATED — deliberately without a Utxo edge, since the UTXO
+// may be unconfirmed at reserve time — creates the Transfer/TransferLeaf rows
+// by delegating to the send-transfer prepare, and links the transfer edge onto
+// its own swap row (replacing the legacy LinkUtxoSwapTransfer fanout). SOs in
+// the leaf signing sets return FROST round-2 shares for the transfer's refund
+// txs; there is no spend-tx signing at reserve.
+//
+// No FROST round-1 commitments are carried: unlike the fixed swap and refund
+// flows there is nothing to sign against the deposit UTXO yet. The coordinator
+// identity recorded on each SO's row is derived from the engine's
+// coordinator_index, never from a payload field.
+//
+// The active-reservation race arbiter is the partial unique index on
+// (deposit_address, utxo_value_sats) WHERE status NOT IN (CANCELLED,
+// COMPLETED) — it holds pre-confirmation because it does not involve the Utxo
+// edge.
+message ReserveInstantStaticDepositUtxoSwapPrepareRequest {
+    ReserveInstantStaticDepositUtxoSwapRequest original_request = 1;
+}
+
+// ReserveInstantStaticDepositUtxoSwapCommitRequest is the 2PC commit payload:
+// just the embedded send-transfer commit (aggregated leaf refund signatures).
+// The swap row deliberately STAYS CREATED at commit — CREATED-with-transfer is
+// the reserved state the claim phase consumes; only claim completes the swap.
+message ReserveInstantStaticDepositUtxoSwapCommitRequest {
+    SendTransferCommitRequest transfer_commit = 1;
+}
+
+// ReserveInstantStaticDepositUtxoSwapRollbackRequest is the 2PC rollback
+// payload. requested_transfer_id selects the participant's OWN instant swap row
+// (RequestType INSTANT, status CREATED), additionally scoped to the coordinator
+// that drove this flow (identity taken from the participant FlowExecution row,
+// not the payload); the transfer to roll back is then derived from the matched
+// row, never taken as a free-standing coordinator-named transfer id. So a
+// buggy or misbehaving coordinator cannot name another SO's in-flight
+// reservation and have its transfer returned.
+//
+// Idempotency has two cases, since — unlike the fixed-swap and refund flows,
+// whose committed row is COMPLETED and thus status-filtered out — a committed
+// instant reservation is deliberately left CREATED (the reserved state the
+// claim phase consumes) and so still matches this query: (1) a missing /
+// cancelled row is a no-op by row scope; (2) a committed-but-unclaimed
+// reservation is a no-op via the handler's already-sent guard (its transfer is
+// SENDER_KEY_TWEAKED), not row scope. Redelivery safety comes from the engine's
+// participant FlowExecution terminal-row fence, not this payload.
+message ReserveInstantStaticDepositUtxoSwapRollbackRequest {
+    string requested_transfer_id = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }

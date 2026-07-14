@@ -33,17 +33,18 @@ const (
 type ConsensusOperationType int32
 
 const (
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_UNSPECIFIED                ConsensusOperationType = 0
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE      ConsensusOperationType = 1
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE       ConsensusOperationType = 2
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RENEW_LEAF                 ConsensusOperationType = 3
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER              ConsensusOperationType = 4
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER             ConsensusOperationType = 5
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE           ConsensusOperationType = 6
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT                  ConsensusOperationType = 7
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP     ConsensusOperationType = 8
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND ConsensusOperationType = 9
-	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP   ConsensusOperationType = 10
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_UNSPECIFIED                              ConsensusOperationType = 0
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE                    ConsensusOperationType = 1
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE                     ConsensusOperationType = 2
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RENEW_LEAF                               ConsensusOperationType = 3
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER                            ConsensusOperationType = 4
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER                           ConsensusOperationType = 5
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE                         ConsensusOperationType = 6
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT                                ConsensusOperationType = 7
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP                   ConsensusOperationType = 8
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND               ConsensusOperationType = 9
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP                 ConsensusOperationType = 10
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP ConsensusOperationType = 11
 )
 
 // Enum value maps for ConsensusOperationType.
@@ -60,19 +61,21 @@ var (
 		8:  "CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP",
 		9:  "CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND",
 		10: "CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP",
+		11: "CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP",
 	}
 	ConsensusOperationType_value = map[string]int32{
-		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":                0,
-		"CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE":      1,
-		"CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE":       2,
-		"CONSENSUS_OPERATION_TYPE_RENEW_LEAF":                 3,
-		"CONSENSUS_OPERATION_TYPE_SEND_TRANSFER":              4,
-		"CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER":             5,
-		"CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE":           6,
-		"CONSENSUS_OPERATION_TYPE_COOP_EXIT":                  7,
-		"CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP":     8,
-		"CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND": 9,
-		"CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP":   10,
+		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":                              0,
+		"CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE":                    1,
+		"CONSENSUS_OPERATION_TYPE_STORE_PREIMAGE_SHARE":                     2,
+		"CONSENSUS_OPERATION_TYPE_RENEW_LEAF":                               3,
+		"CONSENSUS_OPERATION_TYPE_SEND_TRANSFER":                            4,
+		"CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER":                           5,
+		"CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE":                         6,
+		"CONSENSUS_OPERATION_TYPE_COOP_EXIT":                                7,
+		"CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP":                   8,
+		"CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND":               9,
+		"CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP":                 10,
+		"CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP": 11,
 	}
 )
 
@@ -1941,7 +1944,7 @@ const file_gossip_proto_rawDesc = "" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
-	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xa7\x04\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xee\x04\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
 	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +
@@ -1954,7 +1957,8 @@ const file_gossip_proto_rawDesc = "" +
 	"/CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP\x10\b\x127\n" +
 	"3CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND\x10\t\x125\n" +
 	"1CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP\x10\n" +
-	"2H\n" +
+	"\x12E\n" +
+	"ACONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP\x10\v2H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
 
