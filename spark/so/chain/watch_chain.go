@@ -378,36 +378,34 @@ func scanChainUpdates(
 	}
 	logger.Sugar().Infof("Connected %d blocks", len(difference.Connected))
 
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) > 0 {
-		// After connecting blocks, process deposit availability
-		// This runs sequentially to avoid potential issues with parallel database transactions
-		deposits, err := loadDepositAvailabilityCandidates(ctx, dbClient, latestBlockHeight, oldBlockHeight, bitcoindConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load deposit availability candidates: %w", err)
-		}
-		err = setDepositAvailability(ctx, dbClient, deposits, network)
-		if err != nil {
-			return fmt.Errorf("failed to set deposit availability: %w", err)
-		}
+	// After connecting blocks, process deposit availability. This runs sequentially
+	// to avoid potential issues with parallel database transactions.
+	deposits, err := loadDepositAvailabilityCandidates(ctx, dbClient, latestBlockHeight, oldBlockHeight, bitcoindConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load deposit availability candidates: %w", err)
+	}
+	err = setDepositAvailability(ctx, dbClient, deposits, network)
+	if err != nil {
+		return fmt.Errorf("failed to set deposit availability: %w", err)
+	}
 
-		// Mark individual UTXOs as confirmed once they meet the confirmation threshold.
-		// Each UTXO is tracked independently since new UTXOs can arrive at the same
-		// deposit address after the first one was confirmed.
-		// UTXOs are only created in connectBlocks (above) when scanning chain data for
-		// outputs matching deposit addresses, with BlockHeight set to the block they
-		// were found in. This bulk update catches all UTXOs that have reached the
-		// required number of confirmations.
-		threshold := getNonStaticConfirmationThreshold(bitcoindConfig)
-		maxUtxoBlockHeight := latestBlockHeight - threshold + 1
-		_, err = dbClient.Utxo.Update().
-			Where(entutxo.AvailabilityConfirmedAtIsNil()).
-			Where(entutxo.BlockHeightLTE(maxUtxoBlockHeight)).
-			Where(entutxo.NetworkEQ(network)).
-			SetAvailabilityConfirmedAt(time.Now()).
-			Save(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to mark UTXOs as confirmed: %w", err)
-		}
+	// Mark individual UTXOs as confirmed once they meet the confirmation threshold.
+	// Each UTXO is tracked independently since new UTXOs can arrive at the same
+	// deposit address after the first one was confirmed.
+	// UTXOs are only created in connectBlocks (above) when scanning chain data for
+	// outputs matching deposit addresses, with BlockHeight set to the block they
+	// were found in. This bulk update catches all UTXOs that have reached the
+	// required number of confirmations.
+	threshold := getNonStaticConfirmationThreshold(bitcoindConfig)
+	maxUtxoBlockHeight := latestBlockHeight - threshold + 1
+	_, err = dbClient.Utxo.Update().
+		Where(entutxo.AvailabilityConfirmedAtIsNil()).
+		Where(entutxo.BlockHeightLTE(maxUtxoBlockHeight)).
+		Where(entutxo.NetworkEQ(network)).
+		SetAvailabilityConfirmedAt(time.Now()).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to mark UTXOs as confirmed: %w", err)
 	}
 
 	return nil
@@ -906,7 +904,6 @@ func handleBlock(
 		return err
 	}
 	for _, deposit := range confirmedDeposits {
-		// TODO: only unlock if deposit reaches X confirmations
 		utxos, ok := addressToUtxoMap[deposit.Address]
 		if !ok || len(utxos) == 0 {
 			logger.Sugar().Infof("UTXO not found for deposit address %s", deposit.Address)
@@ -929,28 +926,6 @@ func handleBlock(
 			Save(ctx)
 		if err != nil {
 			return err
-		}
-
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) == 0 {
-			err = markDepositAsAvailable(ctx, dbClient, deposit, confirmedTxHashSet)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Mark individual UTXOs as confirmed when the multi-confirmation knob is off.
-	// Each UTXO is tracked independently since new UTXOs can arrive at the same
-	// deposit address after the first one was confirmed.
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMultipleConfirmationForNonStaticDeposit, 0) == 0 {
-		_, err = dbClient.Utxo.Update().
-			Where(entutxo.AvailabilityConfirmedAtIsNil()).
-			Where(entutxo.BlockHeight(blockHeight)).
-			Where(entutxo.NetworkEQ(network)).
-			SetAvailabilityConfirmedAt(time.Now()).
-			Save(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to mark UTXOs as confirmed at block %d: %w", blockHeight, err)
 		}
 	}
 
