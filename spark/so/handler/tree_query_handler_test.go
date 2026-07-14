@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -781,6 +782,203 @@ func TestQueryNodes_PrivacyEnabled_NodeIds(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ownerResp.GetNodes(), 1, "Owner should still be able to query their own private node by ID")
 	assert.Equal(t, testData.Node.ID.String(), ownerResp.GetNodes()[testData.Node.ID.String()].GetId())
+}
+
+// TestQueryNodes_PrivacyEnabled_NodeIds_AncestorsBypassFilter locks in the
+// contract the SDK unilateral-exit walk depends on: ancestor (non-leaf) nodes
+// must be returned when queried by ID even if their recorded owner is a
+// privacy-enabled wallet. Transfers only re-own the leaf, so ancestors keep
+// their original owner; filtering them would make the exit walk fail with
+// "Exit chain is incomplete" while the include_parents walk still exposes the
+// same nodes unfiltered.
+func TestQueryNodes_PrivacyEnabled_NodeIds_AncestorsBypassFilter(t *testing.T) {
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, false)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Give the private wallet's node a child leaf, making it an ancestor.
+	rng := rand.NewChaCha8([32]byte{1})
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tree, err := testData.Node.QueryTree().Only(ctx)
+	require.NoError(t, err)
+	keyshare, err := testData.Node.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+	rawTx := createOldBitcoinTxBytes(t, verifyingPubKey)
+	refundTx := createOldBitcoinTxBytes(t, signingPubKey)
+
+	child, err := tx.TreeNode.Create().
+		SetTree(tree).
+		SetParent(testData.Node).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(testData.OwnerIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(100000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(keyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewTreeQueryHandler(cfg)
+
+	// A requester without read access fetches both the ancestor and the leaf
+	// by ID, as the SDK unilateral-exit walk does.
+	resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: []string{testData.Node.ID.String(), child.ID.String()},
+			},
+		},
+	}, false)
+	require.NoError(t, err)
+
+	nodes := resp.GetNodes()
+	assert.NotContains(t, nodes, child.ID.String(), "leaf owned by a private wallet must stay hidden from other requesters")
+	require.Contains(t, nodes, testData.Node.ID.String(), "ancestor (non-leaf) node must not be dropped by the privacy filter")
+	assert.Equal(t, bitcointransaction.NUMSPoint().Serialize(), nodes[testData.Node.ID.String()].GetOwnerIdentityPublicKey(),
+		"ancestor returned to a requester without read access must not reveal the private wallet's identity pubkey")
+
+	// Masking is unconditional for non-leaf nodes: even the recorded owner
+	// sees the NUMS point, keeping the response independent of who asks.
+	ownerCtx := authn.InjectSessionForTests(ctx, testData.OwnerIdentityPubKey, 9999999999)
+	ownerResp, err := handler.QueryNodes(ownerCtx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: []string{testData.Node.ID.String()},
+			},
+		},
+	}, false)
+	require.NoError(t, err)
+	require.Contains(t, ownerResp.GetNodes(), testData.Node.ID.String())
+	assert.Equal(t, bitcointransaction.NUMSPoint().Serialize(), ownerResp.GetNodes()[testData.Node.ID.String()].GetOwnerIdentityPublicKey(),
+		"non-leaf nodes are masked for every external requester, including the recorded owner")
+}
+
+// TestQueryNodes_PrivacyEnabled_IncludeParents_MasksPrivateAncestorOwner
+// covers the include_parents ancestor walk: ancestors owned by a
+// privacy-enabled wallet are returned (the walk never filtered them), but
+// their owner identity pubkey must be masked with a NUMS point so the walk
+// cannot be used to learn a private wallet's identity.
+func TestQueryNodes_PrivacyEnabled_IncludeParents_MasksPrivateAncestorOwner(t *testing.T) {
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, false)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// The requester owns a leaf whose parent belongs to the private wallet,
+	// as happens after a transfer (only the leaf is re-owned).
+	rng := rand.NewChaCha8([32]byte{2})
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tree, err := testData.Node.QueryTree().Only(ctx)
+	require.NoError(t, err)
+	keyshare, err := testData.Node.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+	rawTx := createOldBitcoinTxBytes(t, verifyingPubKey)
+	refundTx := createOldBitcoinTxBytes(t, signingPubKey)
+
+	child, err := tx.TreeNode.Create().
+		SetTree(tree).
+		SetParent(testData.Node).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(testData.RequesterIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(100000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(keyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewTreeQueryHandler(cfg)
+
+	resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: []string{child.ID.String()},
+			},
+		},
+		IncludeParents: true,
+	}, false)
+	require.NoError(t, err)
+
+	nodes := resp.GetNodes()
+	require.Contains(t, nodes, child.ID.String(), "requester's own leaf must be returned")
+	assert.Equal(t, testData.RequesterIdentityPubKey.Serialize(), nodes[child.ID.String()].GetOwnerIdentityPublicKey())
+	require.Contains(t, nodes, testData.Node.ID.String(), "include_parents must return the ancestor")
+	assert.Equal(t, bitcointransaction.NUMSPoint().Serialize(), nodes[testData.Node.ID.String()].GetOwnerIdentityPublicKey(),
+		"ancestor owned by a private wallet must have its identity pubkey masked in the include_parents walk")
+}
+
+// TestQueryNodes_OwnerSource_MasksOwnNonLeafAncestors locks in that non-leaf
+// masking is independent of the request source and the requester: even a
+// wallet querying its own nodes by owner identity pubkey sees the NUMS point
+// on its own non-leaf nodes, while its leaves keep the real owner pubkey.
+func TestQueryNodes_OwnerSource_MasksOwnNonLeafAncestors(t *testing.T) {
+	// Privacy disabled, requester is the owner — masking must apply anyway.
+	ctx, cfg, testData := createPrivacyTestData(t, false, true, true, false)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{3})
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tree, err := testData.Node.QueryTree().Only(ctx)
+	require.NoError(t, err)
+	keyshare, err := testData.Node.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+	rawTx := createOldBitcoinTxBytes(t, verifyingPubKey)
+	refundTx := createOldBitcoinTxBytes(t, signingPubKey)
+
+	child, err := tx.TreeNode.Create().
+		SetTree(tree).
+		SetParent(testData.Node).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(testData.OwnerIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(100000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(keyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewTreeQueryHandler(cfg)
+
+	resp, err := handler.QueryNodes(ctx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
+			OwnerIdentityPubkey: testData.OwnerIdentityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		Limit:   100,
+	}, false)
+	require.NoError(t, err)
+
+	nodes := resp.GetNodes()
+	require.Contains(t, nodes, testData.Node.ID.String())
+	require.Contains(t, nodes, child.ID.String())
+	assert.Equal(t, bitcointransaction.NUMSPoint().Serialize(), nodes[testData.Node.ID.String()].GetOwnerIdentityPublicKey(),
+		"non-leaf node must be masked even for its own owner querying by owner identity pubkey")
+	assert.Equal(t, testData.OwnerIdentityPubKey.Serialize(), nodes[child.ID.String()].GetOwnerIdentityPublicKey(),
+		"leaf must keep the real owner identity pubkey")
 }
 
 // TestQueryNodes_NodeIds_SSPBypassPrivacy locks in the contract the internal
