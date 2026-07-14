@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -142,8 +144,27 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		return nil, err
 	}
 
+	// Ancestor (non-leaf) nodes are exempt from the wallet privacy filter and
+	// are masked instead: ownership is only meaningful on leaves — transfers
+	// re-own the leaf while ancestors keep their original owner — so dropping
+	// ancestors would only break clients that fetch the exit chain
+	// node-by-node (e.g. the SDK unilateral-exit walk), while returning their
+	// recorded owner could reveal a privacy-enabled wallet's identity.
+	// Masking is deliberately unconditional: a non-leaf node's recorded owner
+	// is a stale artifact of past transfers, not meaningful ownership, so no
+	// external caller may rely on it. Masking every non-leaf node keeps the
+	// response independent of who asks and requires no per-owner privacy
+	// lookups.
+	var ancestorIDSet map[uuid.UUID]struct{}
+	if !isSSP {
+		ancestorIDSet, err = queryNodeIDsWithChildren(ctx, nodes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if _, ok := req.GetSource().(*pb.QueryNodesRequest_NodeIds); ok && !isSSP {
-		nodes, err = filterNodesByWalletAccess(ctx, h.config, nodes)
+		nodes, err = filterNodesByWalletAccess(ctx, h.config, nodes, ancestorIDSet)
 		if err != nil {
 			return nil, err
 		}
@@ -151,10 +172,14 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 
 	protoNodeMap := make(map[string]*pb.TreeNode)
 	for _, node := range nodes {
-		protoNodeMap[node.ID.String()], err = node.MarshalSparkProto(ctx)
+		protoNode, err := node.MarshalSparkProto(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal node %s: %w", node.ID, err)
 		}
+		if _, isAncestor := ancestorIDSet[node.ID]; isAncestor {
+			protoNode.OwnerIdentityPublicKey = bitcointransaction.NUMSPoint().Serialize()
+		}
+		protoNodeMap[node.ID.String()] = protoNode
 		if req.GetIncludeParents() {
 			err := getAncestorChain(ctx, db, node, protoNodeMap, isSSP)
 			if err != nil {
@@ -261,19 +286,33 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 	}
 
 	// Parent exists, continue search
-	nodeMap[parent.ID.String()], err = parent.MarshalSparkProto(ctx)
+	protoParent, err := parent.MarshalSparkProto(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to marshal node %s: %w", parent.ID, err)
 	}
+	// Parents are by definition non-leaf nodes, so their recorded owner is
+	// masked for external callers (see QueryNodes).
+	if !isSSP {
+		protoParent.OwnerIdentityPublicKey = bitcointransaction.NUMSPoint().Serialize()
+	}
+	nodeMap[parent.ID.String()] = protoParent
 
 	return getAncestorChain(ctx, db, parent, nodeMap, isSSP)
 }
 
-func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*ent.TreeNode) ([]*ent.TreeNode, error) {
+// filterNodesByWalletAccess drops leaves whose owner's wallet the requester
+// has no read access to. Ancestor (non-leaf) nodes are kept regardless, since
+// ownership is only meaningful on leaves; the caller masks their owner
+// identity pubkey instead.
+func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*ent.TreeNode, ancestorIDs map[uuid.UUID]struct{}) ([]*ent.TreeNode, error) {
 	walletSettingHandler := NewWalletSettingHandler(config)
 	accessCache := make(map[keys.Public]bool)
 	filtered := nodes[:0]
 	for _, node := range nodes {
+		if _, isAncestor := ancestorIDs[node.ID]; isAncestor {
+			filtered = append(filtered, node)
+			continue
+		}
 		ownerKey := node.OwnerIdentityPubkey
 		hasAccess, cached := accessCache[ownerKey]
 		if !cached {
@@ -289,6 +328,31 @@ func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*
 		}
 	}
 	return filtered, nil
+}
+
+func queryNodeIDsWithChildren(ctx context.Context, nodes []*ent.TreeNode) (map[uuid.UUID]struct{}, error) {
+	if len(nodes) == 0 {
+		return nil, nil
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	nodeIDs := make([]uuid.UUID, len(nodes))
+	for i, node := range nodes {
+		nodeIDs[i] = node.ID
+	}
+	ancestorIDs, err := db.TreeNode.Query().
+		Where(treenode.IDIn(nodeIDs...), treenode.HasChildren()).
+		IDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query nodes with children: %w", err)
+	}
+	ancestorIDSet := make(map[uuid.UUID]struct{}, len(ancestorIDs))
+	for _, id := range ancestorIDs {
+		ancestorIDSet[id] = struct{}{}
+	}
+	return ancestorIDSet, nil
 }
 
 func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
