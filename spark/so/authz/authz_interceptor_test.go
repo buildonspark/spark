@@ -720,7 +720,7 @@ func TestEnforceSession_PreservesAuthErrorStatus(t *testing.T) {
 			setupContext: func(ctx context.Context) context.Context {
 				// Inject a session where the identity doesn't match
 				wrongSessionKey := keys.MustGeneratePrivateKeyFromRand(rng)
-				return authn.InjectSessionForTests(ctx, wrongSessionKey.Public().ToHex(), 0)
+				return authn.InjectSessionForTests(ctx, wrongSessionKey.Public(), 0)
 			},
 			identityPubKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
 			config:         &simpleConfig{authzEnforced: true},

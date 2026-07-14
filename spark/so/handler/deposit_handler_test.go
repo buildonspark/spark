@@ -627,7 +627,7 @@ func TestGenerateDepositAddressRejectsMalformedKeysAndIdentityMismatch(t *testin
 
 	sessionIdentity := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	validSigningKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionIdentity.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, sessionIdentity, 9999999999)
 
 	baseReq := func() *pb.GenerateDepositAddressRequest {
 		return &pb.GenerateDepositAddressRequest{
@@ -902,7 +902,7 @@ func TestRotateStaticDepositAddressCreatesIfNotExists(t *testing.T) {
 	}
 	handler := NewDepositHandler(config)
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(testIdentityPrivKey.Public().Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, testIdentityPrivKey.Public(), 9999999999)
 
 	req := &pb.RotateStaticDepositAddressRequest{
 		SigningPublicKey: testSigningPrivKey.Public().Serialize(),
@@ -2131,7 +2131,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 
 	t.Run("privacy disabled allows authenticated access", func(t *testing.T) {
 		env := newTestEnv(t)
-		ctx := authn.InjectSessionForTests(env.ctx, hex.EncodeToString(env.otherIdentityPubKey.Serialize()), 9999999999)
+		ctx := authn.InjectSessionForTests(env.ctx, env.otherIdentityPubKey, 9999999999)
 
 		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
 			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
@@ -2158,7 +2158,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 	t.Run("privacy enabled allows the owner", func(t *testing.T) {
 		env := newTestEnv(t)
 		ctx := enablePrivacy(t, env, false)
-		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(env.ownerIdentityPubKey.Serialize()), 9999999999)
+		ctx = authn.InjectSessionForTests(ctx, env.ownerIdentityPubKey, 9999999999)
 
 		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
 			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
@@ -2174,7 +2174,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 	t.Run("privacy enabled allows the wallet master", func(t *testing.T) {
 		env := newTestEnv(t)
 		ctx := enablePrivacy(t, env, true)
-		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(env.masterIdentityPubKey.Serialize()), 9999999999)
+		ctx = authn.InjectSessionForTests(ctx, env.masterIdentityPubKey, 9999999999)
 
 		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
 			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),
@@ -2190,7 +2190,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 	t.Run("privacy enabled returns empty results for a different identity", func(t *testing.T) {
 		env := newTestEnv(t)
 		ctx := enablePrivacy(t, env, true)
-		ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(env.otherIdentityPubKey.Serialize()), 9999999999)
+		ctx = authn.InjectSessionForTests(ctx, env.otherIdentityPubKey, 9999999999)
 
 		response, err := env.handler.GetUtxosForIdentity(ctx, &pb.GetUtxosForIdentityRequest{
 			IdentityPublicKey: env.ownerIdentityPubKey.Serialize(),

@@ -2,7 +2,6 @@ package handler_test
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 
@@ -30,7 +29,7 @@ func TestUpdateWalletSetting_CreateNew(t *testing.T) {
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
@@ -69,7 +68,7 @@ func TestUpdateWalletSetting_UpdateExisting(t *testing.T) {
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	// Create existing wallet setting
 	database, err := ent.GetDbFromContext(ctx)
@@ -118,7 +117,7 @@ func TestUpdateWalletSetting_NoFieldsProvided(t *testing.T) {
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
@@ -180,7 +179,7 @@ func TestHasReadAccessToWallet_NoWalletSetting(t *testing.T) {
 	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, sessionUserPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
@@ -201,7 +200,7 @@ func TestHasReadAccessToWallet_PrivacyDisabled(t *testing.T) {
 	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, sessionUserPubKey, 9999999999)
 
 	// Create wallet setting with privacy disabled
 	database, err := ent.GetDbFromContext(ctx)
@@ -230,7 +229,7 @@ func TestHasReadAccessToWallet_PrivacyEnabled_OwnerAccess(t *testing.T) {
 	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context as the owner
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(walletOwnerPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, walletOwnerPubKey, 9999999999)
 
 	// Create wallet setting with privacy enabled
 	database, err := ent.GetDbFromContext(ctx)
@@ -265,7 +264,7 @@ func TestHasReadAccessToWallet_PrivacyEnabled_MasterAccess(t *testing.T) {
 	sessionUserPubKey := masterPubKey
 
 	// Set up session context as the master
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, sessionUserPubKey, 9999999999)
 
 	// Create wallet setting with privacy enabled and master set
 	database, err := ent.GetDbFromContext(ctx)
@@ -298,7 +297,7 @@ func TestHasReadAccessToWallet_PrivacyEnabled_NoAccess(t *testing.T) {
 	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, sessionUserPubKey, 9999999999)
 
 	// Create wallet setting with privacy enabled
 	database, err := ent.GetDbFromContext(ctx)
@@ -342,7 +341,7 @@ func TestQueryWalletSetting_Existing(t *testing.T) {
 	require.NotNil(t, existingSetting)
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 	resp, err := walletSettingHandler.QueryWalletSetting(ctx, &pb.QueryWalletSettingRequest{})
@@ -363,7 +362,7 @@ func TestQueryWalletSetting_NotExisting(t *testing.T) {
 	// Generate test identity public key
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 	resp, err := walletSettingHandler.QueryWalletSetting(ctx, &pb.QueryWalletSettingRequest{})
@@ -398,7 +397,7 @@ func TestUpdateWalletSetting_SetMasterIdentityPublicKey_CreateNew(t *testing.T) 
 	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
@@ -440,7 +439,7 @@ func TestUpdateWalletSetting_SetMasterIdentityPublicKey_UpdateExisting(t *testin
 	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	// Create existing wallet setting without master key
 	database, err := ent.GetDbFromContext(ctx)
@@ -494,7 +493,7 @@ func TestUpdateWalletSetting_ClearMasterIdentityPublicKey(t *testing.T) {
 	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	// Create existing wallet setting with master key
 	database, err := ent.GetDbFromContext(ctx)
@@ -548,7 +547,7 @@ func TestUpdateWalletSetting_UpdateBothFields(t *testing.T) {
 	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	// Create existing wallet setting
 	database, err := ent.GetDbFromContext(ctx)
@@ -603,7 +602,7 @@ func TestUpdateWalletSetting_NoFieldsProvided_WithOneof(t *testing.T) {
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Set up session context
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+	ctx = authn.InjectSessionForTests(ctx, identityPubKey, 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 

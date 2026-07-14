@@ -2,8 +2,8 @@ package schema
 
 import (
 	"context"
-	"encoding/hex"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -65,12 +65,12 @@ func tokenTransactionParticipantFanOutHook() ent.Hook {
 			}
 
 			// Collect distinct participant pubkeys from both spent and created outputs.
-			participants := make(map[string]struct{})
+			participants := make(map[keys.Public]struct{})
 			for _, output := range spentOutputs {
-				participants[hex.EncodeToString(output.OwnerPublicKey.Serialize())] = struct{}{}
+				participants[output.OwnerPublicKey] = struct{}{}
 			}
 			for _, output := range createdOutputs {
-				participants[hex.EncodeToString(output.OwnerPublicKey.Serialize())] = struct{}{}
+				participants[output.OwnerPublicKey] = struct{}{}
 			}
 
 			if len(participants) == 0 {
@@ -86,18 +86,18 @@ func tokenTransactionParticipantFanOutHook() ent.Hook {
 
 			status := string(tx.Status)
 
-			for pubkeyHex := range participants {
+			for pubKey := range participants {
 				if err := notifier.Notify(ctx, ent.Notification{
 					Channel: "tokentransaction",
 					Payload: map[string]any{
 						"id":               tx.ID.String(),
-						"owner_public_key": pubkeyHex,
+						"owner_public_key": pubKey.String(),
 						"status":           status,
 					},
 				}); err != nil {
 					logger.With(zap.Error(err)).Sugar().Warnf(
 						"token tx fan-out: failed to emit event for participant %s on token transaction %s",
-						pubkeyHex, tx.ID)
+						pubKey, tx.ID)
 				}
 			}
 

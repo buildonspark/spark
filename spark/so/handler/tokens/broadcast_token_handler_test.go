@@ -61,11 +61,11 @@ func TestBroadcastTokenHandlerRejectsNilMetadata(t *testing.T) {
 	require.Contains(t, err.Error(), "token transaction metadata cannot be nil")
 }
 
-func phase2KnobsWithBroadcastAllowedFor(hexKey string) knobs.Knobs {
+func phase2KnobsWithBroadcastAllowedFor(pubKey keys.Public) knobs.Knobs {
 	return knobs.NewFixedKnobs(map[string]float64{
 		knobs.KnobTokenTransactionV3Enabled:                                  100,
 		knobs.KnobTokenTransactionV3Phase2Enabled:                            100,
-		fmt.Sprintf("%s@%s", knobs.KnobTokenBroadcastAllowedPubkeys, hexKey): 1,
+		fmt.Sprintf("%s@%s", knobs.KnobTokenBroadcastAllowedPubkeys, pubKey): 1,
 	})
 }
 
@@ -75,7 +75,7 @@ func TestBroadcastTokenTransaction_Phase2_RejectsIdentityMismatch(t *testing.T) 
 
 	handler := NewBroadcastTokenHandler(&so.Config{AuthzEnforced: true})
 	ctx := knobs.InjectKnobsService(t.Context(), v3Phase2EnabledKnobs())
-	ctx = authn.InjectSessionForTests(ctx, sessionKey.Public().ToHex(), math.MaxInt64)
+	ctx = authn.InjectSessionForTests(ctx, sessionKey.Public(), math.MaxInt64)
 
 	req := &tokenpb.BroadcastTransactionRequest{
 		IdentityPublicKey:       differentKey.Public().Serialize(),
@@ -94,8 +94,8 @@ func TestBroadcastTokenTransaction_Phase2_AuthorizedBroadcasterBypasses(t *testi
 	targetKey := keys.GeneratePrivateKey()
 
 	handler := NewBroadcastTokenHandler(&so.Config{AuthzEnforced: true})
-	ctx := knobs.InjectKnobsService(t.Context(), phase2KnobsWithBroadcastAllowedFor(broadcasterKey.Public().ToHex()))
-	ctx = authn.InjectSessionForTests(ctx, broadcasterKey.Public().ToHex(), math.MaxInt64)
+	ctx := knobs.InjectKnobsService(t.Context(), phase2KnobsWithBroadcastAllowedFor(broadcasterKey.Public()))
+	ctx = authn.InjectSessionForTests(ctx, broadcasterKey.Public(), math.MaxInt64)
 
 	req := &tokenpb.BroadcastTransactionRequest{
 		IdentityPublicKey:       targetKey.Public().Serialize(),

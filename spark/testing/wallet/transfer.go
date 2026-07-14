@@ -217,18 +217,17 @@ func CreateTransferPackageV3(
 		receiver keys.Public
 		leaves   []LeafKeyTweak
 	}
-	groups := make(map[string]*receiverGroup) // keyed by receiver pubkey hex
+	groups := make(map[keys.Public]*receiverGroup) // keyed by receiver pubkey
 
 	for _, leaf := range leaves {
 		receiver, ok := leafReceiverMap[leaf.Leaf.GetId()]
 		if !ok {
 			return nil, fmt.Errorf("no receiver for leaf %s", leaf.Leaf.GetId())
 		}
-		key := fmt.Sprintf("%x", receiver.Serialize())
-		if groups[key] == nil {
-			groups[key] = &receiverGroup{receiver: receiver}
+		if groups[receiver] == nil {
+			groups[receiver] = &receiverGroup{receiver: receiver}
 		}
-		groups[key].leaves = append(groups[key].leaves, leaf)
+		groups[receiver].leaves = append(groups[receiver].leaves, leaf)
 	}
 
 	// Open a single signer connection for all receiver groups

@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func knobsWithBroadcastAllowedFor(hexKey string) knobs.Knobs {
-	targetKey := fmt.Sprintf("%s@%s", knobs.KnobTokenBroadcastAllowedPubkeys, hexKey)
+func knobsWithBroadcastAllowedFor(pubKey keys.Public) knobs.Knobs {
+	targetKey := fmt.Sprintf("%s@%s", knobs.KnobTokenBroadcastAllowedPubkeys, pubKey)
 	return knobs.New(knobs.NewStaticValuesProvider(map[string]float64{
 		targetKey: 1,
 	}))
@@ -27,7 +27,7 @@ func TestCanBroadcastForSession_NoSession(t *testing.T) {
 
 func TestCanBroadcastForSession_KnobNotSet(t *testing.T) {
 	sessionKey := keys.GeneratePrivateKey().Public()
-	ctx := authn.InjectSessionForTests(t.Context(), sessionKey.ToHex(), math.MaxInt64)
+	ctx := authn.InjectSessionForTests(t.Context(), sessionKey, math.MaxInt64)
 	ctx = knobs.InjectKnobsService(ctx, knobs.New(nil))
 	require.False(t, canBroadcastForSession(ctx))
 }
@@ -36,16 +36,16 @@ func TestCanBroadcastForSession_KnobSetForDifferentKey(t *testing.T) {
 	sessionKey := keys.GeneratePrivateKey().Public()
 	otherKey := keys.GeneratePrivateKey().Public()
 
-	ctx := authn.InjectSessionForTests(t.Context(), sessionKey.ToHex(), math.MaxInt64)
-	ctx = knobs.InjectKnobsService(ctx, knobsWithBroadcastAllowedFor(otherKey.ToHex()))
+	ctx := authn.InjectSessionForTests(t.Context(), sessionKey, math.MaxInt64)
+	ctx = knobs.InjectKnobsService(ctx, knobsWithBroadcastAllowedFor(otherKey))
 	require.False(t, canBroadcastForSession(ctx))
 }
 
 func TestCanBroadcastForSession_KnobSetForSessionKey(t *testing.T) {
 	sessionKey := keys.GeneratePrivateKey().Public()
 
-	ctx := authn.InjectSessionForTests(t.Context(), sessionKey.ToHex(), math.MaxInt64)
-	ctx = knobs.InjectKnobsService(ctx, knobsWithBroadcastAllowedFor(sessionKey.ToHex()))
+	ctx := authn.InjectSessionForTests(t.Context(), sessionKey, math.MaxInt64)
+	ctx = knobs.InjectKnobsService(ctx, knobsWithBroadcastAllowedFor(sessionKey))
 	require.True(t, canBroadcastForSession(ctx))
 }
 
@@ -54,7 +54,7 @@ func TestStartTokenTransaction_RejectsIdentityMismatch(t *testing.T) {
 	differentKey := keys.GeneratePrivateKey()
 
 	handler := NewStartTokenTransactionHandler(&so.Config{AuthzEnforced: true})
-	ctx := authn.InjectSessionForTests(t.Context(), sessionKey.Public().ToHex(), math.MaxInt64)
+	ctx := authn.InjectSessionForTests(t.Context(), sessionKey.Public(), math.MaxInt64)
 	ctx = knobs.InjectKnobsService(ctx, knobs.New(nil))
 
 	_, err := handler.StartTokenTransaction(ctx, &tokenpb.StartTransactionRequest{
@@ -70,8 +70,8 @@ func TestStartTokenTransaction_AuthorizedBroadcasterBypasses(t *testing.T) {
 	targetKey := keys.GeneratePrivateKey()
 
 	handler := NewStartTokenTransactionHandler(&so.Config{AuthzEnforced: true})
-	ctx := authn.InjectSessionForTests(t.Context(), broadcasterKey.Public().ToHex(), math.MaxInt64)
-	ctx = knobs.InjectKnobsService(ctx, knobsWithBroadcastAllowedFor(broadcasterKey.Public().ToHex()))
+	ctx := authn.InjectSessionForTests(t.Context(), broadcasterKey.Public(), math.MaxInt64)
+	ctx = knobs.InjectKnobsService(ctx, knobsWithBroadcastAllowedFor(broadcasterKey.Public()))
 
 	_, err := handler.StartTokenTransaction(ctx, &tokenpb.StartTransactionRequest{
 		IdentityPublicKey:       targetKey.Public().Serialize(),

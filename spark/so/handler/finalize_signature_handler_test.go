@@ -1559,7 +1559,7 @@ func TestVerifyAndUpdateTransfer_UpdatesReceiverStatus(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
@@ -1596,7 +1596,7 @@ func TestVerifyAndUpdateTransferRejectsNonCompletableLeafStatuses(t *testing.T) 
 				Intent: pbcommon.SignatureIntent_TRANSFER,
 			}
 
-			ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+			ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 			_, err := handler.verifyAndUpdateTransfer(ctx, req)
 			require.ErrorContains(t, err, "expected TRANSFER_LOCKED or AVAILABLE")
 
@@ -1623,7 +1623,7 @@ func TestVerifyAndUpdateTransferAllowsTransferLockedLeaf(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, transfer.ID, updatedTransfer.ID)
@@ -1642,7 +1642,7 @@ func TestVerifyAndUpdateTransferAllowsAvailableLeaf(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, transfer.ID, updatedTransfer.ID)
@@ -1704,7 +1704,7 @@ func TestVerifyAndUpdateTransfer_SkipsAlreadyCompletedReceiver(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 	updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
@@ -1819,7 +1819,7 @@ func TestVerifyAndUpdateTransfer_ErrorsOnMultipleReceivers(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub1.Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, receiverPub1, time.Now().Add(time.Hour).Unix())
 	_, err = handler.verifyAndUpdateTransfer(ctx, req)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "does not support multi-receiver transfers")
@@ -1891,7 +1891,7 @@ func TestFinalizeNodeSignatures_RejectsSubstitutedTransferLeaf(t *testing.T) {
 		Intent: pbcommon.SignatureIntent_TRANSFER,
 	}
 
-	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+	ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 	_, err = handler.FinalizeNodeSignatures(ctx, req)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "does not belong to transfer")

@@ -67,7 +67,7 @@ func TestEnforceWalletNotKillSwitched(t *testing.T) {
 		// constant matches itself; calling the real function asserts that the
 		// kill-switch wire surface matches whatever production code actually
 		// emits for identity mismatch.
-		mismatchCtx := authn.InjectSessionForTests(t.Context(), walletB.ToHex(), 0)
+		mismatchCtx := authn.InjectSessionForTests(t.Context(), walletB, 0)
 		mismatchErr := EnforceSessionIdentityPublicKeyMatches(mismatchCtx, &simpleConfig{authzEnforced: true}, walletA)
 		require.Error(t, mismatchErr)
 		var mismatchAuthzErr *Error

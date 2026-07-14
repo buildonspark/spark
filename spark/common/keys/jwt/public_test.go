@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"math/rand/v2"
 	"testing"
@@ -298,7 +297,7 @@ func TestMustParsePublicHex(t *testing.T) {
 	rng := &rand.ChaCha8{}
 	k := PublicFromSecp256k1(keys.MustGeneratePrivateKeyFromRand(rng).Public())
 
-	parsed := MustParsePublicHex(hex.EncodeToString(k.Serialize()))
+	parsed := MustParsePublicHex(k.String())
 	assert.Equal(t, k, parsed)
 }
 

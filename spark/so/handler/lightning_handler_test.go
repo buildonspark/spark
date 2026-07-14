@@ -505,7 +505,7 @@ func TestQueryHTLCFiltersByRoleAndSessionIdentity(t *testing.T) {
 	})
 
 	queryCtxFor := func(identityPubKey keys.Public) context.Context {
-		return authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+		return authn.InjectSessionForTests(ctx, identityPubKey, time.Now().Add(time.Hour).Unix())
 	}
 
 	baseReqFor := func(identityPubKey keys.Public) *pb.QueryHtlcRequest {
@@ -619,7 +619,7 @@ func TestQueryUserSignedRefundsVisibleOnlyToReceiverWhileWaiting(t *testing.T) {
 	})
 
 	queryCtxFor := func(identityPubKey keys.Public) context.Context {
-		return authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+		return authn.InjectSessionForTests(ctx, identityPubKey, time.Now().Add(time.Hour).Unix())
 	}
 	query := func(identityPubKey keys.Public) (*pb.QueryUserSignedRefundsResponse, error) {
 		return handler.QueryUserSignedRefunds(queryCtxFor(identityPubKey), &pb.QueryUserSignedRefundsRequest{
@@ -1217,7 +1217,7 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 	t.Run("allows provider session to store for LNURL user owner", func(t *testing.T) {
 		providerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		providerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(providerIdentityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+		providerCtx := authn.InjectSessionForTests(ctx, providerIdentityPubKey, time.Now().Add(time.Hour).Unix())
 
 		authConfig := &so.Config{
 			AuthzEnforced:              true,
@@ -1310,7 +1310,7 @@ func TestStorePreimageShareV2EdgeCases(t *testing.T) {
 	t.Run("allows provider session to coordinate share storage for LNURL user owner", func(t *testing.T) {
 		providerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		providerCtx := authn.InjectSessionForTests(ctx, hex.EncodeToString(providerIdentityPubKey.Serialize()), time.Now().Add(time.Hour).Unix())
+		providerCtx := authn.InjectSessionForTests(ctx, providerIdentityPubKey, time.Now().Add(time.Hour).Unix())
 
 		authConfig := &so.Config{
 			AuthzEnforced:              true,
@@ -1541,11 +1541,7 @@ func TestProvidePreimageRejectsSessionIdentityMismatchBeforeValidation(t *testin
 	})
 	sessionIdentityPubKey := keys.GeneratePrivateKey().Public()
 	requestIdentityPubKey := keys.GeneratePrivateKey().Public()
-	ctx := authn.InjectSessionForTests(
-		t.Context(),
-		hex.EncodeToString(sessionIdentityPubKey.Serialize()),
-		time.Now().Add(time.Hour).Unix(),
-	)
+	ctx := authn.InjectSessionForTests(t.Context(), sessionIdentityPubKey, time.Now().Add(time.Hour).Unix())
 
 	preimage := bytes.Repeat([]byte{0x02}, 32)
 	paymentHash := sha256.Sum256(preimage)
@@ -3590,8 +3586,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 			AuthzEnforced:              true,
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 		})
-		sessionCtx := authn.InjectSessionForTests(
-			withKnobs(ctx), hex.EncodeToString(ownerPrivKey.Public().Serialize()), time.Now().Add(time.Hour).Unix())
+		sessionCtx := authn.InjectSessionForTests(withKnobs(ctx), ownerPrivKey.Public(), time.Now().Add(time.Hour).Unix())
 
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String()}}, 100, 0)
 		_, err = authzHandler.InitiatePreimageSwapV2(sessionCtx, req)

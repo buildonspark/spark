@@ -234,7 +234,7 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].ReceiverIdentityPublicKeys["leaf-1"] = []byte{0x00}
 			},
-			wantSub: "receiver pubkey",
+			wantSub: "receiver public key",
 		},
 	}
 
@@ -243,8 +243,7 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			req := makeValid()
 			tc.mutate(req)
 			_, err := parseSendTransferRequest(req)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.wantSub)
+			require.ErrorContains(t, err, tc.wantSub)
 		})
 	}
 }

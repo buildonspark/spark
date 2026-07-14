@@ -595,7 +595,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 	// This allows us to correctly match proto outputs to their token regardless of
 	// whether they use token_identifier or token_public_key
 	tokenIdentifierToCreateID := make(map[string]string)
-	tokenPublicKeyToCreateID := make(map[string]string)
+	tokenPublicKeyToCreateID := make(map[keys.Public]string)
 
 	expectedTokenIdentifier := tokenTransaction.GetTokenOutputs()[0].GetTokenIdentifier()
 	useTokenIdentifier := expectedTokenIdentifier != nil
@@ -608,7 +608,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 			tokenIdentifierToCreateID[hex.EncodeToString(outputEnt.TokenIdentifier)] = tokenKey
 		}
 		if !outputEnt.TokenPublicKey.IsZero() {
-			tokenPublicKeyToCreateID[hex.EncodeToString(outputEnt.TokenPublicKey.Serialize())] = tokenKey
+			tokenPublicKeyToCreateID[outputEnt.TokenPublicKey] = tokenKey
 		}
 
 		if tokenBalances[tokenKey] == nil {
@@ -634,10 +634,14 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifier %x does not match any input", output.GetTokenIdentifier()))
 			}
 		} else {
-			tokenKey, found = tokenPublicKeyToCreateID[hex.EncodeToString(output.GetTokenPublicKey())]
+			tokenPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
+			if err != nil {
+				return sparkerrors.FailedPreconditionTokenRulesViolation(err)
+			}
+			tokenKey, found = tokenPublicKeyToCreateID[tokenPubKey]
 			if !found {
 				return tokens.FormatErrorWithTransactionProto("token not found in inputs", tokenTransaction,
-					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public key %x does not match any input", output.GetTokenPublicKey())))
+					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public key %s does not match any input", tokenPubKey)))
 			}
 		}
 

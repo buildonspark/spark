@@ -271,10 +271,10 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 
 func filterNodesByWalletAccess(ctx context.Context, config *so.Config, nodes []*ent.TreeNode) ([]*ent.TreeNode, error) {
 	walletSettingHandler := NewWalletSettingHandler(config)
-	accessCache := make(map[string]bool)
+	accessCache := make(map[keys.Public]bool)
 	filtered := nodes[:0]
 	for _, node := range nodes {
-		ownerKey := node.OwnerIdentityPubkey.String()
+		ownerKey := node.OwnerIdentityPubkey
 		hasAccess, cached := accessCache[ownerKey]
 		if !cached {
 			var err error
