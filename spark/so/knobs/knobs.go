@@ -282,9 +282,6 @@ const (
 
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
-	// Require multiple confirmations before marking non-static deposits as available (see SPARK-118)
-	KnobMultipleConfirmationForNonStaticDeposit = "spark.so.require_multiple_conf_for_non_static_deposit"
-
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
 
 	// KnobMimoTransferMultiReceiverEnabled enables multi-input multi-output transfer support

@@ -1964,4 +1964,7 @@ func TestHandleBlock_NonStaticDeposit_SetsConfirmationTxid(t *testing.T) {
 	utxos, err := dbClient.DepositAddress.QueryUtxo(updated).All(ctx)
 	require.NoError(t, err)
 	assert.Len(t, utxos, 2)
+	for _, utxo := range utxos {
+		assert.Nil(t, utxo.AvailabilityConfirmedAt, "UTXO must wait for the configured confirmation threshold")
+	}
 }
