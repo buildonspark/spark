@@ -917,7 +917,46 @@ func dispatchConsensusRollback(ctx context.Context, config *so.Config, opType pb
 	if err != nil {
 		return err
 	}
+	// Attach the coordinator identity of THIS flow to ctx from the participant's
+	// own FlowExecution row (its coordinator_index, recorded at prepare from the
+	// authenticated ConsensusPrepare — not from the rollback payload), mirroring
+	// DispatchPrepare. Rollback handlers that scope their lookup by coordinator
+	// identity (e.g. the instant static deposit reserve, which resolves a
+	// coordinator-supplied transfer id against local rows) use this to ensure a
+	// coordinator can only roll back reservations IT coordinated — a coordinator
+	// driving its own flow's rollback cannot redirect the cancellation at a
+	// reservation coordinated by a different SO. Best-effort: if the row/index
+	// can't be resolved the ctx value is simply absent and such handlers fall
+	// back to their existing scoping.
+	ctx = withRollbackCoordinatorIdentity(ctx, config, flowExecutionID)
 	return runConsensusRollback(ctx, handler, opType, flowExecutionID, op)
+}
+
+// withRollbackCoordinatorIdentity resolves the coordinator identity for a
+// rollback from the local participant FlowExecution row and attaches it to ctx.
+// Returns ctx unchanged if the row is absent, is this SO's own coordinator row,
+// or the index doesn't resolve — callers must tolerate a missing value.
+func withRollbackCoordinatorIdentity(ctx context.Context, config *so.Config, flowExecutionID string) context.Context {
+	if flowExecutionID == "" {
+		return ctx
+	}
+	id, err := uuid.Parse(flowExecutionID)
+	if err != nil {
+		return ctx
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return ctx
+	}
+	row, err := db.FlowExecution.Get(ctx, id)
+	if err != nil || row.Role != st.FlowExecutionRoleParticipant {
+		return ctx
+	}
+	coordinator, err := config.GetOperatorByID(uint64(row.CoordinatorIndex))
+	if err != nil {
+		return ctx
+	}
+	return consensus.WithCoordinatorIdentity(ctx, coordinator.IdentityPublicKey)
 }
 
 // runConsensusRollback mirrors runConsensusCommit for the rollback path.
