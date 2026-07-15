@@ -1631,7 +1631,7 @@ func TestVerifyAndUpdateTransferAllowsExitedToL1LeafPreservingStatus(t *testing.
 				Intent: pbcommon.SignatureIntent_TRANSFER,
 			}
 
-			ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+			ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 			updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
 			require.NoError(t, err)
 			require.Equal(t, transfer.ID, updatedTransfer.ID)
