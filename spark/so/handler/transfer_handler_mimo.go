@@ -1,11 +1,8 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -81,12 +78,9 @@ func (h *TransferHandler) startTransferV3Internal(
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
 
-	leafReceiverMap, receivers, err := parseReceivers(senderPkg)
+	leafReceiverMap, receivers, err := parseSendTransferReceivers(senderPkg)
 	if err != nil {
 		return nil, err
-	}
-	if len(receivers) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
 	}
 
 	// Multi-receiver transfers require the MIMO knob to be enabled.
@@ -240,24 +234,6 @@ func (h *TransferHandler) startTransferV3Internal(
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
 }
 
-func parseReceivers(senderPkg *pb.SenderTransferPackage) (map[string]keys.Public, []keys.Public, error) {
-	// Parse receivers from the leaf→receiver map.
-	leafReceiverMap := make(map[string]keys.Public)
-	receiverSet := make(map[keys.Public]struct{})
-	for leafID, receiverBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
-		recvPK, err := keys.ParsePublicKey(receiverBytes)
-		if err != nil {
-			return nil, nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
-		}
-		leafReceiverMap[leafID] = recvPK
-		receiverSet[recvPK] = struct{}{}
-	}
-	receivers := slices.SortedFunc(maps.Keys(receiverSet), func(a, b keys.Public) int {
-		return bytes.Compare(a.Serialize(), b.Serialize())
-	})
-	return leafReceiverMap, receivers, nil
-}
-
 // convertV2ToV3SendTransferRequest maps a v2 StartTransferRequest onto the v3
 // StartTransferV3Request shape consumed by the consensus engine. A v2 request
 // targets a single receiver for the whole transfer, so every leaf in the
@@ -314,23 +290,16 @@ func (h *TransferHandler) startTransferV3Consensus(
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Consensus")
 	defer span.End()
 
-	// Fast-fail structural validation. Mirrors parseSendTransferRequest (called
-	// later by buildSendTransferCoordinatorFlow) so a malformed request errors
-	// out before we pay for the engine fan-out. The two sites must stay in
-	// sync; if you add a new structural check to parseSendTransferRequest,
-	// mirror it here.
-	if len(req.GetSenderPackages()) != 1 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
-	}
-	senderPkg := req.GetSenderPackages()[0]
-	if senderPkg.GetTransferPackage() == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
+	// Entry-gate precedence is pinned by tests (e.g. the multi-receiver knob
+	// gate fires before any package parsing): envelope checks, then session
+	// auth, then the receiver gates, and only then the full parse — whose
+	// result is threaded into buildSendTransferCoordinatorFlow so the
+	// coordinator parses the request body once.
+	senderPkg, senderIDPK, err := parseSendTransferEnvelope(req)
+	if err != nil {
+		return nil, err
 	}
 
-	senderIDPK, err := keys.ParsePublicKey(senderPkg.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
-	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPK); err != nil {
 		return nil, err
 	}
@@ -338,18 +307,11 @@ func (h *TransferHandler) startTransferV3Consensus(
 		return nil, err
 	}
 
-	// Count distinct receivers (canonical-serialization dedup) for the MIMO
-	// multi-receiver guard. Parsing here also fails fast on malformed
-	// receiver keys before paying for the engine fan-out.
-	_, receivers, err := parseReceivers(senderPkg)
+	_, entryReceivers, err := parseSendTransferReceivers(senderPkg)
 	if err != nil {
 		return nil, err
 	}
-	if len(receivers) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
-	}
-
-	if len(receivers) > 1 {
+	if len(entryReceivers) > 1 {
 		// Coordinator-only by design (matches legacy InitiateTransferV2).
 		// Participants don't re-check this — during the multi-receiver
 		// rollout, set KnobMimoTransferMultiReceiverEnabled on every SO
@@ -368,7 +330,12 @@ func (h *TransferHandler) startTransferV3Consensus(
 	// rolls back, and the participant reconciler cleans up. Other consensus
 	// flows (renew_leaf) follow the same pattern.
 
-	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req, sparkInvoice, NewSendTransferFlowHandler(h.config))
+	parsed, err := parseSendTransferRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	flow, err := buildSendTransferCoordinatorFlow(ctx, h.config, req, parsed, sparkInvoice, NewSendTransferFlowHandler(h.config))
 	if err != nil {
 		return nil, err
 	}
