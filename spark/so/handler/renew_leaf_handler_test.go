@@ -830,8 +830,7 @@ func serializeRenewTestTx(t *testing.T, tx *wire.MsgTx) []byte {
 func mutateRenewTestTx(t *testing.T, tx *wire.MsgTx, mutate func(*wire.MsgTx)) []byte {
 	t.Helper()
 
-	clonedTx, err := common.TxFromRawTxBytes(serializeRenewTestTx(t, tx))
-	require.NoError(t, err)
+	clonedTx := tx.Copy()
 	mutate(clonedTx)
 	return serializeRenewTestTx(t, clonedTx)
 }

@@ -54,7 +54,7 @@ func createTestUtxoWithOutpointForDepositAddress(
 	return utxo
 }
 
-func createSpendTxBytesSpendingOutpoint(t *testing.T, prevTxid chainhash.Hash, prevVout uint32, receiverPubKey keys.Public, amount int64) []byte {
+func createSpendTxSpendingOutpoint(t *testing.T, prevTxid chainhash.Hash, prevVout uint32, receiverPubKey keys.Public, amount int64) *wire.MsgTx {
 	t.Helper()
 
 	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
@@ -72,10 +72,12 @@ func createSpendTxBytesSpendingOutpoint(t *testing.T, prevTxid chainhash.Hash, p
 		Value:    amount,
 		PkScript: p2trScript,
 	})
+	return tx
+}
 
-	var buf bytes.Buffer
-	require.NoError(t, tx.Serialize(&buf))
-	return buf.Bytes()
+func createSpendTxBytesSpendingOutpoint(t *testing.T, prevTxid chainhash.Hash, prevVout uint32, receiverPubKey keys.Public, amount int64) []byte {
+	t.Helper()
+	return mustSerializeTx(t, createSpendTxSpendingOutpoint(t, prevTxid, prevVout, receiverPubKey, amount))
 }
 
 func createSpendTxBytesSpendingUtxo(t *testing.T, utxo *ent.Utxo, receiverPubKey keys.Public) []byte {
@@ -97,9 +99,9 @@ func createMockInitiateStaticDepositUtxoRefundRequest(
 
 	utxoTxid, err := chainhash.NewHashFromStr(txidString)
 	require.NoError(t, err)
-	refundTxBytes := createSpendTxBytesSpendingOutpoint(t, *utxoTxid, utxo.Vout, ownerIdentityPrivKey.Public(), int64(utxo.Amount))
+	refundTx := createSpendTxSpendingOutpoint(t, *utxoTxid, utxo.Vout, ownerIdentityPrivKey.Public(), int64(utxo.Amount))
 
-	userSignature := createStaticDepositRefundUserSignatureForTest(t, utxo, refundTxBytes, ownerIdentityPrivKey)
+	userSignature := createStaticDepositRefundUserSignatureForTest(t, utxo, refundTx, ownerIdentityPrivKey)
 
 	return &pb.InitiateStaticDepositUtxoRefundRequest{
 		OnChainUtxo: &pb.UTXO{
@@ -109,18 +111,15 @@ func createMockInitiateStaticDepositUtxoRefundRequest(
 		},
 		RefundTxSigningJob: &pb.SigningJob{
 			SigningPublicKey:       ownerSigningPubKey.Serialize(),
-			RawTx:                  refundTxBytes,
+			RawTx:                  mustSerializeTx(t, refundTx),
 			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 		UserSignature: userSignature,
 	}
 }
 
-func createStaticDepositRefundUserSignatureForTest(t *testing.T, utxo *ent.Utxo, refundTxBytes []byte, ownerIdentityPrivKey keys.Private) []byte {
+func createStaticDepositRefundUserSignatureForTest(t *testing.T, utxo *ent.Utxo, spendTx *wire.MsgTx, ownerIdentityPrivKey keys.Private) []byte {
 	t.Helper()
-
-	spendTx, err := common.TxFromRawTxBytes(refundTxBytes)
-	require.NoError(t, err, "unable to parse refund tx")
 
 	// Calculate total amount from spend tx
 	totalAmount := int64(0)
@@ -185,10 +184,8 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 	txidString := hex.EncodeToString(testUtxo.Txid)
 	utxoTxid, err := chainhash.NewHashFromStr(txidString)
 	require.NoError(t, err)
-	refundTxBytes := createSpendTxBytesSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, ownerIdentityPubKey, int64(testUtxo.Amount))
-
-	spendTx, err := common.TxFromRawTxBytes(refundTxBytes)
-	require.NoError(t, err)
+	spendTx := createSpendTxSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, ownerIdentityPubKey, int64(testUtxo.Amount))
+	refundTxBytes := mustSerializeTx(t, spendTx)
 
 	onChainTxOut := wire.NewTxOut(int64(testUtxo.Amount), testUtxo.PkScript)
 	spendTxSigHash, err := sighash.FromTx(spendTx, 0, onChainTxOut)
@@ -659,8 +656,8 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	require.NoError(t, err)
 	// Replace the transaction with one that has different receiver (but still spends the same UTXO).
 	// The old user signature is bound to req1's transaction and must not authorize this retry.
-	differentRefundTx := createSpendTxBytesSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, differentReceiverPubKey, int64(testUtxo.Amount))
-	req2.RefundTxSigningJob.RawTx = differentRefundTx
+	differentRefundTx := createSpendTxSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, differentReceiverPubKey, int64(testUtxo.Amount))
+	req2.RefundTxSigningJob.RawTx = mustSerializeTx(t, differentRefundTx)
 
 	resp2, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req2)
 	require.ErrorContains(t, err, "user signature validation failed")
