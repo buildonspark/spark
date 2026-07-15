@@ -171,6 +171,10 @@ func (UtxoSwap) Fields() []ent.Field {
 		field.Uint64("utxo_value_sats").
 			Comment("Amount of sats for 0-conf swap matching.").
 			Annotations(entexample.Default(10000)),
+		field.Bool("consensus_managed").
+			Default(false).
+			Immutable().
+			Comment("True when this swap row is owned by a 2PC consensus flow (set at consensus Prepare). Legacy rollback gossip refuses to cancel such rows so a stray legacy rollback cannot wedge an in-flight consensus swap. Non-nullable + Immutable: the fence's safety depends on this being set once at creation and never changed or cleared."),
 	}
 }
 

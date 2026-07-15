@@ -50,6 +50,8 @@ const (
 	FieldSpendTxSigningResult = "spend_tx_signing_result"
 	// FieldUtxoValueSats holds the string denoting the utxo_value_sats field in the database.
 	FieldUtxoValueSats = "utxo_value_sats"
+	// FieldConsensusManaged holds the string denoting the consensus_managed field in the database.
+	FieldConsensusManaged = "consensus_managed"
 	// EdgeUtxo holds the string denoting the utxo edge name in mutations.
 	EdgeUtxo = "utxo"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
@@ -109,6 +111,7 @@ var Columns = []string{
 	FieldRequestedSecondaryTransferID,
 	FieldSpendTxSigningResult,
 	FieldUtxoValueSats,
+	FieldConsensusManaged,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "utxo_swaps"
@@ -148,6 +151,8 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
+	// DefaultConsensusManaged holds the default value on creation for the "consensus_managed" field.
+	DefaultConsensusManaged bool
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -228,6 +233,11 @@ func ByRequestedSecondaryTransferID(opts ...sql.OrderTermOption) OrderOption {
 // ByUtxoValueSats orders the results by the utxo_value_sats field.
 func ByUtxoValueSats(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUtxoValueSats, opts...).ToFunc()
+}
+
+// ByConsensusManaged orders the results by the consensus_managed field.
+func ByConsensusManaged(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConsensusManaged, opts...).ToFunc()
 }
 
 // ByUtxoField orders the results by utxo field.

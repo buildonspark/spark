@@ -266,26 +266,35 @@ const (
 	// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND (consensusFlowHandler) —
 	// an SO without the handler fails prepare/commit/rollback for op type 9, and
 	// the coordinator entrypoint has no legacy fallback, so a premature flip breaks
-	// (not just degrades) all static-deposit refunds. Before flipping, let pending
-	// legacy refund rollback gossip drain: a stray pre-flip RollbackUtxoSwap is
-	// utxo+coordinator-keyed and can cancel a fresh consensus-created swap for the
-	// same UTXO mid-flight (surfaces as a stuck flow_execution alert, needs manual
-	// repair).
+	// (not just degrades) all static-deposit refunds. Once the consensus-ownership fence is
+	// deployed on EVERY SO, a stray legacy RollbackUtxoSwap can no longer wedge a consensus
+	// swap — legacy rollback refuses consensus_managed rows — so no gossip drain is needed.
+	// The fence only exists on upgraded binaries, so until it is fleet-wide (e.g.
+	// mid-rolling-deploy) an un-upgraded SO can still cancel such a row; keep the
+	// drain/canary gate until every SO carries the fence. Rows prepared by an un-upgraded SO
+	// carry consensus_managed=false forever (the flag is immutable), so also let those
+	// pre-fence consensus rows drain before relying on the fence alone.
 	KnobUseConsensusStaticDepositUtxoRefund = "spark.so.use_consensus_static_deposit_utxo_refund"
 
 	// KnobUseConsensusStaticDepositUtxoSwap routes the fixed-amount static deposit claim
-	// through the 2PC consensus engine (0 = legacy, >0 = consensus). Enable only after every
-	// SO dispatches CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP. HARD gate until the
-	// SP-3495 structural fence lands: keep canary-only and drain pending legacy RollbackUtxoSwap
-	// gossip first (no FlowExecution fence, so a stray rollback can wedge a fresh consensus swap).
+	// through the 2PC consensus engine (0 = legacy, >0 = consensus). Enable only after every SO
+	// dispatches CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP AND carries the
+	// consensus-ownership fence (legacy rollback refusing consensus_managed rows). Once the
+	// fence is fleet-wide a stray legacy RollbackUtxoSwap can't wedge a fresh consensus swap,
+	// so no gossip drain is needed; until then (mid-rolling-deploy) keep the drain/canary gate
+	// — an un-upgraded SO would still cancel the row, and rows it prepared stay
+	// consensus_managed=false forever (the flag is immutable), so let those pre-fence rows
+	// drain too.
 	KnobUseConsensusStaticDepositUtxoSwap = "spark.so.use_consensus_static_deposit_utxo_swap"
 
 	// KnobUseConsensusReserveInstantStaticDepositUtxoSwap routes phase one of the instant
 	// static deposit claim through the 2PC consensus engine (0 = legacy, >0 = consensus).
-	// Enable only after every SO dispatches the op type. HARD gate until the SP-3495 fence
-	// lands: canary-only, and BOTH flip directions are unsafe (a stray legacy rollback with no
-	// FlowExecution fence can cancel an in-flight consensus reservation — which stays CREATED
-	// post-commit, so it diverges from its sent transfer). Drain legacy rollback gossip first.
+	// Enable only after every SO dispatches the op type AND carries the consensus-ownership
+	// fence. Once the fence is fleet-wide, a stray legacy rollback (in either knob-flip
+	// direction) can't cancel an in-flight consensus reservation; until then
+	// (mid-rolling-deploy) keep the drain/canary gate, since an un-upgraded SO would still
+	// cancel the row — and rows it prepared stay consensus_managed=false forever (the flag is
+	// immutable), so let those pre-fence rows drain too.
 	KnobUseConsensusReserveInstantStaticDepositUtxoSwap = "spark.so.use_consensus_reserve_instant_static_deposit_utxo_swap"
 
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"

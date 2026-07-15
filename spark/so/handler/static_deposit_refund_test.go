@@ -584,6 +584,7 @@ func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwa
 
 	assert.Equal(t, st.UtxoSwapStatusCompleted, createdSwap.Status)
 	assert.Equal(t, st.UtxoSwapRequestTypeRefund, createdSwap.RequestType)
+	assert.False(t, createdSwap.ConsensusManaged, "legacy refund create must not mark the row consensus-managed")
 
 	// Verify this is the only refund swap for this UTXO
 	refundSwapCount, err := sessionCtx.Client.UtxoSwap.Query().

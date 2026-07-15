@@ -585,6 +585,20 @@ func CreateInstantUserStatement(
 	return hash
 }
 
+// isConsensusManagedRollbackNoOp is the fence shared by both legacy
+// rollback handlers. A consensus-owned UtxoSwap is driven only by the 2PC
+// engine's own rollback, never legacy gossip, so a stray legacy rollback — e.g.
+// an SSP retry on the same UTXO taking the legacy path during a knob flip — must
+// treat it as an idempotent no-op rather than cancel it. Returns true when the
+// caller should stop and return a success response.
+func isConsensusManagedRollbackNoOp(ctx context.Context, utxoSwap *ent.UtxoSwap) bool {
+	if !utxoSwap.ConsensusManaged {
+		return false
+	}
+	logging.GetLoggerFromContext(ctx).Sugar().Infof("legacy rollback: refusing consensus-managed utxo swap %s, no-op", utxoSwap.ID)
+	return true
+}
+
 func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 	if utxoSwap.Status == st.UtxoSwapStatusCompleted {
 		return fmt.Errorf("utxo swap is already completed")
@@ -939,6 +953,10 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return &pbinternal.RollbackUtxoSwapResponse{}, nil
 	}
 
+	if isConsensusManagedRollbackNoOp(ctx, utxoSwap) {
+		return &pbinternal.RollbackUtxoSwapResponse{}, nil
+	}
+
 	if err := CancelUtxoSwap(ctx, utxoSwap); err != nil {
 		return nil, err
 	}
@@ -1067,6 +1085,10 @@ func (h *InternalDepositHandler) RollbackInstantUtxoSwap(ctx context.Context, co
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
 	}
 	if ent.IsNotFound(err) {
+		return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
+	}
+
+	if isConsensusManagedRollbackNoOp(ctx, utxoSwap) {
 		return &pbinternal.RollbackInstantUtxoSwapResponse{}, nil
 	}
 

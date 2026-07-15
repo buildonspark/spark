@@ -53,6 +53,7 @@ func createTestRefundUtxoSwap(t *testing.T, ctx context.Context, status st.UtxoS
 		SetSspIdentityPublicKey(ownerIdentityPubKey).
 		SetUserIdentityPublicKey(ownerIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
+		SetConsensusManaged(true).
 		Save(ctx)
 	require.NoError(t, err)
 	require.NoError(t, addUtxoSwapToDepositAddress(ctx, client, depositAddress.ID, utxoSwap))

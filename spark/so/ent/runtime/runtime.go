@@ -1138,6 +1138,10 @@ func init() {
 	utxoswap.DefaultUpdateTime = utxoswapDescUpdateTime.Default.(func() time.Time)
 	// utxoswap.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	utxoswap.UpdateDefaultUpdateTime = utxoswapDescUpdateTime.UpdateDefault.(func() time.Time)
+	// utxoswapDescConsensusManaged is the schema descriptor for consensus_managed field.
+	utxoswapDescConsensusManaged := utxoswapFields[14].Descriptor()
+	// utxoswap.DefaultConsensusManaged holds the default value on creation for the consensus_managed field.
+	utxoswap.DefaultConsensusManaged = utxoswapDescConsensusManaged.Default.(bool)
 	// utxoswapDescID is the schema descriptor for id field.
 	utxoswapDescID := utxoswapMixinFields0[0].Descriptor()
 	// utxoswap.DefaultID holds the default value on creation for the id field.

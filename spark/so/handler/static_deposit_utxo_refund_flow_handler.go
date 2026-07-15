@@ -192,6 +192,7 @@ func (h *StaticDepositUtxoRefundFlowHandler) createRefundSwap(ctx context.Contex
 		SetSspIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
 		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
+		SetConsensusManaged(true).
 		Save(ctx)
 	if err != nil {
 		if sqlgraph.IsUniqueConstraintError(err) {
@@ -364,6 +365,9 @@ func (h *StaticDepositUtxoRefundFlowHandler) loadSwapForUtxo(ctx context.Context
 		}
 		return nil, fmt.Errorf("unable to load utxo %x:%d: %w", utxo.GetTxid(), utxo.GetVout(), err)
 	}
+	// Not scoped by consensus_managed: during a rolling deploy a consensus row prepared by an older
+	// binary predates the flag (false), and this SO's own Commit/Rollback must still find it. The
+	// legacy rollback fence handles the reverse (a stray legacy rollback off a consensus row).
 	swap, err := db.UtxoSwap.Query().
 		Where(
 			entutxoswap.HasUtxoWith(entutxo.IDEQ(targetUtxo.ID)),

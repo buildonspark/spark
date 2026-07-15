@@ -232,3 +232,57 @@ func TestCancelUtxoSwap_FailsClosedWhenTransferStateUnreadable(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, st.UtxoSwapStatusCreated, reloaded.Status, "must not cancel when transfer state is unreadable")
 }
+
+// A consensus-managed swap is driven only by the 2PC engine's rollback, so the
+// legacy RollbackUtxoSwap gossip must refuse it (idempotent no-op) — even here,
+// where the transfer is not sent and the transfer-sent guard alone would allow
+// the cancel. This is the fence that lets the consensus knobs roll out without
+// first draining legacy rollback gossip.
+func TestRollbackUtxoSwap_RefusesConsensusManagedRow(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
+	require.NoError(t, gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil))
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalDepositHandler(cfg)
+
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	rng := rand.NewChaCha8([32]byte{6})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
+	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
+
+	transfer := createSwapTransferWithStatus(t, ctx, sessionCtx.Client, rng, st.TransferStatusSenderKeyTweakPending)
+	swap, err := sessionCtx.Client.UtxoSwap.Create().
+		SetStatus(st.UtxoSwapStatusCreated).
+		SetUtxo(utxo).
+		SetUtxoValueSats(utxo.Amount).
+		SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
+		SetCreditAmountSats(transfer.TotalValue).
+		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspIdentityPublicKey(transfer.SenderIdentityPubkey).
+		SetUserIdentityPublicKey(transfer.ReceiverIdentityPubkey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
+		SetRequestedTransferID(transfer.ID).
+		SetConsensusManaged(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
+		Txid:    utxo.Txid,
+		Vout:    utxo.Vout,
+		Network: pb.Network_REGTEST,
+	}, nil)
+	require.NoError(t, err)
+
+	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
+	require.NoError(t, err)
+
+	reloaded, err := sessionCtx.Client.UtxoSwap.Get(ctx, swap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCreated, reloaded.Status, "consensus-managed swap must not be cancelled by legacy rollback")
+}

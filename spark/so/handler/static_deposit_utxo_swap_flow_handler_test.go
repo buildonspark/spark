@@ -89,6 +89,7 @@ func createTestFixedUtxoSwap(t *testing.T, ctx context.Context, swapStatus st.Ut
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		SetRequestedTransferID(transfer.ID).
 		SetTransfer(transfer).
+		SetConsensusManaged(true).
 		Save(ctx)
 	require.NoError(t, err)
 	require.NoError(t, addUtxoSwapToDepositAddress(ctx, client, depositAddress.ID, utxoSwap))
