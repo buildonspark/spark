@@ -2,6 +2,7 @@ package multisig
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -26,7 +27,7 @@ var (
 func sortedKeys(keys ...[]byte) [][]byte {
 	out := make([][]byte, len(keys))
 	copy(out, keys)
-	sortKeys(out)
+	slices.SortFunc(out, bytes.Compare)
 	return out
 }
 

@@ -3,7 +3,7 @@ package tokens
 import (
 	"bytes"
 	"math/big"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -48,32 +48,20 @@ func (s *broadcastTokenPostgresTestSetup) signAndBuildRequestWithSingleSig(
 
 // createMultisigConfig generates n key pairs, builds a t-of-n MultisigConfig
 // proto, and returns the sorted private keys and the config.
-func createMultisigConfig(
-	t *testing.T,
-	numKeys int,
-	threshold uint32,
-) ([]keys.Private, *multisigpb.MultisigConfig) {
+func createMultisigConfig(t *testing.T, numKeys int, threshold uint32) ([]keys.Private, *multisigpb.MultisigConfig) {
 	t.Helper()
 
 	privKeys := make([]keys.Private, numKeys)
-	pubKeyBytes := make([][]byte, numKeys)
 	for i := range numKeys {
 		privKeys[i] = keys.GeneratePrivateKey()
-		pubKeyBytes[i] = privKeys[i].Public().Serialize()
 	}
-
-	sort.Slice(pubKeyBytes, func(i, j int) bool {
-		return bytes.Compare(pubKeyBytes[i], pubKeyBytes[j]) < 0
+	slices.SortFunc(privKeys, func(a, b keys.Private) int {
+		return bytes.Compare(a.Public().Serialize(), b.Public().Serialize())
 	})
 
-	sortedPrivKeys := make([]keys.Private, numKeys)
-	for i, pkBytes := range pubKeyBytes {
-		for _, priv := range privKeys {
-			if bytes.Equal(priv.Public().Serialize(), pkBytes) {
-				sortedPrivKeys[i] = priv
-				break
-			}
-		}
+	pubKeyBytes := make([][]byte, numKeys)
+	for i, priv := range privKeys {
+		pubKeyBytes[i] = priv.Public().Serialize()
 	}
 
 	protoConfig := &multisigpb.MultisigConfig{
@@ -82,7 +70,7 @@ func createMultisigConfig(
 		PublicKeys: pubKeyBytes,
 	}
 
-	return sortedPrivKeys, protoConfig
+	return privKeys, protoConfig
 }
 
 // ---------- Tests: Broadcast with single_signature oneof ----------

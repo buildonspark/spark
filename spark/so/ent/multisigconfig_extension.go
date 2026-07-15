@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/multisig"
@@ -88,9 +88,7 @@ func (mc *MultisigConfig) ToProtoConfig() *pb.MultisigConfig {
 	for i, member := range mc.Edges.Members {
 		publicKeys[i] = member.PublicKey.Serialize()
 	}
-	sort.Slice(publicKeys, func(i, j int) bool {
-		return bytes.Compare(publicKeys[i], publicKeys[j]) < 0
-	})
+	slices.SortFunc(publicKeys, bytes.Compare)
 	return &pb.MultisigConfig{
 		Version:    0,
 		Threshold:  mc.NumSignersThreshold,

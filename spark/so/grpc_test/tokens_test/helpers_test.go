@@ -2,11 +2,12 @@ package tokens_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -77,9 +78,7 @@ func getSigningOperatorPublicKeyBytes(config *wallet.TestWalletConfig) [][]byte 
 		operatorKeys = append(operatorKeys, operator.IdentityPublicKey.Serialize())
 	}
 	// Ensure deterministic ordering which is required for V3+ tests.
-	sort.Slice(operatorKeys, func(i, j int) bool {
-		return bytes.Compare(operatorKeys[i], operatorKeys[j]) < 0
-	})
+	slices.SortFunc(operatorKeys, bytes.Compare)
 	return operatorKeys
 }
 
@@ -94,12 +93,10 @@ func normalizeV3TokenTransaction(tx *tokenpb.TokenTransaction) {
 	if ts := tx.GetClientCreatedTimestamp(); ts != nil {
 		tx.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(ts.AsTime()))
 	}
-	sort.Slice(tx.GetSparkOperatorIdentityPublicKeys(), func(i, j int) bool {
-		return bytes.Compare(tx.GetSparkOperatorIdentityPublicKeys()[i], tx.GetSparkOperatorIdentityPublicKeys()[j]) < 0
-	})
+	slices.SortFunc(tx.GetSparkOperatorIdentityPublicKeys(), bytes.Compare)
 	if len(tx.GetInvoiceAttachments()) > 1 {
-		sort.Slice(tx.GetInvoiceAttachments(), func(i, j int) bool {
-			return tx.GetInvoiceAttachments()[i].GetSparkInvoice() < tx.GetInvoiceAttachments()[j].GetSparkInvoice()
+		slices.SortFunc(tx.GetInvoiceAttachments(), func(a, b *tokenpb.InvoiceAttachment) int {
+			return cmp.Compare(a.GetSparkInvoice(), b.GetSparkInvoice())
 		})
 	}
 }
@@ -115,14 +112,11 @@ func normalizeV3PartialTokenTransaction(partialTx *tokenpb.PartialTokenTransacti
 	if ts := metadata.GetClientCreatedTimestamp(); ts != nil {
 		metadata.ClientCreatedTimestamp = timestamppb.New(utils.ToMicrosecondPrecision(ts.AsTime()))
 	}
-
-	sort.Slice(metadata.GetSparkOperatorIdentityPublicKeys(), func(i, j int) bool {
-		return bytes.Compare(metadata.GetSparkOperatorIdentityPublicKeys()[i], metadata.GetSparkOperatorIdentityPublicKeys()[j]) < 0
-	})
+	slices.SortFunc(metadata.GetSparkOperatorIdentityPublicKeys(), bytes.Compare)
 
 	if len(metadata.GetInvoiceAttachments()) > 1 {
-		sort.Slice(metadata.GetInvoiceAttachments(), func(i, j int) bool {
-			return metadata.GetInvoiceAttachments()[i].GetSparkInvoice() < metadata.GetInvoiceAttachments()[j].GetSparkInvoice()
+		slices.SortFunc(metadata.GetInvoiceAttachments(), func(a, b *tokenpb.InvoiceAttachment) int {
+			return cmp.Compare(a.GetSparkInvoice(), b.GetSparkInvoice())
 		})
 	}
 }
