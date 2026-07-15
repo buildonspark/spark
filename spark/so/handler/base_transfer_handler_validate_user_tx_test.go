@@ -301,7 +301,7 @@ func validateAndConstructBitcoinTransactionsForTest(
 		return fmt.Errorf("could not find all tree nodes: expected %d, found %d", len(cpfpLeafRefundMap), len(leaves))
 	}
 
-	return h.validateAndConstructBitcoinTransactions(ctx, req.GetTransferPackage(), transferType, leaves, cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, refundDestPubkey, connectorTx)
+	return h.validateAndConstructBitcoinTransactions(ctx, transferPackageLeafIDLists(req.GetTransferPackage()), transferType, leaves, cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, refundDestPubkey, connectorTx)
 }
 
 // --- Tests ---

@@ -158,7 +158,7 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 	//     this is where the check has to live to preserve legacy coord
 	//     behavior.
 	_, leafMap, err := h.createTransferV3(
-		ctx, parsed.transferID, h.transferType, parsed.senderPkg.GetTransferPackage(), orig.GetExpiryTime().AsTime(),
+		ctx, parsed.transferID, h.transferType, transferPackageLeafIDLists(parsed.senderPkg.GetTransferPackage()), orig.GetExpiryTime().AsTime(),
 		parsed.senderIDPK, parsed.receivers, parsed.leafReceiverMap,
 		cpfpMap, directMap, dfcMap,
 		keyTweakMap,

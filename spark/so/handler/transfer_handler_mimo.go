@@ -137,7 +137,7 @@ func (h *TransferHandler) startTransferV3Internal(
 		ctx,
 		transferID,
 		st.TransferTypeTransfer,
-		senderPkg.GetTransferPackage(),
+		transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
 		req.GetExpiryTime().AsTime(),
 		senderIDPK,
 		receivers,

@@ -700,7 +700,7 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 		ctx,
 		transferID,
 		st.TransferTypeTransfer,
-		senderPkg.GetTransferPackage(),
+		transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
 		req.GetExpiryTime().AsTime(),
 		senderIdentityPubKey,
 		receivers,
