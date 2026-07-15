@@ -46,10 +46,53 @@ func NewInternalTransferHandler(config *so.Config) *InternalTransferHandler {
 }
 
 func validateFinalizeTransferLeafCanComplete(node *ent.TreeNode) error {
-	if node.Status == st.TreeNodeStatusAvailable || node.Status == st.TreeNodeStatusTransferLocked {
+	// Leaves that exited to L1 mid-transfer stay claimable; the finalize path
+	// preserves their on-chain status — see claimLeafTweakKey.
+	if node.Status == st.TreeNodeStatusAvailable || node.Status == st.TreeNodeStatusTransferLocked || node.Status.IsExitedToL1() {
 		return nil
 	}
 	return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("tree node %s cannot be finalized from status %s", node.ID, node.Status))
+}
+
+// lockTreeNodesForFinalize loads the given tree nodes under a FOR UPDATE lock
+// so the status read that decides between preserving an exited-to-L1 status
+// and marking the leaf AVAILABLE cannot race the chain watcher's
+// MarkExitingNodes bulk update — a stale TRANSFER_LOCKED read would otherwise
+// revive an already-exited leaf. The single batch query also acquires row
+// locks in deterministic order, unlike per-node lookups driven by map
+// iteration.
+func lockTreeNodesForFinalize(ctx context.Context, db *ent.Client, nodeIDs []uuid.UUID) (map[uuid.UUID]*ent.TreeNode, error) {
+	nodes, err := db.TreeNode.Query().
+		Where(treenode.IDIn(nodeIDs...)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes) != len(nodeIDs) {
+		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("expected %d tree nodes to finalize, found %d", len(nodeIDs), len(nodes)))
+	}
+	nodesByID := make(map[uuid.UUID]*ent.TreeNode, len(nodes))
+	for _, node := range nodes {
+		nodesByID[node.ID] = node
+	}
+	return nodesByID, nil
+}
+
+// setAvailableUnlessExitedToL1 marks a leaf AVAILABLE at transfer completion
+// unless it exited (or is exiting) to L1. Such a leaf keeps its on-chain
+// status: its backing UTXO is spent (or being spent), so reviving it to
+// AVAILABLE would let the claimed leaf be transferred again (see SP-3049).
+func setAvailableUnlessExitedToL1(update *ent.TreeNodeUpdateOne, node *ent.TreeNode) {
+	if !node.Status.IsExitedToL1() {
+		update.SetStatus(st.TreeNodeStatusAvailable)
+	}
+}
+
+func sortedNodeIDs(nodeIDs map[uuid.UUID]*pbinternal.TreeNode) []uuid.UUID {
+	ids := slices.Collect(maps.Keys(nodeIDs))
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return bytes.Compare(a[:], b[:]) })
+	return ids
 }
 
 // FinalizeTransfer finalizes a transfer.
@@ -98,11 +141,13 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		requestNodesByID[nodeID] = node
 	}
 
+	dbNodesByID, err := lockTreeNodesForFinalize(ctx, db, sortedNodeIDs(requestNodesByID))
+	if err != nil {
+		return fmt.Errorf("failed to lock tree nodes. transfer id: %s. with status: %s and error: %w", transferID, transfer.Status, err)
+	}
+
 	for nodeID, node := range requestNodesByID {
-		dbNode, err := db.TreeNode.Get(ctx, nodeID)
-		if err != nil {
-			return fmt.Errorf("failed to get dbNode. transfer id: %s. with status: %s. node id: %s and error: %w", transferID, transfer.Status, nodeID, err)
-		}
+		dbNode := dbNodesByID[nodeID]
 		if err := validateFinalizeTransferLeafCanComplete(dbNode); err != nil {
 			return err
 		}
@@ -169,20 +214,25 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			// so overwrite them even if new direct transactions aren't provided.
 			update.SetDirectRefundTx(node.GetDirectRefundTx())
 			update.SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
-			update.SetStatus(st.TreeNodeStatusAvailable)
+			setAvailableUnlessExitedToL1(update, dbNode)
 
 			if _, err = update.Save(ctx); err != nil {
 				return fmt.Errorf("failed to update dbNode. transfer id: %s. with status: %s. node id: %s and error: %w", transferID, transfer.Status, nodeID, err)
 			}
 		} else {
-			_, err = dbNode.Update().
+			// For an ON_CHAIN leaf the refund overwrite is what lets the
+			// watchtower broadcast the receiver's refund tx; for an EXITED
+			// leaf (old refund already confirmed) it is a deliberate
+			// simplification that keeps gossip redelivery idempotent, at the
+			// cost of the stored refund txid no longer matching the tx behind
+			// refund_confirmation_height.
+			update := dbNode.Update().
 				SetRawTx(node.GetRawTx()).
 				SetRawRefundTx(node.GetRawRefundTx()).
 				SetDirectRefundTx(node.GetDirectRefundTx()).
-				SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx()).
-				SetStatus(st.TreeNodeStatusAvailable).
-				Save(ctx)
-			if err != nil {
+				SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
+			setAvailableUnlessExitedToL1(update, dbNode)
+			if _, err = update.Save(ctx); err != nil {
 				return fmt.Errorf("failed to update dbNode. transfer id: %s. with status: %s. node id: %s and error: %w", transferID, transfer.Status, nodeID, err)
 			}
 		}
@@ -292,6 +342,7 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 		receiverLeafIDs[leaf.ID] = struct{}{}
 	}
 
+	requestNodesByID := make(map[uuid.UUID]*pbinternal.TreeNode, len(req.GetInternalNodes()))
 	for _, node := range req.GetInternalNodes() {
 		nodeID, err := uuid.Parse(node.GetId())
 		if err != nil {
@@ -301,10 +352,16 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 			return fmt.Errorf("node %s not in receiver's leaves (or duplicate) for transfer %s", nodeID, transferID)
 		}
 		delete(receiverLeafIDs, nodeID)
-		dbNode, err := db.TreeNode.Get(ctx, nodeID)
-		if err != nil {
-			return fmt.Errorf("failed to get tree node %s: %w", nodeID, err)
-		}
+		requestNodesByID[nodeID] = node
+	}
+
+	dbNodesByID, err := lockTreeNodesForFinalize(ctx, db, sortedNodeIDs(requestNodesByID))
+	if err != nil {
+		return fmt.Errorf("failed to lock tree nodes for transfer %s: %w", transferID, err)
+	}
+
+	for nodeID, node := range requestNodesByID {
+		dbNode := dbNodesByID[nodeID]
 		if err := validateFinalizeTransferLeafCanComplete(dbNode); err != nil {
 			return err
 		}
@@ -367,19 +424,20 @@ func (h *InternalTransferHandler) FinalizeTransferReceiver(ctx context.Context, 
 			}
 			update.SetDirectRefundTx(node.GetDirectRefundTx())
 			update.SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
-			update.SetStatus(st.TreeNodeStatusAvailable)
+			setAvailableUnlessExitedToL1(update, dbNode)
 			if _, err = update.Save(ctx); err != nil {
 				return fmt.Errorf("failed to update tree node %s: %w", nodeID, err)
 			}
 		} else {
-			_, err = dbNode.Update().
+			// See FinalizeTransfer for why refund txs are overwritten even for
+			// exited-to-L1 leaves.
+			update := dbNode.Update().
 				SetRawTx(node.GetRawTx()).
 				SetRawRefundTx(node.GetRawRefundTx()).
 				SetDirectRefundTx(node.GetDirectRefundTx()).
-				SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx()).
-				SetStatus(st.TreeNodeStatusAvailable).
-				Save(ctx)
-			if err != nil {
+				SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx())
+			setAvailableUnlessExitedToL1(update, dbNode)
+			if _, err = update.Save(ctx); err != nil {
 				return fmt.Errorf("failed to update tree node %s: %w", nodeID, err)
 			}
 		}

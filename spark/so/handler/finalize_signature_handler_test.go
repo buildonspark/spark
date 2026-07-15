@@ -1598,12 +1598,46 @@ func TestVerifyAndUpdateTransferRejectsNonCompletableLeafStatuses(t *testing.T) 
 
 			ctx = authn.InjectSessionForTests(ctx, receiverPub, time.Now().Add(time.Hour).Unix())
 			_, err := handler.verifyAndUpdateTransfer(ctx, req)
-			require.ErrorContains(t, err, "expected TRANSFER_LOCKED or AVAILABLE")
+			require.ErrorContains(t, err, "expected TRANSFER_LOCKED, AVAILABLE, or exited to L1")
 
 			updatedTransfer, err := dbTx.Transfer.Get(ctx, transfer.ID)
 			require.NoError(t, err)
 			require.Equal(t, st.TransferStatusReceiverRefundSigned, updatedTransfer.Status)
 
+			updatedLeaf, err := dbTx.TreeNode.Get(ctx, node.ID)
+			require.NoError(t, err)
+			require.Equal(t, leafStatus, updatedLeaf.Status)
+		})
+	}
+}
+
+func TestVerifyAndUpdateTransferAllowsExitedToL1LeafPreservingStatus(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusParentExited,
+	}
+
+	for _, leafStatus := range statuses {
+		t.Run(string(leafStatus), func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			handler := NewFinalizeSignatureHandler(&so.Config{})
+			dbTx, transfer, node, receiverPub := createReceiverRefundSignedTransferForFinalizeTest(t, ctx, leafStatus)
+
+			req := &pb.FinalizeNodeSignaturesRequest{
+				NodeSignatures: []*pb.NodeSignatures{
+					{NodeId: node.ID.String()},
+				},
+				Intent: pbcommon.SignatureIntent_TRANSFER,
+			}
+
+			ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(receiverPub.Serialize()), time.Now().Add(time.Hour).Unix())
+			updatedTransfer, err := handler.verifyAndUpdateTransfer(ctx, req)
+			require.NoError(t, err)
+			require.Equal(t, transfer.ID, updatedTransfer.ID)
+			require.Equal(t, st.TransferStatusCompleted, updatedTransfer.Status)
+
+			// The transfer completes, but the leaf keeps its on-chain status.
 			updatedLeaf, err := dbTx.TreeNode.Get(ctx, node.ID)
 			require.NoError(t, err)
 			require.Equal(t, leafStatus, updatedLeaf.Status)

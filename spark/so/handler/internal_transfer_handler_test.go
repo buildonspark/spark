@@ -162,13 +162,10 @@ func TestFinalizeTransferRejectsNonCompletableLeafStatuses(t *testing.T) {
 		st.TreeNodeStatusSplitLocked,
 		st.TreeNodeStatusSplitted,
 		st.TreeNodeStatusAggregated,
-		st.TreeNodeStatusOnChain,
 		st.TreeNodeStatusAggregateLock,
-		st.TreeNodeStatusExited,
 		st.TreeNodeStatusInvestigation,
 		st.TreeNodeStatusLost,
 		st.TreeNodeStatusReimbursed,
-		st.TreeNodeStatusParentExited,
 		st.TreeNodeStatusRenewLocked,
 	}
 
@@ -202,13 +199,10 @@ func TestFinalizeTransferReceiverRejectsNonCompletableLeafStatuses(t *testing.T)
 		st.TreeNodeStatusSplitLocked,
 		st.TreeNodeStatusSplitted,
 		st.TreeNodeStatusAggregated,
-		st.TreeNodeStatusOnChain,
 		st.TreeNodeStatusAggregateLock,
-		st.TreeNodeStatusExited,
 		st.TreeNodeStatusInvestigation,
 		st.TreeNodeStatusLost,
 		st.TreeNodeStatusReimbursed,
-		st.TreeNodeStatusParentExited,
 		st.TreeNodeStatusRenewLocked,
 	}
 
@@ -232,6 +226,138 @@ func TestFinalizeTransferReceiverRejectsNonCompletableLeafStatuses(t *testing.T)
 			require.Equal(t, status, refreshed.Status)
 			require.Equal(t, fixture.originalRawTx, refreshed.RawTx)
 			require.Equal(t, fixture.originalRawRefundTx, refreshed.RawRefundTx)
+		})
+	}
+}
+
+func TestFinalizeTransferCompletesExitedToL1LeafPreservingStatus(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusParentExited,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, dbCtx := db.ConnectToTestPostgres(t)
+			fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, status, false)
+
+			err := NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+				TransferId: fixture.transfer.ID.String(),
+				Nodes:      []*pbinternal.TreeNode{fixture.requestNode},
+				Timestamp:  timestamppb.New(time.Now()),
+			})
+			require.NoError(t, err)
+
+			entTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+			require.NoError(t, entTx.Commit())
+
+			// The refund txs sync to the receiver's, but the on-chain status is preserved.
+			refreshedLeaf, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, refreshedLeaf.Status)
+			require.Equal(t, fixture.requestNode.GetRawTx(), refreshedLeaf.RawTx)
+			require.Equal(t, fixture.requestNode.GetRawRefundTx(), refreshedLeaf.RawRefundTx)
+
+			refreshedTransfer, err := dbCtx.Client.Transfer.Get(ctx, fixture.transfer.ID)
+			require.NoError(t, err)
+			require.Equal(t, st.TransferStatusCompleted, refreshedTransfer.Status)
+		})
+	}
+}
+
+func TestLockTreeNodesForFinalizeRejectsMissingNode(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, st.TreeNodeStatusTransferLocked, false)
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	nodesByID, err := lockTreeNodesForFinalize(ctx, dbTx, []uuid.UUID{fixture.leaf.ID, uuid.New()})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "expected 2 tree nodes to finalize, found 1")
+	require.Equal(t, codes.NotFound, grpcstatus.Code(err))
+	require.Nil(t, nodesByID)
+}
+
+func TestFinalizeTransferAlreadyCompletedRetryPreservesExitedLeafStatus(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusParentExited,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, dbCtx := db.ConnectToTestPostgres(t)
+			fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, status, false)
+
+			// A gossip redelivery after the transfer is already completed takes
+			// the tx-comparison branch rather than the overwrite branch; the
+			// exited leaf must keep its on-chain status there too.
+			_, err := fixture.transfer.Update().
+				SetStatus(st.TransferStatusCompleted).
+				SetCompletionTime(time.Now()).
+				Save(ctx)
+			require.NoError(t, err)
+
+			fixture.requestNode.RawTx = fixture.leaf.RawTx
+			fixture.requestNode.RawRefundTx = fixture.leaf.RawRefundTx
+			fixture.requestNode.DirectRefundTx = fixture.leaf.DirectRefundTx
+			fixture.requestNode.DirectFromCpfpRefundTx = fixture.leaf.DirectFromCpfpRefundTx
+
+			err = NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{
+				TransferId: fixture.transfer.ID.String(),
+				Nodes:      []*pbinternal.TreeNode{fixture.requestNode},
+				Timestamp:  timestamppb.New(time.Now()),
+			})
+			require.NoError(t, err)
+
+			entTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+			require.NoError(t, entTx.Commit())
+
+			refreshedLeaf, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, refreshedLeaf.Status)
+		})
+	}
+}
+
+func TestFinalizeTransferReceiverCompletesExitedToL1LeafPreservingStatus(t *testing.T) {
+	statuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusParentExited,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			ctx, dbCtx := db.ConnectToTestPostgres(t)
+			fixture := createFinalizeTransferLeafStateFixture(t, ctx, dbCtx.Client, status, true)
+
+			err := NewInternalTransferHandler(finalizeTransferLeafStateConfig()).FinalizeTransferReceiver(ctx, &pbgossip.GossipMessageFinalizeTransferReceiver{
+				TransferId:                fixture.transfer.ID.String(),
+				ReceiverIdentityPublicKey: fixture.receiver.Serialize(),
+				InternalNodes:             []*pbinternal.TreeNode{fixture.requestNode},
+				CompletionTimestamp:       timestamppb.New(time.Now()),
+			})
+			require.NoError(t, err)
+
+			entTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+			require.NoError(t, entTx.Commit())
+
+			refreshedLeaf, err := dbCtx.Client.TreeNode.Get(ctx, fixture.leaf.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, refreshedLeaf.Status)
+			require.Equal(t, fixture.requestNode.GetRawTx(), refreshedLeaf.RawTx)
+			require.Equal(t, fixture.requestNode.GetRawRefundTx(), refreshedLeaf.RawRefundTx)
+
+			refreshedTransfer, err := dbCtx.Client.Transfer.Get(ctx, fixture.transfer.ID)
+			require.NoError(t, err)
+			require.Equal(t, st.TransferStatusCompleted, refreshedTransfer.Status)
 		})
 	}
 }
