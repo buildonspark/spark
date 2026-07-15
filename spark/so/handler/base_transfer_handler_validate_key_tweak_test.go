@@ -367,3 +367,226 @@ func TestValidateTransferPackage_RejectsDuplicateEncryptedKeyTweakLeafID(t *test
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate leaf id in encrypted key tweaks")
 }
+
+// buildKeyTweakPackageWithMutation builds an encrypted key-tweak package for a
+// single leaf, applying mutate to the SendLeafKeyTweak before encryption so
+// tests can characterize how ValidateTransferPackage rejects tampered fields.
+func buildKeyTweakPackageWithMutation(
+	t *testing.T,
+	cfg *so.Config,
+	rng *rand.ChaCha8,
+	leafID uuid.UUID,
+	mutate func(*pb.SendLeafKeyTweak),
+) map[string][]byte {
+	t.Helper()
+
+	secretShare, pubkeySharesTweak := createValidSecretShares(cfg, rng)
+	publicKey, err := eciesgo.NewPublicKeyFromBytes(cfg.IdentityPublicKey().Serialize())
+	require.NoError(t, err)
+	secretCipher, err := eciesgo.Encrypt(publicKey, secretShare.GetSecretShare())
+	require.NoError(t, err)
+
+	leafTweak := &pb.SendLeafKeyTweak{
+		LeafId:            leafID.String(),
+		SecretShareTweak:  secretShare,
+		PubkeySharesTweak: pubkeySharesTweak,
+		SecretCipher:      secretCipher,
+		Sig:               &pb.SendLeafKeyTweak_Signature{Signature: []byte("mock_signature_for_testing")},
+	}
+	mutate(leafTweak)
+
+	data, err := proto.Marshal(&pb.SendLeafKeyTweaks{LeavesToSend: []*pb.SendLeafKeyTweak{leafTweak}})
+	require.NoError(t, err)
+	encrypted, err := eciesgo.Encrypt(publicKey, data)
+	require.NoError(t, err)
+	return map[string][]byte{cfg.Identifier: encrypted}
+}
+
+// singleLeafPackage assembles a one-leaf TransferPackage around the given
+// key-tweak package.
+func singleLeafPackage(t *testing.T, leafID uuid.UUID, keyTweakPackage map[string][]byte) *pb.TransferPackage {
+	t.Helper()
+	return &pb.TransferPackage{
+		LeavesToSend: []*pb.UserSignedTxSigningJob{
+			{LeafId: leafID.String(), RawTx: createTestTxBytes(t, 1000)},
+		},
+		KeyTweakPackage: keyTweakPackage,
+	}
+}
+
+// The tests below pin ValidateTransferPackage's behavior per failure mode
+// (message fragment and success/failure), so the validation can be
+// restructured with confidence that observable behavior is unchanged.
+
+func TestValidateTransferPackage_NilPackageIsNoop(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	h := NewBaseTransferHandler(cfg)
+
+	tweaksMap, err := h.ValidateTransferPackage(t.Context(), uuid.New(), nil, keys.Public{}, false)
+
+	require.NoError(t, err)
+	assert.Nil(t, tweaksMap)
+}
+
+func TestValidateTransferPackage_EmptyKeyTweakPackage(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{44})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	pkg := singleLeafPackage(t, leafID, nil)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "key tweak package is empty")
+}
+
+func TestValidateTransferPackage_EmptyUserSignature(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{45})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage, _ := buildKeyTweakPackageForLeaves(t, cfg, rng, []uuid.UUID{leafID})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	// Deliberately not signed.
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user signature cannot be empty")
+}
+
+func TestValidateTransferPackage_WrongSigner(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{46})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	otherPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage, _ := buildKeyTweakPackageForLeaves(t, cfg, rng, []uuid.UUID{leafID})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, otherPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to verify user signature")
+}
+
+func TestValidateTransferPackage_NoKeyTweaksForThisOperator(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{47})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage, _ := buildKeyTweakPackageForLeaves(t, cfg, rng, []uuid.UUID{leafID})
+	// Re-key the ciphertext to a different operator identifier so this SO
+	// finds no entry for itself.
+	for k, v := range keyTweakPackage {
+		delete(keyTweakPackage, k)
+		keyTweakPackage["not-"+k] = v
+	}
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no key tweaks found for SO")
+}
+
+func TestValidateTransferPackage_UndecryptableKeyTweaks(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{48})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := map[string][]byte{cfg.Identifier: []byte("not a valid ECIES ciphertext")}
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to decrypt key tweaks")
+}
+
+func TestValidateTransferPackage_TooManyLeaves(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{49})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+
+	leaves := make([]*pb.UserSignedTxSigningJob, MaxLeavesToSend+1)
+	for i := range leaves {
+		leaves[i] = &pb.UserSignedTxSigningJob{LeafId: uuid.NewString()}
+	}
+	pkg := &pb.TransferPackage{
+		LeavesToSend:    leaves,
+		KeyTweakPackage: map[string][]byte{cfg.Identifier: []byte("placeholder")},
+	}
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many leaves to send")
+}
+
+func TestValidateTransferPackage_InvalidSecretShare(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{50})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := buildKeyTweakPackageWithMutation(t, cfg, rng, leafID, func(lt *pb.SendLeafKeyTweak) {
+		// Corrupt the share so it no longer lies on the committed polynomial.
+		lt.SecretShareTweak.SecretShare[0] ^= 0x01
+	})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to validate share")
+}
+
+func TestValidateTransferPackage_MissingPubkeyShareForOperator(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{51})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := buildKeyTweakPackageWithMutation(t, cfg, rng, leafID, func(lt *pb.SendLeafKeyTweak) {
+		for k := range lt.GetPubkeySharesTweak() {
+			delete(lt.GetPubkeySharesTweak(), k)
+			break
+		}
+	})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "pubkey share tweak missing for operator")
+}
