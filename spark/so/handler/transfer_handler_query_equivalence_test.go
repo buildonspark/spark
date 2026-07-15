@@ -2300,3 +2300,258 @@ func TestQueryAllTransfers_ByParticipantFallback_PerReceiverDivergence(t *testin
 		"fallback surfaces the completed receiver despite parent t.status lag")
 	assert.Equal(t, transfer.ID.String(), mimoResp.GetTransfers()[0].GetId())
 }
+
+// -----------------------------------------------------------------------------
+// Receiver leaf-scoping invariant — RPC-boundary lock.
+// -----------------------------------------------------------------------------
+//
+// The participant-filtered query endpoints receiver-scope their output: a
+// receiver querying a multi-receiver transfer gets back only its own leaves and
+// only itself in Receivers[]. The SDK relies on this — it treats every returned
+// leaf as belonging to the queried receiver. The equivalence suite above can't
+// guard the invariant: its fixtures carry no leaves (makeTransfer creates
+// none), so its lone leaf-set assertion is vacuous, and it only proves
+// legacy==MIMO sameness — if both paths stopped scoping in lockstep it would
+// stay green. These tests pin the scoping at each query RPC with a transfer that
+// actually has receiver-tagged leaves, so a regression (e.g. a shared marshal
+// helper that stops scoping) fails loudly even once the SDK repoints off these
+// endpoints and real traffic no longer exercises them.
+
+// receiverLeafSpec declares a receiver and the receiver-status it holds on a
+// transfer built by makeMultiReceiverTransferWithLeaves.
+type receiverLeafSpec struct {
+	pubkey keys.Public
+	status st.TransferReceiverStatus
+}
+
+// receiverLeaf records, per receiver, the TransferReceiver row and the TreeNode
+// id of the single leaf tagged to it. leafNodeID equals the marshaled leaf's
+// GetLeaf().GetId(), so tests assert the scoped set against it directly.
+type receiverLeaf struct {
+	pubkey     keys.Public
+	receiverID uuid.UUID
+	leafNodeID uuid.UUID
+}
+
+func leafNodeIDFor(leaves []receiverLeaf, pubkey keys.Public) string {
+	for _, l := range leaves {
+		if l.pubkey.Equals(pubkey) {
+			return l.leafNodeID.String()
+		}
+	}
+	return ""
+}
+
+// makeMultiReceiverTransferWithLeaves builds a transfer with one sender, N
+// receivers, and one receiver-tagged leaf per receiver — the shape makeTransfer
+// deliberately omits (it creates no leaves). The real TransferLeaf/TreeNode rows
+// are what make the receiver-scoping projection observable through the query
+// RPCs. The parent status is caller-supplied since a multi-receiver parent lags
+// its receivers.
+func (f *equivFixture) makeMultiReceiverTransferWithLeaves(parentStatus st.TransferStatus, sender keys.Public, specs []receiverLeafSpec) (*ent.Transfer, []receiverLeaf) {
+	f.t.Helper()
+
+	createTime := f.baseNow.Add(-2 * time.Hour)
+	transfer, err := f.client.Transfer.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetType(st.TransferTypeTransfer).
+		SetStatus(parentStatus).
+		SetExpiryTime(f.baseNow.Add(-24 * time.Hour)).
+		SetTotalValue(uint64(1000 * len(specs))).
+		SetSenderIdentityPubkey(sender).
+		SetReceiverIdentityPubkey(specs[0].pubkey).
+		SetCreateTime(createTime).
+		Save(f.ctx)
+	require.NoError(f.t, err)
+
+	_, err = f.client.TransferSender.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(sender).
+		SetCreateTime(createTime).
+		SetTransferType(transfer.Type).
+		Save(f.ctx)
+	require.NoError(f.t, err)
+
+	tree := createTestTreeForClaim(f.t, f.ctx, sender, f.client)
+
+	out := make([]receiverLeaf, 0, len(specs))
+	for _, spec := range specs {
+		receiver, err := f.client.TransferReceiver.Create().
+			SetTransferID(transfer.ID).
+			SetIdentityPubkey(spec.pubkey).
+			SetStatus(spec.status).
+			SetCreateTime(createTime).
+			SetTransferType(transfer.Type).
+			Save(f.ctx)
+		require.NoError(f.t, err)
+
+		keyshare := createTestSigningKeyshare(f.t, f.ctx, f.rng, f.client)
+		leafNode := createTestTreeNode(f.t, f.ctx, f.rng, f.client, tree, keyshare)
+		transferLeaf := createTestTransferLeaf(f.t, f.ctx, f.client, transfer, leafNode)
+		_, err = transferLeaf.Update().SetTransferReceiverID(receiver.ID).Save(f.ctx)
+		require.NoError(f.t, err)
+
+		out = append(out, receiverLeaf{pubkey: spec.pubkey, receiverID: receiver.ID, leafNodeID: leafNode.ID})
+	}
+	return transfer, out
+}
+
+// TestQueryAllTransfers_ScopesLeavesToQueriedReceiver locks the receiver
+// projection at the exported QueryAllTransfers boundary — the endpoint contract
+// the SDK depends on, independent of which internal handler the filter routes
+// to. A bare receiver filter falls through to queryByParticipantFallback, which
+// must return the transfer scoped to the querying receiver's leaves.
+func TestQueryAllTransfers_ScopesLeavesToQueriedReceiver(t *testing.T) {
+	if !sparktesting.PostgresTestsEnabled() {
+		t.Skip("requires Postgres (raw SQL execution path)")
+	}
+	f := newEquivFixture(t)
+	recvA, recvB, sender := f.newPubkey(), f.newPubkey(), f.newPubkey()
+	f.privacyEnabled(recvA, recvB)
+
+	transfer, leaves := f.makeMultiReceiverTransferWithLeaves(
+		st.TransferStatusSenderKeyTweaked, sender,
+		[]receiverLeafSpec{
+			{pubkey: recvA, status: st.TransferReceiverStatusKeyTweaked},
+			{pubkey: recvB, status: st.TransferReceiverStatusKeyTweaked},
+		},
+	)
+
+	for _, tc := range []struct {
+		name   string
+		viewer keys.Public
+	}{
+		{"receiver_A", recvA},
+		{"receiver_B", recvB},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := f.ctxForViewer(tc.viewer)
+			resp, err := f.handler.QueryAllTransfers(ctx, receiverFilter(tc.viewer), false)
+			require.NoError(t, err)
+			require.Len(t, resp.GetTransfers(), 1)
+			got := resp.GetTransfers()[0]
+			assert.Equal(t, transfer.ID.String(), got.GetId())
+			assert.Equal(t, []string{leafNodeIDFor(leaves, tc.viewer)}, leafIDSetOf(got),
+				"receiver must see exactly its own leaf, never the sibling's")
+			require.Len(t, got.GetReceivers(), 1, "Receivers[] must be scoped to the queried receiver")
+			assert.Equal(t, tc.viewer.Serialize(), got.GetReceivers()[0].GetIdentityPublicKey())
+		})
+	}
+}
+
+// TestQueryPendingTransfers_ScopesLeavesToQueriedReceiver locks the same
+// projection at the exported QueryPendingTransfers boundary (→
+// queryPendingTransfersMIMO). Receivers sit on the pending receiver-arm while
+// the multi-receiver parent stays at SENDER_KEY_TWEAKED.
+func TestQueryPendingTransfers_ScopesLeavesToQueriedReceiver(t *testing.T) {
+	if !sparktesting.PostgresTestsEnabled() {
+		t.Skip("requires Postgres (raw SQL execution path)")
+	}
+	f := newEquivFixture(t)
+	recvA, recvB, sender := f.newPubkey(), f.newPubkey(), f.newPubkey()
+	f.privacyEnabled(recvA, recvB)
+
+	transfer, leaves := f.makeMultiReceiverTransferWithLeaves(
+		st.TransferStatusSenderKeyTweaked, sender,
+		[]receiverLeafSpec{
+			{pubkey: recvA, status: st.TransferReceiverStatusReceiverClaimPending},
+			{pubkey: recvB, status: st.TransferReceiverStatusReceiverClaimPending},
+		},
+	)
+
+	for _, tc := range []struct {
+		name   string
+		viewer keys.Public
+	}{
+		{"receiver_A", recvA},
+		{"receiver_B", recvB},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := f.ctxForViewer(tc.viewer)
+			resp, err := f.handler.QueryPendingTransfers(ctx, receiverFilter(tc.viewer))
+			require.NoError(t, err)
+			require.Len(t, resp.GetTransfers(), 1)
+			got := resp.GetTransfers()[0]
+			assert.Equal(t, transfer.ID.String(), got.GetId())
+			assert.Equal(t, []string{leafNodeIDFor(leaves, tc.viewer)}, leafIDSetOf(got),
+				"receiver must see exactly its own leaf, never the sibling's")
+			require.Len(t, got.GetReceivers(), 1, "Receivers[] must be scoped to the queried receiver")
+			assert.Equal(t, tc.viewer.Serialize(), got.GetReceivers()[0].GetIdentityPublicKey())
+		})
+	}
+}
+
+// TestQueryTransfers_LegacyParticipantPath_ScopesLeavesToReceiver locks the
+// receiver-scoping branch of the legacy queryTransfers fallback specifically.
+// Production routing now steers participant-bearing shapes to the MIMO
+// handlers, so this branch loses real-traffic coverage — but it stays reachable
+// until the forced-upgrade retirement, and its scoping must not rot meanwhile.
+func TestQueryTransfers_LegacyParticipantPath_ScopesLeavesToReceiver(t *testing.T) {
+	if !sparktesting.PostgresTestsEnabled() {
+		t.Skip("requires Postgres")
+	}
+	f := newEquivFixture(t)
+	recvA, recvB, sender := f.newPubkey(), f.newPubkey(), f.newPubkey()
+	f.privacyEnabled(recvA, recvB)
+
+	_, leaves := f.makeMultiReceiverTransferWithLeaves(
+		st.TransferStatusSenderKeyTweaked, sender,
+		[]receiverLeafSpec{
+			{pubkey: recvA, status: st.TransferReceiverStatusKeyTweaked},
+			{pubkey: recvB, status: st.TransferReceiverStatusKeyTweaked},
+		},
+	)
+
+	ctx := f.ctxForViewer(recvA)
+	resp, err := f.handler.queryTransfers(ctx, receiverFilter(recvA), false, false)
+	require.NoError(t, err)
+	require.Len(t, resp.GetTransfers(), 1)
+	got := resp.GetTransfers()[0]
+	assert.Equal(t, []string{leafNodeIDFor(leaves, recvA)}, leafIDSetOf(got),
+		"legacy queryTransfers must scope leaves to the queried receiver")
+	require.Len(t, got.GetReceivers(), 1)
+	assert.Equal(t, recvA.Serialize(), got.GetReceivers()[0].GetIdentityPublicKey())
+}
+
+// TestQueryTransfersByID_ReturnsAllLeavesUnscoped is the opposite lock: the
+// by-id endpoint has no participant to scope to and must return the FULL
+// transfer — every leaf and every receiver. This pins that the scoping in the
+// participant-filtered paths is deliberate, not an accident of the shared
+// marshal helper — the two contracts must be able to diverge under refactor.
+func TestQueryTransfersByID_ReturnsAllLeavesUnscoped(t *testing.T) {
+	if !sparktesting.PostgresTestsEnabled() {
+		t.Skip("requires Postgres")
+	}
+	f := newEquivFixture(t)
+	recvA, recvB, sender := f.newPubkey(), f.newPubkey(), f.newPubkey()
+	f.privacyEnabled(recvA, recvB)
+
+	transfer, leaves := f.makeMultiReceiverTransferWithLeaves(
+		st.TransferStatusSenderKeyTweaked, sender,
+		[]receiverLeafSpec{
+			{pubkey: recvA, status: st.TransferReceiverStatusKeyTweaked},
+			{pubkey: recvB, status: st.TransferReceiverStatusKeyTweaked},
+		},
+	)
+
+	ctx := f.ctxForViewer(recvA)
+	resp, err := f.handler.QueryTransfersByID(ctx, &pb.QueryTransfersByIdRequest{
+		TransferIds: []string{transfer.ID.String()},
+		Network:     pb.Network_REGTEST,
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.GetTransfers(), 1)
+	got := resp.GetTransfers()[0]
+	assert.ElementsMatch(t,
+		[]string{leafNodeIDFor(leaves, recvA), leafNodeIDFor(leaves, recvB)},
+		leafIDSetOf(got),
+		"by-id must return ALL leaves — no receiver scoping")
+	gotReceivers := make([][]byte, 0, len(got.GetReceivers()))
+	for _, r := range got.GetReceivers() {
+		gotReceivers = append(gotReceivers, r.GetIdentityPublicKey())
+	}
+	assert.ElementsMatch(t,
+		[][]byte{recvA.Serialize(), recvB.Serialize()},
+		gotReceivers,
+		"by-id must return exactly both receivers — no receiver scoping")
+}
