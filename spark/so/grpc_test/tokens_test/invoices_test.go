@@ -1,9 +1,10 @@
 package tokens_test
 
 import (
+	"cmp"
 	"encoding/binary"
 	"math/rand/v2"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -332,8 +333,8 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		attachment := &tokenpb.InvoiceAttachment{SparkInvoice: sparkInvoice}
 		invoiceAttachments = append(invoiceAttachments, attachment)
 	}
-	sort.Slice(invoiceAttachments, func(i, j int) bool {
-		return invoiceAttachments[i].GetSparkInvoice() < invoiceAttachments[j].GetSparkInvoice()
+	slices.SortFunc(invoiceAttachments, func(a, b *tokenpb.InvoiceAttachment) int {
+		return cmp.Compare(a.GetSparkInvoice(), b.GetSparkInvoice())
 	})
 	transferTransaction.InvoiceAttachments = invoiceAttachments
 

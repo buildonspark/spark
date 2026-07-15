@@ -3,7 +3,7 @@ package multisig
 import (
 	"bytes"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/lightsparkdev/spark/common/protohash"
 	pb "github.com/lightsparkdev/spark/proto/multisig"
@@ -56,16 +56,10 @@ func NormalizeMultisigConfig(config *pb.MultisigConfig) *pb.MultisigConfig {
 	}
 	sorted := make([][]byte, len(config.GetPublicKeys()))
 	copy(sorted, config.GetPublicKeys())
-	sortKeys(sorted)
+	slices.SortFunc(sorted, bytes.Compare)
 	return &pb.MultisigConfig{
 		Version:    config.GetVersion(),
 		Threshold:  config.GetThreshold(),
 		PublicKeys: sorted,
 	}
-}
-
-func sortKeys(keys [][]byte) {
-	sort.Slice(keys, func(i, j int) bool {
-		return bytes.Compare(keys[i], keys[j]) < 0
-	})
 }
