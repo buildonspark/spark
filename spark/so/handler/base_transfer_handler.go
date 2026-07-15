@@ -522,7 +522,7 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	if transferType == st.TransferTypeTransfer || transferType == st.TransferTypeSwap || transferType == st.TransferTypeCounterSwap || transferType == st.TransferTypePrimarySwapV3 || transferType == st.TransferTypeCounterSwapV3 || transferType == st.TransferTypeCooperativeExit {
-		if err := h.validateAndConstructBitcoinTransactions(ctx, pkg, transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, connectorTx); err != nil {
+		if err := h.validateAndConstructBitcoinTransactions(ctx, transferPackageLeafIDLists(pkg), transferType, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, connectorTx); err != nil {
 			return nil, nil, fmt.Errorf("unable to validate and construct bitcoin transactions: %w, transfer id: %s", err, transferID)
 		}
 	}
@@ -603,7 +603,7 @@ func (h *BaseTransferHandler) createTransferV3(
 	ctx context.Context,
 	transferID uuid.UUID,
 	transferType st.TransferType,
-	pkg *pbspark.TransferPackage,
+	pkgLeafIDs *transferPackageLeafIDs,
 	expiryTime time.Time,
 	senderIdentityPubKey keys.Public,
 	receivers []keys.Public,
@@ -695,7 +695,7 @@ func (h *BaseTransferHandler) createTransferV3(
 			}
 			continue
 		}
-		if err := h.validateAndConstructBitcoinTransactions(ctx, pkg, transferType, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, nil); err != nil {
+		if err := h.validateAndConstructBitcoinTransactions(ctx, pkgLeafIDs, transferType, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, nil); err != nil {
 			return nil, nil, fmt.Errorf("unable to validate bitcoin transactions for receiver %s: %w", g.receiverPubKey, err)
 		}
 	}
@@ -1684,7 +1684,7 @@ func (h *BaseTransferHandler) loadSingleTransferReceiverForUnsupportedMimoPath(c
 
 func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 	ctx context.Context,
-	pkg *pbspark.TransferPackage,
+	pkgLeafIDs *transferPackageLeafIDs,
 	transferType st.TransferType,
 	leaves []*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
@@ -1701,10 +1701,10 @@ func (h *BaseTransferHandler) validateAndConstructBitcoinTransactions(
 
 	switch transferType {
 	case st.TransferTypeTransfer:
-		if pkg == nil {
+		if pkgLeafIDs == nil {
 			return validateLegacyLeavesToSend_transfer(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 		}
-		return validateLeaves_transfer(ctx, pkg, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
+		return validateLeaves_transfer(ctx, pkgLeafIDs, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey)
 
 	case st.TransferTypeSwap, st.TransferTypeCounterSwap, st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3:
 		return validateLeaves_swap(ctx, nodesByID, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, refundDestPubkey, transferType)
@@ -2200,60 +2200,60 @@ func validateLegacyLeavesToSend_transfer(
 
 func validateLeaves_transfer(
 	ctx context.Context,
-	pkg *pbspark.TransferPackage,
+	pkgLeafIDs *transferPackageLeafIDs,
 	nodesByID map[string]*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
 	refundDestPubkey keys.Public,
 ) error {
-	leavesToSendByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.GetLeavesToSend()))
-	for _, leaf := range pkg.GetLeavesToSend() {
-		parsed, err := uuid.Parse(leaf.GetLeafId())
+	leavesToSendByID := make(map[string]struct{}, len(pkgLeafIDs.leavesToSend))
+	for _, rawLeafID := range pkgLeafIDs.leavesToSend {
+		parsed, err := uuid.Parse(rawLeafID)
 		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.GetLeafId(), err))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", rawLeafID, err))
 		}
 		leafID := parsed.String()
 		if _, exists := leavesToSendByID[leafID]; exists {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", leafID))
 		}
-		leavesToSendByID[leafID] = leaf
+		leavesToSendByID[leafID] = struct{}{}
 	}
 
-	directLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.GetDirectLeavesToSend()))
-	for _, leaf := range pkg.GetDirectLeavesToSend() {
-		parsed, err := uuid.Parse(leaf.GetLeafId())
+	directLeavesByID := make(map[string]struct{}, len(pkgLeafIDs.directLeavesToSend))
+	for _, rawLeafID := range pkgLeafIDs.directLeavesToSend {
+		parsed, err := uuid.Parse(rawLeafID)
 		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.GetLeafId(), err))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", rawLeafID, err))
 		}
 		directLeafID := parsed.String()
 		if _, ok := leavesToSendByID[directLeafID]; !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", leaf.GetLeafId()))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("found orphan leaf in DirectLeavesToSend with ID %s that does not correspond to any leaf in LeavesToSend", rawLeafID))
 		}
 		if _, exists := directLeavesByID[directLeafID]; exists {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", directLeafID))
 		}
-		directLeavesByID[directLeafID] = leaf
+		directLeavesByID[directLeafID] = struct{}{}
 	}
 
-	if len(pkg.GetLeavesToSend()) != len(pkg.GetDirectFromCpfpLeavesToSend()) {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkg.GetLeavesToSend()), len(pkg.GetDirectFromCpfpLeavesToSend())))
+	if len(pkgLeafIDs.leavesToSend) != len(pkgLeafIDs.directFromCpfpLeaves) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched number of leaves: LeavesToSend (%d) and DirectFromCpfpLeavesToSend (%d) must be equal", len(pkgLeafIDs.leavesToSend), len(pkgLeafIDs.directFromCpfpLeaves)))
 	}
 
-	directFromCpfpLeavesByID := make(map[string]*pbspark.UserSignedTxSigningJob, len(pkg.GetDirectFromCpfpLeavesToSend()))
-	for _, leaf := range pkg.GetDirectFromCpfpLeavesToSend() {
-		parsed, err := uuid.Parse(leaf.GetLeafId())
+	directFromCpfpLeavesByID := make(map[string]struct{}, len(pkgLeafIDs.directFromCpfpLeaves))
+	for _, rawLeafID := range pkgLeafIDs.directFromCpfpLeaves {
+		parsed, err := uuid.Parse(rawLeafID)
 		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", leaf.GetLeafId(), err))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf_id %s: %w", rawLeafID, err))
 		}
 		directFromCpfpLeafID := parsed.String()
 		if _, ok := leavesToSendByID[directFromCpfpLeafID]; !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", leaf.GetLeafId()))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("mismatched leaves: DirectFromCpfpLeavesToSend contains leaf ID %s which is not in LeavesToSend", rawLeafID))
 		}
 		if _, exists := directFromCpfpLeavesByID[directFromCpfpLeafID]; exists {
 			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate leaf id: %s", directFromCpfpLeafID))
 		}
-		directFromCpfpLeavesByID[directFromCpfpLeafID] = leaf
+		directFromCpfpLeavesByID[directFromCpfpLeafID] = struct{}{}
 	}
 
 	for leafID := range leafCpfpRefundMap {

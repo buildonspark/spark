@@ -358,3 +358,36 @@ func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*p
 	}
 	return nil
 }
+
+// transferPackageLeafIDs carries just the leaf IDs of a TransferPackage's
+// three refund-transaction lists — the only facts the transfer core needs
+// from the wire package. A nil value means the request used the legacy
+// (packageless) shape.
+type transferPackageLeafIDs struct {
+	leavesToSend         []string
+	directLeavesToSend   []string
+	directFromCpfpLeaves []string
+}
+
+// transferPackageLeafIDLists digests a wire TransferPackage into its leaf-ID
+// lists. Nil in, nil out, preserving the package-vs-legacy distinction.
+func transferPackageLeafIDLists(pkg *pbspark.TransferPackage) *transferPackageLeafIDs {
+	if pkg == nil {
+		return nil
+	}
+	out := &transferPackageLeafIDs{
+		leavesToSend:         make([]string, 0, len(pkg.GetLeavesToSend())),
+		directLeavesToSend:   make([]string, 0, len(pkg.GetDirectLeavesToSend())),
+		directFromCpfpLeaves: make([]string, 0, len(pkg.GetDirectFromCpfpLeavesToSend())),
+	}
+	for _, leaf := range pkg.GetLeavesToSend() {
+		out.leavesToSend = append(out.leavesToSend, leaf.GetLeafId())
+	}
+	for _, leaf := range pkg.GetDirectLeavesToSend() {
+		out.directLeavesToSend = append(out.directLeavesToSend, leaf.GetLeafId())
+	}
+	for _, leaf := range pkg.GetDirectFromCpfpLeavesToSend() {
+		out.directFromCpfpLeaves = append(out.directFromCpfpLeaves, leaf.GetLeafId())
+	}
+	return out
+}
