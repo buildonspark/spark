@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"maps"
@@ -547,10 +548,14 @@ func aggregateLeafSignature(
 	return resp.GetSignature(), signingResult, nil
 }
 
-// buildSendTransferCoordinatorFlow validates the request and pre-computes the
-// signing-job helpers the coordinator needs during BuildCommitPayload's
-// aggregation. The coordinator's own DB writes (createTransferV3, FROST round-2)
-// happen inside engine.Execute via the engine-driven Prepare phase.
+// buildSendTransferCoordinatorFlow pre-computes the signing-job helpers the
+// coordinator needs during BuildCommitPayload's aggregation. Callers parse the
+// request via parseSendTransferRequest and thread the result in, so the
+// coordinator runs the expensive body parse (transferpkg.ParsePackage) only
+// once. (The cheap envelope/receiver parses still run twice — at the entry
+// gate and here — which isn't worth avoiding.) The coordinator's own DB
+// writes (createTransferV3, FROST round-2) happen inside engine.Execute via
+// the engine-driven Prepare phase.
 //
 // handler supplies the transfer semantics (transferType/partnerType/
 // requireDirectRefunds) the flow applies — plain sends pass
@@ -566,12 +571,7 @@ func aggregateLeafSignature(
 // handler on every SO (the static deposit utxo swap does exactly this via
 // NewStaticDepositUtxoSwapFlowHandler), never reuse SEND_TRANSFER with a
 // customized handler.
-func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request, sparkInvoice string, handler *SendTransferFlowHandler) (*sendTransferCoordinatorFlow, error) {
-	parsed, err := parseSendTransferRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
+func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.StartTransferV3Request, parsed parsedSendTransferRequest, sparkInvoice string, handler *SendTransferFlowHandler) (*sendTransferCoordinatorFlow, error) {
 	// Pre-load leaves for signing-job construction. The pre-load is
 	// intentionally non-locking: createTransferV3 inside the engine's Prepare
 	// phase re-loads these under FOR UPDATE before mutating them, and
@@ -644,24 +644,61 @@ type parsedSendTransferRequest struct {
 	receivers       []keys.Public
 }
 
+// parseSendTransferEnvelope validates the request envelope — the cheap checks
+// the public entry point runs before session auth and knob gates — and
+// returns the sender package with its parsed identity key.
+func parseSendTransferEnvelope(req *pb.StartTransferV3Request) (*pb.SenderTransferPackage, keys.Public, error) {
+	if req == nil {
+		return nil, keys.Public{}, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	if len(req.GetSenderPackages()) != 1 {
+		return nil, keys.Public{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
+	}
+	senderPkg := req.GetSenderPackages()[0]
+	if senderPkg == nil {
+		return nil, keys.Public{}, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender_package is required"))
+	}
+	if senderPkg.GetTransferPackage() == nil {
+		return nil, keys.Public{}, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
+	}
+	senderIDPK, err := keys.ParsePublicKey(senderPkg.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, keys.Public{}, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner identity public key: %w", err))
+	}
+	return senderPkg, senderIDPK, nil
+}
+
+// parseSendTransferReceivers parses the sender package's leaf→receiver map and
+// returns it along with the distinct receivers in canonical (sorted) order.
+func parseSendTransferReceivers(senderPkg *pb.SenderTransferPackage) (map[string]keys.Public, []keys.Public, error) {
+	leafReceiverMap := make(map[string]keys.Public, len(senderPkg.GetReceiverIdentityPublicKeys()))
+	receiverSet := make(map[string]keys.Public)
+	for leafID, recvBytes := range senderPkg.GetReceiverIdentityPublicKeys() {
+		recvPK, err := keys.ParsePublicKey(recvBytes)
+		if err != nil {
+			return nil, nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key for leaf %s: %w", leafID, err))
+		}
+		leafReceiverMap[leafID] = recvPK
+		receiverSet[string(recvPK.Serialize())] = recvPK
+	}
+	if len(receiverSet) == 0 {
+		return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
+	}
+	receivers := slices.SortedFunc(maps.Values(receiverSet), func(a, b keys.Public) int {
+		return bytes.Compare(a.Serialize(), b.Serialize())
+	})
+	return leafReceiverMap, receivers, nil
+}
+
 // parseSendTransferRequest extracts and validates the structural fields shared
 // by every call site (Prepare on each SO, buildSendTransferCoordinatorFlow).
 // MVP: single sender; multi-receiver is supported but gated behind
 // KnobMimoTransferMultiReceiverEnabled in the public StartTransferV3 handler.
 func parseSendTransferRequest(req *pb.StartTransferV3Request) (parsedSendTransferRequest, error) {
 	var empty parsedSendTransferRequest
-	if req == nil {
-		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
-	}
-	if len(req.GetSenderPackages()) != 1 {
-		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
-	}
-	senderPkg := req.GetSenderPackages()[0]
-	if senderPkg == nil {
-		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender_package is required"))
-	}
-	if senderPkg.GetTransferPackage() == nil {
-		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
+	senderPkg, senderIDPK, err := parseSendTransferEnvelope(req)
+	if err != nil {
+		return empty, err
 	}
 	pkg, err := transferpkg.ParsePackage(senderPkg.GetTransferPackage())
 	if err != nil {
@@ -671,16 +708,9 @@ func parseSendTransferRequest(req *pb.StartTransferV3Request) (parsedSendTransfe
 	if err != nil {
 		return empty, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
-	senderIDPK, err := keys.ParsePublicKey(senderPkg.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return empty, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner identity public key: %w", err))
-	}
-	leafReceiverMap, receivers, err := parseReceivers(senderPkg)
+	leafReceiverMap, receivers, err := parseSendTransferReceivers(senderPkg)
 	if err != nil {
 		return empty, err
-	}
-	if len(receivers) == 0 {
-		return empty, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one receiver required"))
 	}
 
 	return parsedSendTransferRequest{

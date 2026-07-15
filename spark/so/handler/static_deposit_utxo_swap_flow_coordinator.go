@@ -351,7 +351,12 @@ func buildStaticDepositUtxoSwapCoordinatorFlow(ctx context.Context, config *so.C
 	// transfer handler (TransferTypeUtxoSwap rows, TransferPartnerTypeDeposit
 	// attribution, no direct-refund requirement) so it carries the swap's
 	// transfer semantics from construction.
-	transferCoord, err := buildSendTransferCoordinatorFlow(ctx, config, convertV2ToV3SendTransferRequest(req.GetTransfer()), "", handler.transfer)
+	transferReq := convertV2ToV3SendTransferRequest(req.GetTransfer())
+	parsedTransfer, err := parseSendTransferRequest(transferReq)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse swap transfer request: %w", err)
+	}
+	transferCoord, err := buildSendTransferCoordinatorFlow(ctx, config, transferReq, parsedTransfer, "", handler.transfer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build transfer coordinator flow: %w", err)
 	}

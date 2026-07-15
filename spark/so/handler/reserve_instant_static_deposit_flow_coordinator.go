@@ -232,7 +232,12 @@ func (o *StaticDepositHandler) reserveInstantStaticDepositUtxoSwapConsensus(ctx 
 	// The delegated coordinator flow is built directly on this flow's typed
 	// transfer handler so it carries the swap's transfer semantics from
 	// construction.
-	transferCoord, err := buildSendTransferCoordinatorFlow(ctx, config, convertV2ToV3SendTransferRequest(req.GetTransfer()), "", handler.transfer)
+	transferReq := convertV2ToV3SendTransferRequest(req.GetTransfer())
+	parsedTransfer, err := parseSendTransferRequest(transferReq)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse reserve transfer request: %w", err)
+	}
+	transferCoord, err := buildSendTransferCoordinatorFlow(ctx, config, transferReq, parsedTransfer, "", handler.transfer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build transfer coordinator flow: %w", err)
 	}
