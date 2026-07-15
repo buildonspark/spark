@@ -3077,9 +3077,14 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		return nil, fmt.Errorf("unable to validate share: %w", err)
 	}
 
-	if leaf.Status != st.TreeNodeStatusTransferLocked {
+	// A leaf that exited (or is exiting) to L1 mid-transfer stays claimable:
+	// the receiver already owns the funds, and claiming lets the watchtower
+	// broadcast the newest refund tx for them instead of forcing a unilateral
+	// exit of the transfer's remaining leaves. Only ownership and the keyshare
+	// are updated — the leaf keeps its on-chain status.
+	if leaf.Status != st.TreeNodeStatusTransferLocked && !leaf.Status.IsExitedToL1() {
 		return nil, sparkerrors.FailedPreconditionInvalidState(
-			fmt.Errorf("leaf %s must be %s to claim receiver key tweak, got %s", leaf.ID, st.TreeNodeStatusTransferLocked, leaf.Status),
+			fmt.Errorf("leaf %s must be %s or exited to L1 to claim receiver key tweak, got %s", leaf.ID, st.TreeNodeStatusTransferLocked, leaf.Status),
 		)
 	}
 
@@ -5334,6 +5339,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			err = db.TreeNode.CreateBulk(chunk...).
 				OnConflictColumns(enttreenode.FieldID).
 				Update(func(u *ent.TreeNodeUpsert) {
+					// Status is intentionally excluded from the update set:
+					// claiming must never rewrite a leaf's status here — in
+					// particular an exited-to-L1 leaf keeps its on-chain
+					// status (see claimLeafTweakKey), and adding
+					// UpdateStatus() would let a stale read revive it.
 					u.UpdateOwnerIdentityPubkey()
 					u.UpdateOwnerSigningPubkey()
 				}).

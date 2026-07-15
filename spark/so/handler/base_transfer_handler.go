@@ -2744,7 +2744,7 @@ func (h *BaseTransferHandler) validateTransferLeavesNotExitedToL1(ctx context.Co
 		return fmt.Errorf("unable to query transfer leaf nodes: %w", err)
 	}
 	for _, node := range transferLeafNodes {
-		if node.Status == st.TreeNodeStatusOnChain || node.Status == st.TreeNodeStatusExited || node.Status == st.TreeNodeStatusParentExited {
+		if node.Status.IsExitedToL1() {
 			return sparkerrors.FailedPreconditionInvalidState(
 				fmt.Errorf("cannot %s: leaf %s has been exited to L1 (status: %s)", operation, node.ID, node.Status))
 		}

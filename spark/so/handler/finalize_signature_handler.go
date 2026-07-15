@@ -499,12 +499,12 @@ func validateFinalizeNodeSignatureTransferLeafStates(ctx context.Context, db *en
 		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("not all transfer leaves found for transfer %s: expected %d, got %d", transferID, len(leafIDs), len(leaves)))
 	}
 	for _, leaf := range leaves {
-		switch leaf.Status {
-		case st.TreeNodeStatusTransferLocked, st.TreeNodeStatusAvailable:
+		// Leaves that exited to L1 mid-transfer stay claimable; the finalize
+		// path preserves their on-chain status — see claimLeafTweakKey.
+		if leaf.Status == st.TreeNodeStatusTransferLocked || leaf.Status == st.TreeNodeStatusAvailable || leaf.Status.IsExitedToL1() {
 			continue
-		default:
-			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s for transfer %s has status %s, expected TRANSFER_LOCKED or AVAILABLE", leaf.ID, transferID, leaf.Status))
 		}
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s for transfer %s has status %s, expected TRANSFER_LOCKED, AVAILABLE, or exited to L1", leaf.ID, transferID, leaf.Status))
 	}
 	return nil
 }

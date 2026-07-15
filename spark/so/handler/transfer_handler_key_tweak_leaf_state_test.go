@@ -38,13 +38,10 @@ func TestSettleReceiverKeyTweakRejectsNonTransferLockedLeaf(t *testing.T) {
 		st.TreeNodeStatusSplitLocked,
 		st.TreeNodeStatusSplitted,
 		st.TreeNodeStatusAggregated,
-		st.TreeNodeStatusOnChain,
 		st.TreeNodeStatusAggregateLock,
-		st.TreeNodeStatusExited,
 		st.TreeNodeStatusInvestigation,
 		st.TreeNodeStatusLost,
 		st.TreeNodeStatusReimbursed,
-		st.TreeNodeStatusParentExited,
 		st.TreeNodeStatusRenewLocked,
 	}
 
@@ -64,7 +61,7 @@ func TestSettleReceiverKeyTweakRejectsNonTransferLockedLeaf(t *testing.T) {
 			})
 			require.Error(t, err)
 			require.Equal(t, codes.FailedPrecondition, status.Code(err))
-			require.ErrorContains(t, err, "must be TRANSFER_LOCKED to claim receiver key tweak")
+			require.ErrorContains(t, err, "must be TRANSFER_LOCKED or exited to L1 to claim receiver key tweak")
 
 			updatedLeaf, err := sessionCtx.Client.TreeNode.Get(ctx, leaf.ID)
 			require.NoError(t, err)
@@ -79,6 +76,53 @@ func TestSettleReceiverKeyTweakRejectsNonTransferLockedLeaf(t *testing.T) {
 			updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
 			require.NoError(t, err)
 			require.Equal(t, st.TransferStatusReceiverKeyTweakLocked, updatedTransfer.Status)
+		})
+	}
+}
+
+func TestSettleReceiverKeyTweakAppliesExitedToL1LeafPreservingStatus(t *testing.T) {
+	exitedStatuses := []st.TreeNodeStatus{
+		st.TreeNodeStatusOnChain,
+		st.TreeNodeStatusExited,
+		st.TreeNodeStatusParentExited,
+	}
+
+	for i, leafStatus := range exitedStatuses {
+		t.Run(string(leafStatus), func(t *testing.T) {
+			ctx, sessionCtx := db.ConnectToTestPostgres(t)
+			rng := rand.NewChaCha8([32]byte{byte(73 + i)})
+			cfg := sparktesting.TestConfig(t)
+			handler := NewTransferHandler(cfg)
+
+			leaf, transfer, transferLeaf := createReceiverKeyTweakSettlementFixture(t, ctx, sessionCtx.Client, cfg, rng)
+			leaf, err := leaf.Update().SetStatus(leafStatus).Save(ctx)
+			require.NoError(t, err)
+			originalOwnerSigningPubkey := leaf.OwnerSigningPubkey.Serialize()
+
+			err = handler.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
+				TransferId: transfer.ID.String(),
+				Action:     pbinternal.SettleKeyTweakAction_COMMIT,
+			})
+			require.NoError(t, err)
+
+			entTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+			require.NoError(t, entTx.Commit())
+
+			// Ownership moves to the receiver, but the on-chain status is preserved.
+			updatedLeaf, err := sessionCtx.Client.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			require.Equal(t, leafStatus, updatedLeaf.Status)
+			require.Equal(t, transfer.ReceiverIdentityPubkey.Serialize(), updatedLeaf.OwnerIdentityPubkey.Serialize())
+			require.NotEqual(t, originalOwnerSigningPubkey, updatedLeaf.OwnerSigningPubkey.Serialize())
+
+			updatedTransferLeaf, err := sessionCtx.Client.TransferLeaf.Get(ctx, transferLeaf.ID)
+			require.NoError(t, err)
+			require.Empty(t, updatedTransferLeaf.KeyTweak)
+
+			updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)
+			require.NoError(t, err)
+			require.Equal(t, st.TransferStatusReceiverKeyTweakApplied, updatedTransfer.Status)
 		})
 	}
 }

@@ -68,6 +68,17 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 	return false
 }
 
+// IsExitedToL1 reports whether the node has exited (or is exiting) to Bitcoin
+// L1: its own node tx confirmed (ON_CHAIN), its refund tx confirmed (EXITED),
+// or an ancestor's exit confirmed (PARENT_EXITED). These are the only
+// non-claimable-by-default statuses a receiver may still claim through (the
+// claim preserves them). Distinct from CanBecomeAvailable above, whose false
+// set additionally includes SPLITTED and REIMBURSED — statuses that must
+// remain neither claimable nor revivable.
+func (s TreeNodeStatus) IsExitedToL1() bool {
+	return s == TreeNodeStatusOnChain || s == TreeNodeStatusExited || s == TreeNodeStatusParentExited
+}
+
 // Values returns the values of the tree node status.
 func (TreeNodeStatus) Values() []string {
 	return []string{
