@@ -36700,6 +36700,7 @@ type UtxoSwapMutation struct {
 	spend_tx_signing_result         *[]byte
 	utxo_value_sats                 *uint64
 	addutxo_value_sats              *int64
+	consensus_managed               *bool
 	clearedFields                   map[string]struct{}
 	utxo                            *uuid.UUID
 	clearedutxo                     bool
@@ -37607,6 +37608,42 @@ func (m *UtxoSwapMutation) ResetUtxoValueSats() {
 	m.addutxo_value_sats = nil
 }
 
+// SetConsensusManaged sets the "consensus_managed" field.
+func (m *UtxoSwapMutation) SetConsensusManaged(b bool) {
+	m.consensus_managed = &b
+}
+
+// ConsensusManaged returns the value of the "consensus_managed" field in the mutation.
+func (m *UtxoSwapMutation) ConsensusManaged() (r bool, exists bool) {
+	v := m.consensus_managed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConsensusManaged returns the old "consensus_managed" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldConsensusManaged(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConsensusManaged is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConsensusManaged requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConsensusManaged: %w", err)
+	}
+	return oldValue.ConsensusManaged, nil
+}
+
+// ResetConsensusManaged resets all changes to the "consensus_managed" field.
+func (m *UtxoSwapMutation) ResetConsensusManaged() {
+	m.consensus_managed = nil
+}
+
 // SetUtxoID sets the "utxo" edge to the Utxo entity by id.
 func (m *UtxoSwapMutation) SetUtxoID(id uuid.UUID) {
 	m.utxo = &id
@@ -37797,7 +37834,7 @@ func (m *UtxoSwapMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UtxoSwapMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.create_time != nil {
 		fields = append(fields, utxoswap.FieldCreateTime)
 	}
@@ -37846,6 +37883,9 @@ func (m *UtxoSwapMutation) Fields() []string {
 	if m.utxo_value_sats != nil {
 		fields = append(fields, utxoswap.FieldUtxoValueSats)
 	}
+	if m.consensus_managed != nil {
+		fields = append(fields, utxoswap.FieldConsensusManaged)
+	}
 	return fields
 }
 
@@ -37886,6 +37926,8 @@ func (m *UtxoSwapMutation) Field(name string) (ent.Value, bool) {
 		return m.SpendTxSigningResult()
 	case utxoswap.FieldUtxoValueSats:
 		return m.UtxoValueSats()
+	case utxoswap.FieldConsensusManaged:
+		return m.ConsensusManaged()
 	}
 	return nil, false
 }
@@ -37927,6 +37969,8 @@ func (m *UtxoSwapMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldSpendTxSigningResult(ctx)
 	case utxoswap.FieldUtxoValueSats:
 		return m.OldUtxoValueSats(ctx)
+	case utxoswap.FieldConsensusManaged:
+		return m.OldConsensusManaged(ctx)
 	}
 	return nil, fmt.Errorf("unknown UtxoSwap field %s", name)
 }
@@ -38047,6 +38091,13 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUtxoValueSats(v)
+		return nil
+	case utxoswap.FieldConsensusManaged:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConsensusManaged(v)
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap field %s", name)
@@ -38258,6 +38309,9 @@ func (m *UtxoSwapMutation) ResetField(name string) error {
 		return nil
 	case utxoswap.FieldUtxoValueSats:
 		m.ResetUtxoValueSats()
+		return nil
+	case utxoswap.FieldConsensusManaged:
+		m.ResetConsensusManaged()
 		return nil
 	}
 	return fmt.Errorf("unknown UtxoSwap field %s", name)

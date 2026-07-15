@@ -84,6 +84,7 @@ func TestStaticDepositUtxoRefund_Consensus_HappyPath(t *testing.T) {
 			Only(t.Context())
 		require.NoError(t, err, "operator %d missing refund utxo swap", i)
 		assert.Equal(t, st.UtxoSwapStatusCompleted, swap.Status, "operator %d utxo swap status mismatch", i)
+		assert.True(t, swap.ConsensusManaged, "operator %d refund swap must be consensus-managed", i)
 		assert.Equal(t, coordinatorPubKey, swap.CoordinatorIdentityPublicKey, "operator %d coordinator identity mismatch", i)
 	}
 }

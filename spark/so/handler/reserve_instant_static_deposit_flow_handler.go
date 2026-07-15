@@ -234,7 +234,8 @@ func (h *ReserveInstantStaticDepositFlowHandler) createInstantReserveSwap(ctx co
 		SetUserSignature(req.GetUserSignature()).
 		SetUserIdentityPublicKey(receiverIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
-		SetRequestedTransferID(transferID)
+		SetRequestedTransferID(transferID).
+		SetConsensusManaged(true)
 	if req.GetSecondaryCreditAmountSats() > 0 {
 		utxoSwapCreate = utxoSwapCreate.SetSecondaryCreditAmountSats(uint64(req.GetSecondaryCreditAmountSats()))
 	}

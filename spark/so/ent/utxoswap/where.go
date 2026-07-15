@@ -128,6 +128,11 @@ func UtxoValueSats(v uint64) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldUtxoValueSats, v))
 }
 
+// ConsensusManaged applies equality check predicate on the "consensus_managed" field. It's identical to ConsensusManagedEQ.
+func ConsensusManaged(v bool) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldConsensusManaged, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldCreateTime, v))
@@ -846,6 +851,16 @@ func UtxoValueSatsLT(v uint64) predicate.UtxoSwap {
 // UtxoValueSatsLTE applies the LTE predicate on the "utxo_value_sats" field.
 func UtxoValueSatsLTE(v uint64) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLTE(FieldUtxoValueSats, v))
+}
+
+// ConsensusManagedEQ applies the EQ predicate on the "consensus_managed" field.
+func ConsensusManagedEQ(v bool) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldEQ(FieldConsensusManaged, v))
+}
+
+// ConsensusManagedNEQ applies the NEQ predicate on the "consensus_managed" field.
+func ConsensusManagedNEQ(v bool) predicate.UtxoSwap {
+	return predicate.UtxoSwap(sql.FieldNEQ(FieldConsensusManaged, v))
 }
 
 // HasUtxo applies the HasEdge predicate on the "utxo" edge.

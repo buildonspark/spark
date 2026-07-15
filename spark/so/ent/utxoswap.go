@@ -55,6 +55,8 @@ type UtxoSwap struct {
 	SpendTxSigningResult []byte `json:"spend_tx_signing_result,omitempty"`
 	// Amount of sats for 0-conf swap matching.
 	UtxoValueSats uint64 `json:"utxo_value_sats,omitempty"`
+	// True when this swap row is owned by a 2PC consensus flow (set at consensus Prepare). Legacy rollback gossip refuses to cancel such rows so a stray legacy rollback cannot wedge an in-flight consensus swap. Non-nullable + Immutable: the fence's safety depends on this being set once at creation and never changed or cleared.
+	ConsensusManaged bool `json:"consensus_managed,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UtxoSwapQuery when eager-loading is set.
 	Edges                        UtxoSwapEdges `json:"edges"`
@@ -133,6 +135,8 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case utxoswap.FieldSspIdentityPublicKey, utxoswap.FieldUserIdentityPublicKey, utxoswap.FieldCoordinatorIdentityPublicKey:
 			values[i] = new(keys.Public)
+		case utxoswap.FieldConsensusManaged:
+			values[i] = new(sql.NullBool)
 		case utxoswap.FieldCreditAmountSats, utxoswap.FieldSecondaryCreditAmountSats, utxoswap.FieldMaxFeeSats, utxoswap.FieldUtxoValueSats:
 			values[i] = new(sql.NullInt64)
 		case utxoswap.FieldStatus, utxoswap.FieldRequestType:
@@ -267,6 +271,12 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				us.UtxoValueSats = uint64(value.Int64)
 			}
+		case utxoswap.FieldConsensusManaged:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field consensus_managed", values[i])
+			} else if value.Valid {
+				us.ConsensusManaged = value.Bool
+			}
 		case utxoswap.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field deposit_address_utxoswaps", values[i])
@@ -400,6 +410,9 @@ func (us *UtxoSwap) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("utxo_value_sats=")
 	builder.WriteString(fmt.Sprintf("%v", us.UtxoValueSats))
+	builder.WriteString(", ")
+	builder.WriteString("consensus_managed=")
+	builder.WriteString(fmt.Sprintf("%v", us.ConsensusManaged))
 	builder.WriteByte(')')
 	return builder.String()
 }

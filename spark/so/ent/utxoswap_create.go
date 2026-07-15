@@ -197,6 +197,20 @@ func (usc *UtxoSwapCreate) SetUtxoValueSats(u uint64) *UtxoSwapCreate {
 	return usc
 }
 
+// SetConsensusManaged sets the "consensus_managed" field.
+func (usc *UtxoSwapCreate) SetConsensusManaged(b bool) *UtxoSwapCreate {
+	usc.mutation.SetConsensusManaged(b)
+	return usc
+}
+
+// SetNillableConsensusManaged sets the "consensus_managed" field if the given value is not nil.
+func (usc *UtxoSwapCreate) SetNillableConsensusManaged(b *bool) *UtxoSwapCreate {
+	if b != nil {
+		usc.SetConsensusManaged(*b)
+	}
+	return usc
+}
+
 // SetID sets the "id" field.
 func (usc *UtxoSwapCreate) SetID(u uuid.UUID) *UtxoSwapCreate {
 	usc.mutation.SetID(u)
@@ -338,6 +352,10 @@ func (usc *UtxoSwapCreate) defaults() error {
 		v := utxoswap.DefaultUpdateTime()
 		usc.mutation.SetUpdateTime(v)
 	}
+	if _, ok := usc.mutation.ConsensusManaged(); !ok {
+		v := utxoswap.DefaultConsensusManaged
+		usc.mutation.SetConsensusManaged(v)
+	}
 	if _, ok := usc.mutation.ID(); !ok {
 		if utxoswap.DefaultID == nil {
 			return fmt.Errorf("ent: uninitialized utxoswap.DefaultID (forgotten import ent/runtime?)")
@@ -377,6 +395,9 @@ func (usc *UtxoSwapCreate) check() error {
 	}
 	if _, ok := usc.mutation.UtxoValueSats(); !ok {
 		return &ValidationError{Name: "utxo_value_sats", err: errors.New(`ent: missing required field "UtxoSwap.utxo_value_sats"`)}
+	}
+	if _, ok := usc.mutation.ConsensusManaged(); !ok {
+		return &ValidationError{Name: "consensus_managed", err: errors.New(`ent: missing required field "UtxoSwap.consensus_managed"`)}
 	}
 	return nil
 }
@@ -477,6 +498,10 @@ func (usc *UtxoSwapCreate) createSpec() (*UtxoSwap, *sqlgraph.CreateSpec) {
 	if value, ok := usc.mutation.UtxoValueSats(); ok {
 		_spec.SetField(utxoswap.FieldUtxoValueSats, field.TypeUint64, value)
 		_node.UtxoValueSats = value
+	}
+	if value, ok := usc.mutation.ConsensusManaged(); ok {
+		_spec.SetField(utxoswap.FieldConsensusManaged, field.TypeBool, value)
+		_node.ConsensusManaged = value
 	}
 	if nodes := usc.mutation.UtxoIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -881,6 +906,9 @@ func (u *UtxoSwapUpsertOne) UpdateNewValues() *UtxoSwapUpsertOne {
 		}
 		if _, exists := u.create.mutation.CreateTime(); exists {
 			s.SetIgnore(utxoswap.FieldCreateTime)
+		}
+		if _, exists := u.create.mutation.ConsensusManaged(); exists {
+			s.SetIgnore(utxoswap.FieldConsensusManaged)
 		}
 	}))
 	return u
@@ -1406,6 +1434,9 @@ func (u *UtxoSwapUpsertBulk) UpdateNewValues() *UtxoSwapUpsertBulk {
 			}
 			if _, exists := b.mutation.CreateTime(); exists {
 				s.SetIgnore(utxoswap.FieldCreateTime)
+			}
+			if _, exists := b.mutation.ConsensusManaged(); exists {
+				s.SetIgnore(utxoswap.FieldConsensusManaged)
 			}
 		}
 	}))

@@ -482,7 +482,7 @@ func TestRollbackInstantUtxoSwap_SuccessfulRollback(t *testing.T) {
 // status, returning everything the RollbackInstantUtxoSwap fence needs. The
 // transfer carries a RequestedTransferID so the SP-3261 fence block actually
 // runs (every pre-existing test left it nil, skipping the block).
-func buildInstantRollbackFixture(t *testing.T, ctx context.Context, client *ent.Client, cfg *so.Config, rngSeed byte, transferStatus st.TransferStatus) ([]byte, chainhash.Hash, *ent.UtxoSwap) {
+func buildInstantRollbackFixture(t *testing.T, ctx context.Context, client *ent.Client, cfg *so.Config, rngSeed byte, transferStatus st.TransferStatus, consensusManaged bool) ([]byte, chainhash.Hash, *ent.UtxoSwap) {
 	t.Helper()
 	rng := rand.NewChaCha8([32]byte{rngSeed})
 	depositKeyPair := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -524,6 +524,7 @@ func buildInstantRollbackFixture(t *testing.T, ctx context.Context, client *ent.
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetRequestedTransferID(transfer.ID).
 		SetTransfer(transfer).
+		SetConsensusManaged(consensusManaged).
 		Save(ctx)
 	require.NoError(t, err)
 	_, err = depositAddress.Update().AddUtxoswaps(utxoSwap).Save(ctx)
@@ -543,7 +544,7 @@ func TestRollbackInstantUtxoSwap_RefusesWhenTransferSent(t *testing.T) {
 	handler := NewInternalDepositHandler(cfg)
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 4, st.TransferStatusSenderKeyTweaked)
+	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 4, st.TransferStatusSenderKeyTweaked, false)
 	req := generateRollbackInstantRequest(t, ctx, cfg, &pb.UTXO{Txid: txHash[:], Vout: 0, Network: pb.Network_REGTEST},
 		rawTx, []pb.UtxoSwapStatus{pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CREATED}, pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED)
 
@@ -567,7 +568,7 @@ func TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent(t *testing.T) {
 	handler := NewInternalDepositHandler(cfg)
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 6, st.TransferStatusSenderInitiated)
+	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 6, st.TransferStatusSenderInitiated, false)
 	req := generateRollbackInstantRequest(t, ctx, cfg, &pb.UTXO{Txid: txHash[:], Vout: 0, Network: pb.Network_REGTEST},
 		rawTx, []pb.UtxoSwapStatus{pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CREATED}, pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED)
 
@@ -580,6 +581,35 @@ func TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent(t *testing.T) {
 	updated, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.UtxoSwapStatusCancelled, updated.Status, "an unsent-transfer reservation must still cancel")
+}
+
+// TestRollbackInstantUtxoSwap_RefusesConsensusManagedRow pins the consensus-ownership fence:
+// a consensus-managed reservation is owned by the 2PC engine's rollback, so the
+// legacy instant rollback must refuse it (no-op) unconditionally. The transfer is
+// not sent here — the transfer-sent guard alone would cancel (see
+// TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent) — so the reservation
+// staying CREATED proves the consensus_managed fence overrides it, closing both
+// knob-flip directions without a gossip drain.
+func TestRollbackInstantUtxoSwap_RefusesConsensusManagedRow(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	handler := NewInternalDepositHandler(cfg)
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+
+	rawTx, txHash, utxoSwap := buildInstantRollbackFixture(t, ctx, sessionCtx.Client, cfg, 8, st.TransferStatusSenderInitiated, true)
+
+	req := generateRollbackInstantRequest(t, ctx, cfg, &pb.UTXO{Txid: txHash[:], Vout: 0, Network: pb.Network_REGTEST},
+		rawTx, []pb.UtxoSwapStatus{pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CREATED}, pb.UtxoSwapStatus_UTXO_SWAP_STATUS_CANCELLED)
+
+	_, err := handler.RollbackInstantUtxoSwap(ctx, cfg, req)
+	require.NoError(t, err)
+	entTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, entTx.Commit())
+
+	updated, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.UtxoSwapStatusCreated, updated.Status, "consensus-managed reservation must not be cancelled by legacy rollback")
 }
 
 func TestRollbackInstantUtxoSwap_StatusNotMatching(t *testing.T) {
