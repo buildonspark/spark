@@ -17,11 +17,17 @@ const (
 	DirectHTLCSequenceOffset = 15
 )
 
-var NUMSPoint = func() keys.Public {
+var numsPoint = func() keys.Public {
 	// Taking from bip341, it's the x value public key of the hash of generator point G on secp256k1 curve.
 	numsBytes, _ := hex.DecodeString("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 	numsKey, _ := keys.ParsePublicKey(numsBytes)
 	return numsKey
+}()
+
+// NUMSPoint returns the BIP-341 nothing-up-my-sleeve point, a public key
+// with no known private key.
+func NUMSPoint() keys.Public {
+	return numsPoint
 }
 
 var LightningHTLCSequence = uint32(2160)
