@@ -5,8 +5,8 @@ import { type ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
   CurrencyUnit,
-  type LightningSendRequest,
   LightningReceiveRequestStatus,
+  type LightningSendRequest,
   LightningSendRequestStatus,
 } from "../../../types/index.js";
 import {
@@ -113,10 +113,10 @@ describe("Lightning Network provider", () => {
 
       // Register listener before payment so we don't miss the stream event.
       const bobClaimed = waitForClaim({ wallet: bobWallet });
-      await aliceWallet.payLightningInvoice({
+      const request = (await aliceWallet.payLightningInvoice({
         invoice: invoice.invoice.encodedInvoice,
         maxFeeSats: 100,
-      });
+      })) as LightningSendRequest;
 
       // wait for the claim event, we care about the transfer completing...
       await bobClaimed;
@@ -128,6 +128,12 @@ describe("Lightning Network provider", () => {
       expect(aliceBalance).toBeLessThan(
         DEPOSIT_AMOUNT - BigInt(INVOICE_AMOUNT),
       );
+
+      // Verify that payment preimage is still set for spark -> spark lightning payments
+      const lightningSendRequest = await aliceWallet.getLightningSendRequest(
+        request.id,
+      );
+      expect(lightningSendRequest?.paymentPreimage).toBeDefined();
     }, 120000);
   });
 
