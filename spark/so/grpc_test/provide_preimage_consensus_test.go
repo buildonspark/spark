@@ -59,7 +59,6 @@ func TestProvidePreimage_Consensus_HappyPath(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -126,7 +125,6 @@ func TestProvidePreimage_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 

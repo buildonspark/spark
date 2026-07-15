@@ -164,18 +164,17 @@ func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSign
 	return signingHandler.GetSigningCommitments(ctx, req)
 }
 
-// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+// InitiatePreimageSwap is disabled; use InitiatePreimageSwapV3.
 func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
-// InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
+// InitiatePreimageSwapV2 is disabled; use InitiatePreimageSwapV3.
 func (s *SparkServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.InitiatePreimageSwapV2(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
-// InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
+// InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.
 func (s *SparkServer) InitiatePreimageSwapV3(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.InitiatePreimageSwapV3(ctx, req)

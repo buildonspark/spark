@@ -15,6 +15,8 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
@@ -154,7 +156,6 @@ func TestReceiveLightningPayment(t *testing.T) {
 		feeSats,
 		true,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 	assert.Equal(t, response.GetPreimage(), preimage[:])
@@ -172,7 +173,6 @@ func TestReceiveLightningPayment(t *testing.T) {
 		feeSats,
 		true,
 		amountSats,
-		false, // useV3
 	)
 	require.Error(t, err, "should not be able to swap the same leaves twice")
 
@@ -244,7 +244,6 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 		feeSats,
 		true,
 		paymentAmountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 	require.Equal(t, response.GetPreimage(), preimage[:])
@@ -278,7 +277,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
-func TestSendLightningPaymentV2(t *testing.T) {
+func TestSendLightningPayment(t *testing.T) {
 	// Create user and ssp configs
 	userConfig := wallet.NewTestWalletConfig(t)
 	sspConfig := wallet.NewTestWalletConfig(t)
@@ -311,18 +310,19 @@ func TestSendLightningPaymentV2(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
 	transfer := response.GetTransfer()
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.GetStatus())
 
-	// Check that the expiry time is at least 15 days from now
+	// V3 honors the transfer_request expiry as-is (the test wallet stamps a
+	// sub-hour value); a multi-day expiry means a server-side override crept in.
 	htlcs, err := wallet.QueryHTLC(t.Context(), sspConfig, 5, 0, nil, nil, nil, nil)
 	require.NoError(t, err)
 	expiryTime := htlcs.GetPreimageRequests()[0].GetTransfer().GetExpiryTime().AsTime()
-	require.Greater(t, expiryTime, time.Now().Add(15*24*time.Hour))
+	require.Greater(t, expiryTime, time.Now())
+	require.Less(t, expiryTime, time.Now().Add(time.Hour))
 
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err)
@@ -351,6 +351,23 @@ func TestSendLightningPaymentV2(t *testing.T) {
 		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
+}
+
+func TestInitiatePreimageSwapV2Disabled(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+
+	conn, err := config.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	client := spark.NewSparkServiceClient(conn)
+	_, err = client.InitiatePreimageSwapV2(ctx, &spark.InitiatePreimageSwapRequest{})
+	require.Error(t, err)
+	require.Equal(t, codes.Unimplemented, status.Code(err))
 }
 
 func TestSendLightningPaymentWithRejection(t *testing.T) {
@@ -386,7 +403,6 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -436,7 +452,6 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 		feeSats,
 		true,
 		amountSats,
-		false, // useV3
 	)
 	require.Error(t, err, "should not be able to swap nodes with wrong payment hash")
 
@@ -487,7 +502,6 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -501,7 +515,6 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.Error(t, err, "should not be able to swap the same leaves twice")
 
@@ -566,7 +579,6 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3: legacy V2 fanout path
 	)
 	require.NoError(t, err)
 
@@ -631,7 +643,6 @@ func TestQueryHTLCWithNoFilters(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -683,7 +694,6 @@ func TestQueryHTLCMultipleHTLCs(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -722,7 +732,6 @@ func TestQueryHTLCMultipleHTLCs(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -779,7 +788,6 @@ func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -817,7 +825,6 @@ func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -869,7 +876,6 @@ func TestQueryHTLCWithStatusFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -926,7 +932,6 @@ func TestQueryHTLCWithTransferIdFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -981,7 +986,6 @@ func TestQueryHTLCWithTransferIdFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -1032,7 +1036,6 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -1085,7 +1088,6 @@ func TestQueryHTLCWithRoleFilter(t *testing.T) {
 		feeSats,
 		false,
 		amountSats2,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -1182,7 +1184,7 @@ func TestReceiveLightningPaymentWithTransferRequest(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	response, err := client.InitiatePreimageSwapV2(ctx, &spark.InitiatePreimageSwapRequest{
+	response, err := client.InitiatePreimageSwapV3(ctx, &spark.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash[:],
 		Reason:      spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
 		InvoiceAmount: &spark.InvoiceAmount{

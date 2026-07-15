@@ -114,14 +114,19 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 	err = kc.SetKnobWithTarget(t, knobs.KnobGrpcServerMethodEnabled, settleMethod, 0)
 	require.NoError(t, err)
 
-	// Call InitiatePreimageSwapV2 with RECEIVE reason and TransferRequest.
+	// Pin V3 to the legacy fan-out route: the consensus engine settles through
+	// its own path, and this test exists to exercise settleSenderKeyTweaks failing.
+	err = kc.SetKnob(t, knobs.KnobUseConsensusInitiatePreimageSwap, 0)
+	require.NoError(t, err)
+
+	// Call InitiatePreimageSwapV3 with RECEIVE reason and TransferRequest.
 	// The handler will:
 	//   1. Fan out the transfer to non-coordinator SOs (succeeds)
 	//   2. Recover the preimage from shares (succeeds)
 	//   3. Attempt settleSenderKeyTweaks (FAILS — endpoint disabled)
 	// The transfer data is committed before settle, so it should survive
 	// despite the error.
-	response, err := client.InitiatePreimageSwapV2(ctx, &spark.InitiatePreimageSwapRequest{
+	response, err := client.InitiatePreimageSwapV3(ctx, &spark.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash[:],
 		Reason:      spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
 		InvoiceAmount: &spark.InvoiceAmount{
@@ -150,7 +155,7 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 	// locally and returns the preimage. Other SOs receive settlement via
 	// gossip, which is persisted even though delivery is blocked by the
 	// disabled knob.
-	require.NoError(t, err, "InitiatePreimageSwapV2 should succeed even when settle RPC is disabled")
+	require.NoError(t, err, "InitiatePreimageSwapV3 should succeed even when settle RPC is disabled")
 	require.NotNil(t, response)
 	assert.Equal(t, transferID.String(), response.GetTransfer().GetId())
 

@@ -94,7 +94,6 @@ func TestInitiatePreimageSwapV3_Consensus_SendHappyPath(t *testing.T) {
 		feeSats,
 		false, // isInboundPayment: this is a send
 		amountSats,
-		true, // useV3: route through the consensus engine
 	)
 	require.NoError(t, err, "InitiatePreimageSwapV3 should succeed through the consensus path")
 
@@ -207,7 +206,6 @@ func TestInitiatePreimageSwapV3_Consensus_WritesFlowExecutionRows(t *testing.T) 
 		feeSats,
 		false,
 		amountSats,
-		true, // useV3
 	)
 	require.NoError(t, err)
 
@@ -297,7 +295,6 @@ func TestInitiatePreimageSwapV3_Consensus_ReceiveHappyPath(t *testing.T) {
 		uint64(0), // feeSats: not allowed on receive
 		true,      // isInboundPayment: lightning receive
 		amountSats,
-		true, // useV3: route through the consensus engine
 	)
 	require.NoError(t, err, "consensus receive swap should succeed")
 	// The coordinator recovered the preimage from the threshold of shares the SOs

@@ -98,7 +98,6 @@ func SwapNodesForPreimageWithHTLC(
 	feeSats uint64,
 	isInboundPayment bool,
 	amountSats uint64,
-	useV3 bool,
 	opts ...PreimageSwapOption,
 ) (*pb.InitiatePreimageSwapResponse, error) {
 	var swapOpts preimageSwapOptions
@@ -143,7 +142,10 @@ func SwapNodesForPreimageWithHTLC(
 
 	// SSP calls SO to get the preimage
 	transferID, err := uuid.NewV7()
-	expireTime := time.Now().Add(2 * time.Minute)
+	// V3 honors this expiry as-is and the settle path rejects expired transfers,
+	// so it must outlast a slow multi-SO test run while staying far below the
+	// multi-day range the override-regression assertion treats as a failure.
+	expireTime := time.Now().Add(30 * time.Minute)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate transfer id: %w", err)
 	}
@@ -313,16 +315,7 @@ func SwapNodesForPreimageWithHTLC(
 		FeeSats:                   feeSats,
 		TransferRequest:           transfer,
 	}
-	// V3 is gated behind KnobUseConsensusInitiatePreimageSwap on the SO side; the
-	// request shape is identical to V2, only the routing/expiry semantics differ.
-	if useV3 {
-		response, err := client.InitiatePreimageSwapV3(tmpCtx, swapReq)
-		if err != nil {
-			return nil, err
-		}
-		return response, nil
-	}
-	response, err := client.InitiatePreimageSwapV2(tmpCtx, swapReq)
+	response, err := client.InitiatePreimageSwapV3(tmpCtx, swapReq)
 	if err != nil {
 		return nil, err
 	}
