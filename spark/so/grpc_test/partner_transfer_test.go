@@ -228,7 +228,6 @@ func testHodlReceiveWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, signT
 		feeSats,
 		false,
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 
@@ -335,7 +334,6 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 		feeSats,
 		false, // REASON_SEND
 		amountSats,
-		false, // useV3
 	)
 	require.NoError(t, err)
 	require.NotNil(t, response.GetTransfer())
@@ -362,7 +360,7 @@ func testLightningSendWithPartnerJWT(t *testing.T, jwtPubKey jwtkeys.Public, sig
 
 // TestNonHodlReceiveWithPartnerAttribution verifies that partner info stored
 // with StorePreimageShareV2 propagates to transfer_partner during
-// InitiatePreimageSwapV2 (non-hodl receive).
+// InitiatePreimageSwapV3 (non-hodl receive).
 func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 	partnerKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -476,7 +474,7 @@ func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	response, err := client.InitiatePreimageSwapV2(ctx, &spark.InitiatePreimageSwapRequest{
+	response, err := client.InitiatePreimageSwapV3(ctx, &spark.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash[:],
 		Reason:      spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
 		InvoiceAmount: &spark.InvoiceAmount{

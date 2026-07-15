@@ -61,7 +61,6 @@ func TestInitiatePreimageSwap_RejectsReceiveWithoutTransferPackage(t *testing.T)
 		0,
 		true,
 		amountSats,
-		false, // useV3
 		wallet.WithoutTransferPackage(),
 	)
 	require.Error(t, err)
