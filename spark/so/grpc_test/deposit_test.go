@@ -209,9 +209,7 @@ func TestRotateStaticDepositAddress(t *testing.T) {
 	assert.True(t, rotateResp.GetArchivedDepositAddress().GetIsStatic())
 
 	// Verify proofs are present for both addresses
-	require.NotNil(t, rotateResp.GetNewDepositAddress().GetDepositAddressProof())
 	require.Len(t, rotateResp.GetNewDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
-	require.NotNil(t, rotateResp.GetArchivedDepositAddress().GetDepositAddressProof())
 	require.Len(t, rotateResp.GetArchivedDepositAddress().GetDepositAddressProof().GetAddressSignatures(), len(config.SigningOperators))
 
 	// Query static deposit addresses again - should now have 2 addresses (new default + archived)
@@ -493,20 +491,6 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
 			vout := 0
-			var buf bytes.Buffer
-			err = depositTx.Serialize(&buf)
-			if err != nil {
-				t.Fatalf("failed to serialize deposit tx: %v", err)
-			}
-			depositTxHex := hex.EncodeToString(buf.Bytes())
-			decodedBytes, err := hex.DecodeString(depositTxHex)
-			if err != nil {
-				t.Fatalf("failed to decode deposit tx hex: %v", err)
-			}
-			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-			if err != nil {
-				t.Fatalf("failed to deserilize deposit tx: %v", err)
-			}
 
 			// Sign, broadcast, and mine deposit tx
 			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
@@ -576,20 +560,6 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
 			vout := 0
-			var buf bytes.Buffer
-			err = depositTx.Serialize(&buf)
-			if err != nil {
-				t.Fatalf("failed to serialize deposit tx: %v", err)
-			}
-			depositTxHex := hex.EncodeToString(buf.Bytes())
-			decodedBytes, err := hex.DecodeString(depositTxHex)
-			if err != nil {
-				t.Fatalf("failed to decode deposit tx hex: %v", err)
-			}
-			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-			if err != nil {
-				t.Fatalf("failed to deserilize deposit tx: %v", err)
-			}
 
 			// Sign, broadcast, and mine deposit tx
 			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
@@ -659,20 +629,6 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
 			vout := 0
-			var buf bytes.Buffer
-			err = depositTx.Serialize(&buf)
-			if err != nil {
-				t.Fatalf("failed to serialize deposit tx: %v", err)
-			}
-			depositTxHex := hex.EncodeToString(buf.Bytes())
-			decodedBytes, err := hex.DecodeString(depositTxHex)
-			if err != nil {
-				t.Fatalf("failed to decode deposit tx hex: %v", err)
-			}
-			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-			if err != nil {
-				t.Fatalf("failed to deserilize deposit tx: %v", err)
-			}
 
 			// Sign, broadcast, and mine deposit tx
 			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
@@ -815,20 +771,6 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
 			vout := 0
-			var buf bytes.Buffer
-			err = depositTx.Serialize(&buf)
-			if err != nil {
-				t.Fatalf("failed to serialize deposit tx: %v", err)
-			}
-			depositTxHex := hex.EncodeToString(buf.Bytes())
-			decodedBytes, err := hex.DecodeString(depositTxHex)
-			if err != nil {
-				t.Fatalf("failed to decode deposit tx hex: %v", err)
-			}
-			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-			if err != nil {
-				t.Fatalf("failed to deserilize deposit tx: %v", err)
-			}
 
 			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
@@ -934,20 +876,6 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
 			vout := 0
-			var buf bytes.Buffer
-			err = depositTx.Serialize(&buf)
-			if err != nil {
-				t.Fatalf("failed to serialize deposit tx: %v", err)
-			}
-			depositTxHex := hex.EncodeToString(buf.Bytes())
-			decodedBytes, err := hex.DecodeString(depositTxHex)
-			if err != nil {
-				t.Fatalf("failed to decode deposit tx hex: %v", err)
-			}
-			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-			if err != nil {
-				t.Fatalf("failed to deserilize deposit tx: %v", err)
-			}
 
 			verifyingKey, err := keys.ParsePublicKey(depositResp.GetDepositAddress().GetVerifyingKey())
 			require.NoError(t, err)
@@ -1044,20 +972,6 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
 	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
 
 	// Sign, broadcast, and mine deposit tx
 	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
@@ -1175,20 +1089,6 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 				t.Fatalf("failed to create deposit tx: %v", err)
 			}
 			vout := 0
-			var buf bytes.Buffer
-			err = depositTx.Serialize(&buf)
-			if err != nil {
-				t.Fatalf("failed to serialize deposit tx: %v", err)
-			}
-			depositTxHex := hex.EncodeToString(buf.Bytes())
-			decodedBytes, err := hex.DecodeString(depositTxHex)
-			if err != nil {
-				t.Fatalf("failed to decode deposit tx hex: %v", err)
-			}
-			depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-			if err != nil {
-				t.Fatalf("failed to deserilize deposit tx: %v", err)
-			}
 
 			// Sign, broadcast, and mine deposit tx
 			signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)

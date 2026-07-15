@@ -29,9 +29,7 @@ import (
 func mustSerializeTx(t *testing.T, tx *wire.MsgTx) []byte {
 	t.Helper()
 	bytes, err := common.SerializeTx(tx)
-	if err != nil {
-		t.Fatalf("failed to serialize tx: %v", err)
-	}
+	require.NoErrorf(t, err, "failed to serialize tx")
 	return bytes
 }
 

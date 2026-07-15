@@ -360,10 +360,8 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 	// Test cases
 	testCases := []struct {
-		name        string
-		utxo        *pb.UTXO
-		expectError bool
-		errorMsg    string
+		name string
+		utxo *pb.UTXO
 	}{
 		{
 			name: "successful rollback request generation",
@@ -372,7 +370,6 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 				Vout:    0,
 				Network: pb.Network_REGTEST,
 			},
-			expectError: false,
 		},
 		{
 			name: "successful rollback request generation with vout 1",
@@ -381,18 +378,12 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 				Vout:    1,
 				Network: pb.Network_MAINNET,
 			},
-			expectError: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, tc.utxo, nil)
-
-			if tc.expectError {
-				require.ErrorContains(t, err, tc.errorMsg)
-				return
-			}
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
