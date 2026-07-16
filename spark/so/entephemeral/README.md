@@ -92,14 +92,17 @@ The helpers below rotate secrets in ephemeral storage and then update main DB po
 Behavior:
 
 - If ephemeral DB is available, a new version is created in ephemeral DB first, then main DB is updated to point to that version.
+- Rotation updates pass the entity's current `secret_version` as an exact compare-and-swap token. A concurrent rotation that moves the pointer first causes the stale writer to return retryable `Aborted` with reason `CONCURRENT_KEYSHARE_ROTATION`.
 - If ephemeral DB is unavailable, logic falls back to main-db `secret_share` only (legacy mode).
 - Dual-write to main `secret_share` during ephemeral mode is controlled by knob `spark.so.signing_keyshare.dual_write_secret_share`.
 - Batch/loop flows should freeze the rollout decision once per request via `FreezeSigningKeyshareSecretDualWriteDecision(ctx)` so behavior is consistent within that flow.
 
 Cleanup semantics for rotations are best-effort and instrumented:
 
-- On main transaction rollback: newly-created ephemeral version is best-effort deleted.
-- On successful main commit: previous ephemeral version is best-effort deleted.
+- On main transaction rollback before commit is attempted: the newly-created ephemeral version is best-effort deleted.
+- On successful main commit after the rotation update saved: the exact base version superseded by the successful CAS is best-effort deleted. If the base version was nil, there is no prior ephemeral row to retire.
+- On successful main commit when the rotation update never saved, such as a swallowed CAS miss: the newly-created ephemeral version is best-effort deleted.
+- On a commit error after commit was attempted: no inline cleanup deletes anything, because the main commit may have persisted. The dangling-secret purge task is the only collector for these ambiguous leftovers.
 - Cleanup failures are counted in metric `spark_db_ent_signing_keyshare_secret_cleanup_failures_total` with stage/reason attributes.
 
 ## Backstop Cleanup Job (Dangling Secrets)
