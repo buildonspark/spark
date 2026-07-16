@@ -696,23 +696,20 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 	}
 
 	// Create transfer with multiple receivers.
-	_, _, err = h.createTransferV3(
-		ctx,
-		transferID,
-		st.TransferTypeTransfer,
-		transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
-		req.GetExpiryTime().AsTime(),
-		senderIdentityPubKey,
-		receivers,
-		leafReceiverMap,
-		cpfpLeafRefundMap,
-		directLeafRefundMap,
-		directFromCpfpLeafRefundMap,
-		keyTweakMap,
-		TransferRoleParticipant,
-		false,
-		"", /* sparkInvoice: v3 request carries no invoice */
-	)
+	spec := &transferSpec{
+		transferID:      transferID,
+		senderIDPK:      senderIdentityPubKey,
+		receivers:       receivers,
+		leafReceiverMap: leafReceiverMap,
+		expiryTime:      req.GetExpiryTime().AsTime(),
+		pkgLeafIDs:      transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
+		cpfpRefunds:     cpfpLeafRefundMap,
+		directRefunds:   directLeafRefundMap,
+		dfcRefunds:      directFromCpfpLeafRefundMap,
+		keyTweaks:       keyTweakMap,
+		// sparkInvoice stays empty: the v3 request carries no invoice.
+	}
+	_, _, err = h.createTransferV3(ctx, spec, st.TransferTypeTransfer, TransferRoleParticipant, false)
 	if err != nil {
 		return fmt.Errorf("failed to initiate transfer V2 for transfer id: %s: %w", transferID, err)
 	}

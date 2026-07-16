@@ -596,26 +596,31 @@ func (h *BaseTransferHandler) createTransfer(
 	return transfer, leafMap, nil
 }
 
-// createTransferV3 creates a transfer with one sender and multiple receivers.
-// Each leaf is associated with a specific receiver via leafReceiverMap.
-// Validation is done per-receiver group since refund outputs must pay to the correct receiver.
+// createTransferV3 is the entry into the transfer core: it creates a transfer
+// with one sender and multiple receivers, consuming a transferSpec produced by
+// a request front plus the transfer semantics (type, role, direct-refund
+// requirement) chosen by the calling flow. Each leaf is associated with a
+// specific receiver via leafReceiverMap, and validation is done per-receiver
+// group since refund outputs must pay to the correct receiver.
 func (h *BaseTransferHandler) createTransferV3(
 	ctx context.Context,
-	transferID uuid.UUID,
+	spec *transferSpec,
 	transferType st.TransferType,
-	pkgLeafIDs *transferPackageLeafIDs,
-	expiryTime time.Time,
-	senderIdentityPubKey keys.Public,
-	receivers []keys.Public,
-	leafReceiverMap map[string]keys.Public,
-	leafCpfpRefundMap map[string][]byte,
-	leafDirectRefundMap map[string][]byte,
-	leafDirectFromCpfpRefundMap map[string][]byte,
-	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
 	role TransferRole,
 	requireDirectTx bool,
-	sparkInvoice string,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
+	transferID := spec.transferID
+	pkgLeafIDs := spec.pkgLeafIDs
+	expiryTime := spec.expiryTime
+	senderIdentityPubKey := spec.senderIDPK
+	receivers := spec.receivers
+	leafReceiverMap := spec.leafReceiverMap
+	leafCpfpRefundMap := spec.cpfpRefunds
+	leafDirectRefundMap := spec.directRefunds
+	leafDirectFromCpfpRefundMap := spec.dfcRefunds
+	leafTweakMap := spec.keyTweaks
+	sparkInvoice := spec.sparkInvoice
+
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry_time %v", expiryTime))
 	}
