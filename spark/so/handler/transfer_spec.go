@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
-	pbspark "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // transferSpec is the seam between send-request handling and the
@@ -28,11 +27,11 @@ import (
 // persisted-then-reloaded tweak, not a second authority; new checks belong in
 // the front.
 //
-// keyTweaks deliberately carries the wire proto (*pbspark.SendLeafKeyTweak):
-// the tweak is persisted in that encoding on TransferLeaf rows and re-parsed
-// at commit, so the proto is the seam's carrier end to end. Changing the
-// persisted encoding is a deploy-compatibility problem (old rows, in-flight
-// transfers) and is intentionally out of scope here.
+// keyTweaks holds validatedKeyTweak values, each wrapping the wire proto
+// (*pbspark.SendLeafKeyTweak): that proto stays the carrier end to end — it
+// is the persisted encoding on TransferLeaf rows and is re-parsed at commit.
+// Changing the persisted encoding is a deploy-compatibility problem (old
+// rows, in-flight transfers) and is intentionally out of scope here.
 type transferSpec struct {
 	transferID      uuid.UUID
 	senderIDPK      keys.Public
@@ -51,7 +50,7 @@ type transferSpec struct {
 	dfcRefunds    map[string][]byte
 	// keyTweaks holds this SO's validated per-leaf key tweaks, as returned by
 	// ValidateTransferPackage.
-	keyTweaks map[string]*pbspark.SendLeafKeyTweak
+	keyTweaks map[string]validatedKeyTweak
 	// sparkInvoice is non-empty only for invoice-paying sends.
 	sparkInvoice string
 }

@@ -412,7 +412,7 @@ func (h *BaseTransferHandler) createTransfer(
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
-	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
+	leafTweakMap map[string]validatedKeyTweak,
 	role TransferRole,
 	requireDirectTx bool,
 	sparkInvoice string,
@@ -1126,7 +1126,7 @@ func createTransferLeaves(
 	cpfpLeafRefundMap map[string][]byte,
 	directLeafRefundMap map[string][]byte,
 	directFromCpfpLeafRefundMap map[string][]byte,
-	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
+	leafTweakMap map[string]validatedKeyTweak,
 ) error {
 	mutators := make([]*ent.TransferLeafCreate, 0, len(leaves))
 	for _, leaf := range leaves {
@@ -1148,7 +1148,7 @@ func createTransferLeaves(
 			if !ok {
 				return fmt.Errorf("key tweak not found for leaf %s in transfer %s", leaf.ID, transfer.ID)
 			}
-			leafTweakBinary, err := proto.Marshal(leafTweak)
+			leafTweakBinary, err := proto.Marshal(leafTweak.Proto())
 			if err != nil {
 				return fmt.Errorf("unable to marshal leaf tweak: %w", err)
 			}
@@ -2420,7 +2420,7 @@ func validateTransactionCooperativeExitLeavesToSend(
 // verifySenderKeyTweakProofsMatch checks that the coordinator's plaintext proofs match
 // the proofs each SO independently decrypted from the transfer package.
 // Used before the transfer is persisted.
-func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]*pbspark.SendLeafKeyTweak, senderKeyTweakProofs map[string]*pbspark.SecretProof) error {
+func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]validatedKeyTweak, senderKeyTweakProofs map[string]*pbspark.SecretProof) error {
 	if keyTweakMap == nil || senderKeyTweakProofs == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("key tweak map and sender key tweak proofs must not be nil"))
 	}
@@ -2429,7 +2429,7 @@ func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]*pbspark.SendLeafKey
 	}
 
 	for leafID, leafTweak := range keyTweakMap {
-		if leafTweak.GetSecretShareTweak() == nil {
+		if leafTweak.Proto().GetSecretShareTweak() == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", leafID))
 		}
 		proof, ok := senderKeyTweakProofs[leafID]
@@ -2439,7 +2439,7 @@ func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]*pbspark.SendLeafKey
 		if proof == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender key tweak proof value is nil for leaf %s", leafID))
 		}
-		if !slices.EqualFunc(proof.GetProofs(), leafTweak.GetSecretShareTweak().GetProofs(), bytes.Equal) {
+		if !slices.EqualFunc(proof.GetProofs(), leafTweak.Proto().GetSecretShareTweak().GetProofs(), bytes.Equal) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof mismatch for leaf %s", leafID))
 		}
 	}

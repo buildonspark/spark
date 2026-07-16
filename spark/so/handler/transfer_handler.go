@@ -389,8 +389,8 @@ func (h *TransferHandler) startTransferInternal(
 	// so that they can validate it against the version they decrypt
 	senderKeyTweakProofs := make(map[string]*pb.SecretProof)
 	for _, leaf := range leafTweakMap {
-		senderKeyTweakProofs[leaf.GetLeafId()] = &pb.SecretProof{
-			Proofs: leaf.GetSecretShareTweak().GetProofs(),
+		senderKeyTweakProofs[leaf.Proto().GetLeafId()] = &pb.SecretProof{
+			Proofs: leaf.Proto().GetSecretShareTweak().GetProofs(),
 		}
 	}
 
@@ -1031,7 +1031,7 @@ func (h *TransferHandler) syncTransferInit(
 	return err
 }
 
-func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest, transferType st.TransferType, coordinatorKeyTweakMap map[string]*pb.SendLeafKeyTweak) error {
+func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest, transferType st.TransferType, coordinatorKeyTweakMap map[string]validatedKeyTweak) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.syncDeliverSenderKeyTweak", trace.WithAttributes(
 		transferTypeKey.String(string(transferType)),
 	))
@@ -1046,7 +1046,7 @@ func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb
 	senderKeyTweakProofs := make(map[string]*pb.SecretProof, len(coordinatorKeyTweakMap))
 	for leafID, leafTweak := range coordinatorKeyTweakMap {
 		senderKeyTweakProofs[leafID] = &pb.SecretProof{
-			Proofs: leafTweak.GetSecretShareTweak().GetProofs(),
+			Proofs: leafTweak.Proto().GetSecretShareTweak().GetProofs(),
 		}
 	}
 
@@ -5474,7 +5474,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 }
 
 // setSoCoordinatorKeyTweaks sets the key tweaks for each transfer leaf based on the validated transfer package.
-func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, keyTweakMap map[string]*pb.SendLeafKeyTweak) error {
+func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, keyTweakMap map[string]validatedKeyTweak) error {
 	// Query all transfer leaves associated with the transfer
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
@@ -5487,11 +5487,11 @@ func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfe
 			return fmt.Errorf("failed to query leaf for transfer leaf %s: %w", transferLeaf.ID, err)
 		}
 		if keyTweak, ok := keyTweakMap[leaf.ID.String()]; ok {
-			keyTweakBinary, err := proto.Marshal(keyTweak)
+			keyTweakBinary, err := proto.Marshal(keyTweak.Proto())
 			if err != nil {
 				return fmt.Errorf("failed to marshal key tweak for leaf %s: %w", leaf.ID, err)
 			}
-			_, err = transferLeaf.Update().SetKeyTweak(keyTweakBinary).SetSecretCipher(keyTweak.GetSecretCipher()).SetSignature(keyTweak.GetSignature()).Save(ctx)
+			_, err = transferLeaf.Update().SetKeyTweak(keyTweakBinary).SetSecretCipher(keyTweak.Proto().GetSecretCipher()).SetSignature(keyTweak.Proto().GetSignature()).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to set key tweak for transfer leaf %s: %w", transferLeaf.ID, err)
 			}

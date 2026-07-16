@@ -264,7 +264,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		directFromCpfpLeafRefundMap[t.GetLeafId()] = t.GetRawTx()
 	}
 
-	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferRequest() != nil {
 		keyTweakMap, err = h.transfer.ValidateTransferPackage(ctx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false)
 		if err != nil {
