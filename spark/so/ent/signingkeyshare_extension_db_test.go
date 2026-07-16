@@ -115,6 +115,20 @@ func TestAggregateKeyshares_IgnoresInputSecretVersions(t *testing.T) {
 	require.False(t, persisted.SecretShare.Equals(originalSecret))
 }
 
+func TestAggregateKeyshares_RejectsTargetAsInput(t *testing.T) {
+	t.Parallel()
+
+	ctx, _ := db.NewTestSQLiteContext(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	first := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(7)))
+	second := createSigningKeyshareForAggregateTest(t, ctx, client, new(int32(8)))
+
+	_, err = ent.AggregateKeyshares(ctx, nil, []*ent.SigningKeyshare{first, second}, first.ID)
+	require.ErrorContains(t, err, "cannot also be an input keyshare")
+}
+
 func TestCalculateAndStoreLastKey_ClearsSecretVersion(t *testing.T) {
 	t.Parallel()
 

@@ -215,6 +215,9 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 		return fmt.Errorf("fix keyshare error: %w", err)
 	}
 
+	// A concurrent rotation may make the keyshare version loaded before round 1 stale.
+	// In that case updateWithFixed returns CONCURRENT_KEYSHARE_ROTATION, and callers
+	// must retry the full FixKeyshare RPC so the protocol runs against a fresh keyshare.
 	err = h.updateWithFixed(ctx, outPayload3, args.badKeyshare)
 	if err != nil {
 		return err
@@ -503,6 +506,7 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	_, err = ent.UpdateSigningKeyshareWithRotatedSecret(
 		ctx,
 		badKeyshare.ID,
+		badKeyshare.SecretVersion,
 		secretShare,
 		func(update *ent.SigningKeyshareUpdateOne) *ent.SigningKeyshareUpdateOne {
 			return update.

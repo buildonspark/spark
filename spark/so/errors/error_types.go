@@ -56,9 +56,10 @@ const (
 	ReasonFailedPreconditionReplay                    = "REPLAY"
 	ReasonFailedPreconditionHashMismatch              = "HASH_MISMATCH"
 
-	ReasonAbortedTransactionPreempted    = "TRANSACTION_PREEMPTED"
-	ReasonAbortedConcurrentClaimConflict = "CONCURRENT_CLAIM_CONFLICT"
-	ReasonAbortedLockConflict            = "LOCK_CONFLICT"
+	ReasonAbortedTransactionPreempted       = "TRANSACTION_PREEMPTED"
+	ReasonAbortedConcurrentClaimConflict    = "CONCURRENT_CLAIM_CONFLICT"
+	ReasonAbortedConcurrentKeyshareRotation = "CONCURRENT_KEYSHARE_ROTATION"
+	ReasonAbortedLockConflict               = "LOCK_CONFLICT"
 
 	ReasonAlreadyExistsDuplicateOperation = "DUPLICATE_OPERATION"
 	ReasonAlreadyExistsExpiredTransaction = "EXPIRED_TRANSACTION"
@@ -269,6 +270,10 @@ func AbortedTransactionPreempted(err error) error {
 
 func AbortedConcurrentClaimConflict(err error) error {
 	return newRetryableGRPCError(codes.Aborted, err, ReasonAbortedConcurrentClaimConflict, abortedLockConflictRetryAfter)
+}
+
+func AbortedConcurrentKeyshareRotation(err error) error {
+	return newRetryableGRPCError(codes.Aborted, err, ReasonAbortedConcurrentKeyshareRotation, abortedLockConflictRetryAfter)
 }
 
 func AbortedLockConflict(err error) error {

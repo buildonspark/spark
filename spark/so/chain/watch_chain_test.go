@@ -1507,6 +1507,7 @@ func TestUpdateSigningKeyshareWithRotatedSecret_MainRollbackCleansUpWithTxBacked
 	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(
 		chainCtx,
 		keyshare.ID,
+		keyshare.SecretVersion,
 		newSecret,
 		nil,
 	)
@@ -1580,13 +1581,13 @@ func TestUpdateSigningKeyshareWithRotatedSecret_TxBackedEphemeralSessionReopensF
 	chainCtx := ent.Inject(ctx, &txBackedSession{tx: mainTx})
 	chainCtx = entephemeral.Inject(chainCtx, ephemeralSession)
 
-	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, firstSecret, nil)
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, keyshare.SecretVersion, firstSecret, nil)
 	require.NoError(t, err)
 	require.NotNil(t, updated.SecretVersion)
 	require.Equal(t, int32(1), *updated.SecretVersion)
 	require.Nil(t, ephemeralSession.GetTxIfExists(), "first rotation should commit the current ephemeral tx")
 
-	updated, err = ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, secondSecret, nil)
+	updated, err = ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, updated.SecretVersion, secondSecret, nil)
 	require.NoError(t, err)
 	require.NotNil(t, updated.SecretVersion)
 	require.Equal(t, int32(2), *updated.SecretVersion)
@@ -1699,7 +1700,7 @@ func TestCommitBlockTransactions_SurvivesInlineEphemeralCommit(t *testing.T) {
 
 	// Simulates the chain watcher's handleBlock path triggering keyshare rotation,
 	// which commits the per-block ephemeral tx inline today (SP-2913).
-	_, err = ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, newSecret, nil)
+	_, err = ent.UpdateSigningKeyshareWithRotatedSecret(chainCtx, keyshare.ID, keyshare.SecretVersion, newSecret, nil)
 	require.NoError(t, err)
 	require.Nil(t, ephemeralSession.GetTxIfExists(), "callee should have finalized the ephemeral tx")
 	// The captured local tx pointer (the pre-fix pattern in connectBlocks) is now

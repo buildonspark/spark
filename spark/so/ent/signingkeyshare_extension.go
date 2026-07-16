@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -42,8 +41,6 @@ import (
 // If the number of available keys drops below this threshold, DKG will be triggered to generate new
 // keys.
 const defaultMinAvailableKeys = 100_000
-
-const signingKeyshareSecretCleanupMainReadTimeout = 5 * time.Second
 
 var (
 	ErrSigningKeyshareSecretUnavailable        = errors.New("signing keyshare secret unavailable")
@@ -202,85 +199,42 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 	return true
 }
 
-func cleanupSigningKeyshareSecretRotationAfterMainOutcome(
-	ctx context.Context,
-	mainDB *Client,
-	signingKeyshareID uuid.UUID,
-	oldVersion *int32,
-	newVersion int32,
-	reason string,
-) {
-	logger := logging.GetLoggerFromContext(ctx)
-	if mainDB == nil {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
-		logger.Sugar().Warnf(
-			"skipping signing keyshare %s secret cleanup after %s because main DB is unavailable",
-			signingKeyshareID,
-			reason,
-		)
-		return
-	}
-
-	readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), signingKeyshareSecretCleanupMainReadTimeout)
-	defer cancel()
-
-	keyshare, err := mainDB.SigningKeyshare.Query().
-		Where(signingkeyshare.IDEQ(signingKeyshareID)).
-		Select(signingkeyshare.FieldSecretVersion).
-		Only(readCtx)
-	if err != nil {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
-		logger.With(zap.Error(err)).Sugar().Warnf(
-			"skipping signing keyshare %s secret cleanup after %s because main state could not be read",
-			signingKeyshareID,
-			reason,
-		)
-		return
-	}
-
-	if keyshare.SecretVersion != nil && *keyshare.SecretVersion == newVersion {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_new")
-		if oldVersion != nil && !deleteSigningKeyshareSecretVersionBestEffort(ctx, signingKeyshareID, *oldVersion, reason+" delete old") {
-			recordSigningKeyshareSecretCleanupOutcome(ctx, "delete_old_failed")
-		}
-		return
-	}
-
-	recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_old_or_other")
-	if !deleteSigningKeyshareSecretVersionBestEffort(ctx, signingKeyshareID, newVersion, reason+" delete new") {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "delete_new_failed")
-	}
-}
-
-func nonTransactionalClientFromTx(tx *Tx) (*Client, error) {
-	// Ent transaction clients are backed by txDriver, whose drv field is the parent
-	// non-transactional driver. Cleanup needs that parent driver so it can re-read
-	// committed main state after the transaction finishes. If this generated invariant
-	// changes, callers fall back to preserving all eph versions.
-	txDriver, ok := tx.config.driver.(*txDriver)
-	if !ok {
-		return nil, fmt.Errorf("unexpected main tx driver type %T", tx.config.driver)
-	}
-
-	client := &Client{config: tx.config}
-	client.config.driver = txDriver.drv
-	client.init()
-	return client, nil
+type signingKeyshareRotationOutcome struct {
+	mainSaveSucceeded  bool
+	commitAttempted    bool
+	commitErr          error
+	retiredBaseVersion *int32
 }
 
 type signingKeyshareSecretRotation struct {
 	newVersion   *int32
-	oldVersion   *int32
 	useEphemeral bool
+	outcome      *signingKeyshareRotationOutcome
 }
 
-func prepareSigningKeyshareSecretRotation(ctx context.Context, signingKeyshareID uuid.UUID, newSecretShare keys.Private) (*signingKeyshareSecretRotation, error) {
+type signingKeyshareSecretCleanupMode int
+
+const (
+	signingKeyshareSecretCleanupModeRotation signingKeyshareSecretCleanupMode = iota
+	signingKeyshareSecretCleanupModeCreate
+)
+
+// prepareSigningKeyshareSecretRotation writes the next ephemeral secret version and registers
+// cleanup hooks for the main transaction. Cleanup never re-reads main state: a version can become
+// current only through the rotation that created it, the main update is guarded by an exact
+// secret_version CAS, and committed rotations only move the pointer forward. Once a committed
+// rotation points main at N, every version below N is permanently unreachable.
+func prepareSigningKeyshareSecretRotation(
+	ctx context.Context,
+	signingKeyshareID uuid.UUID,
+	newSecretShare keys.Private,
+	cleanupMode signingKeyshareSecretCleanupMode,
+) (*signingKeyshareSecretRotation, error) {
 	ephemeralTx, err := entephemeral.GetTxFromContext(ctx)
 	if err != nil {
 		if errors.Is(err, entephemeral.ErrNoTransactionProvider) {
 			return &signingKeyshareSecretRotation{
 				newVersion:   nil,
-				oldVersion:   nil,
 				useEphemeral: false,
 			}, nil
 		}
@@ -293,14 +247,11 @@ func prepareSigningKeyshareSecretRotation(ctx context.Context, signingKeyshareID
 		return nil, err
 	}
 
-	var oldVersion *int32
 	var newVersion int32
 	if latest != nil {
 		if latest.Version == math.MaxInt32 {
 			return nil, fmt.Errorf("signing keyshare secret version overflow for keyshare %s", signingKeyshareID)
 		}
-		oldVersion = new(int32)
-		*oldVersion = latest.Version
 		newVersion = latest.Version + 1
 	}
 
@@ -317,85 +268,85 @@ func prepareSigningKeyshareSecretRotation(ctx context.Context, signingKeyshareID
 
 	tx, err := GetTxFromContext(ctx)
 	if err != nil {
-		mainDB, mainDBErr := GetDbFromContext(ctx)
-		if mainDBErr != nil {
-			mainDB = nil
-		}
-		cleanupSigningKeyshareSecretRotationAfterMainOutcome(
-			cleanupCtx,
-			mainDB,
-			signingKeyshareID,
-			oldVersion,
-			newVersion,
-			"main tx unavailable after ephemeral commit",
-		)
+		deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx unavailable after ephemeral commit")
 		return nil, err
 	}
-	mainDBForCleanup, err := nonTransactionalClientFromTx(tx)
-	if err != nil {
-		recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "main_read_failed")
-		logging.GetLoggerFromContext(cleanupCtx).With(zap.Error(err)).Sugar().Warnf(
-			"signing keyshare %s cleanup will preserve all versions because main DB client could not be prepared",
-			signingKeyshareID,
-		)
-		return &signingKeyshareSecretRotation{
-			newVersion:   &newVersion,
-			oldVersion:   oldVersion,
-			useEphemeral: true,
-		}, nil
-	}
+
+	outcome := &signingKeyshareRotationOutcome{}
 
 	tx.OnRollback(func(fn Rollbacker) Rollbacker {
 		return RollbackFunc(func(ctx context.Context, tx *Tx) error {
 			err := fn.Rollback(ctx, tx)
-			cleanupSigningKeyshareSecretRotationAfterMainOutcome(
-				cleanupCtx,
-				mainDBForCleanup,
-				signingKeyshareID,
-				oldVersion,
-				newVersion,
-				"main tx rollback",
-			)
+			if !outcome.commitAttempted && deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx rollback") {
+				recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "rollback_deleted_new")
+			}
 			return err
 		})
 	})
 
 	tx.OnCommit(func(fn Committer) Committer {
 		return CommitFunc(func(ctx context.Context, tx *Tx) error {
+			outcome.commitAttempted = true
 			err := fn.Commit(ctx, tx)
-			if err == nil && oldVersion == nil {
-				return nil
+			outcome.commitErr = err
+			switch {
+			case err == nil && cleanupMode == signingKeyshareSecretCleanupModeCreate:
+				// Creation commits reference this newly-created version. There is no older version to
+				// retire, and if the caller never saved the main INSERT then the row is only a purgeable
+				// orphan.
+			case err == nil && outcome.mainSaveSucceeded && outcome.retiredBaseVersion != nil:
+				if deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, *outcome.retiredBaseVersion, "main tx commit") {
+					recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "commit_deleted_base")
+				}
+			case err == nil && outcome.mainSaveSucceeded:
+				// The successful CAS started from a nil base version, so there is no prior
+				// ephemeral row that this rotation can prove safe to retire.
+			case err == nil && !outcome.mainSaveSucceeded:
+				if deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, newVersion, "main tx commit without rotation write") {
+					recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "commit_without_write_deleted_new")
+				}
+			default:
+				recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "ambiguous_commit_preserved")
+				logging.GetLoggerFromContext(cleanupCtx).With(zap.Error(outcome.commitErr)).Sugar().Warnf(
+					"preserving signing keyshare %s secret version %d after ambiguous main tx commit",
+					signingKeyshareID,
+					newVersion,
+				)
 			}
-			cleanupSigningKeyshareSecretRotationAfterMainOutcome(
-				cleanupCtx,
-				mainDBForCleanup,
-				signingKeyshareID,
-				oldVersion,
-				newVersion,
-				"main tx commit",
-			)
 			return err
 		})
 	})
 
 	return &signingKeyshareSecretRotation{
 		newVersion:   &newVersion,
-		oldVersion:   oldVersion,
 		useEphemeral: true,
+		outcome:      outcome,
 	}, nil
 }
 
 // UpdateSigningKeyshareWithRotatedSecret rotates the external secret version for a keyshare and
 // updates the signing_keyshares row in the main database within the same request transaction flow.
+// expectedBaseVersion must be the entity SecretVersion from the moment the base secret value was
+// read, not a later "latest" re-read. It is used as an exact compare-and-swap token for the main
+// row update. When ephemeral mode is active, the update advances secret_version to a new non-null
+// value; under Postgres READ COMMITTED, a blocked UPDATE re-checks the CAS predicate after
+// acquiring the row lock, so concurrent rotations of the same keyshare serialize with one winner.
+// Pure legacy nil-base fallback remains last-writer-wins because secret_version stays NULL.
 // Batch callers must freeze the dual-write rollout decision once via
 // FreezeSigningKeyshareSecretDualWriteDecision and reuse that context across all invocations.
 func UpdateSigningKeyshareWithRotatedSecret(
 	ctx context.Context,
 	signingKeyshareID uuid.UUID,
+	expectedBaseVersion *int32,
 	newSecretShare keys.Private,
 	mutate func(*SigningKeyshareUpdateOne) *SigningKeyshareUpdateOne,
 ) (*SigningKeyshare, error) {
-	rotation, err := prepareSigningKeyshareSecretRotation(ctx, signingKeyshareID, newSecretShare)
+	rotation, err := prepareSigningKeyshareSecretRotation(
+		ctx,
+		signingKeyshareID,
+		newSecretShare,
+		signingKeyshareSecretCleanupModeRotation,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -406,6 +357,11 @@ func UpdateSigningKeyshareWithRotatedSecret(
 	}
 
 	update := db.SigningKeyshare.UpdateOneID(signingKeyshareID)
+	if expectedBaseVersion != nil {
+		update = update.Where(signingkeyshare.SecretVersionEQ(*expectedBaseVersion))
+	} else {
+		update = update.Where(signingkeyshare.SecretVersionIsNil())
+	}
 	if rotation.useEphemeral && rotation.newVersion != nil {
 		update = update.SetSecretVersion(*rotation.newVersion)
 	} else {
@@ -423,7 +379,28 @@ func UpdateSigningKeyshareWithRotatedSecret(
 		update = mutate(update)
 	}
 
-	return update.Save(ctx)
+	if rotation.outcome != nil && expectedBaseVersion != nil {
+		retiredBaseVersion := *expectedBaseVersion
+		rotation.outcome.retiredBaseVersion = &retiredBaseVersion
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		if IsNotFound(err) {
+			// Rotation callers pass a keyshare row they already loaded, and this path does not
+			// delete rows. If the row is truly gone, the caller's retry reload fails before
+			// reaching this guarded update.
+			return nil, sparkerrors.AbortedConcurrentKeyshareRotation(fmt.Errorf(
+				"signing keyshare %s secret_version moved from expected base; retry from a fresh read: %w",
+				signingKeyshareID,
+				err,
+			))
+		}
+		return nil, err
+	}
+	if rotation.outcome != nil {
+		rotation.outcome.mainSaveSucceeded = true
+	}
+	return updated, nil
 }
 
 // PrepareSigningKeyshareCreateWithSecret writes a secret version in the ephemeral store and
@@ -434,7 +411,12 @@ func PrepareSigningKeyshareCreateWithSecret(
 	signingKeyshareID uuid.UUID,
 	secretShare keys.Private,
 ) (*SigningKeyshareCreate, error) {
-	rotation, err := prepareSigningKeyshareSecretRotation(ctx, signingKeyshareID, secretShare)
+	rotation, err := prepareSigningKeyshareSecretRotation(
+		ctx,
+		signingKeyshareID,
+		secretShare,
+		signingKeyshareSecretCleanupModeCreate,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -499,9 +481,9 @@ func PrepareSigningKeyshareCreatesWithSecrets(
 // crash-safety contract for the create case. It returns useEphemeral=false (and writes nothing) when
 // no ephemeral transaction provider is configured, so the caller stores the secret in the main column.
 //
-// On success it registers a main-tx rollback hook that re-reads committed main state and deletes only
-// the ephemeral versions main does not reference (see cleanupNewKeyshareSecretVersionsAfterMainOutcome);
-// no commit-time cleanup is needed because brand-new keyshares have no prior version to retire.
+// On success it registers main-tx hooks that delete the ephemeral rows only on a genuine rollback.
+// If Commit is attempted and reports an error, cleanup preserves every row because some main INSERTs
+// may have persisted and brand-new keyshares have no previous version to fall back to.
 func bulkCreateEphemeralSecretVersionsForNewKeyshares(
 	ctx context.Context,
 	ids []uuid.UUID,
@@ -534,104 +516,39 @@ func bulkCreateEphemeralSecretVersionsForNewKeyshares(
 
 	tx, err := GetTxFromContext(ctx)
 	if err != nil {
-		// No main transaction, so the keyshares were never written to main. Re-read committed main
-		// state (best effort) and delete the now-orphaned ephemeral versions.
-		mainDB, mainDBErr := GetDbFromContext(ctx)
-		if mainDBErr != nil {
-			mainDB = nil
-		}
-		cleanupNewKeyshareSecretVersionsAfterMainOutcome(cleanupCtx, mainDB, ids, "main tx unavailable after ephemeral bulk commit")
+		deleteSigningKeyshareSecretVersionsBestEffort(cleanupCtx, ids, newKeyshareSecretVersion, "main tx unavailable after ephemeral bulk commit")
 		return false, err
 	}
 
-	mainDBForCleanup, err := nonTransactionalClientFromTx(tx)
-	if err != nil {
-		// Without a main DB client we cannot tell committed keyshares apart from rolled-back ones, so
-		// preserve every version and let the dangling-secret purge cron reclaim any orphans rather than
-		// risk deleting live signing material.
-		recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "main_read_failed")
-		logging.GetLoggerFromContext(cleanupCtx).With(zap.Error(err)).Sugar().Warnf(
-			"signing keyshare secret bulk cleanup will preserve all %d versions because main DB client could not be prepared",
-			len(ids),
-		)
-		return true, nil
-	}
+	outcome := &signingKeyshareRotationOutcome{}
 
 	tx.OnRollback(func(fn Rollbacker) Rollbacker {
 		return RollbackFunc(func(ctx context.Context, tx *Tx) error {
 			err := fn.Rollback(ctx, tx)
-			cleanupNewKeyshareSecretVersionsAfterMainOutcome(cleanupCtx, mainDBForCleanup, ids, "main tx rollback")
+			if !outcome.commitAttempted && deleteSigningKeyshareSecretVersionsBestEffort(cleanupCtx, ids, newKeyshareSecretVersion, "main tx rollback") {
+				recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "rollback_deleted_new")
+			}
+			return err
+		})
+	})
+
+	tx.OnCommit(func(fn Committer) Committer {
+		return CommitFunc(func(ctx context.Context, tx *Tx) error {
+			outcome.commitAttempted = true
+			err := fn.Commit(ctx, tx)
+			outcome.commitErr = err
+			if err != nil {
+				recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "ambiguous_commit_preserved")
+				logging.GetLoggerFromContext(cleanupCtx).With(zap.Error(outcome.commitErr)).Sugar().Warnf(
+					"preserving %d new signing keyshare secret versions after ambiguous main tx commit",
+					len(ids),
+				)
+			}
 			return err
 		})
 	})
 
 	return true, nil
-}
-
-// cleanupNewKeyshareSecretVersionsAfterMainOutcome deletes the version-0 ephemeral secrets written for
-// a brand-new keyshare batch, but only for IDs the committed main DB does not reference at version 0.
-// This guards the ambiguous-commit case: if the main Commit() reports an error after the rows actually
-// persisted, the main-tx rollback hook still fires, and an unconditional delete would strand the
-// secret_version pointer of committed keyshares (unrecoverable when dual-write is off). IDs whose main
-// row is absent (a genuine rollback) are unreferenced, so their orphaned ephemeral rows are deleted; if
-// main state cannot be read, nothing is deleted and the dangling-secret purge cron reclaims any orphans.
-func cleanupNewKeyshareSecretVersionsAfterMainOutcome(
-	ctx context.Context,
-	mainDB *Client,
-	ids []uuid.UUID,
-	reason string,
-) {
-	if len(ids) == 0 {
-		return
-	}
-	logger := logging.GetLoggerFromContext(ctx)
-	if mainDB == nil {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
-		logger.Sugar().Warnf(
-			"skipping cleanup of %d new keyshare secrets after %s because main DB is unavailable",
-			len(ids), reason,
-		)
-		return
-	}
-
-	readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), signingKeyshareSecretCleanupMainReadTimeout)
-	defer cancel()
-
-	committedKeyshares, err := mainDB.SigningKeyshare.Query().
-		Where(signingkeyshare.IDIn(ids...)).
-		Select(signingkeyshare.FieldID, signingkeyshare.FieldSecretVersion).
-		All(readCtx)
-	if err != nil {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_read_failed")
-		logger.With(zap.Error(err)).Sugar().Warnf(
-			"skipping cleanup of %d new keyshare secrets after %s because main state could not be read",
-			len(ids), reason,
-		)
-		return
-	}
-
-	referencesNewVersion := make(map[uuid.UUID]struct{}, len(committedKeyshares))
-	for _, keyshare := range committedKeyshares {
-		if keyshare.SecretVersion != nil && *keyshare.SecretVersion == newKeyshareSecretVersion {
-			referencesNewVersion[keyshare.ID] = struct{}{}
-		}
-	}
-
-	toDelete := make([]uuid.UUID, 0, len(ids))
-	for _, id := range ids {
-		if _, ok := referencesNewVersion[id]; !ok {
-			toDelete = append(toDelete, id)
-		}
-	}
-	if len(toDelete) == 0 {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_new")
-		return
-	}
-
-	recordSigningKeyshareSecretCleanupOutcome(ctx, "main_references_old_or_other")
-	if !deleteSigningKeyshareSecretVersionsBestEffort(ctx, toDelete, newKeyshareSecretVersion, reason) {
-		recordSigningKeyshareSecretCleanupOutcome(ctx, "delete_new_failed")
-	}
 }
 
 // deleteSigningKeyshareSecretVersionsBestEffort deletes the given version for all provided keyshare
@@ -850,11 +767,17 @@ func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Pr
 	defer span.End()
 
 	if err := HydrateSigningKeyshareSecrets(ctx, []*SigningKeyshare{sk}); err != nil {
+		if concurrentRotationErr := sk.concurrentRotationErrorIfVersionMoved(ctx, err); concurrentRotationErr != nil {
+			return nil, concurrentRotationErr
+		}
 		return nil, err
 	}
 
 	secretShare, err := sk.GetSecretShare(ctx)
 	if err != nil {
+		if concurrentRotationErr := sk.concurrentRotationErrorIfVersionMoved(ctx, err); concurrentRotationErr != nil {
+			return nil, concurrentRotationErr
+		}
 		return nil, err
 	}
 
@@ -869,6 +792,7 @@ func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Pr
 	return UpdateSigningKeyshareWithRotatedSecret(
 		ctx,
 		sk.ID,
+		sk.SecretVersion,
 		newSecretShare,
 		func(update *SigningKeyshareUpdateOne) *SigningKeyshareUpdateOne {
 			return update.
@@ -876,6 +800,41 @@ func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Pr
 				SetPublicShares(newPublicShares)
 		},
 	)
+}
+
+func (sk *SigningKeyshare) concurrentRotationErrorIfVersionMoved(ctx context.Context, err error) error {
+	if !errors.Is(err, ErrSigningKeyshareSecretMissing) {
+		return nil
+	}
+
+	db, dbErr := GetDbFromContext(ctx)
+	if dbErr != nil {
+		return nil
+	}
+
+	current, dbErr := db.SigningKeyshare.Query().
+		Where(signingkeyshare.IDEQ(sk.ID)).
+		Select(signingkeyshare.FieldSecretVersion).
+		Only(ctx)
+	if dbErr != nil {
+		return nil
+	}
+	if signingKeyshareSecretVersionsEqual(sk.SecretVersion, current.SecretVersion) {
+		return nil
+	}
+
+	return sparkerrors.AbortedConcurrentKeyshareRotation(fmt.Errorf(
+		"signing keyshare %s secret_version moved from expected base while reading secret; retry from a fresh read: %w",
+		sk.ID,
+		err,
+	))
+}
+
+func signingKeyshareSecretVersionsEqual(a, b *int32) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // MarshalProto converts a SigningKeyshare to a spark protobuf SigningKeyshare.
@@ -1359,10 +1318,16 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 	return lastKey, nil
 }
 
-// AggregateKeyshares aggregates the given keyshares and updates the keyshare in the database.
+// AggregateKeyshares aggregates the given keyshares into a distinct target keyshare in the database.
 func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningKeyshare, updateKeyshareID uuid.UUID) (*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.AggregateKeyshares")
 	defer span.End()
+
+	for _, keyshare := range keyshares {
+		if keyshare != nil && keyshare.ID == updateKeyshareID {
+			return nil, fmt.Errorf("aggregate target keyshare %s cannot also be an input keyshare", updateKeyshareID)
+		}
+	}
 
 	if err := HydrateSigningKeyshareSecrets(ctx, keyshares); err != nil {
 		return nil, err
@@ -1373,9 +1338,19 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 		return nil, fmt.Errorf("failed to sum keyshares: %w", err)
 	}
 
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	baseKeyshare, err := db.SigningKeyshare.Get(ctx, updateKeyshareID)
+	if err != nil {
+		return nil, err
+	}
+
 	updateKeyshare, err := UpdateSigningKeyshareWithRotatedSecret(
 		ctx,
 		updateKeyshareID,
+		baseKeyshare.SecretVersion,
 		*sumKeyshare.SecretShare,
 		func(update *SigningKeyshareUpdateOne) *SigningKeyshareUpdateOne {
 			return update.
