@@ -345,13 +345,8 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 	sspToken, err := wallet.AuthenticateWithServer(t.Context(), sspConfig)
 	require.NoError(t, err)
 	sspCtx := wallet.ContextWithToken(t.Context(), sspToken)
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransferTweakKeys(
-		sspCtx,
-		senderTransfer,
-		sspConfig,
-		leavesToClaim[:],
-	)
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransferTweakKeys(sspCtx, senderTransfer, sspConfig, leavesToClaim)
 	require.Error(t, err, "expected error claiming transfer before exit tx confirms")
 	stat, ok := status.FromError(err)
 	require.True(t, ok)
