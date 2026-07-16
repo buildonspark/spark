@@ -133,23 +133,20 @@ func (h *TransferHandler) startTransferV3Internal(
 	}()
 
 	// Create transfer with multiple receivers.
-	transfer, leafMap, err := h.createTransferV3(
-		ctx,
-		transferID,
-		st.TransferTypeTransfer,
-		transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
-		req.GetExpiryTime().AsTime(),
-		senderIDPK,
-		receivers,
-		leafReceiverMap,
-		leafCpfpRefundMap,
-		leafDirectRefundMap,
-		leafDirectFromCpfpRefundMap,
-		leafTweakMap,
-		TransferRoleCoordinator,
-		true, /* requireDirectTx */
-		"",   /* sparkInvoice: v3 request carries no invoice */
-	)
+	spec := &transferSpec{
+		transferID:      transferID,
+		senderIDPK:      senderIDPK,
+		receivers:       receivers,
+		leafReceiverMap: leafReceiverMap,
+		expiryTime:      req.GetExpiryTime().AsTime(),
+		pkgLeafIDs:      transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
+		cpfpRefunds:     leafCpfpRefundMap,
+		directRefunds:   leafDirectRefundMap,
+		dfcRefunds:      leafDirectFromCpfpRefundMap,
+		keyTweaks:       leafTweakMap,
+		// sparkInvoice stays empty: the v3 request carries no invoice.
+	}
+	transfer, leafMap, err := h.createTransferV3(ctx, spec, st.TransferTypeTransfer, TransferRoleCoordinator, true /* requireDirectTx */)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, err)
 	}

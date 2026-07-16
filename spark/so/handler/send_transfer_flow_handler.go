@@ -157,15 +157,20 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 	//     createTransferV3 — Prepare on every SO is the only call site, so
 	//     this is where the check has to live to preserve legacy coord
 	//     behavior.
-	_, leafMap, err := h.createTransferV3(
-		ctx, parsed.transferID, h.transferType, transferPackageLeafIDLists(parsed.senderPkg.GetTransferPackage()), orig.GetExpiryTime().AsTime(),
-		parsed.senderIDPK, parsed.receivers, parsed.leafReceiverMap,
-		cpfpMap, directMap, dfcMap,
-		keyTweakMap,
-		TransferRoleParticipant,
-		h.requireDirectRefunds,
-		req.GetSparkInvoice(),
-	)
+	spec := &transferSpec{
+		transferID:      parsed.transferID,
+		senderIDPK:      parsed.senderIDPK,
+		receivers:       parsed.receivers,
+		leafReceiverMap: parsed.leafReceiverMap,
+		expiryTime:      orig.GetExpiryTime().AsTime(),
+		pkgLeafIDs:      transferPackageLeafIDLists(parsed.senderPkg.GetTransferPackage()),
+		cpfpRefunds:     cpfpMap,
+		directRefunds:   directMap,
+		dfcRefunds:      dfcMap,
+		keyTweaks:       keyTweakMap,
+		sparkInvoice:    req.GetSparkInvoice(),
+	}
+	_, leafMap, err := h.createTransferV3(ctx, spec, h.transferType, TransferRoleParticipant, h.requireDirectRefunds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer rows for %s: %w", parsed.transferID, err)
 	}
