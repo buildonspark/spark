@@ -687,6 +687,13 @@ func TestClassifyConsensusOp(t *testing.T) {
 		SetStatus(st.FlowExecutionStatusRolledBack).Save(ctx)
 	require.NoError(t, err)
 
+	participantWrongOp := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(participantWrongOp).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT)).
+		SetCoordinatorIndex(1).Save(ctx)
+	require.NoError(t, err)
+
 	unknown := uuid.New()
 
 	cases := []struct {
@@ -699,18 +706,19 @@ func TestClassifyConsensusOp(t *testing.T) {
 		{"no row -> skip foreign", unknown.String(), skipForeignOp},
 		{"empty id -> apply (pre-upgrade)", "", applyOp},
 		{"participant row committed -> skip terminal", participantCommitted.String(), skipAlreadyTerminal},
+		{"op type mismatch -> skip foreign", participantWrongOp.String(), skipForeignOp},
 		{"participant row rolled back -> skip terminal", participantRolledBack.String(), skipAlreadyTerminal},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := classifyConsensusOp(ctx, c.id)
+			got, err := classifyConsensusOp(ctx, c.id, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
 			require.NoError(t, err)
 			require.Equal(t, c.want, got)
 		})
 	}
 
 	t.Run("invalid flow id -> error, not applied", func(t *testing.T) {
-		got, err := classifyConsensusOp(ctx, "not-a-uuid")
+		got, err := classifyConsensusOp(ctx, "not-a-uuid", pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
 		require.Error(t, err)
 		require.NotEqual(t, applyOp, got)
 	})

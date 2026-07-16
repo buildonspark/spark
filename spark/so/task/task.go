@@ -307,11 +307,15 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return err
 					}
 
-					// Query 2: SENDER_KEY_TWEAK_PENDING + PREIMAGE_SWAP
+					// Query 2: SENDER_KEY_TWEAK_PENDING transfers of the 2PC-routed
+					// types whose participant Prepare persists this status durably
+					// (PREIMAGE_SWAP; UTXO_SWAP for the static-deposit flows). An
+					// aborted round can strand such a transfer with its leaves
+					// locked; expiry is the recovery that returns them.
 					// Order by expiry_time ASC to cancel oldest expired transfers first
 					senderKeyTweakPendingTransferQuery := tx.Transfer.Query().Where(
 						transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
-						transfer.TypeEQ(st.TransferTypePreimageSwap),
+						transfer.TypeIn(st.TransferTypePreimageSwap, st.TransferTypeUtxoSwap),
 						transfer.ExpiryTimeLT(time.Now()),
 						transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
 					).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
