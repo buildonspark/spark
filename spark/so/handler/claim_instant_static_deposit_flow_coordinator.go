@@ -302,10 +302,14 @@ func buildClaimInstantStaticDepositCoordinatorFlow(ctx context.Context, config *
 	handler := NewClaimInstantStaticDepositFlowHandler(config)
 	var transferCoord *sendTransferCoordinatorFlow
 	if req.GetTransfer() != nil {
-		var err error
 		// Built on the claim's typed transfer handler so the secondary carries
 		// the swap's transfer semantics from construction.
-		transferCoord, err = buildSendTransferCoordinatorFlow(ctx, config, convertV2ToV3SendTransferRequest(req.GetTransfer()), "", handler.transfer)
+		transferReq := convertV2ToV3SendTransferRequest(req.GetTransfer())
+		parsedTransfer, err := parseSendTransferRequest(transferReq)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse secondary transfer request: %w", err)
+		}
+		transferCoord, err = buildSendTransferCoordinatorFlow(ctx, config, transferReq, parsedTransfer, "", handler.transfer)
 		if err != nil {
 			return nil, fmt.Errorf("unable to build secondary transfer coordinator flow: %w", err)
 		}
