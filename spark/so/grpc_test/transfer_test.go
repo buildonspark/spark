@@ -986,12 +986,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	}
 	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 
-	_, err = wallet.ClaimTransferTweakKeys(
-		receiverCtx,
-		receiverTransfer,
-		receiverConfig,
-		leavesToClaim,
-	)
+	_, err = wallet.ClaimTransferTweakKeys(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransferTweakKeys")
 
 	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
