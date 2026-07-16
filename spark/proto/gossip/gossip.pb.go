@@ -45,6 +45,7 @@ const (
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND               ConsensusOperationType = 9
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP                 ConsensusOperationType = 10
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP ConsensusOperationType = 11
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_INSTANT_STATIC_DEPOSIT_UTXO_SWAP   ConsensusOperationType = 12
 )
 
 // Enum value maps for ConsensusOperationType.
@@ -62,6 +63,7 @@ var (
 		9:  "CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND",
 		10: "CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP",
 		11: "CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP",
+		12: "CONSENSUS_OPERATION_TYPE_CLAIM_INSTANT_STATIC_DEPOSIT_UTXO_SWAP",
 	}
 	ConsensusOperationType_value = map[string]int32{
 		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":                              0,
@@ -76,6 +78,7 @@ var (
 		"CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND":               9,
 		"CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP":                 10,
 		"CONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP": 11,
+		"CONSENSUS_OPERATION_TYPE_CLAIM_INSTANT_STATIC_DEPOSIT_UTXO_SWAP":   12,
 	}
 )
 
@@ -1944,7 +1947,7 @@ const file_gossip_proto_rawDesc = "" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
-	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xee\x04\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xb3\x05\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
 	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +
@@ -1958,7 +1961,8 @@ const file_gossip_proto_rawDesc = "" +
 	"3CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND\x10\t\x125\n" +
 	"1CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP\x10\n" +
 	"\x12E\n" +
-	"ACONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP\x10\v2H\n" +
+	"ACONSENSUS_OPERATION_TYPE_RESERVE_INSTANT_STATIC_DEPOSIT_UTXO_SWAP\x10\v\x12C\n" +
+	"?CONSENSUS_OPERATION_TYPE_CLAIM_INSTANT_STATIC_DEPOSIT_UTXO_SWAP\x10\f2H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
 

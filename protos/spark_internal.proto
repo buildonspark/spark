@@ -753,6 +753,71 @@ message ReserveInstantStaticDepositUtxoSwapRollbackRequest {
     string requested_transfer_id = 1;
 }
 
+// ClaimInstantStaticDepositUtxoSwapRequest is the internal mirror of the
+// SSP-facing claim request (phase two of the instant static deposit claim:
+// the UTXO has confirmed, so the reserved swap gets its utxo edge, the
+// optional secondary transfer, the spend-tx signature, and completion).
+// transfer_id is the PRIMARY transfer id from the coordinator's
+// ForUpdate-locked reservation row — every SO locates its own swap row by it,
+// exactly as the legacy SaveUtxoForInstantStaticDeposit fanout did. The
+// SSP-facing utxo_swap_id is deliberately not mirrored: it names the
+// coordinator's row, which the coordinator resolved to the transfer id before
+// building this request, and participant rows have per-SO ids.
+message ClaimInstantStaticDepositUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    reserved 2;
+    // Optional secondary transfer package (present iff the reservation has a
+    // secondary credit amount).
+    spark.StartTransferRequest transfer = 3;
+    // Transaction constructed by the SSP spending the UTXO to an address it owns.
+    spark.SigningJob spend_tx_signing_job = 4;
+    // Primary transfer id of the reservation; per-SO row locator.
+    string transfer_id = 5;
+}
+
+// ClaimInstantStaticDepositUtxoSwapPrepareRequest is the prepare op for the
+// CONSENSUS_OPERATION_TYPE_CLAIM_INSTANT_STATIC_DEPOSIT_UTXO_SWAP 2PC flow.
+// Every SO re-verifies the confirmed UTXO against its reserved swap row
+// (amount + deposit address), links the utxo edge, validates the spend tx it
+// is about to sign, and — if present — prepares the secondary transfer via
+// the embedded send-transfer prepare and links the secondary_transfer edge.
+// SOs in the coordinator-collected round-1 set also return their FROST
+// round-2 share over the spend-tx sighash, so signing needs no extra round:
+// the engine's Prepare fan-out IS the round-2 trip (commitments prefetched by
+// the coordinator before Execute), mirroring the fixed-swap and refund flows.
+message ClaimInstantStaticDepositUtxoSwapPrepareRequest {
+    ClaimInstantStaticDepositUtxoSwapRequest original_request = 1;
+    map<string, common.SigningCommitment> spend_tx_signing_commitments = 2;
+}
+
+// ClaimInstantStaticDepositUtxoSwapCommitRequest is the 2PC commit payload:
+// the optional embedded secondary-transfer commit plus the primary transfer
+// id locating each participant's own swap row. Participants apply the
+// secondary transfer commit FIRST, then complete the swap — CompleteUtxoSwap
+// requires every linked transfer to be sent (the primary has been sent since
+// reserve), so this ordering is load-bearing.
+message ClaimInstantStaticDepositUtxoSwapCommitRequest {
+    string transfer_id = 1;
+    SendTransferCommitRequest transfer_commit = 2;
+}
+
+// ClaimInstantStaticDepositUtxoSwapRollbackRequest is the 2PC rollback
+// payload. The claim's rollback deliberately mutates NOTHING — parity with
+// the legacy claim, whose failure path never undoes claim-side state (its
+// rollback callback is empty): the swap stays CREATED with the utxo edge
+// Prepare linked, and the sent primary is untouched (cancelling would orphan
+// it, SP-3261). A secondary transfer Prepare created stays
+// SENDER_KEY_TWEAK_PENDING; the cancel_expired_transfers sweep returns it —
+// unlocking its leaves — once it expires, the same recovery that owns
+// stranded PREIMAGE_SWAP rounds. Returning it here instead would free the
+// leaves sooner but equally burns the reservation's pinned secondary transfer
+// id (a RETURNED row blocks re-creating it just as a pending one does), and
+// would give a forged rollback payload a cross-flow transfer to corrupt.
+// transfer_id is carried for observability only.
+message ClaimInstantStaticDepositUtxoSwapRollbackRequest {
+    string transfer_id = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }
