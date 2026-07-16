@@ -832,7 +832,7 @@ const (
 // refund rollback keyed by on_chain_utxo): without it, a redelivered rollback
 // whose own swap was already cancelled would find — and cancel — a newer
 // attempt's active swap for the same UTXO.
-func classifyConsensusOp(ctx context.Context, flowExecutionID string) (consensusOpDisposition, error) {
+func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbgossip.ConsensusOperationType) (consensusOpDisposition, error) {
 	// Dormant pre-April-2026 leftover (#6288): every live coordinator populates
 	// flow_execution_id, so this branch is unreachable today. It is kept (rather
 	// than made an error) because a gossip handler error loops redelivery
@@ -856,6 +856,17 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string) (consensus
 		return skipForeignOp, nil
 	case err != nil:
 		return dispositionUnknown, fmt.Errorf("unable to load flow execution %s: %w", id, err)
+	case row.OpType != int32(opType):
+		// The gossip envelope's op type picks the handler, but the row proves
+		// which flow this SO actually prepared under this id — a mismatch means
+		// a buggy or misbehaving coordinator is steering another flow's decision
+		// into a different handler. Skip (never dispatch) rather than error:
+		// erroring would loop redelivery on a message that can never become
+		// valid, and the real flow's decision still arrives under its own type.
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+			"consensus op fence: gossip op_type %d does not match FlowExecution row %s op_type %d; skipping handler",
+			opType, flowExecutionID, row.OpType)
+		return skipForeignOp, nil
 	case row.Role == st.FlowExecutionRoleParticipant:
 		if row.Status != st.FlowExecutionStatusInFlight {
 			logging.GetLoggerFromContext(ctx).Sugar().Infof(
@@ -873,7 +884,7 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string) (consensus
 // AlreadyExists-as-success rule is testable independently of the
 // production opType→handler mapping. handler is supplied by the caller.
 func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
-	disposition, err := classifyConsensusOp(ctx, flowExecutionID)
+	disposition, err := classifyConsensusOp(ctx, flowExecutionID, opType)
 	if err != nil {
 		return err
 	}
@@ -961,7 +972,7 @@ func withRollbackCoordinatorIdentity(ctx context.Context, config *so.Config, flo
 
 // runConsensusRollback mirrors runConsensusCommit for the rollback path.
 func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
-	disposition, err := classifyConsensusOp(ctx, flowExecutionID)
+	disposition, err := classifyConsensusOp(ctx, flowExecutionID, opType)
 	if err != nil {
 		return err
 	}
