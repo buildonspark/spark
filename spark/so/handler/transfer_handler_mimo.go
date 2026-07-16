@@ -168,8 +168,8 @@ func (h *TransferHandler) startTransferV3Internal(
 	// Gossip sync: notify other SOs using InitiateTransferV2.
 	senderKeyTweakProofs := make(map[string]*pb.SecretProof)
 	for _, leaf := range leafTweakMap {
-		senderKeyTweakProofs[leaf.GetLeafId()] = &pb.SecretProof{
-			Proofs: leaf.GetSecretShareTweak().GetProofs(),
+		senderKeyTweakProofs[leaf.Proto().GetLeafId()] = &pb.SecretProof{
+			Proofs: leaf.Proto().GetSecretShareTweak().GetProofs(),
 		}
 	}
 

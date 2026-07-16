@@ -508,7 +508,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	}
 
 	// Validate the transfer package and the decrypted key tweak proofs if the package is present
-	var keyTweakMap map[string]*pb.SendLeafKeyTweak
+	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferPackage() != nil {
 		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIdentityPubKey, !transferType.IsSwap())
 		if err != nil {
@@ -777,11 +777,11 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 		if !ok {
 			return fmt.Errorf("key tweak not found for leaf %s in transfer %s", leaf.ID, transferID)
 		}
-		leafTweakBinary, err := proto.Marshal(leafTweak)
+		leafTweakBinary, err := proto.Marshal(leafTweak.Proto())
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak for leaf %s: %w", leaf.ID, err)
 		}
-		_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.GetSignature()).SetSecretCipher(leafTweak.GetSecretCipher()).Save(ctx)
+		_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.Proto().GetSignature()).SetSecretCipher(leafTweak.Proto().GetSecretCipher()).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update transfer leaf %s for leaf %s: %w", transferLeaf.ID, leaf.ID, err)
 		}
@@ -937,7 +937,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		return err
 	}
 
-	var keyTweakMap map[string]*pb.SendLeafKeyTweak
+	var keyTweakMap map[string]validatedKeyTweak
 	if transferReq.GetTransferPackage() != nil {
 		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.GetTransferPackage(), senderIDPubKey, true)
 		if err != nil {

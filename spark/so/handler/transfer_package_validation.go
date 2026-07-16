@@ -33,7 +33,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	pkg *pbspark.TransferPackage,
 	senderIdentityPubKey keys.Public,
 	requireDirectFromCpfpLeaves bool,
-) (map[string]*pbspark.SendLeafKeyTweak, error) {
+) (map[string]validatedKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if pkg == nil {
 		return nil, nil
@@ -59,11 +59,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		return nil, err
 	}
 
-	if err := h.validateKeyTweakShares(leafTweaksMap); err != nil {
-		return nil, err
-	}
-
-	return leafTweaksMap, nil
+	return h.validateKeyTweakShares(leafTweaksMap)
 }
 
 // transferLeafLimit returns the per-transfer leaf limit, runtime-configurable
@@ -310,14 +306,25 @@ func verifyTransferPackageSignature(
 	return nil
 }
 
+// validatedKeyTweak is a sender key tweak that has passed this SO's share
+// validation (Feldman check plus per-operator pubkey-share consistency).
+// The zero value is meaningless; the only construction site is
+// validateKeyTweakShares, so holding one is evidence of validation.
+type validatedKeyTweak struct{ pb *pbspark.SendLeafKeyTweak }
+
+// Proto returns the tweak's wire encoding, which is also its persistence
+// encoding on TransferLeaf rows.
+func (v validatedKeyTweak) Proto() *pbspark.SendLeafKeyTweak { return v.pb }
+
 // validateKeyTweakShares runs the cryptographic validation on each decrypted
 // key tweak: this SO's sub-share must lie on the polynomial committed to by
 // the proofs (Feldman verification), and every per-operator pubkey share must
 // match the same polynomial's public evaluation at that operator's index (so
 // operators can't be handed mutually inconsistent commitments that all pass
 // local checks).
-func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*pbspark.SendLeafKeyTweak) error {
-	for _, leafTweak := range leafTweaksMap {
+func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*pbspark.SendLeafKeyTweak) (map[string]validatedKeyTweak, error) {
+	validated := make(map[string]validatedKeyTweak, len(leafTweaksMap))
+	for leafID, leafTweak := range leafTweaksMap {
 		shareInt := new(big.Int).SetBytes(leafTweak.GetSecretShareTweak().GetSecretShare())
 		err := secretsharing.ValidateShare(
 			&secretsharing.VerifiableSecretShare{
@@ -331,17 +338,17 @@ func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*p
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("unable to validate share: %w", err)
+			return nil, fmt.Errorf("unable to validate share: %w", err)
 		}
 		// Verify every PubkeySharesTweak entry matches the polynomial commitment derived from
 		// the supplied Proofs at each operator's share index.
 		for soID, operator := range h.config.SigningOperatorMap {
 			pubkeyTweakBytes, ok := leafTweak.GetPubkeySharesTweak()[soID]
 			if !ok {
-				return fmt.Errorf("pubkey share tweak missing for operator %s in leaf %s", soID, leafTweak.GetLeafId())
+				return nil, fmt.Errorf("pubkey share tweak missing for operator %s in leaf %s", soID, leafTweak.GetLeafId())
 			}
 			if _, err := keys.ParsePublicKey(pubkeyTweakBytes); err != nil {
-				return fmt.Errorf("unable to parse pubkey share tweak for operator %s leaf %s: %w", soID, leafTweak.GetLeafId(), err)
+				return nil, fmt.Errorf("unable to parse pubkey share tweak for operator %s leaf %s: %w", soID, leafTweak.GetLeafId(), err)
 			}
 			expectedPub, err := secretsharing.EvaluatePolynomialCommitment(
 				leafTweak.GetSecretShareTweak().GetProofs(),
@@ -349,14 +356,15 @@ func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*p
 				secp256k1.S256().N,
 			)
 			if err != nil {
-				return fmt.Errorf("unable to evaluate polynomial commitment for operator %s leaf %s: %w", soID, leafTweak.GetLeafId(), err)
+				return nil, fmt.Errorf("unable to evaluate polynomial commitment for operator %s leaf %s: %w", soID, leafTweak.GetLeafId(), err)
 			}
 			if !bytes.Equal(expectedPub.Serialize(), pubkeyTweakBytes) {
-				return fmt.Errorf("pubkey share tweak for operator %s does not match polynomial commitment for leaf %s", soID, leafTweak.GetLeafId())
+				return nil, fmt.Errorf("pubkey share tweak for operator %s does not match polynomial commitment for leaf %s", soID, leafTweak.GetLeafId())
 			}
 		}
+		validated[leafID] = validatedKeyTweak{pb: leafTweak}
 	}
-	return nil
+	return validated, nil
 }
 
 // transferPackageLeafIDs carries just the leaf IDs of a TransferPackage's

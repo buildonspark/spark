@@ -1789,11 +1789,11 @@ func TestVerifySenderKeyTweakProofsMatch_Match(t *testing.T) {
 	leafID := uuid.New().String()
 	proofs := [][]byte{{1, 2, 3}, {4, 5, 6}}
 
-	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
-		leafID: {
+	keyTweakMap := map[string]validatedKeyTweak{
+		leafID: {pb: &pbspark.SendLeafKeyTweak{
 			LeafId:           leafID,
 			SecretShareTweak: &pbspark.SecretShare{Proofs: proofs},
-		},
+		}},
 	}
 	senderProofs := map[string]*pbspark.SecretProof{
 		leafID: {Proofs: proofs},
@@ -1807,18 +1807,18 @@ func TestVerifySenderKeyTweakProofsMatch_NilInputs(t *testing.T) {
 	err := verifySenderKeyTweakProofsMatch(nil, map[string]*pbspark.SecretProof{})
 	require.ErrorContains(t, err, "must not be nil")
 
-	err = verifySenderKeyTweakProofsMatch(map[string]*pbspark.SendLeafKeyTweak{}, nil)
+	err = verifySenderKeyTweakProofsMatch(map[string]validatedKeyTweak{}, nil)
 	require.ErrorContains(t, err, "must not be nil")
 }
 
 func TestVerifySenderKeyTweakProofsMatch_CountMismatch(t *testing.T) {
 	leafID := uuid.New().String()
 
-	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
-		leafID: {
+	keyTweakMap := map[string]validatedKeyTweak{
+		leafID: {pb: &pbspark.SendLeafKeyTweak{
 			LeafId:           leafID,
 			SecretShareTweak: &pbspark.SecretShare{Proofs: [][]byte{{1}}},
-		},
+		}},
 	}
 
 	err := verifySenderKeyTweakProofsMatch(keyTweakMap, map[string]*pbspark.SecretProof{})
@@ -1829,11 +1829,11 @@ func TestVerifySenderKeyTweakProofsMatch_MissingProof(t *testing.T) {
 	leafID1 := uuid.New().String()
 	leafID2 := uuid.New().String()
 
-	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
-		leafID1: {
+	keyTweakMap := map[string]validatedKeyTweak{
+		leafID1: {pb: &pbspark.SendLeafKeyTweak{
 			LeafId:           leafID1,
 			SecretShareTweak: &pbspark.SecretShare{Proofs: [][]byte{{1}}},
-		},
+		}},
 	}
 	senderProofs := map[string]*pbspark.SecretProof{
 		leafID2: {Proofs: [][]byte{{1}}},
@@ -1846,11 +1846,11 @@ func TestVerifySenderKeyTweakProofsMatch_MissingProof(t *testing.T) {
 func TestVerifySenderKeyTweakProofsMatch_Mismatch(t *testing.T) {
 	leafID := uuid.New().String()
 
-	keyTweakMap := map[string]*pbspark.SendLeafKeyTweak{
-		leafID: {
+	keyTweakMap := map[string]validatedKeyTweak{
+		leafID: {pb: &pbspark.SendLeafKeyTweak{
 			LeafId:           leafID,
 			SecretShareTweak: &pbspark.SecretShare{Proofs: [][]byte{{1, 2, 3}}},
-		},
+		}},
 	}
 	senderProofs := map[string]*pbspark.SecretProof{
 		leafID: {Proofs: [][]byte{{9, 9, 9}}},

@@ -1299,7 +1299,7 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferRequest() != nil {
 		phaseStart = time.Now()
 		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.buildHTLCRefunds", spanOpt)
@@ -1902,7 +1902,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferRequest() != nil {
 		phaseStart = time.Now()
 		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.buildHTLCRefunds", spanOpt)
