@@ -77,13 +77,20 @@ func (h *CoopExitFlowHandler) Prepare(ctx context.Context, op proto.Message) (pr
 	if orig == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("original_request is required"))
 	}
-	parsed, err := parseCoopExitRequest(orig)
+
+	// exit_txid + connector binding before package parsing, DB writes, or
+	// FROST work, so a mismatched binding is always rejected by this validator
+	// regardless of what else is wrong with the package. The legacy path checks
+	// the binding after parsing the transfer id and owner key but likewise
+	// before package validation; the shared invariant is binding-before-package
+	// — exact error precedence among the cheap request-shape checks is not part
+	// of the contract.
+	exitTxid, err := parseAndValidateCoopExitTxid(orig.GetTransfer().GetTransferId(), orig.GetExitTxid(), orig.GetConnectorTx())
 	if err != nil {
 		return nil, err
 	}
 
-	// exit_txid + connector binding before any DB write or FROST work.
-	exitTxid, err := parseAndValidateCoopExitTxid(orig.GetTransfer().GetTransferId(), orig.GetExitTxid(), orig.GetConnectorTx())
+	parsed, err := parseCoopExitRequest(orig)
 	if err != nil {
 		return nil, err
 	}
@@ -440,17 +447,21 @@ func (f *coopExitCoordinatorFlow) RollbackPayload() proto.Message {
 // (createTransfer, CooperativeExit row, FROST round-2) happen inside
 // engine.Execute via the engine-driven Prepare phase.
 func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *pb.CooperativeExitRequest) (*coopExitCoordinatorFlow, error) {
-	parsed, err := parseCoopExitRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
 	// Fast-fail the exit_txid<->connector_tx binding on the coordinator before
 	// the engine fans Prepare out to every SO. Prepare re-runs this on each SO
 	// (it's the authoritative gate, before any DB write), but rejecting a
 	// malformed/malicious binding here avoids a wasted RPC round-trip across the
-	// cluster. Mirrors send transfer's fast-fail structural validation.
+	// cluster. Runs before package parsing so the binding validator's rejection
+	// takes precedence over package errors — the same binding-before-package
+	// invariant the legacy cooperativeExitWithTransferPackage path enforces
+	// (exact error precedence among the cheap request-shape checks is not part
+	// of the contract).
 	if _, err := parseAndValidateCoopExitTxid(req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx()); err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseCoopExitRequest(req)
+	if err != nil {
 		return nil, err
 	}
 
