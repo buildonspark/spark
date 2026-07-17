@@ -17,6 +17,8 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/knobs"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,7 +59,25 @@ import (
 //     term invariant, which holds even when the per-share divergence is
 //     present and is therefore not by itself sufficient evidence that the
 //     bug is fixed. We check it as a sanity guard.
+//
+// Knob note: pins KnobUseConsensusClaim=0 because the atomicity fix under
+// test lives in the legacy settle path (settleReceiverKeyTweakInternal's
+// single-outer-tx behavior). With the tilt default routing claims through
+// the consensus engine, an unpinned run would exercise
+// claim_transfer_flow_handler instead and legacy regressions could pass
+// unnoticed.
 func TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping legacy-path knob-pinned test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot pin KnobUseConsensusClaim=0: %v", err)
+	}
+	// KnobController registers its own t.Cleanup that restores the full
+	// ConfigMap snapshot — no per-knob reset needed here.
+	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 0))
+
 	// Sender side
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
@@ -216,7 +236,26 @@ func readKeyshareFromAllOperators(
 // so the test writes the post-T1 state directly via
 // stageEarlyCommittedKeyTweakOnOperator. The actual behavior under test
 // runs through wallet.ClaimTransferV2.
+//
+// Knob note: this pins KnobUseConsensusClaim=0 because the recovery contract
+// under test — persistCoordinatorClaimKeyTweak's T1 wedge, the synchronous
+// cluster-wide ROLLBACK, and the "rolled back" error text — is specific to
+// the legacy settle path. The consensus (2PC engine) path can't produce this
+// wedge on its own (Prepare's writes are atomic with the engine's request
+// tx) and recovers stranded state via engine rollback gossip + the
+// FlowExecution reconciler instead, which has its own contract.
 func TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping legacy-path knob-pinned test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot pin KnobUseConsensusClaim=0: %v", err)
+	}
+	// KnobController registers its own t.Cleanup that restores the full
+	// ConfigMap snapshot — no per-knob reset needed here.
+	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 0))
+
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)

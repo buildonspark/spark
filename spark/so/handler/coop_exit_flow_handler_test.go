@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -179,4 +182,50 @@ func TestCoopExitFlowHandler_Rollback_RejectsMissingTransferID(t *testing.T) {
 		err := handler.Rollback(t.Context(), &pbinternal.CoopExitRollbackRequest{})
 		require.ErrorContains(t, err, "transfer_id is required")
 	})
+}
+
+// TestCoopExitFlowHandler_Prepare_BindingValidationPrecedesPackageParsing pins
+// the participant-side validation ordering: a request whose exit_txid fails the
+// connector-tx binding AND whose transfer package is invalid must be rejected
+// by the binding validator, matching the coordinator fast-fail and the legacy
+// cooperativeExitWithTransferPackage precedence. The coordinator rejects such a
+// request before engine fan-out, so the end-to-end coop-exit test never drives
+// this combination through Prepare — this unit test covers the participant
+// seam directly. The binding check runs on raw request fields before any DB or
+// config access, so a nil config and bare context suffice; a package-parsing
+// error surfacing here means Prepare consulted the package first.
+func TestCoopExitFlowHandler_Prepare_BindingValidationPrecedesPackageParsing(t *testing.T) {
+	t.Parallel()
+
+	var legitParent chainhash.Hash
+	for i := range legitParent {
+		legitParent[i] = byte(i + 1)
+	}
+	connectorTx := wire.NewMsgTx(3)
+	connectorTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: legitParent, Index: 1}})
+	connectorTx.AddTxOut(&wire.TxOut{Value: 354, PkScript: []byte{0x51}})
+	connectorTxBytes, err := common.SerializeTx(connectorTx)
+	require.NoError(t, err)
+
+	// Alibi exit_txid: 32 bytes that do not match legitParent in either endian.
+	alibiExitTxid := make([]byte, 32)
+	for i := range alibiExitTxid {
+		alibiExitTxid[i] = byte(255 - i)
+	}
+
+	handler := NewCoopExitFlowHandler(nil)
+	_, err = handler.Prepare(t.Context(), &pbinternal.CoopExitPrepareRequest{
+		OriginalRequest: &pb.CooperativeExitRequest{
+			Transfer: &pb.StartTransferRequest{
+				TransferId:      uuid.NewString(),
+				TransferPackage: &pb.TransferPackage{}, // invalid: empty key tweak package
+			},
+			ExitId:      uuid.NewString(),
+			ExitTxid:    alibiExitTxid,
+			ConnectorTx: connectorTxBytes,
+		},
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "does not match exit_txid",
+		"rejection must come from the connector-binding validator, not package parsing")
 }
