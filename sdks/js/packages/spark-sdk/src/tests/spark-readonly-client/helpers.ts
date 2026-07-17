@@ -125,6 +125,87 @@ export function createSignerReadonlyClient(
   return SparkReadonlyClient.createWithSigner(LOCAL_OPTIONS, signer);
 }
 
+// ── Privacy Convergence ─────────────────────────────────────────
+
+/** Rejects if `promise` doesn't settle within `ms`, so a stalled SO can't hang the poll. */
+async function withReadTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} exceeded ${ms}ms`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Waits until the public client observes a privatized wallet as empty, so
+ * enforcement assertions don't race gossip propagation of the wallet setting to
+ * peer SOs. Requires consecutive zero reads so one already-gossiped operator
+ * can't satisfy the wait while a peer still serves the wallet as public. Each
+ * read is deadline-bounded and the whole wait is time-boxed — the readonly-client
+ * RPCs carry no gRPC deadline, so an unbounded read against a stalled SO would
+ * otherwise hang to the Jest hook timeout. Throws its own error on timeout, so a
+ * genuine enforcement regression fails rather than hangs.
+ */
+export async function waitForPrivacyConvergence(
+  publicClient: SparkReadonlyClient,
+  sparkAddress: string,
+): Promise<void> {
+  const convergenceTimeoutMs = 60_000;
+  const perReadTimeoutMs = 5_000;
+  const requiredConsecutiveZeroReads = 5;
+  const pollIntervalMs = 500;
+
+  const deadline = Date.now() + convergenceTimeoutMs;
+  let consecutiveZeroReads = 0;
+  let lastObserved = "no successful read";
+
+  while (Date.now() < deadline) {
+    try {
+      const [available, owned] = await Promise.all([
+        withReadTimeout(
+          publicClient.getAvailableBalance(sparkAddress),
+          perReadTimeoutMs,
+          "getAvailableBalance",
+        ),
+        withReadTimeout(
+          publicClient.getOwnedBalance(sparkAddress),
+          perReadTimeoutMs,
+          "getOwnedBalance",
+        ),
+      ]);
+      if (available === 0n && owned === 0n) {
+        if (++consecutiveZeroReads >= requiredConsecutiveZeroReads) {
+          return;
+        }
+        continue;
+      }
+      consecutiveZeroReads = 0;
+      lastObserved = `available=${available}, owned=${owned}`;
+    } catch (err) {
+      consecutiveZeroReads = 0;
+      lastObserved = err instanceof Error ? err.message : String(err);
+    }
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+  }
+
+  throw new Error(
+    `privacy enforcement did not converge within ${convergenceTimeoutMs}ms (last: ${lastObserved})`,
+  );
+}
+
 // ── Address Helpers ─────────────────────────────────────────────
 
 /**

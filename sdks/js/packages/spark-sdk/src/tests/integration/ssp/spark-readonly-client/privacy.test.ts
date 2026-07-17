@@ -8,12 +8,13 @@ import {
   createFundedWallet,
   createPublicReadonlyClient,
   createOwnerReadonlyClient,
+  waitForPrivacyConvergence,
   type FundedWallet,
 } from "../../../spark-readonly-client/helpers.js";
 import { type SparkReadonlyClient } from "../../../../spark-readonly-client/spark-readonly-client.node.js";
 
 describe("private wallet access", () => {
-  jest.setTimeout(60_000);
+  jest.setTimeout(120_000);
 
   let funded: FundedWallet;
   let publicClient: SparkReadonlyClient;
@@ -25,6 +26,10 @@ describe("private wallet access", () => {
 
     publicClient = createPublicReadonlyClient();
     ownerClient = await createOwnerReadonlyClient(funded.mnemonic);
+
+    // Wallet settings propagate to peer SOs asynchronously and reads fail open
+    // until the row lands; wait for enforcement to converge before asserting.
+    await waitForPrivacyConvergence(publicClient, funded.sparkAddress);
   });
 
   describe("getAvailableBalance", () => {
