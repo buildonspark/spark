@@ -9,7 +9,6 @@ import (
 	"maps"
 	"runtime/debug"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -31,7 +30,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/entephemeral"
@@ -39,7 +37,6 @@ import (
 	"github.com/lightsparkdev/spark/so/knobs"
 	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/lightsparkdev/spark/so/tree"
-	"github.com/lightsparkdev/spark/so/watchtower"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -59,6 +56,7 @@ var (
 	eligibleNodesGauge                 metric.Int64Gauge
 	blockHeightGauge                   metric.Int64Gauge
 	blockHeightProcessingTimeHistogram metric.Int64Histogram
+	sparkChainActionTimeHistogram      metric.Int64Histogram
 
 	// tweakKeysForCoopExitFunc is a function variable that can be mocked in tests
 	tweakKeysForCoopExitFunc = tweakKeysForCoopExit
@@ -205,12 +203,22 @@ func init() {
 		otel.Handle(err)
 		blockHeightProcessingTimeHistogram = noop.Int64Histogram{}
 	}
+
+	sparkChainActionTimeHistogram, err = meter.Int64Histogram(
+		"chain_watcher.spark_chain_action_time_milliseconds",
+		metric.WithDescription("Time taken to perform Spark chain actions (watchtower broadcasts, coop exit key tweaks)"),
+		metric.WithExplicitBucketBoundaries(1000, 3000, 7000, 10000, 20000, 60000, 120000, 180000),
+	)
+	if err != nil {
+		otel.Handle(err)
+		sparkChainActionTimeHistogram = noop.Int64Histogram{}
+	}
 }
 
 func pollInterval(network btcnetwork.Network) time.Duration {
 	switch network {
 	case btcnetwork.Mainnet:
-		return 15 * time.Second
+		return 30 * time.Second
 	case btcnetwork.Testnet:
 		return 1 * time.Minute
 	case btcnetwork.Regtest:
@@ -377,6 +385,18 @@ func scanChainUpdates(
 		return fmt.Errorf("failed to connect blocks: %w", err)
 	}
 	logger.Sugar().Infof("Connected %d blocks", len(difference.Connected))
+
+	// Self-gated on block_heights.chain_action_height: runs only while the
+	// cursor is behind the connected tip, so failed, crashed, or interrupted
+	// runs are retried on every scan tick until they succeed. Runs before the
+	// deposit-availability pass below so a persistent failure there cannot
+	// starve watchtower broadcasts and coop-exit tweaks.
+	if err := processSparkChainActions(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network); err != nil {
+		if errors.Is(err, errEphemeralMainDBDiverged) {
+			return err
+		}
+		logger.Error("Failed to perform Spark chain actions", zap.Error(err))
+	}
 
 	// After connecting blocks, process deposit availability. This runs sequentially
 	// to avoid potential issues with parallel database transactions.
@@ -729,6 +749,7 @@ func processTransactions(txs []wire.MsgTx, networkParams *chaincfg.Params) (map[
 // Attempts to process all transactions in the block and update the block
 // height. If an error occurs, none of the transactions are processed and the block
 // height is not updated so the block can be retried.
+// Spark chain actions derived from DB state (watchtower broadcasts, coop-exit key tweaks) run in processSparkChainActions after blocks commit.
 func handleBlock(
 	ctx context.Context,
 	config *so.Config,
@@ -761,49 +782,6 @@ func handleBlock(
 	confirmedTxHashSet, creditedAddresses, addressToUtxoMap, err := processTransactions(txs, networkParams)
 	if err != nil {
 		return err
-	}
-
-	// Find transactions with expired timelocks and broadcast them if needed
-	processNodesForWatchtowers := true
-	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
-		if bitcoinConfig.ProcessNodesForWatchtowers != nil {
-			processNodesForWatchtowers = *bitcoinConfig.ProcessNodesForWatchtowers
-		}
-	}
-	if processNodesForWatchtowers {
-		logger.Sugar().Infof("Started processing nodes & transfer leaves for watchtowers at block height %d", blockHeight)
-		// Fetch only nodes that could have expired timelocks
-		nodes, err := watchtower.QueryBroadcastableNodes(ctx, dbClient, blockHeight, network)
-		if err != nil {
-			return fmt.Errorf("failed to query nodes: %w", err)
-		}
-		// Record number of eligible nodes for timelock checks
-		if eligibleNodesGauge != nil {
-			eligibleNodesGauge.Record(ctx, int64(len(nodes)), metric.WithAttributes(
-				attribute.String("network", network.String()),
-			))
-		}
-		for _, node := range nodes {
-			if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight, network); err != nil {
-				logger.Sugar().Errorf("Failed to check expired time locks for node %s: %v", node.ID, err)
-			}
-		}
-
-		// Process transfer leaves for watchtower
-		transferLeaves, err := watchtower.QueryBroadcastableTransferLeaves(ctx, dbClient, network)
-		if err != nil {
-			return fmt.Errorf("failed to query transfer leaves: %w", err)
-		}
-		for _, transferLeaf := range transferLeaves {
-			leaf := transferLeaf.Edges.Leaf
-			if leaf == nil {
-				logger.Sugar().Errorf("Transfer leaf %s has no leaf edge (expected with WithLeaf())", transferLeaf.ID)
-				continue
-			}
-			if err := watchtower.BroadcastTransferLeafRefund(ctx, bitcoinClient, transferLeaf, leaf.NodeConfirmationHeight, network, blockHeight); err != nil {
-				logger.Sugar().Errorf("Failed to broadcast intermediate refund for transfer leaf %s: %v", transferLeaf.ID, err)
-			}
-		}
 	}
 
 	// If marking exiting nodes is slow, it can be disabled by setting the knob to 0,
@@ -855,34 +833,6 @@ func handleBlock(
 			_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to update ConfirmationHeight for coop exit %s: %w", coopExit.ID, err)
-			}
-		}
-	}
-
-	coopExitsToTweak, err := dbClient.CooperativeExit.Query().
-		Where(
-			cooperativeexit.ConfirmationHeightNotNil(),
-			cooperativeexit.KeyTweakedHeightIsNil(),
-			cooperativeexit.HasTransferWith(transfer.NetworkEQ(network)),
-		).
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to query coop exits to tweak: %w", err)
-	}
-
-	requiredConfirmations := int64(knobs.CoopExitConfirmationThreshold)
-	for _, coopExit := range coopExitsToTweak {
-		if blockHeight-*coopExit.ConfirmationHeight+1 >= requiredConfirmations {
-			// Attempt to tweak keys for the coop exit. Ok to log the error and continue here
-			// since this is not critical for the block processing.
-			err = tweakKeysForCoopExitFunc(ctx, config, coopExit, blockHeight)
-			if err != nil {
-				logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle transfer key tweak for coop exit %s", coopExit.ID)
-				continue
-			}
-			_, err = coopExit.Update().SetKeyTweakedHeight(blockHeight).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to update KeyTweakedHeight for coop exit %s: %w", coopExit.ID, err)
 			}
 		}
 	}
