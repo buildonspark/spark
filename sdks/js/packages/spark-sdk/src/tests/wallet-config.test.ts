@@ -358,3 +358,51 @@ describe("WalletConfigService logging normalization", () => {
     );
   });
 });
+
+describe("WalletConfigService nested option merging", () => {
+  it("keeps auto-optimization enabled when only multiplicity is overridden", () => {
+    const service = new WalletConfigService(
+      { optimizationOptions: { multiplicity: 2 } },
+      mockSigner,
+    );
+
+    expect(service.getOptimizationOptions()).toEqual({
+      auto: true,
+      multiplicity: 2,
+    });
+  });
+
+  it("respects an explicit auto: false override", () => {
+    const service = new WalletConfigService(
+      { optimizationOptions: { auto: false } },
+      mockSigner,
+    );
+
+    expect(service.getOptimizationOptions()).toEqual({
+      auto: false,
+      multiplicity: 1,
+    });
+  });
+
+  it("uses optimization defaults when no override is provided", () => {
+    const service = new WalletConfigService({}, mockSigner);
+
+    expect(service.getOptimizationOptions()).toEqual({
+      auto: true,
+      multiplicity: 1,
+    });
+  });
+
+  it("keeps token optimization enabled when only intervalMs is overridden", () => {
+    const service = new WalletConfigService(
+      { tokenOptimizationOptions: { intervalMs: 60000 } },
+      mockSigner,
+    );
+
+    expect(service.getTokenOptimizationOptions()).toEqual({
+      enabled: true,
+      intervalMs: 60000,
+      minOutputsThreshold: 50,
+    });
+  });
+});

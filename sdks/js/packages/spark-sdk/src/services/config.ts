@@ -179,6 +179,9 @@ export class WalletConfigService implements HasSspClientOptions {
     const defaultConfig = this.getDefaultConfig(Network[network]);
     const envTls = getTlsOptionsFromEnv(network);
 
+    // Nested option objects are merged key-by-key so a partial override like
+    // optimizationOptions: { multiplicity: 2 } tunes the defaults instead of
+    // replacing them (which would silently drop e.g. auto: true).
     this.config = {
       ...defaultConfig,
       ...options,
@@ -186,6 +189,14 @@ export class WalletConfigService implements HasSspClientOptions {
         ...defaultConfig.tls,
         ...envTls,
         ...options.tls,
+      },
+      optimizationOptions: {
+        ...defaultConfig.optimizationOptions,
+        ...options.optimizationOptions,
+      },
+      tokenOptimizationOptions: {
+        ...defaultConfig.tokenOptimizationOptions,
+        ...options.tokenOptimizationOptions,
       },
     };
 
