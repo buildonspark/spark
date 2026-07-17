@@ -26,7 +26,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
@@ -366,10 +365,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 
-	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
-
-	bitcoinClient, err := rpcclient.New(connCfg, nil)
-	require.NoError(t, err)
+	bitcoinClient := newDeadBitcoinClient(t)
 	blockHeight := int64(101)
 	err = handleBlock(ctx, &config, dbTx, bitcoinClient, txs, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
 	require.NoError(t, err)
@@ -584,10 +580,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 
-	// Create a mock bitcoin client
-	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
-	bitcoinClient, err := rpcclient.New(connCfg, nil)
-	require.NoError(t, err)
+	bitcoinClient := newDeadBitcoinClient(t)
 
 	blockHeight := int64(500)
 
@@ -652,14 +645,11 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 
 func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, tc := db.NewTestSQLiteContext(t)
 
-	// Mock tweakKeysForCoopExit to succeed immediately
-	originalTweakFunc := tweakKeysForCoopExitFunc
-	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
+	setTweakFunc(t, func(context.Context, *so.Config, *ent.CooperativeExit, int64) error {
 		return nil
-	}
-	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
+	})
 
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -780,9 +770,7 @@ func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 
-	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
-	bitcoinClient, err := rpcclient.New(connCfg, nil)
-	require.NoError(t, err)
+	bitcoinClient := newDeadBitcoinClient(t)
 
 	blockHeight := int64(100)
 	blockTxs := []wire.MsgTx{coopExitTx1, coopExitTx2}
@@ -812,13 +800,17 @@ func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 	assert.True(t, confirmedTransferIDs[transfer2.ID], "Exit 2 (transfer2) should be confirmed")
 	assert.False(t, confirmedTransferIDs[transfer3.ID], "Exit 3 (transfer3) should NOT be confirmed")
 
-	// Process more blocks to trigger key tweaking (need CoopExitConfirmationThreshold confirmations)
+	// The tweak phase runs in its own per-exit transactions which cannot see
+	// uncommitted session data, so commit the session tx first.
+	require.NoError(t, tc.Session.GetTxIfExists().Commit())
+
+	// Process at a height that triggers key tweaking (need CoopExitConfirmationThreshold confirmations)
 	blockHeight = int64(100 + knobs.CoopExitConfirmationThreshold - 1)
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
+	err = tweakEligibleCoopExits(ctx, &config, tc.Client, nil, NewTip(blockHeight, chainhash.Hash{}), btcnetwork.Testnet)
 	require.NoError(t, err)
 
 	// Verify: After enough confirmations, keys should be tweaked for all confirmed exits
-	allCoopExits, err = dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
+	allCoopExits, err = tc.Client.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
 
 	tweakedCount := 0
@@ -846,13 +838,11 @@ func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 // already-confirmed exits are not duplicated.
 func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, tc := db.NewTestSQLiteContext(t)
 
-	originalTweakFunc := tweakKeysForCoopExitFunc
-	tweakKeysForCoopExitFunc = func(ctx context.Context, _ *so.Config, coopExit *ent.CooperativeExit, blockHeight int64) error {
+	setTweakFunc(t, func(context.Context, *so.Config, *ent.CooperativeExit, int64) error {
 		return nil
-	}
-	defer func() { tweakKeysForCoopExitFunc = originalTweakFunc }()
+	})
 
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -932,9 +922,7 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 
-	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
-	bitcoinClient, err := rpcclient.New(connCfg, nil)
-	require.NoError(t, err)
+	bitcoinClient := newDeadBitcoinClient(t)
 
 	// Create the BlockHeight record (normally created by scanChainUpdates on first run)
 	_, err = dbTx.BlockHeight.Create().
@@ -991,12 +979,16 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	require.NotNil(t, storedBlockHeight.BlockHash)
 	assert.Equal(t, reorgBlockHash.CloneBytes(), *storedBlockHeight.BlockHash)
 
-	// --- Step 3: Process enough blocks for key tweaking ---
+	// --- Step 3: Run the deferred tweak phase at a height with enough confirmations ---
+	// The tweak phase runs in its own per-exit transactions which cannot see
+	// uncommitted session data, so commit the session tx first.
+	require.NoError(t, tc.Session.GetTxIfExists().Commit())
+
 	blockHeight = int64(100 + knobs.CoopExitConfirmationThreshold - 1)
-	err = handleBlock(ctx, &config, dbTx, bitcoinClient, []wire.MsgTx{}, blockHeight, chainhash.Hash{}, btcnetwork.Testnet)
+	err = tweakEligibleCoopExits(ctx, &config, tc.Client, nil, NewTip(blockHeight, chainhash.Hash{}), btcnetwork.Testnet)
 	require.NoError(t, err)
 
-	allExits, err = dbTx.CooperativeExit.Query().WithTransfer().All(ctx)
+	allExits, err = tc.Client.CooperativeExit.Query().WithTransfer().All(ctx)
 	require.NoError(t, err)
 
 	tweakedCount := 0
@@ -1946,9 +1938,7 @@ func TestHandleBlock_NonStaticDeposit_SetsConfirmationTxid(t *testing.T) {
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
-	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
-	bitcoinClient, err := rpcclient.New(connCfg, nil)
-	require.NoError(t, err)
+	bitcoinClient := newDeadBitcoinClient(t)
 
 	// Block 1: both transactions confirm
 	blockTxs := []wire.MsgTx{smallTx, largeTx}
