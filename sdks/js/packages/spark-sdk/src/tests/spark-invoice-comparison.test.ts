@@ -1,8 +1,8 @@
 import { hexToBytes, numberToVarBytesBE } from "@noble/curves/utils";
 import { uuidv7obj } from "uuidv7";
-import { encodeSparkAddress } from "./address.js";
-import { type NetworkType } from "./network.js";
-import { compareSparkInvoices } from "./spark-invoice-comparison.js";
+import { encodeSparkAddress } from "../utils/address.js";
+import { type NetworkType } from "../utils/network.js";
+import { compareSparkInvoices } from "../utils/spark-invoice-comparison.js";
 
 const RECEIVER_A =
   "02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132";

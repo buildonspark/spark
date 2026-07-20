@@ -1,8 +1,8 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { HashSparkInvoice } from "./invoice-hashing.js";
+import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { type SparkInvoiceFields } from "../proto/spark.js";
 import { UUID } from "uuidv7";
-import { type NetworkType } from "./network.js";
+import { type NetworkType } from "../utils/network.js";
 
 it("produces a stable hash from known inputs", () => {
   const identityPKHex =
