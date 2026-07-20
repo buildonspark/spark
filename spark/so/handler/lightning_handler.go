@@ -359,6 +359,8 @@ func saveTransferPartnerFromPreimageShare(ctx context.Context, preimageShare *en
 	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
 		return fmt.Errorf("unable to save transfer partner: %w", err)
 	}
+
+	partner.RecordTransferPartnerWrite(ctx, st.TransferPartnerTypeLightningReceive)
 	return nil
 }
 

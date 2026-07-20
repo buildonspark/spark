@@ -42,5 +42,8 @@ func SaveTransferPartner(ctx context.Context, transferID uuid.UUID, transferPart
 		Exec(ctx)
 	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf("failed to save transfer partner for transfer %s: %w", transferID, err)
+		return
 	}
+
+	RecordTransferPartnerWrite(ctx, transferPartnerType)
 }
