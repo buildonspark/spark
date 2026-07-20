@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -108,14 +107,9 @@ func TestIgnoreLegacyTransfer(t *testing.T) {
 			Reason:                    reason,
 		}
 	}
-	knobOn := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPreimageSwapIgnoreLegacyTransfer: 1,
-	}))
-	knobOff := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{}))
-
-	t.Run("knob on strips both-shape SEND onto the package path", func(t *testing.T) {
+	t.Run("strips both-shape SEND onto the package path", func(t *testing.T) {
 		req := newBoth(pbspark.InitiatePreimageSwapRequest_REASON_SEND)
-		require.True(t, ignoreLegacyTransfer(knobOn, req))
+		require.True(t, ignoreLegacyTransfer(req))
 		require.Nil(t, req.GetTransfer())
 		inputs, err := preimageSwapInputsFromRequest(req)
 		require.NoError(t, err)
@@ -123,55 +117,26 @@ func TestIgnoreLegacyTransfer(t *testing.T) {
 		require.Equal(t, "tr-id", inputs.transferID)
 	})
 
-	t.Run("knob off keeps the legacy transfer path", func(t *testing.T) {
-		req := newBoth(pbspark.InitiatePreimageSwapRequest_REASON_SEND)
-		require.False(t, ignoreLegacyTransfer(knobOff, req))
-		require.NotNil(t, req.GetTransfer())
-		inputs, err := preimageSwapInputsFromRequest(req)
-		require.NoError(t, err)
-		require.False(t, inputs.isPackageOnlySend)
-		require.Equal(t, "transfer-id", inputs.transferID)
-	})
-
-	t.Run("knob on leaves RECEIVE feeding package lists to plain validation", func(t *testing.T) {
+	t.Run("strips RECEIVE, feeding package lists to plain validation", func(t *testing.T) {
 		req := newBoth(pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
-		require.True(t, ignoreLegacyTransfer(knobOn, req))
+		require.True(t, ignoreLegacyTransfer(req))
 		inputs, err := preimageSwapInputsFromRequest(req)
 		require.NoError(t, err)
 		require.False(t, inputs.isPackageOnlySend)
 		require.Equal(t, "package-leaf", inputs.validationCpfp[0].GetLeafId())
 	})
 
-	t.Run("knob on is a no-op when the caller already omits transfer", func(t *testing.T) {
+	t.Run("no-op when the caller already omits transfer", func(t *testing.T) {
 		req := newBoth(pbspark.InitiatePreimageSwapRequest_REASON_SEND)
 		req.Transfer = nil
-		require.False(t, ignoreLegacyTransfer(knobOn, req))
+		require.False(t, ignoreLegacyTransfer(req))
 	})
 
-	t.Run("knob on strips a transfer-only straggler into a closed rejection", func(t *testing.T) {
+	t.Run("strips a transfer-only straggler into a closed rejection", func(t *testing.T) {
 		req := newBoth(pbspark.InitiatePreimageSwapRequest_REASON_SEND)
 		req.TransferRequest = nil
-		require.True(t, ignoreLegacyTransfer(knobOn, req))
+		require.True(t, ignoreLegacyTransfer(req))
 		_, err := preimageSwapInputsFromRequest(req)
 		require.ErrorContains(t, err, "transfer_request is required")
 	})
-}
-
-// Ordering guard: the shape must be captured as-received, before the strip, or the drain
-// census is corrupted for knob-forced requests. A reorder that stripped first would make
-// this return transfer_request_only for a both-shape SEND.
-func TestCaptureShapeAndStripLegacyTransfer(t *testing.T) {
-	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobPreimageSwapIgnoreLegacyTransfer: 1,
-	}))
-	req := &pbspark.InitiatePreimageSwapRequest{
-		Transfer:                  &pbspark.StartUserSignedTransferRequest{TransferId: "transfer-id"},
-		TransferRequest:           &pbspark.StartTransferRequest{TransferId: "tr-id"},
-		ReceiverIdentityPublicKey: []byte{0x04},
-		Reason:                    pbspark.InitiatePreimageSwapRequest_REASON_SEND,
-	}
-	shape, legacyIgnored := captureShapeAndStripLegacyTransfer(ctx, req)
-	require.Equal(t, preimageSwapShapeBoth, shape)
-	require.True(t, legacyIgnored)
-	require.Nil(t, req.GetTransfer())
 }
