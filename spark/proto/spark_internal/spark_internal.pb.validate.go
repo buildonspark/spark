@@ -9715,6 +9715,941 @@ var _ interface {
 	ErrorName() string
 } = ClaimInstantStaticDepositUtxoSwapRollbackRequestValidationError{}
 
+// Validate checks the field values on
+// InitiateSwapPrimaryTransferPrepareRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *InitiateSwapPrimaryTransferPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// InitiateSwapPrimaryTransferPrepareRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// InitiateSwapPrimaryTransferPrepareRequestMultiError, or nil if none found.
+func (m *InitiateSwapPrimaryTransferPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateSwapPrimaryTransferPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateSwapPrimaryTransferPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiateSwapPrimaryTransferPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateSwapPrimaryTransferPrepareRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// InitiateSwapPrimaryTransferPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateSwapPrimaryTransferPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateSwapPrimaryTransferPrepareRequestMultiError) AllErrors() []error { return m }
+
+// InitiateSwapPrimaryTransferPrepareRequestValidationError is the validation
+// error returned by InitiateSwapPrimaryTransferPrepareRequest.Validate if the
+// designated constraints aren't met.
+type InitiateSwapPrimaryTransferPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateSwapPrimaryTransferPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateSwapPrimaryTransferPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateSwapPrimaryTransferPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateSwapPrimaryTransferPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateSwapPrimaryTransferPrepareRequestValidationError) ErrorName() string {
+	return "InitiateSwapPrimaryTransferPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateSwapPrimaryTransferPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateSwapPrimaryTransferPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateSwapPrimaryTransferPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateSwapPrimaryTransferPrepareRequestValidationError{}
+
+// Validate checks the field values on InitiateSwapPrimaryTransferCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *InitiateSwapPrimaryTransferCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// InitiateSwapPrimaryTransferCommitRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// InitiateSwapPrimaryTransferCommitRequestMultiError, or nil if none found.
+func (m *InitiateSwapPrimaryTransferCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateSwapPrimaryTransferCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InitiateSwapPrimaryTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InitiateSwapPrimaryTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InitiateSwapPrimaryTransferCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for AdaptorPublicKey
+
+	if len(errors) > 0 {
+		return InitiateSwapPrimaryTransferCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateSwapPrimaryTransferCommitRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// InitiateSwapPrimaryTransferCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateSwapPrimaryTransferCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateSwapPrimaryTransferCommitRequestMultiError) AllErrors() []error { return m }
+
+// InitiateSwapPrimaryTransferCommitRequestValidationError is the validation
+// error returned by InitiateSwapPrimaryTransferCommitRequest.Validate if the
+// designated constraints aren't met.
+type InitiateSwapPrimaryTransferCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateSwapPrimaryTransferCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateSwapPrimaryTransferCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateSwapPrimaryTransferCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateSwapPrimaryTransferCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateSwapPrimaryTransferCommitRequestValidationError) ErrorName() string {
+	return "InitiateSwapPrimaryTransferCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateSwapPrimaryTransferCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateSwapPrimaryTransferCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateSwapPrimaryTransferCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateSwapPrimaryTransferCommitRequestValidationError{}
+
+// Validate checks the field values on
+// InitiateSwapPrimaryTransferRollbackRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *InitiateSwapPrimaryTransferRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// InitiateSwapPrimaryTransferRollbackRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// InitiateSwapPrimaryTransferRollbackRequestMultiError, or nil if none found.
+func (m *InitiateSwapPrimaryTransferRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateSwapPrimaryTransferRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	if len(errors) > 0 {
+		return InitiateSwapPrimaryTransferRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateSwapPrimaryTransferRollbackRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// InitiateSwapPrimaryTransferRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateSwapPrimaryTransferRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateSwapPrimaryTransferRollbackRequestMultiError) AllErrors() []error { return m }
+
+// InitiateSwapPrimaryTransferRollbackRequestValidationError is the validation
+// error returned by InitiateSwapPrimaryTransferRollbackRequest.Validate if
+// the designated constraints aren't met.
+type InitiateSwapPrimaryTransferRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateSwapPrimaryTransferRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateSwapPrimaryTransferRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateSwapPrimaryTransferRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateSwapPrimaryTransferRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateSwapPrimaryTransferRollbackRequestValidationError) ErrorName() string {
+	return "InitiateSwapPrimaryTransferRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateSwapPrimaryTransferRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateSwapPrimaryTransferRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateSwapPrimaryTransferRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateSwapPrimaryTransferRollbackRequestValidationError{}
+
+// Validate checks the field values on InitiateCounterTransferRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *InitiateCounterTransferRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateCounterTransferRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// InitiateCounterTransferRequestMultiError, or nil if none found.
+func (m *InitiateCounterTransferRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateCounterTransferRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateCounterTransferRequestValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateCounterTransferRequestValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateCounterTransferRequestValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetAdaptorPublicKeys()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateCounterTransferRequestValidationError{
+					field:  "AdaptorPublicKeys",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateCounterTransferRequestValidationError{
+					field:  "AdaptorPublicKeys",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAdaptorPublicKeys()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateCounterTransferRequestValidationError{
+				field:  "AdaptorPublicKeys",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for PrimaryTransferId
+
+	if len(errors) > 0 {
+		return InitiateCounterTransferRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateCounterTransferRequestMultiError is an error wrapping multiple
+// validation errors returned by InitiateCounterTransferRequest.ValidateAll()
+// if the designated constraints aren't met.
+type InitiateCounterTransferRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateCounterTransferRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateCounterTransferRequestMultiError) AllErrors() []error { return m }
+
+// InitiateCounterTransferRequestValidationError is the validation error
+// returned by InitiateCounterTransferRequest.Validate if the designated
+// constraints aren't met.
+type InitiateCounterTransferRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateCounterTransferRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateCounterTransferRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateCounterTransferRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateCounterTransferRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateCounterTransferRequestValidationError) ErrorName() string {
+	return "InitiateCounterTransferRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateCounterTransferRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateCounterTransferRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateCounterTransferRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateCounterTransferRequestValidationError{}
+
+// Validate checks the field values on InitiateCounterTransferPrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *InitiateCounterTransferPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateCounterTransferPrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiateCounterTransferPrepareRequestMultiError, or nil if none found.
+func (m *InitiateCounterTransferPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateCounterTransferPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateCounterTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateCounterTransferPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateCounterTransferPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiateCounterTransferPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateCounterTransferPrepareRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// InitiateCounterTransferPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateCounterTransferPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateCounterTransferPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateCounterTransferPrepareRequestMultiError) AllErrors() []error { return m }
+
+// InitiateCounterTransferPrepareRequestValidationError is the validation error
+// returned by InitiateCounterTransferPrepareRequest.Validate if the
+// designated constraints aren't met.
+type InitiateCounterTransferPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateCounterTransferPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateCounterTransferPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateCounterTransferPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateCounterTransferPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateCounterTransferPrepareRequestValidationError) ErrorName() string {
+	return "InitiateCounterTransferPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateCounterTransferPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateCounterTransferPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateCounterTransferPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateCounterTransferPrepareRequestValidationError{}
+
+// Validate checks the field values on InitiateCounterTransferCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *InitiateCounterTransferCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateCounterTransferCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiateCounterTransferCommitRequestMultiError, or nil if none found.
+func (m *InitiateCounterTransferCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateCounterTransferCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InitiateCounterTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InitiateCounterTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InitiateCounterTransferCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for AdaptorPublicKey
+
+	if len(errors) > 0 {
+		return InitiateCounterTransferCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateCounterTransferCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiateCounterTransferCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateCounterTransferCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateCounterTransferCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateCounterTransferCommitRequestMultiError) AllErrors() []error { return m }
+
+// InitiateCounterTransferCommitRequestValidationError is the validation error
+// returned by InitiateCounterTransferCommitRequest.Validate if the designated
+// constraints aren't met.
+type InitiateCounterTransferCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateCounterTransferCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateCounterTransferCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateCounterTransferCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateCounterTransferCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateCounterTransferCommitRequestValidationError) ErrorName() string {
+	return "InitiateCounterTransferCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateCounterTransferCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateCounterTransferCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateCounterTransferCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateCounterTransferCommitRequestValidationError{}
+
+// Validate checks the field values on InitiateCounterTransferRollbackRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *InitiateCounterTransferRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// InitiateCounterTransferRollbackRequest with the rules defined in the proto
+// definition for this message. If any rules are violated, the result is a
+// list of violation errors wrapped in
+// InitiateCounterTransferRollbackRequestMultiError, or nil if none found.
+func (m *InitiateCounterTransferRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateCounterTransferRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	if len(errors) > 0 {
+		return InitiateCounterTransferRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateCounterTransferRollbackRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// InitiateCounterTransferRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateCounterTransferRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateCounterTransferRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateCounterTransferRollbackRequestMultiError) AllErrors() []error { return m }
+
+// InitiateCounterTransferRollbackRequestValidationError is the validation
+// error returned by InitiateCounterTransferRollbackRequest.Validate if the
+// designated constraints aren't met.
+type InitiateCounterTransferRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateCounterTransferRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateCounterTransferRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateCounterTransferRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateCounterTransferRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateCounterTransferRollbackRequestValidationError) ErrorName() string {
+	return "InitiateCounterTransferRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateCounterTransferRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateCounterTransferRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateCounterTransferRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateCounterTransferRollbackRequestValidationError{}
+
 // Validate checks the field values on ReserveEntityDkgKeyRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

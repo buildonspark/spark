@@ -802,6 +802,95 @@ message ClaimInstantStaticDepositUtxoSwapRollbackRequest {
     string transfer_id = 1;
 }
 
+// InitiateSwapPrimaryTransferPrepareRequest is the prepare op for the
+// CONSENSUS_OPERATION_TYPE_INITIATE_SWAP_PRIMARY_TRANSFER 2PC flow (swap v3
+// primary leg). Every SO validates the transfer package, persists the
+// PRIMARY_SWAP_V3 transfer with its key tweaks stored-but-unapplied (swap v3
+// defers primary tweaks until the counter transfer settles both legs
+// atomically), and returns its FROST round-2 share over the CPFP refund tx
+// sighashes computed with the request's adaptor public key. The coordinator
+// overrides transfer.expiry_time to now + 2x the counter-transfer safety
+// buffer BEFORE building this op, so every SO persists the identical expiry
+// the legacy coordinator-side override produced.
+message InitiateSwapPrimaryTransferPrepareRequest {
+    spark.InitiateSwapPrimaryTransferRequest original_request = 1;
+}
+
+// InitiateSwapPrimaryTransferCommitRequest is the 2PC commit payload for the
+// swap v3 primary leg: the aggregated adaptor signatures for each leaf's CPFP
+// refund tx (swap v3 transfers are CPFP-only). Commit applies signatures ONLY
+// — the primary's sender key tweaks stay pending until the counter leg's
+// commit settles both legs in one transaction. adaptor_public_key is the CPFP
+// adaptor point participants need to verify the adaptor signature
+// (ValidateAdaptorSignature) before persisting it; a wrong point cannot forge
+// a valid signature, it only fails verification.
+message InitiateSwapPrimaryTransferCommitRequest {
+    string transfer_id = 1;
+    repeated SendTransferLeafSignatures leaf_signatures = 2;
+    bytes adaptor_public_key = 3;
+}
+
+// InitiateSwapPrimaryTransferRollbackRequest is the 2PC rollback payload for
+// the swap v3 primary leg. SOs cancel the transfer rows Prepare wrote
+// (RETURNED) and unlock the leaves, exactly like the send-transfer rollback.
+message InitiateSwapPrimaryTransferRollbackRequest {
+    string transfer_id = 1;
+}
+
+// InitiateCounterTransferRequest is the internal mirror of the SSP-facing
+// CounterTransferRequest (spark_ssp_internal.proto): spark_internal cannot
+// import spark_ssp_internal, and the prepare op must be dispatchable on every
+// SO from untagged builds. Field shapes match the SSP request one-to-one.
+message InitiateCounterTransferRequest {
+    // Counter transfer with refunds and key tweaks signed.
+    spark.StartTransferRequest transfer = 1;
+    // Adaptor public keys to verify the signatures of refunds for the counter
+    // transfer in the swap.
+    spark.AdaptorPublicKeyPackage adaptor_public_keys = 2;
+    // The primary swap transfer this counter transfer settles against.
+    string primary_transfer_id = 3;
+}
+
+// InitiateCounterTransferPrepareRequest is the prepare op for the
+// CONSENSUS_OPERATION_TYPE_INITIATE_COUNTER_TRANSFER 2PC flow (swap v3
+// counter leg). Every SO validates the counter transfer against its own copy
+// of the primary (status, expiry safety buffer, network, amount, reversed
+// parties), persists the COUNTER_SWAP_V3 transfer, flips the primary to
+// APPLYING_SENDER_KEY_TWEAK — fencing it from cancellation and the expiry
+// sweep on every SO for the in-flight window (the legacy flow only fenced the
+// counter coordinator) — and returns its FROST round-2 share over the CPFP
+// refund tx sighashes computed with the request's adaptor public key.
+message InitiateCounterTransferPrepareRequest {
+    InitiateCounterTransferRequest original_request = 1;
+}
+
+// InitiateCounterTransferCommitRequest is the 2PC commit payload for the swap
+// v3 counter leg: the aggregated adaptor signatures for the counter leaves'
+// CPFP refund txs. Commit applies the signatures and then settles the sender
+// key tweaks of BOTH the primary and the counter transfer in the same DB
+// transaction (CommitSwapKeyTweaks) — the atomic point of the swap.
+message InitiateCounterTransferCommitRequest {
+    string transfer_id = 1;
+    repeated SendTransferLeafSignatures leaf_signatures = 2;
+    bytes adaptor_public_key = 3;
+}
+
+// InitiateCounterTransferRollbackRequest is the 2PC rollback payload for the
+// swap v3 counter leg. SOs revert the primary transfer's
+// APPLYING_SENDER_KEY_TWEAK fence back to its pre-flip pending status, then
+// cancel the counter transfer rows Prepare wrote and unlock its leaves.
+//
+// The primary transfer id is deliberately NOT carried here: the rollback
+// handler resolves the primary through the counter row's primary_swap_transfer
+// edge, which Prepare persists in the same DB transaction as the fence flip —
+// a failed Prepare leaves neither, so a rollback that finds no counter row has
+// nothing to un-fence. Resolving through the local edge (rather than a
+// payload-supplied id) also keeps a forged rollback from steering the fence
+// revert at an unrelated primary.
+message InitiateCounterTransferRollbackRequest {
+    string transfer_id = 1;
+}
+
 message ReserveEntityDkgKeyRequest {
     string keyshare_id = 1;
 }
