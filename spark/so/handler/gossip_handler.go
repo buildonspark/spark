@@ -35,6 +35,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var gossipMessageHandledTotal metric.Int64Counter
@@ -818,11 +819,18 @@ const (
 	skipForeignOp
 	skipCoordinatorEcho
 	skipAlreadyTerminal
+	// skipMalformedFlowID: the gossip flow_execution_id is not a UUID, so no row
+	// lookup is even possible. Distinct from skipForeignOp (row lookup found no
+	// participant) so the logs/metric don't misdescribe malformed input as an
+	// absent row.
+	skipMalformedFlowID
 )
 
-// classifyConsensusOp returns the disposition for a gossip-delivered consensus op.
-// On error it fails closed (returns the error; the op is not applied) — recovery is
-// via gossip retry for retriable codes, otherwise via the participant reconciler.
+// classifyConsensusOp returns the disposition for a gossip-delivered consensus op,
+// along with the participant's own FlowExecution row when one was loaded (nil for
+// the dormant empty-id branch). On error it fails closed (returns the error; the
+// op is not applied) — recovery is via gossip retry for retriable codes, otherwise
+// via the participant reconciler.
 //
 // A participant row that is already terminal yields skipAlreadyTerminal: the
 // handler effect and the row's terminal transition commit in the same request
@@ -832,7 +840,7 @@ const (
 // refund rollback keyed by on_chain_utxo): without it, a redelivered rollback
 // whose own swap was already cancelled would find — and cancel — a newer
 // attempt's active swap for the same UTXO.
-func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbgossip.ConsensusOperationType) (consensusOpDisposition, error) {
+func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbgossip.ConsensusOperationType) (consensusOpDisposition, *ent.FlowExecution, error) {
 	// Dormant pre-April-2026 leftover (#6288): every live coordinator populates
 	// flow_execution_id, so this branch is unreachable today. It is kept (rather
 	// than made an error) because a gossip handler error loops redelivery
@@ -840,22 +848,31 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbg
 	// only come from a pre-rollout binary. Paired with DispatchPrepare's
 	// empty-flowExecutionID skip (consensus_handler.go) — remove both together.
 	if flowExecutionID == "" {
-		return applyOp, nil
+		return applyOp, nil, nil
 	}
 	id, err := uuid.Parse(flowExecutionID)
 	if err != nil {
-		return dispositionUnknown, fmt.Errorf("invalid flow_execution_id in gossip: %w", err)
+		// A non-UUID flow_execution_id can only come from a buggy/misbehaving
+		// coordinator or on-wire corruption, and can never parse on retry. Skip
+		// (never dispatch) rather than error: erroring would loop gossip
+		// redelivery forever on a message that can never become valid — the same
+		// rationale as the op-type-mismatch branch below. Reported as its own
+		// disposition (not skipForeignOp) so the caller doesn't log/label it as a
+		// row lookup that found no participant.
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+			"consensus op fence: unparseable flow_execution_id %q in gossip; skipping handler: %v", flowExecutionID, err)
+		return skipMalformedFlowID, nil, nil
 	}
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return dispositionUnknown, err
+		return dispositionUnknown, nil, err
 	}
 	row, err := db.FlowExecution.Get(ctx, id)
 	switch {
 	case ent.IsNotFound(err):
-		return skipForeignOp, nil
+		return skipForeignOp, nil, nil
 	case err != nil:
-		return dispositionUnknown, fmt.Errorf("unable to load flow execution %s: %w", id, err)
+		return dispositionUnknown, nil, fmt.Errorf("unable to load flow execution %s: %w", id, err)
 	case row.OpType != int32(opType):
 		// The gossip envelope's op type picks the handler, but the row proves
 		// which flow this SO actually prepared under this id — a mismatch means
@@ -866,25 +883,116 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbg
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
 			"consensus op fence: gossip op_type %d does not match FlowExecution row %s op_type %d; skipping handler",
 			opType, flowExecutionID, row.OpType)
-		return skipForeignOp, nil
+		return skipForeignOp, nil, nil
 	case row.Role == st.FlowExecutionRoleParticipant:
 		if row.Status != st.FlowExecutionStatusInFlight {
 			logging.GetLoggerFromContext(ctx).Sugar().Infof(
 				"consensus op fence: participant FlowExecution row %s already terminal (%s); skipping handler",
 				flowExecutionID, row.Status)
-			return skipAlreadyTerminal, nil
+			return skipAlreadyTerminal, nil, nil
 		}
-		return applyOp, nil
+		return applyOp, row, nil
 	default: // FlowExecutionRoleCoordinator
-		return skipCoordinatorEcho, nil
+		return skipCoordinatorEcho, nil, nil
 	}
+}
+
+// validateDecisionAgainstPreparedOp enforces PrepareBoundFlowHandler binding
+// for a gossip-delivered decision: when the handler implements the interface
+// and this SO persisted a prepare payload for the flow, the decision payload
+// must be consistent with it. Returns (false, nil) when the decision must be
+// skipped — the participant row stays IN_FLIGHT so the flow's real decision
+// can still arrive; skipping rather than erroring avoids looping gossip
+// redelivery on a message that can never become valid (same rationale as the
+// op-type fence in classifyConsensusOp).
+func validateDecisionAgainstPreparedOp(ctx context.Context, handler consensus.FlowHandler, row *ent.FlowExecution, op proto.Message, phase string) bool {
+	bound, ok := handler.(consensus.PrepareBoundFlowHandler)
+	if !ok {
+		// The flow does not opt into payload binding — dispatch unchanged.
+		return true
+	}
+	if row == nil {
+		// classifyConsensusOp returns applyOp with a nil row only for the
+		// dormant empty-flow_execution_id branch. For a bound flow this is a
+		// fence bypass: an empty id skips the row lookup, op-type fence,
+		// terminal-state check, and payload binding before reaching the
+		// handler. Every flow that opts into binding is post-April-2026 (swap
+		// v3 is a new op type; consensus SEND_TRANSFER is knob-gated and
+		// post-rollout), so a live coordinator always populates the id — an
+		// empty id on a bound op can only be a forged or misrouted decision.
+		// Fail closed. (Non-bound legacy flows returned earlier and keep the
+		// pre-rollout compatibility fall-through.)
+		logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+			"consensus op fence: %s decision for a bound flow arrived with no flow_execution_id; refusing to bypass the fences", phase)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", phase), attribute.String("disposition", "missing_flow_execution_id")))
+		return false
+	}
+	if row.PreparePayload == nil || len(*row.PreparePayload) == 0 {
+		// A participant row for a bound flow always carries its prepare payload:
+		// DispatchPrepare persists it in the same transaction as the prepare
+		// work (consensus_handler.go). An empty payload is therefore an anomaly
+		// — a corrupt or hand-mutated row — and we have nothing to bind the
+		// decision to. Fail closed: refuse to dispatch an unbound decision
+		// rather than treat the missing payload as a passing check. The row
+		// stays IN_FLIGHT and the metric surfaces it for operator attention.
+		logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+			"consensus op fence: %s for flow %s has no persisted prepare payload; refusing to dispatch an unbound decision",
+			phase, row.ID)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", phase), attribute.String("disposition", "missing_prepare_payload")))
+		return false
+	}
+	var prepareAny anypb.Any
+	if err := proto.Unmarshal(*row.PreparePayload, &prepareAny); err != nil {
+		// A persisted payload that no longer decodes is a corrupt or hand-mutated
+		// row — unrecoverable by retry, exactly like the missing-payload case
+		// above. Skip (stay IN_FLIGHT) with a metric rather than error: returning
+		// an error would loop gossip redelivery forever on a message that can
+		// never become valid.
+		logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+			"consensus op fence: %s for flow %s has an undecodable persisted prepare payload; refusing to dispatch an unbound decision: %v",
+			phase, row.ID, err)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", phase), attribute.String("disposition", "corrupt_prepare_payload")))
+		return false
+	}
+	prepareOp, err := prepareAny.UnmarshalNew()
+	if err != nil {
+		logging.GetLoggerFromContext(ctx).Sugar().Errorf(
+			"consensus op fence: %s for flow %s has an undecodable persisted prepare op; refusing to dispatch an unbound decision: %v",
+			phase, row.ID, err)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", phase), attribute.String("disposition", "corrupt_prepare_payload")))
+		return false
+	}
+	if err := bound.ValidateDecisionAgainstPrepare(prepareOp, op); err != nil {
+		// A mismatch means the decision payload names resources this SO did not
+		// prepare under this flow_execution_id. This is reachable only from a
+		// forged or misrouted gossip decision — never the authoritative one: the
+		// decision the reconciler replays via ConsensusQueryOutcome is the
+		// coordinator's own decision_payload, which it built from the same
+		// request it fanned out as the prepare op, so it is by construction
+		// consistent with what this SO persisted. Skipping the forged decision
+		// leaves the row IN_FLIGHT so the real (matching) decision — or the
+		// reconciler's replay of it — can still land. A persistent mismatch
+		// would require a coordinator bug producing an authoritative decision
+		// that disagrees with its own prepare op; in that case keeping the row
+		// IN_FLIGHT with its resources locked is the strictly safe outcome
+		// versus applying a decision to the wrong resource, and the
+		// payload_mismatch metric fires so on-call can quarantine it. (The
+		// presumed-abort reconciler path is the automatic backstop whenever the
+		// coordinator has no authoritative record at all.)
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+			"consensus op fence: %s payload for flow %s does not match the prepare op this SO persisted; skipping handler: %v",
+			phase, row.ID, err)
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", phase), attribute.String("disposition", "payload_mismatch")))
+		return false
+	}
+	return true
 }
 
 // runConsensusCommit centralizes the post-handler logic so the
 // AlreadyExists-as-success rule is testable independently of the
 // production opType→handler mapping. handler is supplied by the caller.
 func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
-	disposition, err := classifyConsensusOp(ctx, flowExecutionID, opType)
+	disposition, row, err := classifyConsensusOp(ctx, flowExecutionID, opType)
 	if err != nil {
 		return err
 	}
@@ -895,6 +1003,9 @@ func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opTy
 			flowExecutionID, opType)
 		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "commit"), attribute.String("disposition", "foreign")))
 		return nil
+	case skipMalformedFlowID:
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "commit"), attribute.String("disposition", "malformed_flow_execution_id")))
+		return nil
 	case skipCoordinatorEcho:
 		return nil
 	case skipAlreadyTerminal:
@@ -903,6 +1014,11 @@ func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opTy
 	case applyOp:
 	default:
 		return fmt.Errorf("unexpected consensus op disposition %d for flow %s", disposition, flowExecutionID)
+	}
+	if !validateDecisionAgainstPreparedOp(ctx, handler, row, op, "commit") {
+		// Fenced (mismatch / missing / corrupt prepare payload): skip without
+		// erroring so gossip redelivery doesn't loop; the row stays IN_FLIGHT.
+		return nil
 	}
 	if err := handler.Commit(ctx, op); err != nil {
 		if status.Code(err) != codes.AlreadyExists {
@@ -972,7 +1088,7 @@ func withRollbackCoordinatorIdentity(ctx context.Context, config *so.Config, flo
 
 // runConsensusRollback mirrors runConsensusCommit for the rollback path.
 func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, opType pbgossip.ConsensusOperationType, flowExecutionID string, op proto.Message) error {
-	disposition, err := classifyConsensusOp(ctx, flowExecutionID, opType)
+	disposition, row, err := classifyConsensusOp(ctx, flowExecutionID, opType)
 	if err != nil {
 		return err
 	}
@@ -983,6 +1099,9 @@ func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, op
 			flowExecutionID, opType)
 		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "rollback"), attribute.String("disposition", "foreign")))
 		return nil
+	case skipMalformedFlowID:
+		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", "rollback"), attribute.String("disposition", "malformed_flow_execution_id")))
+		return nil
 	case skipCoordinatorEcho:
 		return nil
 	case skipAlreadyTerminal:
@@ -991,6 +1110,11 @@ func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, op
 	case applyOp:
 	default:
 		return fmt.Errorf("unexpected consensus op disposition %d for flow %s", disposition, flowExecutionID)
+	}
+	if !validateDecisionAgainstPreparedOp(ctx, handler, row, op, "rollback") {
+		// Fenced (mismatch / missing / corrupt prepare payload): skip without
+		// erroring so gossip redelivery doesn't loop; the row stays IN_FLIGHT.
+		return nil
 	}
 	if err := handler.Rollback(ctx, op); err != nil {
 		if status.Code(err) != codes.AlreadyExists {

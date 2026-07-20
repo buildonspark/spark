@@ -82,3 +82,31 @@ type CoordinatorFlow interface {
 type GossipSender interface {
 	CreateCommitAndSendGossipMessage(ctx context.Context, msg *pbgossip.GossipMessage, participants []string) (*ent.Gossip, error)
 }
+
+// PrepareBoundFlowHandler is an optional interface a FlowHandler can implement
+// to bind gossip-delivered commit/rollback payloads to the prepare op this SO
+// persisted on its own FlowExecution row for the same flow execution.
+//
+// The generic gossip fence (classifyConsensusOp) proves a decision targets a
+// flow this SO prepared, but not that the decision payload names the same
+// domain resources the prepare did: a misbehaving coordinator could drive a
+// legitimate flow to the prepared state and then send a decision whose payload
+// names an unrelated resource (e.g., someone else's in-flight transfer id).
+// A flow should implement this interface when its commit/rollback resolves the
+// target row purely from an id or field carried in the decision payload (which a
+// coordinator could forge). A flow that already pins its target via a domain row
+// at Prepare (e.g. a UtxoSwap reservation keyed by on_chain_utxo), or whose
+// commit carries derived content rather than a lookup id, or whose
+// commit/rollback are no-ops, does not need it — it has no forgeable
+// payload-id-to-row lookup. Each consumer PR that adds an implementation
+// documents why its flow meets the bind criterion.
+//
+// prepareOp is the unmarshalled prepare op persisted at Prepare time;
+// decisionOp is the incoming commit or rollback payload (either the canonical
+// decision shape or, for reconciler presumed-abort rollbacks, the prepare op
+// shape itself). Return an error to reject the decision: the handler is not
+// invoked and the participant row stays IN_FLIGHT so the flow's real decision
+// can still arrive.
+type PrepareBoundFlowHandler interface {
+	ValidateDecisionAgainstPrepare(prepareOp proto.Message, decisionOp proto.Message) error
+}

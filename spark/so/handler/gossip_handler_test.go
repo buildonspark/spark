@@ -697,31 +697,34 @@ func TestClassifyConsensusOp(t *testing.T) {
 	unknown := uuid.New()
 
 	cases := []struct {
-		name string
-		id   string
-		want consensusOpDisposition
+		name    string
+		id      string
+		want    consensusOpDisposition
+		wantRow bool // the fence only carries the row on the applyOp disposition
 	}{
-		{"participant row -> apply", participant.String(), applyOp},
-		{"coordinator row -> skip echo", coordinator.String(), skipCoordinatorEcho},
-		{"no row -> skip foreign", unknown.String(), skipForeignOp},
-		{"empty id -> apply (pre-upgrade)", "", applyOp},
-		{"participant row committed -> skip terminal", participantCommitted.String(), skipAlreadyTerminal},
-		{"op type mismatch -> skip foreign", participantWrongOp.String(), skipForeignOp},
-		{"participant row rolled back -> skip terminal", participantRolledBack.String(), skipAlreadyTerminal},
+		{"participant row -> apply", participant.String(), applyOp, true},
+		{"coordinator row -> skip echo", coordinator.String(), skipCoordinatorEcho, false},
+		{"no row -> skip foreign", unknown.String(), skipForeignOp, false},
+		{"empty id -> apply (pre-upgrade)", "", applyOp, false},
+		{"participant row committed -> skip terminal", participantCommitted.String(), skipAlreadyTerminal, false},
+		{"op type mismatch -> skip foreign", participantWrongOp.String(), skipForeignOp, false},
+		{"participant row rolled back -> skip terminal", participantRolledBack.String(), skipAlreadyTerminal, false},
+		// An unparseable flow id can never become valid on retry, so it is skipped
+		// (never errored) — erroring would loop gossip redelivery forever.
+		{"invalid flow id -> skip malformed", "not-a-uuid", skipMalformedFlowID, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := classifyConsensusOp(ctx, c.id, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
+			got, row, err := classifyConsensusOp(ctx, c.id, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
 			require.NoError(t, err)
 			require.Equal(t, c.want, got)
+			if c.wantRow {
+				require.NotNil(t, row, "the applyOp disposition must carry the FlowExecution row the fence binds against")
+			} else {
+				require.Nil(t, row, "non-apply dispositions must not carry a row")
+			}
 		})
 	}
-
-	t.Run("invalid flow id -> error, not applied", func(t *testing.T) {
-		got, err := classifyConsensusOp(ctx, "not-a-uuid", pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
-		require.Error(t, err)
-		require.NotEqual(t, applyOp, got)
-	})
 }
 
 func TestHandleGossipMessage_ConsensusCommit_TransitionsParticipantRowToCommitted(t *testing.T) {
@@ -957,9 +960,20 @@ func TestConsensusRollbackFenceThroughGossip(t *testing.T) {
 	newPreparedTransfer := func(t *testing.T, owner uuid.UUID) *ent.Transfer {
 		t.Helper()
 		transfer := createTestTransfer(t, ctx, rng, client, st.TransferStatusSenderKeyTweakPending)
-		_, err := client.FlowExecution.Create().
+		// These tests dispatch via prepareBoundFakeFlowHandler (a bound handler),
+		// so the participant row must carry a prepare payload the decision is bound
+		// against (as DispatchPrepare persists for a bound flow). The SEND_TRANSFER
+		// prepare shape is used as a realistic fixture; the real SendTransferFlowHandler
+		// implements the interface in a later PR in the other-flows stack.
+		prepareAny, err := anypb.New(&pbinternal.SendTransferPrepareRequest{
+			OriginalRequest: &pb.StartTransferV3Request{TransferId: transfer.ID.String()},
+		})
+		require.NoError(t, err)
+		prepareBytes, err := proto.Marshal(prepareAny)
+		require.NoError(t, err)
+		_, err = client.FlowExecution.Create().
 			SetID(owner).SetRole(st.FlowExecutionRoleParticipant).
-			SetOpType(opType).SetCoordinatorIndex(1).Save(ctx)
+			SetOpType(opType).SetCoordinatorIndex(1).SetPreparePayload(prepareBytes).Save(ctx)
 		require.NoError(t, err)
 		return transfer
 	}
@@ -1039,6 +1053,223 @@ func TestConsensusRollbackFenceThroughGossip(t *testing.T) {
 	})
 }
 
+// TestConsensusFenceMetricDispositions pins the metric labels for the three
+// dispositions this PR's PrepareBoundFlowHandler fence introduces
+// (missing_flow_execution_id, missing_prepare_payload, payload_mismatch), so
+// label drift is caught by a test rather than going unnoticed.
+func TestConsensusFenceMetricDispositions(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	reader := msdk.NewManualReader()
+	prevProvider := otel.GetMeterProvider()
+	testProvider := msdk.NewMeterProvider(msdk.WithReader(reader))
+	otel.SetMeterProvider(testProvider)
+	prev := consensusOpFencedTotal
+	consensusOpFencedTotal = newConsensusOpFencedCounter()
+	t.Cleanup(func() {
+		consensusOpFencedTotal = prev
+		otel.SetMeterProvider(prevProvider)
+		// Deliberately not t.Context(): it is cancelled before t.Cleanup runs, so
+		// Shutdown needs a live context.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second) //nolint:usetesting // see comment above
+		defer cancel()
+		require.NoError(t, testProvider.Shutdown(shutdownCtx))
+	})
+
+	opType := pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER
+	handler := &prepareBoundFakeFlowHandler{}
+	rollbackOp := &pbinternal.SendTransferRollbackRequest{TransferId: uuid.NewString()}
+
+	// missing_flow_execution_id: bound handler, empty id → row is nil.
+	require.NoError(t, runConsensusRollback(ctx, handler, opType, "", rollbackOp))
+
+	// missing_prepare_payload: bound handler, row exists but has no payload.
+	noPayloadID := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(noPayloadID).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(int32(opType)).SetCoordinatorIndex(1).Save(ctx)
+	require.NoError(t, err)
+	require.NoError(t, runConsensusRollback(ctx, handler, opType, noPayloadID.String(), rollbackOp))
+
+	// payload_mismatch: bound handler, row with a payload for a different transfer.
+	mismatchID := seedFenceParticipantRow(t, ctx, uuid.NewString())
+	require.NoError(t, runConsensusRollback(ctx, handler, opType, mismatchID.String(), rollbackOp))
+
+	// Same fence on the COMMIT phase (phase="commit"): the label path added in
+	// runConsensusCommit must also emit.
+	commitMismatchID := seedFenceParticipantRow(t, ctx, uuid.NewString())
+	require.NoError(t, runConsensusCommit(ctx, handler, opType, commitMismatchID.String(),
+		&pbinternal.SendTransferCommitRequest{TransferId: uuid.NewString()}))
+
+	require.Equal(t, 0, handler.rollbackCalls, "all rollback-phase dispositions must fence before the handler")
+	require.Equal(t, 0, handler.commitCalls, "the commit-phase mismatch must fence before the handler")
+
+	var rm md.ResourceMetrics
+	require.NoError(t, reader.Collect(ctx, &rm))
+	byDisposition := map[string]int64{}
+	byPhase := map[string]int64{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "gossip.consensus_op_fenced_total" {
+				continue
+			}
+			sum, ok := m.Data.(md.Sum[int64])
+			require.True(t, ok, "expected Sum[int64] for %s", m.Name)
+			for _, dp := range sum.DataPoints {
+				d, _ := dp.Attributes.Value(attribute.Key("disposition"))
+				byDisposition[d.AsString()] += dp.Value
+				p, _ := dp.Attributes.Value(attribute.Key("phase"))
+				byPhase[p.AsString()] += dp.Value
+			}
+		}
+	}
+	require.Equal(t, int64(1), byDisposition["missing_flow_execution_id"])
+	require.Equal(t, int64(1), byDisposition["missing_prepare_payload"])
+	require.Equal(t, int64(2), byDisposition["payload_mismatch"], "one rollback + one commit")
+	require.GreaterOrEqual(t, byPhase["rollback"], int64(1), "rollback-phase label emitted")
+	require.GreaterOrEqual(t, byPhase["commit"], int64(1), "commit-phase label emitted")
+}
+
+// TestConsensusDecisionFence_CorruptedPreparePayloadSkips pins the fail-closed
+// behavior when a persisted prepare payload can't be unmarshalled (a corrupt
+// row). It's unreachable in normal operation — DispatchPrepare always persists
+// a valid Any — but an undecodable row is unrecoverable by retry, so the fence
+// must SKIP (leave the row IN_FLIGHT, no dispatch, corrupt_prepare_payload
+// metric) rather than return an error that would loop gossip redelivery forever.
+func TestConsensusDecisionFence_CorruptedPreparePayloadSkips(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	reader := msdk.NewManualReader()
+	prevProvider := otel.GetMeterProvider()
+	testProvider := msdk.NewMeterProvider(msdk.WithReader(reader))
+	otel.SetMeterProvider(testProvider)
+	prev := consensusOpFencedTotal
+	consensusOpFencedTotal = newConsensusOpFencedCounter()
+	t.Cleanup(func() {
+		consensusOpFencedTotal = prev
+		otel.SetMeterProvider(prevProvider)
+		// Deliberately not t.Context(): it is cancelled before t.Cleanup runs, so
+		// Shutdown needs a live context.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second) //nolint:usetesting // see comment above
+		defer cancel()
+		require.NoError(t, testProvider.Shutdown(shutdownCtx))
+	})
+
+	flowID := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(flowID).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)).
+		SetCoordinatorIndex(1).
+		SetPreparePayload([]byte{0xff, 0xff, 0xff}). // invalid protobuf wire bytes
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := &prepareBoundFakeFlowHandler{}
+	err = runConsensusRollback(ctx, handler,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+		flowID.String(),
+		&pbinternal.SendTransferRollbackRequest{TransferId: uuid.NewString()})
+	// Skip, not error: an undecodable row can never become valid via retry, so
+	// erroring would loop gossip redelivery indefinitely.
+	require.NoError(t, err)
+	require.Equal(t, 0, handler.rollbackCalls, "a corrupt prepare payload must fail closed, not dispatch")
+	// The row must stay IN_FLIGHT — the fence must not transition it (e.g. to
+	// ROLLED_BACK) before returning, so the real decision can still land.
+	assertFenceRowStatus(t, ctx, flowID, st.FlowExecutionStatusInFlight)
+
+	var rm md.ResourceMetrics
+	require.NoError(t, reader.Collect(ctx, &rm))
+	var corruptCount int64
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "gossip.consensus_op_fenced_total" {
+				continue
+			}
+			sum, ok := m.Data.(md.Sum[int64])
+			require.True(t, ok, "expected Sum[int64] for %s", m.Name)
+			for _, dp := range sum.DataPoints {
+				d, _ := dp.Attributes.Value(attribute.Key("disposition"))
+				if d.AsString() == "corrupt_prepare_payload" {
+					corruptCount += dp.Value
+				}
+			}
+		}
+	}
+	require.Equal(t, int64(1), corruptCount, "corrupt payload must increment the corrupt_prepare_payload disposition")
+}
+
+// TestConsensusDecisionFence_UndecodableAnyTypeURLSkips covers the SECOND
+// corrupt_prepare_payload branch: a payload that IS a valid anypb.Any envelope
+// but whose type_url does not resolve to a registered message, so
+// prepareAny.UnmarshalNew() (not proto.Unmarshal) fails. It must skip with the
+// same disposition as raw wire corruption, not error or dispatch.
+func TestConsensusDecisionFence_UndecodableAnyTypeURLSkips(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	reader := msdk.NewManualReader()
+	prevProvider := otel.GetMeterProvider()
+	testProvider := msdk.NewMeterProvider(msdk.WithReader(reader))
+	otel.SetMeterProvider(testProvider)
+	prev := consensusOpFencedTotal
+	consensusOpFencedTotal = newConsensusOpFencedCounter()
+	t.Cleanup(func() {
+		consensusOpFencedTotal = prev
+		otel.SetMeterProvider(prevProvider)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second) //nolint:usetesting // cancelled t.Context() before cleanup
+		defer cancel()
+		require.NoError(t, testProvider.Shutdown(shutdownCtx))
+	})
+
+	// A well-formed Any whose type_url names no registered message.
+	bogusAny := &anypb.Any{TypeUrl: "type.googleapis.com/spark.internal.NotARealMessage", Value: []byte{0x08, 0x01}}
+	bogusBytes, err := proto.Marshal(bogusAny)
+	require.NoError(t, err)
+
+	flowID := uuid.New()
+	_, err = client.FlowExecution.Create().
+		SetID(flowID).SetRole(st.FlowExecutionRoleParticipant).
+		SetOpType(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)).
+		SetCoordinatorIndex(1).
+		SetPreparePayload(bogusBytes).
+		Save(ctx)
+	require.NoError(t, err)
+
+	handler := &prepareBoundFakeFlowHandler{}
+	err = runConsensusRollback(ctx, handler,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+		flowID.String(),
+		&pbinternal.SendTransferRollbackRequest{TransferId: uuid.NewString()})
+	require.NoError(t, err)
+	require.Equal(t, 0, handler.rollbackCalls, "an unresolvable Any type_url must fail closed, not dispatch")
+	assertFenceRowStatus(t, ctx, flowID, st.FlowExecutionStatusInFlight)
+
+	var rm md.ResourceMetrics
+	require.NoError(t, reader.Collect(ctx, &rm))
+	var corruptCount int64
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "gossip.consensus_op_fenced_total" {
+				continue
+			}
+			sum, ok := m.Data.(md.Sum[int64])
+			require.True(t, ok, "expected Sum[int64] for %s", m.Name)
+			for _, dp := range sum.DataPoints {
+				d, _ := dp.Attributes.Value(attribute.Key("disposition"))
+				if d.AsString() == "corrupt_prepare_payload" {
+					corruptCount += dp.Value
+				}
+			}
+		}
+	}
+	require.Equal(t, int64(1), corruptCount, "unresolvable Any type_url must increment corrupt_prepare_payload")
+}
+
 func TestConsensusFenceMetricIncrements(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	gossipHandler := NewGossipHandler(sparktesting.TestConfig(t))
@@ -1054,7 +1285,11 @@ func TestConsensusFenceMetricIncrements(t *testing.T) {
 	t.Cleanup(func() {
 		consensusOpFencedTotal = prev
 		otel.SetMeterProvider(prevProvider)
-		_ = testProvider.Shutdown(t.Context())
+		// Deliberately not t.Context(): it is cancelled before t.Cleanup runs, so
+		// Shutdown needs a live context.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second) //nolint:usetesting // see comment above
+		defer cancel()
+		require.NoError(t, testProvider.Shutdown(shutdownCtx))
 	})
 
 	// A foreign flow id has no FlowExecution row, so both ops are fenced (skip-foreign).

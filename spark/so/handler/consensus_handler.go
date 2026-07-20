@@ -113,6 +113,22 @@ func (h *ConsensusHandler) DispatchPrepare(
 		return nil, fmt.Errorf("consensus prepare for op type %d declares the receiving SO (coordinator_index %d) as coordinator; coordinators prepare locally and never call ConsensusPrepare on themselves", opType, coordinatorIndex)
 	}
 	ctx = consensus.WithCoordinatorIdentity(ctx, coordinator.IdentityPublicKey)
+
+	// Prepare-side match to validateDecisionAgainstPreparedOp's empty-id
+	// fail-closed: a bound flow with no flow_execution_id writes no participant
+	// row (the write below is skipped for an empty id) and the decision-side fence
+	// rejects an empty id, so running Prepare would lock resources with nothing to
+	// commit, roll back, or reconcile against. Every live coordinator populates the
+	// id (post-#6288), so an empty id on a bound op is forged or misrouted. Reject
+	// (rather than run Prepare) — and reject with an ERROR, not a nil result:
+	// unlike the gossip decision path (where an error would loop redelivery), a
+	// ConsensusPrepare RPC error drives the coordinator's rollback path, whereas a
+	// (nil, nil) return reads as a successful prepare and could let the coordinator
+	// record and broadcast COMMITTED for the other participants.
+	if _, bound := handler.(consensus.PrepareBoundFlowHandler); bound && flowExecutionID == "" {
+		return nil, fmt.Errorf("consensus prepare for bound op type %d requires a flow_execution_id; refusing to prepare a bound flow with no row to commit/rollback/reconcile against", opType)
+	}
+
 	result, err := handler.Prepare(ctx, msg)
 	if err != nil {
 		return nil, err
