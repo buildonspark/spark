@@ -12,14 +12,11 @@ import {
   InitiatePreimageSwapRequest_Reason,
   type InitiatePreimageSwapResponse,
   type ProvidePreimageResponse,
-  type QueryUserSignedRefundsResponse,
   SecretShare as SecretShareProto,
   type Transfer,
   type StartTransferRequest,
-  type UserSignedRefund,
 } from "../proto/spark.js";
 import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
-import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
 import {
   optionsWithIdempotencyKey,
@@ -284,35 +281,6 @@ export class LightningService {
     }
 
     return response;
-  }
-
-  async queryUserSignedRefunds(
-    paymentHash: Uint8Array,
-  ): Promise<UserSignedRefund[]> {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
-
-    let response: QueryUserSignedRefundsResponse;
-    try {
-      response = await sparkClient.query_user_signed_refunds({
-        paymentHash,
-        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-      });
-    } catch (error) {
-      throw new SparkRequestError("Failed to query user signed refunds", {
-        operation: "query_user_signed_refunds",
-        error,
-      });
-    }
-
-    return response.userSignedRefunds;
-  }
-
-  validateUserSignedRefund(userSignedRefund: UserSignedRefund): bigint {
-    const refundTx = getTxFromRawTxBytes(userSignedRefund.refundTx);
-    // TODO: Should we assert that the amount is always defined here?
-    return refundTx.getOutput(0).amount || 0n;
   }
 
   async providePreimage(preimage: Uint8Array): Promise<Transfer> {

@@ -40,7 +40,6 @@ const (
 	SparkService_GetSigningOperatorList_FullMethodName              = "/spark.SparkService/get_signing_operator_list"
 	SparkService_QueryNodes_FullMethodName                          = "/spark.SparkService/query_nodes"
 	SparkService_QueryBalance_FullMethodName                        = "/spark.SparkService/query_balance"
-	SparkService_QueryUserSignedRefunds_FullMethodName              = "/spark.SparkService/query_user_signed_refunds"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName         = "/spark.SparkService/query_unused_deposit_addresses"
 	SparkService_QueryStaticDepositAddresses_FullMethodName         = "/spark.SparkService/query_static_deposit_addresses"
 	SparkService_SubscribeToEvents_FullMethodName                   = "/spark.SparkService/subscribe_to_events"
@@ -97,7 +96,6 @@ type SparkServiceClient interface {
 	GetSigningOperatorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSigningOperatorListResponse, error)
 	QueryNodes(ctx context.Context, in *QueryNodesRequest, opts ...grpc.CallOption) (*QueryNodesResponse, error)
 	QueryBalance(ctx context.Context, in *QueryBalanceRequest, opts ...grpc.CallOption) (*QueryBalanceResponse, error)
-	QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
 	QueryStaticDepositAddresses(ctx context.Context, in *QueryStaticDepositAddressesRequest, opts ...grpc.CallOption) (*QueryStaticDepositAddressesResponse, error)
 	SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error)
@@ -330,16 +328,6 @@ func (c *sparkServiceClient) QueryBalance(ctx context.Context, in *QueryBalanceR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryBalanceResponse)
 	err := c.cc.Invoke(ctx, SparkService_QueryBalance_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryUserSignedRefundsResponse)
-	err := c.cc.Invoke(ctx, SparkService_QueryUserSignedRefunds_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +568,6 @@ type SparkServiceServer interface {
 	GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error)
 	QueryNodes(context.Context, *QueryNodesRequest) (*QueryNodesResponse, error)
 	QueryBalance(context.Context, *QueryBalanceRequest) (*QueryBalanceResponse, error)
-	QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
 	QueryStaticDepositAddresses(context.Context, *QueryStaticDepositAddressesRequest) (*QueryStaticDepositAddressesResponse, error)
 	SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error
@@ -678,9 +665,6 @@ func (UnimplementedSparkServiceServer) QueryNodes(context.Context, *QueryNodesRe
 }
 func (UnimplementedSparkServiceServer) QueryBalance(context.Context, *QueryBalanceRequest) (*QueryBalanceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryBalance not implemented")
-}
-func (UnimplementedSparkServiceServer) QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method QueryUserSignedRefunds not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryUnusedDepositAddresses not implemented")
@@ -1120,24 +1104,6 @@ func _SparkService_QueryBalance_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_QueryUserSignedRefunds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryUserSignedRefundsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).QueryUserSignedRefunds(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_QueryUserSignedRefunds_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).QueryUserSignedRefunds(ctx, req.(*QueryUserSignedRefundsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkService_QueryUnusedDepositAddresses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryUnusedDepositAddressesRequest)
 	if err := dec(in); err != nil {
@@ -1559,10 +1525,6 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_balance",
 			Handler:    _SparkService_QueryBalance_Handler,
-		},
-		{
-			MethodName: "query_user_signed_refunds",
-			Handler:    _SparkService_QueryUserSignedRefunds_Handler,
 		},
 		{
 			MethodName: "query_unused_deposit_addresses",

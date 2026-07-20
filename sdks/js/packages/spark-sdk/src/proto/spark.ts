@@ -1923,15 +1923,6 @@ export interface SigningCommitments_SigningCommitmentsEntry {
   value: SigningCommitment | undefined;
 }
 
-export interface UserSignedRefund {
-  nodeId: string;
-  refundTx: Uint8Array;
-  userSignature: Uint8Array;
-  signingCommitments: SigningCommitments | undefined;
-  userSignatureCommitment: SigningCommitment | undefined;
-  network: Network;
-}
-
 export interface InvoiceAmountProof {
   bolt11Invoice: string;
 }
@@ -1945,7 +1936,6 @@ export interface InitiatePreimageSwapRequest {
   paymentHash: Uint8Array;
   invoiceAmount: InvoiceAmount | undefined;
   reason: InitiatePreimageSwapRequest_Reason;
-  transfer: StartUserSignedTransferRequest | undefined;
   receiverIdentityPublicKey: Uint8Array;
   feeSats: number;
   transferRequest: StartTransferRequest | undefined;
@@ -2154,16 +2144,6 @@ export interface GetSigningOperatorListResponse {
 export interface GetSigningOperatorListResponse_SigningOperatorsEntry {
   key: string;
   value: SigningOperatorInfo | undefined;
-}
-
-export interface QueryUserSignedRefundsRequest {
-  paymentHash: Uint8Array;
-  identityPublicKey: Uint8Array;
-}
-
-export interface QueryUserSignedRefundsResponse {
-  userSignedRefunds: UserSignedRefund[];
-  transfer: Transfer | undefined;
 }
 
 export interface PreimageRequestWithTransfer {
@@ -13692,162 +13672,6 @@ export const SigningCommitments_SigningCommitmentsEntry: MessageFns<SigningCommi
   },
 };
 
-function createBaseUserSignedRefund(): UserSignedRefund {
-  return {
-    nodeId: "",
-    refundTx: new Uint8Array(0),
-    userSignature: new Uint8Array(0),
-    signingCommitments: undefined,
-    userSignatureCommitment: undefined,
-    network: 0,
-  };
-}
-
-export const UserSignedRefund: MessageFns<UserSignedRefund> = {
-  encode(message: UserSignedRefund, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.nodeId !== "") {
-      writer.uint32(10).string(message.nodeId);
-    }
-    if (message.refundTx.length !== 0) {
-      writer.uint32(18).bytes(message.refundTx);
-    }
-    if (message.userSignature.length !== 0) {
-      writer.uint32(26).bytes(message.userSignature);
-    }
-    if (message.signingCommitments !== undefined) {
-      SigningCommitments.encode(message.signingCommitments, writer.uint32(34).fork()).join();
-    }
-    if (message.userSignatureCommitment !== undefined) {
-      SigningCommitment.encode(message.userSignatureCommitment, writer.uint32(42).fork()).join();
-    }
-    if (message.network !== 0) {
-      writer.uint32(48).int32(message.network);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): UserSignedRefund {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseUserSignedRefund();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.nodeId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.refundTx = reader.bytes();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.userSignature = reader.bytes();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.signingCommitments = SigningCommitments.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.userSignatureCommitment = SigningCommitment.decode(reader, reader.uint32());
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.network = reader.int32() as any;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): UserSignedRefund {
-    return {
-      nodeId: isSet(object.nodeId) ? globalThis.String(object.nodeId) : "",
-      refundTx: isSet(object.refundTx) ? bytesFromBase64(object.refundTx) : new Uint8Array(0),
-      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
-      signingCommitments: isSet(object.signingCommitments)
-        ? SigningCommitments.fromJSON(object.signingCommitments)
-        : undefined,
-      userSignatureCommitment: isSet(object.userSignatureCommitment)
-        ? SigningCommitment.fromJSON(object.userSignatureCommitment)
-        : undefined,
-      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
-    };
-  },
-
-  toJSON(message: UserSignedRefund): unknown {
-    const obj: any = {};
-    if (message.nodeId !== "") {
-      obj.nodeId = message.nodeId;
-    }
-    if (message.refundTx.length !== 0) {
-      obj.refundTx = base64FromBytes(message.refundTx);
-    }
-    if (message.userSignature.length !== 0) {
-      obj.userSignature = base64FromBytes(message.userSignature);
-    }
-    if (message.signingCommitments !== undefined) {
-      obj.signingCommitments = SigningCommitments.toJSON(message.signingCommitments);
-    }
-    if (message.userSignatureCommitment !== undefined) {
-      obj.userSignatureCommitment = SigningCommitment.toJSON(message.userSignatureCommitment);
-    }
-    if (message.network !== 0) {
-      obj.network = networkToJSON(message.network);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<UserSignedRefund>): UserSignedRefund {
-    return UserSignedRefund.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<UserSignedRefund>): UserSignedRefund {
-    const message = createBaseUserSignedRefund();
-    message.nodeId = object.nodeId ?? "";
-    message.refundTx = object.refundTx ?? new Uint8Array(0);
-    message.userSignature = object.userSignature ?? new Uint8Array(0);
-    message.signingCommitments = (object.signingCommitments !== undefined && object.signingCommitments !== null)
-      ? SigningCommitments.fromPartial(object.signingCommitments)
-      : undefined;
-    message.userSignatureCommitment =
-      (object.userSignatureCommitment !== undefined && object.userSignatureCommitment !== null)
-        ? SigningCommitment.fromPartial(object.userSignatureCommitment)
-        : undefined;
-    message.network = object.network ?? 0;
-    return message;
-  },
-};
-
 function createBaseInvoiceAmountProof(): InvoiceAmountProof {
   return { bolt11Invoice: "" };
 }
@@ -13991,7 +13815,6 @@ function createBaseInitiatePreimageSwapRequest(): InitiatePreimageSwapRequest {
     paymentHash: new Uint8Array(0),
     invoiceAmount: undefined,
     reason: 0,
-    transfer: undefined,
     receiverIdentityPublicKey: new Uint8Array(0),
     feeSats: 0,
     transferRequest: undefined,
@@ -14008,9 +13831,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     }
     if (message.reason !== 0) {
       writer.uint32(24).int32(message.reason);
-    }
-    if (message.transfer !== undefined) {
-      StartUserSignedTransferRequest.encode(message.transfer, writer.uint32(34).fork()).join();
     }
     if (message.receiverIdentityPublicKey.length !== 0) {
       writer.uint32(42).bytes(message.receiverIdentityPublicKey);
@@ -14055,14 +13875,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
           message.reason = reader.int32() as any;
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.transfer = StartUserSignedTransferRequest.decode(reader, reader.uint32());
-          continue;
-        }
         case 5: {
           if (tag !== 42) {
             break;
@@ -14101,7 +13913,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
       invoiceAmount: isSet(object.invoiceAmount) ? InvoiceAmount.fromJSON(object.invoiceAmount) : undefined,
       reason: isSet(object.reason) ? initiatePreimageSwapRequest_ReasonFromJSON(object.reason) : 0,
-      transfer: isSet(object.transfer) ? StartUserSignedTransferRequest.fromJSON(object.transfer) : undefined,
       receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
         ? bytesFromBase64(object.receiverIdentityPublicKey)
         : new Uint8Array(0),
@@ -14122,9 +13933,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     }
     if (message.reason !== 0) {
       obj.reason = initiatePreimageSwapRequest_ReasonToJSON(message.reason);
-    }
-    if (message.transfer !== undefined) {
-      obj.transfer = StartUserSignedTransferRequest.toJSON(message.transfer);
     }
     if (message.receiverIdentityPublicKey.length !== 0) {
       obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
@@ -14148,9 +13956,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       ? InvoiceAmount.fromPartial(object.invoiceAmount)
       : undefined;
     message.reason = object.reason ?? 0;
-    message.transfer = (object.transfer !== undefined && object.transfer !== null)
-      ? StartUserSignedTransferRequest.fromPartial(object.transfer)
-      : undefined;
     message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
     message.feeSats = object.feeSats ?? 0;
     message.transferRequest = (object.transferRequest !== undefined && object.transferRequest !== null)
@@ -16565,164 +16370,6 @@ export const GetSigningOperatorListResponse_SigningOperatorsEntry: MessageFns<
     message.key = object.key ?? "";
     message.value = (object.value !== undefined && object.value !== null)
       ? SigningOperatorInfo.fromPartial(object.value)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseQueryUserSignedRefundsRequest(): QueryUserSignedRefundsRequest {
-  return { paymentHash: new Uint8Array(0), identityPublicKey: new Uint8Array(0) };
-}
-
-export const QueryUserSignedRefundsRequest: MessageFns<QueryUserSignedRefundsRequest> = {
-  encode(message: QueryUserSignedRefundsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.paymentHash.length !== 0) {
-      writer.uint32(10).bytes(message.paymentHash);
-    }
-    if (message.identityPublicKey.length !== 0) {
-      writer.uint32(18).bytes(message.identityPublicKey);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryUserSignedRefundsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryUserSignedRefundsRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.paymentHash = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.identityPublicKey = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryUserSignedRefundsRequest {
-    return {
-      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
-      identityPublicKey: isSet(object.identityPublicKey)
-        ? bytesFromBase64(object.identityPublicKey)
-        : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: QueryUserSignedRefundsRequest): unknown {
-    const obj: any = {};
-    if (message.paymentHash.length !== 0) {
-      obj.paymentHash = base64FromBytes(message.paymentHash);
-    }
-    if (message.identityPublicKey.length !== 0) {
-      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryUserSignedRefundsRequest>): QueryUserSignedRefundsRequest {
-    return QueryUserSignedRefundsRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryUserSignedRefundsRequest>): QueryUserSignedRefundsRequest {
-    const message = createBaseQueryUserSignedRefundsRequest();
-    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
-    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseQueryUserSignedRefundsResponse(): QueryUserSignedRefundsResponse {
-  return { userSignedRefunds: [], transfer: undefined };
-}
-
-export const QueryUserSignedRefundsResponse: MessageFns<QueryUserSignedRefundsResponse> = {
-  encode(message: QueryUserSignedRefundsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.userSignedRefunds) {
-      UserSignedRefund.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.transfer !== undefined) {
-      Transfer.encode(message.transfer, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryUserSignedRefundsResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryUserSignedRefundsResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.userSignedRefunds.push(UserSignedRefund.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.transfer = Transfer.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryUserSignedRefundsResponse {
-    return {
-      userSignedRefunds: globalThis.Array.isArray(object?.userSignedRefunds)
-        ? object.userSignedRefunds.map((e: any) => UserSignedRefund.fromJSON(e))
-        : [],
-      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
-    };
-  },
-
-  toJSON(message: QueryUserSignedRefundsResponse): unknown {
-    const obj: any = {};
-    if (message.userSignedRefunds?.length) {
-      obj.userSignedRefunds = message.userSignedRefunds.map((e) => UserSignedRefund.toJSON(e));
-    }
-    if (message.transfer !== undefined) {
-      obj.transfer = Transfer.toJSON(message.transfer);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryUserSignedRefundsResponse>): QueryUserSignedRefundsResponse {
-    return QueryUserSignedRefundsResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryUserSignedRefundsResponse>): QueryUserSignedRefundsResponse {
-    const message = createBaseQueryUserSignedRefundsResponse();
-    message.userSignedRefunds = object.userSignedRefunds?.map((e) => UserSignedRefund.fromPartial(e)) || [];
-    message.transfer = (object.transfer !== undefined && object.transfer !== null)
-      ? Transfer.fromPartial(object.transfer)
       : undefined;
     return message;
   },
@@ -22327,14 +21974,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    query_user_signed_refunds: {
-      name: "query_user_signed_refunds",
-      requestType: QueryUserSignedRefundsRequest,
-      requestStream: false,
-      responseType: QueryUserSignedRefundsResponse,
-      responseStream: false,
-      options: {},
-    },
     query_unused_deposit_addresses: {
       name: "query_unused_deposit_addresses",
       requestType: QueryUnusedDepositAddressesRequest,
@@ -22595,10 +22234,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryBalanceRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryBalanceResponse>>;
-  query_user_signed_refunds(
-    request: QueryUserSignedRefundsRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryUserSignedRefundsResponse>>;
   query_unused_deposit_addresses(
     request: QueryUnusedDepositAddressesRequest,
     context: CallContext & CallContextExt,
@@ -22788,10 +22423,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryBalanceRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryBalanceResponse>;
-  query_user_signed_refunds(
-    request: DeepPartial<QueryUserSignedRefundsRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryUserSignedRefundsResponse>;
   query_unused_deposit_addresses(
     request: DeepPartial<QueryUnusedDepositAddressesRequest>,
     options?: CallOptions & CallOptionsExt,

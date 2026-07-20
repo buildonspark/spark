@@ -469,23 +469,12 @@ func TestNonHodlReceiveWithPartnerAttribution(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	userSignedLeavesToSend, err := wallet.PrepareUserSignedLeafSigningJobs(
-		ctx, sspConfig, client, leaves, userConfig.IdentityPublicKey(), keys.Public{},
-	)
-	require.NoError(t, err)
-
 	response, err := client.InitiatePreimageSwapV3(ctx, &spark.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash[:],
 		Reason:      spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
 		InvoiceAmount: &spark.InvoiceAmount{
 			InvoiceAmountProof: &spark.InvoiceAmountProof{Bolt11Invoice: invoice},
 			ValueSats:          amountSats,
-		},
-		Transfer: &spark.StartUserSignedTransferRequest{
-			TransferId:                transferID.String(),
-			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
-			LeavesToSend:              userSignedLeavesToSend,
 		},
 		TransferRequest: &spark.StartTransferRequest{
 			TransferId:                transferID.String(),

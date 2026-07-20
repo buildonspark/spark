@@ -148,7 +148,6 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_GetSigningOperatorList_FullMethodName:              {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_QueryNodes_FullMethodName:                          {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_QueryBalance_FullMethodName:                        {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryUserSignedRefunds_FullMethodName:              {AuthMode: AuthSession},
 		pbspark.SparkService_QueryUnusedDepositAddresses_FullMethodName:         {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_QueryStaticDepositAddresses_FullMethodName:         {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_SubscribeToEvents_FullMethodName:                   {AuthMode: AuthSession},
