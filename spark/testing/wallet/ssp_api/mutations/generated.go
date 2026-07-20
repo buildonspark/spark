@@ -63,27 +63,6 @@ func (v *CompleteCoopExitResponse) GetCompleteCoopExit() CompleteCoopExitComplet
 	return v.CompleteCoopExit
 }
 
-// CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput includes the requested fields of the GraphQL type CompleteSeedReleaseOutput.
-type CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput struct {
-	Seed string `json:"seed"`
-}
-
-// GetSeed returns CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput.Seed, and is useful for accessing the field via an interface.
-func (v *CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput) GetSeed() string {
-	return v.Seed
-}
-
-// CompleteReleaseSeedResponse is returned by CompleteReleaseSeed on success.
-type CompleteReleaseSeedResponse struct {
-	// Complete the process to request releasing seed.
-	CompleteSeedRelease CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput `json:"complete_seed_release"`
-}
-
-// GetCompleteSeedRelease returns CompleteReleaseSeedResponse.CompleteSeedRelease, and is useful for accessing the field via an interface.
-func (v *CompleteReleaseSeedResponse) GetCompleteSeedRelease() CompleteReleaseSeedCompleteSeedReleaseCompleteSeedReleaseOutput {
-	return v.CompleteSeedRelease
-}
-
 // This enum identifies the unit of currency associated with a CurrencyAmount.
 type CurrencyUnit string
 
@@ -277,17 +256,6 @@ var AllLightningSendRequestStatus = []LightningSendRequestStatus{
 	LightningSendRequestStatusUSERSWAPRETURNED,
 	LightningSendRequestStatusUSERSWAPRETURNFAILED,
 	LightningSendRequestStatusREQUESTVALIDATED,
-}
-
-// NotifyReceiverTransferResponse is returned by NotifyReceiverTransfer on success.
-type NotifyReceiverTransferResponse struct {
-	// Send SMS to receiver they received transfer.
-	NotifyReceiverTransfer any `json:"notify_receiver_transfer"`
-}
-
-// GetNotifyReceiverTransfer returns NotifyReceiverTransferResponse.NotifyReceiverTransfer, and is useful for accessing the field via an interface.
-func (v *NotifyReceiverTransferResponse) GetNotifyReceiverTransfer() any {
-	return v.NotifyReceiverTransfer
 }
 
 // RequestCoopExitRequestCoopExitRequestCoopExitOutput includes the requested fields of the GraphQL type RequestCoopExitOutput.
@@ -580,36 +548,6 @@ var AllSparkCoopExitRequestStatus = []SparkCoopExitRequestStatus{
 	SparkCoopExitRequestStatusINBOUNDTRANSFERCLAIMINGSCHEDULED,
 }
 
-// StartReleaseSeedResponse is returned by StartReleaseSeed on success.
-type StartReleaseSeedResponse struct {
-	// Start the process to request releasing seed. SSP will send an OTP code to the phone number.
-	StartSeedRelease any `json:"start_seed_release"`
-}
-
-// GetStartSeedRelease returns StartReleaseSeedResponse.StartSeedRelease, and is useful for accessing the field via an interface.
-func (v *StartReleaseSeedResponse) GetStartSeedRelease() any { return v.StartSeedRelease }
-
-// WalletUserIdentityPublicKeyResponse is returned by WalletUserIdentityPublicKey on success.
-type WalletUserIdentityPublicKeyResponse struct {
-	// Get wallet's identity public key from phone number.
-	WalletUserIdentityPublicKey WalletUserIdentityPublicKeyWalletUserIdentityPublicKeyWalletUserIdentityPublicKeyOutput `json:"wallet_user_identity_public_key"`
-}
-
-// GetWalletUserIdentityPublicKey returns WalletUserIdentityPublicKeyResponse.WalletUserIdentityPublicKey, and is useful for accessing the field via an interface.
-func (v *WalletUserIdentityPublicKeyResponse) GetWalletUserIdentityPublicKey() WalletUserIdentityPublicKeyWalletUserIdentityPublicKeyWalletUserIdentityPublicKeyOutput {
-	return v.WalletUserIdentityPublicKey
-}
-
-// WalletUserIdentityPublicKeyWalletUserIdentityPublicKeyWalletUserIdentityPublicKeyOutput includes the requested fields of the GraphQL type WalletUserIdentityPublicKeyOutput.
-type WalletUserIdentityPublicKeyWalletUserIdentityPublicKeyWalletUserIdentityPublicKeyOutput struct {
-	IdentityPublicKey string `json:"identity_public_key"`
-}
-
-// GetIdentityPublicKey returns WalletUserIdentityPublicKeyWalletUserIdentityPublicKeyWalletUserIdentityPublicKeyOutput.IdentityPublicKey, and is useful for accessing the field via an interface.
-func (v *WalletUserIdentityPublicKeyWalletUserIdentityPublicKeyWalletUserIdentityPublicKeyOutput) GetIdentityPublicKey() string {
-	return v.IdentityPublicKey
-}
-
 // __CompleteCoopExitInput is used internally by genqlient
 type __CompleteCoopExitInput struct {
 	UserOutboundTransferExternalId uuid.UUID `json:"user_outbound_transfer_external_id"`
@@ -623,30 +561,6 @@ func (v *__CompleteCoopExitInput) GetUserOutboundTransferExternalId() uuid.UUID 
 
 // GetCoopExitRequestId returns __CompleteCoopExitInput.CoopExitRequestId, and is useful for accessing the field via an interface.
 func (v *__CompleteCoopExitInput) GetCoopExitRequestId() string { return v.CoopExitRequestId }
-
-// __CompleteReleaseSeedInput is used internally by genqlient
-type __CompleteReleaseSeedInput struct {
-	PhoneNumber string `json:"phone_number"`
-	Code        string `json:"code"`
-}
-
-// GetPhoneNumber returns __CompleteReleaseSeedInput.PhoneNumber, and is useful for accessing the field via an interface.
-func (v *__CompleteReleaseSeedInput) GetPhoneNumber() string { return v.PhoneNumber }
-
-// GetCode returns __CompleteReleaseSeedInput.Code, and is useful for accessing the field via an interface.
-func (v *__CompleteReleaseSeedInput) GetCode() string { return v.Code }
-
-// __NotifyReceiverTransferInput is used internally by genqlient
-type __NotifyReceiverTransferInput struct {
-	PhoneNumber string `json:"phone_number"`
-	AmountSats  int64  `json:"amount_sats"`
-}
-
-// GetPhoneNumber returns __NotifyReceiverTransferInput.PhoneNumber, and is useful for accessing the field via an interface.
-func (v *__NotifyReceiverTransferInput) GetPhoneNumber() string { return v.PhoneNumber }
-
-// GetAmountSats returns __NotifyReceiverTransferInput.AmountSats, and is useful for accessing the field via an interface.
-func (v *__NotifyReceiverTransferInput) GetAmountSats() int64 { return v.AmountSats }
 
 // __RequestCoopExitInput is used internally by genqlient
 type __RequestCoopExitInput struct {
@@ -704,22 +618,6 @@ func (v *__RequestLightningSendInput) GetEncodedInvoice() string { return v.Enco
 // GetIdempotencyKey returns __RequestLightningSendInput.IdempotencyKey, and is useful for accessing the field via an interface.
 func (v *__RequestLightningSendInput) GetIdempotencyKey() string { return v.IdempotencyKey }
 
-// __StartReleaseSeedInput is used internally by genqlient
-type __StartReleaseSeedInput struct {
-	PhoneNumber string `json:"phone_number"`
-}
-
-// GetPhoneNumber returns __StartReleaseSeedInput.PhoneNumber, and is useful for accessing the field via an interface.
-func (v *__StartReleaseSeedInput) GetPhoneNumber() string { return v.PhoneNumber }
-
-// __WalletUserIdentityPublicKeyInput is used internally by genqlient
-type __WalletUserIdentityPublicKeyInput struct {
-	PhoneNumber string `json:"phone_number"`
-}
-
-// GetPhoneNumber returns __WalletUserIdentityPublicKeyInput.PhoneNumber, and is useful for accessing the field via an interface.
-func (v *__WalletUserIdentityPublicKeyInput) GetPhoneNumber() string { return v.PhoneNumber }
-
 // The mutation executed by CompleteCoopExit.
 const CompleteCoopExit_Operation = `
 mutation CompleteCoopExit ($user_outbound_transfer_external_id: UUID!, $coop_exit_request_id: ID!) {
@@ -747,76 +645,6 @@ func CompleteCoopExit(
 	}
 
 	data_ = &CompleteCoopExitResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by CompleteReleaseSeed.
-const CompleteReleaseSeed_Operation = `
-mutation CompleteReleaseSeed ($phone_number: String!, $code: String!) {
-	complete_seed_release(input: {phone_number:$phone_number,code:$code}) {
-		seed
-	}
-}
-`
-
-func CompleteReleaseSeed(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	phone_number string,
-	code string,
-) (data_ *CompleteReleaseSeedResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "CompleteReleaseSeed",
-		Query:  CompleteReleaseSeed_Operation,
-		Variables: &__CompleteReleaseSeedInput{
-			PhoneNumber: phone_number,
-			Code:        code,
-		},
-	}
-
-	data_ = &CompleteReleaseSeedResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by NotifyReceiverTransfer.
-const NotifyReceiverTransfer_Operation = `
-mutation NotifyReceiverTransfer ($phone_number: String!, $amount_sats: Long!) {
-	notify_receiver_transfer(input: {phone_number:$phone_number,amount_sats:$amount_sats})
-}
-`
-
-func NotifyReceiverTransfer(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	phone_number string,
-	amount_sats int64,
-) (data_ *NotifyReceiverTransferResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "NotifyReceiverTransfer",
-		Query:  NotifyReceiverTransfer_Operation,
-		Variables: &__NotifyReceiverTransferInput{
-			PhoneNumber: phone_number,
-			AmountSats:  amount_sats,
-		},
-	}
-
-	data_ = &NotifyReceiverTransferResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -963,72 +791,6 @@ func RequestLightningSend(
 	}
 
 	data_ = &RequestLightningSendResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by StartReleaseSeed.
-const StartReleaseSeed_Operation = `
-mutation StartReleaseSeed ($phone_number: String!) {
-	start_seed_release(input: {phone_number:$phone_number})
-}
-`
-
-func StartReleaseSeed(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	phone_number string,
-) (data_ *StartReleaseSeedResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "StartReleaseSeed",
-		Query:  StartReleaseSeed_Operation,
-		Variables: &__StartReleaseSeedInput{
-			PhoneNumber: phone_number,
-		},
-	}
-
-	data_ = &StartReleaseSeedResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by WalletUserIdentityPublicKey.
-const WalletUserIdentityPublicKey_Operation = `
-mutation WalletUserIdentityPublicKey ($phone_number: String!) {
-	wallet_user_identity_public_key(input: {phone_number:$phone_number}) {
-		identity_public_key
-	}
-}
-`
-
-func WalletUserIdentityPublicKey(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	phone_number string,
-) (data_ *WalletUserIdentityPublicKeyResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "WalletUserIdentityPublicKey",
-		Query:  WalletUserIdentityPublicKey_Operation,
-		Variables: &__WalletUserIdentityPublicKeyInput{
-			PhoneNumber: phone_number,
-		},
-	}
-
-	data_ = &WalletUserIdentityPublicKeyResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

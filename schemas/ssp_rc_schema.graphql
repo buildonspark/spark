@@ -188,15 +188,6 @@ type CompleteLeavesSwapOutput {
   request: LeavesSwapRequest!
 }
 
-input CompleteSeedReleaseInput {
-  phone_number: String!
-  code: String!
-}
-
-type CompleteSeedReleaseOutput {
-  seed: String!
-}
-
 input CompleteStuckLeavesSwapInput {
   swap_request_id: UUID!
 }
@@ -842,9 +833,6 @@ type Mutation {
   """For spark users to complete a stuck leaves swap."""
   complete_stuck_leaves_swap(input: CompleteStuckLeavesSwapInput!): CompleteStuckLeavesSwapOutput!
 
-  """Complete the process to request releasing seed."""
-  complete_seed_release(input: CompleteSeedReleaseInput!): CompleteSeedReleaseOutput!
-
   """
   Create an instant static deposit quote from this SSP to claim a deposit to a static deposit address.
   """
@@ -855,9 +843,6 @@ type Mutation {
 
   """Get a new SSP authentication challenge."""
   get_challenge(input: GetChallengeInput!): GetChallengeOutput!
-
-  """Send SMS to receiver they received transfer."""
-  notify_receiver_transfer(input: NotifyReceiverTransferInput!): Void
 
   """For spark users to initiate coop exit."""
   request_coop_exit(input: RequestCoopExitInput!): RequestCoopExitOutput!
@@ -879,11 +864,6 @@ type Mutation {
   """
   request_regtest_funds(input: RequestRegtestFundsInput!): RequestRegtestFundsOutput!
 
-  """
-  Start the process to request releasing seed. SSP will send an OTP code to the phone number.
-  """
-  start_seed_release(input: StartSeedReleaseInput!): Void
-
   """Delete a webhook for the authenticated Spark wallet user."""
   delete_wallet_webhook(input: DeleteSparkWalletWebhookInput!): DeleteSparkWalletWebhookOutput!
 
@@ -895,13 +875,6 @@ type Mutation {
   """Verify a signed SSP authentication challenge."""
   verify_challenge(input: VerifyChallengeInput!): VerifyChallengeOutput!
 
-  """Get wallet's identity public key from phone number."""
-  wallet_user_identity_public_key(input: WalletUserIdentityPublicKeyInput!): WalletUserIdentityPublicKeyOutput!
-}
-
-input NotifyReceiverTransferInput {
-  phone_number: String!
-  amount_sats: Long!
 }
 
 """
@@ -1242,10 +1215,6 @@ enum SparkWalletWebhookEventType {
   SPARK_STATIC_DEPOSIT_FINISHED
 }
 
-input StartSeedReleaseInput {
-  phone_number: String!
-}
-
 type StaticDepositPlan implements Entity {
   """
   The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque string.
@@ -1412,11 +1381,3 @@ type VerifyChallengeOutput {
 
 """Represents NULL values"""
 scalar Void
-
-input WalletUserIdentityPublicKeyInput {
-  phone_number: String!
-}
-
-type WalletUserIdentityPublicKeyOutput {
-  identity_public_key: PublicKey!
-}

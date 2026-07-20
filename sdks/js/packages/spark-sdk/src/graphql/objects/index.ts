@@ -10,8 +10,6 @@ export { default as ClaimStaticDepositStatus } from "./ClaimStaticDepositStatus.
 export type { default as CompleteCoopExitInput } from "./CompleteCoopExitInput.js";
 export type { default as CompleteCoopExitOutput } from "./CompleteCoopExitOutput.js";
 export type { default as CompleteLeavesSwapOutput } from "./CompleteLeavesSwapOutput.js";
-export type { default as CompleteSeedReleaseInput } from "./CompleteSeedReleaseInput.js";
-export type { default as CompleteSeedReleaseOutput } from "./CompleteSeedReleaseOutput.js";
 export type { default as Connection } from "./Connection.js";
 export type { default as CoopExitFeeEstimate } from "./CoopExitFeeEstimate.js";
 export type { default as CoopExitFeeEstimatesInput } from "./CoopExitFeeEstimatesInput.js";
@@ -61,7 +59,6 @@ export {
 } from "./LightningSendRequest.js";
 export { default as LightningSendRequestStatus } from "./LightningSendRequestStatus.js";
 export type { default as ListSparkWalletWebhooksOutput } from "./ListSparkWalletWebhooksOutput.js";
-export type { default as NotifyReceiverTransferInput } from "./NotifyReceiverTransferInput.js";
 export type { default as PageInfo } from "./PageInfo.js";
 export type { default as Provider } from "./Provider.js";
 export type { default as RegisterSparkWalletWebhookInput } from "./RegisterSparkWalletWebhookInput.js";
@@ -83,7 +80,6 @@ export { default as SparkWalletUser } from "./SparkWalletUser.js";
 export type { default as SparkWalletUserToUserRequestsConnection } from "./SparkWalletUserToUserRequestsConnection.js";
 export type { default as SparkWalletWebhookEntry } from "./SparkWalletWebhookEntry.js";
 export { default as SparkWalletWebhookEventType } from "./SparkWalletWebhookEventType.js";
-export type { default as StartSeedReleaseInput } from "./StartSeedReleaseInput.js";
 export type { default as StaticDepositQuoteInput } from "./StaticDepositQuoteInput.js";
 export type { default as StaticDepositQuoteOutput } from "./StaticDepositQuoteOutput.js";
 export type { default as SwapLeaf } from "./SwapLeaf.js";
@@ -95,6 +91,3 @@ export {
 } from "./UserRequest.js";
 export type { default as VerifyChallengeInput } from "./VerifyChallengeInput.js";
 export type { default as VerifyChallengeOutput } from "./VerifyChallengeOutput.js";
-export type { default as WalletUserIdentityPublicKeyInput } from "./WalletUserIdentityPublicKeyInput.js";
-export type { default as WalletUserIdentityPublicKeyOutput } from "./WalletUserIdentityPublicKeyOutput.js";
-

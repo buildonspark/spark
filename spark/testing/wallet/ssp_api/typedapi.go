@@ -90,29 +90,3 @@ func (s *TypedSparkServiceAPI) CompleteCoopExit(ctx context.Context, userOutboun
 	}
 	return response.CompleteCoopExit.Request.Id, nil
 }
-
-func (s *TypedSparkServiceAPI) FetchPublicKeyByPhoneNumber(ctx context.Context, phoneNumber string) (string, error) {
-	response, err := mutations.WalletUserIdentityPublicKey(ctx, s.requester, phoneNumber)
-	if err != nil {
-		return "", err
-	}
-	return response.WalletUserIdentityPublicKey.IdentityPublicKey, nil
-}
-
-func (s *TypedSparkServiceAPI) StartReleaseSeed(ctx context.Context, phoneNumber string) error {
-	_, err := mutations.StartReleaseSeed(ctx, s.requester, phoneNumber)
-	return err
-}
-
-func (s *TypedSparkServiceAPI) CompleteReleaseSeed(ctx context.Context, phoneNumber string, code string) ([]byte, error) {
-	response, err := mutations.CompleteReleaseSeed(ctx, s.requester, phoneNumber, code)
-	if err != nil {
-		return nil, err
-	}
-	return hex.DecodeString(response.CompleteSeedRelease.Seed)
-}
-
-func (s *TypedSparkServiceAPI) NotifyReceiverTransfer(ctx context.Context, phoneNumber string, amountSats int64) error {
-	_, err := mutations.NotifyReceiverTransfer(ctx, s.requester, phoneNumber, amountSats)
-	return err
-}
