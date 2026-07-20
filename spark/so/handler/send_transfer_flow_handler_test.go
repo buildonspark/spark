@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/db"
@@ -21,8 +22,129 @@ import (
 	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// TestSendTransferSigningJobsThreadAdaptorKeysPerVariant proves each refund
+// variant's adaptor key is mapped consistently through BOTH the participant
+// signing-job builder (buildSendTransferLocalSigningJobs) and the coordinator
+// aggregation-job builder (buildSendTransferAggregationJobs) — a cpfp/direct/
+// dfc mix-up in either would silently break adaptor aggregation.
+func TestSendTransferSigningJobsThreadAdaptorKeysPerVariant(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{21})
+	ctx, leaf, cpfpParentTx := createSendTransferSigningJobTestLeaf(t, rng)
+	refundScript, err := common.P2TRScriptFromPubKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	require.NoError(t, err)
+
+	// Give the leaf a distinct direct parent tx for the direct refund variant.
+	directParentRaw := createSendTransferSigningJobTestTx(t, wire.OutPoint{Hash: [32]byte{0x42}, Index: 0}, 950, refundScript, nil)
+	directParentTx, err := common.TxFromRawTxBytes(directParentRaw)
+	require.NoError(t, err)
+	leaf, err = leaf.Update().SetDirectTx(directParentRaw).Save(ctx)
+	require.NoError(t, err)
+
+	job := func(parentTx *wire.MsgTx) *pb.UserSignedTxSigningJob {
+		raw := createSendTransferSigningJobTestTx(t, wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}, 900, refundScript, nil)
+		return createSendTransferUserSignedJob(t, rng, leaf.ID.String(), raw)
+	}
+	pkg, err := transferpkg.ParsePackage(withDummyPackageAuth(&pb.TransferPackage{
+		LeavesToSend:               []*pb.UserSignedTxSigningJob{job(cpfpParentTx)},   // cpfp parent = leaf.RawTx
+		DirectLeavesToSend:         []*pb.UserSignedTxSigningJob{job(directParentTx)}, // direct parent = leaf.DirectTx
+		DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{job(cpfpParentTx)},   // dfc parent = leaf.RawTx
+	}))
+	require.NoError(t, err)
+
+	cpfpKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	directKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	dfcKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	adaptorKeys := TransferAdaptorPublicKeys{
+		cpfpAdaptorPubKey:           cpfpKey,
+		directAdaptorPubKey:         directKey,
+		directFromCpfpAdaptorPubKey: dfcKey,
+	}
+	transferID := uuid.New()
+	leafID := leaf.ID.String()
+	leafMap := map[string]*ent.TreeNode{leafID: leaf}
+
+	// Coordinator aggregation jobs: each variant carries its own adaptor key.
+	agg, err := buildSendTransferAggregationJobs(ctx, transferID, pkg, leafMap, adaptorKeys)
+	require.NoError(t, err)
+	jobs := agg[leafID]
+	require.NotNil(t, jobs.cpfp)
+	require.NotNil(t, jobs.direct)
+	require.NotNil(t, jobs.dfc)
+	require.NotNil(t, jobs.cpfp.AdaptorPublicKey)
+	require.NotNil(t, jobs.direct.AdaptorPublicKey)
+	require.NotNil(t, jobs.dfc.AdaptorPublicKey)
+	assert.Equal(t, cpfpKey, *jobs.cpfp.AdaptorPublicKey)
+	assert.Equal(t, directKey, *jobs.direct.AdaptorPublicKey)
+	assert.Equal(t, dfcKey, *jobs.dfc.AdaptorPublicKey)
+
+	// Participant local jobs: same per-variant mapping, keyed by deterministic job id.
+	local, err := buildSendTransferLocalSigningJobs(ctx, transferID, pkg, leafMap, adaptorKeys)
+	require.NoError(t, err)
+	byJobID := make(map[string][]byte, len(local))
+	for _, j := range local {
+		byJobID[j.GetJobId()] = j.GetAdaptorPublicKey()
+	}
+	assert.Equal(t, cpfpKey.Serialize(), byJobID[sendTransferJobID(transferID, leafID, "cpfp").String()])
+	assert.Equal(t, directKey.Serialize(), byJobID[sendTransferJobID(transferID, leafID, "direct").String()])
+	assert.Equal(t, dfcKey.Serialize(), byJobID[sendTransferJobID(transferID, leafID, "directFromCpfp").String()])
+}
+
+// capturingFrostClient records the AggregateFrostRequest the caller builds so a
+// test can assert the request fields without a real FROST server. Only
+// AggregateFrost is exercised; the embedded nil interface satisfies the rest.
+type capturingFrostClient struct {
+	pbfrost.FrostServiceClient
+	req *pbfrost.AggregateFrostRequest
+}
+
+func (c *capturingFrostClient) AggregateFrost(_ context.Context, in *pbfrost.AggregateFrostRequest, _ ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
+	c.req = in
+	return &pbfrost.AggregateFrostResponse{Signature: []byte{0xAB}}, nil
+}
+
+// TestAggregateLeafSignatureThreadsAdaptorPublicKey asserts aggregateLeafSignature
+// populates AggregateFrostRequest.AdaptorPublicKey from the job's adaptor point
+// (and leaves it empty when the job carries none), localizing a regression here
+// instead of it surfacing as an opaque aggregate-signature failure.
+func TestAggregateLeafSignatureThreadsAdaptorPublicKey(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{12})
+	ctx, leaf, parentTx := createSendTransferSigningJobTestLeaf(t, rng)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
+	refundScript, err := common.P2TRScriptFromPubKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	require.NoError(t, err)
+	parentOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
+	refundRaw := createSendTransferSigningJobTestTx(t, parentOutPoint, 900, refundScript, nil)
+	adaptorPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// "operator1" is the public-share key createTestSigningKeyshare seeds.
+	sharesFor := func(jobID uuid.UUID) map[string]map[string][]byte {
+		return map[string]map[string][]byte{jobID.String(): {"operator1": {0x01}}}
+	}
+
+	withAdaptor, err := buildSigningJobForRefund(ctx,
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), refundRaw)),
+		leaf, leaf.RawTx, uuid.New(), adaptorPubKey)
+	require.NoError(t, err)
+	fc := &capturingFrostClient{}
+	_, _, err = aggregateLeafSignature(ctx, cfg, fc, withAdaptor, sharesFor(withAdaptor.JobID), leaf, []byte{0x02})
+	require.NoError(t, err)
+	require.NotNil(t, fc.req)
+	assert.Equal(t, adaptorPubKey.Serialize(), fc.req.GetAdaptorPublicKey())
+
+	withoutAdaptor, err := buildSigningJobForRefund(ctx,
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), refundRaw)),
+		leaf, leaf.RawTx, uuid.New(), keys.Public{})
+	require.NoError(t, err)
+	fc2 := &capturingFrostClient{}
+	_, _, err = aggregateLeafSignature(ctx, cfg, fc2, withoutAdaptor, sharesFor(withoutAdaptor.JobID), leaf, []byte{0x02})
+	require.NoError(t, err)
+	require.NotNil(t, fc2.req)
+	assert.Empty(t, fc2.req.GetAdaptorPublicKey())
+}
 
 // TestSendTransferJobID_Deterministic verifies that the same (transferID,
 // leafID, txKind) tuple produces the same UUID across invocations — the
@@ -319,6 +441,7 @@ func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {
 		leaf,
 		leaf.RawTx,
 		uuid.New(),
+		keys.Public{},
 	)
 	require.NoError(t, err)
 
@@ -330,6 +453,7 @@ func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {
 		leaf,
 		leaf.RawTx,
 		uuid.New(),
+		keys.Public{},
 	)
 	require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
 
@@ -343,8 +467,56 @@ func TestBuildSigningJobForRefundValidatesParentOutpoint(t *testing.T) {
 		leaf,
 		leaf.RawTx,
 		uuid.New(),
+		keys.Public{},
 	)
 	require.ErrorContains(t, err, "refund tx must have exactly 1 input")
+}
+
+// TestBuildSigningJobForRefundThreadsAdaptorPublicKey verifies the adaptor
+// point set on a refund signing job survives into the marshalled FrostRound2
+// proto (swap v3 signs adaptor-encumbered refunds), and that the zero value
+// leaves both the helper job and the proto without one. Narrow lower-level
+// test: whether the round-2 job carries the adaptor point is invisible at the
+// RPC boundary (a dropped point only surfaces as a FROST verification failure
+// deep in signing); the swap v3 consensus integration tests cover the
+// end-to-end behavior.
+func TestBuildSigningJobForRefundThreadsAdaptorPublicKey(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{9})
+	ctx, leaf, parentTx := createSendTransferSigningJobTestLeaf(t, rng)
+	refundScript, err := common.P2TRScriptFromPubKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
+	require.NoError(t, err)
+	parentOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: 0}
+	refundRaw := createSendTransferSigningJobTestTx(t, parentOutPoint, 900, refundScript, nil)
+	adaptorPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	withAdaptor, err := buildSigningJobForRefund(
+		ctx,
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), refundRaw)),
+		leaf,
+		leaf.RawTx,
+		uuid.New(),
+		adaptorPubKey,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, withAdaptor.AdaptorPublicKey)
+	assert.Equal(t, adaptorPubKey, *withAdaptor.AdaptorPublicKey)
+	marshalled, err := marshalSigningJobHelper(withAdaptor)
+	require.NoError(t, err)
+	assert.Equal(t, adaptorPubKey.Serialize(), marshalled.GetAdaptorPublicKey())
+
+	withoutAdaptor, err := buildSigningJobForRefund(
+		ctx,
+		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), refundRaw)),
+		leaf,
+		leaf.RawTx,
+		uuid.New(),
+		keys.Public{},
+	)
+	require.NoError(t, err)
+	assert.Nil(t, withoutAdaptor.AdaptorPublicKey)
+	marshalled, err = marshalSigningJobHelper(withoutAdaptor)
+	require.NoError(t, err)
+	assert.Empty(t, marshalled.GetAdaptorPublicKey())
 }
 
 func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *testing.T) {
@@ -421,7 +593,7 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 		t.Run(tt.name, func(t *testing.T) {
 			pkg, err := transferpkg.ParsePackage(tt.pkg())
 			require.NoError(t, err)
-			_, err = buildSendTransferAggregationJobs(ctx, uuid.New(), pkg, leafMap)
+			_, err = buildSendTransferAggregationJobs(ctx, uuid.New(), pkg, leafMap, TransferAdaptorPublicKeys{})
 			require.ErrorContains(t, err, tt.wantErr)
 			require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
 		})

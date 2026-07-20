@@ -121,7 +121,7 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
 		}
-		jobs, err := buildSendTransferLocalSigningJobs(ctx, state.transferID, pkg, state.leafMap)
+		jobs, err := buildSendTransferLocalSigningJobs(ctx, state.transferID, pkg, state.leafMap, TransferAdaptorPublicKeys{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to build local signing jobs: %w", err)
 		}
@@ -849,7 +849,7 @@ func buildInitiatePreimageSwapCoordinatorFlow(ctx context.Context, config *so.Co
 		if err != nil {
 			return nil, err
 		}
-		jobsByLeaf, err := buildSendTransferAggregationJobs(ctx, transferID, pkg, leafMap)
+		jobsByLeaf, err := buildSendTransferAggregationJobs(ctx, transferID, pkg, leafMap, TransferAdaptorPublicKeys{})
 		if err != nil {
 			return nil, fmt.Errorf("unable to build signing-job helpers: %w", err)
 		}

@@ -175,7 +175,7 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, fmt.Errorf("failed to create transfer rows for %s: %w", parsed.transferID, err)
 	}
 
-	jobs, err := buildSendTransferLocalSigningJobs(ctx, parsed.transferID, parsed.pkg, leafMap)
+	jobs, err := buildSendTransferLocalSigningJobs(ctx, parsed.transferID, parsed.pkg, leafMap, TransferAdaptorPublicKeys{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to build local signing jobs: %w", err)
 	}
@@ -482,9 +482,13 @@ func (f *sendTransferCoordinatorFlow) RollbackPayload() proto.Message {
 // aggregateLeafSignature drives a single FROST AggregateFrost RPC for one job
 // and returns both the aggregated signature and a SigningResult mirroring
 // helper.GetSignaturesWithPregeneratedNonce's output shape. Shared by the
-// send-transfer and coop-exit coordinator flows (both aggregate the same
-// cpfp/direct/direct-from-cpfp refund variants), so it takes config explicitly
-// rather than hanging off a flow type.
+// send-transfer, coop-exit and initiate-preimage-swap coordinator flows (all
+// aggregate the same cpfp/direct/direct-from-cpfp refund variants), and by the
+// swap v3 coordinator flows added in the next PR in the stack, so it takes
+// config explicitly rather than hanging off a flow type. A job carrying an
+// adaptor point (set by buildSigningJobForRefund) makes FROST produce an
+// adaptor-embedded signature — reading it off the job keeps round-2 signing
+// and aggregation structurally incapable of disagreeing about the point.
 func aggregateLeafSignature(
 	ctx context.Context,
 	config *so.Config,
@@ -521,6 +525,10 @@ func aggregateLeafSignature(
 		publicShares[id] = share
 	}
 
+	var adaptorPublicKeyBytes []byte
+	if job.AdaptorPublicKey != nil && !job.AdaptorPublicKey.IsZero() {
+		adaptorPublicKeyBytes = job.AdaptorPublicKey.Serialize()
+	}
 	roundCommitments := collections.ConvertObjectMapToProtoMap(job.Round1Packages)
 	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            job.Message.Serialize(),
@@ -531,6 +539,7 @@ func aggregateLeafSignature(
 		UserCommitments:    job.UserCommitment.MarshalProto(),
 		UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
 		UserSignatureShare: userSignatureShare,
+		AdaptorPublicKey:   adaptorPublicKeyBytes,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
@@ -612,7 +621,7 @@ func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, re
 		leafMap[leaf.ID.String()] = leaf
 	}
 
-	jobsByLeaf, err := buildSendTransferAggregationJobs(ctx, parsed.transferID, parsed.pkg, leafMap)
+	jobsByLeaf, err := buildSendTransferAggregationJobs(ctx, parsed.transferID, parsed.pkg, leafMap, TransferAdaptorPublicKeys{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to build signing-job helpers: %w", err)
 	}
@@ -762,13 +771,15 @@ type sendTransferLeafSigningJobs struct {
 
 // buildSendTransferAggregationJobs constructs the per-leaf signing-job helpers
 // the coordinator uses for FROST aggregation. Mirrors the iteration logic in
-// SignRefundsWithPregeneratedNonce but with deterministic job IDs and no
-// adaptor public keys (v3 doesn't use adaptor signatures).
+// SignRefundsWithPregeneratedNonce but with deterministic job IDs.
+// adaptorKeys carries the per-variant adaptor public keys (zero values for
+// flows without adaptor signatures; set by the swap v3 flows).
 func buildSendTransferAggregationJobs(
 	ctx context.Context,
 	transferID uuid.UUID,
 	pkg *transferpkg.Package,
 	leafMap map[string]*ent.TreeNode,
+	adaptorKeys TransferAdaptorPublicKeys,
 ) (map[string]*sendTransferLeafSigningJobs, error) {
 	out := make(map[string]*sendTransferLeafSigningJobs, len(leafMap))
 	for _, leaf := range leafMap {
@@ -780,7 +791,7 @@ func buildSendTransferAggregationJobs(
 		if !ok {
 			return nil, fmt.Errorf("cpfp leaf %s not found in leaf map", leafID)
 		}
-		signingJob, err := buildSigningJobForRefund(ctx, job, leaf, leaf.RawTx, sendTransferJobID(transferID, leafID, "cpfp"))
+		signingJob, err := buildSigningJobForRefund(ctx, job, leaf, leaf.RawTx, sendTransferJobID(transferID, leafID, "cpfp"), adaptorKeys.cpfpAdaptorPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", leafID, err)
 		}
@@ -793,7 +804,7 @@ func buildSendTransferAggregationJobs(
 		if !ok {
 			return nil, fmt.Errorf("direct leaf %s not found in leaf map", leafID)
 		}
-		signingJob, err := buildSigningJobForRefund(ctx, job, leaf, leaf.DirectTx, sendTransferJobID(transferID, leafID, "direct"))
+		signingJob, err := buildSigningJobForRefund(ctx, job, leaf, leaf.DirectTx, sendTransferJobID(transferID, leafID, "direct"), adaptorKeys.directAdaptorPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", leafID, err)
 		}
@@ -806,7 +817,7 @@ func buildSendTransferAggregationJobs(
 		if !ok {
 			return nil, fmt.Errorf("direct-from-cpfp leaf %s not found in leaf map", leafID)
 		}
-		signingJob, err := buildSigningJobForRefund(ctx, job, leaf, leaf.RawTx, sendTransferJobID(transferID, leafID, "directFromCpfp"))
+		signingJob, err := buildSigningJobForRefund(ctx, job, leaf, leaf.RawTx, sendTransferJobID(transferID, leafID, "directFromCpfp"), adaptorKeys.directFromCpfpAdaptorPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", leafID, err)
 		}
@@ -820,13 +831,17 @@ func buildSendTransferAggregationJobs(
 // refund variant. parentTxBytes is the tx whose vout 0 is being spent
 // (leaf.RawTx for cpfp + direct-from-cpfp; leaf.DirectTx for direct). The
 // refund tx and the user/operator commitments are already parsed on job (by
-// transfer.ParsePackage); this only computes the sighash and assembles the job.
+// transfer.ParsePackage); this only computes the sighash and assembles the
+// job. A non-zero adaptorPubKey is attached to the job so FROST round-2
+// shares embed the adaptor point (swap v3); the zero value leaves the job a
+// normal signing job.
 func buildSigningJobForRefund(
 	ctx context.Context,
 	job *transferpkg.RefundSigningJob,
 	leaf *ent.TreeNode,
 	parentTxBytes []byte,
 	jobID uuid.UUID,
+	adaptorPubKey keys.Public,
 ) (*helper.SigningJobWithPregeneratedNonce, error) {
 	refundTx := job.RefundTx()
 	parentTx, err := common.TxFromRawTxBytes(parentTxBytes)
@@ -865,6 +880,10 @@ func buildSigningJobForRefund(
 	if err != nil {
 		return nil, fmt.Errorf("unable to load signing keyshare for leaf %s: %w", leaf.ID, err)
 	}
+	var adaptorPubKeyRef *keys.Public
+	if !adaptorPubKey.IsZero() {
+		adaptorPubKeyRef = &adaptorPubKey
+	}
 	return &helper.SigningJobWithPregeneratedNonce{
 		SigningJob: helper.SigningJob{
 			JobID:             jobID,
@@ -872,6 +891,7 @@ func buildSigningJobForRefund(
 			Message:           sigHash,
 			VerifyingKey:      new(leaf.VerifyingPubkey),
 			UserCommitment:    &userCommitment,
+			AdaptorPublicKey:  adaptorPubKeyRef,
 		},
 		Round1Packages: round1,
 	}, nil
@@ -880,20 +900,23 @@ func buildSigningJobForRefund(
 // buildSendTransferLocalSigningJobs constructs the *pbinternal.SigningJob list
 // each SO feeds into its local FrostRound2 handler during Prepare. Mirrors
 // buildSendTransferAggregationJobs but produces the internal proto shape.
+// adaptorKeys carries the per-variant adaptor public keys (zero values for
+// flows without adaptor signatures; set by the swap v3 flows).
 func buildSendTransferLocalSigningJobs(
 	ctx context.Context,
 	transferID uuid.UUID,
 	pkg *transferpkg.Package,
 	leafMap map[string]*ent.TreeNode,
+	adaptorKeys TransferAdaptorPublicKeys,
 ) ([]*pbinternal.SigningJob, error) {
 	jobs := make([]*pbinternal.SigningJob, 0)
-	addJob := func(job *transferpkg.RefundSigningJob, txKind string, parentTxBytes []byte) error {
+	addJob := func(job *transferpkg.RefundSigningJob, txKind string, parentTxBytes []byte, adaptorPubKey keys.Public) error {
 		leafID := job.LeafID().String()
 		leaf, ok := leafMap[leafID]
 		if !ok {
 			return fmt.Errorf("leaf %s not found in leaf map", leafID)
 		}
-		helperJob, err := buildSigningJobForRefund(ctx, job, leaf, parentTxBytes, sendTransferJobID(transferID, leafID, txKind))
+		helperJob, err := buildSigningJobForRefund(ctx, job, leaf, parentTxBytes, sendTransferJobID(transferID, leafID, txKind), adaptorPubKey)
 		if err != nil {
 			return err
 		}
@@ -910,7 +933,7 @@ func buildSendTransferLocalSigningJobs(
 		if !ok {
 			return nil, fmt.Errorf("cpfp leaf %s not found", leafID)
 		}
-		if err := addJob(job, "cpfp", leaf.RawTx); err != nil {
+		if err := addJob(job, "cpfp", leaf.RawTx, adaptorKeys.cpfpAdaptorPubKey); err != nil {
 			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", leafID, err)
 		}
 	}
@@ -920,7 +943,7 @@ func buildSendTransferLocalSigningJobs(
 		if !ok {
 			return nil, fmt.Errorf("direct leaf %s not found", leafID)
 		}
-		if err := addJob(job, "direct", leaf.DirectTx); err != nil {
+		if err := addJob(job, "direct", leaf.DirectTx, adaptorKeys.directAdaptorPubKey); err != nil {
 			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", leafID, err)
 		}
 	}
@@ -930,7 +953,7 @@ func buildSendTransferLocalSigningJobs(
 		if !ok {
 			return nil, fmt.Errorf("direct-from-cpfp leaf %s not found", leafID)
 		}
-		if err := addJob(job, "directFromCpfp", leaf.RawTx); err != nil {
+		if err := addJob(job, "directFromCpfp", leaf.RawTx, adaptorKeys.directFromCpfpAdaptorPubKey); err != nil {
 			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", leafID, err)
 		}
 	}
