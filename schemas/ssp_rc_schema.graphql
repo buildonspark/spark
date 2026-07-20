@@ -547,6 +547,30 @@ enum CurrencyUnit {
   """Chinese Yuan."""
   CNY
 
+  """Bulgarian Lev."""
+  BGN
+
+  """Czech Koruna."""
+  CZK
+
+  """Hungarian Forint."""
+  HUF
+
+  """Norwegian Krone."""
+  NOK
+
+  """Polish Zloty."""
+  PLN
+
+  """Romanian Leu."""
+  RON
+
+  """Swedish Krona."""
+  SEK
+
+  """Swiss Franc."""
+  CHF
+
   """Tether"""
   USDT
 
@@ -684,6 +708,32 @@ type LeavesSwapRequest implements UserRequest & Entity {
 
   """The swap leaves returned to the user"""
   swap_leaves: [SwapLeaf!]
+}
+
+input LightningReceiveQuoteInput {
+  """The bitcoin network the receive would settle on."""
+  network: BitcoinNetwork!
+
+  """
+  The NET amount the receiver wants to end up with, in satoshis. Any partner markup is computed on this amount and added on top, so the receiver nets exactly this and the payer funds the markup.
+  """
+  amount_sats: Long!
+}
+
+type LightningReceiveQuoteOutput {
+  """
+  The quoted TransferManifest, serialized proto bytes as hex. Echo it back verbatim at commit time — the manifest is looked up by its bytes, not rebuilt.
+  """
+  serialized_manifest: String!
+
+  """The SSP's signature over the quote envelope, hex."""
+  issuer_signature: String!
+
+  """The transfer id the manifest describes (uuid_v7)."""
+  transfer_id: String!
+
+  """When this quote stops being commitable."""
+  quote_expiry_time: DateTime!
 }
 
 type LightningReceiveRequest implements UserRequest & Entity {
@@ -852,6 +902,14 @@ type Mutation {
 
   """For spark users to receive through lightning invoices."""
   request_lightning_receive(input: RequestLightningReceiveInput!): RequestLightningReceiveOutput!
+
+  """
+  A signed, stateless fee quote for a fixed-amount lightning receive.
+  Nothing is persisted; the manifest + issuer signature are echoed back at commit time.
+  Single-use is enforced at commit: the manifest's transfer_id becomes the created
+  transfer's id, so a quote can materialize at most one transfer.
+  """
+  lightning_receive_quote(input: LightningReceiveQuoteInput!): LightningReceiveQuoteOutput!
 
   """For spark users to initiate a leaves swap."""
   request_leaves_swap(input: RequestLeavesSwapInput!): RequestLeavesSwapOutput!
