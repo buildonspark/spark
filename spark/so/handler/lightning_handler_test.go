@@ -1072,9 +1072,8 @@ func TestValidateIdenticalLeavesRejectsNilTransferPackage(t *testing.T) {
 	require.Equal(t, "MISSING_FIELD", reason)
 }
 
-// A request whose legacy transfer was stripped (KnobPreimageSwapIgnoreLegacyTransfer)
-// must pass the dual-shape cross-check untouched, since the field-drop dry-run leaves
-// only transfer_request.
+// A request whose legacy transfer was stripped must pass the dual-shape cross-check
+// untouched, since the strip leaves only transfer_request.
 func TestValidateIdenticalLeavesNoOpsWhenTransferStripped(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	lightningHandler := NewLightningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
@@ -1800,154 +1799,90 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
+	// The legacy `transfer` field is always stripped at the coordinator entrypoint, so
+	// every request resolves inputs from transfer_request. sendRequest builds a minimal
+	// valid-shape SEND request; each case mutates one field to trip a specific validation.
+	// Per-leaf nil-job checks live on the package path (transfer_package_validation.go)
+	// and are covered by TestLoadLeafRefundMapsFromTransferPackage_*.
+	sendRequest := func() *pb.InitiatePreimageSwapRequest {
+		return &pb.InitiatePreimageSwapRequest{
+			PaymentHash:               make([]byte, 32),
+			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+			Reason:                    pb.InitiatePreimageSwapRequest_REASON_SEND,
+			TransferRequest: &pb.StartTransferRequest{
+				OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+				ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+				TransferPackage: &pb.TransferPackage{
+					LeavesToSend: []*pb.UserSignedTxSigningJob{{LeafId: "test-leaf"}},
+				},
+			},
+		}
+	}
+
 	tests := []struct {
 		name           string
 		setUpRequest   func() *pb.InitiatePreimageSwapRequest
 		expectedErrMsg string
 	}{
 		{
-			name: "nil transfer",
+			name: "no request shape",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{Transfer: nil}
+				return &pb.InitiatePreimageSwapRequest{}
 			},
 			expectedErrMsg: "transfer_request is required",
 		},
 		{
 			name: "empty leaves to send",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend:           []*pb.UserSignedTxSigningJob{}, // empty
-						OwnerIdentityPublicKey: ownerIdentityPubKey.Serialize(),
-					},
-				}
+				req := sendRequest()
+				req.TransferRequest.TransferPackage.LeavesToSend = []*pb.UserSignedTxSigningJob{}
+				return req
 			},
 			expectedErrMsg: "at least one cpfp leaf tx must be provided",
 		},
 		{
 			name: "nil owner identity public key",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend: []*pb.UserSignedTxSigningJob{
-							{LeafId: "test-leaf"},
-						},
-						OwnerIdentityPublicKey: nil,
-					},
-				}
+				req := sendRequest()
+				req.TransferRequest.OwnerIdentityPublicKey = nil
+				return req
 			},
 			expectedErrMsg: "unable to parse owner identity public key",
 		},
 		{
 			name: "nil receiver identity public key",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend: []*pb.UserSignedTxSigningJob{
-							{LeafId: "test-leaf"},
-						},
-						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey: nil,
-					},
-				}
+				req := sendRequest()
+				req.ReceiverIdentityPublicKey = nil
+				req.TransferRequest.ReceiverIdentityPublicKey = nil
+				return req
 			},
 			expectedErrMsg: "receiver identity public key is required",
 		},
 		{
 			name: "fee not allowed for receive",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend: []*pb.UserSignedTxSigningJob{
-							{LeafId: "test-leaf"},
-						},
-						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-					},
-					Reason:  pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
-					FeeSats: 100, // fee not allowed for receive
-				}
+				req := sendRequest()
+				req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+				req.FeeSats = 100
+				return req
 			},
 			expectedErrMsg: "fee is not allowed for receive preimage swap",
 		},
 		{
 			name: "too many transactions exceeds knob limit",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				// Create 101 transactions to exceed the default limit of 100
+				req := sendRequest()
 				leaves := make([]*pb.UserSignedTxSigningJob, 101)
 				for i := range leaves {
 					leaves[i] = &pb.UserSignedTxSigningJob{
-						LeafId:                 fmt.Sprintf("550e8400-e29b-41d4-a716-44665544%04d", i),
-						SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
-						SigningNonceCommitment: &pbcommon.SigningCommitment{},
-						RawTx:                  []byte("dummy_transaction_data_for_testing"),
+						LeafId: fmt.Sprintf("550e8400-e29b-41d4-a716-44665544%04d", i),
 					}
 				}
-				return &pb.InitiatePreimageSwapRequest{
-					PaymentHash: []byte("payment_hash_32_bytes_long______"),
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend:              leaves,
-						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-					},
-					Reason: pb.InitiatePreimageSwapRequest_REASON_SEND,
-				}
+				req.TransferRequest.TransferPackage.LeavesToSend = leaves
+				return req
 			},
 			expectedErrMsg: "too many transactions: 101, maximum allowed: 100",
-		},
-		{
-			name: "nil leaves to send",
-			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend:              nil, // nil instead of empty
-						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-					},
-				}
-			},
-			expectedErrMsg: "at least one cpfp leaf tx must be provided",
-		},
-		{
-			name: "nil cpfp transaction",
-			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend:              []*pb.UserSignedTxSigningJob{nil},
-						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-					},
-				}
-			},
-			expectedErrMsg: "leaves_to_send[0] is required",
-		},
-		{
-			name: "nil direct job",
-			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend:              []*pb.UserSignedTxSigningJob{{LeafId: "test-leaf"}},
-						DirectLeavesToSend:        []*pb.UserSignedTxSigningJob{nil},
-						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-					},
-				}
-			},
-			expectedErrMsg: "direct_leaves_to_send[0] is required",
-		},
-		{
-			name: "nil direct from cpfp job",
-			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend:               []*pb.UserSignedTxSigningJob{{LeafId: "test-leaf"}},
-						DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
-						OwnerIdentityPublicKey:     ownerIdentityPubKey.Serialize(),
-						ReceiverIdentityPublicKey:  receiverIdentityPubKey.Serialize(),
-					},
-				}
-			},
-			expectedErrMsg: "direct_from_cpfp_leaves_to_send[0] is required",
 		},
 	}
 
@@ -3296,15 +3231,18 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 		receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		// Create request with duplicated leaves
 		req := &pb.InitiatePreimageSwapRequest{
-			PaymentHash: []byte("payment_hash_32_bytes_long______"),
-			Transfer: &pb.StartUserSignedTransferRequest{
-				TransferId: "transfer-id-123",
-				LeavesToSend: []*pb.UserSignedTxSigningJob{
-					originalLeaf,
-					duplicatedLeaf, // Same leaf ID - this should be rejected but currently isn't
-				},
+			PaymentHash:               []byte("payment_hash_32_bytes_long______"),
+			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+			TransferRequest: &pb.StartTransferRequest{
+				TransferId:                "transfer-id-123",
 				OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
 				ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
+				TransferPackage: &pb.TransferPackage{
+					LeavesToSend: []*pb.UserSignedTxSigningJob{
+						originalLeaf,
+						duplicatedLeaf, // Same leaf ID - this should be rejected
+					},
+				},
 			},
 			InvoiceAmount: &pb.InvoiceAmount{
 				ValueSats: 1000, // Invoice is for 1000 sats, but we're attempting to send 2000 sats due to duplication

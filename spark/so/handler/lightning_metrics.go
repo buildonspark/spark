@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -61,10 +60,6 @@ var (
 	lightningResultKey              = attribute.Key("result")
 	lightningOperationKey           = attribute.Key("operation")
 	lightningTargetOperatorIndexKey = attribute.Key("target_operator_index")
-	lightningShapeKey               = attribute.Key("shape")
-	lightningReasonKey              = attribute.Key("reason")
-	lightningEndpointKey            = attribute.Key("endpoint")
-	lightningLegacyIgnoredKey       = attribute.Key("legacy_transfer_ignored")
 )
 
 var lightningMetricBuckets = []float64{
@@ -77,7 +72,6 @@ type lightningMetricInstruments struct {
 	phaseDuration      metric.Float64Histogram
 	operatorRPC        metric.Float64Histogram
 	operatorRPCFailure metric.Int64Counter
-	preimageSwapShape  metric.Int64Counter
 }
 
 var getLightningMetricInstruments = sync.OnceValue(func() *lightningMetricInstruments {
@@ -136,23 +130,12 @@ var getLightningMetricInstruments = sync.OnceValue(func() *lightningMetricInstru
 		operatorRPCFailure = noop.Int64Counter{}
 	}
 
-	preimageSwapShape, err := meter.Int64Counter(
-		"spark_lightning_preimage_swap_shape_total",
-		metric.WithDescription("InitiatePreimageSwap requests by which transfer shape the caller sent; watch transfer_only/both with result=success drain to zero before removing the legacy transfer field"),
-		metric.WithUnit("1"),
-	)
-	if err != nil {
-		otel.Handle(err)
-		preimageSwapShape = noop.Int64Counter{}
-	}
-
 	return &lightningMetricInstruments{
 		flowDuration:       flowDuration,
 		flowFailures:       flowFailures,
 		phaseDuration:      phaseDuration,
 		operatorRPC:        operatorRPC,
 		operatorRPCFailure: operatorRPCFailure,
-		preimageSwapShape:  preimageSwapShape,
 	}
 })
 
@@ -199,63 +182,6 @@ func observeOperatorFanoutRPC(ctx context.Context, operation, targetOperatorIden
 	if err != nil {
 		instruments.operatorRPCFailure.Add(ctx, 1, attrs)
 	}
-}
-
-// Request-shape labels for the legacy-transfer-object drain metric.
-const (
-	preimageSwapShapeTransferOnly        = "transfer_only"
-	preimageSwapShapeTransferRequestOnly = "transfer_request_only"
-	preimageSwapShapeBoth                = "both"
-	preimageSwapShapeNeither             = "neither"
-)
-
-// preimageSwapShape labels a request by which transfer shape(s) it carries.
-// Shapeless (always-rejected) requests get their own label so retries from a
-// broken caller can't keep the watched transfer_only bucket nonzero.
-// TODO(SP-3285): drain scaffolding — remove with the legacy transfer field.
-func preimageSwapShape(req *pbspark.InitiatePreimageSwapRequest) string {
-	switch {
-	case req.GetTransferRequest() != nil && req.GetTransfer() != nil:
-		return preimageSwapShapeBoth
-	case req.GetTransferRequest() != nil:
-		return preimageSwapShapeTransferRequestOnly
-	case req.GetTransfer() != nil:
-		return preimageSwapShapeTransferOnly
-	default:
-		return preimageSwapShapeNeither
-	}
-}
-
-// preimageSwapReason collapses the open proto3 enum to a closed label set —
-// callers control the wire value, and String() on an unknown value would mint
-// unbounded metric cardinality.
-// TODO(SP-3285): drain scaffolding — remove with the legacy transfer field.
-func preimageSwapReason(reason pbspark.InitiatePreimageSwapRequest_Reason) string {
-	switch reason {
-	case pbspark.InitiatePreimageSwapRequest_REASON_SEND:
-		return "send"
-	case pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE:
-		return "receive"
-	default:
-		return "unknown"
-	}
-}
-
-// observePreimageSwapShape records at flow completion so the drain read can
-// key on result=success; endpoint ("v2"/"v3") names which caller population
-// still sends the legacy field. shape is the as-received shape (captured before
-// KnobPreimageSwapIgnoreLegacyTransfer may strip it) so the drain census stays
-// truthful; legacyTransferIgnored marks the requests that knob forced onto the
-// transfer_request path — its result= split is the SEND package-path bake signal.
-// TODO(SP-3285): drain scaffolding — remove with the legacy transfer field.
-func observePreimageSwapShape(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, shape string, legacyTransferIgnored bool, endpoint string, err error) {
-	getLightningMetricInstruments().preimageSwapShape.Add(ctx, 1, metric.WithAttributes(
-		lightningShapeKey.String(shape),
-		lightningReasonKey.String(preimageSwapReason(req.GetReason())),
-		lightningEndpointKey.String(endpoint),
-		lightningLegacyIgnoredKey.Bool(legacyTransferIgnored),
-		lightningResultKey.String(classifyLightningMetricResult(err)),
-	))
 }
 
 func durationMilliseconds(start time.Time) float64 {

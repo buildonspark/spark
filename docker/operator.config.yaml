@@ -59,7 +59,6 @@ knobs:
     spark.so.enable_instant_static_deposit@REGTEST: 100
     spark.so.max_pending_instant_static_deposit_amount: 1000000
     spark.so.shutdown_hodl_invoices: 0
-    spark.so.lightning.preimage_swap_ignore_legacy_transfer: 1
     spark.so.mimo_transfer_multi_receiver_enabled: 1
     spark.so.mimo_authoritative_receiver_status_enabled: 1
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
