@@ -163,7 +163,6 @@ func SwapNodesForPreimageWithHTLC(
 
 	reason := pb.InitiatePreimageSwapRequest_REASON_SEND
 	var transfer *pb.StartTransferRequest
-	var userSignedTransfer *pb.StartUserSignedTransferRequest
 
 	if isInboundPayment {
 		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
@@ -240,16 +239,6 @@ func SwapNodesForPreimageWithHTLC(
 			}
 		}
 
-		userSignedTransfer = &pb.StartUserSignedTransferRequest{
-			TransferId:                 transferID.String(),
-			OwnerIdentityPublicKey:     config.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey:  receiverIdentityPubKey.Serialize(),
-			LeavesToSend:               cpfpLeafSigningJobs,
-			DirectFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
-			DirectLeavesToSend:         directLeafSigningJobs,
-			ExpiryTime:                 timestamppb.New(expireTime),
-		}
-
 		transfer, err = buildPreimageSwapTransferRequest(
 			config, transferID, receiverIdentityPubKey, leaves,
 			cpfpLeafSigningJobs, directLeafSigningJobs, directFromCpfpLeafSigningJobs, expireTime)
@@ -258,47 +247,15 @@ func SwapNodesForPreimageWithHTLC(
 		}
 	} else {
 		// For SEND, use HTLC transactions
-		originalRefundSigningCommitments := signingCommitments.GetSigningCommitments()[:len(leaves)]
-		signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
-			leaves, originalRefundSigningCommitments, receiverIdentityPubKey, keys.Public{})
-		if err != nil {
-			return nil, err
-		}
-
-		signingResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
-			SigningJobs: signingJobs,
-			Role:        pbfrost.SigningRole_USER,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		leafSigningJobs, err := prepareLeafSigningJobs(
-			leaves, refundTxs, signingResults.GetResults(), userCommitments, originalRefundSigningCommitments)
-		if err != nil {
-			return nil, err
-		}
-
 		htlcSigningCommitments := signingCommitments.GetSigningCommitments()[len(leaves):]
 		transfer, err = buildLightningHTLCTransfer(ctx, leaves, transferID, config, receiverIdentityPubKey, htlcSigningCommitments, paymentHash, signerConn, expireTime)
 		if err != nil {
 			return nil, fmt.Errorf("unable to build lightning htlc transfer: %w", err)
 		}
-
-		userSignedTransfer = &pb.StartUserSignedTransferRequest{
-			TransferId:                transferID.String(),
-			OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-			LeavesToSend:              leafSigningJobs,
-			ExpiryTime:                timestamppb.New(expireTime),
-		}
 	}
 
 	if swapOpts.omitTransferPackage {
-		// Null the legacy field too so the swap is rejected regardless of the
-		// ignore-legacy-transfer knob's strip.
 		transfer.TransferPackage = nil
-		userSignedTransfer = nil
 	}
 
 	swapReq := &pb.InitiatePreimageSwapRequest{
@@ -310,7 +267,6 @@ func SwapNodesForPreimageWithHTLC(
 			},
 			ValueSats: amountSats,
 		},
-		Transfer:                  userSignedTransfer,
 		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 		FeeSats:                   feeSats,
 		TransferRequest:           transfer,

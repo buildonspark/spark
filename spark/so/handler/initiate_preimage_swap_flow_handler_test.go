@@ -202,7 +202,7 @@ func TestInitiatePreimageSwapFlowHandler_Rollback_PostCommit_NoOp(t *testing.T) 
 // TestInitiatePreimageSwapFlowHandler_Rollback_AcceptsPrepareOp verifies the
 // reconciler echo-back path: a rollback dispatched with the prepare op rather
 // than the canonical rollback payload still resolves the transfer via the nested
-// request.transfer.transfer_id.
+// request.transfer_request.transfer_id.
 func TestInitiatePreimageSwapFlowHandler_Rollback_AcceptsPrepareOp(t *testing.T) {
 	t.Parallel()
 	ctx, _ := db.ConnectToTestPostgres(t)
@@ -212,7 +212,7 @@ func TestInitiatePreimageSwapFlowHandler_Rollback_AcceptsPrepareOp(t *testing.T)
 	handler := NewInitiatePreimageSwapFlowHandler(nil)
 	prepareOp := &pbinternal.InitiatePreimageSwapPrepareRequest{
 		OriginalRequest: &pbspark.InitiatePreimageSwapRequest{
-			Transfer: &pbspark.StartUserSignedTransferRequest{TransferId: transfer.ID.String()},
+			TransferRequest: &pbspark.StartTransferRequest{TransferId: transfer.ID.String()},
 		},
 	}
 	require.NoError(t, handler.Rollback(ctx, prepareOp))

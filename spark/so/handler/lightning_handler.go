@@ -31,7 +31,6 @@ import (
 	"github.com/lightsparkdev/spark/common/bolt11"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
-	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
@@ -1239,16 +1238,6 @@ func (h *LightningHandler) GetPreimageShare(
 			return err
 		}
 
-		// TODO(SP-3285): transitional cross-check while callers send both shapes;
-		// remove with the legacy transfer field.
-		transferRequest := req.GetTransferRequest()
-		if transferRequest != nil {
-			err := h.validateIdenticalLeavesInTransferAndTransferRequest(validateCtx, req)
-			if err != nil {
-				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
-			}
-		}
-
 		if inputs.isPackageOnlySend {
 			err = h.validatePackageOnlySendRequest(validateCtx, req, inputs, invoiceAmount, receiverIdentityPubKey, false)
 		} else {
@@ -1391,93 +1380,6 @@ func (h *LightningHandler) GetPreimageShare(
 	}
 
 	return nil, nil
-}
-
-func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context, fieldName string, signingJobs []*pbspark.UserSignedTxSigningJob, leafIDMap map[string]bool, needDirectTx bool) error {
-	logger := logging.GetLoggerFromContext(ctx)
-	currentLeafIDMap := make(map[string]bool)
-	for i, job := range signingJobs {
-		if job == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("%s[%d] is required", fieldName, i))
-		}
-		if _, ok := leafIDMap[job.GetLeafId()]; !ok {
-			logger.Sugar().Errorf("leaf id is not in signing jobs %s", job.GetLeafId())
-			return fmt.Errorf("leaf id %s is not in signing jobs", job.GetLeafId())
-		}
-		currentLeafIDMap[job.GetLeafId()] = true
-	}
-
-	if needDirectTx {
-		var db *ent.Client
-		for leafID := range leafIDMap {
-			if _, ok := currentLeafIDMap[leafID]; !ok {
-				if db == nil {
-					var err error
-					db, err = ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-				}
-				leafID, err := uuid.Parse(leafID)
-				if err != nil {
-					return fmt.Errorf("failed to parse leaf id: %w", err)
-				}
-				leaf, err := db.TreeNode.Get(ctx, leafID)
-				if err != nil {
-					return fmt.Errorf("failed to get leaf by id: %w", err)
-				}
-				if len(leaf.DirectTx) == 0 {
-					currentLeafIDMap[leafID.String()] = true
-				}
-			}
-		}
-	}
-	if len(currentLeafIDMap) != len(leafIDMap) {
-		logger.Sugar().Errorf("signing jobs has different number of leaves than leaf id map %v %v", currentLeafIDMap, leafIDMap)
-		return fmt.Errorf("signing jobs has different number of leaves than leaf id map")
-	}
-	return nil
-}
-
-func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) error {
-	// Validates that req.Transfer and req.TransferRequest carry the same leaves
-	// while callers send both shapes. TODO(SP-3285): remove with the legacy field.
-	if req.GetTransfer() == nil {
-		return nil
-	}
-	if req.GetTransferRequest().GetTransferPackage() == nil {
-		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request.transfer_package is required"))
-	}
-	if !bytes.Equal(req.GetTransfer().GetOwnerIdentityPublicKey(), req.GetTransferRequest().GetOwnerIdentityPublicKey()) ||
-		!bytes.Equal(req.GetTransfer().GetReceiverIdentityPublicKey(), req.GetTransferRequest().GetReceiverIdentityPublicKey()) ||
-		!bytes.Equal(req.GetReceiverIdentityPublicKey(), req.GetTransferRequest().GetReceiverIdentityPublicKey()) {
-		return fmt.Errorf("owner identity public key or receiver identity public key mismatch")
-	}
-	if req.GetTransfer().GetExpiryTime().AsTime() != req.GetTransferRequest().GetExpiryTime().AsTime() {
-		return fmt.Errorf("expiry time mismatch")
-	}
-	if req.GetTransfer().GetTransferId() != req.GetTransferRequest().GetTransferId() {
-		return fmt.Errorf("transfer id mismatch")
-	}
-	leafIDMap := make(map[string]bool)
-	for _, leaf := range req.GetTransfer().GetLeavesToSend() {
-		leafIDMap[leaf.GetLeafId()] = true
-	}
-	err := h.validateSigningJobsHasAllLeafIDs(ctx, "leaves_to_send", req.GetTransferRequest().GetTransferPackage().GetLeavesToSend(), leafIDMap, false)
-	if err != nil {
-		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
-	}
-
-	err = h.validateSigningJobsHasAllLeafIDs(ctx, "direct_leaves_to_send", req.GetTransferRequest().GetTransferPackage().GetDirectLeavesToSend(), leafIDMap, true)
-	if err != nil {
-		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
-	}
-
-	err = h.validateSigningJobsHasAllLeafIDs(ctx, "direct_from_cpfp_leaves_to_send", req.GetTransferRequest().GetTransferPackage().GetDirectFromCpfpLeavesToSend(), leafIDMap, false)
-	if err != nil {
-		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
-	}
-	return nil
 }
 
 func (h *LightningHandler) loadRefund(fieldName string, req []*pbspark.UserSignedTxSigningJob) (map[string][]byte, error) {
@@ -1651,21 +1553,6 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 	return AggregateSignatures(ctx, h.config, transferRequest.GetTransferId(), transferRequest.GetTransferPackage(), keys.Public{}, keys.Public{}, keys.Public{}, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
 }
 
-// ignoreLegacyTransfer nils req.Transfer at the coordinator entrypoints when the caller
-// sent it, reporting whether it stripped. Coordinator-only: the stripped req fans out to
-// participants by reference, so downstream sees a transfer_request-only request. Stripping
-// also no-ops the dual-shape cross-check (a nil transfer makes
-// validateIdenticalLeavesInTransferAndTransferRequest return early) — intended, since the
-// legacy field is no longer read.
-// TODO(SP-3285): remove with the legacy transfer field.
-func ignoreLegacyTransfer(req *pbspark.InitiatePreimageSwapRequest) bool {
-	if req.GetTransfer() == nil {
-		return false
-	}
-	req.Transfer = nil
-	return true
-}
-
 // InitiatePreimageSwapV3 initiates a preimage swap for the given payment hash.
 //
 // Gated on KnobUseConsensusInitiatePreimageSwap: when enabled, routes through the
@@ -1676,7 +1563,6 @@ func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pbsp
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	ignoreLegacyTransfer(req)
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusInitiatePreimageSwap, 0) > 0 {
 		return h.initiatePreimageSwapV3Consensus(ctx, req)
 	}
@@ -1688,7 +1574,6 @@ func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pbsp
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
-	ignoreLegacyTransfer(req)
 
 	var expireTimeOverride *time.Time
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
@@ -1815,9 +1700,9 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			return err
 		}
 
-		// Receive preimage swap only has expiry time when it is HODL invoice.
-		// Apply the override before validation so that Transfer and TransferRequest
-		// have matching expiry times when checked below.
+		// Receive preimage swap only has expiry time when it is a HODL invoice.
+		// Apply the override before validation so the transfer_request carries the
+		// resolved expiry downstream.
 		effectiveExpiry = inputs.expiryTime
 		if expireTimeOverride != nil && (req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND || preimageShare == nil) {
 			effectiveExpiry = timestamppb.New(*expireTimeOverride)
@@ -1828,15 +1713,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil {
 			effectiveExpiry = nil
 			setPreimageSwapExpiry(req, nil)
-		}
-
-		// TODO(SP-3285): transitional cross-check while callers send both shapes;
-		// remove with the legacy transfer field.
-		if transferRequest := req.GetTransferRequest(); transferRequest != nil {
-			err := h.validateIdenticalLeavesInTransferAndTransferRequest(validateCtx, req)
-			if err != nil {
-				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
-			}
 		}
 
 		if inputs.isPackageOnlySend {
@@ -2318,107 +2194,6 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 		return fmt.Errorf("unable to update preimage request status: %w", err)
 	}
 	return nil
-}
-
-// QueryUserSignedRefunds queries the user signed refunds for the given payment hash.
-func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pbspark.QueryUserSignedRefundsRequest) (*pbspark.QueryUserSignedRefundsResponse, error) {
-	if req == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
-	}
-
-	logger := logging.GetLoggerFromContext(ctx)
-	tx, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-	if len(req.GetPaymentHash()) != sha256.Size {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("payment hash must be %d bytes", sha256.Size))
-	}
-	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
-	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqIdentityPubKey); err != nil {
-		return nil, err
-	}
-
-	preimageRequest, err := tx.PreimageRequest.Query().Where(
-		preimagerequest.PaymentHashEQ(req.GetPaymentHash()),
-		preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
-		preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
-	).First(ctx)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf(
-			"QueryUserSignedRefunds: unable to get preimage request for public key %x and payment hash %x",
-			req.GetIdentityPublicKey(),
-			req.GetPaymentHash(),
-		)
-		if ent.IsNotFound(err) {
-			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("QueryUserSignedRefunds: preimage request not found for public key %x and payment hash %x", req.GetIdentityPublicKey(), req.GetPaymentHash()))
-		}
-		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err))
-	}
-
-	transfer, err := preimageRequest.QueryTransfers().
-		WithTransferSenders().
-		WithTransferReceivers().
-		Only(ctx)
-	if err != nil {
-		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("unable to get transfer: %w", err))
-	}
-
-	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("expected either status sender key tweak pending or sender initiated coordinator, got status: %s", transfer.Status))
-	}
-
-	if transfer.ExpiryTime.Before(time.Now()) {
-		return nil, sparkerrors.FailedPreconditionExpired(fmt.Errorf("expiry time is in the past"))
-	}
-
-	userSignedRefunds, err := preimageRequest.QueryTransactions().All(ctx)
-	if err != nil {
-		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("unable to get user signed transactions: %w", err))
-	}
-
-	protos := make([]*pbspark.UserSignedRefund, len(userSignedRefunds))
-	for i, userSignedRefund := range userSignedRefunds {
-		userSigningCommitment := &pbcommon.SigningCommitment{}
-		err := proto.Unmarshal(userSignedRefund.SigningCommitments, userSigningCommitment)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal user signed refund: %w", err)
-		}
-		signingCommitments := &pbspark.SigningCommitments{}
-		err = proto.Unmarshal(userSignedRefund.SigningCommitments, signingCommitments)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal user signed refund: %w", err)
-		}
-		treeNode, err := userSignedRefund.QueryTreeNode().WithTree().Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node: %w", err)
-		}
-		networkProto, err := treeNode.Edges.Tree.Network.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal network: %w", err)
-		}
-
-		protos[i] = &pbspark.UserSignedRefund{
-			NodeId:                  treeNode.ID.String(),
-			RefundTx:                userSignedRefund.Transaction,
-			UserSignature:           userSignedRefund.UserSignature,
-			SigningCommitments:      signingCommitments,
-			UserSignatureCommitment: userSigningCommitment,
-			Network:                 networkProto,
-		}
-	}
-
-	transferProto, err := transfer.MarshalProto(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
-	}
-	return &pbspark.QueryUserSignedRefundsResponse{
-		UserSignedRefunds: protos,
-		Transfer:          transferProto,
-	}, nil
 }
 
 func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pbspark.QueryHtlcRequest) (*pbspark.QueryHtlcResponse, error) {

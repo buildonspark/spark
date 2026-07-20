@@ -162,9 +162,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 	}
 
 	// Receiver key from the top-level field, matching the legacy participant
-	// (GetPreimageShare) path. When a transfer package is present,
-	// validateIdenticalLeavesInTransferAndTransferRequest below enforces that
-	// this equals transfer.receiver and transfer_request.receiver.
+	// (GetPreimageShare) path.
 	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse receiver identity public key: %w", err))
@@ -212,12 +210,6 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		return nil, err
 	}
 
-	if req.GetTransferRequest() != nil {
-		if err := h.lightning.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req); err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer validation failed: %w", err))
-		}
-	}
-
 	if inputs.isPackageOnlySend {
 		// validateNodeOwnership=false: session-based, coordinator-entrypoint-only.
 		if err := h.lightning.validatePackageOnlySendRequest(ctx, req, inputs, invoiceAmount, receiverIdentityPubKey, false); err != nil {
@@ -247,8 +239,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
 
-	// Refund maps default to the client-supplied raw txs (legacy req.Transfer
-	// path). When a transfer package is present, ValidateTransferPackage
+	// Seed the refund maps from the package's raw txs; ValidateTransferPackage
 	// validates + decrypts this SO's key-tweak slice and buildHTLCRefundMaps
 	// reconstructs the HTLC refund txs and byte-matches them against the package.
 	cpfpLeafRefundMap := make(map[string][]byte)
@@ -987,12 +978,10 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
 		}
 
-		// Transfer-less packages get the size cap before the ownership load and
-		// the flow builder's preload — Prepare re-checks it in the validator.
-		if req.GetTransfer() == nil {
-			if err := validatePreimageSwapPackageSize(validateCtx, req.GetTransferRequest().GetTransferPackage()); err != nil {
-				return err
-			}
+		// Size cap before the ownership load and the flow builder's preload —
+		// Prepare re-checks it in the validator.
+		if err := validatePreimageSwapPackageSize(validateCtx, req.GetTransferRequest().GetTransferPackage()); err != nil {
+			return err
 		}
 
 		// Coordinator-only node ownership check (session-based; participants run

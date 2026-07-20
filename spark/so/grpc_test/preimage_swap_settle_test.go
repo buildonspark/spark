@@ -95,16 +95,6 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	userSignedLeavesToSend, err := wallet.PrepareUserSignedLeafSigningJobs(
-		ctx,
-		sspConfig,
-		client,
-		leaves,
-		userConfig.IdentityPublicKey(),
-		keys.Public{},
-	)
-	require.NoError(t, err)
-
 	// Disable SettleSenderKeyTweak on non-coordinator SOs to simulate the
 	// production failure where one SO returns 500 during settlement.
 	kc, err := sparktesting.NewKnobController(t)
@@ -134,12 +124,6 @@ func TestPreimageSwapSettleFailure_TransferSurvives(t *testing.T) {
 				Bolt11Invoice: invoice,
 			},
 			ValueSats: amountSats,
-		},
-		Transfer: &spark.StartUserSignedTransferRequest{
-			TransferId:                transferID.String(),
-			OwnerIdentityPublicKey:    sspConfig.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey: userConfig.IdentityPublicKey().Serialize(),
-			LeavesToSend:              userSignedLeavesToSend,
 		},
 		TransferRequest: &spark.StartTransferRequest{
 			TransferId:                transferID.String(),

@@ -237,11 +237,6 @@ func (s *SparkServer) GetSigningOperatorList(_ context.Context, _ *emptypb.Empty
 	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil
 }
 
-func (s *SparkServer) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.QueryUserSignedRefunds(ctx, req)
-}
-
 func (s *SparkServer) QueryHtlc(ctx context.Context, req *pb.QueryHtlcRequest) (*pb.QueryHtlcResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.QueryHTLC(ctx, req)

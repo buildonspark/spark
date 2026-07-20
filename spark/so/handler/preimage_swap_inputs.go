@@ -9,11 +9,11 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// preimageSwapInputs carries the request fields the preimage-swap paths read from
-// whichever shape is present (legacy transfer, else transfer_request). The validation*
-// lists feed the P2TR-refund validator (ValidateGetPreimageRequest): they hold the
-// package lists for a transfer-less RECEIVE and are empty for a transfer-less SEND
-// (isPackageOnlySend), whose HTLC refunds the byte-match and signing paths validate.
+// preimageSwapInputs carries the request fields the preimage-swap paths read from the
+// transfer_request. The validation* lists feed the P2TR-refund validator
+// (ValidateGetPreimageRequest): they hold the package lists for a RECEIVE and are empty
+// for a package-only SEND (isPackageOnlySend), whose HTLC refunds the byte-match and
+// signing paths validate.
 type preimageSwapInputs struct {
 	ownerIdentityPublicKey    []byte
 	receiverIdentityPublicKey []byte
@@ -37,32 +37,12 @@ func (inputs *preimageSwapInputs) cpfpLeaves() []*pbspark.UserSignedTxSigningJob
 	return inputs.validationCpfp
 }
 
-// preimageSwapInputsFromRequest dispatches on request shape. TODO(SP-3285): the transfer
-// case and preimageSwapInputsFromTransfer go away with the legacy field, leaving only
-// the transfer_request path.
+// preimageSwapInputsFromRequest builds the inputs from the request's transfer_request.
 func preimageSwapInputsFromRequest(req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapInputs, error) {
-	switch {
-	case req.GetTransfer() != nil:
-		return preimageSwapInputsFromTransfer(req), nil
-	case req.GetTransferRequest() != nil:
-		return preimageSwapInputsFromTransferRequest(req)
-	default:
+	if req.GetTransferRequest() == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request is required"))
 	}
-}
-
-// support for legacy Transfer type
-func preimageSwapInputsFromTransfer(req *pbspark.InitiatePreimageSwapRequest) *preimageSwapInputs {
-	t := req.GetTransfer()
-	return &preimageSwapInputs{
-		ownerIdentityPublicKey:    t.GetOwnerIdentityPublicKey(),
-		receiverIdentityPublicKey: t.GetReceiverIdentityPublicKey(),
-		transferID:                t.GetTransferId(),
-		expiryTime:                t.GetExpiryTime(),
-		validationCpfp:            t.GetLeavesToSend(),
-		validationDirect:          t.GetDirectLeavesToSend(),
-		validationDirectFromCpfp:  t.GetDirectFromCpfpLeavesToSend(),
-	}
+	return preimageSwapInputsFromTransferRequest(req)
 }
 
 func preimageSwapInputsFromTransferRequest(req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapInputs, error) {
@@ -102,20 +82,14 @@ func preimageSwapInputsFromTransferRequest(req *pbspark.InitiatePreimageSwapRequ
 	return inputs, nil
 }
 
-// preimageSwapTransferIDFromRequest returns the transfer ID from whichever shape is present.
+// preimageSwapTransferIDFromRequest returns the transfer ID from the transfer_request.
 func preimageSwapTransferIDFromRequest(req *pbspark.InitiatePreimageSwapRequest) string {
-	if t := req.GetTransfer(); t != nil {
-		return t.GetTransferId()
-	}
 	return req.GetTransferRequest().GetTransferId()
 }
 
-// setPreimageSwapExpiry writes a server-resolved expiry onto whichever request
-// shapes are present, so the peer fanout and the cross-check agree.
+// setPreimageSwapExpiry writes a server-resolved expiry onto the transfer_request so the
+// peer fanout agrees.
 func setPreimageSwapExpiry(req *pbspark.InitiatePreimageSwapRequest, expiry *timestamppb.Timestamp) {
-	if req.GetTransfer() != nil {
-		req.Transfer.ExpiryTime = expiry
-	}
 	if req.GetTransferRequest() != nil {
 		req.TransferRequest.ExpiryTime = expiry
 	}

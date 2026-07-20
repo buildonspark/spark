@@ -53,8 +53,6 @@ service SparkService {
 
     rpc query_balance(QueryBalanceRequest) returns (QueryBalanceResponse) {}
 
-    rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
-
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
     rpc query_static_deposit_addresses(QueryStaticDepositAddressesRequest) returns (QueryStaticDepositAddressesResponse) {}
 
@@ -1103,15 +1101,6 @@ message SigningCommitments {
     map<string, common.SigningCommitment> signing_commitments = 1;
 }
 
-message UserSignedRefund {
-    string node_id = 1;
-    bytes refund_tx = 2;
-    bytes user_signature = 3;
-    SigningCommitments signing_commitments = 4;
-    common.SigningCommitment user_signature_commitment = 5;
-    Network network = 6 [(validate.rules).enum = {not_in: [0]}];
-}
-
 message InvoiceAmountProof {
     string bolt11_invoice = 1;
 }
@@ -1122,6 +1111,8 @@ message InvoiceAmount {
 }
 
 message InitiatePreimageSwapRequest {
+    reserved 4;
+    reserved "transfer";
     bytes payment_hash = 1;
     InvoiceAmount invoice_amount = 2;
     enum Reason {
@@ -1131,7 +1122,6 @@ message InitiatePreimageSwapRequest {
         REASON_RECEIVE = 1;
     }
     Reason reason = 3;
-    StartUserSignedTransferRequest transfer = 4;
     bytes receiver_identity_public_key = 5;
     uint64 fee_sats = 6;
     StartTransferRequest transfer_request = 7;
@@ -1287,17 +1277,6 @@ message SigningOperatorInfo {
 
 message GetSigningOperatorListResponse {
     map<string, SigningOperatorInfo> signing_operators = 1;
-}
-
-message QueryUserSignedRefundsRequest {
-    bytes payment_hash = 1;
-    bytes identity_public_key = 2;
-}
-
-message QueryUserSignedRefundsResponse {
-    repeated UserSignedRefund user_signed_refunds = 1;
-    reserved 2;
-    Transfer transfer = 3;
 }
 
 enum PreimageRequestStatus {
