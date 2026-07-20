@@ -53,8 +53,6 @@ const (
 	SparkInternalService_RollbackUtxoSwap_FullMethodName                   = "/spark_internal.SparkInternalService/rollback_utxo_swap"
 	SparkInternalService_RollbackInstantUtxoSwap_FullMethodName            = "/spark_internal.SparkInternalService/rollback_instant_utxo_swap"
 	SparkInternalService_UtxoSwapCompleted_FullMethodName                  = "/spark_internal.SparkInternalService/utxo_swap_completed"
-	SparkInternalService_QueryLeafSigningPubkeys_FullMethodName            = "/spark_internal.SparkInternalService/query_leaf_signing_pubkeys"
-	SparkInternalService_ResolveLeafInvestigation_FullMethodName           = "/spark_internal.SparkInternalService/resolve_leaf_investigation"
 	SparkInternalService_FixKeyshare_FullMethodName                        = "/spark_internal.SparkInternalService/fix_keyshare"
 	SparkInternalService_FixKeyshareRound1_FullMethodName                  = "/spark_internal.SparkInternalService/fix_keyshare_round1"
 	SparkInternalService_FixKeyshareRound2_FullMethodName                  = "/spark_internal.SparkInternalService/fix_keyshare_round2"
@@ -112,8 +110,6 @@ type SparkInternalServiceClient interface {
 	RollbackInstantUtxoSwap(ctx context.Context, in *RollbackInstantUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackInstantUtxoSwapResponse, error)
 	// Internal method to mark a swap as COMPLETE in all SOs
 	UtxoSwapCompleted(ctx context.Context, in *UtxoSwapCompletedRequest, opts ...grpc.CallOption) (*UtxoSwapCompletedResponse, error)
-	QueryLeafSigningPubkeys(ctx context.Context, in *QueryLeafSigningPubkeysRequest, opts ...grpc.CallOption) (*QueryLeafSigningPubkeysResponse, error)
-	ResolveLeafInvestigation(ctx context.Context, in *ResolveLeafInvestigationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FixKeyshare(ctx context.Context, in *FixKeyshareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FixKeyshareRound1(ctx context.Context, in *FixKeyshareRound1Request, opts ...grpc.CallOption) (*FixKeyshareRound1Response, error)
 	FixKeyshareRound2(ctx context.Context, in *FixKeyshareRound2Request, opts ...grpc.CallOption) (*FixKeyshareRound2Response, error)
@@ -474,26 +470,6 @@ func (c *sparkInternalServiceClient) UtxoSwapCompleted(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) QueryLeafSigningPubkeys(ctx context.Context, in *QueryLeafSigningPubkeysRequest, opts ...grpc.CallOption) (*QueryLeafSigningPubkeysResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryLeafSigningPubkeysResponse)
-	err := c.cc.Invoke(ctx, SparkInternalService_QueryLeafSigningPubkeys_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkInternalServiceClient) ResolveLeafInvestigation(ctx context.Context, in *ResolveLeafInvestigationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_ResolveLeafInvestigation_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkInternalServiceClient) FixKeyshare(ctx context.Context, in *FixKeyshareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -630,8 +606,6 @@ type SparkInternalServiceServer interface {
 	RollbackInstantUtxoSwap(context.Context, *RollbackInstantUtxoSwapRequest) (*RollbackInstantUtxoSwapResponse, error)
 	// Internal method to mark a swap as COMPLETE in all SOs
 	UtxoSwapCompleted(context.Context, *UtxoSwapCompletedRequest) (*UtxoSwapCompletedResponse, error)
-	QueryLeafSigningPubkeys(context.Context, *QueryLeafSigningPubkeysRequest) (*QueryLeafSigningPubkeysResponse, error)
-	ResolveLeafInvestigation(context.Context, *ResolveLeafInvestigationRequest) (*emptypb.Empty, error)
 	FixKeyshare(context.Context, *FixKeyshareRequest) (*emptypb.Empty, error)
 	FixKeyshareRound1(context.Context, *FixKeyshareRound1Request) (*FixKeyshareRound1Response, error)
 	FixKeyshareRound2(context.Context, *FixKeyshareRound2Request) (*FixKeyshareRound2Response, error)
@@ -765,12 +739,6 @@ func (UnimplementedSparkInternalServiceServer) RollbackInstantUtxoSwap(context.C
 }
 func (UnimplementedSparkInternalServiceServer) UtxoSwapCompleted(context.Context, *UtxoSwapCompletedRequest) (*UtxoSwapCompletedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UtxoSwapCompleted not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) QueryLeafSigningPubkeys(context.Context, *QueryLeafSigningPubkeysRequest) (*QueryLeafSigningPubkeysResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method QueryLeafSigningPubkeys not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) ResolveLeafInvestigation(context.Context, *ResolveLeafInvestigationRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method ResolveLeafInvestigation not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) FixKeyshare(context.Context, *FixKeyshareRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method FixKeyshare not implemented")
@@ -1396,42 +1364,6 @@ func _SparkInternalService_UtxoSwapCompleted_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_QueryLeafSigningPubkeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryLeafSigningPubkeysRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).QueryLeafSigningPubkeys(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_QueryLeafSigningPubkeys_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).QueryLeafSigningPubkeys(ctx, req.(*QueryLeafSigningPubkeysRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkInternalService_ResolveLeafInvestigation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResolveLeafInvestigationRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).ResolveLeafInvestigation(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_ResolveLeafInvestigation_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).ResolveLeafInvestigation(ctx, req.(*ResolveLeafInvestigationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkInternalService_FixKeyshare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FixKeyshareRequest)
 	if err := dec(in); err != nil {
@@ -1728,14 +1660,6 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "utxo_swap_completed",
 			Handler:    _SparkInternalService_UtxoSwapCompleted_Handler,
-		},
-		{
-			MethodName: "query_leaf_signing_pubkeys",
-			Handler:    _SparkInternalService_QueryLeafSigningPubkeys_Handler,
-		},
-		{
-			MethodName: "resolve_leaf_investigation",
-			Handler:    _SparkInternalService_ResolveLeafInvestigation_Handler,
 		},
 		{
 			MethodName: "fix_keyshare",

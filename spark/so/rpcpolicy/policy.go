@@ -208,8 +208,6 @@ func sparkInternalServicePolicies() map[string]Policy {
 		pbinternal.SparkInternalService_RollbackUtxoSwap_FullMethodName:                   unauthInternal,
 		pbinternal.SparkInternalService_RollbackInstantUtxoSwap_FullMethodName:            unauthInternal,
 		pbinternal.SparkInternalService_UtxoSwapCompleted_FullMethodName:                  unauthInternal,
-		pbinternal.SparkInternalService_QueryLeafSigningPubkeys_FullMethodName:            unauthInternal,
-		pbinternal.SparkInternalService_ResolveLeafInvestigation_FullMethodName:           unauthInternal,
 		pbinternal.SparkInternalService_FixKeyshare_FullMethodName:                        unauthInternal,
 		pbinternal.SparkInternalService_FixKeyshareRound1_FullMethodName:                  unauthInternal,
 		pbinternal.SparkInternalService_FixKeyshareRound2_FullMethodName:                  unauthInternal,

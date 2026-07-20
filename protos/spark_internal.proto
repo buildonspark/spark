@@ -69,9 +69,6 @@ service SparkInternalService {
     // Internal method to mark a swap as COMPLETE in all SOs
     rpc utxo_swap_completed(UtxoSwapCompletedRequest) returns (UtxoSwapCompletedResponse) {}
 
-    rpc query_leaf_signing_pubkeys(QueryLeafSigningPubkeysRequest) returns (QueryLeafSigningPubkeysResponse) {}
-    rpc resolve_leaf_investigation(ResolveLeafInvestigationRequest) returns (google.protobuf.Empty) {}
-
     rpc fix_keyshare(FixKeyshareRequest) returns (google.protobuf.Empty) {}
     rpc fix_keyshare_round1(FixKeyshareRound1Request) returns (FixKeyshareRound1Response) {}
     rpc fix_keyshare_round2(FixKeyshareRound2Request) returns (FixKeyshareRound2Response) {}
@@ -496,19 +493,6 @@ message LinkUtxoSwapTransferRequest {
 }
 
 message LinkUtxoSwapTransferResponse {}
-
-message QueryLeafSigningPubkeysRequest {
-    repeated string leaf_ids = 1;
-}
-
-message QueryLeafSigningPubkeysResponse {
-    map<string, bytes> signing_pubkeys = 1;
-}
-
-message ResolveLeafInvestigationRequest {
-    repeated string lost_leaf_ids = 1;
-    repeated string available_leaf_ids = 2;
-}
 
 // ProvidePreimagePrepareRequest is the Prepare payload for the
 // CONSENSUS_OPERATION_TYPE_PROVIDE_PREIMAGE 2PC flow. Wraps the public

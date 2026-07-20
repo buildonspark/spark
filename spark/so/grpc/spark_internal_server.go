@@ -212,16 +212,6 @@ func (s *SparkInternalServer) UtxoSwapCompleted(ctx context.Context, req *pb.Utx
 	return depositHandler.UtxoSwapCompleted(ctx, s.config, req)
 }
 
-func (s *SparkInternalServer) QueryLeafSigningPubkeys(ctx context.Context, req *pb.QueryLeafSigningPubkeysRequest) (*pb.QueryLeafSigningPubkeysResponse, error) {
-	investigationHandler := handler.NewInvestigationHandler(s.config)
-	return investigationHandler.QueryLeafSigningPubkeys(ctx, req)
-}
-
-func (s *SparkInternalServer) ResolveLeafInvestigation(ctx context.Context, req *pb.ResolveLeafInvestigationRequest) (*emptypb.Empty, error) {
-	investigationHandler := handler.NewInvestigationHandler(s.config)
-	return investigationHandler.ResolveLeafInvestigation(ctx, req)
-}
-
 func (s *SparkInternalServer) Gossip(ctx context.Context, req *pbgossip.GossipMessage) (*emptypb.Empty, error) {
 	gossipHandler := handler.NewGossipHandler(s.config)
 	return &emptypb.Empty{}, gossipHandler.HandleGossipMessage(ctx, req, false)
