@@ -7,7 +7,7 @@ pre-commit:
         parallel: true
         jobs:
           - name: golangci-lint
-            run: golangci-lint run --new-from-merge-base=main
+            run: mise run lint-build && ./bin/golangci-lint-spark run --new-from-merge-base=main
           - name: gotestsum
             env:
               GOFLAGS: "-tags=lightspark"
