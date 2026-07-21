@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -394,8 +393,6 @@ func (f *coopExitCoordinatorFlow) BuildCommitPayload(ctx context.Context, result
 		return nil, fmt.Errorf("failed to collect signature shares: %w", err)
 	}
 
-	leafSignatures := make([]*pbinternal.SendTransferLeafSignatures, 0, len(f.signingJobsByLeaf))
-
 	frostConn, err := f.config.NewFrostGRPCConnection()
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to frost: %w", err)
@@ -403,37 +400,9 @@ func (f *coopExitCoordinatorFlow) BuildCommitPayload(ctx context.Context, result
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-	leafIDs := make([]string, 0, len(f.signingJobsByLeaf))
-	for id := range f.signingJobsByLeaf {
-		leafIDs = append(leafIDs, id)
-	}
-	slices.Sort(leafIDs)
-
-	for _, leafID := range leafIDs {
-		jobs := f.signingJobsByLeaf[leafID]
-		sigs := &pbinternal.SendTransferLeafSignatures{LeafId: leafID}
-		if jobs.cpfp != nil {
-			sig, _, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate cpfp signature for leaf %s: %w", leafID, err)
-			}
-			sigs.RefundSignature = sig
-		}
-		if jobs.direct != nil {
-			sig, _, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate direct signature for leaf %s: %w", leafID, err)
-			}
-			sigs.DirectRefundSignature = sig
-		}
-		if jobs.dfc != nil {
-			sig, _, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate direct-from-cpfp signature for leaf %s: %w", leafID, err)
-			}
-			sigs.DirectFromCpfpRefundSignature = sig
-		}
-		leafSignatures = append(leafSignatures, sigs)
+	leafSignatures, _, err := aggregateSendTransferLeafSignatures(ctx, f.config, frostClient, f.signingJobsByLeaf, allShares, false)
+	if err != nil {
+		return nil, err
 	}
 
 	// Apply on the coordinator's DB now so the request tx the engine commits

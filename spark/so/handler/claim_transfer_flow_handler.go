@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"slices"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -12,7 +11,6 @@ import (
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
@@ -718,7 +716,7 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	//
 	// For the coordinator path, BuildCommitPayload already applied the tweak
 	// before FROST aggregation (so leaf.OwnerSigningPubkey holds the
-	// receiver's new pubkey when aggregateLeafSignature reads it); this second
+	// receiver's new pubkey when the aggregation jobs are built); this second
 	// call is a no-op there.
 	var receiverIDPKBytes []byte
 	if receiver != nil {
@@ -980,7 +978,7 @@ type claimTransferCoordinatorFlow struct {
 
 	req               *pb.ClaimTransferRequest
 	parsed            parsedClaimTransferRequest
-	signingJobsByLeaf map[string]*claimTransferLeafSigningJobs
+	signingJobsByLeaf map[string]*sendTransferLeafSigningJobs
 
 	// response is populated during BuildCommitPayload so the public
 	// ClaimTransfer handler can return it after engine.Execute completes.
@@ -1004,8 +1002,8 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 		return nil, fmt.Errorf("failed to collect signature shares: %w", err)
 	}
 
-	// Phase-2 apply must run before FROST aggregation: aggregateLeafSignature
-	// reads leaf.OwnerSigningPubkey as the user's signing pubkey, and the user
+	// Phase-2 apply must run before FROST aggregation: the aggregation jobs
+	// read leaf.OwnerSigningPubkey as the user's signing pubkey, and the user
 	// signed with their post-tweak key. Apply the tweak now so the next
 	// refreshLeafOwnership sees the post-tweak owner pubkey in DB.
 	//
@@ -1021,47 +1019,26 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 	}
 
 	// Reload the in-memory leaves captured by buildClaimTransferCoordinatorFlow
-	// (pre-tweak snapshot) so aggregateLeafSignature sees the post-tweak
+	// (pre-tweak snapshot) so the aggregation jobs see the post-tweak
 	// OwnerSigningPubkey just written by the apply above.
 	if err := f.refreshLeafOwnership(ctx); err != nil {
 		return nil, fmt.Errorf("unable to refresh leaf ownership for aggregation: %w", err)
 	}
 
-	leafSignatures := make([]*pbinternal.ClaimTransferLeafSignatures, 0, len(f.signingJobsByLeaf))
-
-	leafIDs := make([]string, 0, len(f.signingJobsByLeaf))
-	for id := range f.signingJobsByLeaf {
-		leafIDs = append(leafIDs, id)
+	// One FROST gRPC connection for all per-leaf aggregation jobs.
+	frostConn, err := f.config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to frost: %w", err)
 	}
-	slices.Sort(leafIDs)
+	defer frostConn.Close()
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-	for _, leafID := range leafIDs {
-		jobs := f.signingJobsByLeaf[leafID]
-		sigs := &pbinternal.ClaimTransferLeafSignatures{LeafId: leafID}
-
-		if jobs.cpfp != nil {
-			sig, err := f.aggregateLeafSignature(ctx, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate cpfp signature for leaf %s: %w", leafID, err)
-			}
-			sigs.RefundSignature = sig
-		}
-		if jobs.direct != nil {
-			sig, err := f.aggregateLeafSignature(ctx, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate direct signature for leaf %s: %w", leafID, err)
-			}
-			sigs.DirectRefundSignature = sig
-		}
-		if jobs.dfc != nil {
-			sig, err := f.aggregateLeafSignature(ctx, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate direct-from-cpfp signature for leaf %s: %w", leafID, err)
-			}
-			sigs.DirectFromCpfpRefundSignature = sig
-		}
-		leafSignatures = append(leafSignatures, sigs)
+	signatures, leafIDs, _, err := aggregateLeafRefundSignatures(ctx, f.config, frostClient, f.signingJobsByLeaf, allShares, false)
+	if err != nil {
+		return nil, err
 	}
+
+	leafSignatures := buildClaimTransferLeafSignatures(f.signingJobsByLeaf, signatures, leafIDs)
 
 	commitReq := &pbinternal.ClaimTransferCommitRequest{
 		TransferId:                f.parsed.transferID.String(),
@@ -1121,59 +1098,6 @@ func (f *claimTransferCoordinatorFlow) RollbackPayload() proto.Message {
 		TransferId:                f.parsed.transferID.String(),
 		ReceiverIdentityPublicKey: f.parsed.ownerIDPK.Serialize(),
 	}
-}
-
-// aggregateLeafSignature drives a single FROST AggregateFrost RPC for one job.
-func (f *claimTransferCoordinatorFlow) aggregateLeafSignature(
-	ctx context.Context,
-	job *helper.SigningJobWithPregeneratedNonce,
-	allShares map[string]map[string][]byte,
-	leaf *ent.TreeNode,
-	userSignatureShare []byte,
-) ([]byte, error) {
-	keyPackage, err := ent.GetKeyPackage(ctx, f.config, job.SigningKeyshareID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get key package: %w", err)
-	}
-	shares, ok := allShares[job.JobID.String()]
-	if !ok {
-		return nil, fmt.Errorf("missing signature shares for job %s", job.JobID)
-	}
-	// Public shares must match the signing set per job, not the global
-	// participant set. Different leaves can carry different round1 commitment
-	// sets, so filter from the actual contributors to this job's shares.
-	publicShares := make(map[string][]byte, len(shares))
-	for id := range shares {
-		share, ok := keyPackage.GetPublicShares()[id]
-		if !ok {
-			return nil, fmt.Errorf("missing public share for operator %s", id)
-		}
-		publicShares[id] = share
-	}
-
-	conn, err := f.config.NewFrostGRPCConnection()
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to frost: %w", err)
-	}
-	defer conn.Close()
-	frostClient := pbfrost.NewFrostServiceClient(conn)
-
-	userCommitment := job.UserCommitment.MarshalProto()
-	roundCommitments := collections.ConvertObjectMapToProtoMap(job.Round1Packages)
-	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            job.Message.Serialize(),
-		SignatureShares:    shares,
-		PublicShares:       publicShares,
-		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-		Commitments:        roundCommitments,
-		UserCommitments:    userCommitment,
-		UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-		UserSignatureShare: userSignatureShare,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
-	}
-	return resp.GetSignature(), nil
 }
 
 // buildClaimTransferCoordinatorFlow pre-computes the per-leaf signing-job
@@ -1575,34 +1499,11 @@ func shouldUseStoredKeyTweaks(ctx context.Context, transferEnt *ent.Transfer, re
 // with other 2PC flows.
 var claimTransferSigningJobNamespace = uuid.MustParse("5e2f4a1d-6c3b-4e8f-9a7d-2b5c8e1f3a6d")
 
-// Tx-variant tags mixed into deterministic job IDs. Constants so the producer
-// (claimTransferJobID call sites in buildClaimTransferAggregationJobs) and the
-// consumer (marshalClaimSigningJobsForFrost) can't drift on a typo — a
-// mismatch silently produces wrong job IDs and surfaces only at FROST
-// aggregation as "missing signature shares".
-const (
-	claimTxKindCPFP           = "cpfp"
-	claimTxKindDirect         = "direct"
-	claimTxKindDirectFromCPFP = "directFromCpfp"
-)
-
 // claimTransferJobID returns a deterministic UUID identifying the FROST signing
-// job for (transferID, leafID, txKind). Valid txKind values are the
-// claimTxKind* constants above.
+// job for (transferID, leafID, txKind). Valid txKind values are the shared
+// txKind* constants (frost_aggregation.go).
 func claimTransferJobID(transferID uuid.UUID, leafID string, txKind string) uuid.UUID {
 	return uuid.NewSHA1(claimTransferSigningJobNamespace, fmt.Appendf(nil, "%s:%s:%s", transferID, leafID, txKind))
-}
-
-// claimTransferLeafSigningJobs holds the pre-built signing-job helpers for one
-// leaf's three refund tx variants, plus the user's signature shares.
-type claimTransferLeafSigningJobs struct {
-	leaf          *ent.TreeNode
-	cpfp          *helper.SigningJobWithPregeneratedNonce
-	cpfpUserSig   []byte
-	direct        *helper.SigningJobWithPregeneratedNonce
-	directUserSig []byte
-	dfc           *helper.SigningJobWithPregeneratedNonce
-	dfcUserSig    []byte
 }
 
 // buildClaimTransferAggregationJobs constructs the per-leaf signing-job helpers
@@ -1613,7 +1514,7 @@ func buildClaimTransferAggregationJobs(
 	transferID uuid.UUID,
 	pkg *pb.ClaimPackage,
 	leafMap map[string]*ent.TreeNode,
-) (map[string]*claimTransferLeafSigningJobs, error) {
+) (map[string]*sendTransferLeafSigningJobs, error) {
 	// Seed only the leaves that appear in the claim package's cpfp list — every
 	// claimed leaf is required to have a cpfp job, and Prepare's leaf-count
 	// guard (len(leavesByID) == len(LeavesToClaim)) enforces 1:1 with the
@@ -1621,24 +1522,24 @@ func buildClaimTransferAggregationJobs(
 	// nil-job entries for any DB leaf the package didn't cover, which then
 	// flow into BuildCommitPayload's loop as empty signature records and into
 	// updateNode as all-nil sigs.
-	out := make(map[string]*claimTransferLeafSigningJobs, len(pkg.GetLeavesToClaim()))
+	out := make(map[string]*sendTransferLeafSigningJobs, len(pkg.GetLeavesToClaim()))
 	for _, req := range pkg.GetLeavesToClaim() {
 		leaf, ok := leafMap[req.GetLeafId()]
 		if !ok {
 			return nil, fmt.Errorf("cpfp leaf %s not found in leaf map", req.GetLeafId())
 		}
-		job, err := buildClaimRefundSigningJob(ctx, req, leaf, leaf.RawTx, claimTransferJobID(transferID, leaf.ID.String(), claimTxKindCPFP))
+		job, err := buildClaimRefundSigningJob(ctx, req, leaf, leaf.RawTx, claimTransferJobID(transferID, leaf.ID.String(), txKindCPFP))
 		if err != nil {
 			return nil, fmt.Errorf("build cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
 		}
-		out[req.GetLeafId()] = &claimTransferLeafSigningJobs{leaf: leaf, cpfp: job, cpfpUserSig: req.GetUserSignature()}
+		out[req.GetLeafId()] = &sendTransferLeafSigningJobs{leaf: leaf, cpfp: job, cpfpUserSig: req.GetUserSignature()}
 	}
 	for _, req := range pkg.GetDirectLeavesToClaim() {
 		entry, ok := out[req.GetLeafId()]
 		if !ok {
 			return nil, fmt.Errorf("direct leaf %s missing cpfp entry in claim package", req.GetLeafId())
 		}
-		job, err := buildClaimRefundSigningJob(ctx, req, entry.leaf, entry.leaf.DirectTx, claimTransferJobID(transferID, entry.leaf.ID.String(), claimTxKindDirect))
+		job, err := buildClaimRefundSigningJob(ctx, req, entry.leaf, entry.leaf.DirectTx, claimTransferJobID(transferID, entry.leaf.ID.String(), txKindDirect))
 		if err != nil {
 			return nil, fmt.Errorf("build direct signing job for leaf %s: %w", req.GetLeafId(), err)
 		}
@@ -1650,7 +1551,7 @@ func buildClaimTransferAggregationJobs(
 		if !ok {
 			return nil, fmt.Errorf("direct-from-cpfp leaf %s missing cpfp entry in claim package", req.GetLeafId())
 		}
-		job, err := buildClaimRefundSigningJob(ctx, req, entry.leaf, entry.leaf.RawTx, claimTransferJobID(transferID, entry.leaf.ID.String(), claimTxKindDirectFromCPFP))
+		job, err := buildClaimRefundSigningJob(ctx, req, entry.leaf, entry.leaf.RawTx, claimTransferJobID(transferID, entry.leaf.ID.String(), txKindDirectFromCPFP))
 		if err != nil {
 			return nil, fmt.Errorf("build direct-from-cpfp signing job for leaf %s: %w", req.GetLeafId(), err)
 		}
@@ -1748,11 +1649,11 @@ func marshalClaimSigningJobsForFrost(transferID uuid.UUID, result *claimRefundSi
 		var txKind string
 		switch {
 		case result.jobIsDirectRefund[job.JobID]:
-			txKind = claimTxKindDirect
+			txKind = txKindDirect
 		case result.jobIsDirectFromCpfpRefund[job.JobID]:
-			txKind = claimTxKindDirectFromCPFP
+			txKind = txKindDirectFromCPFP
 		default:
-			txKind = claimTxKindCPFP
+			txKind = txKindCPFP
 		}
 		job.JobID = claimTransferJobID(transferID, leaf.ID.String(), txKind)
 		marshalled, err := marshalSigningJobHelper(job)
