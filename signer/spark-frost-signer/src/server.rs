@@ -268,6 +268,33 @@ impl FrostService for FrostServer {
         Ok(Response::new(response))
     }
 
+    async fn aggregate_frost_batch(
+        &self,
+        request: Request<AggregateFrostBatchRequest>,
+    ) -> Result<Response<AggregateFrostBatchResponse>, Status> {
+        tracing::info!(
+            "Received frost aggregate batch request with {} jobs",
+            request.get_ref().jobs.len()
+        );
+        // A full batch is up to MAX_AGGREGATE_BATCH_JOBS CPU-bound
+        // aggregations; run it on the blocking pool so it doesn't stall the
+        // tokio worker serving other latency-sensitive signer RPCs.
+        let req = request.into_inner();
+        let response =
+            tokio::task::spawn_blocking(move || spark_frost::signing::aggregate_frost_batch(&req))
+                .await
+                .map_err(|e| Status::internal(format!("aggregate batch task failed: {e}")))?
+                .map_err(|e| match e {
+                    spark_frost::signing::BatchAggregateError::InvalidArgument(msg) => {
+                        Status::invalid_argument(msg)
+                    }
+                    spark_frost::signing::BatchAggregateError::Internal(msg) => {
+                        Status::internal(msg)
+                    }
+                })?;
+        Ok(Response::new(response))
+    }
+
     async fn validate_signature_share(
         &self,
         request: Request<ValidateSignatureShareRequest>,

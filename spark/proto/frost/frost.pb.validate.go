@@ -2491,6 +2491,424 @@ var _ interface {
 	ErrorName() string
 } = AggregateFrostResponseValidationError{}
 
+// Validate checks the field values on AggregateFrostJob with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *AggregateFrostJob) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateFrostJob with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AggregateFrostJobMultiError, or nil if none found.
+func (m *AggregateFrostJob) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateFrostJob) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for JobId
+
+	if all {
+		switch v := interface{}(m.GetRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AggregateFrostJobValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AggregateFrostJobValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AggregateFrostJobValidationError{
+				field:  "Request",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return AggregateFrostJobMultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateFrostJobMultiError is an error wrapping multiple validation errors
+// returned by AggregateFrostJob.ValidateAll() if the designated constraints
+// aren't met.
+type AggregateFrostJobMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateFrostJobMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateFrostJobMultiError) AllErrors() []error { return m }
+
+// AggregateFrostJobValidationError is the validation error returned by
+// AggregateFrostJob.Validate if the designated constraints aren't met.
+type AggregateFrostJobValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateFrostJobValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateFrostJobValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateFrostJobValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateFrostJobValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateFrostJobValidationError) ErrorName() string {
+	return "AggregateFrostJobValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateFrostJobValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateFrostJob.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateFrostJobValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateFrostJobValidationError{}
+
+// Validate checks the field values on AggregateFrostBatchRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AggregateFrostBatchRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateFrostBatchRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AggregateFrostBatchRequestMultiError, or nil if none found.
+func (m *AggregateFrostBatchRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateFrostBatchRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetJobs() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, AggregateFrostBatchRequestValidationError{
+						field:  fmt.Sprintf("Jobs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, AggregateFrostBatchRequestValidationError{
+						field:  fmt.Sprintf("Jobs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return AggregateFrostBatchRequestValidationError{
+					field:  fmt.Sprintf("Jobs[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return AggregateFrostBatchRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateFrostBatchRequestMultiError is an error wrapping multiple
+// validation errors returned by AggregateFrostBatchRequest.ValidateAll() if
+// the designated constraints aren't met.
+type AggregateFrostBatchRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateFrostBatchRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateFrostBatchRequestMultiError) AllErrors() []error { return m }
+
+// AggregateFrostBatchRequestValidationError is the validation error returned
+// by AggregateFrostBatchRequest.Validate if the designated constraints aren't met.
+type AggregateFrostBatchRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateFrostBatchRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateFrostBatchRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateFrostBatchRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateFrostBatchRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateFrostBatchRequestValidationError) ErrorName() string {
+	return "AggregateFrostBatchRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateFrostBatchRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateFrostBatchRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateFrostBatchRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateFrostBatchRequestValidationError{}
+
+// Validate checks the field values on AggregateFrostBatchResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AggregateFrostBatchResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateFrostBatchResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AggregateFrostBatchResponseMultiError, or nil if none found.
+func (m *AggregateFrostBatchResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateFrostBatchResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	{
+		sorted_keys := make([]string, len(m.GetResults()))
+		i := 0
+		for key := range m.GetResults() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetResults()[key]
+			_ = val
+
+			// no validation rules for Results[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, AggregateFrostBatchResponseValidationError{
+							field:  fmt.Sprintf("Results[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, AggregateFrostBatchResponseValidationError{
+							field:  fmt.Sprintf("Results[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return AggregateFrostBatchResponseValidationError{
+						field:  fmt.Sprintf("Results[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return AggregateFrostBatchResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateFrostBatchResponseMultiError is an error wrapping multiple
+// validation errors returned by AggregateFrostBatchResponse.ValidateAll() if
+// the designated constraints aren't met.
+type AggregateFrostBatchResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateFrostBatchResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateFrostBatchResponseMultiError) AllErrors() []error { return m }
+
+// AggregateFrostBatchResponseValidationError is the validation error returned
+// by AggregateFrostBatchResponse.Validate if the designated constraints
+// aren't met.
+type AggregateFrostBatchResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateFrostBatchResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateFrostBatchResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateFrostBatchResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateFrostBatchResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateFrostBatchResponseValidationError) ErrorName() string {
+	return "AggregateFrostBatchResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateFrostBatchResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateFrostBatchResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateFrostBatchResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateFrostBatchResponseValidationError{}
+
 // Validate checks the field values on ValidateSignatureShareRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

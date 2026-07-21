@@ -166,6 +166,10 @@ func (m *mockFrostServiceClient) AggregateFrost(context.Context, *pbfrost.Aggreg
 	return &pbfrost.AggregateFrostResponse{}, nil
 }
 
+func (m *mockFrostServiceClient) AggregateFrostBatch(context.Context, *pbfrost.AggregateFrostBatchRequest, ...grpc.CallOption) (*pbfrost.AggregateFrostBatchResponse, error) {
+	return &pbfrost.AggregateFrostBatchResponse{}, nil
+}
+
 func (m *mockFrostServiceClient) ValidateSignatureShare(context.Context, *pbfrost.ValidateSignatureShareRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
 	// Mock successful validation
 	return &emptypb.Empty{}, nil
@@ -579,6 +583,10 @@ func (m *trackingFrostServiceClient) SignFrost(context.Context, *pbfrost.SignFro
 
 func (m *trackingFrostServiceClient) AggregateFrost(context.Context, *pbfrost.AggregateFrostRequest, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
 	return &pbfrost.AggregateFrostResponse{}, nil
+}
+
+func (m *trackingFrostServiceClient) AggregateFrostBatch(context.Context, *pbfrost.AggregateFrostBatchRequest, ...grpc.CallOption) (*pbfrost.AggregateFrostBatchResponse, error) {
+	return &pbfrost.AggregateFrostBatchResponse{}, nil
 }
 
 func (m *trackingFrostServiceClient) ValidateSignatureShare(ctx context.Context, _ *pbfrost.ValidateSignatureShareRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
