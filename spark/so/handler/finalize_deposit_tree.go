@@ -740,80 +740,64 @@ func aggregateDepositSignatures(
 	defer frostConn.Close()
 
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+	return aggregateDepositSignaturesWithClient(ctx, config, frostClient, req, signingResults, verifyingKey, rootSigningPubKey, rootTxInputCount)
+}
+
+// aggregateDepositSignaturesWithClient is aggregateDepositSignatures with the
+// FROST client injected, so the positional request-to-signature mapping is
+// unit testable without a signer connection.
+func aggregateDepositSignaturesWithClient(
+	ctx context.Context,
+	config *so.Config,
+	frostClient pbfrost.FrostServiceClient,
+	req *pb.FinalizeDepositTreeCreationRequest,
+	signingResults []*helper.SigningResult,
+	verifyingKey keys.Public,
+	rootSigningPubKey keys.Public,
+	rootTxInputCount int,
+) ([][]byte, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	signatures := make([][]byte, len(signingResults))
+	batch := newFrostAggregationBatch(config)
+	jobKeys := make([]string, len(signingResults))
+	addJob := func(idx int, jobKey string, userJob userSignedSigningJob) error {
+		jobKeys[idx] = jobKey
+		return batch.addSigningResultJob(jobKey, signingResults[idx], userJob, verifyingKey, rootSigningPubKey, keys.Public{})
+	}
 
-	// Aggregate root transaction signatures (one per input)
+	// Root transaction signatures (one per input)
 	for i := range rootTxInputCount {
-		logger.Sugar().Infof("Aggregating cpfp root tx signature for input %d", i)
-
-		var commitments map[string]*pbcommon.SigningCommitment
-		var userCommitment *pbcommon.SigningCommitment
-		var userSignature []byte
-		if i == 0 {
-			commitments = req.GetRootTxSigningJob().GetSigningCommitments().GetSigningCommitments()
-			userCommitment = req.GetRootTxSigningJob().GetSigningNonceCommitment()
-			userSignature = req.GetRootTxSigningJob().GetUserSignature()
-		} else {
-			addInput := req.GetRootTxSigningJob().GetAdditionalInputs()[i-1]
-			commitments = addInput.GetSigningCommitments().GetSigningCommitments()
-			userCommitment = addInput.GetSigningNonceCommitment()
-			userSignature = addInput.GetUserSignature()
+		var userJob userSignedSigningJob = req.GetRootTxSigningJob()
+		if i > 0 {
+			userJob = req.GetRootTxSigningJob().GetAdditionalInputs()[i-1]
 		}
-
-		result, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResults[i].Message.Serialize(),
-			SignatureShares:    signingResults[i].SignatureShares,
-			PublicShares:       signingResults[i].PublicKeys,
-			VerifyingKey:       verifyingKey.Serialize(),
-			Commitments:        commitments,
-			UserCommitments:    userCommitment,
-			UserPublicKey:      rootSigningPubKey.Serialize(),
-			UserSignatureShare: userSignature,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to aggregate root tx signature for input %d: %w", i, err)
+		if err := addJob(i, fmt.Sprintf("root-input-%d", i), userJob); err != nil {
+			return nil, fmt.Errorf("failed to build root tx aggregation job for input %d: %w", i, err)
 		}
-		signatures[i] = result.GetSignature()
 	}
 
-	// Aggregate refund transaction signature
+	// Refund transaction signature
 	refundIdx := rootTxInputCount
-	logger.Sugar().Infof("Aggregating cpfp refund tx signature")
-	refundSigResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            signingResults[refundIdx].Message.Serialize(),
-		SignatureShares:    signingResults[refundIdx].SignatureShares,
-		PublicShares:       signingResults[refundIdx].PublicKeys,
-		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        req.GetRefundTxSigningJob().GetSigningCommitments().GetSigningCommitments(),
-		UserCommitments:    req.GetRefundTxSigningJob().GetSigningNonceCommitment(),
-		UserPublicKey:      rootSigningPubKey.Serialize(),
-		UserSignatureShare: req.GetRefundTxSigningJob().GetUserSignature(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to aggregate refund tx signature: %w", err)
+	if err := addJob(refundIdx, "refund", req.GetRefundTxSigningJob()); err != nil {
+		return nil, fmt.Errorf("failed to build refund tx aggregation job: %w", err)
 	}
-	signatures[refundIdx] = refundSigResult.GetSignature()
 
-	// Aggregate DirectFromCpfpRefund signature
+	// DirectFromCpfpRefund signature
 	directIdx := rootTxInputCount + 1
-	logger.Sugar().Infof("Aggregating direct from cpfp refund tx signature")
-	directFromCpfpRefundSigResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            signingResults[directIdx].Message.Serialize(),
-		SignatureShares:    signingResults[directIdx].SignatureShares,
-		PublicShares:       signingResults[directIdx].PublicKeys,
-		VerifyingKey:       verifyingKey.Serialize(),
-		Commitments:        req.GetDirectFromCpfpRefundTxSigningJob().GetSigningCommitments().GetSigningCommitments(),
-		UserCommitments:    req.GetDirectFromCpfpRefundTxSigningJob().GetSigningNonceCommitment(),
-		UserPublicKey:      rootSigningPubKey.Serialize(),
-		UserSignatureShare: req.GetDirectFromCpfpRefundTxSigningJob().GetUserSignature(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to aggregate direct from cpfp refund tx signature: %w", err)
+	if err := addJob(directIdx, "directFromCpfpRefund", req.GetDirectFromCpfpRefundTxSigningJob()); err != nil {
+		return nil, fmt.Errorf("failed to build direct from cpfp refund tx aggregation job: %w", err)
 	}
-	signatures[directIdx] = directFromCpfpRefundSigResult.GetSignature()
 
+	logger.Sugar().Infof("Aggregating %d deposit tree signatures (%d root inputs)", len(jobKeys), rootTxInputCount)
+	aggregated, err := batch.aggregate(ctx, frostClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate deposit tree signatures: %w", err)
+	}
+
+	signatures := make([][]byte, len(jobKeys))
+	for i, jobKey := range jobKeys {
+		signatures[i] = aggregated[jobKey]
+	}
 	return signatures, nil
 }
 
