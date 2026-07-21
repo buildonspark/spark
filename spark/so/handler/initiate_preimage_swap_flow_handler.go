@@ -60,7 +60,67 @@ type InitiatePreimageSwapFlowHandler struct {
 	transfer  *TransferHandler
 }
 
-var _ consensus.FlowHandler = (*InitiatePreimageSwapFlowHandler)(nil)
+var (
+	_ consensus.FlowHandler             = (*InitiatePreimageSwapFlowHandler)(nil)
+	_ consensus.PrepareBoundFlowHandler = (*InitiatePreimageSwapFlowHandler)(nil)
+)
+
+// ValidateDecisionAgainstPrepare implements consensus.PrepareBoundFlowHandler:
+// commit and rollback resolve the transfer purely from the decision payload's
+// transfer_id (Rollback cancels/unlocks whatever pre-commit transfer it names),
+// so bind it to the id this SO persisted in its prepare op to stop a
+// coordinator reusing a valid IN_FLIGHT preimage-swap flow id against an
+// unrelated transfer. Uses sameTransferID because the prepare op stores the
+// client's verbatim id while the decision payloads canonicalize via uuid.Parse.
+func (h *InitiatePreimageSwapFlowHandler) ValidateDecisionAgainstPrepare(prepareOp proto.Message, decisionOp proto.Message) error {
+	prepare, ok := prepareOp.(*pbinternal.InitiatePreimageSwapPrepareRequest)
+	if !ok {
+		return fmt.Errorf("unexpected prepare op type %T for initiate preimage swap", prepareOp)
+	}
+	// Resolve the prepared id the same way production does, via
+	// preimageSwapTransferIDFromRequest (the transfer lives under
+	// transfer_request; the legacy transfer/V2 field is disabled). Using the same
+	// resolver keeps the bind consistent with how the id was persisted.
+	preparedTransferID := preimageSwapTransferIDFromRequest(prepare.GetOriginalRequest())
+	switch d := decisionOp.(type) {
+	case *pbinternal.InitiatePreimageSwapCommitRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("commit transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+		// A SEND+package prepare settles by applying aggregated HTLC refund
+		// signatures, so its commit MUST carry them. Without this bind an
+		// empty-leaf_signatures commit with a matching id passes the fence, and
+		// applyInitiatePreimageSwapCommit's settlement block no-ops when both
+		// leaf_signatures and key_tweak_proofs are empty — silently marking the
+		// participant row COMMITTED while the transfer stays SenderKeyTweakPending
+		// with its refund signatures never applied (stuck funds). Fail loud here,
+		// mirroring the receiver-key bind on claim and applySendTransferCommit's
+		// empty-signature error.
+		if isSendPackagePreimageSwap(prepare.GetOriginalRequest()) && len(d.GetLeafSignatures()) == 0 {
+			return fmt.Errorf("commit for SEND+package preimage swap %s carries no leaf signatures", preparedTransferID)
+		}
+		// NOTE: RECEIVE commit-payload completeness (a non-HODL receive must settle
+		// key tweaks; only HODL receives may commit empty and settle later via
+		// ProvidePreimage) is deliberately NOT enforced here. This fence is a pure
+		// function of the prepare op, which does not carry HODL-ness — that lives on
+		// the transfer/preimage_request rows — so the fence cannot tell a legitimate
+		// HODL empty commit from a non-HODL one. That completeness check belongs in
+		// applyInitiatePreimageSwapCommit, where the transfer state is loaded;
+		// tracked as a follow-up. (SEND has no such ambiguity, hence the bind above.)
+	case *pbinternal.InitiatePreimageSwapRollbackRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("rollback transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+	case *pbinternal.InitiatePreimageSwapPrepareRequest:
+		// The reconciler's presumed-abort path echoes the prepare op itself.
+		if !sameTransferID(preimageSwapTransferIDFromRequest(d.GetOriginalRequest()), preparedTransferID) {
+			return fmt.Errorf("presumed-abort rollback transfer id %s does not match the prepared transfer id %s", preimageSwapTransferIDFromRequest(d.GetOriginalRequest()), preparedTransferID)
+		}
+	default:
+		return fmt.Errorf("unexpected decision op type %T for initiate preimage swap", decisionOp)
+	}
+	return nil
+}
 
 func NewInitiatePreimageSwapFlowHandler(config *so.Config) *InitiatePreimageSwapFlowHandler {
 	return &InitiatePreimageSwapFlowHandler{
@@ -103,6 +163,15 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 	req := prepareReq.GetOriginalRequest()
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
+	}
+	// Reject an unrecognized Reason up front. The FROST-share (leaf_signatures)
+	// producing paths gate on ==REASON_SEND, while the commit fence requires
+	// leaf_signatures for anything !=REASON_RECEIVE; an unknown Reason would slip
+	// through Prepare producing no shares and then be permanently fenced at commit,
+	// stranding the flow. Only SEND and RECEIVE are valid, so fail closed here and
+	// the two classifications can never disagree.
+	if r := req.GetReason(); r != pbspark.InitiatePreimageSwapRequest_REASON_SEND && r != pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unrecognized preimage swap reason %d", r))
 	}
 
 	state, err := h.prepareState(ctx, req)

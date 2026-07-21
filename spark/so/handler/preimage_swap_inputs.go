@@ -82,6 +82,21 @@ func preimageSwapTransferIDFromRequest(req *pbspark.InitiatePreimageSwapRequest)
 	return req.GetTransferRequest().GetTransferId()
 }
 
+// isSendPackagePreimageSwap reports whether a preimage-swap request is the
+// send-with-transfer-package shape whose commit settles by applying aggregated
+// HTLC refund signatures (see BuildCommitPayload). This is the only shape whose
+// commit must carry non-empty leaf_signatures.
+//
+// Classified as "not a receive" to match production, which treats REASON_RECEIVE
+// as the one special path and everything else as a send (see
+// preimageSwapInputsFromTransferRequest's RECEIVE-else branch). Prepare rejects
+// any Reason that is neither SEND nor RECEIVE up front, so only those two ever
+// reach the fence and this predicate agrees with production's ==REASON_SEND
+// signature-producing paths for every reachable input.
+func isSendPackagePreimageSwap(req *pbspark.InitiatePreimageSwapRequest) bool {
+	return req.GetReason() != pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.GetTransferRequest() != nil
+}
+
 // setPreimageSwapExpiry writes a server-resolved expiry onto the transfer_request so the
 // peer fanout agrees.
 func setPreimageSwapExpiry(req *pbspark.InitiatePreimageSwapRequest, expiry *timestamppb.Timestamp) {
