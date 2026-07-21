@@ -1529,11 +1529,9 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	// The legacy `transfer` field is always stripped at the coordinator entrypoint, so
-	// every request resolves inputs from transfer_request. sendRequest builds a minimal
-	// valid-shape SEND request; each case mutates one field to trip a specific validation.
-	// Per-leaf nil-job checks live on the package path (transfer_package_validation.go)
-	// and are covered by TestLoadLeafRefundMapsFromTransferPackage_*.
+	// sendRequest builds a minimal valid-shape SEND request; each case mutates one field
+	// to trip a specific validation. Per-leaf nil-job checks live on the package path
+	// (transfer_package_validation.go) and are covered by TestLoadLeafRefundMapsFromTransferPackage_*.
 	sendRequest := func() *pb.InitiatePreimageSwapRequest {
 		return &pb.InitiatePreimageSwapRequest{
 			PaymentHash:               make([]byte, 32),
@@ -3178,8 +3176,8 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		require.ErrorContains(t, err, "too many transactions")
 	})
 
-	// Participant paths accept transfer-less requests with NO knob — deploy-gated.
-	t.Run("participant GetPreimageShare accepts transfer-less send", func(t *testing.T) {
+	// Participant paths (GetPreimageShare) resolve inputs and validate directly.
+	t.Run("participant GetPreimageShare resolves and validates a send request", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
 		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)

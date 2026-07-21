@@ -39,14 +39,10 @@ func (inputs *preimageSwapInputs) cpfpLeaves() []*pbspark.UserSignedTxSigningJob
 
 // preimageSwapInputsFromRequest builds the inputs from the request's transfer_request.
 func preimageSwapInputsFromRequest(req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapInputs, error) {
-	if req.GetTransferRequest() == nil {
+	tr := req.GetTransferRequest()
+	if tr == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request is required"))
 	}
-	return preimageSwapInputsFromTransferRequest(req)
-}
-
-func preimageSwapInputsFromTransferRequest(req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapInputs, error) {
-	tr := req.GetTransferRequest()
 	pkg := tr.GetTransferPackage()
 	if pkg == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_request.transfer_package is required"))
@@ -59,7 +55,6 @@ func preimageSwapInputsFromTransferRequest(req *pbspark.InitiatePreimageSwapRequ
 		return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("receiver identity public key mismatch between request and transfer_request"))
 	}
 
-	// build the inputs based on the newer transfer_request form
 	inputs := &preimageSwapInputs{
 		ownerIdentityPublicKey:    tr.GetOwnerIdentityPublicKey(),
 		receiverIdentityPublicKey: req.GetReceiverIdentityPublicKey(),
@@ -68,7 +63,7 @@ func preimageSwapInputsFromTransferRequest(req *pbspark.InitiatePreimageSwapRequ
 		packageCpfp:               pkg.GetLeavesToSend(),
 	}
 
-	// RECEIVE packages carry P2TR refunds (like the legacy transfer), so they feed the
+	// RECEIVE packages carry P2TR refunds, so they feed the
 	// refund validators directly. SEND packages carry HTLC refunds those validators
 	// reject, so mark it package-only send and let the package-aware path validate.
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {

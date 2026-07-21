@@ -696,16 +696,6 @@ message LeafRefundTxSigningResult {
     SigningResult direct_from_cpfp_refund_tx_signing_result = 5;
 }
 
-message StartUserSignedTransferRequest {
-    string transfer_id = 1;
-    bytes owner_identity_public_key = 2;
-    repeated UserSignedTxSigningJob leaves_to_send = 3;
-    bytes receiver_identity_public_key = 4;
-    google.protobuf.Timestamp expiry_time = 5;
-    repeated UserSignedTxSigningJob direct_leaves_to_send = 6;
-    repeated UserSignedTxSigningJob direct_from_cpfp_leaves_to_send = 7;
-}
-
 
 message StartTransferRequest {
     reserved 6;
