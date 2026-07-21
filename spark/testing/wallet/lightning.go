@@ -80,8 +80,8 @@ type preimageSwapOptions struct {
 	omitTransferPackage bool
 }
 
-// WithoutTransferPackage drops the committed transfer_request package (and the
-// legacy transfer field) from the swap request, reproducing a caller that
+// WithoutTransferPackage drops the committed transfer_request package from the
+// swap request, reproducing a caller that
 // initiates a preimage swap without committing key tweaks. The SO rejects it at
 // input resolution — an uncommitted preimage-swap transfer must never be created.
 func WithoutTransferPackage() PreimageSwapOption {
@@ -434,8 +434,8 @@ func buildLightningHTLCTransfer(
 
 // buildPreimageSwapTransferRequest wraps already-signed refund leaf jobs plus the
 // per-operator encrypted key tweaks into a signed TransferPackage / StartTransferRequest.
-// The RECEIVE preimage swap uses it to send the transfer_request shape, which the
-// coordinator requires once the legacy Transfer field is stripped.
+// The RECEIVE preimage swap uses it to send the committed transfer_request, which the
+// coordinator requires.
 func buildPreimageSwapTransferRequest(
 	config *TestWalletConfig,
 	transferID uuid.UUID,

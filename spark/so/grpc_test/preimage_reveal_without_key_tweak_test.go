@@ -16,20 +16,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TestInitiatePreimageSwap_RejectsReceiveWithoutTransferPackage is the
-// end-to-end regression for the "preimage revealed without key-tweak commit"
-// theft, closed structurally once preimage swaps resolve from transfer_request.
+// TestInitiatePreimageSwap_RejectsReceiveWithoutTransferPackage guards against the
+// "preimage revealed without key-tweak commit" theft.
 //
 // The theft required a HODL receive swap that reached SENDER_INITIATED — a
 // transfer created without staged sender key tweaks — so a revealed preimage
 // could be read back by the SSP (via QueryPreimage), settling the inbound
 // Lightning HTLC while the receiver held an unclaimable transfer.
 //
-// Under the transfer_request path (the ignore-legacy-transfer knob is on, and
-// the legacy transfer field is removed entirely in SP-3285), a preimage swap
-// that withholds the committed transfer package is rejected at input resolution
-// before any transfer is created. There is no uncommitted transfer to strand
-// and no preimage-bearing swap for the sender to read — the vector is gone.
+// A receive swap that omits the committed transfer package is rejected at input
+// resolution before any transfer is created: there is no uncommitted transfer to
+// strand and no preimage-bearing swap for the sender to read.
 func TestInitiatePreimageSwap_RejectsReceiveWithoutTransferPackage(t *testing.T) {
 	userConfig := wallet.NewTestWalletConfig(t)
 	sspConfig := wallet.NewTestWalletConfig(t)

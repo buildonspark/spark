@@ -1880,7 +1880,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		}
 	}
 
-	// TODO: Remove this once SSP has removed the query user refund call.
+	// TODO(SP-3621): query_user_signed_refunds is retired; revisit with the user-signed-transaction decommission.
 	var status st.PreimageRequestStatus
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil {
 		status = st.PreimageRequestStatusPreimageShared
