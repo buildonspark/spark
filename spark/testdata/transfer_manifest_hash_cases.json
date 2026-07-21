@@ -357,6 +357,59 @@
           }
         ]
       }
+    },
+    {
+      "name": "receive_with_fee_components",
+      "description": "Receive-shaped manifest with a sender==receiver (self-send) edge: the SSP identity key both sends and collects the LS + keyless-partner cut (folded into one FEE_ROLE_LS row); the affiliate collects its own. Pins self-send edge hashing plus both expiry timestamps.",
+      "expectedHash": "646a2ebf72c7b1cff4cc7266f0a02ecbad722f0345484d032a6cf47593ab2dd5",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-2222-7000-8000-000000000002",
+        "network": "MAINNET",
+        "transferExpiryTime": "2026-08-01T00:00:00.500Z",
+        "quoteExpiryTime": "2026-07-16T12:00:00.250Z",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "100000"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "Ax8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8f",
+            "amount": {
+              "sats": "1020"
+            }
+          },
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "amount": {
+              "sats": "1020"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_AFFILIATE",
+            "amount": {
+              "sats": "1020"
+            },
+            "recipientIdentityPublicKey": "Ax8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8f"
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "1020"
+            },
+            "recipientIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh"
+          }
+        ]
+      }
     }
   ],
   "invalidCases": [
