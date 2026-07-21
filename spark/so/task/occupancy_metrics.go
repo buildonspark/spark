@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 type transferCellKey struct {
@@ -40,10 +41,24 @@ type transferOccupancyRow struct {
 	Min     time.Time          `json:"min"`
 }
 
+type treeNodeCellKey struct {
+	network btcnetwork.Network
+	status  st.TreeNodeStatus
+}
+
+type treeNodeOccupancyRow struct {
+	Network btcnetwork.Network `json:"network"`
+	Status  st.TreeNodeStatus  `json:"status"`
+	Count   int64              `json:"count"`
+	Min     time.Time          `json:"min"`
+}
+
 var (
 	occupancyMeter         = otel.Meter("occupancy")
 	transferOccupancyGauge metric.Int64Gauge
 	transferOldestAgeGauge metric.Float64Gauge
+	treeNodeOccupancyGauge metric.Int64Gauge
+	treeNodeOldestAgeGauge metric.Float64Gauge
 
 	publishOccupancyMetricsTimeout = 2 * time.Minute
 )
@@ -68,6 +83,25 @@ func init() {
 		otel.Handle(err)
 		transferOldestAgeGauge = noop.Float64Gauge{}
 	}
+
+	treeNodeOccupancyGauge, err = occupancyMeter.Int64Gauge(
+		"spark_tree_node_occupancy",
+		metric.WithDescription("Tree nodes currently in each occupancy-tracked status, by status/network. Zero-filled: a drained status reports 0."),
+		metric.WithUnit("{row}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		treeNodeOccupancyGauge = noop.Int64Gauge{}
+	}
+
+	treeNodeOldestAgeGauge, err = occupancyMeter.Float64Gauge(
+		"spark_tree_node_oldest_age_seconds",
+		metric.WithDescription("Age in seconds of the oldest tree node (now - MIN(update_time)) per occupancy-tracked status; 0 when the status is empty."),
+	)
+	if err != nil {
+		otel.Handle(err)
+		treeNodeOldestAgeGauge = noop.Float64Gauge{}
+	}
 }
 
 func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
@@ -89,6 +123,19 @@ func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
 		)
 		transferOccupancyGauge.Record(ctx, c.count, attrs)
 		transferOldestAgeGauge.Record(ctx, c.oldestAge.Seconds(), attrs)
+	}
+
+	treeNodeCells, err := treeNodeOccupancyCells(ctx, db, config.SupportedNetworks, now)
+	if err != nil {
+		return err
+	}
+	for k, c := range treeNodeCells {
+		attrs := metric.WithAttributes(
+			attribute.String("status", string(k.status)),
+			attribute.String("network", k.network.String()),
+		)
+		treeNodeOccupancyGauge.Record(ctx, c.count, attrs)
+		treeNodeOldestAgeGauge.Record(ctx, c.oldestAge.Seconds(), attrs)
 	}
 	return nil
 }
@@ -116,6 +163,33 @@ func transferOccupancyCells(ctx context.Context, db *ent.Client, networks []btcn
 	}
 	for _, r := range rows {
 		cells[transferCellKey{r.Network, r.Status, r.Type}] = occupancyCell{
+			count:     r.Count,
+			oldestAge: clampAge(now.Sub(r.Min)),
+		}
+	}
+	return cells, nil
+}
+
+// treeNodeOccupancyCells is the tree_nodes twin of transferOccupancyCells
+// (no type dimension).
+func treeNodeOccupancyCells(ctx context.Context, db *ent.Client, networks []btcnetwork.Network, now time.Time) (map[treeNodeCellKey]occupancyCell, error) {
+	cells := make(map[treeNodeCellKey]occupancyCell)
+	for _, network := range networks {
+		for _, status := range st.OccupancyTreeNodeStatuses() {
+			cells[treeNodeCellKey{network, status}] = occupancyCell{}
+		}
+	}
+
+	var rows []treeNodeOccupancyRow
+	if err := db.TreeNode.Query().
+		Where(treenode.StatusIn(st.OccupancyTreeNodeStatuses()...)).
+		GroupBy(treenode.FieldNetwork, treenode.FieldStatus).
+		Aggregate(ent.Count(), ent.Min(treenode.FieldUpdateTime)).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("aggregate tree_node occupancy: %w", err)
+	}
+	for _, r := range rows {
+		cells[treeNodeCellKey{r.Network, r.Status}] = occupancyCell{
 			count:     r.Count,
 			oldestAge: clampAge(now.Sub(r.Min)),
 		}

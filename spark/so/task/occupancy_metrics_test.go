@@ -89,3 +89,45 @@ func TestPublishOccupancyMetricsTask_IsRegisteredAndRuns(t *testing.T) {
 	err := spec.RunOnce(ctx, cfg, sessionCtx.Client, nil, knobs.NewFixedKnobs(nil))
 	require.NoError(t, err)
 }
+
+func TestTreeNodeOccupancyCells_CountsTrackedStatusesAndZeroFills(t *testing.T) {
+	t.Parallel()
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	client := sessionCtx.Client
+
+	rng := rand.NewChaCha8([32]byte{92})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	keyshare := createSenderInitiatedExpirySigningKeyshare(t, ctx, rng, client)
+	tree := createSenderInitiatedExpiryTree(t, ctx, owner, client)
+	leafLocked := createSenderInitiatedExpiryLeaf(t, ctx, rng, client, tree, keyshare)
+	leafAvailable := createSenderInitiatedExpiryLeaf(t, ctx, rng, client, tree, keyshare)
+	leafSplitted := createSenderInitiatedExpiryLeaf(t, ctx, rng, client, tree, keyshare)
+	_, err := leafLocked.Update().SetStatus(st.TreeNodeStatusTransferLocked).Save(ctx)
+	require.NoError(t, err)
+	_, err = leafAvailable.Update().SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
+	require.NoError(t, err)
+	_, err = leafSplitted.Update().SetStatus(st.TreeNodeStatusSplitted).Save(ctx)
+	require.NoError(t, err)
+
+	now := time.Now()
+	cells, err := treeNodeOccupancyCells(ctx, client, []btcnetwork.Network{btcnetwork.Regtest}, now)
+	require.NoError(t, err)
+
+	assert.Len(t, cells, len(st.OccupancyTreeNodeStatuses()))
+
+	locked := cells[treeNodeCellKey{network: btcnetwork.Regtest, status: st.TreeNodeStatusTransferLocked}]
+	assert.EqualValues(t, 1, locked.count)
+	assert.Greater(t, locked.oldestAge, time.Duration(0))
+
+	// Neither the terminal SPLITTED leaf nor the resting AVAILABLE leaf
+	// contributes a cell.
+	_, exists := cells[treeNodeCellKey{network: btcnetwork.Regtest, status: st.TreeNodeStatusSplitted}]
+	assert.False(t, exists)
+	_, exists = cells[treeNodeCellKey{network: btcnetwork.Regtest, status: st.TreeNodeStatusAvailable}]
+	assert.False(t, exists)
+
+	empty := cells[treeNodeCellKey{network: btcnetwork.Regtest, status: st.TreeNodeStatusRenewLocked}]
+	assert.EqualValues(t, 0, empty.count)
+}

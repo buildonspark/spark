@@ -99,3 +99,60 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusRenewLocked),
 	}
 }
+
+// IsTerminal reports whether a tree node in this status has left the live
+// pool for good. Deliberate divergences from CanBecomeAvailable():
+// AGGREGATED is terminal here (consumed history in practice; its
+// revivability is an SP-3049-guard edge case), while ON_CHAIN and
+// PARENT_EXITED are non-terminal — the watchtower still owes both
+// broadcast/refund work (QueryBroadcastableNodes excludes neither) and
+// they drain to EXITED.
+func (s TreeNodeStatus) IsTerminal() bool {
+	switch s {
+	case TreeNodeStatusSplitted,
+		TreeNodeStatusAggregated,
+		TreeNodeStatusExited,
+		TreeNodeStatusReimbursed:
+		return true
+	case TreeNodeStatusCreating,
+		TreeNodeStatusAvailable,
+		TreeNodeStatusFrozenByIssuer,
+		TreeNodeStatusTransferLocked,
+		TreeNodeStatusSplitLocked,
+		TreeNodeStatusOnChain,
+		TreeNodeStatusAggregateLock,
+		TreeNodeStatusInvestigation,
+		TreeNodeStatusLost,
+		TreeNodeStatusParentExited,
+		TreeNodeStatusRenewLocked:
+		return false
+	}
+	// A status added without classification defaults to non-terminal so it
+	// appears in occupancy counts rather than silently vanishing.
+	return false
+}
+
+// CountsForOccupancy reports whether rows in this status belong in the
+// occupancy metrics. Terminal statuses are consumed history;
+// AVAILABLE is excluded even though it is non-terminal because available
+// leaves are the resting spendable pool, not in-flight work — the stuck-fund
+// signal the metrics exist for. SPLIT_LOCKED is excluded for the same
+// reason: it is the permanent resting status of renew-created split nodes
+// (no transition leaves it), so it grows with every leaf renewal by design.
+func (s TreeNodeStatus) CountsForOccupancy() bool {
+	return !s.IsTerminal() &&
+		s != TreeNodeStatusAvailable &&
+		s != TreeNodeStatusSplitLocked
+}
+
+// OccupancyTreeNodeStatuses returns the statuses counted by the
+// occupancy metrics.
+func OccupancyTreeNodeStatuses() []TreeNodeStatus {
+	var out []TreeNodeStatus
+	for _, v := range (TreeNodeStatus("")).Values() {
+		if s := TreeNodeStatus(v); s.CountsForOccupancy() {
+			out = append(out, s)
+		}
+	}
+	return out
+}
