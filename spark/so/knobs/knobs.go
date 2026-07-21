@@ -85,6 +85,16 @@ const (
 
 	KnobSoDkgBatchSize = "spark.so.dkg.batch_size"
 
+	// KnobFrostAggregateBatchEnabled routes multi-job FROST signature
+	// aggregation through the signer's aggregate_frost_batch RPC (one round
+	// trip, jobs fanned out across cores) instead of one aggregate_frost call
+	// per job. Interpreted as binary (any non-zero value enables). The knob is
+	// coordinator-local — it only changes how an SO talks to its own signer
+	// sidecar, so it can be flipped per-SO without coordination. Default off;
+	// enable only once the SO's signer runs a build that serves
+	// aggregate_frost_batch, and flip back to 0 as a kill switch.
+	KnobFrostAggregateBatchEnabled = "spark.so.frost.aggregate_batch_enabled"
+
 	// KnobInternalRPCBrontideEnabled gates whether outbound SO-to-SO internal RPCs actually route over brontide
 	// (TLS + Noise_XK) at dial time. Brontide must first be provisioned via the internal_grpc_port config
 	// flag, which validates peer metadata and installs the client factory at startup; this knob then flips the live

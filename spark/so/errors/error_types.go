@@ -34,6 +34,7 @@ const (
 	ReasonInternalKeyshareError                = "INTERNAL_KEYSHARE_ERROR"
 	ReasonInternalInvalidOperatorResponse      = "INVALID_OPERATOR_RESPONSE"
 	ReasonInternalOperationTooSlow             = "OPERATION_TOO_SLOW"
+	ReasonInternalSigningFailure               = "SIGNING_FAILURE"
 
 	ReasonInvalidArgumentMissingField        = "MISSING_FIELD"
 	ReasonInvalidArgumentMalformedField      = "MALFORMED_FIELD"
@@ -147,6 +148,12 @@ func InternalInvalidOperatorResponse(err error) error {
 
 func InternalKeyshareError(err error) error {
 	return newGRPCError(codes.Internal, err, ReasonInternalKeyshareError)
+}
+
+// Use for failures in the FROST signing/aggregation pipeline (signer RPCs,
+// share bookkeeping) that are not attributable to caller input.
+func InternalSigningError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalSigningFailure)
 }
 
 func InternalObjectOutOfRange(err error) error {

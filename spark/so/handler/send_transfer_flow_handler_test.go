@@ -14,7 +14,6 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
-	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/db"
@@ -23,7 +22,6 @@ import (
 	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -138,24 +136,11 @@ func TestSendTransferSigningJobsThreadAdaptorKeysPerVariant(t *testing.T) {
 	assert.Equal(t, dfcKey.Serialize(), byJobID[sendTransferJobID(transferID, leafID, "directFromCpfp").String()])
 }
 
-// capturingFrostClient records the AggregateFrostRequest the caller builds so a
-// test can assert the request fields without a real FROST server. Only
-// AggregateFrost is exercised; the embedded nil interface satisfies the rest.
-type capturingFrostClient struct {
-	pbfrost.FrostServiceClient
-	req *pbfrost.AggregateFrostRequest
-}
-
-func (c *capturingFrostClient) AggregateFrost(_ context.Context, in *pbfrost.AggregateFrostRequest, _ ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
-	c.req = in
-	return &pbfrost.AggregateFrostResponse{Signature: []byte{0xAB}}, nil
-}
-
-// TestAggregateLeafSignatureThreadsAdaptorPublicKey asserts aggregateLeafSignature
-// populates AggregateFrostRequest.AdaptorPublicKey from the job's adaptor point
-// (and leaves it empty when the job carries none), localizing a regression here
+// TestFrostAggregationAddJobThreadsAdaptorPublicKey asserts addJob populates
+// AggregateFrostRequest.AdaptorPublicKey from the job's adaptor point (and
+// leaves it empty when the job carries none), localizing a regression here
 // instead of it surfacing as an opaque aggregate-signature failure.
-func TestAggregateLeafSignatureThreadsAdaptorPublicKey(t *testing.T) {
+func TestFrostAggregationAddJobThreadsAdaptorPublicKey(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{12})
 	ctx, leaf, parentTx := createSendTransferSigningJobTestLeaf(t, rng)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
@@ -169,26 +154,25 @@ func TestAggregateLeafSignatureThreadsAdaptorPublicKey(t *testing.T) {
 	sharesFor := func(jobID uuid.UUID) map[string]map[string][]byte {
 		return map[string]map[string][]byte{jobID.String(): {"operator1": {0x01}}}
 	}
+	batch := newFrostAggregationBatch(cfg)
 
 	withAdaptor, err := buildSigningJobForRefund(ctx,
 		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), refundRaw)),
 		leaf, leaf.RawTx, uuid.New(), adaptorPubKey)
 	require.NoError(t, err)
-	fc := &capturingFrostClient{}
-	_, _, err = aggregateLeafSignature(ctx, cfg, fc, withAdaptor, sharesFor(withAdaptor.JobID), leaf, []byte{0x02})
-	require.NoError(t, err)
-	require.NotNil(t, fc.req)
-	assert.Equal(t, adaptorPubKey.Serialize(), fc.req.GetAdaptorPublicKey())
+	withAdaptorKey := leafAggregationJobKey(leaf.ID.String(), txKindCPFP)
+	require.NoError(t, batch.addJob(ctx, withAdaptorKey, withAdaptor, sharesFor(withAdaptor.JobID), leaf, []byte{0x02}))
+	require.NotNil(t, batch.requests[withAdaptorKey])
+	assert.Equal(t, adaptorPubKey.Serialize(), batch.requests[withAdaptorKey].GetAdaptorPublicKey())
 
 	withoutAdaptor, err := buildSigningJobForRefund(ctx,
 		parseSendRefundJob(t, createSendTransferUserSignedJob(t, rng, leaf.ID.String(), refundRaw)),
 		leaf, leaf.RawTx, uuid.New(), keys.Public{})
 	require.NoError(t, err)
-	fc2 := &capturingFrostClient{}
-	_, _, err = aggregateLeafSignature(ctx, cfg, fc2, withoutAdaptor, sharesFor(withoutAdaptor.JobID), leaf, []byte{0x02})
-	require.NoError(t, err)
-	require.NotNil(t, fc2.req)
-	assert.Empty(t, fc2.req.GetAdaptorPublicKey())
+	withoutAdaptorKey := leafAggregationJobKey(leaf.ID.String(), txKindDirect)
+	require.NoError(t, batch.addJob(ctx, withoutAdaptorKey, withoutAdaptor, sharesFor(withoutAdaptor.JobID), leaf, []byte{0x02}))
+	require.NotNil(t, batch.requests[withoutAdaptorKey])
+	assert.Empty(t, batch.requests[withoutAdaptorKey].GetAdaptorPublicKey())
 }
 
 // TestSendTransferJobID_Deterministic verifies that the same (transferID,

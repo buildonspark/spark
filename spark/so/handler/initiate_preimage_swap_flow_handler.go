@@ -5,9 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"maps"
 	"math/big"
-	"slices"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -721,7 +719,8 @@ func (f *initiatePreimageSwapCoordinatorFlow) RollbackPayload() proto.Message {
 
 // aggregateRefundSignatures aggregates the per-leaf FROST shares collected from
 // every SO's Prepare into the HTLC refund signatures, reusing the SEND flow's
-// aggregateLeafSignature. Mirrors sendTransferCoordinatorFlow.BuildCommitPayload.
+// aggregateSendTransferLeafSignatures. Mirrors
+// sendTransferCoordinatorFlow.BuildCommitPayload.
 func (f *initiatePreimageSwapCoordinatorFlow) aggregateRefundSignatures(ctx context.Context, results map[string]*anypb.Any) ([]*pbinternal.SendTransferLeafSignatures, error) {
 	allShares, err := collectPreimageSwapFrostShares(results)
 	if err != nil {
@@ -735,33 +734,9 @@ func (f *initiatePreimageSwapCoordinatorFlow) aggregateRefundSignatures(ctx cont
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-	leafIDs := slices.Sorted(maps.Keys(f.signingJobsByLeaf))
-	leafSignatures := make([]*pbinternal.SendTransferLeafSignatures, 0, len(leafIDs))
-	for _, leafID := range leafIDs {
-		jobs := f.signingJobsByLeaf[leafID]
-		sigs := &pbinternal.SendTransferLeafSignatures{LeafId: leafID}
-		if jobs.cpfp != nil {
-			sig, _, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.cpfp, allShares, jobs.leaf, jobs.cpfpUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate cpfp signature for leaf %s: %w", leafID, err)
-			}
-			sigs.RefundSignature = sig
-		}
-		if jobs.direct != nil {
-			sig, _, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.direct, allShares, jobs.leaf, jobs.directUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate direct signature for leaf %s: %w", leafID, err)
-			}
-			sigs.DirectRefundSignature = sig
-		}
-		if jobs.dfc != nil {
-			sig, _, err := aggregateLeafSignature(ctx, f.config, frostClient, jobs.dfc, allShares, jobs.leaf, jobs.dfcUserSig)
-			if err != nil {
-				return nil, fmt.Errorf("aggregate direct-from-cpfp signature for leaf %s: %w", leafID, err)
-			}
-			sigs.DirectFromCpfpRefundSignature = sig
-		}
-		leafSignatures = append(leafSignatures, sigs)
+	leafSignatures, _, err := aggregateSendTransferLeafSignatures(ctx, f.config, frostClient, f.signingJobsByLeaf, allShares, false)
+	if err != nil {
+		return nil, err
 	}
 	return leafSignatures, nil
 }
