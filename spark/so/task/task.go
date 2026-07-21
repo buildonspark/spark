@@ -1127,6 +1127,17 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			ExecutionInterval: 10 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "publish_occupancy_metrics",
+				Timeout:      &publishOccupancyMetricsTimeout,
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					return publishOccupancyMetrics(ctx, config)
+				},
+			},
+		},
+		{
 			ExecutionInterval: 30 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_event_messages",
