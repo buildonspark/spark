@@ -179,6 +179,12 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Fields("update_time"),
 		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
 		index.Fields("network"),
+		// Occupancy metrics: per-status COUNT + MIN(update_time). Leading
+		// status lets the non-terminal IN-list skip the huge consumed-history
+		// regions (SPLITTED/AGGREGATED); update_time last makes MIN() the
+		// first tuple of each (status, network) range, so the whole aggregate
+		// is index-only.
+		index.Fields("status", "network", "update_time"),
 		// Composite index for watchtower queries that check for nodes with confirmed
 		// node tx but unconfirmed refund tx on a specific network.
 		index.Fields("refund_confirmation_height", "node_confirmation_height", "network"),
