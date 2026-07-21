@@ -225,6 +225,8 @@ const commands = [
   "claiminstantstaticdeposit",
   "getutxosfordepositaddress",
   "createsparkinvoice",
+  "signmanifest",
+  "verifymanifest",
   "createinvoice",
   "createhodlinvoice",
   "payinvoice",
@@ -631,6 +633,43 @@ function parseCreateSparkInvoiceArgsWithYargs(
   }
 }
 
+// Loaded lazily: an installed CLI may pair with a released spark-sdk that
+// predates these exports, and a static named import would break CLI startup
+// outright instead of just these temporary commands.
+async function importManifestSigning() {
+  const [sdk, proto] = await Promise.all([
+    import("@buildonspark/spark-sdk"),
+    import("@buildonspark/spark-sdk/proto/spark"),
+  ]);
+  const signTransferManifest = (sdk as Record<string, unknown>)
+    .signTransferManifest as
+    | typeof import("@buildonspark/spark-sdk").signTransferManifest
+    | undefined;
+  const verifyTransferManifestSignature = (sdk as Record<string, unknown>)
+    .verifyTransferManifestSignature as
+    | typeof import("@buildonspark/spark-sdk").verifyTransferManifestSignature
+    | undefined;
+  const TransferManifest = (proto as Record<string, unknown>)
+    .TransferManifest as
+    | typeof import("@buildonspark/spark-sdk/proto/spark").TransferManifest
+    | undefined;
+  if (
+    !signTransferManifest ||
+    !verifyTransferManifestSignature ||
+    !TransferManifest
+  ) {
+    console.log(
+      "signmanifest/verifymanifest need a @buildonspark/spark-sdk release with manifest signing support",
+    );
+    return null;
+  }
+  return {
+    signTransferManifest,
+    verifyTransferManifestSignature,
+    TransferManifest,
+  };
+}
+
 const CLI_VERSION: string = process.env.SPARK_CLI_VERSION ?? "dev";
 
 function parseCliArgs(): {
@@ -832,6 +871,8 @@ async function runCLI() {
   createhodlinvoice <amount> <paymentHash> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a HODL lightning invoice with payment hash (includeSparkAddress and includeSparkInvoice are mutually exclusive)
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
+  signmanifest <manifestHex> <privateKeyHex>                           - TEMPORARY dev-only: sign a serialized TransferManifest (identity-key signature over the manifest hash) with an explicit TEST key (never a real identity key)
+  verifymanifest <manifestHex> <signatureHex> <publicKeyHex>           - TEMPORARY dev-only: verify a Signature-A manifest signature (e.g. cross-check an SSP-minted signature)
   createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
   claimhtlc <preimage>                                                - Claim a HTLC
   queryhtlc <paymentHashes> <status> <transferIds> <matchRole>        - Query a HTLC
@@ -1710,6 +1751,78 @@ async function runCLI() {
           const sig = args[0];
           validateSparkInvoiceSignature(sig as SparkAddressFormat);
           console.log("signature valid");
+          break;
+        }
+        // TODO(SP-3368): remove this temporary parity harness when the first
+        // User-Created flow wires real manifest signing. Not a production surface —
+        // the SDK never validates the SSP issuer signature in prod.
+        case "signmanifest": {
+          // Dev-only: gate before reading argv so the private-key path can't run outside dev.
+          if (process.env.NODE_ENV !== "development") {
+            console.log(
+              "signmanifest is dev-only (it takes a private key on argv); set NODE_ENV=development to use it.",
+            );
+            break;
+          }
+          const [manifestHex, privateKeyHex] = args;
+          if (!manifestHex || !privateKeyHex) {
+            console.log(
+              "Usage: signmanifest <manifestHex> <privateKeyHex>  (TEST KEYS ONLY — argv leaks to shell history/ps; never a real identity key)",
+            );
+            break;
+          }
+          console.warn(
+            "TEST KEYS ONLY: the private key was passed via argv and leaks to shell history/ps; never sign with a real identity key.",
+          );
+          const manifestSigning = await importManifestSigning();
+          if (!manifestSigning) {
+            break;
+          }
+          const manifest = manifestSigning.TransferManifest.decode(
+            hexToBytes(manifestHex),
+          );
+          const signature = await manifestSigning.signTransferManifest(
+            manifest,
+            {
+              signMessageWithIdentityKey: (message: Uint8Array) =>
+                Promise.resolve(
+                  secp256k1
+                    .sign(message, hexToBytes(privateKeyHex))
+                    .toDERRawBytes(),
+                ),
+            },
+          );
+          console.log("signature (DER):", bytesToHex(signature));
+          break;
+        }
+        case "verifymanifest": {
+          // Dev-only (temporary), like signmanifest; gate before use.
+          if (process.env.NODE_ENV !== "development") {
+            console.log(
+              "verifymanifest is dev-only; set NODE_ENV=development to use it.",
+            );
+            break;
+          }
+          const [manifestHex, signatureHex, publicKeyHex] = args;
+          if (!manifestHex || !signatureHex || !publicKeyHex) {
+            console.log(
+              "Usage: verifymanifest <manifestHex> <signatureHex> <publicKeyHex>",
+            );
+            break;
+          }
+          const manifestSigning = await importManifestSigning();
+          if (!manifestSigning) {
+            break;
+          }
+          const manifest = manifestSigning.TransferManifest.decode(
+            hexToBytes(manifestHex),
+          );
+          const valid = await manifestSigning.verifyTransferManifestSignature(
+            manifest,
+            hexToBytes(signatureHex),
+            hexToBytes(publicKeyHex),
+          );
+          console.log("valid:", valid);
           break;
         }
         case "createsparkinvoice": {
