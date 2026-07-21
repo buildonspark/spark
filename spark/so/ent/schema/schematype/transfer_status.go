@@ -50,3 +50,41 @@ func (TransferStatus) Values() []string {
 		string(TransferStatusReceiverKeyTweakApplied),
 	}
 }
+
+// IsTerminal reports whether a transfer in this status has finished its
+// lifecycle. Drives the occupancy metrics: terminal statuses are never
+// counted. Deliberately broader than idx_transfers_active_network_time's
+// in-flight predicate, which omits APPLYING_SENDER_KEY_TWEAK.
+func (s TransferStatus) IsTerminal() bool {
+	switch s {
+	case TransferStatusCompleted,
+		TransferStatusExpired,
+		TransferStatusReturned:
+		return true
+	case TransferStatusSenderInitiated,
+		TransferStatusSenderInitiatedCoordinator,
+		TransferStatusSenderKeyTweakPending,
+		TransferStatusApplyingSenderKeyTweak,
+		TransferStatusSenderKeyTweaked,
+		TransferStatusReceiverKeyTweaked,
+		TransferStatusReceiverKeyTweakLocked,
+		TransferStatusReceiverKeyTweakApplied,
+		TransferStatusReceiverRefundSigned:
+		return false
+	}
+	// A status added without classification defaults to non-terminal so it
+	// appears in occupancy counts rather than silently vanishing.
+	return false
+}
+
+// NonTerminalTransferStatuses returns the statuses counted by the
+// occupancy metrics.
+func NonTerminalTransferStatuses() []TransferStatus {
+	var out []TransferStatus
+	for _, v := range (TransferStatus("")).Values() {
+		if s := TransferStatus(v); !s.IsTerminal() {
+			out = append(out, s)
+		}
+	}
+	return out
+}
