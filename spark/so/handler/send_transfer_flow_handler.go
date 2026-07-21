@@ -64,7 +64,10 @@ type SendTransferFlowHandler struct {
 	requireDirectRefunds bool
 }
 
-var _ consensus.FlowHandler = (*SendTransferFlowHandler)(nil)
+var (
+	_ consensus.FlowHandler             = (*SendTransferFlowHandler)(nil)
+	_ consensus.PrepareBoundFlowHandler = (*SendTransferFlowHandler)(nil)
+)
 
 func NewSendTransferFlowHandler(config *so.Config) *SendTransferFlowHandler {
 	return NewSendTransferFlowHandlerForType(config, st.TransferTypeTransfer, st.TransferPartnerTypeTransfer, true)
@@ -191,6 +194,38 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, fmt.Errorf("local frost round 2 failed during prepare: %w", err)
 	}
 	return frostResp, nil
+}
+
+// ValidateDecisionAgainstPrepare implements consensus.PrepareBoundFlowHandler:
+// commit and rollback resolve the transfer purely from the decision payload's
+// transfer_id, so without this binding a misbehaving coordinator could reuse a
+// valid IN_FLIGHT SEND_TRANSFER flow id while pointing the payload at an
+// unrelated pre-commit transfer. Bind the decision's transfer_id to the one
+// this SO persisted in its prepare op.
+func (h *SendTransferFlowHandler) ValidateDecisionAgainstPrepare(prepareOp proto.Message, decisionOp proto.Message) error {
+	prepare, ok := prepareOp.(*pbinternal.SendTransferPrepareRequest)
+	if !ok {
+		return fmt.Errorf("unexpected prepare op type %T for send transfer", prepareOp)
+	}
+	preparedTransferID := prepare.GetOriginalRequest().GetTransferId()
+	switch d := decisionOp.(type) {
+	case *pbinternal.SendTransferCommitRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("commit transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+	case *pbinternal.SendTransferRollbackRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("rollback transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+	case *pbinternal.SendTransferPrepareRequest:
+		// The reconciler's presumed-abort path echoes the prepare op itself.
+		if !sameTransferID(d.GetOriginalRequest().GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("presumed-abort rollback transfer id %s does not match the prepared transfer id %s", d.GetOriginalRequest().GetTransferId(), preparedTransferID)
+		}
+	default:
+		return fmt.Errorf("unexpected decision op type %T for send transfer", decisionOp)
+	}
+	return nil
 }
 
 // Commit runs on every participant (the coordinator's equivalent work lives in

@@ -50,3 +50,26 @@ func TestDispatchPrepare_CoordinatorIndexGuards(t *testing.T) {
 		require.ErrorContains(t, err, "request is required")
 	})
 }
+
+// TestDispatchPrepare_BoundEmptyFlowIDRejected pins the prepare-side counterpart
+// to validateDecisionAgainstPreparedOp's empty-id fail-closed: a bound flow
+// (SEND_TRANSFER implements PrepareBoundFlowHandler) with an empty
+// flow_execution_id must be rejected with an ERROR — not a (nil, nil) result.
+// The error-vs-nil distinction is load-bearing: a nil result reads as a
+// successful prepare and would let the coordinator record a false COMMITTED for
+// the other participants, whereas an RPC error drives its rollback path. The
+// guard runs after the coordinator-index checks, so this uses a valid remote
+// index to reach it.
+func TestDispatchPrepare_BoundEmptyFlowIDRejected(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	h := NewConsensusHandler(cfg)
+
+	op, err := anypb.New(&pbinternal.SendTransferPrepareRequest{})
+	require.NoError(t, err)
+
+	_, err = h.DispatchPrepare(ctx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
+		op, "", uint(cfg.Index)+1)
+	require.ErrorContains(t, err, "requires a flow_execution_id")
+}

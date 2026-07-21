@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"math/rand/v2"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,50 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// TestSendTransferValidateDecisionAgainstPrepare directly covers the binding
+// fence, including the non-canonical-UUID case: the prepare op stores the
+// client's verbatim transfer_id while the decision payloads canonicalize via
+// uuid.Parse(...).String(), so the comparison must be UUID-aware, not raw
+// string. A raw-string compare would reject a valid non-canonical id and
+// strand participants IN_FLIGHT.
+func TestSendTransferValidateDecisionAgainstPrepare(t *testing.T) {
+	handler := NewSendTransferFlowHandler(setUpTestConfigWithRegtestNoAuthz(t))
+	id := uuid.New()
+	canonical := id.String()
+	nonCanonical := strings.ToUpper(canonical) // same UUID, uppercase form
+	require.NotEqual(t, canonical, nonCanonical)
+	prepare := &pbinternal.SendTransferPrepareRequest{
+		OriginalRequest: &pb.StartTransferV3Request{TransferId: nonCanonical},
+	}
+
+	// Canonical decision ids match the non-canonical prepared id (same UUID).
+	require.NoError(t, handler.ValidateDecisionAgainstPrepare(prepare, &pbinternal.SendTransferCommitRequest{TransferId: canonical}))
+	require.NoError(t, handler.ValidateDecisionAgainstPrepare(prepare, &pbinternal.SendTransferRollbackRequest{TransferId: canonical}))
+	require.NoError(t, handler.ValidateDecisionAgainstPrepare(prepare, &pbinternal.SendTransferPrepareRequest{
+		OriginalRequest: &pb.StartTransferV3Request{TransferId: canonical},
+	}))
+
+	// A genuinely different UUID is rejected on both decision variants (the
+	// commit and rollback paths carry copy-pasted validation).
+	err := handler.ValidateDecisionAgainstPrepare(prepare, &pbinternal.SendTransferCommitRequest{TransferId: uuid.NewString()})
+	require.ErrorContains(t, err, "does not match")
+	err = handler.ValidateDecisionAgainstPrepare(prepare, &pbinternal.SendTransferRollbackRequest{TransferId: uuid.NewString()})
+	require.ErrorContains(t, err, "does not match")
+
+	// Presumed-abort path (prepare-shape decision) must also reject a mismatch,
+	// not just accept the matching echo.
+	err = handler.ValidateDecisionAgainstPrepare(prepare, &pbinternal.SendTransferPrepareRequest{
+		OriginalRequest: &pb.StartTransferV3Request{TransferId: uuid.NewString()},
+	})
+	require.ErrorContains(t, err, "does not match")
+
+	// Wrong prepare / decision op types are rejected.
+	err = handler.ValidateDecisionAgainstPrepare(&pbinternal.SendTransferCommitRequest{}, &pbinternal.SendTransferCommitRequest{TransferId: canonical})
+	require.ErrorContains(t, err, "unexpected prepare op type")
+	err = handler.ValidateDecisionAgainstPrepare(prepare, &pb.StartTransferV3Request{TransferId: canonical})
+	require.ErrorContains(t, err, "unexpected decision op type")
+}
 
 // TestSendTransferSigningJobsThreadAdaptorKeysPerVariant proves each refund
 // variant's adaptor key is mapped consistently through BOTH the participant
