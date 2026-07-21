@@ -16,6 +16,7 @@ service FrostService {
     rpc frost_nonce(FrostNonceRequest) returns (FrostNonceResponse) {}
     rpc sign_frost(SignFrostRequest) returns (SignFrostResponse) {}
     rpc aggregate_frost(AggregateFrostRequest) returns (AggregateFrostResponse) {}
+    rpc aggregate_frost_batch(AggregateFrostBatchRequest) returns (AggregateFrostBatchResponse) {}
     rpc validate_signature_share(ValidateSignatureShareRequest) returns (google.protobuf.Empty) {}
 
     rpc sign_frost_v2(SignFrostRequestV2) returns (SignFrostResponse) {}
@@ -269,6 +270,36 @@ message AggregateFrostRequest {
 message AggregateFrostResponse {
     // The signature.
     bytes signature = 1;
+}
+
+/*
+ * A single aggregation job within a batch aggregate request.
+ */
+message AggregateFrostJob {
+    // Identifier for this job, unique within the batch. Results are keyed by it.
+    string job_id = 1;
+
+    // The aggregation inputs, identical to a standalone aggregate_frost call.
+    AggregateFrostRequest request = 2;
+}
+
+/*
+ * Batch aggregate frost request
+ *
+ * Aggregates many independent signing jobs in a single call, so callers with
+ * many leaves avoid one RPC round trip per signature.
+ */
+message AggregateFrostBatchRequest {
+    // The aggregation jobs.
+    repeated AggregateFrostJob jobs = 1;
+}
+
+/*
+ * Batch aggregate frost response
+ */
+message AggregateFrostBatchResponse {
+    // The aggregated signatures, keyed by job_id.
+    map<string, AggregateFrostResponse> results = 1;
 }
 
 message ValidateSignatureShareRequest {
