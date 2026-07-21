@@ -211,7 +211,58 @@ type ClaimTransferFlowHandler struct {
 	*TransferHandler
 }
 
-var _ consensus.FlowHandler = (*ClaimTransferFlowHandler)(nil)
+var (
+	_ consensus.FlowHandler             = (*ClaimTransferFlowHandler)(nil)
+	_ consensus.PrepareBoundFlowHandler = (*ClaimTransferFlowHandler)(nil)
+)
+
+// ValidateDecisionAgainstPrepare implements consensus.PrepareBoundFlowHandler:
+// commit and rollback resolve the transfer purely from the decision payload's
+// transfer_id, so bind it to the id this SO persisted in its prepare op to stop
+// a coordinator reusing a valid IN_FLIGHT claim flow id against an unrelated
+// transfer. Uses sameTransferID because the prepare op stores the client's
+// verbatim id while the decision payloads canonicalize via uuid.Parse.
+func (h *ClaimTransferFlowHandler) ValidateDecisionAgainstPrepare(prepareOp proto.Message, decisionOp proto.Message) error {
+	prepare, ok := prepareOp.(*pbinternal.ClaimTransferPrepareRequest)
+	if !ok {
+		return fmt.Errorf("unexpected prepare op type %T for claim transfer", prepareOp)
+	}
+	preparedTransferID := prepare.GetOriginalRequest().GetTransferId()
+	// The claim's owner_identity_public_key IS the receiver claiming the
+	// transfer; commit/rollback also carry a receiver_identity_public_key that
+	// selects which MIMO TransferReceiver row to mutate. Bind it too, or a
+	// coordinator could pair a genuinely-prepared transfer_id with a different
+	// receiver on the same transfer and (via Rollback) revert another
+	// receiver's claim state.
+	preparedReceiver := prepare.GetOriginalRequest().GetOwnerIdentityPublicKey()
+	switch d := decisionOp.(type) {
+	case *pbinternal.ClaimTransferCommitRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("commit transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+		if !samePublicKey(d.GetReceiverIdentityPublicKey(), preparedReceiver) {
+			return fmt.Errorf("commit receiver identity does not match the prepared receiver for transfer %s", preparedTransferID)
+		}
+	case *pbinternal.ClaimTransferRollbackRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("rollback transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+		if !samePublicKey(d.GetReceiverIdentityPublicKey(), preparedReceiver) {
+			return fmt.Errorf("rollback receiver identity does not match the prepared receiver for transfer %s", preparedTransferID)
+		}
+	case *pbinternal.ClaimTransferPrepareRequest:
+		// The reconciler's presumed-abort path echoes the prepare op itself.
+		if !sameTransferID(d.GetOriginalRequest().GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("presumed-abort rollback transfer id %s does not match the prepared transfer id %s", d.GetOriginalRequest().GetTransferId(), preparedTransferID)
+		}
+		if !samePublicKey(d.GetOriginalRequest().GetOwnerIdentityPublicKey(), preparedReceiver) {
+			return fmt.Errorf("presumed-abort rollback receiver identity does not match the prepared receiver for transfer %s", preparedTransferID)
+		}
+	default:
+		return fmt.Errorf("unexpected decision op type %T for claim transfer", decisionOp)
+	}
+	return nil
+}
 
 func NewClaimTransferFlowHandler(config *so.Config) *ClaimTransferFlowHandler {
 	return &ClaimTransferFlowHandler{TransferHandler: NewTransferHandler(config)}
