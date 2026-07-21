@@ -734,6 +734,11 @@ type LightningReceiveQuoteOutput {
 
   """When this quote stops being commitable."""
   quote_expiry_time: DateTime!
+
+  """
+  Whether the x-partner-jwt resolved to a fee attribution, and if not, why. Advisory — the applied markup lives in the signed manifest's fees[].
+  """
+  attribution_status: SparkFeeAttributionStatus!
 }
 
 type LightningReceiveRequest implements UserRequest & Entity {
@@ -932,7 +937,6 @@ type Mutation {
 
   """Verify a signed SSP authentication challenge."""
   verify_challenge(input: VerifyChallengeInput!): VerifyChallengeOutput!
-
 }
 
 """
@@ -1161,6 +1165,18 @@ enum SparkCoopExitRequestStatus {
   TX_SIGNED @deprecated(reason: "No more needed")
   WAITING_ON_TX_CONFIRMATIONS @deprecated(reason: "No more needed")
   INBOUND_TRANSFER_CLAIMING_SCHEDULED @deprecated(reason: "No more needed")
+}
+
+"""
+Whether an x-partner-jwt resolved to a fee attribution, and if not, why. Any value other than ATTRIBUTED means no markup was applied.
+"""
+enum SparkFeeAttributionStatus {
+  NOT_PROVIDED
+  ATTRIBUTED
+  TOKEN_INVALID
+  UNKNOWN_PARTNER
+  UNKNOWN_AFFILIATE
+  AFFILIATE_DISABLED
 }
 
 enum SparkLeavesSwapRequestStatus {
@@ -1436,6 +1452,3 @@ type VerifyChallengeOutput {
   valid_until: DateTime!
   session_token: String!
 }
-
-"""Represents NULL values"""
-scalar Void
