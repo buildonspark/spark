@@ -54,7 +54,42 @@ type CoopExitFlowHandler struct {
 	*TransferHandler
 }
 
-var _ consensus.FlowHandler = (*CoopExitFlowHandler)(nil)
+var (
+	_ consensus.FlowHandler             = (*CoopExitFlowHandler)(nil)
+	_ consensus.PrepareBoundFlowHandler = (*CoopExitFlowHandler)(nil)
+)
+
+// ValidateDecisionAgainstPrepare implements consensus.PrepareBoundFlowHandler:
+// commit and rollback resolve the transfer purely from the decision payload's
+// transfer_id, so bind it to the id this SO persisted in its prepare op to stop
+// a coordinator reusing a valid IN_FLIGHT coop-exit flow id against an
+// unrelated transfer. Uses sameTransferID because the prepare op stores the
+// client's verbatim id while the decision payloads canonicalize via uuid.Parse.
+func (h *CoopExitFlowHandler) ValidateDecisionAgainstPrepare(prepareOp proto.Message, decisionOp proto.Message) error {
+	prepare, ok := prepareOp.(*pbinternal.CoopExitPrepareRequest)
+	if !ok {
+		return fmt.Errorf("unexpected prepare op type %T for coop exit", prepareOp)
+	}
+	preparedTransferID := prepare.GetOriginalRequest().GetTransfer().GetTransferId()
+	switch d := decisionOp.(type) {
+	case *pbinternal.CoopExitCommitRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("commit transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+	case *pbinternal.CoopExitRollbackRequest:
+		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("rollback transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
+		}
+	case *pbinternal.CoopExitPrepareRequest:
+		// The reconciler's presumed-abort path echoes the prepare op itself.
+		if !sameTransferID(d.GetOriginalRequest().GetTransfer().GetTransferId(), preparedTransferID) {
+			return fmt.Errorf("presumed-abort rollback transfer id %s does not match the prepared transfer id %s", d.GetOriginalRequest().GetTransfer().GetTransferId(), preparedTransferID)
+		}
+	default:
+		return fmt.Errorf("unexpected decision op type %T for coop exit", decisionOp)
+	}
+	return nil
+}
 
 func NewCoopExitFlowHandler(config *so.Config) *CoopExitFlowHandler {
 	return &CoopExitFlowHandler{TransferHandler: NewTransferHandler(config)}
