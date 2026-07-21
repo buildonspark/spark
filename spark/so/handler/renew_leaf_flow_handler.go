@@ -357,20 +357,17 @@ func (f *renewLeafCoordinatorFlow) BuildCommitPayload(ctx context.Context, resul
 		publicKeys[id] = pk
 	}
 
-	// 4. Aggregate each signing job's signature
-	signatures := make([][]byte, len(f.signingJobHelpers))
-	for i, jobHelper := range f.signingJobHelpers {
-		jobID := jobHelper.JobID.String()
-		shares, ok := allShares[jobID]
-		if !ok {
-			return nil, fmt.Errorf("missing signature shares for job %s", jobID)
-		}
+	// 4. Aggregate every signing job's signature in one batch
+	frostConn, err := f.config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to frost: %w", err)
+	}
+	defer frostConn.Close()
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-		sig, err := aggregateSignature(ctx, f.config, jobHelper, shares, publicKeys, f.userSigningJobs[i], f.leaf)
-		if err != nil {
-			return nil, fmt.Errorf("failed to aggregate signature for job %d: %w", i, err)
-		}
-		signatures[i] = sig
+	signatures, err := aggregateRenewLeafSignatures(ctx, f.config, frostClient, f.signingJobHelpers, f.userSigningJobs, allShares, publicKeys, f.leaf)
+	if err != nil {
+		return nil, err
 	}
 
 	// 5. Dispatch to variant-specific finalize
@@ -420,36 +417,55 @@ func collectSignatureShares(results map[string]*anypb.Any) (map[string]map[strin
 	return allShares, participantIDs, nil
 }
 
-func aggregateSignature(
+// aggregateRenewLeafSignatures batches every renewal signing job and returns
+// the aggregated signatures positionally aligned with signingJobHelpers (and
+// the parallel userSigningJobs slice). Takes the FROST client so the
+// positional pairing is unit testable without a signer connection.
+func aggregateRenewLeafSignatures(
 	ctx context.Context,
 	config *so.Config,
-	jobHelper *helper.SigningJobWithPregeneratedNonce,
-	signatureShares map[string][]byte,
+	frostClient pbfrost.FrostServiceClient,
+	signingJobHelpers []*helper.SigningJobWithPregeneratedNonce,
+	userSigningJobs []*pb.UserSignedTxSigningJob,
+	allShares map[string]map[string][]byte,
 	publicKeys map[string][]byte,
-	userSigningJob *pb.UserSignedTxSigningJob,
 	leaf *ent.TreeNode,
-) ([]byte, error) {
-	conn, err := config.NewFrostGRPCConnection()
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to frost: %w", err)
-	}
-	defer conn.Close()
-	frostClient := pbfrost.NewFrostServiceClient(conn)
+) ([][]byte, error) {
+	batch := newFrostAggregationBatch(config)
+	// Job IDs are unique UUIDs, so they key the batch directly; addRequest's
+	// duplicate check would surface an upstream duplicate-JobID bug.
+	jobKeys := make([]string, len(signingJobHelpers))
+	for i, jobHelper := range signingJobHelpers {
+		jobID := jobHelper.JobID.String()
+		shares, ok := allShares[jobID]
+		if !ok {
+			return nil, fmt.Errorf("missing signature shares for job %s", jobID)
+		}
 
-	resp, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            jobHelper.Message.Serialize(),
-		SignatureShares:    signatureShares,
-		PublicShares:       publicKeys,
-		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-		Commitments:        userSigningJob.GetSigningCommitments().GetSigningCommitments(),
-		UserCommitments:    userSigningJob.GetSigningNonceCommitment(),
-		UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-		UserSignatureShare: userSigningJob.GetUserSignature(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to aggregate frost signature: %w", err)
+		userSigningJob := userSigningJobs[i]
+		jobKeys[i] = jobID
+		if err := batch.addRequest(jobID, &pbfrost.AggregateFrostRequest{
+			Message:            jobHelper.Message.Serialize(),
+			SignatureShares:    shares,
+			PublicShares:       publicKeys,
+			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
+			Commitments:        userSigningJob.GetSigningCommitments().GetSigningCommitments(),
+			UserCommitments:    userSigningJob.GetSigningNonceCommitment(),
+			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
+			UserSignatureShare: userSigningJob.GetUserSignature(),
+		}); err != nil {
+			return nil, fmt.Errorf("failed to build aggregation job %d: %w", i, err)
+		}
 	}
-	return resp.GetSignature(), nil
+	aggregated, err := batch.aggregate(ctx, frostClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate signatures: %w", err)
+	}
+	signatures := make([][]byte, len(jobKeys))
+	for i, jobKey := range jobKeys {
+		signatures[i] = aggregated[jobKey]
+	}
+	return signatures, nil
 }
 
 // ---------------------------------------------------------------------------

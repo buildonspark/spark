@@ -9,8 +9,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/collections"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -195,12 +198,59 @@ func (b *frostAggregationBatch) addJob(
 	return nil
 }
 
+// addRequest queues a pre-built AggregateFrostRequest under jobKey. Most
+// legacy paths should prefer addSigningResultJob; this raw entry point exists
+// for requests whose fields don't come from a SigningResult.
+func (b *frostAggregationBatch) addRequest(jobKey string, req *pbfrost.AggregateFrostRequest) error {
+	if _, ok := b.requests[jobKey]; ok {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("duplicate aggregation job key %s", jobKey))
+	}
+	b.requests[jobKey] = req
+	return nil
+}
+
+// userSignedSigningJob is the shape shared by pb.UserSignedTxSigningJob and
+// pb.InputSigningData that aggregation requests read the user's round-1/round-2
+// contributions from.
+type userSignedSigningJob interface {
+	GetSigningCommitments() *pb.SigningCommitments
+	GetSigningNonceCommitment() *pbcommon.SigningCommitment
+	GetUserSignature() []byte
+}
+
+// addSigningResultJob queues a request built from a completed SO signing
+// round (SigningResult) plus the user's signed job. The single builder keeps
+// the request field construction identical across the legacy transfer, claim,
+// and deposit paths — a drifted copy would aggregate against wrong or missing
+// fields. Pass keys.Public{} for adaptorPublicKey when the flow doesn't use
+// adaptor signatures (it serializes to nil).
+func (b *frostAggregationBatch) addSigningResultJob(
+	jobKey string,
+	signingResult *helper.SigningResult,
+	userJob userSignedSigningJob,
+	verifyingKey keys.Public,
+	userPublicKey keys.Public,
+	adaptorPublicKey keys.Public,
+) error {
+	return b.addRequest(jobKey, &pbfrost.AggregateFrostRequest{
+		Message:            signingResult.Message.Serialize(),
+		SignatureShares:    signingResult.SignatureShares,
+		PublicShares:       signingResult.PublicKeys,
+		VerifyingKey:       verifyingKey.Serialize(),
+		Commitments:        userJob.GetSigningCommitments().GetSigningCommitments(),
+		UserCommitments:    userJob.GetSigningNonceCommitment(),
+		UserPublicKey:      userPublicKey.Serialize(),
+		UserSignatureShare: userJob.GetUserSignature(),
+		AdaptorPublicKey:   adaptorPublicKey.Serialize(),
+	})
+}
+
 // aggregate dispatches every queued job and returns the aggregated signatures
-// keyed by the jobKey passed to addJob. When KnobFrostAggregateBatchEnabled is
-// on it issues aggregate_frost_batch RPCs (the signer fans each batch's jobs
-// out across cores), chunked to respect the signer's per-request job and
-// message-size limits; otherwise it falls back to one aggregate_frost call
-// per job in deterministic key order.
+// keyed by the jobKey passed to addJob or addRequest. When
+// KnobFrostAggregateBatchEnabled is on it issues aggregate_frost_batch RPCs
+// (the signer fans each batch's jobs out across cores), chunked to respect
+// the signer's per-request job and message-size limits; otherwise it falls
+// back to one aggregate_frost call per job in deterministic key order.
 func (b *frostAggregationBatch) aggregate(ctx context.Context, frostClient pbfrost.FrostServiceClient) (map[string][]byte, error) {
 	signatures := make(map[string][]byte, len(b.requests))
 	if len(b.requests) == 0 {

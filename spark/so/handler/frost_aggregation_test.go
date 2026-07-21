@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/sighash"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -70,16 +71,23 @@ func (c *dispatchRecordingFrostClient) AggregateFrostBatch(_ context.Context, re
 	return &pbfrost.AggregateFrostBatchResponse{Results: results}, nil
 }
 
-// batchWithRequests seeds a frostAggregationBatch with pre-built requests.
-// addJob needs DB-backed key packages, and the RPC-dispatch contract under
-// test here (knob routing, result mapping) is independent of how requests are
-// built, so tests construct the queue directly.
-func batchWithRequests(keys ...string) *frostAggregationBatch {
+// batchWithRequests seeds a frostAggregationBatch with pre-built requests via
+// addRequest. addJob needs DB-backed key packages, and the RPC-dispatch
+// contract under test here (knob routing, result mapping) is independent of
+// how requests are built.
+func batchWithRequests(t *testing.T, jobKeys ...string) *frostAggregationBatch {
 	b := newFrostAggregationBatch(nil)
-	for _, key := range keys {
-		b.requests[key] = &pbfrost.AggregateFrostRequest{Message: []byte(key)}
+	for _, jobKey := range jobKeys {
+		require.NoError(t, b.addRequest(jobKey, &pbfrost.AggregateFrostRequest{Message: []byte(jobKey)}))
 	}
 	return b
+}
+
+func TestFrostAggregationBatchAddRequestDuplicateKeyErrors(t *testing.T) {
+	batch := batchWithRequests(t, "leaf-a/cpfp")
+	err := batch.addRequest("leaf-a/cpfp", &pbfrost.AggregateFrostRequest{})
+	require.ErrorContains(t, err, "duplicate aggregation job key")
+	requireCodeAndReason(t, err, codes.Internal, sparkerrors.ReasonInternalDataInconsistency)
 }
 
 func knobCtx(t *testing.T, batchEnabled float64) context.Context {
@@ -90,7 +98,7 @@ func knobCtx(t *testing.T, batchEnabled float64) context.Context {
 
 func TestFrostAggregationBatchKnobOffUsesPerJobRPCs(t *testing.T) {
 	client := &dispatchRecordingFrostClient{}
-	batch := batchWithRequests("leaf-b/cpfp", "leaf-a/cpfp", "leaf-a/direct")
+	batch := batchWithRequests(t, "leaf-b/cpfp", "leaf-a/cpfp", "leaf-a/direct")
 
 	signatures, err := batch.aggregate(knobCtx(t, 0), client)
 	require.NoError(t, err)
@@ -109,7 +117,7 @@ func TestFrostAggregationBatchKnobOffUsesPerJobRPCs(t *testing.T) {
 
 func TestFrostAggregationBatchKnobOnUsesSingleBatchRPC(t *testing.T) {
 	client := &dispatchRecordingFrostClient{}
-	batch := batchWithRequests("leaf-b/cpfp", "leaf-a/cpfp", "leaf-a/direct")
+	batch := batchWithRequests(t, "leaf-b/cpfp", "leaf-a/cpfp", "leaf-a/direct")
 
 	signatures, err := batch.aggregate(knobCtx(t, 1), client)
 	require.NoError(t, err)
@@ -139,7 +147,7 @@ func requireCodeAndReason(t *testing.T, err error, wantCode codes.Code, wantReas
 
 func TestFrostAggregationBatchMissingResultErrors(t *testing.T) {
 	client := &dispatchRecordingFrostClient{dropJobID: "leaf-a/direct"}
-	batch := batchWithRequests("leaf-a/cpfp", "leaf-a/direct")
+	batch := batchWithRequests(t, "leaf-a/cpfp", "leaf-a/direct")
 
 	_, err := batch.aggregate(knobCtx(t, 1), client)
 	require.ErrorContains(t, err, "leaf-a/direct")
@@ -150,7 +158,7 @@ func TestFrostAggregationBatchMissingResultErrors(t *testing.T) {
 // would commit a transfer with an unsigned refund variant.
 func TestFrostAggregationBatchRejectsEmptySignature(t *testing.T) {
 	client := &dispatchRecordingFrostClient{emptySigJobID: "leaf-a/direct"}
-	batch := batchWithRequests("leaf-a/cpfp", "leaf-a/direct")
+	batch := batchWithRequests(t, "leaf-a/cpfp", "leaf-a/direct")
 
 	_, err := batch.aggregate(knobCtx(t, 1), client)
 	require.ErrorContains(t, err, "empty signature for job leaf-a/direct")
@@ -161,7 +169,7 @@ func TestFrostAggregationSerialRejectsEmptySignature(t *testing.T) {
 	// The serial fake keys empty responses off the request message, which the
 	// batchWithRequests helper sets to the job key.
 	client := &dispatchRecordingFrostClient{emptySigJobID: "leaf-a/direct"}
-	batch := batchWithRequests("leaf-a/cpfp", "leaf-a/direct")
+	batch := batchWithRequests(t, "leaf-a/cpfp", "leaf-a/direct")
 
 	_, err := batch.aggregate(knobCtx(t, 0), client)
 	require.ErrorContains(t, err, "empty signature for job leaf-a/direct")
@@ -173,7 +181,7 @@ func TestFrostAggregationSerialRejectsEmptySignature(t *testing.T) {
 // SO down on a version-skewed rollout.
 func TestFrostAggregationBatchFallsBackToSerialOnUnimplemented(t *testing.T) {
 	client := &dispatchRecordingFrostClient{batchErr: status.Error(codes.Unimplemented, "unknown method aggregate_frost_batch")}
-	batch := batchWithRequests("leaf-a/cpfp", "leaf-b/cpfp")
+	batch := batchWithRequests(t, "leaf-a/cpfp", "leaf-b/cpfp")
 
 	signatures, err := batch.aggregate(knobCtx(t, 1), client)
 	require.NoError(t, err)
@@ -186,7 +194,7 @@ func TestFrostAggregationBatchFallsBackToSerialOnUnimplemented(t *testing.T) {
 
 func TestFrostAggregationBatchDoesNotFallBackOnOtherErrors(t *testing.T) {
 	client := &dispatchRecordingFrostClient{batchErr: status.Error(codes.Internal, "signer exploded")}
-	batch := batchWithRequests("leaf-a/cpfp")
+	batch := batchWithRequests(t, "leaf-a/cpfp")
 
 	_, err := batch.aggregate(knobCtx(t, 1), client)
 	require.Error(t, err)
@@ -202,13 +210,13 @@ func TestFrostAggregationBatchDoesNotFallBackOnOtherErrors(t *testing.T) {
 func TestFrostAggregationPreservesCallerContextCodes(t *testing.T) {
 	for _, transientCode := range []codes.Code{codes.DeadlineExceeded, codes.Canceled, codes.Unavailable, codes.ResourceExhausted} {
 		batchClient := &dispatchRecordingFrostClient{batchErr: status.Error(transientCode, "transient signer failure")}
-		_, err := batchWithRequests("leaf-a/cpfp").aggregate(knobCtx(t, 1), batchClient)
+		_, err := batchWithRequests(t, "leaf-a/cpfp").aggregate(knobCtx(t, 1), batchClient)
 		code, reason := sparkerrors.CodeAndReasonFrom(err)
 		assert.Equalf(t, transientCode, code, "batch path must preserve %s", transientCode)
 		assert.Empty(t, reason)
 
 		serialClient := &dispatchRecordingFrostClient{singleErr: status.Error(transientCode, "transient signer failure")}
-		_, err = batchWithRequests("leaf-a/cpfp").aggregate(knobCtx(t, 0), serialClient)
+		_, err = batchWithRequests(t, "leaf-a/cpfp").aggregate(knobCtx(t, 0), serialClient)
 		code, reason = sparkerrors.CodeAndReasonFrom(err)
 		assert.Equalf(t, transientCode, code, "serial path must preserve %s", transientCode)
 		assert.Empty(t, reason)
@@ -217,7 +225,7 @@ func TestFrostAggregationPreservesCallerContextCodes(t *testing.T) {
 	// A malformed batch (InvalidArgument from this internal RPC) is an SO bug
 	// and must surface as a signing failure, not leak the signer's code.
 	client := &dispatchRecordingFrostClient{batchErr: status.Error(codes.InvalidArgument, "duplicate job id")}
-	_, err := batchWithRequests("leaf-a/cpfp").aggregate(knobCtx(t, 1), client)
+	_, err := batchWithRequests(t, "leaf-a/cpfp").aggregate(knobCtx(t, 1), client)
 	requireCodeAndReason(t, err, codes.Internal, sparkerrors.ReasonInternalSigningFailure)
 }
 
@@ -258,7 +266,7 @@ func TestFrostAggregationBatchChunksByJobCount(t *testing.T) {
 	for i := range jobKeys {
 		jobKeys[i] = fmt.Sprintf("leaf-%03d/cpfp", i)
 	}
-	batch := batchWithRequests(jobKeys...)
+	batch := batchWithRequests(t, jobKeys...)
 
 	signatures, err := batch.aggregate(knobCtx(t, 1), client)
 	require.NoError(t, err)
@@ -517,4 +525,167 @@ func TestAggregateSendTransferLeafSignaturesWiresVariants(t *testing.T) {
 	signingResult, err := batch.signingResult(leafAggregationJobKey(leafA, txKindCPFP))
 	require.NoError(t, err)
 	assert.Equal(t, signingJobsByLeaf[leafA].cpfp.JobID, signingResult.JobID)
+}
+
+// TestAggregateSignaturesRoutesVariantSignaturesToTheRightLeaf pins the
+// enqueue/readback routing of AggregateSignatures: each leaf's
+// cpfp/direct/direct-from-cpfp signature must land in its own result map
+// under its own leaf ID. The fake client derives each signature from the
+// request's message, so a mis-keyed readback would surface as a wrong or
+// missing signature.
+func TestAggregateSignaturesRoutesVariantSignaturesToTheRightLeaf(t *testing.T) {
+	client := &dispatchRecordingFrostClient{}
+
+	leafA, leafB := uuid.NewString(), uuid.NewString()
+	leafMap := map[string]*ent.TreeNode{
+		leafA: {VerifyingPubkey: keys.GeneratePrivateKey().Public(), OwnerSigningPubkey: keys.GeneratePrivateKey().Public()},
+		leafB: {VerifyingPubkey: keys.GeneratePrivateKey().Public(), OwnerSigningPubkey: keys.GeneratePrivateKey().Public()},
+	}
+	signingResult := func(message byte) *helper.SigningResult {
+		return &helper.SigningResult{Message: sighash.Hash{message}}
+	}
+	pkg := &pbspark.TransferPackage{
+		LeavesToSend: []*pbspark.UserSignedTxSigningJob{
+			{LeafId: leafA}, {LeafId: leafB},
+		},
+		DirectLeavesToSend:         []*pbspark.UserSignedTxSigningJob{{LeafId: leafA}},
+		DirectFromCpfpLeavesToSend: []*pbspark.UserSignedTxSigningJob{{LeafId: leafB}},
+	}
+
+	cpfpSigs, directSigs, dfcSigs, err := aggregateSignaturesWithClient(
+		knobCtx(t, 1), nil, client, uuid.NewString(), pkg,
+		keys.Public{}, keys.Public{}, keys.Public{},
+		map[string]*helper.SigningResult{leafA: signingResult(1), leafB: signingResult(2)},
+		map[string]*helper.SigningResult{leafA: signingResult(3)},
+		map[string]*helper.SigningResult{leafB: signingResult(4)},
+		leafMap,
+	)
+	require.NoError(t, err)
+
+	// One batched dispatch, 4 jobs total.
+	require.Len(t, client.batchRequests, 1)
+	require.Len(t, client.batchRequests[0].GetJobs(), 4)
+
+	expectedSig := func(message byte) []byte {
+		return append([]byte("sig:"), sighash.Hash{message}.Serialize()...)
+	}
+	require.Len(t, cpfpSigs, 2)
+	assert.Equal(t, expectedSig(1), cpfpSigs[leafA])
+	assert.Equal(t, expectedSig(2), cpfpSigs[leafB])
+	require.Len(t, directSigs, 1)
+	assert.Equal(t, expectedSig(3), directSigs[leafA])
+	require.Len(t, dfcSigs, 1)
+	assert.Equal(t, expectedSig(4), dfcSigs[leafB])
+}
+
+// expectedRoutedSig is the signature the dispatchRecordingFrostClient fake
+// returns for a signing result whose message is sighash.Hash{message}.
+func expectedRoutedSig(message byte) []byte {
+	return append([]byte("sig:"), sighash.Hash{message}.Serialize()...)
+}
+
+func routedSigningResult(message byte) *helper.SigningResult {
+	return &helper.SigningResult{Message: sighash.Hash{message}}
+}
+
+// TestAggregateDepositSignaturesPreservesPositionalOrder pins that deposit
+// tree finalization returns root-input, refund, and direct-from-cpfp refund
+// signatures in the same positional order as signingResults.
+func TestAggregateDepositSignaturesPreservesPositionalOrder(t *testing.T) {
+	client := &dispatchRecordingFrostClient{}
+	req := &pbspark.FinalizeDepositTreeCreationRequest{
+		RootTxSigningJob: &pbspark.UserSignedTxSigningJob{
+			AdditionalInputs: []*pbspark.InputSigningData{{}},
+		},
+		RefundTxSigningJob:               &pbspark.UserSignedTxSigningJob{},
+		DirectFromCpfpRefundTxSigningJob: &pbspark.UserSignedTxSigningJob{},
+	}
+	// Two root inputs, then refund, then direct-from-cpfp refund.
+	signingResults := []*helper.SigningResult{
+		routedSigningResult(1), routedSigningResult(2), routedSigningResult(3), routedSigningResult(4),
+	}
+
+	signatures, err := aggregateDepositSignaturesWithClient(
+		knobCtx(t, 1), nil, client, req, signingResults,
+		keys.GeneratePrivateKey().Public(), keys.GeneratePrivateKey().Public(), 2,
+	)
+	require.NoError(t, err)
+
+	require.Len(t, client.batchRequests, 1)
+	require.Len(t, client.batchRequests[0].GetJobs(), 4)
+	require.Len(t, signatures, 4)
+	for i := range signingResults {
+		assert.Equalf(t, expectedRoutedSig(byte(i+1)), signatures[i], "signature %d routed to wrong position", i)
+	}
+}
+
+// TestAggregateRenewLeafSignaturesPairsJobsPositionally pins that leaf
+// renewal returns each signing job's signature at the job's own index.
+func TestAggregateRenewLeafSignaturesPairsJobsPositionally(t *testing.T) {
+	client := &dispatchRecordingFrostClient{}
+	leaf := &ent.TreeNode{
+		VerifyingPubkey:    keys.GeneratePrivateKey().Public(),
+		OwnerSigningPubkey: keys.GeneratePrivateKey().Public(),
+	}
+	signingJobHelpers := make([]*helper.SigningJobWithPregeneratedNonce, 3)
+	userSigningJobs := make([]*pbspark.UserSignedTxSigningJob, 3)
+	allShares := make(map[string]map[string][]byte, 3)
+	for i := range signingJobHelpers {
+		signingJobHelpers[i] = &helper.SigningJobWithPregeneratedNonce{
+			SigningJob: helper.SigningJob{JobID: uuid.New(), Message: sighash.Hash{byte(i + 1)}},
+		}
+		userSigningJobs[i] = &pbspark.UserSignedTxSigningJob{}
+		allShares[signingJobHelpers[i].JobID.String()] = map[string][]byte{"op1": []byte("share")}
+	}
+
+	signatures, err := aggregateRenewLeafSignatures(
+		knobCtx(t, 1), nil, client, signingJobHelpers, userSigningJobs, allShares,
+		map[string][]byte{"op1": []byte("pub")}, leaf,
+	)
+	require.NoError(t, err)
+
+	require.Len(t, signatures, 3)
+	for i := range signingJobHelpers {
+		assert.Equalf(t, expectedRoutedSig(byte(i+1)), signatures[i], "signature %d paired with wrong job", i)
+	}
+}
+
+// TestAggregateClaimRefundSignaturesRoutesOptionalVariants pins that the
+// legacy claim path routes each leaf's cpfp signature plus its optional
+// direct / direct-from-cpfp signatures into that leaf's NodeSignatures, and
+// leaves absent variants empty.
+func TestAggregateClaimRefundSignaturesRoutesOptionalVariants(t *testing.T) {
+	client := &dispatchRecordingFrostClient{}
+	leafA, leafB := uuid.NewString(), uuid.NewString()
+	leavesByID := map[string]*ent.TreeNode{
+		leafA: {VerifyingPubkey: keys.GeneratePrivateKey().Public(), OwnerSigningPubkey: keys.GeneratePrivateKey().Public()},
+		leafB: {VerifyingPubkey: keys.GeneratePrivateKey().Public(), OwnerSigningPubkey: keys.GeneratePrivateKey().Public()},
+	}
+	userJobs := map[string]*pbspark.UserSignedTxSigningJob{leafA: {}, leafB: {}}
+
+	nodeSignatures, err := aggregateClaimRefundSignatures(
+		knobCtx(t, 1), nil, client,
+		map[string]*helper.SigningResult{leafA: routedSigningResult(1), leafB: routedSigningResult(3)},
+		map[string]*helper.SigningResult{leafA: routedSigningResult(2)},
+		map[string]*helper.SigningResult{leafB: routedSigningResult(4)},
+		userJobs, userJobs, userJobs,
+		leavesByID,
+	)
+	require.NoError(t, err)
+	require.Len(t, nodeSignatures, 2)
+
+	byLeaf := make(map[string]*pbspark.NodeSignatures, 2)
+	for _, nodeSig := range nodeSignatures {
+		byLeaf[nodeSig.GetNodeId()] = nodeSig
+	}
+	require.Contains(t, byLeaf, leafA)
+	require.Contains(t, byLeaf, leafB)
+
+	assert.Equal(t, expectedRoutedSig(1), byLeaf[leafA].GetRefundTxSignature())
+	assert.Equal(t, expectedRoutedSig(2), byLeaf[leafA].GetDirectRefundTxSignature())
+	assert.Empty(t, byLeaf[leafA].GetDirectFromCpfpRefundTxSignature())
+
+	assert.Equal(t, expectedRoutedSig(3), byLeaf[leafB].GetRefundTxSignature())
+	assert.Empty(t, byLeaf[leafB].GetDirectRefundTxSignature())
+	assert.Equal(t, expectedRoutedSig(4), byLeaf[leafB].GetDirectFromCpfpRefundTxSignature())
 }

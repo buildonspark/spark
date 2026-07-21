@@ -1665,109 +1665,162 @@ func AggregateSignatures(
 	directFromCpfpSigningResultMap map[string]*helper.SigningResult,
 	leafMap map[string]*ent.TreeNode,
 ) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
-	finalCpfpSignatureMap := make(map[string][]byte)
-	finalDirectSignatureMap := make(map[string][]byte)
-	finalDirectFromCpfpSignatureMap := make(map[string][]byte)
 	frostConn, err := config.NewFrostGRPCConnection()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("unable to connect to frost: %w", err)
 	}
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
-	cpfpUserSignedRefunds := pkg.GetLeavesToSend()
-	directUserSignedRefunds := pkg.GetDirectLeavesToSend()
-	directFromCpfpUserSignedRefunds := pkg.GetDirectFromCpfpLeavesToSend()
 
+	return aggregateSignaturesWithClient(
+		ctx, config, frostClient, transferID, pkg,
+		cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey,
+		cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap,
+		leafMap,
+	)
+}
+
+// aggregateSignaturesWithClient is AggregateSignatures with the FROST client
+// injected, so the per-leaf per-variant enqueue/readback routing is unit
+// testable without a signer connection.
+func aggregateSignaturesWithClient(
+	ctx context.Context,
+	config *so.Config,
+	frostClient pbfrost.FrostServiceClient,
+	transferID string,
+	pkg *pb.TransferPackage,
+	cpfpAdaptorPubKey keys.Public,
+	directAdaptorPubKey keys.Public,
+	directFromCpfpAdaptorPubKey keys.Public,
+	cpfpSigningResultMap map[string]*helper.SigningResult,
+	directSigningResultMap map[string]*helper.SigningResult,
+	directFromCpfpSigningResultMap map[string]*helper.SigningResult,
+	leafMap map[string]*ent.TreeNode,
+) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
 	cpfpUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
 	directUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
 	directFromCpfpUserRefundMap := make(map[string]*pb.UserSignedTxSigningJob)
-	for _, userSignedRefund := range cpfpUserSignedRefunds {
+	for _, userSignedRefund := range pkg.GetLeavesToSend() {
 		cpfpUserRefundMap[userSignedRefund.GetLeafId()] = userSignedRefund
 	}
-	for _, userSignedRefund := range directUserSignedRefunds {
+	for _, userSignedRefund := range pkg.GetDirectLeavesToSend() {
 		directUserRefundMap[userSignedRefund.GetLeafId()] = userSignedRefund
 	}
-	for _, userSignedRefund := range directFromCpfpUserSignedRefunds {
+	for _, userSignedRefund := range pkg.GetDirectFromCpfpLeavesToSend() {
 		directFromCpfpUserRefundMap[userSignedRefund.GetLeafId()] = userSignedRefund
 	}
+
+	batch := newFrostAggregationBatch(config)
+	addVariant := func(txKind string, signingResultMap map[string]*helper.SigningResult, userRefundMap map[string]*pb.UserSignedTxSigningJob, adaptorPubKey keys.Public) error {
+		for leafID, signingResult := range signingResultMap {
+			leaf, exists := leafMap[leafID]
+			if !exists {
+				return fmt.Errorf("leaf %s not found in leafMap", leafID)
+			}
+			if err := batch.addSigningResultJob(leafAggregationJobKey(leafID, txKind), signingResult, userRefundMap[leafID], leaf.VerifyingPubkey, leaf.OwnerSigningPubkey, adaptorPubKey); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := addVariant(txKindCPFP, cpfpSigningResultMap, cpfpUserRefundMap, cpfpAdaptorPubKey); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := addVariant(txKindDirect, directSigningResultMap, directUserRefundMap, directAdaptorPubKey); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := addVariant(txKindDirectFromCPFP, directFromCpfpSigningResultMap, directFromCpfpUserRefundMap, directFromCpfpAdaptorPubKey); err != nil {
+		return nil, nil, nil, err
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
-	for leafID, signingResult := range cpfpSigningResultMap {
-		logger.Sugar().Infof("Aggregating cpfp frost signature for leaf %s (message: %x)", leafID, signingResult.Message)
-		cpfpUserSignedRefund := cpfpUserRefundMap[leafID]
-		leaf, exists := leafMap[leafID]
-		if !exists {
-			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
-		}
-		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message.Serialize(),
-			SignatureShares:    signingResult.SignatureShares,
-			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-			Commitments:        cpfpUserSignedRefund.GetSigningCommitments().GetSigningCommitments(),
-			UserCommitments:    cpfpUserSignedRefund.GetSigningNonceCommitment(),
-			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-			UserSignatureShare: cpfpUserSignedRefund.GetUserSignature(),
-			AdaptorPublicKey:   cpfpAdaptorPubKey.Serialize(),
-		})
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost for cpfp results for leaf %s", leaf.ID)
-			return nil, nil, nil, fmt.Errorf("unable to aggregate frost for cpfp results: %w, leaf_id: %s", err, leaf.ID)
-		}
-		finalCpfpSignatureMap[leaf.ID.String()] = signatureResult.GetSignature()
+	logger.Sugar().Infof(
+		"Aggregating frost signatures for transfer %s (%d cpfp, %d direct, %d direct-from-cpfp jobs)",
+		transferID, len(cpfpSigningResultMap), len(directSigningResultMap), len(directFromCpfpSigningResultMap),
+	)
+	signatures, err := batch.aggregate(ctx, frostClient)
+	if err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost signatures for transfer %s", transferID)
+		return nil, nil, nil, fmt.Errorf("unable to aggregate frost signatures for transfer %s: %w", transferID, err)
 	}
-	for leafID, signingResult := range directSigningResultMap {
-		logger.Sugar().Infof("Aggregating direct frost signature for direct results for leaf %s (message: %x)", leafID, signingResult.Message)
-		directUserSignedRefund := directUserRefundMap[leafID]
-		leaf, exists := leafMap[leafID]
-		if !exists {
-			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
-		}
-		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message.Serialize(),
-			SignatureShares:    signingResult.SignatureShares,
-			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-			Commitments:        directUserSignedRefund.GetSigningCommitments().GetSigningCommitments(),
-			UserCommitments:    directUserSignedRefund.GetSigningNonceCommitment(),
-			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-			UserSignatureShare: directUserSignedRefund.GetUserSignature(),
-			AdaptorPublicKey:   directAdaptorPubKey.Serialize(),
-		})
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost for direct results for leaf %s", leaf.ID)
-			return nil, nil, nil, fmt.Errorf("unable to aggregate frost for direct results: %w, leaf_id: %s", err, leaf.ID)
-		}
-		finalDirectSignatureMap[leaf.ID.String()] = signatureResult.GetSignature()
+
+	finalCpfpSignatureMap := make(map[string][]byte, len(cpfpSigningResultMap))
+	finalDirectSignatureMap := make(map[string][]byte, len(directSigningResultMap))
+	finalDirectFromCpfpSignatureMap := make(map[string][]byte, len(directFromCpfpSigningResultMap))
+	for leafID := range cpfpSigningResultMap {
+		finalCpfpSignatureMap[leafID] = signatures[leafAggregationJobKey(leafID, txKindCPFP)]
 	}
-	for leafID, signingResult := range directFromCpfpSigningResultMap {
-		logger.Sugar().Infof(
-			"Aggregating direct from cpfp frost signature for direct from cpfp results for leaf %s (message: %x)",
-			leafID,
-			signingResult.Message,
-		)
-		directFromCpfpUserSignedRefund := directFromCpfpUserRefundMap[leafID]
-		leaf, exists := leafMap[leafID]
-		if !exists {
-			return nil, nil, nil, fmt.Errorf("leaf %s not found in leafMap", leafID)
-		}
-		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message.Serialize(),
-			SignatureShares:    signingResult.SignatureShares,
-			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-			Commitments:        directFromCpfpUserSignedRefund.GetSigningCommitments().GetSigningCommitments(),
-			UserCommitments:    directFromCpfpUserSignedRefund.GetSigningNonceCommitment(),
-			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-			UserSignatureShare: directFromCpfpUserSignedRefund.GetUserSignature(),
-			AdaptorPublicKey:   directFromCpfpAdaptorPubKey.Serialize(),
-		})
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost for direct from cpfp results for leaf %s", leaf.ID)
-			return nil, nil, nil, fmt.Errorf("unable to aggregate frost for direct from cpfp results: %w, leaf_id: %s", err, leaf.ID)
-		}
-		finalDirectFromCpfpSignatureMap[leaf.ID.String()] = signatureResult.GetSignature()
+	for leafID := range directSigningResultMap {
+		finalDirectSignatureMap[leafID] = signatures[leafAggregationJobKey(leafID, txKindDirect)]
+	}
+	for leafID := range directFromCpfpSigningResultMap {
+		finalDirectFromCpfpSignatureMap[leafID] = signatures[leafAggregationJobKey(leafID, txKindDirectFromCPFP)]
 	}
 	return finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, nil
+}
+
+// aggregateClaimRefundSignatures batches the legacy claim path's refund
+// aggregation jobs (cpfp required per leaf, direct and direct-from-cpfp
+// optional) and routes each leaf's signatures into its NodeSignatures proto.
+// Takes the FROST client so the per-leaf per-variant routing is unit testable
+// without a signer connection.
+func aggregateClaimRefundSignatures(
+	ctx context.Context,
+	config *so.Config,
+	frostClient pbfrost.FrostServiceClient,
+	cpfpResults map[string]*helper.SigningResult,
+	directResults map[string]*helper.SigningResult,
+	directFromCpfpResults map[string]*helper.SigningResult,
+	cpfpUserRefundMap map[string]*pb.UserSignedTxSigningJob,
+	directUserRefundMap map[string]*pb.UserSignedTxSigningJob,
+	directFromCpfpUserRefundMap map[string]*pb.UserSignedTxSigningJob,
+	leavesById map[string]*ent.TreeNode,
+) ([]*pb.NodeSignatures, error) {
+	batch := newFrostAggregationBatch(config)
+	for leafID, signingResult := range cpfpResults {
+		leaf, exists := leavesById[leafID]
+		if !exists {
+			return nil, fmt.Errorf("leaf %s not found", leafID)
+		}
+		if err := batch.addSigningResultJob(leafAggregationJobKey(leafID, txKindCPFP), signingResult, cpfpUserRefundMap[leafID], leaf.VerifyingPubkey, leaf.OwnerSigningPubkey, keys.Public{}); err != nil {
+			return nil, err
+		}
+		if directResult, ok := directResults[leafID]; ok {
+			if err := batch.addSigningResultJob(leafAggregationJobKey(leafID, txKindDirect), directResult, directUserRefundMap[leafID], leaf.VerifyingPubkey, leaf.OwnerSigningPubkey, keys.Public{}); err != nil {
+				return nil, err
+			}
+		}
+		if directFromCpfpResult, ok := directFromCpfpResults[leafID]; ok {
+			if err := batch.addSigningResultJob(leafAggregationJobKey(leafID, txKindDirectFromCPFP), directFromCpfpResult, directFromCpfpUserRefundMap[leafID], leaf.VerifyingPubkey, leaf.OwnerSigningPubkey, keys.Public{}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	signatures, err := batch.aggregate(ctx, frostClient)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeSignatures := make([]*pb.NodeSignatures, 0, len(cpfpResults))
+	for leafID := range cpfpResults {
+		nodeSig := &pb.NodeSignatures{
+			NodeId:                          leafID,
+			NodeTxSignature:                 []byte{},
+			DirectNodeTxSignature:           []byte{},
+			RefundTxSignature:               signatures[leafAggregationJobKey(leafID, txKindCPFP)],
+			DirectRefundTxSignature:         []byte{},
+			DirectFromCpfpRefundTxSignature: []byte{},
+		}
+		if _, ok := directResults[leafID]; ok {
+			nodeSig.DirectRefundTxSignature = signatures[leafAggregationJobKey(leafID, txKindDirect)]
+		}
+		if _, ok := directFromCpfpResults[leafID]; ok {
+			nodeSig.DirectFromCpfpRefundTxSignature = signatures[leafAggregationJobKey(leafID, txKindDirectFromCPFP)]
+		}
+		nodeSignatures = append(nodeSignatures, nodeSig)
+	}
+	return nodeSignatures, nil
 }
 
 func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest) (*pb.FinalizeTransferResponse, error) {
@@ -3934,77 +3987,15 @@ func (h *TransferHandler) claimTransferLegacy(ctx context.Context, req *pb.Claim
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-	nodeSignatures := make([]*pb.NodeSignatures, 0, len(cpfpResults))
-	for leafID, signingResult := range cpfpResults {
-		cpfpUserJob := cpfpUserRefundMap[leafID]
-		leaf, exists := leavesById[leafID]
-		if !exists {
-			return nil, fmt.Errorf("leaf %s not found", leafID)
-		}
-
-		logger.Sugar().Infof("Aggregating cpfp frost signature for claim transfer leaf %s", leafID)
-		cpfpSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-			Message:            signingResult.Message.Serialize(),
-			SignatureShares:    signingResult.SignatureShares,
-			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-			Commitments:        cpfpUserJob.GetSigningCommitments().GetSigningCommitments(),
-			UserCommitments:    cpfpUserJob.GetSigningNonceCommitment(),
-			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-			UserSignatureShare: cpfpUserJob.GetUserSignature(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("unable to aggregate frost for cpfp refund of leaf %s: %w", leafID, err)
-		}
-
-		nodeSig := &pb.NodeSignatures{
-			NodeId:                          leafID,
-			NodeTxSignature:                 []byte{},
-			DirectNodeTxSignature:           []byte{},
-			RefundTxSignature:               cpfpSig.GetSignature(),
-			DirectRefundTxSignature:         []byte{},
-			DirectFromCpfpRefundTxSignature: []byte{},
-		}
-
-		if directResult, ok := directResults[leafID]; ok {
-			directUserJob := directUserRefundMap[leafID]
-			logger.Sugar().Infof("Aggregating direct frost signature for claim transfer leaf %s", leafID)
-			directSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-				Message:            directResult.Message.Serialize(),
-				SignatureShares:    directResult.SignatureShares,
-				PublicShares:       directResult.PublicKeys,
-				VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-				Commitments:        directUserJob.GetSigningCommitments().GetSigningCommitments(),
-				UserCommitments:    directUserJob.GetSigningNonceCommitment(),
-				UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-				UserSignatureShare: directUserJob.GetUserSignature(),
-			})
-			if err != nil {
-				return nil, fmt.Errorf("unable to aggregate frost for direct refund of leaf %s: %w", leafID, err)
-			}
-			nodeSig.DirectRefundTxSignature = directSig.GetSignature()
-		}
-
-		if directFromCpfpResult, ok := directFromCpfpResults[leafID]; ok {
-			directFromCpfpUserJob := directFromCpfpUserRefundMap[leafID]
-			logger.Sugar().Infof("Aggregating direct from cpfp frost signature for claim transfer leaf %s", leafID)
-			directFromCpfpSig, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-				Message:            directFromCpfpResult.Message.Serialize(),
-				SignatureShares:    directFromCpfpResult.SignatureShares,
-				PublicShares:       directFromCpfpResult.PublicKeys,
-				VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
-				Commitments:        directFromCpfpUserJob.GetSigningCommitments().GetSigningCommitments(),
-				UserCommitments:    directFromCpfpUserJob.GetSigningNonceCommitment(),
-				UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
-				UserSignatureShare: directFromCpfpUserJob.GetUserSignature(),
-			})
-			if err != nil {
-				return nil, fmt.Errorf("unable to aggregate frost for direct from cpfp refund of leaf %s: %w", leafID, err)
-			}
-			nodeSig.DirectFromCpfpRefundTxSignature = directFromCpfpSig.GetSignature()
-		}
-
-		nodeSignatures = append(nodeSignatures, nodeSig)
+	logger.Sugar().Infof("Aggregating frost signatures for claim transfer %s (%d leaves)", req.GetTransferId(), len(cpfpResults))
+	nodeSignatures, err := aggregateClaimRefundSignatures(
+		ctx, h.config, frostClient,
+		cpfpResults, directResults, directFromCpfpResults,
+		cpfpUserRefundMap, directUserRefundMap, directFromCpfpUserRefundMap,
+		leavesById,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to aggregate frost signatures for claim transfer %s: %w", req.GetTransferId(), err)
 	}
 
 	// Finalize: update nodes with aggregated signatures and complete transfer.
