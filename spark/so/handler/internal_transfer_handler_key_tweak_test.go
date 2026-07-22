@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	sparkProto "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -387,6 +388,30 @@ func TestSettleSenderKeyTweak_Commit_SwapV3RequiresAtomicSwapCommit(t *testing.T
 	require.NoError(t, baseHandler.CommitSwapKeyTweaks(ctx, counter.ID))
 	assertTransferCommittedSenderKeyTweak(t, ctx, dbCtx.Client, primary.ID)
 	assertTransferCommittedSenderKeyTweak(t, ctx, dbCtx.Client, counter.ID)
+}
+
+// TestHandleSettleSwapKeyTweakGossip_DefersUntilPrimaryRefundSignaturesApplied
+// drives the legacy settle gossip entry (handleSettleSwapKeyTweakGossipMessage)
+// end-to-end: when the swap primary's refund signatures have not landed on this
+// operator (the fixture's primary carries an unsigned refund tx), the settle must
+// defer with a FailedPrecondition instead of committing the key tweaks, so a
+// lagging SO can't finalize the swap before the primary commit arrives. Gossip
+// redelivery retries once the primary commit lands.
+func TestHandleSettleSwapKeyTweakGossip_DefersUntilPrimaryRefundSignaturesApplied(t *testing.T) {
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{131})
+	primary, counter := createSwapV3PendingSenderKeyTweakTransfersForTest(t, ctx, dbCtx.Client, cfg, rng)
+
+	err := NewGossipHandler(cfg).handleSettleSwapKeyTweakGossipMessage(ctx, &pbgossip.GossipMessageSettleSwapKeyTweak{
+		CounterTransferId: counter.ID.String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "refund signatures are not yet applied")
+
+	// Neither leg settled — both remain pending for the retry.
+	assertTransferStillPendingSenderKeyTweak(t, ctx, dbCtx.Client, primary.ID)
+	assertTransferStillPendingSenderKeyTweak(t, ctx, dbCtx.Client, counter.ID)
 }
 
 func TestCommitSwapKeyTweaksRejectsTerminalSideWithoutPartialCommit(t *testing.T) {

@@ -43,6 +43,7 @@ import (
 	"github.com/lightsparkdev/spark/so/mimo"
 	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Validation constants to prevent resource exhaustion and DoS attacks
@@ -67,6 +68,15 @@ const (
 	// created      transfer     transfer       transfer      cancelled
 	PrimaryTransferExpiryTimeSafetyBuffer = 120 * time.Second
 )
+
+// swapPrimaryTransferExpiryOverride returns the server-enforced expiry for a
+// swap v3 primary transfer: double the safety buffer so the user has enough
+// time to reach the SSP for the counter transfer (diagram above). Shared by
+// the legacy startTransferInternal path and the consensus coordinator entry so
+// the two can never drift.
+func swapPrimaryTransferExpiryOverride() *timestamppb.Timestamp {
+	return timestamppb.New(time.Now().Add(2 * PrimaryTransferExpiryTimeSafetyBuffer))
+}
 
 type TransferRole int
 

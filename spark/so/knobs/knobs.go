@@ -307,6 +307,37 @@ const (
 	// knobs above does not apply to this one.
 	KnobUseConsensusClaimInstantStaticDepositUtxoSwap = "spark.so.use_consensus_claim_instant_static_deposit_utxo_swap"
 
+	// KnobUseConsensusInitiateSwapPrimaryTransfer routes the swap v3 primary leg
+	// (initiate_swap_primary_transfer) through the 2PC consensus engine (0 = legacy,
+	// >0 = consensus; binary, not a percentage rollout), replacing the legacy
+	// startTransferInternal fanout with an engine round whose Prepare signs the
+	// adaptor-encumbered refunds on every SO and whose commit applies the aggregated
+	// signatures without settling key tweaks (the counter leg settles both legs).
+	// Enable only after every SO dispatches
+	// CONSENSUS_OPERATION_TYPE_INITIATE_SWAP_PRIMARY_TRANSFER. Mixed-mode legs are
+	// safe: both paths write identical Transfer rows, so a legacy-created primary
+	// can be settled by a consensus counter and vice versa. One observable
+	// difference: a consensus-created primary sits in SENDER_KEY_TWEAK_PENDING on
+	// every SO (never SENDER_INITIATED_COORDINATOR), so the RPC response's transfer
+	// status changes accordingly — verify SSP-side swap handling treats both as
+	// "primary pending" before ramping beyond canary.
+	KnobUseConsensusInitiateSwapPrimaryTransfer = "spark.so.use_consensus_initiate_swap_primary_transfer"
+
+	// KnobUseConsensusInitiateCounterTransfer routes the swap v3 counter leg
+	// (initiate_counter_transfer) through the 2PC consensus engine (0 = legacy,
+	// >0 = consensus; binary, not a percentage rollout), replacing the legacy
+	// fanout + SettleSwapKeyTweak gossip with an engine round whose commit applies
+	// the aggregated adaptor signatures and settles BOTH legs' key tweaks in one
+	// transaction on each SO. Enable only after every SO dispatches
+	// CONSENSUS_OPERATION_TYPE_INITIATE_COUNTER_TRANSFER. No drain hazard with the
+	// legacy path: the legacy retry gossip only fires for counter transfers in
+	// coordinator-side statuses, which the consensus flow never uses, and
+	// CommitSwapKeyTweaks is idempotent either way. For the same reason the
+	// resume_send_transfer cron never sees consensus-routed swap transfers —
+	// recovery for a wedged flow is the FlowExecution reconciler (stuck-participant
+	// query + coordinator self-sweep), not the legacy cron.
+	KnobUseConsensusInitiateCounterTransfer = "spark.so.use_consensus_initiate_counter_transfer"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"

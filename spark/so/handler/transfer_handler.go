@@ -317,9 +317,7 @@ func (h *TransferHandler) startTransferInternal(
 	if swapV3Package != nil {
 		if transferType == st.TransferTypePrimarySwapV3 {
 			tweakKeys = false
-			// Override the expiry time to be double of the safety buffer time so the user have
-			// enough time to call the SSP to create a counter transfer.
-			req.ExpiryTime = timestamppb.New(time.Now().Add(2 * PrimaryTransferExpiryTimeSafetyBuffer))
+			req.ExpiryTime = swapPrimaryTransferExpiryOverride()
 		} else {
 			primaryTransferId = swapV3Package.primaryTransferId
 		}
@@ -912,6 +910,15 @@ func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *
 
 	if len(req.GetTransfer().GetTransferPackage().GetDirectLeavesToSend()) > 0 || len(req.GetTransfer().GetTransferPackage().GetDirectFromCpfpLeavesToSend()) > 0 {
 		return nil, fmt.Errorf("direct transactions should not be provided for primary transfer %s", req.GetTransfer().GetTransferId())
+	}
+
+	// Route through the 2PC consensus engine when enabled; otherwise fall
+	// through to the legacy startTransferInternal fanout below. Only
+	// package-carrying requests can be expressed as a consensus flow (the
+	// swap wallets always send one).
+	if req.GetTransfer().GetTransferPackage() != nil &&
+		knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusInitiateSwapPrimaryTransfer, 0) > 0 {
+		return h.initiateSwapPrimaryTransferConsensus(ctx, req)
 	}
 
 	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypePrimarySwapV3, adaptorPublicKey, keys.Public{}, keys.Public{}, true, &SwapV3Package{primaryTransferId: uuid.Nil})
