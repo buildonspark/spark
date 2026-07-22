@@ -312,6 +312,13 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					// (PREIMAGE_SWAP; UTXO_SWAP for the static-deposit flows). An
 					// aborted round can strand such a transfer with its leaves
 					// locked; expiry is the recovery that returns them.
+					// PRIMARY/COUNTER_SWAP_V3 are deliberately excluded even though
+					// their consensus flows also persist this status: cancelling a
+					// counter requires reverting the primary's
+					// APPLYING_SENDER_KEY_TWEAK fence, which only the flow's own
+					// Rollback knows how to do — the FlowExecution reconciler (which
+					// replays that Rollback via presumed-abort) owns their recovery,
+					// and the swap-v3 primary has its own expiry sweep below.
 					// Order by expiry_time ASC to cancel oldest expired transfers first
 					senderKeyTweakPendingTransferQuery := tx.Transfer.Query().Where(
 						transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),

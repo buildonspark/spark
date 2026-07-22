@@ -610,17 +610,37 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 }
 
 func (h *GossipHandler) handleSettleSwapKeyTweakGossipMessage(ctx context.Context, settleSwapKeyTweak *pbgossip.GossipMessageSettleSwapKeyTweak) error {
+	logger := logging.GetLoggerFromContext(ctx)
 	transferHandler := NewBaseTransferHandler(h.config)
 	id, err := uuid.Parse(settleSwapKeyTweak.GetCounterTransferId())
 	if err != nil {
 		return fmt.Errorf("invalid counter transfer id: %w", err)
 	}
-	err = transferHandler.CommitSwapKeyTweaks(ctx, id)
+	// The legacy counter settles through this gossip path, which — unlike the
+	// consensus counter's Prepare (requirePrimaryRefundSignaturesApplied) — has
+	// no per-SO fence. Commit gossip is asynchronous, so a legacy counter could
+	// otherwise finalize a consensus primary on a lagging SO before that SO wrote
+	// the primary's refund-tx witnesses. Gate the settle on the primary's refund
+	// signatures being applied here; the FailedPrecondition propagates so gossip
+	// redelivery retries the settle once the primary commit lands.
+	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle swap key tweak for counter transfer %s", id)
+		return fmt.Errorf("unable to get database transaction: %w", err)
 	}
-	return err
+	counterTransfer, err := db.Transfer.Get(ctx, id)
+	if err != nil {
+		return fmt.Errorf("unable to load counter transfer %s: %w", id, err)
+	}
+	if err := requirePrimaryRefundSignaturesApplied(ctx, counterTransfer); err != nil {
+		logger.With(zap.Error(err)).Sugar().Infof(
+			"deferring swap key tweak settle for counter transfer %s until the primary's refund signatures land", id)
+		return err
+	}
+	if err := transferHandler.CommitSwapKeyTweaks(ctx, id); err != nil {
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle swap key tweak for counter transfer %s", id)
+		return err
+	}
+	return nil
 }
 
 func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Context, updateWalletSetting *pbgossip.GossipMessageUpdateWalletSetting, forCoordinator bool) error {
@@ -867,7 +887,15 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbg
 	if err != nil {
 		return dispositionUnknown, nil, err
 	}
-	row, err := db.FlowExecution.Get(ctx, id)
+	// ForUpdate so a commit and a rollback for the same flow can't both read
+	// IN_FLIGHT and both dispatch: without the lock, concurrent decisions each
+	// classify as applyOp and markParticipantFlowExecutionTerminal's CAS then
+	// silently no-ops the loser, leaving the row terminal in one state while
+	// both handler effects ran. Flows whose commit advances a domain status
+	// (e.g. send-transfer) are partly self-fenced by that status; the swap
+	// primary commit leaves the transfer status unchanged, so the row lock is
+	// the only serialization point.
+	row, err := db.FlowExecution.Query().Where(flowexecution.ID(id)).ForUpdate().Only(ctx)
 	switch {
 	case ent.IsNotFound(err):
 		return skipForeignOp, nil, nil
