@@ -207,25 +207,6 @@ const (
 	// COMMITTED row the reconciler drives forward (SP-3195).
 	KnobUseConsensusClaim = "spark.so.use_consensus_claim"
 
-	// KnobUseConsensusCoopExit routes the TransferPackage (single-call) path of
-	// CooperativeExitV2 through the 2PC engine instead of the legacy
-	// syncCoopExitInit -> InitiateCooperativeExit fanout. Interpreted as binary
-	// (any non-zero value enables) — not a percentage rollout.
-	//
-	// Unlike SEND_TRANSFER/CLAIM_TRANSFER, coop exit does NOT apply key tweaks in
-	// Commit: the chain watcher (tweakKeysForCoopExit) applies them only after the
-	// exit tx confirms on-chain. Prepare stores the key tweaks but leaves the
-	// transfer at SENDER_INITIATED (a status the watcher leaves untouched); Commit
-	// applies the refund signatures and promotes it to SENDER_KEY_TWEAK_PENDING.
-	//
-	// TODO: extend SweepStaleCoordinatorFlows to invoke FlowHandler.Rollback for
-	// COOP_EXIT on the coordinator. Today the sweep only flips the FlowExecution
-	// row to ROLLED_BACK — it does not undo the coordinator-side createTransfer +
-	// CooperativeExit row, so a coordinator crash between engine DbCommit and
-	// markCommitted leaves the coordinator stranded while participants reconcile
-	// to RETURNED.
-	KnobUseConsensusCoopExit = "spark.so.use_consensus_coop_exit"
-
 	// KnobUseConsensusInitiatePreimageSwap routes InitiatePreimageSwapV3 through
 	// the 2PC engine instead of the legacy initiatePreimageSwap fanout
 	// (InitiatePreimageSwapV2 -> GetPreimageShare) + PreimageSwap gossip.

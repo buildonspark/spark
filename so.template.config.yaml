@@ -61,10 +61,6 @@ knobs:
     spark.database.pool.min_conns: 4
     # Deposit/transfer validation
     spark.so.max_unused_deposit_addresses: 64
-    # Consensus (2PC engine). coop_exit is enabled here so local dev exercises
-    # the consensus path; the sibling knobs (use_consensus_transfer/_claim/
-    # _provide_preimage) are intentionally left off and managed separately.
-    spark.so.use_consensus_coop_exit: 1
     # Instant static deposit
     spark.so.enable_instant_static_deposit@REGTEST: 100
     spark.so.max_pending_instant_static_deposit_amount: 1000000
