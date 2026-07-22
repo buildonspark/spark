@@ -46,6 +46,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	entsigningkeyshare "github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
@@ -3112,7 +3113,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	return nil
 }
 
-func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubKey keys.Public) (*ent.TreeNodeKeyUpdateInput, error) {
+func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, keyshare *ent.SigningKeyshare, req *pb.ClaimLeafKeyTweak, ownerIdentityPubKey keys.Public) (*ent.TreeNodeKeyUpdateInput, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.claimLeafTweakKey")
 	defer span.End()
 
@@ -3146,12 +3147,6 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		return nil, sparkerrors.FailedPreconditionInvalidState(
 			fmt.Errorf("leaf %s must be %s or exited to L1 to claim receiver key tweak, got %s", leaf.ID, st.TreeNodeStatusTransferLocked, leaf.Status),
 		)
-	}
-
-	// Tweak keyshare
-	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %w", leaf.ID, err)
 	}
 
 	secretShare, err := keys.ParsePrivateKey(req.GetSecretShareTweak().GetSecretShare())
@@ -4285,6 +4280,27 @@ type claimRefundSigningJobsResult struct {
 	directFromCpfpUserRefundMap map[string]*pb.UserSignedTxSigningJob
 }
 
+// leafSigningKeyshare returns the leaf's signing keyshare, preferring the
+// eager-loaded edge (claim callers query leaves with .WithSigningKeyshare) and
+// falling back to a query when the edge isn't populated. The queried keyshare
+// is cached back on the edge so repeated lookups for the same leaf — one per
+// refund variant in prepareClaimRefundSigningJobs — don't re-issue the query.
+//
+// The cache write is unsynchronized and the returned keyshare is a plain
+// (non-row-locked) read used only to build signing jobs; callers iterate
+// leaves in a single goroutine and must not mutate the keyshare through it.
+func leafSigningKeyshare(ctx context.Context, leaf *ent.TreeNode) (*ent.SigningKeyshare, error) {
+	if ks := leaf.Edges.SigningKeyshare; ks != nil {
+		return ks, nil
+	}
+	ks, err := leaf.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", leaf.ID, err)
+	}
+	leaf.Edges.SigningKeyshare = ks
+	return ks, nil
+}
+
 // prepareClaimRefundSigningJobs validates refund transactions (cpfp, direct,
 // and direct-from-cpfp) from the claim package and persists them on the
 // corresponding leaves, then builds FROST signing jobs with pre-generated
@@ -4422,9 +4438,9 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 			return nil, fmt.Errorf("unable to unmarshal signing nonce commitment for leaf %s: %w", job.GetLeafId(), err)
 		}
 
-		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		signingKeyshare, err := leafSigningKeyshare(ctx, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", job.GetLeafId(), err)
+			return nil, err
 		}
 
 		round1Packages, err := parseSigningCommitments(job)
@@ -4474,9 +4490,9 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 		if err := userNonceCommitment.UnmarshalProto(job.GetSigningNonceCommitment()); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal signing nonce commitment for leaf %s: %w", job.GetLeafId(), err)
 		}
-		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		signingKeyshare, err := leafSigningKeyshare(ctx, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", job.GetLeafId(), err)
+			return nil, err
 		}
 		round1Packages, err := parseSigningCommitments(job)
 		if err != nil {
@@ -4524,9 +4540,9 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 		if err := userNonceCommitment.UnmarshalProto(job.GetSigningNonceCommitment()); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal signing nonce commitment for leaf %s: %w", job.GetLeafId(), err)
 		}
-		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		signingKeyshare, err := leafSigningKeyshare(ctx, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get signing keyshare for leaf %s: %w", job.GetLeafId(), err)
+			return nil, err
 		}
 		round1Packages, err := parseSigningCommitments(job)
 		if err != nil {
@@ -5077,12 +5093,20 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			return fmt.Errorf("unable to unmarshal claim key tweaks: %w", err)
 		}
 
-		transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf().All(ctx)
+		transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
+			tnq.WithSigningKeyshare()
+		}).All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get transfer leaves for transfer %s: %w", transferID, err)
 		}
 		if len(transferLeaves) != len(claimKeyTweaks.GetLeavesToReceive()) {
 			return fmt.Errorf("transfer has %d leaves but claim key tweaks has %d", len(transferLeaves), len(claimKeyTweaks.GetLeavesToReceive()))
+		}
+		// Reject duplicate keyshare assignments in Phase 1, where every SO can
+		// still abort the two-phase commit cleanly; the same check during the
+		// Phase-2 apply is defense-in-depth.
+		if _, err := leafKeyshareIDsForClaim(transferLeaves, transferID); err != nil {
+			return err
 		}
 
 		// Verify that all LeavesToReceive are found in the queried transfer leaves
@@ -5175,6 +5199,91 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	// The consensus claim-transfer 2PC flow handler also calls this
 	// function directly: its engine's request tx owns the commit lifecycle.
 	return nil
+}
+
+// leafKeyshareIDsForClaim validates that every transfer leaf has its tree
+// node and signing keyshare edges loaded and that no two leaves share a
+// keyshare, returning the keyshare IDs in leaf order.
+//
+// Two leaves sharing a keyshare cannot both tweak it: each leaf's
+// OwnerSigningPubkey is derived from the keyshare state after its own tweak,
+// so stacked tweaks would leave the first leaf's stored owner key
+// inconsistent with the final keyshare. The protocol assigns each spendable
+// leaf its own SE keyshare (the 1:1 mapping is an application convention with
+// no DB unique constraint, and the tree_node signing_keyshare edge is not
+// schema-immutable), so this can only fire on data corruption or a bug in a
+// leaf-creation path — rejecting the claim is strictly safer than the silent
+// double-tweak that would otherwise happen.
+func leafKeyshareIDsForClaim(leaves []*ent.TransferLeaf, transferID uuid.UUID) ([]uuid.UUID, error) {
+	keyshareIDs := make([]uuid.UUID, 0, len(leaves))
+	keyshareLeafIDs := make(map[uuid.UUID]uuid.UUID, len(leaves))
+	for _, leaf := range leaves {
+		treeNode := leaf.Edges.Leaf
+		if treeNode == nil {
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("tree node edge not loaded for transfer leaf %s", leaf.ID))
+		}
+		keyshare := treeNode.Edges.SigningKeyshare
+		if keyshare == nil {
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("signing keyshare edge not loaded for leaf %s", treeNode.ID))
+		}
+		if otherLeafID, ok := keyshareLeafIDs[keyshare.ID]; ok {
+			return nil, sparkerrors.InternalDataInconsistency(fmt.Errorf(
+				"signing keyshare %s is referenced by both leaf %s and leaf %s in transfer %s", keyshare.ID, otherLeafID, treeNode.ID, transferID))
+		}
+		keyshareLeafIDs[keyshare.ID] = treeNode.ID
+		keyshareIDs = append(keyshareIDs, keyshare.ID)
+	}
+	return keyshareIDs, nil
+}
+
+// lockAndHydrateLeafKeyshares loads every leaf's keyshare with one row-locked
+// batch read and hydrates their secrets in one ephemeral-DB query, returning
+// them keyed by keyshare ID. FOR UPDATE pins the rows until the surrounding
+// transaction commits, so a concurrent rotation can neither invalidate the
+// hydrated secrets nor abort the per-leaf TweakKeyShare CAS. The IDs come
+// from the eager-loaded edges, which is safe because a tree node's keyshare
+// is never reassigned after creation (an application convention — the ent
+// edge is not schema-immutable; see the matching note on
+// leafKeyshareIDsForClaim).
+//
+// Deadlock safety does not depend on lock-acquisition order: same-transfer
+// claims are serialized by the transfer row lock the caller already holds,
+// and keyshares are never shared across transfers, so no two transactions
+// can contend for an overlapping keyshare set here. Order(Asc(ID)) just
+// keeps the batch read deterministic.
+//
+// A hydration failure is deliberately not returned: with the rows locked the
+// secret versions cannot move, so a failure here means the ephemeral store is
+// unavailable or missing a secret. TweakKeyShare re-attempts hydration per
+// keyshare, which isolates such a failure to the affected leaf with the
+// precise caller-facing error. The commit loop aborts on that first failing
+// leaf, so even a store-wide outage costs at most one redundant round trip.
+func lockAndHydrateLeafKeyshares(ctx context.Context, db *ent.Client, leaves []*ent.TransferLeaf, transferID uuid.UUID) (map[uuid.UUID]*ent.SigningKeyshare, error) {
+	keyshareIDs, err := leafKeyshareIDsForClaim(leaves, transferID)
+	if err != nil {
+		return nil, err
+	}
+	lockedKeyshares, err := db.SigningKeyshare.Query().
+		Where(entsigningkeyshare.IDIn(keyshareIDs...)).
+		Order(ent.Asc(entsigningkeyshare.FieldID)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load keyshares for transfer %s: %w", transferID, err)
+	}
+	if len(lockedKeyshares) != len(keyshareIDs) {
+		return nil, sparkerrors.InternalDataInconsistency(fmt.Errorf(
+			"expected %d signing keyshares for transfer %s but locked %d", len(keyshareIDs), transferID, len(lockedKeyshares)))
+	}
+	keysharesByID := make(map[uuid.UUID]*ent.SigningKeyshare, len(lockedKeyshares))
+	for _, keyshare := range lockedKeyshares {
+		keysharesByID[keyshare.ID] = keyshare
+	}
+	if err := ent.HydrateSigningKeyshareSecrets(ctx, lockedKeyshares); err != nil {
+		logging.GetLoggerFromContext(ctx).With(zap.Error(err), zap.Stringer("transfer_id", transferID)).Warn(
+			"batch keyshare secret hydration failed, falling back to per-keyshare hydration")
+	}
+	return keysharesByID, nil
 }
 
 // SettleReceiverKeyTweak performs the per-SO Phase-2 work (apply tweaks,
@@ -5278,6 +5387,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			return fmt.Errorf("unable to get db: %w", err)
 		}
 
+		keysharesByID, err := lockAndHydrateLeafKeyshares(ctx, db, leaves, transferID)
+		if err != nil {
+			return err
+		}
+
 		// Track successful leaf IDs to clear key_tweak in a single batch.
 		clearedIDs := make([]uuid.UUID, 0, len(leaves))
 		builders := make([]*ent.TreeNodeCreate, 0, len(leaves))
@@ -5287,10 +5401,9 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			proofsHash string
 		}, 0, len(leaves))
 		for _, leaf := range leaves {
+			// Leaf and keyshare edges were validated non-nil by
+			// lockAndHydrateLeafKeyshares over this same slice.
 			treeNode := leaf.Edges.Leaf
-			if treeNode == nil {
-				return fmt.Errorf("unable to get tree node for leaf %v: %w", leaf.ID, err)
-			}
 			if len(leaf.KeyTweak) == 0 {
 				return fmt.Errorf("key tweak for leaf %v is not set", leaf.ID)
 			}
@@ -5298,8 +5411,13 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
 				return fmt.Errorf("unable to unmarshal key tweak for leaf %v: %w", leaf.ID, err)
 			}
+			keyshare, ok := keysharesByID[treeNode.Edges.SigningKeyshare.ID]
+			if !ok {
+				return sparkerrors.InternalDataInconsistency(fmt.Errorf(
+					"signing keyshare %s for leaf %s not found during claim commit", treeNode.Edges.SigningKeyshare.ID, treeNode.ID))
+			}
 			// claimLeafTweakKey now returns the key update instead of mutating the leaf
-			keyUpdate, err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, *receiverIdentityPublicKey)
+			keyUpdate, err := h.claimLeafTweakKey(ctx, treeNode, keyshare, keyTweakProto, *receiverIdentityPublicKey)
 			if err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}

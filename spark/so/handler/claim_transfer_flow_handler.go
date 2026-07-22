@@ -1610,14 +1610,11 @@ func buildClaimRefundSigningJob(
 	}
 
 	// loadClaimReceiverLeaves eager-loads the keyshare via .WithSigningKeyshare;
-	// fall back to a query only if the caller didn't populate the edge.
-	signingKeyshare := leaf.Edges.SigningKeyshare
-	if signingKeyshare == nil {
-		ks, err := leaf.QuerySigningKeyshare().Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load signing keyshare for leaf %s: %w", leaf.ID, err)
-		}
-		signingKeyshare = ks
+	// leafSigningKeyshare falls back to a query only if the caller didn't
+	// populate the edge.
+	signingKeyshare, err := leafSigningKeyshare(ctx, leaf)
+	if err != nil {
+		return nil, err
 	}
 	return &helper.SigningJobWithPregeneratedNonce{
 		SigningJob: helper.SigningJob{
