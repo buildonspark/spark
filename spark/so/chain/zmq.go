@@ -42,14 +42,28 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 		return nil, nil, fmt.Errorf("failed to create ZMQ subscriber socket: %w", err)
 	}
 
-	err = zmqSocket.Connect(endpoint)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to ZMQ endpoint %s: %w", endpoint, err)
+	// Until the receive goroutine below takes ownership, every error path must close the
+	// socket — a leaked socket blocks Close()'s ctx.Term() forever.
+	closeAndErr := func(err error) (<-chan struct{}, <-chan error, error) {
+		if closeErr := zmqSocket.Close(); closeErr != nil {
+			err = fmt.Errorf("%w (also failed to close socket: %w)", err, closeErr)
+		}
+		return nil, nil, err
 	}
 
-	err = zmqSocket.SetSubscribe(filter)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to set ZMQ subscription filter %s: %w", filter, err)
+	// A half-open TCP connection (e.g. a silently dropped conntrack flow) leaves RecvMessage
+	// blocked forever with no error. ZMTP heartbeats let libzmq detect the dead peer and
+	// transparently reconnect.
+	if err := configureHeartbeats(zmqSocket); err != nil {
+		return closeAndErr(fmt.Errorf("failed to configure ZMQ heartbeats: %w", err))
+	}
+
+	if err := zmqSocket.Connect(endpoint); err != nil {
+		return closeAndErr(fmt.Errorf("failed to connect to ZMQ endpoint %s: %w", endpoint, err))
+	}
+
+	if err := zmqSocket.SetSubscribe(filter); err != nil {
+		return closeAndErr(fmt.Errorf("failed to set ZMQ subscription filter %s: %w", filter, err))
 	}
 
 	logger := logging.GetLoggerFromContext(ctx).With(zap.String("subscription", filter))
@@ -104,6 +118,13 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 	}()
 
 	return msgChan, errChan, nil
+}
+
+func configureHeartbeats(socket *zmq4.Socket) error {
+	if err := socket.SetHeartbeatIvl(30 * time.Second); err != nil {
+		return err
+	}
+	return socket.SetHeartbeatTimeout(30 * time.Second)
 }
 
 // Close closes the ZMQ socket and terminates the context. This should be called when the subscriber
