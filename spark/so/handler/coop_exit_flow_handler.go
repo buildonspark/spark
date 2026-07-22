@@ -47,8 +47,8 @@ import (
 //     and Commit promotes it to SENDER_KEY_TWEAK_PENDING once the refund
 //     signatures land.
 //
-// Reached via the engine when CooperativeExitV2 routes through it (gated on
-// KnobUseConsensusCoopExit).
+// Reached via the engine whenever CooperativeExitV2 is called with a
+// TransferPackage.
 type CoopExitFlowHandler struct {
 	*TransferHandler
 }
@@ -417,8 +417,7 @@ func (f *coopExitCoordinatorFlow) BuildCommitPayload(ctx context.Context, result
 		return nil, fmt.Errorf("failed to apply commit on coordinator: %w", err)
 	}
 
-	// Coordinator-only partner attribution, matching the legacy package path
-	// (cooperativeExitWithTransferPackage). Runs here — in the request ctx (which
+	// Coordinator-only partner attribution. Runs here — in the request ctx (which
 	// carries the partner JWT) and the request tx — before the engine's DbCommit,
 	// since SaveTransferPartner reads partner info from context and is a no-op on
 	// participants. Fire-and-forget: it logs and never blocks.
@@ -432,9 +431,8 @@ func (f *coopExitCoordinatorFlow) BuildCommitPayload(ctx context.Context, result
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer %s for response: %w", f.parsed.transferID, err)
 	}
-	// SigningResults is nil to match the legacy single-call package path
-	// (cooperativeExitWithTransferPackage): the SDK's package flow does not
-	// consume per-leaf signing results from the response.
+	// SigningResults is nil: the SDK's package flow does not consume per-leaf
+	// signing results from the response.
 	f.response = &pb.CooperativeExitResponse{Transfer: transferProto, SigningResults: nil}
 
 	return commitReq, nil
@@ -456,10 +454,8 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 	// (it's the authoritative gate, before any DB write), but rejecting a
 	// malformed/malicious binding here avoids a wasted RPC round-trip across the
 	// cluster. Runs before package parsing so the binding validator's rejection
-	// takes precedence over package errors — the same binding-before-package
-	// invariant the legacy cooperativeExitWithTransferPackage path enforces
-	// (exact error precedence among the cheap request-shape checks is not part
-	// of the contract).
+	// takes precedence over package errors (exact error precedence among the
+	// cheap request-shape checks is not part of the contract).
 	if _, err := parseAndValidateCoopExitTxid(req.GetTransfer().GetTransferId(), req.GetExitTxid(), req.GetConnectorTx()); err != nil {
 		return nil, err
 	}

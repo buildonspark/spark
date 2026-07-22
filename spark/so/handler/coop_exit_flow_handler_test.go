@@ -187,8 +187,8 @@ func TestCoopExitFlowHandler_Rollback_RejectsMissingTransferID(t *testing.T) {
 // TestCoopExitFlowHandler_Prepare_BindingValidationPrecedesPackageParsing pins
 // the participant-side validation ordering: a request whose exit_txid fails the
 // connector-tx binding AND whose transfer package is invalid must be rejected
-// by the binding validator, matching the coordinator fast-fail and the legacy
-// cooperativeExitWithTransferPackage precedence. The coordinator rejects such a
+// by the binding validator, matching the coordinator fast-fail. The
+// coordinator rejects such a
 // request before engine fan-out, so the end-to-end coop-exit test never drives
 // this combination through Prepare — this unit test covers the participant
 // seam directly. The binding check runs on raw request fields before any DB or

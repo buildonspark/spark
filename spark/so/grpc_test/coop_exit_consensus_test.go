@@ -25,20 +25,11 @@ import (
 
 // opTypeCoopExit is the int32 value of CONSENSUS_OPERATION_TYPE_COOP_EXIT,
 // derived from the proto enum so renumbering the enum surfaces a compile error
-// rather than vacuously passing the KnobOffUsesLegacyPath filter.
+// rather than vacuously passing the FlowExecution-row op-type filter.
 const opTypeCoopExit = int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_COOP_EXIT)
 
-// enableConsensusCoopExitKnobs sets KnobUseConsensusCoopExit (the routing knob)
-// to route CooperativeExitV2 through the 2PC engine. Restoration is handled by
-// KnobController's own t.Cleanup.
-func enableConsensusCoopExitKnobs(t *testing.T, kc *sparktesting.KnobController) {
-	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusCoopExit, 100))
-}
-
 // TestCoopExit_Consensus_HappyPath drives the single-call cooperative exit
-// through the 2PC engine end-to-end with KnobUseConsensusCoopExit set, and
-// verifies the same observable end-state as the legacy path (TestCoopExitSingleCall):
+// through the 2PC engine end-to-end and verifies:
 //   - the public CooperativeExitV2 RPC returns with the transfer in
 //     SENDER_KEY_TWEAK_PENDING (Commit applied refund signatures but did NOT
 //     apply key tweaks)
@@ -53,11 +44,6 @@ func TestCoopExit_Consensus_HappyPath(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
-	}
-	enableConsensusCoopExitKnobs(t, kc)
 
 	client := sparktesting.GetBitcoinClient()
 	coin, err := faucet.Fund()
@@ -177,11 +163,6 @@ func TestCoopExit_Consensus_WritesFlowExecutionRows(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable: %v", err)
-	}
-	enableConsensusCoopExitKnobs(t, kc)
 
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
@@ -241,65 +222,5 @@ func TestCoopExit_Consensus_WritesFlowExecutionRows(t *testing.T) {
 		} else {
 			assert.Equal(t, st.FlowExecutionRoleParticipant, row.Role, "operator %d should be PARTICIPANT", i)
 		}
-	}
-}
-
-// TestCoopExit_Consensus_KnobOffUsesLegacyPath verifies the knob actually gates
-// routing: with the knob at 0 (default), the single-call coop exit goes through
-// the legacy syncCoopExitInit fanout, which writes no FlowExecution rows. This
-// guards against the routing check silently flipping under us.
-func TestCoopExit_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
-	if !sparktesting.HasLocalSparkIngressHost() {
-		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
-	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot guarantee knob=0: %v", err)
-	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusCoopExit, 0))
-
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
-	amountSats := int64(100_000)
-	config, sspConfig, transferNode := setupUsers(t, amountSats)
-
-	operatorIndices := operatorIndicesFromConfig(config)
-	preExistingIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
-	for _, i := range operatorIndices {
-		preExistingIDs[i] = snapshotFlowExecutionIDs(t, operatorDatabasePath(t, i))
-	}
-
-	withdrawPrivKey := keys.GeneratePrivateKey()
-	exitTx, connectorTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
-		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
-	)
-	var connectorTxBuf bytes.Buffer
-	require.NoError(t, connectorTx.Serialize(&connectorTxBuf))
-
-	exitTxID, err := hex.DecodeString(exitTx.TxID())
-	require.NoError(t, err)
-	senderTransfer, err := wallet.GetConnectorRefundSignaturesV2WithTransferPackage(
-		t.Context(),
-		config,
-		[]wallet.LeafKeyTweak{transferNode},
-		exitTxID,
-		connectorOutputs,
-		sspConfig.IdentityPublicKey(),
-		time.Now().Add(24*time.Hour),
-		connectorTxBuf.Bytes(),
-	)
-	require.NoError(t, err, "legacy single-call coop exit should still succeed with knob off")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.GetStatus())
-
-	for _, i := range operatorIndices {
-		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])
-		var coopExitRows []*ent.FlowExecution
-		for _, r := range rows {
-			if r.OpType == opTypeCoopExit {
-				coopExitRows = append(coopExitRows, r)
-			}
-		}
-		assert.Empty(t, coopExitRows,
-			"operator %d should NOT have written a COOP_EXIT FlowExecution row when the knob is off", i)
 	}
 }
