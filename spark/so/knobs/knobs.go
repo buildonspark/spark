@@ -184,6 +184,17 @@ const (
 	KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds = "spark.so.finalize_revealed_token_transactions.max_runtime_seconds"
 
 	KnobEnablePartnerJWT = "spark.so.enable_partner_jwt"
+
+	// KnobMpcTransferEnabled gates the multiparty (user-side MPC) transfer send
+	// endpoint (StartTransferMpc). Interpreted as binary (any non-zero value
+	// enables). Default off: a disabled endpoint behaves as if the RPC were
+	// absent (Unimplemented before any request inspection), so clusters that
+	// have not opted in expose no MPC surface. While the MPC send flow is being
+	// built out milestone by milestone, the enabled endpoint still ends
+	// fail-closed (Unimplemented after validation) rather than committing a
+	// transfer.
+	KnobMpcTransferEnabled = "spark.so.mpc_transfer.enabled"
+
 	// KnobUseConsensusInitiatePreimageSwap routes InitiatePreimageSwapV3 through
 	// the 2PC engine instead of the legacy initiatePreimageSwap fanout
 	// (InitiatePreimageSwapV2 -> GetPreimageShare) + PreimageSwap gossip.

@@ -77,6 +77,11 @@ const (
 	ReasonUnavailableDatabaseTimeout  = "DATABASE_TIMEOUT"
 	ReasonUnavailableExternalOperator = "EXTERNAL_OPERATOR_UNAVAILABLE"
 
+	// ReasonUnimplementedFeatureIncomplete marks a request that passed every implemented check on a method whose
+	// remaining stages have not shipped yet — distinguishing "accepted as far as the code goes" from METHOD_DISABLED
+	// ("this method is switched off"), which shares the Unimplemented code.
+	ReasonUnimplementedFeatureIncomplete = "FEATURE_NOT_IMPLEMENTED"
+
 	// ErrorReasonPrefixFailedWithExternalCoordinator is a prefix for errors that occur when the coordinator calls out to another
 	// coordinator and that call fails. The underlying reason from the external coordinator should be appended after a colon.
 	ErrorReasonPrefixFailedWithExternalCoordinator = "FAILED_WITH_EXTERNAL_COORDINATOR"
@@ -313,6 +318,10 @@ func PermissionDeniedNoReadAccess(err error) error {
 
 func UnimplementedMethodDisabled(err error) error {
 	return newGRPCError(codes.Unimplemented, err, ReasonUnavailableMethodDisabled)
+}
+
+func UnimplementedFeatureIncomplete(err error) error {
+	return newGRPCError(codes.Unimplemented, err, ReasonUnimplementedFeatureIncomplete)
 }
 
 func UnavailableMethodDisabled(err error) error {
