@@ -17,7 +17,6 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs is a
+// TestClaimTransfer_SettleAtomicity_KeysharesConsistentAcrossSOs is a
 // regression test for a 2PC atomicity bug in `claim_transfer`. The pre-fix
 // flow did:
 //
@@ -39,16 +38,15 @@ import (
 //	    └── entTx.Commit()
 //
 // After the fix:
-//   - leaf.KeyTweak is stored by ClaimTransfer via
-//     persistCoordinatorClaimKeyTweak with its own commit (durable across
-//     outer cancellation/rollback).
+//   - leaf.KeyTweak is durably stored before the settle 2PC starts
+//     (ClaimTransferTweakKeys in the multi-call flow).
 //   - InitiateSettleReceiverKeyTweak and SettleReceiverKeyTweak no longer
 //     entTx.Commit() mid-flow; Phase 1 SELF, Phase 2 fan-out, and Phase 2
 //     SELF all share one outer tx that holds the row lock throughout.
 //
 // What this test asserts end-to-end:
 //
-//  1. A normal `claim_transfer` to ClaimTransferV2 completes successfully.
+//  1. A normal multi-call claim completes successfully.
 //  2. Every SO's stored `signing_keyshares.public_shares` row for the
 //     claimed leaf agrees with every other SO's view of that same
 //     polynomial — the invariant that broke in the bug, where the
@@ -60,23 +58,15 @@ import (
 //     present and is therefore not by itself sufficient evidence that the
 //     bug is fixed. We check it as a sanity guard.
 //
-// Knob note: pins KnobUseConsensusClaim=0 because the atomicity fix under
-// test lives in the legacy settle path (settleReceiverKeyTweakInternal's
-// single-outer-tx behavior). With the tilt default routing claims through
-// the consensus engine, an unpinned run would exercise
-// claim_transfer_flow_handler instead and legacy regressions could pass
-// unnoticed.
-func TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing.T) {
+// Flow note: drives the multi-call claim flow (ClaimTransferTweakKeys +
+// ClaimTransferSignRefunds + FinalizeTransfer via wallet.ClaimTransfer),
+// which is the remaining production user of settleReceiverKeyTweakInternal.
+// The single-call ClaimTransfer RPC routes through the consensus engine and
+// no longer touches this settle path.
+func TestClaimTransfer_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
-		t.Skip("skipping legacy-path knob-pinned test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot pin KnobUseConsensusClaim=0: %v", err)
-	}
-	// KnobController registers its own t.Cleanup that restores the full
-	// ConfigMap snapshot — no per-knob reset needed here.
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 0))
 
 	// Sender side
 	senderConfig := wallet.NewTestWalletConfig(t)
@@ -114,14 +104,13 @@ func TestClaimTransferV2_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
 
-	// Drive the unified claim_transfer end-to-end. The settle flow now
+	// Drive the multi-call claim end-to-end. The settle flow
 	// holds the FOR UPDATE row lock across Phase 1 SELF + Phase 2 fan-out
 	// + Phase 2 SELF (no mid-flow entTx.Commit), so this must succeed
 	// without the "invalid status SENDER_KEY_TWEAKED" race seen in prod.
-	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
-	require.NoError(t, err, "ClaimTransferV2 must succeed under the new atomic settle flow")
-	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.GetStatus().String())
-	require.Len(t, claimedTransfer.GetLeaves(), 1)
+	claimedNodes, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
+	require.NoError(t, err, "multi-call claim must succeed under the atomic settle flow")
+	require.Len(t, claimedNodes, 1)
 
 	// Verify keyshare consistency across SOs for the claimed leaf.
 	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
@@ -189,165 +178,6 @@ func readKeyshareFromAllOperators(
 		result[op.ID] = ks
 	}
 	return result
-}
-
-// TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds pins down the
-// recovery contract for the wedged-RKT state the prior "override-on-retry"
-// design tried (and failed) to handle. Scenario:
-//
-//  1. Attempt 1 calls claim_transfer. persistCoordinatorClaimKeyTweak's T1
-//     commits proofs_X plus transfer.status = RECEIVER_KEY_TWEAKED on the
-//     coordinator (T1 is durable across outer T2 rollback).
-//  2. Something downstream fails (Phase 1 fan-out hits Unavailable, the
-//     process dies, etc.) so the rest of the 2PC never runs. Coordinator
-//     is left stranded at RKT with proofs_X stored; no peer has committed
-//     Phase 1.
-//  3. The user retries. wallet.ClaimTransferV2 / prepareClaimLeafKeyTweaks
-//     reseeds the polynomial on every call, so attempt 2 carries a fresh
-//     proofs_Y in its claim_package.
-//
-// Behavior under test (driven entirely through the public ClaimTransfer
-// API):
-//
-//   - Attempt 2 must NOT silently install proofs_Y on the coordinator.
-//     With RKT in the useStoredKeyTweaks=true set, attempt 2 ignores the
-//     fresh claim_package, drives the 2PC with the anchored proofs_X,
-//     finds peers at SKT without a claim_package, and rolls the whole
-//     cluster back to SKT. The error surfaces with "rolled back" to the
-//     client.
-//
-//   - A third attempt with fresh proofs_Z then succeeds end-to-end. This
-//     succeeding IS the observable signal that the rollback actually
-//     cleared coordinator state: if it hadn't, attempt 3 would see RKT +
-//     proofs_X and fail the same way attempt 2 did.
-//
-//   - Cluster keyshare view is internally consistent after recovery.
-//
-// This test fails under the prior "override unconditionally" behavior
-// (attempt 2 would install proofs_Y on the coordinator and Phase 2 would
-// apply divergent keyshares across SOs — the unrecoverable state observed
-// in prod against transfer 019e2705-4b37-7f6f-a8c1-bae077a82d5a). It
-// passes once persistCoordinatorClaimKeyTweak no-ops on populated
-// leaf.KeyTweak AND useStoredKeyTweaks=true at RKT.
-//
-// Staging note: the wedged-RKT state can only be produced by a transient
-// downstream failure between persistCoordinatorClaimKeyTweak's commit and
-// the rest of the 2PC. There's no public API knob to inject that failure,
-// so the test writes the post-T1 state directly via
-// stageEarlyCommittedKeyTweakOnOperator. The actual behavior under test
-// runs through wallet.ClaimTransferV2.
-//
-// Knob note: this pins KnobUseConsensusClaim=0 because the recovery contract
-// under test — persistCoordinatorClaimKeyTweak's T1 wedge, the synchronous
-// cluster-wide ROLLBACK, and the "rolled back" error text — is specific to
-// the legacy settle path. The consensus (2PC engine) path can't produce this
-// wedge on its own (Prepare's writes are atomic with the engine's request
-// tx) and recovers stranded state via engine rollback gossip + the
-// FlowExecution reconciler instead, which has its own contract.
-func TestClaimTransferV2_StrandedRKTRollsBackOnRetryThenSucceeds(t *testing.T) {
-	if !sparktesting.HasLocalSparkIngressHost() {
-		t.Skip("skipping legacy-path knob-pinned test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
-	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot pin KnobUseConsensusClaim=0: %v", err)
-	}
-	// KnobController registers its own t.Cleanup that restores the full
-	// ConfigMap snapshot — no per-knob reset needed here.
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 0))
-
-	senderConfig := wallet.NewTestWalletConfig(t)
-	leafPrivKey := keys.GeneratePrivateKey()
-	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
-	require.NoError(t, err, "failed to create new tree")
-
-	newLeafPrivKey := keys.GeneratePrivateKey()
-	receiverPrivKey := keys.GeneratePrivateKey()
-	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
-
-	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
-		t.Context(), senderConfig,
-		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
-		receiverPrivKey.Public(),
-		time.Now().Add(10*time.Minute),
-	)
-	require.NoError(t, err, "failed to send transfer")
-
-	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
-	require.NoError(t, err, "failed to authenticate receiver")
-	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
-
-	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pending.GetTransfers(), 1)
-	receiverTransfer := pending.GetTransfers()[0]
-
-	finalLeafPrivKey := keys.GeneratePrivateKey()
-	claimLeaf := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
-		SigningPrivKey:    newLeafPrivKey,
-		NewSigningPrivKey: finalLeafPrivKey,
-	}
-
-	// Stage the coordinator's persisted state to mimic attempt 1's wedge:
-	// leaf.KeyTweak populated with proofs_X, transfer.status = RKT, only
-	// on the coordinator. Peers stay at SKT — no peer has yet committed
-	// Phase 1.
-	stagedTweaks := buildClaimLeafTweaksAcrossOperators(t, receiverConfig, claimLeaf)
-	coordinator := receiverConfig.SigningOperators[receiverConfig.CoordinatorIdentifier]
-	stageEarlyCommittedKeyTweakOnOperator(
-		t, coordinator,
-		senderTransfer.GetId(), claimLeaf.Leaf.GetId(),
-		stagedTweaks[receiverConfig.CoordinatorIdentifier],
-	)
-
-	// Attempt 2: drive the unified claim with fresh polynomial P_Y. The
-	// coordinator must ignore the fresh proofs (useStoredKeyTweaks=true at
-	// RKT), proceed with anchored proofs_X, find peers at SKT without a
-	// claim_package, and roll the whole cluster back to SKT.
-	_, err = wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
-	require.Error(t, err, "stranded-RKT retry must surface the rollback error rather than silently overriding the anchored polynomial")
-	assert.Contains(t, err.Error(), "rolled back",
-		"settle phase must report ROLLBACK to the client; got: %v", err)
-
-	// Attempt 3: fresh polynomial P_Z. If the rollback in attempt 2
-	// actually cleared coordinator state (RKT→SKT, leaf.KeyTweak cleared
-	// via revertClaimTransfer + the explicit settle-phase commit), this
-	// is indistinguishable from a first-ever claim and must succeed
-	// end-to-end. Conversely, if rollback didn't run, attempt 3 would hit
-	// the same wedged-RKT state and fail with the same rollback error.
-	claimedTransfer, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
-	require.NoError(t, err, "post-rollback retry with fresh polynomial must succeed — attempt 3 succeeding is the observable signal that attempt 2's ROLLBACK cleared the stranded RKT state")
-	require.Equal(t, "TRANSFER_STATUS_COMPLETED", claimedTransfer.GetStatus().String())
-
-	// Cluster keyshare view must be internally consistent after recovery
-	// (same invariant as TestClaimTransferV2_SettleAtomicity_*).
-	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
-	require.NoError(t, err)
-	keysharesByOperatorID := readKeyshareFromAllOperators(t, receiverConfig, leafID)
-	require.NotEmpty(t, keysharesByOperatorID)
-	var ref *ent.SigningKeyshare
-	var refOpID uint64
-	for opID, ks := range keysharesByOperatorID {
-		ref = ks
-		refOpID = opID
-		break
-	}
-	require.NotNil(t, ref)
-	for opID, ks := range keysharesByOperatorID {
-		if opID == refOpID {
-			continue
-		}
-		assert.True(t, ks.PublicKey.Equals(ref.PublicKey),
-			"keyshare PublicKey diverges between operators %d and %d after stranded-RKT recovery", refOpID, opID)
-		for identifier, refShare := range ref.PublicShares {
-			thisShare, ok := ks.PublicShares[identifier]
-			require.True(t, ok, "operator %d missing PublicShares entry for %s", opID, identifier)
-			assert.True(t, thisShare.Equals(refShare),
-				"PublicShares[%s] diverges across operators %d and %d after stranded-RKT recovery",
-				identifier, refOpID, opID)
-		}
-	}
 }
 
 // TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL is the
@@ -498,48 +328,6 @@ func buildClaimLeafTweaksAcrossOperators(
 		}
 	}
 	return result
-}
-
-// stageEarlyCommittedKeyTweakOnOperator simulates the post-
-// persistCoordinatorClaimKeyTweak / pre-Phase-2-complete state on a
-// single operator: writes the serialized ClaimLeafKeyTweak to that
-// operator's transfer_leafs.key_tweak row for the given leaf and
-// transitions the transfer status to RECEIVER_KEY_TWEAKED.
-func stageEarlyCommittedKeyTweakOnOperator(
-	t *testing.T,
-	operator *so.SigningOperator,
-	transferIDStr string,
-	leafIDStr string,
-	stagedTweak *sparkpb.ClaimLeafKeyTweak,
-) {
-	t.Helper()
-	transferID, err := uuid.Parse(transferIDStr)
-	require.NoError(t, err)
-	leafID, err := uuid.Parse(leafIDStr)
-	require.NoError(t, err)
-
-	client := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, int(operator.ID)))
-	t.Cleanup(func() { _ = client.Close() })
-
-	stagedBytes, err := proto.Marshal(stagedTweak)
-	require.NoError(t, err)
-
-	transferLeaf, err := client.TransferLeaf.Query().
-		Where(
-			enttransferleaf.HasTransferWith(enttransfer.IDEQ(transferID)),
-			enttransferleaf.HasLeafWith(enttreenode.IDEQ(leafID)),
-		).
-		Only(t.Context())
-	require.NoError(t, err, "operator %d: locate transfer_leaf joining transfer %s and leaf %s",
-		operator.ID, transferID, leafID)
-
-	_, err = transferLeaf.Update().SetKeyTweak(stagedBytes).Save(t.Context())
-	require.NoError(t, err, "operator %d: write staged leaf.KeyTweak", operator.ID)
-
-	_, err = client.Transfer.UpdateOneID(transferID).
-		SetStatus(st.TransferStatusReceiverKeyTweaked).
-		Save(t.Context())
-	require.NoError(t, err, "operator %d: bump transfer status to RKT", operator.ID)
 }
 
 // stagePeerLockedAtRKL writes the given ClaimLeafKeyTweak to the peer's

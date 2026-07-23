@@ -748,11 +748,10 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     // every SO (transitioning each to RECEIVER_KEY_TWEAKED), a subsequent
     // claimTransfer must complete the 2PC against the already-anchored
     // polynomial — *without* the server overriding the stored proofs with a
-    // fresh polynomial from the unified claim_package. With the server-side
-    // fix (RKT in the useStoredKeyTweaks=true set + no-override guard in
-    // persistCoordinatorClaimKeyTweak), the coordinator extracts proofs
-    // from leaf.KeyTweak, omits the encrypted package on the wire, and
-    // Phase 1 / Phase 2 advance every SO to RECEIVER_KEY_TWEAK_APPLIED in a
+    // fresh polynomial from the unified claim_package. Server-side, RKT is
+    // in the useStoredKeyTweaks set: each SO's consensus Prepare reads the
+    // proofs from leaf.KeyTweak and ignores the fresh package ciphertext,
+    // and the engine advances every SO to RECEIVER_KEY_TWEAK_APPLIED in a
     // single round-trip.
     //
     // Pre-fix this same sequence failed on attempt 1 with

@@ -452,9 +452,10 @@ func TestClaimTransferTweakKeys_DualWritesReceiverStatusMimoEnabled(t *testing.T
 //
 
 // TestClaimTransferMIMO_FallsBackWhenNoReceivers verifies backward compatibility: when no
-// TransferReceiver records exist for a transfer (pre-MIMO data), ClaimTransfer falls back to
-// the legacy code path. Does not inject the MIMO-enabled context. Asserts the error does not
-// contain the MIMO-specific "no transfer receivers found" message.
+// TransferReceiver records exist for a transfer (pre-MIMO data), ClaimTransfer uses the
+// non-MIMO read model (transfer-status based) rather than failing on the missing receiver
+// rows. Does not inject the MIMO-enabled context. Asserts the error does not contain the
+// MIMO-specific "no transfer receivers found" message.
 func TestClaimTransferMIMO_FallsBackWhenNoReceivers(t *testing.T) {
 	sparktesting.RequireGripMock(t)
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
@@ -469,7 +470,7 @@ func TestClaimTransferMIMO_FallsBackWhenNoReceivers(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewTransferHandler(cfg)
 
-	// No TransferReceiver records: should fall back to legacy path.
+	// No TransferReceiver records: must use the non-MIMO read model.
 	req := &pb.ClaimTransferRequest{
 		TransferId:             transfer.ID.String(),
 		OwnerIdentityPublicKey: receiverPubKey.Serialize(),
@@ -1636,79 +1637,9 @@ func TestSettleReceiverKeyTweak_RejectsEarlyTransferStatus(t *testing.T) {
 	})
 }
 
-func TestStartTransferV3_MultiReceiverRequiresKnob(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{50})
-	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	receiver1PubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	receiver2PubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	cfg := sparktesting.TestConfig(t)
-	handler := NewTransferHandler(cfg)
-
-	// Build a minimal V3 request with two distinct receivers.
-	makeReq := func(receivers map[string][]byte) *pb.StartTransferV3Request {
-		return &pb.StartTransferV3Request{
-			TransferId: uuid.New().String(),
-			ExpiryTime: timestamppb.New(time.Now().Add(time.Hour)),
-			SenderPackages: []*pb.SenderTransferPackage{{
-				OwnerIdentityPublicKey:     senderPrivKey.Public().Serialize(),
-				TransferPackage:            &pb.TransferPackage{},
-				ReceiverIdentityPublicKeys: receivers,
-			}},
-		}
-	}
-
-	t.Run("multi-receiver rejected when knob disabled", func(t *testing.T) {
-		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobMimoTransferMultiReceiverEnabled: 0,
-		}))
-		_, err := handler.startTransferV3Internal(ctx, makeReq(map[string][]byte{
-			"leaf-1": receiver1PubKey.Serialize(),
-			"leaf-2": receiver2PubKey.Serialize(),
-		}))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
-	})
-
-	t.Run("multi-receiver rejected when knob service absent", func(t *testing.T) {
-		// No knob service injected at all.
-		_, err := handler.startTransferV3Internal(t.Context(), makeReq(map[string][]byte{
-			"leaf-1": receiver1PubKey.Serialize(),
-			"leaf-2": receiver2PubKey.Serialize(),
-		}))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
-	})
-
-	t.Run("multi-receiver allowed when knob enabled", func(t *testing.T) {
-		ctx := mimoEnabledContext(t.Context())
-		_, err := handler.startTransferV3Internal(ctx, makeReq(map[string][]byte{
-			"leaf-1": receiver1PubKey.Serialize(),
-			"leaf-2": receiver2PubKey.Serialize(),
-		}))
-		// Should pass the knob check and fail later (e.g., transfer package validation).
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), "multi-receiver transfers are not enabled")
-	})
-
-	t.Run("single-receiver allowed regardless of knob", func(t *testing.T) {
-		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobMimoTransferMultiReceiverEnabled: 0,
-		}))
-		_, err := handler.startTransferV3Internal(ctx, makeReq(map[string][]byte{
-			"leaf-1": receiver1PubKey.Serialize(),
-		}))
-		// Should pass the knob check and fail later.
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), "multi-receiver transfers are not enabled")
-	})
-}
-
 // TestStartTransferV3Consensus_MultiReceiverRejection asserts that the
-// consensus-path entry point enforces the same multi-receiver knob guard as
-// the legacy path (covered by TestStartTransferV3_MultiReceiverRequiresKnob
-// above). Mirrors the rejection branch the legacy test covers — without this,
-// flipping KnobUseConsensusTransfer would silently bypass the MIMO knob.
+// send-transfer entry point enforces the multi-receiver MIMO knob guard on
+// the coordinator before any package parsing or engine fan-out.
 func TestStartTransferV3Consensus_MultiReceiverRejection(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{60})
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -1729,21 +1660,59 @@ func TestStartTransferV3Consensus_MultiReceiverRejection(t *testing.T) {
 		}
 	}
 
-	// The consensus path checks the multi-receiver knob before any DB work
-	// (createPendingSendTransferAndCommit / engine.Execute), so we only need
-	// a context with the knob service injected — no DB setup required.
-	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobMimoTransferMultiReceiverEnabled: 0,
-	}))
+	// The multi-receiver knob check runs before any DB work
+	// (engine.Execute / package parsing), so we only need a context with the
+	// knob service injected — no DB setup required.
+	t.Run("multi-receiver rejected when knob disabled", func(t *testing.T) {
+		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobMimoTransferMultiReceiverEnabled: 0,
+		}))
+		_, err := handler.startTransferV3Consensus(ctx, makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+			"leaf-2": receiver2PubKey.Serialize(),
+		}), "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
+		assert.Equal(t, codes.FailedPrecondition, status.Code(err),
+			"multi-receiver rejection should produce FailedPrecondition")
+	})
 
-	_, err := handler.startTransferV3Consensus(ctx, makeReq(map[string][]byte{
-		"leaf-1": receiver1PubKey.Serialize(),
-		"leaf-2": receiver2PubKey.Serialize(),
-	}), "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
-	assert.Equal(t, codes.FailedPrecondition, status.Code(err),
-		"multi-receiver rejection should produce FailedPrecondition")
+	t.Run("multi-receiver rejected when knob service absent", func(t *testing.T) {
+		_, err := handler.startTransferV3Consensus(t.Context(), makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+			"leaf-2": receiver2PubKey.Serialize(),
+		}), "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "multi-receiver transfers are not enabled")
+	})
+
+	t.Run("multi-receiver allowed when knob enabled", func(t *testing.T) {
+		ctx := mimoEnabledContext(t.Context())
+		_, err := handler.startTransferV3Consensus(ctx, makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+			"leaf-2": receiver2PubKey.Serialize(),
+		}), "")
+		// Must pass the knob guard and fail at the NEXT stage — full package
+		// parsing (the fixture's package is empty). Pinning the exact
+		// next-stage error proves the guard was actually traversed rather
+		// than some unrelated earlier failure merely lacking the guard text.
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid transfer package")
+	})
+
+	t.Run("single-receiver allowed regardless of knob", func(t *testing.T) {
+		ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobMimoTransferMultiReceiverEnabled: 0,
+		}))
+		_, err := handler.startTransferV3Consensus(ctx, makeReq(map[string][]byte{
+			"leaf-1": receiver1PubKey.Serialize(),
+		}), "")
+		// Single receiver skips the knob guard entirely; the request must
+		// reach full package parsing (empty fixture package) even with the
+		// MIMO knob off.
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid transfer package")
+	})
 }
 
 // -----------------------------------------------------------------------------

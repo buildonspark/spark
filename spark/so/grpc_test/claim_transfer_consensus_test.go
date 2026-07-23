@@ -12,42 +12,24 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	transferent "github.com/lightsparkdev/spark/so/ent/transfer"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// enableConsensusClaimKnobs sets KnobUseConsensusClaim (the routing knob) so
-// the consensus claim path is exercised end-to-end. Mirrors
-// enableConsensusTransferKnobs in send_transfer_consensus_test.go.
-func enableConsensusClaimKnobs(t *testing.T, kc *sparktesting.KnobController) {
-	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 100))
-}
-
 // TestClaimTransfer_Consensus_HappyPath drives a claim_transfer through the 2PC
-// engine end-to-end with KnobUseConsensusClaim set, and verifies:
+// engine end-to-end and verifies:
 //   - the public ClaimTransfer RPC returns successfully
 //   - the returned Transfer is in COMPLETED state
 //   - every operator's DB ends up with a Transfer row in COMPLETED
 //
-// This is the load-bearing assertion that the 2PC claim path produces the same
-// observable end-state as the legacy settleReceiverKeyTweakWithClaimPackage +
-// finalize gossip fanout.
+// This is the load-bearing assertion on the end-to-end observable state of
+// the 2PC claim path.
 func TestClaimTransfer_Consensus_HappyPath(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
-	}
-	// KnobController registers its own t.Cleanup that restores the full
-	// ConfigMap snapshot — no per-knob reset needed here.
-	enableConsensusClaimKnobs(t, kc)
-
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -117,14 +99,6 @@ func TestClaimTransfer_Consensus_WritesFlowExecutionRows(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable: %v", err)
-	}
-	// KnobController registers its own t.Cleanup that restores the full
-	// ConfigMap snapshot — no per-knob reset needed here.
-	enableConsensusClaimKnobs(t, kc)
-
 	senderConfig := wallet.NewTestWalletConfig(t)
 	coordinatorIdx := int(senderConfig.SigningOperators[senderConfig.CoordinatorIdentifier].ID)
 	operatorIndices := operatorIndicesFromConfig(senderConfig)
@@ -205,84 +179,6 @@ func TestClaimTransfer_Consensus_WritesFlowExecutionRows(t *testing.T) {
 			assert.Equal(t, st.FlowExecutionRoleParticipant, row.Role,
 				"operator %d should be PARTICIPANT", i)
 		}
-	}
-}
-
-// TestClaimTransfer_Consensus_KnobOffUsesLegacyPath verifies the knob actually
-// gates routing: with the knob at 0 (default), the claim goes through the
-// legacy settleReceiverKeyTweakWithClaimPackage + finalize gossip fanout, which
-// writes no CLAIM_TRANSFER FlowExecution rows. Guards against the routing check
-// silently flipping under us.
-func TestClaimTransfer_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
-	if !sparktesting.HasLocalSparkIngressHost() {
-		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
-	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		// Without the controller we can't guarantee the knob is 0, so the
-		// "uses legacy path" assertion below would be unreliable — a prior
-		// test leaving knob=non-zero would silently exercise the consensus
-		// path and pass against the wrong code. Skip instead of guessing.
-		t.Skipf("knob controller unavailable, cannot pin KnobUseConsensusClaim=0: %v", err)
-	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusClaim, 0))
-
-	senderConfig := wallet.NewTestWalletConfig(t)
-	operatorIndices := operatorIndicesFromConfig(senderConfig)
-
-	leafPrivKey := keys.GeneratePrivateKey()
-	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
-	require.NoError(t, err)
-
-	newLeafPrivKey := keys.GeneratePrivateKey()
-	receiverPrivKey := keys.GeneratePrivateKey()
-	leavesToTransfer := []wallet.LeafKeyTweak{{
-		Leaf:              rootNode,
-		SigningPrivKey:    leafPrivKey,
-		NewSigningPrivKey: newLeafPrivKey,
-	}}
-	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
-
-	_, err = wallet.SendTransferV3WithKeyTweaks(
-		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
-		time.Now().Add(10*time.Minute),
-	)
-	require.NoError(t, err)
-
-	preExistingIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
-	for _, i := range operatorIndices {
-		preExistingIDs[i] = snapshotFlowExecutionIDs(t, operatorDatabasePath(t, i))
-	}
-
-	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
-	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
-	require.NoError(t, err)
-	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
-	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	require.NoError(t, err)
-	require.Len(t, pending.GetTransfers(), 1)
-	_, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, pending.GetTransfers()[0])
-	require.NoError(t, err)
-	finalLeafPrivKey := keys.GeneratePrivateKey()
-	claimLeaves := []wallet.LeafKeyTweak{{
-		Leaf:              pending.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
-		SigningPrivKey:    newLeafPrivKey,
-		NewSigningPrivKey: finalLeafPrivKey,
-	}}
-	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
-	require.NoError(t, err, "legacy claim path should still succeed with knob off")
-	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus())
-
-	for _, i := range operatorIndices {
-		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])
-		var claimRows []*ent.FlowExecution
-		for _, r := range rows {
-			if r.OpType == opTypeClaimTransfer {
-				claimRows = append(claimRows, r)
-			}
-		}
-		assert.Empty(t, claimRows,
-			"operator %d should NOT have written a CLAIM_TRANSFER FlowExecution row when the knob is off", i)
 	}
 }
 

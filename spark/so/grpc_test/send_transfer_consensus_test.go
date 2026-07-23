@@ -29,29 +29,18 @@ import (
 
 // opTypeSendTransfer is the int32 value of CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
 // derived from the proto enum so renumbering the enum surfaces a compile error
-// rather than vacuously passing the KnobOffUsesLegacyPath filter.
+// rather than vacuously passing the FlowExecution-row op-type filter.
 const opTypeSendTransfer = int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
 
-// enableConsensusTransferKnobs sets KnobUseConsensusTransfer (the routing knob)
-// to route StartTransferV3 through the 2PC engine. Restoration is handled by
-// KnobController's own t.Cleanup (registered in NewKnobController) which
-// restores the entire ConfigMap to its pre-test state — no explicit per-knob
-// reset needed.
-func enableConsensusTransferKnobs(t *testing.T, kc *sparktesting.KnobController) {
-	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusTransfer, 100))
-}
-
 // TestSendTransferV3_Consensus_HappyPath drives a v3 send-transfer through the
-// 2PC engine end-to-end with KnobUseConsensusTransfer set, and verifies:
+// 2PC engine end-to-end and verifies:
 //   - the public StartTransferV3 RPC returns successfully
 //   - the returned Transfer is in SENDER_KEY_TWEAKED state
 //   - every operator's DB ends up with a Transfer row in SENDER_KEY_TWEAKED
 //   - the receiver can complete the claim flow against that transfer
 //
-// This is the load-bearing assertion that the 2PC path produces the same
-// observable end-state as the legacy syncTransferV3Init + syncSettleSenderKeyTweaks
-// fanout. FlowExecution-level invariants are covered separately by
+// This is the load-bearing assertion on the end-to-end observable state of
+// the 2PC send-transfer path. FlowExecution-level invariants are covered separately by
 // TestSendTransferV3_Consensus_WritesFlowExecutionRows. Transfer-expiry
 // rejection is covered by TestCreateTransferV3_ExpiredTransferRejected
 // against the legacy path; the consensus path uses the same createTransferV3
@@ -60,12 +49,6 @@ func TestSendTransferV3_Consensus_HappyPath(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
-	}
-	enableConsensusTransferKnobs(t, kc)
-
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -134,17 +117,16 @@ func TestSendTransferV3_Consensus_HappyPath(t *testing.T) {
 // TestSendTransferV3_Consensus_RecordsTransferPartner is the consensus-path
 // counterpart to TestTransferWithPartnerAttribution_ES256: a transfer routed
 // through the 2PC engine must still write a type=TRANSFER transfer_partner row.
-// The consensus path had no such coverage, which is how the missing attribution
-// shipped when KnobUseConsensusTransfer was enabled.
+// The consensus path originally had no such coverage, which is how the
+// missing attribution shipped when this path was first enabled.
 func TestSendTransferV3_Consensus_RecordsTransferPartner(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
 	kc, err := sparktesting.NewKnobController(t)
 	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+		t.Skipf("knob controller unavailable, cannot enable partner JWT: %v", err)
 	}
-	enableConsensusTransferKnobs(t, kc)
 	require.NoError(t, kc.SetKnob(t, knobs.KnobEnablePartnerJWT, 100))
 
 	// Partner JWT setup (ES256), mirroring TestTransferWithPartnerAttribution.
@@ -241,12 +223,6 @@ func TestSendTransferV3_Consensus_WritesFlowExecutionRows(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable: %v", err)
-	}
-	enableConsensusTransferKnobs(t, kc)
-
 	senderConfig := wallet.NewTestWalletConfig(t)
 	coordinatorIdx := int(senderConfig.SigningOperators[senderConfig.CoordinatorIdentifier].ID)
 	operatorIndices := operatorIndicesFromConfig(senderConfig)
@@ -311,25 +287,24 @@ func TestSendTransferV3_Consensus_WritesFlowExecutionRows(t *testing.T) {
 	}
 }
 
-// TestSendTransferV3_Consensus_KnobOffUsesLegacyPath verifies the knob actually
-// gates routing: with the knob at 0 (default), the transfer goes through the
-// legacy syncTransferV3Init + syncSettleSenderKeyTweaks fanout, which writes
-// no FlowExecution rows. This guards against the routing check silently
-// flipping under us.
-func TestSendTransferV3_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
+// TestSendTransferV2_Consensus_WritesFlowExecutionRows pins the StartTransferV2
+// TransferPackage routing: a package-carrying V2 request must go through the
+// 2PC engine (observable as a SEND_TRANSFER FlowExecution row on every
+// operator), not the legacy startTransferInternal fanout (which writes none).
+// StartTransferV3 routing is covered by
+// TestSendTransferV3_Consensus_WritesFlowExecutionRows; V2 needs its own pin
+// because it is a separate entry point with its own package check.
+//
+// Cannot be t.Parallel()'d: two concurrent SEND_TRANSFER tests would both
+// write rows and break the Len == 1 assertion.
+func TestSendTransferV2_Consensus_WritesFlowExecutionRows(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot guarantee knob=0: %v", err)
-	}
-	// Explicitly set to 0 so we don't pick up a previous test's leak.
-	// KnobController's own t.Cleanup restores the original ConfigMap state.
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusTransfer, 0))
 
 	senderConfig := wallet.NewTestWalletConfig(t)
 	operatorIndices := operatorIndicesFromConfig(senderConfig)
+
 	preExistingIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
 	for _, i := range operatorIndices {
 		preExistingIDs[i] = snapshotFlowExecutionIDs(t, operatorDatabasePath(t, i))
@@ -341,31 +316,27 @@ func TestSendTransferV3_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
 
 	newLeafPrivKey := keys.GeneratePrivateKey()
 	receiverPrivKey := keys.GeneratePrivateKey()
-	leavesToTransfer := []wallet.LeafKeyTweak{{
-		Leaf:              rootNode,
-		SigningPrivKey:    leafPrivKey,
-		NewSigningPrivKey: newLeafPrivKey,
-	}}
-	leafReceiverMap := map[string]keys.Public{rootNode.GetId(): receiverPrivKey.Public()}
 
-	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
-		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		t.Context(), senderConfig,
+		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
+		receiverPrivKey.Public(),
 		time.Now().Add(10*time.Minute),
 	)
-	require.NoError(t, err, "legacy v3 path should still succeed with knob off")
+	require.NoError(t, err, "package-carrying StartTransferV2 must succeed through the consensus path")
 	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
 	for _, i := range operatorIndices {
-		rows := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])
-		// Filter to send-transfer op type only — other flows (renew, etc.)
-		// may write rows concurrently.
+		allNew := newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i])
 		var sendTransferRows []*ent.FlowExecution
-		for _, r := range rows {
+		for _, r := range allNew {
 			if r.OpType == opTypeSendTransfer {
 				sendTransferRows = append(sendTransferRows, r)
 			}
 		}
-		assert.Empty(t, sendTransferRows,
-			"operator %d should NOT have written a SEND_TRANSFER FlowExecution row when the knob is off", i)
+		require.Lenf(t, sendTransferRows, 1,
+			"operator %d must write exactly one SEND_TRANSFER FlowExecution row for a package-carrying V2 request", i)
+		assert.Equal(t, st.FlowExecutionStatusCommitted, sendTransferRows[0].Status,
+			"operator %d FlowExecution must be COMMITTED", i)
 	}
 }

@@ -146,7 +146,7 @@ func (b *frostAggregationBatch) addJob(
 	// set because round1 already arrives t-of-n. If a future flow ships
 	// n-of-n round1 commitments with only t-of-n contributing shares, this
 	// SigningResult.PublicKeys would be narrower than the legacy path's —
-	// a wire-contract divergence under KnobUseConsensusTransfer. AggregateFrost
+	// a wire-contract divergence between the two aggregators. AggregateFrost
 	// itself only requires t public shares matching t signature shares, so
 	// the FROST math is correct either way.
 	publicShares := make(map[string][]byte, len(shares))

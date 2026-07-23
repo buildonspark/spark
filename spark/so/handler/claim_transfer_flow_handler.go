@@ -41,13 +41,17 @@ import (
 // Public entry point (consensus path)
 // ---------------------------------------------------------------------------
 
-// claimTransferConsensus runs the claim flow through the 2PC consensus engine
-// instead of the legacy cross-SO fanout (settleReceiverKeyTweakWithClaimPackage
-// + finalize gossip). Gated by KnobUseConsensusClaim at the public
-// ClaimTransfer entry point.
+// claimTransferConsensus runs the claim flow through the 2PC consensus
+// engine. It is the only path behind the public ClaimTransfer entry point.
 //
-// Coordinator-side preflight (mirrors claimTransferLegacy so the consensus
-// path has the same fast-fail behavior — same observable error codes, same
+// The stale-flow sweep does not need to undo coordinator domain writes: the
+// engine records the COMMITTED decision atomically with the coordinator's
+// RECEIVER_KEY_TWEAK_LOCKED / key-tweak writes (single request-tx DbCommit),
+// so a crash before that commit rolls those writes back with an IN_FLIGHT
+// row (sweep → ROLLED_BACK, consistent) and a crash after it leaves a
+// COMMITTED row the reconciler drives forward (SP-3195).
+//
+// Coordinator-side preflight (fast-fail behavior — observable error codes and
 // rejection ordering — before any cross-SO ConsensusPrepare fan-out):
 //
 //  1. parse the request (transferID, ownerIDPK, claimPackage)
@@ -77,10 +81,7 @@ func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.Cl
 
 	// Parse the request once. parseClaimTransferRequest returns
 	// InvalidArgument-tagged errors for malformed owner pubkey, malformed
-	// transfer id, and missing claim_package; legacy returns plain errors
-	// (gRPC Unknown) for the same conditions. The new codes are more
-	// accurate; the rollout note in KnobUseConsensusClaim's doc covers the
-	// observable change in SDK retry semantics.
+	// transfer id, and missing claim_package.
 	parsed, err := parseClaimTransferRequest(req)
 	if err != nil {
 		return nil, err
@@ -88,9 +89,8 @@ func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.Cl
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, parsed.ownerIDPK); err != nil {
 		return nil, err
 	}
-	// Mirror claimTransferLegacy: a kill-switched wallet must be blocked on the
-	// consensus path too. Without this the cutover would silently re-open
-	// claims for kill-switched wallets the moment KnobUseConsensusClaim flips.
+	// A kill-switched wallet must be blocked before any cross-SO work — this
+	// is the only claim-path enforcement point.
 	if err := authz.EnforceWalletNotKillSwitched(ctx, parsed.ownerIDPK); err != nil {
 		return nil, err
 	}
@@ -117,12 +117,12 @@ func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.Cl
 	}
 	isMimo := isMimoReceiveEnabled(ctx, receiver)
 
-	// Match legacy's coordinator-side gates BEFORE the engine fan-out. The
-	// same gates run again inside each SO's Prepare (defense-in-depth); this
-	// layer just gives us legacy's fast-fail behavior + deterministic gRPC
-	// codes back to the SDK. Check ordering mirrors claimTransferLegacy
-	// exactly: non-MIMO does rejectLegacyAggregate before the identity
-	// check; MIMO does readiness + coop-exit guards.
+	// Coordinator-side gates BEFORE the engine fan-out. The same gates run
+	// again inside each SO's Prepare (defense-in-depth); this layer just
+	// gives us fast-fail behavior + deterministic gRPC codes back to the
+	// SDK. Check ordering is pinned by tests: non-MIMO does
+	// rejectLegacyAggregate before the identity check; MIMO does readiness +
+	// coop-exit guards.
 	if !isMimo {
 		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transferEnt); err != nil {
 			return nil, err
@@ -203,8 +203,7 @@ func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.Cl
 // Embeds *TransferHandler for access to the existing claim helpers
 // (InitiateSettleReceiverKeyTweak, SettleReceiverKeyTweak,
 // prepareClaimRefundSigningJobs, revertClaimTransfer, etc.). Reached via the
-// engine when ClaimTransfer routes through it (gated on
-// KnobUseConsensusClaim).
+// engine whenever ClaimTransfer is called.
 type ClaimTransferFlowHandler struct {
 	*TransferHandler
 }
@@ -294,8 +293,8 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	}
 	isMimo := isMimoReceiveEnabled(ctx, receiver)
 
-	// Non-MIMO gates — ordered to match legacy claimTransferLegacy /
-	// claimTransferConsensus preflight: rejectLegacyAggregate (multi-receiver
+	// Non-MIMO gates — ordered to match the claimTransferConsensus
+	// coordinator preflight: rejectLegacyAggregate (multi-receiver
 	// guard) runs BEFORE the identity check so a multi-receiver request
 	// with a wrong claimer surfaces the same error code at every layer.
 	if !isMimo {
@@ -331,10 +330,9 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	}
 
 	// Load receiver leaves + leaf-count parity check, then structural
-	// validation, then signature verify — matches legacy
-	// claimTransferLegacy's ordering exactly so error precedence is
-	// consistent with the coordinator preflight regardless of which SO
-	// rejects the request first.
+	// validation, then signature verify — matches the coordinator
+	// preflight's ordering exactly so error precedence is consistent
+	// regardless of which SO rejects the request first.
 	transferLeavesPre, leavesByID, err := loadClaimReceiverLeaves(ctx, transferEnt, receiver)
 	if err != nil {
 		return nil, err
@@ -350,11 +348,11 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	}
 
 	// A claim can re-enter at an already-applied state (KeyTweakApplied /
-	// RefundSigned): a prior consensus attempt, or — during the
-	// KnobUseConsensusClaim cutover — a legacy claim that committed the settle
-	// phase before refund signing and then crashed. The key is tweaked exactly
-	// once and the apply is idempotent, so the two cases need different Prepare
-	// work:
+	// RefundSigned): a prior consensus attempt, or a durable row from the
+	// retired pre-consensus claim path, which committed the settle phase
+	// before refund signing and could crash in between. The key is tweaked
+	// exactly once and the apply is idempotent, so the two cases need
+	// different Prepare work:
 	//
 	//   - applied (RKA/RRS): the on-disk keyshare and leaf.OwnerSigningPubkey are
 	//     already post-tweak. Do NOT re-lock or re-tweak. Validate the submitted
@@ -1249,10 +1247,10 @@ func (h *ClaimTransferFlowHandler) loadClaimContext(ctx context.Context, parsed 
 // receiver.Status.
 //
 // The already-applied states (KeyTweakApplied / RefundSigned) are claimable, not
-// terminal: a prior attempt — or, during the KnobUseConsensusClaim cutover, a
-// legacy claim that committed the settle phase before refund signing — can leave
-// a durable RKA/RRS transfer that still needs its refunds signed and a finalize
-// to reach COMPLETED. The consensus Prepare path resumes those (see Prepare's
+// terminal: a prior attempt — or a durable row left by the retired
+// pre-consensus claim path, which committed the settle phase before refund
+// signing — can leave an RKA/RRS transfer that still needs its refunds signed
+// and a finalize to reach COMPLETED. The consensus Prepare path resumes those (see Prepare's
 // applied branch): the key is tweaked exactly once, so it signs against the
 // already-post-tweak owner and Commit's apply no-ops. Returning AlreadyExists
 // here instead would strand such partials — their refunds would never get
@@ -1455,10 +1453,10 @@ func shouldUseStoredKeyTweaks(ctx context.Context, transferEnt *ent.Transfer, re
 	// Statuses where leaf.KeyTweak is durably anchored and a retry must
 	// reuse it instead of installing a fresh polynomial:
 	//
-	//   - ReceiverKeyTweaked (RKT): legacy persistCoordinatorClaimKeyTweak
-	//     committed the coordinator's slice in its own tx before the 2PC ran.
-	//     If a transfer was started under the legacy path and got stranded
-	//     at RKT, a retry via the consensus path must reuse the anchored
+	//   - ReceiverKeyTweaked (RKT): the retired pre-consensus claim path
+	//     committed the coordinator's slice in its own tx before its 2PC ran.
+	//     If a transfer started under that path got stranded at RKT, a retry
+	//     via the consensus path must reuse the anchored
 	//     proofs — a fresh claim package would mismatch the stored tweak
 	//     in InitiateSettleReceiverKeyTweak's already-locked validation,
 	//     and the next user retry would keep failing.

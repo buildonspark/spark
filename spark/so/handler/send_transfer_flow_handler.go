@@ -42,8 +42,8 @@ import (
 //
 // Embeds *TransferHandler for access to ValidateTransferPackage, createTransferV3,
 // UpdateTransferLeavesSignatures, commitSenderKeyTweaks and the cancel helpers.
-// Reached via the engine when StartTransferV3 routes through it (gated on
-// KnobUseConsensusTransfer).
+// Reached via the engine whenever StartTransferV3 (or StartTransferV2 with a
+// TransferPackage) is called.
 type SendTransferFlowHandler struct {
 	*TransferHandler
 
@@ -114,10 +114,10 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 	// has one). V3's TransferPackage is a single user-signed blob; ValidateTransferPackage
 	// above verifies that signature on every SO, which subsumes the legacy parallel-field check.
 
-	// Per-SO transfer-size limit. Mirrors the legacy startTransferV3Internal check
-	// and matches its wire contract (raw status.Errorf so clients see the same
-	// codes.InvalidArgument). TODO: aggregate package counts across senders at the
-	// meta level when multi-sender lands.
+	// Per-SO transfer-size limit, enforced with raw status.Errorf so clients
+	// see codes.InvalidArgument (the wire contract predates the consensus
+	// path). TODO: aggregate package counts across senders at the meta level
+	// when multi-sender lands.
 	transferLimit := knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoTransferLimit, 0)
 	if transferLimit > 0 && len(keyTweakMap) > int(transferLimit) {
 		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
