@@ -52,6 +52,7 @@ const (
 	SparkService_InitiatePreimageSwapV3_FullMethodName              = "/spark.SparkService/initiate_preimage_swap_v3"
 	SparkService_StartTransferV2_FullMethodName                     = "/spark.SparkService/start_transfer_v2"
 	SparkService_StartTransferV3_FullMethodName                     = "/spark.SparkService/start_transfer_v3"
+	SparkService_StartTransferMpc_FullMethodName                    = "/spark.SparkService/start_transfer_mpc"
 	SparkService_ClaimTransfer_FullMethodName                       = "/spark.SparkService/claim_transfer"
 	SparkService_GetUtxosForAddress_FullMethodName                  = "/spark.SparkService/get_utxos_for_address"
 	SparkService_GetUtxosForIdentity_FullMethodName                 = "/spark.SparkService/get_utxos_for_identity"
@@ -114,6 +115,10 @@ type SparkServiceClient interface {
 	InitiatePreimageSwapV3(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	StartTransferV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	StartTransferV3(ctx context.Context, in *StartTransferV3Request, opts ...grpc.CallOption) (*StartTransferResponse, error)
+	// Initiates a transfer whose sender is a multiparty (user-side MPC)
+	// group. The receiver may be any Spark user: everything receiver-facing
+	// is byte-identical to a single-party send.
+	StartTransferMpc(ctx context.Context, in *StartTransferMpcRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	ClaimTransfer(ctx context.Context, in *ClaimTransferRequest, opts ...grpc.CallOption) (*ClaimTransferResponse, error)
 	GetUtxosForAddress(ctx context.Context, in *GetUtxosForAddressRequest, opts ...grpc.CallOption) (*GetUtxosForAddressResponse, error)
 	GetUtxosForIdentity(ctx context.Context, in *GetUtxosForIdentityRequest, opts ...grpc.CallOption) (*GetUtxosForIdentityResponse, error)
@@ -463,6 +468,16 @@ func (c *sparkServiceClient) StartTransferV3(ctx context.Context, in *StartTrans
 	return out, nil
 }
 
+func (c *sparkServiceClient) StartTransferMpc(ctx context.Context, in *StartTransferMpcRequest, opts ...grpc.CallOption) (*StartTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_StartTransferMpc_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) ClaimTransfer(ctx context.Context, in *ClaimTransferRequest, opts ...grpc.CallOption) (*ClaimTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ClaimTransferResponse)
@@ -586,6 +601,10 @@ type SparkServiceServer interface {
 	InitiatePreimageSwapV3(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	StartTransferV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	StartTransferV3(context.Context, *StartTransferV3Request) (*StartTransferResponse, error)
+	// Initiates a transfer whose sender is a multiparty (user-side MPC)
+	// group. The receiver may be any Spark user: everything receiver-facing
+	// is byte-identical to a single-party send.
+	StartTransferMpc(context.Context, *StartTransferMpcRequest) (*StartTransferResponse, error)
 	ClaimTransfer(context.Context, *ClaimTransferRequest) (*ClaimTransferResponse, error)
 	GetUtxosForAddress(context.Context, *GetUtxosForAddressRequest) (*GetUtxosForAddressResponse, error)
 	GetUtxosForIdentity(context.Context, *GetUtxosForIdentityRequest) (*GetUtxosForIdentityResponse, error)
@@ -701,6 +720,9 @@ func (UnimplementedSparkServiceServer) StartTransferV2(context.Context, *StartTr
 }
 func (UnimplementedSparkServiceServer) StartTransferV3(context.Context, *StartTransferV3Request) (*StartTransferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartTransferV3 not implemented")
+}
+func (UnimplementedSparkServiceServer) StartTransferMpc(context.Context, *StartTransferMpcRequest) (*StartTransferResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartTransferMpc not implemented")
 }
 func (UnimplementedSparkServiceServer) ClaimTransfer(context.Context, *ClaimTransferRequest) (*ClaimTransferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ClaimTransfer not implemented")
@@ -1313,6 +1335,24 @@ func _SparkService_StartTransferV3_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_StartTransferMpc_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTransferMpcRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).StartTransferMpc(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_StartTransferMpc_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).StartTransferMpc(ctx, req.(*StartTransferMpcRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_ClaimTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ClaimTransferRequest)
 	if err := dec(in); err != nil {
@@ -1569,6 +1609,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "start_transfer_v3",
 			Handler:    _SparkService_StartTransferV3_Handler,
+		},
+		{
+			MethodName: "start_transfer_mpc",
+			Handler:    _SparkService_StartTransferMpc_Handler,
 		},
 		{
 			MethodName: "claim_transfer",

@@ -7477,6 +7477,40 @@ func (m *UserSignedTxSigningJob) validate(all bool) error {
 
 	}
 
+	for idx, item := range m.GetSubuserContributions() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, UserSignedTxSigningJobValidationError{
+						field:  fmt.Sprintf("SubuserContributions[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, UserSignedTxSigningJobValidationError{
+						field:  fmt.Sprintf("SubuserContributions[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return UserSignedTxSigningJobValidationError{
+					field:  fmt.Sprintf("SubuserContributions[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return UserSignedTxSigningJobMultiError(errors)
 	}
@@ -9121,6 +9155,1651 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SendLeafKeyTweakValidationError{}
+
+// Validate checks the field values on StartTransferMpcRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StartTransferMpcRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StartTransferMpcRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// StartTransferMpcRequestMultiError, or nil if none found.
+func (m *StartTransferMpcRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StartTransferMpcRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	// no validation rules for OwnerIdentityPublicKey
+
+	if all {
+		switch v := interface{}(m.GetMpcTransferPackage()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StartTransferMpcRequestValidationError{
+					field:  "MpcTransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StartTransferMpcRequestValidationError{
+					field:  "MpcTransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMpcTransferPackage()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StartTransferMpcRequestValidationError{
+				field:  "MpcTransferPackage",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return StartTransferMpcRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StartTransferMpcRequestMultiError is an error wrapping multiple validation
+// errors returned by StartTransferMpcRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StartTransferMpcRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StartTransferMpcRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StartTransferMpcRequestMultiError) AllErrors() []error { return m }
+
+// StartTransferMpcRequestValidationError is the validation error returned by
+// StartTransferMpcRequest.Validate if the designated constraints aren't met.
+type StartTransferMpcRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StartTransferMpcRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StartTransferMpcRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StartTransferMpcRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StartTransferMpcRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StartTransferMpcRequestValidationError) ErrorName() string {
+	return "StartTransferMpcRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StartTransferMpcRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStartTransferMpcRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StartTransferMpcRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StartTransferMpcRequestValidationError{}
+
+// Validate checks the field values on MpcTransferPackage with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *MpcTransferPackage) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on MpcTransferPackage with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// MpcTransferPackageMultiError, or nil if none found.
+func (m *MpcTransferPackage) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *MpcTransferPackage) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetLeaves() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("Leaves[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("Leaves[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcTransferPackageValidationError{
+					field:  fmt.Sprintf("Leaves[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweaks()))
+		i := 0
+		for key := range m.GetKeyTweaks() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweaks()[key]
+			_ = val
+
+			// no validation rules for KeyTweaks[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, MpcTransferPackageValidationError{
+							field:  fmt.Sprintf("KeyTweaks[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, MpcTransferPackageValidationError{
+							field:  fmt.Sprintf("KeyTweaks[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("KeyTweaks[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	for idx, item := range m.GetLeavesToSend() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcTransferPackageValidationError{
+					field:  fmt.Sprintf("LeavesToSend[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetDirectLeavesToSend() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("DirectLeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("DirectLeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcTransferPackageValidationError{
+					field:  fmt.Sprintf("DirectLeavesToSend[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetDirectFromCpfpLeavesToSend() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("DirectFromCpfpLeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcTransferPackageValidationError{
+						field:  fmt.Sprintf("DirectFromCpfpLeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcTransferPackageValidationError{
+					field:  fmt.Sprintf("DirectFromCpfpLeavesToSend[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if all {
+		switch v := interface{}(m.GetAuthorization()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, MpcTransferPackageValidationError{
+					field:  "Authorization",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, MpcTransferPackageValidationError{
+					field:  "Authorization",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAuthorization()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return MpcTransferPackageValidationError{
+				field:  "Authorization",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return MpcTransferPackageMultiError(errors)
+	}
+
+	return nil
+}
+
+// MpcTransferPackageMultiError is an error wrapping multiple validation errors
+// returned by MpcTransferPackage.ValidateAll() if the designated constraints
+// aren't met.
+type MpcTransferPackageMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m MpcTransferPackageMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m MpcTransferPackageMultiError) AllErrors() []error { return m }
+
+// MpcTransferPackageValidationError is the validation error returned by
+// MpcTransferPackage.Validate if the designated constraints aren't met.
+type MpcTransferPackageValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e MpcTransferPackageValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e MpcTransferPackageValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e MpcTransferPackageValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e MpcTransferPackageValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e MpcTransferPackageValidationError) ErrorName() string {
+	return "MpcTransferPackageValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e MpcTransferPackageValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sMpcTransferPackage.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = MpcTransferPackageValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = MpcTransferPackageValidationError{}
+
+// Validate checks the field values on MpcSendLeaf with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *MpcSendLeaf) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on MpcSendLeaf with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in MpcSendLeafMultiError, or
+// nil if none found.
+func (m *MpcSendLeaf) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *MpcSendLeaf) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	for idx, item := range m.GetSubuserCommitments() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcSendLeafValidationError{
+						field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcSendLeafValidationError{
+						field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcSendLeafValidationError{
+					field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for SecretCipher
+
+	if all {
+		switch v := interface{}(m.GetSignature()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, MpcSendLeafValidationError{
+					field:  "Signature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, MpcSendLeafValidationError{
+					field:  "Signature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSignature()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return MpcSendLeafValidationError{
+				field:  "Signature",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for RefundSignature
+
+	// no validation rules for DirectRefundSignature
+
+	// no validation rules for DirectFromCpfpRefundSignature
+
+	if len(errors) > 0 {
+		return MpcSendLeafMultiError(errors)
+	}
+
+	return nil
+}
+
+// MpcSendLeafMultiError is an error wrapping multiple validation errors
+// returned by MpcSendLeaf.ValidateAll() if the designated constraints aren't met.
+type MpcSendLeafMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m MpcSendLeafMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m MpcSendLeafMultiError) AllErrors() []error { return m }
+
+// MpcSendLeafValidationError is the validation error returned by
+// MpcSendLeaf.Validate if the designated constraints aren't met.
+type MpcSendLeafValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e MpcSendLeafValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e MpcSendLeafValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e MpcSendLeafValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e MpcSendLeafValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e MpcSendLeafValidationError) ErrorName() string { return "MpcSendLeafValidationError" }
+
+// Error satisfies the builtin error interface
+func (e MpcSendLeafValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sMpcSendLeaf.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = MpcSendLeafValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = MpcSendLeafValidationError{}
+
+// Validate checks the field values on SubUserCommitment with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *SubUserCommitment) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SubUserCommitment with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SubUserCommitmentMultiError, or nil if none found.
+func (m *SubUserCommitment) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SubUserCommitment) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return SubUserCommitmentMultiError(errors)
+	}
+
+	return nil
+}
+
+// SubUserCommitmentMultiError is an error wrapping multiple validation errors
+// returned by SubUserCommitment.ValidateAll() if the designated constraints
+// aren't met.
+type SubUserCommitmentMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SubUserCommitmentMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SubUserCommitmentMultiError) AllErrors() []error { return m }
+
+// SubUserCommitmentValidationError is the validation error returned by
+// SubUserCommitment.Validate if the designated constraints aren't met.
+type SubUserCommitmentValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SubUserCommitmentValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SubUserCommitmentValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SubUserCommitmentValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SubUserCommitmentValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SubUserCommitmentValidationError) ErrorName() string {
+	return "SubUserCommitmentValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SubUserCommitmentValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSubUserCommitment.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SubUserCommitmentValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SubUserCommitmentValidationError{}
+
+// Validate checks the field values on MpcOperatorShares with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *MpcOperatorShares) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on MpcOperatorShares with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// MpcOperatorSharesMultiError, or nil if none found.
+func (m *MpcOperatorShares) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *MpcOperatorShares) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetShares() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcOperatorSharesValidationError{
+						field:  fmt.Sprintf("Shares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcOperatorSharesValidationError{
+						field:  fmt.Sprintf("Shares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcOperatorSharesValidationError{
+					field:  fmt.Sprintf("Shares[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return MpcOperatorSharesMultiError(errors)
+	}
+
+	return nil
+}
+
+// MpcOperatorSharesMultiError is an error wrapping multiple validation errors
+// returned by MpcOperatorShares.ValidateAll() if the designated constraints
+// aren't met.
+type MpcOperatorSharesMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m MpcOperatorSharesMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m MpcOperatorSharesMultiError) AllErrors() []error { return m }
+
+// MpcOperatorSharesValidationError is the validation error returned by
+// MpcOperatorShares.Validate if the designated constraints aren't met.
+type MpcOperatorSharesValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e MpcOperatorSharesValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e MpcOperatorSharesValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e MpcOperatorSharesValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e MpcOperatorSharesValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e MpcOperatorSharesValidationError) ErrorName() string {
+	return "MpcOperatorSharesValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e MpcOperatorSharesValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sMpcOperatorShares.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = MpcOperatorSharesValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = MpcOperatorSharesValidationError{}
+
+// Validate checks the field values on MpcSealedShare with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *MpcSealedShare) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on MpcSealedShare with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in MpcSealedShareMultiError,
+// or nil if none found.
+func (m *MpcSealedShare) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *MpcSealedShare) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Ecies
+
+	if len(errors) > 0 {
+		return MpcSealedShareMultiError(errors)
+	}
+
+	return nil
+}
+
+// MpcSealedShareMultiError is an error wrapping multiple validation errors
+// returned by MpcSealedShare.ValidateAll() if the designated constraints
+// aren't met.
+type MpcSealedShareMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m MpcSealedShareMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m MpcSealedShareMultiError) AllErrors() []error { return m }
+
+// MpcSealedShareValidationError is the validation error returned by
+// MpcSealedShare.Validate if the designated constraints aren't met.
+type MpcSealedShareValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e MpcSealedShareValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e MpcSealedShareValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e MpcSealedShareValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e MpcSealedShareValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e MpcSealedShareValidationError) ErrorName() string { return "MpcSealedShareValidationError" }
+
+// Error satisfies the builtin error interface
+func (e MpcSealedShareValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sMpcSealedShare.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = MpcSealedShareValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = MpcSealedShareValidationError{}
+
+// Validate checks the field values on MpcSealedSharePayload with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *MpcSealedSharePayload) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on MpcSealedSharePayload with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// MpcSealedSharePayloadMultiError, or nil if none found.
+func (m *MpcSealedSharePayload) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *MpcSealedSharePayload) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeafShares() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MpcSealedSharePayloadValidationError{
+						field:  fmt.Sprintf("LeafShares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MpcSealedSharePayloadValidationError{
+						field:  fmt.Sprintf("LeafShares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MpcSealedSharePayloadValidationError{
+					field:  fmt.Sprintf("LeafShares[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return MpcSealedSharePayloadMultiError(errors)
+	}
+
+	return nil
+}
+
+// MpcSealedSharePayloadMultiError is an error wrapping multiple validation
+// errors returned by MpcSealedSharePayload.ValidateAll() if the designated
+// constraints aren't met.
+type MpcSealedSharePayloadMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m MpcSealedSharePayloadMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m MpcSealedSharePayloadMultiError) AllErrors() []error { return m }
+
+// MpcSealedSharePayloadValidationError is the validation error returned by
+// MpcSealedSharePayload.Validate if the designated constraints aren't met.
+type MpcSealedSharePayloadValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e MpcSealedSharePayloadValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e MpcSealedSharePayloadValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e MpcSealedSharePayloadValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e MpcSealedSharePayloadValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e MpcSealedSharePayloadValidationError) ErrorName() string {
+	return "MpcSealedSharePayloadValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e MpcSealedSharePayloadValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sMpcSealedSharePayload.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = MpcSealedSharePayloadValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = MpcSealedSharePayloadValidationError{}
+
+// Validate checks the field values on MpcLeafSubShare with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *MpcLeafSubShare) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on MpcLeafSubShare with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// MpcLeafSubShareMultiError, or nil if none found.
+func (m *MpcLeafSubShare) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *MpcLeafSubShare) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for SecretShare
+
+	if len(errors) > 0 {
+		return MpcLeafSubShareMultiError(errors)
+	}
+
+	return nil
+}
+
+// MpcLeafSubShareMultiError is an error wrapping multiple validation errors
+// returned by MpcLeafSubShare.ValidateAll() if the designated constraints
+// aren't met.
+type MpcLeafSubShareMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m MpcLeafSubShareMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m MpcLeafSubShareMultiError) AllErrors() []error { return m }
+
+// MpcLeafSubShareValidationError is the validation error returned by
+// MpcLeafSubShare.Validate if the designated constraints aren't met.
+type MpcLeafSubShareValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e MpcLeafSubShareValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e MpcLeafSubShareValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e MpcLeafSubShareValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e MpcLeafSubShareValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e MpcLeafSubShareValidationError) ErrorName() string { return "MpcLeafSubShareValidationError" }
+
+// Error satisfies the builtin error interface
+func (e MpcLeafSubShareValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sMpcLeafSubShare.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = MpcLeafSubShareValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = MpcLeafSubShareValidationError{}
+
+// Validate checks the field values on TransferAuthorization with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TransferAuthorization) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TransferAuthorization with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// TransferAuthorizationMultiError, or nil if none found.
+func (m *TransferAuthorization) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TransferAuthorization) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	for idx, item := range m.GetLeaves() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TransferAuthorizationValidationError{
+						field:  fmt.Sprintf("Leaves[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TransferAuthorizationValidationError{
+						field:  fmt.Sprintf("Leaves[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TransferAuthorizationValidationError{
+					field:  fmt.Sprintf("Leaves[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for RefundSighashesDigest
+
+	if all {
+		switch v := interface{}(m.GetExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferAuthorizationValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferAuthorizationValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferAuthorizationValidationError{
+				field:  "ExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetSignature()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferAuthorizationValidationError{
+					field:  "Signature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferAuthorizationValidationError{
+					field:  "Signature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSignature()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferAuthorizationValidationError{
+				field:  "Signature",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return TransferAuthorizationMultiError(errors)
+	}
+
+	return nil
+}
+
+// TransferAuthorizationMultiError is an error wrapping multiple validation
+// errors returned by TransferAuthorization.ValidateAll() if the designated
+// constraints aren't met.
+type TransferAuthorizationMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TransferAuthorizationMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TransferAuthorizationMultiError) AllErrors() []error { return m }
+
+// TransferAuthorizationValidationError is the validation error returned by
+// TransferAuthorization.Validate if the designated constraints aren't met.
+type TransferAuthorizationValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TransferAuthorizationValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TransferAuthorizationValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TransferAuthorizationValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TransferAuthorizationValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TransferAuthorizationValidationError) ErrorName() string {
+	return "TransferAuthorizationValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TransferAuthorizationValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTransferAuthorization.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TransferAuthorizationValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TransferAuthorizationValidationError{}
+
+// Validate checks the field values on LeafAuthorization with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *LeafAuthorization) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on LeafAuthorization with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// LeafAuthorizationMultiError, or nil if none found.
+func (m *LeafAuthorization) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *LeafAuthorization) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for AmountSats
+
+	// no validation rules for OwnerSigningPublicKey
+
+	// no validation rules for MaskCommitment
+
+	// no validation rules for ReceiverIdentityPublicKey
+
+	if len(errors) > 0 {
+		return LeafAuthorizationMultiError(errors)
+	}
+
+	return nil
+}
+
+// LeafAuthorizationMultiError is an error wrapping multiple validation errors
+// returned by LeafAuthorization.ValidateAll() if the designated constraints
+// aren't met.
+type LeafAuthorizationMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m LeafAuthorizationMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m LeafAuthorizationMultiError) AllErrors() []error { return m }
+
+// LeafAuthorizationValidationError is the validation error returned by
+// LeafAuthorization.Validate if the designated constraints aren't met.
+type LeafAuthorizationValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e LeafAuthorizationValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e LeafAuthorizationValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e LeafAuthorizationValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e LeafAuthorizationValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e LeafAuthorizationValidationError) ErrorName() string {
+	return "LeafAuthorizationValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e LeafAuthorizationValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sLeafAuthorization.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = LeafAuthorizationValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = LeafAuthorizationValidationError{}
+
+// Validate checks the field values on SubUserSigningContribution with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SubUserSigningContribution) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SubUserSigningContribution with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SubUserSigningContributionMultiError, or nil if none found.
+func (m *SubUserSigningContribution) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SubUserSigningContribution) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetNonceCommitment()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubUserSigningContributionValidationError{
+					field:  "NonceCommitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubUserSigningContributionValidationError{
+					field:  "NonceCommitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNonceCommitment()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubUserSigningContributionValidationError{
+				field:  "NonceCommitment",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for PartialSignature
+
+	if len(errors) > 0 {
+		return SubUserSigningContributionMultiError(errors)
+	}
+
+	return nil
+}
+
+// SubUserSigningContributionMultiError is an error wrapping multiple
+// validation errors returned by SubUserSigningContribution.ValidateAll() if
+// the designated constraints aren't met.
+type SubUserSigningContributionMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SubUserSigningContributionMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SubUserSigningContributionMultiError) AllErrors() []error { return m }
+
+// SubUserSigningContributionValidationError is the validation error returned
+// by SubUserSigningContribution.Validate if the designated constraints aren't met.
+type SubUserSigningContributionValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SubUserSigningContributionValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SubUserSigningContributionValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SubUserSigningContributionValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SubUserSigningContributionValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SubUserSigningContributionValidationError) ErrorName() string {
+	return "SubUserSigningContributionValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SubUserSigningContributionValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSubUserSigningContribution.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SubUserSigningContributionValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SubUserSigningContributionValidationError{}
 
 // Validate checks the field values on FinalizeTransferRequest with the rules
 // defined in the proto definition for this message. If any rules are
