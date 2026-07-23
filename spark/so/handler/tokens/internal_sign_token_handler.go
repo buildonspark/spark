@@ -1361,7 +1361,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(ctx context.Cont
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)
 		outputShares := make([]*secretsharing.SecretShare, 0, len(output.Edges.TokenPartialRevocationSecretShares)+1)
 		for _, share := range output.Edges.TokenPartialRevocationSecretShares {
-			operatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(share.OperatorIdentityPublicKey), 10, 64)
+			operatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(share.OperatorIdentityPublicKey), 16, 64)
 			if err != nil {
 				return nil, nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse operator index: %w", err))
 			}
@@ -1372,7 +1372,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(ctx context.Cont
 				Share:        new(big.Int).SetBytes(share.SecretShare.Serialize()),
 			})
 		}
-		coordinatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(h.config.IdentityPublicKey()), 10, 64)
+		coordinatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(h.config.IdentityPublicKey()), 16, 64)
 		if err != nil {
 			return nil, nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse coordinator index: %w", err))
 		}
