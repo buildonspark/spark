@@ -317,6 +317,13 @@ func TestParseRefundSigningJob_Errors(t *testing.T) {
 			wantErr: ErrMissingUserSignature,
 		},
 		{
+			name: "multiparty contributions on a single-signer job",
+			mutate: func(j *spark.UserSignedTxSigningJob) {
+				j.SubuserContributions = []*spark.SubUserSigningContribution{{PartialSignature: []byte{0x01}}}
+			},
+			wantErr: ErrUnexpectedSubUserContributions,
+		},
+		{
 			name:    "nil nonce commitment",
 			mutate:  func(j *spark.UserSignedTxSigningJob) { j.SigningNonceCommitment = nil },
 			wantErr: ErrInvalidNonceCommitment,
