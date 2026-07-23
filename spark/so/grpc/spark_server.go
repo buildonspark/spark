@@ -95,6 +95,13 @@ func (s *SparkServer) StartTransferV3(ctx context.Context, req *pb.StartTransfer
 	return transferHandler.StartTransferV3(ctx, req)
 }
 
+// StartTransferMpc initiates a transfer whose sender is a multiparty (user-side MPC) group. Gated by
+// KnobMpcTransferEnabled and fail-closed until the MPC send flow lands.
+func (s *SparkServer) StartTransferMpc(ctx context.Context, req *pb.StartTransferMpcRequest) (*pb.StartTransferResponse, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return transferHandler.StartTransferMpc(ctx, req)
+}
+
 // FinalizeTransfer completes a transfer from sender.
 func (s *SparkServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*pb.FinalizeTransferResponse, error) {
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
