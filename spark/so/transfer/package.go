@@ -23,24 +23,25 @@ const (
 )
 
 var (
-	ErrDuplicateLeafID             = fmt.Errorf("duplicate leaf id")
-	ErrEmptyKeyTweakPackage        = fmt.Errorf("key tweak package is empty")
-	ErrEmptyUserSignature          = fmt.Errorf("user signature is empty")
-	ErrInvalidLeafID               = fmt.Errorf("invalid leaf id")
-	ErrInvalidNonceCommitment      = fmt.Errorf("invalid signing nonce commitment")
-	ErrInvalidOperatorCommitment   = fmt.Errorf("invalid operator signing commitment")
-	ErrInvalidRefundTx             = fmt.Errorf("invalid refund tx")
-	ErrInvalidSigningPublicKey     = fmt.Errorf("invalid signing public key")
-	ErrKeyTweakPackageTooLarge     = fmt.Errorf("key tweak package too large")
-	ErrMismatchedLeafCount         = fmt.Errorf("mismatched leaf count")
-	ErrMissingDirectFromCPFPLeaves = fmt.Errorf("missing direct from cpfp leaves")
-	ErrMissingOperatorCommitment   = fmt.Errorf("missing operator signing commitments")
-	ErrMissingUserSignature        = fmt.Errorf("missing user signature share")
-	ErrOrphanLeaf                  = fmt.Errorf("leaf not in leaves to send")
-	ErrTooManySigningInputs        = fmt.Errorf("more signing inputs than refund tx inputs")
-	ErrTooManyLeaves               = fmt.Errorf("too many leaves")
-	ErrUnknownHashVariant          = fmt.Errorf("unknown hash variant")
-	ErrUserSignatureTooLarge       = fmt.Errorf("user signature too large")
+	ErrDuplicateLeafID                = fmt.Errorf("duplicate leaf id")
+	ErrEmptyKeyTweakPackage           = fmt.Errorf("key tweak package is empty")
+	ErrEmptyUserSignature             = fmt.Errorf("user signature is empty")
+	ErrInvalidLeafID                  = fmt.Errorf("invalid leaf id")
+	ErrInvalidNonceCommitment         = fmt.Errorf("invalid signing nonce commitment")
+	ErrInvalidOperatorCommitment      = fmt.Errorf("invalid operator signing commitment")
+	ErrInvalidRefundTx                = fmt.Errorf("invalid refund tx")
+	ErrInvalidSigningPublicKey        = fmt.Errorf("invalid signing public key")
+	ErrKeyTweakPackageTooLarge        = fmt.Errorf("key tweak package too large")
+	ErrMismatchedLeafCount            = fmt.Errorf("mismatched leaf count")
+	ErrMissingDirectFromCPFPLeaves    = fmt.Errorf("missing direct from cpfp leaves")
+	ErrMissingOperatorCommitment      = fmt.Errorf("missing operator signing commitments")
+	ErrMissingUserSignature           = fmt.Errorf("missing user signature share")
+	ErrOrphanLeaf                     = fmt.Errorf("leaf not in leaves to send")
+	ErrTooManySigningInputs           = fmt.Errorf("more signing inputs than refund tx inputs")
+	ErrUnexpectedSubUserContributions = fmt.Errorf("signing job carries multiparty sub-user contributions")
+	ErrTooManyLeaves                  = fmt.Errorf("too many leaves")
+	ErrUnknownHashVariant             = fmt.Errorf("unknown hash variant")
+	ErrUserSignatureTooLarge          = fmt.Errorf("user signature too large")
 )
 
 // Package is a parsed, structurally-validated view of a spark.TransferPackage. The only way to get one is via ParsePackage,
@@ -266,6 +267,12 @@ func ParseRefundSigningJobs(jobs []*spark.UserSignedTxSigningJob, maxJobs int) (
 }
 
 func parseRefundSigningJob(asProto *spark.UserSignedTxSigningJob) (*RefundSigningJob, error) {
+	// A signing job carries exactly one of the two signing forms; the multiparty form is accepted only by
+	// ParseMpcSubmission. Rejecting (rather than ignoring) contributions here keeps that contract enforced from both
+	// sides of the wire.
+	if len(asProto.GetSubuserContributions()) != 0 {
+		return nil, fmt.Errorf("%w: leaf %q", ErrUnexpectedSubUserContributions, asProto.GetLeafId())
+	}
 	leafID, err := uuid.Parse(asProto.GetLeafId())
 	if err != nil {
 		return nil, fmt.Errorf("%w %q: %w", ErrInvalidLeafID, asProto.GetLeafId(), err)
