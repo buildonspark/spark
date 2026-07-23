@@ -402,6 +402,72 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 	})
 }
 
+func TestRecoverFullRevocationSecretsWithHexOperatorIdentifiers(t *testing.T) {
+	for _, coordinatorIndex := range []uint32{0, 9} {
+		t.Run(fmt.Sprintf("coordinator index %d", coordinatorIndex), func(t *testing.T) {
+			config := sparktesting.TestConfig(t)
+			config.Identifier = so.IndexToIdentifier(coordinatorIndex)
+			config.SigningOperatorMap = make(map[string]*so.SigningOperator, 10)
+			config.Threshold = 2
+
+			secret := keys.GeneratePrivateKey()
+			shares, err := secretsharing.SplitSecret(
+				new(big.Int).SetBytes(secret.Serialize()),
+				secp256k1.S256().N,
+				int(config.Threshold),
+				10,
+			)
+			require.NoError(t, err)
+
+			var coordinatorShare keys.Private
+			partialShares := make([]*ent.TokenPartialRevocationSecretShare, 0, len(shares)-1)
+			for i, share := range shares {
+				identifier := so.IndexToIdentifier(uint32(i))
+				identityPublicKey := keys.GeneratePrivateKey().Public()
+				config.SigningOperatorMap[identifier] = &so.SigningOperator{
+					ID:                uint64(i),
+					Identifier:        identifier,
+					IdentityPublicKey: identityPublicKey,
+				}
+
+				privateShare, err := keys.PrivateKeyFromBigInt(share.Share)
+				require.NoError(t, err)
+				if uint32(i) == coordinatorIndex {
+					coordinatorShare = privateShare
+				} else {
+					partialShares = append(partialShares, &ent.TokenPartialRevocationSecretShare{
+						OperatorIdentityPublicKey: identityPublicKey,
+						SecretShare:               privateShare,
+					})
+				}
+			}
+
+			handler := NewInternalSignTokenHandler(config)
+			recoveredSecrets, commitments, err := handler.recoverFullRevocationSecrets(
+				t.Context(),
+				&ent.TokenTransaction{
+					Edges: ent.TokenTransactionEdges{
+						SpentOutput: []*ent.TokenOutput{{
+							WithdrawRevocationCommitment: secret.Public().Serialize(),
+							Edges: ent.TokenOutputEdges{
+								RevocationKeyshare: &ent.SigningKeyshare{
+									SecretShare: &coordinatorShare,
+								},
+								TokenPartialRevocationSecretShares: partialShares,
+							},
+						}},
+					},
+				},
+			)
+			require.NoError(t, err)
+			require.Len(t, recoveredSecrets, 1)
+			require.Len(t, commitments, 1)
+			require.Equal(t, secret.Serialize(), recoveredSecrets[0].RevocationSecret.Serialize())
+			require.True(t, secret.Public().Equals(commitments[0]))
+		})
+	}
+}
+
 func hash32(b byte) []byte { return bytes.Repeat([]byte{b}, 32) }
 
 // setupThresholdOperators configures the handler with 3 operators and threshold 2.
