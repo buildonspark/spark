@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
@@ -340,9 +341,8 @@ func TestExecute_RecordCommitDecision_PreemptedByExternalRollback(t *testing.T) 
 	_, err := NewTwoPCEngine(config, gs, db.NewDefaultSessionFactory(client)).Execute(ctx, testOpType, selfSelection(t, config), preempt)
 	require.ErrorIs(t, err, ErrCoordinatorRowPreempted, "Execute must propagate the preemption")
 
-	// Clean up the dangling request tx the way the gRPC middleware does on an
-	// error return, so the assertion query below reads committed state.
-	_ = ent.DbRollback(ctx)
+	// Execute rolls back the doomed request tx on the preempted path, so no
+	// dangling tx remains; the assertion query below reads committed state.
 
 	// Row stays ROLLED_BACK — recordCommitDecision's conditional UPDATE matched
 	// zero rows, leaving the sweep's transition intact.
@@ -561,3 +561,180 @@ func TestExecute_CommitDecisionDurablyCommittedOnSuccess(t *testing.T) {
 // emphasizes that the post-rollback read goes through the bare client
 // alone, with no session in scope.
 func parentlessCtx() context.Context { return context.Background() }
+
+// --- Ambiguous commit-outcome tests ---
+//
+// These exercise transaction-commit ambiguity, which is invisible at the gRPC
+// boundary: tx.Commit() returns the same error whether the transaction aborted
+// or durably committed and then lost its acknowledgement (DB failover, killed
+// connection, or the request ctx cancelled mid-commit), and there is no way to
+// induce a committed-but-reported-failed tx deterministically through the public
+// API. Execute is the engine's public entry point; the injected seams
+// (commitCoordinatorTx, readBackDecisionStatus) are at the DB/infrastructure
+// boundary — the same style of system-boundary injection the reconciler uses
+// for outcomeQueryFunc. The primary assertions are on the engine's observable
+// output (the gossip it dispatches to participants); the durable row status is
+// secondary corroboration.
+
+// TestExecute_AmbiguousCommit_TxDurablyCommitted_HonorsCommit models the core
+// vulnerability: the request tx durably COMMITs but tx.Commit() reports an
+// error. The engine must read back the COMMITTED decision and dispatch COMMIT
+// gossip — never rollback — so participants converge with the committed
+// coordinator instead of terminally rolling back a committed transfer.
+func TestExecute_AmbiguousCommit_TxDurablyCommitted_HonorsCommit(t *testing.T) {
+	ctx, engine, gs, client, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+
+	// Actually commit the request tx (so the decision lands durably as
+	// COMMITTED) but return an error, simulating a lost commit acknowledgement.
+	engine.commitCoordinatorTx = func(commitCtx context.Context) error {
+		if err := ent.DbCommit(commitCtx); err != nil {
+			return err
+		}
+		return fmt.Errorf("simulated lost commit acknowledgement")
+	}
+
+	result, err := engine.Execute(ctx, testOpType, selfSelection(t, config),
+		&aggregatingFlow{rollbackOp: rollbackOp, commitResult: commitOp})
+	require.NoError(t, err, "an ambiguous commit that durably applied must be honored, not surfaced as an error")
+	assert.True(t, proto.Equal(commitOp, result))
+
+	// COMMIT gossip dispatched, no ROLLBACK gossip.
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusCommit(),
+		"a durably-committed decision must dispatch COMMIT gossip")
+	assert.Nil(t, gs.calls[0].msg.GetConsensusRollback(),
+		"a durably-committed decision must NEVER dispatch ROLLBACK gossip")
+
+	// Durable row is COMMITTED.
+	rows, err := client.FlowExecution.Query().All(parentlessCtx())
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, rows[0].Status)
+}
+
+// TestExecute_AmbiguousCommit_TxDidNotCommit_RollsBack confirms the other side:
+// when the request tx genuinely did not apply (the decision UPDATE was rolled
+// back with it, so the row reverts to the IN_FLIGHT baseline written at
+// creation), the read-back sees IN_FLIGHT and the engine rolls back — the
+// correct behavior, preserved.
+func TestExecute_AmbiguousCommit_TxDidNotCommit_RollsBack(t *testing.T) {
+	ctx, engine, gs, client, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+
+	engine.commitCoordinatorTx = func(commitCtx context.Context) error {
+		// The real request tx aborts: roll it back, discarding the COMMITTED
+		// decision UPDATE so the row reverts to its committed IN_FLIGHT baseline.
+		require.NoError(t, ent.DbRollback(commitCtx))
+		return fmt.Errorf("commit failed")
+	}
+
+	result, err := engine.Execute(ctx, testOpType, selfSelection(t, config),
+		&aggregatingFlow{rollbackOp: rollbackOp, commitResult: commitOp})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "request tx commit failed")
+	assert.Nil(t, result)
+
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusRollback(),
+		"a tx that did not commit must dispatch ROLLBACK gossip")
+	assert.Nil(t, gs.calls[0].msg.GetConsensusCommit())
+
+	rows, err := client.FlowExecution.Query().All(parentlessCtx())
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, st.FlowExecutionStatusRolledBack, rows[0].Status)
+}
+
+// TestExecute_AmbiguousCommit_ReadBackFails_SendsNoGossip covers the
+// unresolvable case: the commit errored AND the durable-status read-back also
+// failed. The engine must send NO gossip — a wrong rollback over a possibly-
+// committed decision is unrecoverable, whereas silence lets the participant
+// reconciler resolve peers against the coordinator's true outcome later.
+func TestExecute_AmbiguousCommit_ReadBackFails_SendsNoGossip(t *testing.T) {
+	ctx, engine, gs, _, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+
+	engine.commitCoordinatorTx = func(commitCtx context.Context) error {
+		if err := ent.DbCommit(commitCtx); err != nil {
+			return err
+		}
+		return fmt.Errorf("simulated lost commit acknowledgement")
+	}
+	engine.readBackDecisionStatus = func(context.Context, uuid.UUID) (st.FlowExecutionStatus, error) {
+		return "", fmt.Errorf("database unreachable")
+	}
+
+	result, err := engine.Execute(ctx, testOpType, selfSelection(t, config),
+		&aggregatingFlow{rollbackOp: rollbackOp, commitResult: commitOp})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outcome unknown")
+	assert.Nil(t, result)
+
+	assert.Empty(t, gs.calls,
+		"when the commit outcome is unresolvable the engine must send neither COMMIT nor ROLLBACK gossip")
+}
+
+// TestAttemptRollback_DurablyCommittedRow_RefusesGossip exercises the
+// defense-in-depth guard directly: if a row is somehow already COMMITTED when
+// attemptRollback runs (an invariant violation — no real caller passes a
+// committed row), markRolledBack must report it as unsafe and attemptRollback
+// must refuse to dispatch rollback gossip, so participants are never told to
+// contradict a committed coordinator.
+func TestAttemptRollback_DurablyCommittedRow_RefusesGossip(t *testing.T) {
+	ctx, engine, gs, client, _ := newTestEngine(t)
+	row, err := client.FlowExecution.Create().
+		SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(int32(testOpType)).
+		SetCoordinatorIndex(uint(testCoordinatorID)).
+		SetStatus(st.FlowExecutionStatusCommitted).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// markRolledBack reports the committed row as unsafe to roll back.
+	markErr := engine.markRolledBack(ctx, row)
+	require.ErrorIs(t, markErr, errRollbackUnsafe)
+
+	// attemptRollback therefore dispatches no rollback gossip...
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+	engine.attemptRollback(ctx, row, testOpType, &simpleFlow{payload: rollbackOp}, row.ID.String(), []string{"op-self"})
+	assert.Empty(t, gs.calls,
+		"attemptRollback must not gossip a rollback that would contradict a durably-COMMITTED coordinator")
+
+	// ...and leaves the row COMMITTED (the CAS never matched it).
+	updated, err := client.FlowExecution.Get(parentlessCtx(), row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, updated.Status)
+}
+
+// TestAttemptRollback_ReadBackFails_RefusesGossip exercises markRolledBack's
+// CAS-miss re-read-failure branch: when the CAS matches zero rows and the
+// follow-up Get also fails (here, because the row no longer exists), markRolledBack
+// returns a non-nil error and attemptRollback withholds rollback gossip — we can't
+// confirm the coordinator is uncommitted, so convergence is left to the reconciler.
+func TestAttemptRollback_ReadBackFails_RefusesGossip(t *testing.T) {
+	ctx, engine, gs, client, _ := newTestEngine(t)
+	row, err := client.FlowExecution.Create().
+		SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(int32(testOpType)).
+		SetCoordinatorIndex(uint(testCoordinatorID)).
+		SetStatus(st.FlowExecutionStatusInFlight).
+		Save(ctx)
+	require.NoError(t, err)
+	// Delete the row so the CAS matches nothing and the re-read Get fails
+	// (NotFound) — the terminal status is unconfirmable.
+	require.NoError(t, client.FlowExecution.DeleteOne(row).Exec(ctx))
+
+	markErr := engine.markRolledBack(ctx, row)
+	require.Error(t, markErr, "a CAS miss whose re-read fails must not be reported as safe")
+	require.NotErrorIs(t, markErr, errRollbackUnsafe,
+		"re-read failure is unconfirmable, distinct from the confirmed-COMMITTED sentinel")
+
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+	engine.attemptRollback(ctx, row, testOpType, &simpleFlow{payload: rollbackOp}, row.ID.String(), []string{"op-self"})
+	assert.Empty(t, gs.calls,
+		"attemptRollback must withhold rollback gossip when the coordinator's terminal status cannot be confirmed")
+}

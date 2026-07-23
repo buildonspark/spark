@@ -135,6 +135,48 @@ func DbRollback(ctx context.Context) error {
 	return nil
 }
 
+// DiscardResolvedTx detaches the context session's current transaction, if one
+// is still tracked, WITHOUT beginning a new one. It exists for callers that have
+// already settled a transaction's durable outcome out of band — e.g. confirmed
+// a commit via a fresh-connection read after tx.Commit() returned an ambiguous
+// error (a lost acknowledgement from a DB failover / killed connection). In that
+// state the session's OnCommit hook does not clear its tracked tx (the error is
+// neither nil, ErrTxDone, nor context.Canceled), so downstream interceptors —
+// the idempotency store's GetOrBeginTx, and the commit in
+// DatabaseSessionMiddleware — would reuse the now-spent *sql.Tx, fail with
+// ErrTxDone, and turn a settled operation into a client-visible error.
+//
+// It drives the session's OnRollback hook (which clears the tracked tx) by
+// issuing a ROLLBACK; on an already-committed transaction that ROLLBACK is a
+// server-side no-op returning ErrTxDone, which is expected and ignored. It uses
+// GetTxIfExists (never GetOrBeginTx) so it is a safe no-op when the tx was
+// already cleared (e.g. the context.Canceled sub-case).
+//
+// Because it is only used to settle a durably-COMMITTED transaction, it first
+// flushes any notifications buffered in that transaction (delivering events for
+// the committed work) before the rollback clears the buffer — the OnCommit
+// success-path flush was skipped when Commit reported the ambiguous error.
+//
+// MUST only be called once the transaction is known to be committed — calling it
+// on a still-open transaction would roll back real work AND emit notifications
+// for changes that never landed.
+func DiscardResolvedTx(ctx context.Context) {
+	session, ok := ctx.Value(dbSessionKey).(Session)
+	if !ok {
+		return
+	}
+	tx := session.GetTxIfExists()
+	if tx == nil {
+		return
+	}
+	if flusher, ok := session.(interface {
+		FlushBufferedNotifications(context.Context)
+	}); ok {
+		flusher.FlushBufferedNotifications(ctx)
+	}
+	_ = tx.Rollback()
+}
+
 type Notification struct {
 	Channel string
 	Payload map[string]any
