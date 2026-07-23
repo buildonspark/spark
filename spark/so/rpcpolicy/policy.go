@@ -160,6 +160,7 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_InitiatePreimageSwapV3_FullMethodName:              {AuthMode: AuthSession},
 		pbspark.SparkService_StartTransferV2_FullMethodName:                     {AuthMode: AuthSession},
 		pbspark.SparkService_StartTransferV3_FullMethodName:                     {AuthMode: AuthSession},
+		pbspark.SparkService_StartTransferMpc_FullMethodName:                    {AuthMode: AuthSession},
 		pbspark.SparkService_ClaimTransfer_FullMethodName:                       {AuthMode: AuthSession},
 		pbspark.SparkService_GetUtxosForAddress_FullMethodName:                  {AuthMode: AuthUnauthenticated},
 		pbspark.SparkService_GetUtxosForIdentity_FullMethodName:                 {AuthMode: AuthUnauthenticated},

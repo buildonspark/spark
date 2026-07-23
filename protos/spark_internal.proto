@@ -974,6 +974,16 @@ message SendTransferPrepareRequest {
     string spark_invoice = 2;
 }
 
+// MpcSendTransferPrepareRequest is the 2PC prepare payload for consensus
+// multiparty (user-side MPC) send-transfer. It wraps the public request
+// verbatim so every operator receives, and verifies the group signature over,
+// the identical submission bytes. Commit and rollback reuse the shared
+// SendTransferCommitRequest / SendTransferRollbackRequest — commit and
+// redelivery payloads must never carry resharing material.
+message MpcSendTransferPrepareRequest {
+    spark.StartTransferMpcRequest original_request = 1;
+}
+
 // SendTransferCommitRequest is the 2PC commit payload built by the coordinator
 // in BuildCommitPayload. It carries the aggregated refund signatures per leaf
 // so every SO can apply identical state during Commit without re-aggregating.

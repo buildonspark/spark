@@ -111,6 +111,11 @@ func TestLookupBehavior(t *testing.T) {
 			wantAuthMode: AuthSession,
 		},
 		{
+			name:         "session-required multiparty transfer",
+			method:       pbspark.SparkService_StartTransferMpc_FullMethodName,
+			wantAuthMode: AuthSession,
+		},
+		{
 			name:             "internal-only SO-to-SO",
 			method:           pbinternal.SparkInternalService_FinalizeTransfer_FullMethodName,
 			wantAuthMode:     AuthUnauthenticated,

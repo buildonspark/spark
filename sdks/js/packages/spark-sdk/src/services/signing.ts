@@ -94,6 +94,7 @@ export class SigningService {
         signingCommitments: signingCommitments,
       },
       additionalInputs: [],
+      subuserContributions: [],
       selfCommitment: signingCommitment,
     });
 
@@ -585,6 +586,7 @@ export class SigningService {
         },
         userSignature,
         additionalInputs: [],
+        subuserContributions: [],
       };
 
       userSignedTxSigningJobs.set(signingJob.type, userSignedTxSigningJob);

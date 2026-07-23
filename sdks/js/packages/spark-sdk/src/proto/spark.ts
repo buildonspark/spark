@@ -1507,6 +1507,13 @@ export interface UserSignedTxSigningJob {
    * Input 0 uses the fields above for backward compatibility.
    */
   additionalInputs: InputSigningData[];
+  /**
+   * Multiparty (user-side MPC) senders only: per-sub-user FROST
+   * contributions in place of the single-signer pair
+   * (signing_nonce_commitment, user_signature). Exactly one of the two
+   * forms may be present.
+   */
+  subuserContributions: SubUserSigningContribution[];
 }
 
 /**
@@ -1633,6 +1640,207 @@ export interface SendLeafKeyTweak {
 export interface SendLeafKeyTweak_PubkeySharesTweakEntry {
   key: string;
   value: Uint8Array;
+}
+
+/** A transfer-send submission from a multiparty sender. Single-sender only. */
+export interface StartTransferMpcRequest {
+  /** Must equal mpc_transfer_package.authorization.transfer_id. */
+  transferId: string;
+  /**
+   * The sender group's identity public key. Must match the authenticated
+   * session identity.
+   */
+  ownerIdentityPublicKey: Uint8Array;
+  mpcTransferPackage: MpcTransferPackage | undefined;
+}
+
+/**
+ * The MPC analogue of TransferPackage: per-leaf material travels in the clear
+ * once for all operators (it is non-confidential), sealing moves to sub-share
+ * granularity, and the single-signer user_signature + hash_variant pair is
+ * replaced by the group-signed TransferAuthorization.
+ */
+export interface MpcTransferPackage {
+  /**
+   * The leaf-id sets here, in the signing jobs, and in authorization.leaves
+   * must all be identical.
+   */
+  leaves: MpcSendLeaf[];
+  /**
+   * Sealed key-tweak sub-shares: exactly one entry per operator in the
+   * cluster, keyed by operator identifier, readable only by that operator.
+   */
+  keyTweaks: { [key: string]: MpcOperatorShares };
+  /**
+   * Refund-tx signing jobs in multi-sub-user form: subuser_contributions
+   * populated, the single-signer pair absent.
+   */
+  leavesToSend: UserSignedTxSigningJob[];
+  directLeavesToSend: UserSignedTxSigningJob[];
+  directFromCpfpLeavesToSend: UserSignedTxSigningJob[];
+  authorization:
+    | TransferAuthorization
+    | undefined;
+  /**
+   * The participating sub-users' Shamir positions: >= 1, strictly
+   * ascending. The single participant set for the whole submission; every
+   * per-sub-user list in this package aligns to it (entry i belongs to
+   * positions[i]).
+   */
+  positions: number[];
+}
+
+export interface MpcTransferPackage_KeyTweaksEntry {
+  key: string;
+  value: MpcOperatorShares | undefined;
+}
+
+/**
+ * Public (non-sealed) per-leaf sender material. secret_cipher, signature, and
+ * the refund signatures carry the same semantics and byte formats as their
+ * SendLeafKeyTweak counterparts; only the carrier message differs.
+ */
+export interface MpcSendLeaf {
+  leafId: string;
+  /** Feldman commitment vectors, aligned to the package positions. */
+  subuserCommitments: SubUserCommitment[];
+  /**
+   * ECIES encryption of the transfer mask to the receiver's identity public
+   * key — byte-identical to SendLeafKeyTweak.secret_cipher.
+   */
+  secretCipher: Uint8Array;
+  /**
+   * Sender identity signature over Sha256(leaf_id||transfer_id||secret_cipher),
+   * verified by the receiver. Scheme-tagged so a multiparty sender may sign
+   * by threshold-Schnorr (FROST); a deployed single-party receiver verifies
+   * ECDSA only, so any sender — multiparty or not — that cannot assume a
+   * scheme-aware receiver should sign ECDSA.
+   */
+  signature: Signature | undefined;
+  refundSignature: Uint8Array;
+  directRefundSignature: Uint8Array;
+  directFromCpfpRefundSignature: Uint8Array;
+}
+
+/** One sub-user's Feldman commitment vector for one leaf's key-tweak resharing. */
+export interface SubUserCommitment {
+  /**
+   * The coefficient commitments of the sub-user's resharing polynomial,
+   * constant term first; length equals the operator group's signing
+   * threshold.
+   */
+  proofs: Uint8Array[];
+}
+
+/**
+ * All sealed key-tweak sub-shares destined for one operator, aligned to the
+ * package positions. Per-leaf coverage is validated after unsealing (the leaf
+ * structure is inside the ciphertext).
+ */
+export interface MpcOperatorShares {
+  shares: MpcSealedShare[];
+}
+
+/**
+ * One sub-user's key-tweak sub-shares for one operator, across all leaves,
+ * ECIES encrypted by the sub-user directly to that operator's identity public
+ * key — the user-side coordinator routes it but cannot read it. The plaintext
+ * is a serialized MpcSealedSharePayload. No further slot binding is needed: a
+ * blob moved to another operator fails to decrypt, and one moved to another
+ * position slot fails validation against that slot's signed commitments.
+ */
+export interface MpcSealedShare {
+  ecies: Uint8Array;
+}
+
+/** The plaintext of MpcSealedShare.ecies. */
+export interface MpcSealedSharePayload {
+  /**
+   * Must equal the enclosing submission's transfer_id: pins the sub-shares
+   * to one transfer even if resharing material is ever reused across
+   * transfers.
+   */
+  transferId: string;
+  /** One entry per leaf being sent. */
+  leafShares: MpcLeafSubShare[];
+}
+
+/** One leaf's sub-share within a sealed payload. */
+export interface MpcLeafSubShare {
+  leafId: string;
+  /**
+   * The sub-share scalar: the sub-user's resharing polynomial evaluated at
+   * the operator's identifier.
+   */
+  secretShare: Uint8Array;
+}
+
+/**
+ * The group-signed statement of intent for a multiparty send. It names every
+ * fact the submission commits; operators verify each named fact against state
+ * they independently hold or rebuild, aborting on any mismatch.
+ */
+export interface TransferAuthorization {
+  /** Must equal the enclosing request's transfer_id. */
+  transferId: string;
+  /** One entry per leaf being sent. */
+  leaves: LeafAuthorization[];
+  /**
+   * Digest over the BIP-341 sighashes of all leaves' refund transactions
+   * (all three variants) — the sighash commits to every spending-relevant
+   * field while staying invariant to unsigned-tx serialization freedom.
+   * Operators recompute it from transactions they rebuild; the construction
+   * is fixed by the operator-side verifier.
+   */
+  refundSighashesDigest: Uint8Array;
+  /** The transfer's expiry. Nanos must be 0. */
+  expiryTime:
+    | Date
+    | undefined;
+  /**
+   * The sender group's identity-key threshold signature, over a
+   * domain-separated structured hash binding this authorization's fields,
+   * the package's participant positions, and each leaf's commitment vectors
+   * and secret_cipher — and thereby, since Feldman commitments fix the
+   * sub-shares they commit to, the contents of every operator's sealed
+   * key-tweak slice. The exact construction is fixed by the operator-side
+   * verifier. Scheme-tagged: operators accept ECDSA or Schnorr.
+   */
+  signature: Signature | undefined;
+}
+
+/** The signed per-leaf facts of a TransferAuthorization. */
+export interface LeafAuthorization {
+  leafId: string;
+  /** The leaf's value in satoshis. */
+  amountSats: number;
+  /** The leaf's current owner signing public key. */
+  ownerSigningPublicKey: Uint8Array;
+  /** Commitment to the leaf's transfer mask (mask * G). */
+  maskCommitment: Uint8Array;
+  /**
+   * Who can claim this leaf. Per-leaf so multi-receiver MPC sends are a
+   * later validation relaxation rather than a schema change; initial
+   * validation requires all leaves to name the same receiver.
+   */
+  receiverIdentityPublicKey: Uint8Array;
+}
+
+/**
+ * One sub-user's FROST contribution to one refund-tx signing job, aligned to
+ * the package positions. There is deliberately no client-side pre-aggregation
+ * into one user pair: every contributing sub-user's nonce commitment must be
+ * visible to the operators' aggregator.
+ */
+export interface SubUserSigningContribution {
+  nonceCommitment:
+    | SigningCommitment
+    | undefined;
+  /**
+   * 32-byte FROST signature share scalar, with the signer's within-group
+   * Lagrange coefficient already applied.
+   */
+  partialSignature: Uint8Array;
 }
 
 export interface FinalizeTransferRequest {
@@ -8133,6 +8341,7 @@ function createBaseUserSignedTxSigningJob(): UserSignedTxSigningJob {
     userSignature: new Uint8Array(0),
     signingCommitments: undefined,
     additionalInputs: [],
+    subuserContributions: [],
   };
 }
 
@@ -8158,6 +8367,9 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
     }
     for (const v of message.additionalInputs) {
       InputSigningData.encode(v!, writer.uint32(58).fork()).join();
+    }
+    for (const v of message.subuserContributions) {
+      SubUserSigningContribution.encode(v!, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -8225,6 +8437,14 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
           message.additionalInputs.push(InputSigningData.decode(reader, reader.uint32()));
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.subuserContributions.push(SubUserSigningContribution.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8248,6 +8468,9 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
         : undefined,
       additionalInputs: globalThis.Array.isArray(object?.additionalInputs)
         ? object.additionalInputs.map((e: any) => InputSigningData.fromJSON(e))
+        : [],
+      subuserContributions: globalThis.Array.isArray(object?.subuserContributions)
+        ? object.subuserContributions.map((e: any) => SubUserSigningContribution.fromJSON(e))
         : [],
     };
   },
@@ -8275,6 +8498,9 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
     if (message.additionalInputs?.length) {
       obj.additionalInputs = message.additionalInputs.map((e) => InputSigningData.toJSON(e));
     }
+    if (message.subuserContributions?.length) {
+      obj.subuserContributions = message.subuserContributions.map((e) => SubUserSigningContribution.toJSON(e));
+    }
     return obj;
   },
 
@@ -8295,6 +8521,8 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
       ? SigningCommitments.fromPartial(object.signingCommitments)
       : undefined;
     message.additionalInputs = object.additionalInputs?.map((e) => InputSigningData.fromPartial(e)) || [];
+    message.subuserContributions = object.subuserContributions?.map((e) => SubUserSigningContribution.fromPartial(e)) ||
+      [];
     return message;
   },
 };
@@ -9724,6 +9952,1243 @@ export const SendLeafKeyTweak_PubkeySharesTweakEntry: MessageFns<SendLeafKeyTwea
     const message = createBaseSendLeafKeyTweak_PubkeySharesTweakEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseStartTransferMpcRequest(): StartTransferMpcRequest {
+  return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), mpcTransferPackage: undefined };
+}
+
+export const StartTransferMpcRequest: MessageFns<StartTransferMpcRequest> = {
+  encode(message: StartTransferMpcRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.mpcTransferPackage !== undefined) {
+      MpcTransferPackage.encode(message.mpcTransferPackage, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTransferMpcRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTransferMpcRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mpcTransferPackage = MpcTransferPackage.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartTransferMpcRequest {
+    return {
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      mpcTransferPackage: isSet(object.mpcTransferPackage)
+        ? MpcTransferPackage.fromJSON(object.mpcTransferPackage)
+        : undefined,
+    };
+  },
+
+  toJSON(message: StartTransferMpcRequest): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.mpcTransferPackage !== undefined) {
+      obj.mpcTransferPackage = MpcTransferPackage.toJSON(message.mpcTransferPackage);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTransferMpcRequest>): StartTransferMpcRequest {
+    return StartTransferMpcRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StartTransferMpcRequest>): StartTransferMpcRequest {
+    const message = createBaseStartTransferMpcRequest();
+    message.transferId = object.transferId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.mpcTransferPackage = (object.mpcTransferPackage !== undefined && object.mpcTransferPackage !== null)
+      ? MpcTransferPackage.fromPartial(object.mpcTransferPackage)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseMpcTransferPackage(): MpcTransferPackage {
+  return {
+    leaves: [],
+    keyTweaks: {},
+    leavesToSend: [],
+    directLeavesToSend: [],
+    directFromCpfpLeavesToSend: [],
+    authorization: undefined,
+    positions: [],
+  };
+}
+
+export const MpcTransferPackage: MessageFns<MpcTransferPackage> = {
+  encode(message: MpcTransferPackage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leaves) {
+      MpcSendLeaf.encode(v!, writer.uint32(10).fork()).join();
+    }
+    Object.entries(message.keyTweaks).forEach(([key, value]) => {
+      MpcTransferPackage_KeyTweaksEntry.encode({ key: key as any, value }, writer.uint32(18).fork()).join();
+    });
+    for (const v of message.leavesToSend) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(26).fork()).join();
+    }
+    for (const v of message.directLeavesToSend) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(34).fork()).join();
+    }
+    for (const v of message.directFromCpfpLeavesToSend) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.authorization !== undefined) {
+      TransferAuthorization.encode(message.authorization, writer.uint32(50).fork()).join();
+    }
+    writer.uint32(58).fork();
+    for (const v of message.positions) {
+      writer.uint32(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcTransferPackage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcTransferPackage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leaves.push(MpcSendLeaf.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          const entry2 = MpcTransferPackage_KeyTweaksEntry.decode(reader, reader.uint32());
+          if (entry2.value !== undefined) {
+            message.keyTweaks[entry2.key] = entry2.value;
+          }
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.leavesToSend.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.directLeavesToSend.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.directFromCpfpLeavesToSend.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.authorization = TransferAuthorization.decode(reader, reader.uint32());
+          continue;
+        }
+        case 7: {
+          if (tag === 56) {
+            message.positions.push(reader.uint32());
+
+            continue;
+          }
+
+          if (tag === 58) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.positions.push(reader.uint32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcTransferPackage {
+    return {
+      leaves: globalThis.Array.isArray(object?.leaves) ? object.leaves.map((e: any) => MpcSendLeaf.fromJSON(e)) : [],
+      keyTweaks: isObject(object.keyTweaks)
+        ? Object.entries(object.keyTweaks).reduce<{ [key: string]: MpcOperatorShares }>((acc, [key, value]) => {
+          acc[key] = MpcOperatorShares.fromJSON(value);
+          return acc;
+        }, {})
+        : {},
+      leavesToSend: globalThis.Array.isArray(object?.leavesToSend)
+        ? object.leavesToSend.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      directLeavesToSend: globalThis.Array.isArray(object?.directLeavesToSend)
+        ? object.directLeavesToSend.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      directFromCpfpLeavesToSend: globalThis.Array.isArray(object?.directFromCpfpLeavesToSend)
+        ? object.directFromCpfpLeavesToSend.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      authorization: isSet(object.authorization) ? TransferAuthorization.fromJSON(object.authorization) : undefined,
+      positions: globalThis.Array.isArray(object?.positions)
+        ? object.positions.map((e: any) => globalThis.Number(e))
+        : [],
+    };
+  },
+
+  toJSON(message: MpcTransferPackage): unknown {
+    const obj: any = {};
+    if (message.leaves?.length) {
+      obj.leaves = message.leaves.map((e) => MpcSendLeaf.toJSON(e));
+    }
+    if (message.keyTweaks) {
+      const entries = Object.entries(message.keyTweaks);
+      if (entries.length > 0) {
+        obj.keyTweaks = {};
+        entries.forEach(([k, v]) => {
+          obj.keyTweaks[k] = MpcOperatorShares.toJSON(v);
+        });
+      }
+    }
+    if (message.leavesToSend?.length) {
+      obj.leavesToSend = message.leavesToSend.map((e) => UserSignedTxSigningJob.toJSON(e));
+    }
+    if (message.directLeavesToSend?.length) {
+      obj.directLeavesToSend = message.directLeavesToSend.map((e) => UserSignedTxSigningJob.toJSON(e));
+    }
+    if (message.directFromCpfpLeavesToSend?.length) {
+      obj.directFromCpfpLeavesToSend = message.directFromCpfpLeavesToSend.map((e) => UserSignedTxSigningJob.toJSON(e));
+    }
+    if (message.authorization !== undefined) {
+      obj.authorization = TransferAuthorization.toJSON(message.authorization);
+    }
+    if (message.positions?.length) {
+      obj.positions = message.positions.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcTransferPackage>): MpcTransferPackage {
+    return MpcTransferPackage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcTransferPackage>): MpcTransferPackage {
+    const message = createBaseMpcTransferPackage();
+    message.leaves = object.leaves?.map((e) => MpcSendLeaf.fromPartial(e)) || [];
+    message.keyTweaks = Object.entries(object.keyTweaks ?? {}).reduce<{ [key: string]: MpcOperatorShares }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = MpcOperatorShares.fromPartial(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    message.leavesToSend = object.leavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.directLeavesToSend = object.directLeavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.directFromCpfpLeavesToSend =
+      object.directFromCpfpLeavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.authorization = (object.authorization !== undefined && object.authorization !== null)
+      ? TransferAuthorization.fromPartial(object.authorization)
+      : undefined;
+    message.positions = object.positions?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseMpcTransferPackage_KeyTweaksEntry(): MpcTransferPackage_KeyTweaksEntry {
+  return { key: "", value: undefined };
+}
+
+export const MpcTransferPackage_KeyTweaksEntry: MessageFns<MpcTransferPackage_KeyTweaksEntry> = {
+  encode(message: MpcTransferPackage_KeyTweaksEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      MpcOperatorShares.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcTransferPackage_KeyTweaksEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcTransferPackage_KeyTweaksEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = MpcOperatorShares.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcTransferPackage_KeyTweaksEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? MpcOperatorShares.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: MpcTransferPackage_KeyTweaksEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = MpcOperatorShares.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcTransferPackage_KeyTweaksEntry>): MpcTransferPackage_KeyTweaksEntry {
+    return MpcTransferPackage_KeyTweaksEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcTransferPackage_KeyTweaksEntry>): MpcTransferPackage_KeyTweaksEntry {
+    const message = createBaseMpcTransferPackage_KeyTweaksEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? MpcOperatorShares.fromPartial(object.value)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseMpcSendLeaf(): MpcSendLeaf {
+  return {
+    leafId: "",
+    subuserCommitments: [],
+    secretCipher: new Uint8Array(0),
+    signature: undefined,
+    refundSignature: new Uint8Array(0),
+    directRefundSignature: new Uint8Array(0),
+    directFromCpfpRefundSignature: new Uint8Array(0),
+  };
+}
+
+export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
+  encode(message: MpcSendLeaf, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    for (const v of message.subuserCommitments) {
+      SubUserCommitment.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.secretCipher.length !== 0) {
+      writer.uint32(26).bytes(message.secretCipher);
+    }
+    if (message.signature !== undefined) {
+      Signature.encode(message.signature, writer.uint32(34).fork()).join();
+    }
+    if (message.refundSignature.length !== 0) {
+      writer.uint32(42).bytes(message.refundSignature);
+    }
+    if (message.directRefundSignature.length !== 0) {
+      writer.uint32(50).bytes(message.directRefundSignature);
+    }
+    if (message.directFromCpfpRefundSignature.length !== 0) {
+      writer.uint32(58).bytes(message.directFromCpfpRefundSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcSendLeaf {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcSendLeaf();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.subuserCommitments.push(SubUserCommitment.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.secretCipher = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.signature = Signature.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.refundSignature = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.directRefundSignature = reader.bytes();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.directFromCpfpRefundSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcSendLeaf {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      subuserCommitments: globalThis.Array.isArray(object?.subuserCommitments)
+        ? object.subuserCommitments.map((e: any) => SubUserCommitment.fromJSON(e))
+        : [],
+      secretCipher: isSet(object.secretCipher) ? bytesFromBase64(object.secretCipher) : new Uint8Array(0),
+      signature: isSet(object.signature) ? Signature.fromJSON(object.signature) : undefined,
+      refundSignature: isSet(object.refundSignature) ? bytesFromBase64(object.refundSignature) : new Uint8Array(0),
+      directRefundSignature: isSet(object.directRefundSignature)
+        ? bytesFromBase64(object.directRefundSignature)
+        : new Uint8Array(0),
+      directFromCpfpRefundSignature: isSet(object.directFromCpfpRefundSignature)
+        ? bytesFromBase64(object.directFromCpfpRefundSignature)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: MpcSendLeaf): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.subuserCommitments?.length) {
+      obj.subuserCommitments = message.subuserCommitments.map((e) => SubUserCommitment.toJSON(e));
+    }
+    if (message.secretCipher.length !== 0) {
+      obj.secretCipher = base64FromBytes(message.secretCipher);
+    }
+    if (message.signature !== undefined) {
+      obj.signature = Signature.toJSON(message.signature);
+    }
+    if (message.refundSignature.length !== 0) {
+      obj.refundSignature = base64FromBytes(message.refundSignature);
+    }
+    if (message.directRefundSignature.length !== 0) {
+      obj.directRefundSignature = base64FromBytes(message.directRefundSignature);
+    }
+    if (message.directFromCpfpRefundSignature.length !== 0) {
+      obj.directFromCpfpRefundSignature = base64FromBytes(message.directFromCpfpRefundSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcSendLeaf>): MpcSendLeaf {
+    return MpcSendLeaf.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcSendLeaf>): MpcSendLeaf {
+    const message = createBaseMpcSendLeaf();
+    message.leafId = object.leafId ?? "";
+    message.subuserCommitments = object.subuserCommitments?.map((e) => SubUserCommitment.fromPartial(e)) || [];
+    message.secretCipher = object.secretCipher ?? new Uint8Array(0);
+    message.signature = (object.signature !== undefined && object.signature !== null)
+      ? Signature.fromPartial(object.signature)
+      : undefined;
+    message.refundSignature = object.refundSignature ?? new Uint8Array(0);
+    message.directRefundSignature = object.directRefundSignature ?? new Uint8Array(0);
+    message.directFromCpfpRefundSignature = object.directFromCpfpRefundSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSubUserCommitment(): SubUserCommitment {
+  return { proofs: [] };
+}
+
+export const SubUserCommitment: MessageFns<SubUserCommitment> = {
+  encode(message: SubUserCommitment, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.proofs) {
+      writer.uint32(10).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubUserCommitment {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubUserCommitment();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.proofs.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubUserCommitment {
+    return {
+      proofs: globalThis.Array.isArray(object?.proofs) ? object.proofs.map((e: any) => bytesFromBase64(e)) : [],
+    };
+  },
+
+  toJSON(message: SubUserCommitment): unknown {
+    const obj: any = {};
+    if (message.proofs?.length) {
+      obj.proofs = message.proofs.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SubUserCommitment>): SubUserCommitment {
+    return SubUserCommitment.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SubUserCommitment>): SubUserCommitment {
+    const message = createBaseSubUserCommitment();
+    message.proofs = object.proofs?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseMpcOperatorShares(): MpcOperatorShares {
+  return { shares: [] };
+}
+
+export const MpcOperatorShares: MessageFns<MpcOperatorShares> = {
+  encode(message: MpcOperatorShares, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.shares) {
+      MpcSealedShare.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcOperatorShares {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcOperatorShares();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.shares.push(MpcSealedShare.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcOperatorShares {
+    return {
+      shares: globalThis.Array.isArray(object?.shares) ? object.shares.map((e: any) => MpcSealedShare.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: MpcOperatorShares): unknown {
+    const obj: any = {};
+    if (message.shares?.length) {
+      obj.shares = message.shares.map((e) => MpcSealedShare.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcOperatorShares>): MpcOperatorShares {
+    return MpcOperatorShares.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcOperatorShares>): MpcOperatorShares {
+    const message = createBaseMpcOperatorShares();
+    message.shares = object.shares?.map((e) => MpcSealedShare.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseMpcSealedShare(): MpcSealedShare {
+  return { ecies: new Uint8Array(0) };
+}
+
+export const MpcSealedShare: MessageFns<MpcSealedShare> = {
+  encode(message: MpcSealedShare, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ecies.length !== 0) {
+      writer.uint32(10).bytes(message.ecies);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcSealedShare {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcSealedShare();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ecies = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcSealedShare {
+    return { ecies: isSet(object.ecies) ? bytesFromBase64(object.ecies) : new Uint8Array(0) };
+  },
+
+  toJSON(message: MpcSealedShare): unknown {
+    const obj: any = {};
+    if (message.ecies.length !== 0) {
+      obj.ecies = base64FromBytes(message.ecies);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcSealedShare>): MpcSealedShare {
+    return MpcSealedShare.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcSealedShare>): MpcSealedShare {
+    const message = createBaseMpcSealedShare();
+    message.ecies = object.ecies ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseMpcSealedSharePayload(): MpcSealedSharePayload {
+  return { transferId: "", leafShares: [] };
+}
+
+export const MpcSealedSharePayload: MessageFns<MpcSealedSharePayload> = {
+  encode(message: MpcSealedSharePayload, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    for (const v of message.leafShares) {
+      MpcLeafSubShare.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcSealedSharePayload {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcSealedSharePayload();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.leafShares.push(MpcLeafSubShare.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcSealedSharePayload {
+    return {
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      leafShares: globalThis.Array.isArray(object?.leafShares)
+        ? object.leafShares.map((e: any) => MpcLeafSubShare.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: MpcSealedSharePayload): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.leafShares?.length) {
+      obj.leafShares = message.leafShares.map((e) => MpcLeafSubShare.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcSealedSharePayload>): MpcSealedSharePayload {
+    return MpcSealedSharePayload.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcSealedSharePayload>): MpcSealedSharePayload {
+    const message = createBaseMpcSealedSharePayload();
+    message.transferId = object.transferId ?? "";
+    message.leafShares = object.leafShares?.map((e) => MpcLeafSubShare.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseMpcLeafSubShare(): MpcLeafSubShare {
+  return { leafId: "", secretShare: new Uint8Array(0) };
+}
+
+export const MpcLeafSubShare: MessageFns<MpcLeafSubShare> = {
+  encode(message: MpcLeafSubShare, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.secretShare.length !== 0) {
+      writer.uint32(18).bytes(message.secretShare);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MpcLeafSubShare {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMpcLeafSubShare();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.secretShare = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MpcLeafSubShare {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      secretShare: isSet(object.secretShare) ? bytesFromBase64(object.secretShare) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: MpcLeafSubShare): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.secretShare.length !== 0) {
+      obj.secretShare = base64FromBytes(message.secretShare);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MpcLeafSubShare>): MpcLeafSubShare {
+    return MpcLeafSubShare.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MpcLeafSubShare>): MpcLeafSubShare {
+    const message = createBaseMpcLeafSubShare();
+    message.leafId = object.leafId ?? "";
+    message.secretShare = object.secretShare ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseTransferAuthorization(): TransferAuthorization {
+  return {
+    transferId: "",
+    leaves: [],
+    refundSighashesDigest: new Uint8Array(0),
+    expiryTime: undefined,
+    signature: undefined,
+  };
+}
+
+export const TransferAuthorization: MessageFns<TransferAuthorization> = {
+  encode(message: TransferAuthorization, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    for (const v of message.leaves) {
+      LeafAuthorization.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.refundSighashesDigest.length !== 0) {
+      writer.uint32(26).bytes(message.refundSighashesDigest);
+    }
+    if (message.expiryTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(34).fork()).join();
+    }
+    if (message.signature !== undefined) {
+      Signature.encode(message.signature, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferAuthorization {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferAuthorization();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.leaves.push(LeafAuthorization.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.refundSighashesDigest = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.expiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.signature = Signature.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferAuthorization {
+    return {
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      leaves: globalThis.Array.isArray(object?.leaves)
+        ? object.leaves.map((e: any) => LeafAuthorization.fromJSON(e))
+        : [],
+      refundSighashesDigest: isSet(object.refundSighashesDigest)
+        ? bytesFromBase64(object.refundSighashesDigest)
+        : new Uint8Array(0),
+      expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
+      signature: isSet(object.signature) ? Signature.fromJSON(object.signature) : undefined,
+    };
+  },
+
+  toJSON(message: TransferAuthorization): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.leaves?.length) {
+      obj.leaves = message.leaves.map((e) => LeafAuthorization.toJSON(e));
+    }
+    if (message.refundSighashesDigest.length !== 0) {
+      obj.refundSighashesDigest = base64FromBytes(message.refundSighashesDigest);
+    }
+    if (message.expiryTime !== undefined) {
+      obj.expiryTime = message.expiryTime.toISOString();
+    }
+    if (message.signature !== undefined) {
+      obj.signature = Signature.toJSON(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferAuthorization>): TransferAuthorization {
+    return TransferAuthorization.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferAuthorization>): TransferAuthorization {
+    const message = createBaseTransferAuthorization();
+    message.transferId = object.transferId ?? "";
+    message.leaves = object.leaves?.map((e) => LeafAuthorization.fromPartial(e)) || [];
+    message.refundSighashesDigest = object.refundSighashesDigest ?? new Uint8Array(0);
+    message.expiryTime = object.expiryTime ?? undefined;
+    message.signature = (object.signature !== undefined && object.signature !== null)
+      ? Signature.fromPartial(object.signature)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseLeafAuthorization(): LeafAuthorization {
+  return {
+    leafId: "",
+    amountSats: 0,
+    ownerSigningPublicKey: new Uint8Array(0),
+    maskCommitment: new Uint8Array(0),
+    receiverIdentityPublicKey: new Uint8Array(0),
+  };
+}
+
+export const LeafAuthorization: MessageFns<LeafAuthorization> = {
+  encode(message: LeafAuthorization, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.amountSats !== 0) {
+      writer.uint32(16).uint64(message.amountSats);
+    }
+    if (message.ownerSigningPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.ownerSigningPublicKey);
+    }
+    if (message.maskCommitment.length !== 0) {
+      writer.uint32(34).bytes(message.maskCommitment);
+    }
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      writer.uint32(42).bytes(message.receiverIdentityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LeafAuthorization {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLeafAuthorization();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.amountSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.ownerSigningPublicKey = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.maskCommitment = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.receiverIdentityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LeafAuthorization {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      amountSats: isSet(object.amountSats) ? globalThis.Number(object.amountSats) : 0,
+      ownerSigningPublicKey: isSet(object.ownerSigningPublicKey)
+        ? bytesFromBase64(object.ownerSigningPublicKey)
+        : new Uint8Array(0),
+      maskCommitment: isSet(object.maskCommitment) ? bytesFromBase64(object.maskCommitment) : new Uint8Array(0),
+      receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
+        ? bytesFromBase64(object.receiverIdentityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: LeafAuthorization): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.amountSats !== 0) {
+      obj.amountSats = Math.round(message.amountSats);
+    }
+    if (message.ownerSigningPublicKey.length !== 0) {
+      obj.ownerSigningPublicKey = base64FromBytes(message.ownerSigningPublicKey);
+    }
+    if (message.maskCommitment.length !== 0) {
+      obj.maskCommitment = base64FromBytes(message.maskCommitment);
+    }
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<LeafAuthorization>): LeafAuthorization {
+    return LeafAuthorization.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<LeafAuthorization>): LeafAuthorization {
+    const message = createBaseLeafAuthorization();
+    message.leafId = object.leafId ?? "";
+    message.amountSats = object.amountSats ?? 0;
+    message.ownerSigningPublicKey = object.ownerSigningPublicKey ?? new Uint8Array(0);
+    message.maskCommitment = object.maskCommitment ?? new Uint8Array(0);
+    message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSubUserSigningContribution(): SubUserSigningContribution {
+  return { nonceCommitment: undefined, partialSignature: new Uint8Array(0) };
+}
+
+export const SubUserSigningContribution: MessageFns<SubUserSigningContribution> = {
+  encode(message: SubUserSigningContribution, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.nonceCommitment !== undefined) {
+      SigningCommitment.encode(message.nonceCommitment, writer.uint32(10).fork()).join();
+    }
+    if (message.partialSignature.length !== 0) {
+      writer.uint32(18).bytes(message.partialSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubUserSigningContribution {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubUserSigningContribution();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.nonceCommitment = SigningCommitment.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.partialSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubUserSigningContribution {
+    return {
+      nonceCommitment: isSet(object.nonceCommitment) ? SigningCommitment.fromJSON(object.nonceCommitment) : undefined,
+      partialSignature: isSet(object.partialSignature) ? bytesFromBase64(object.partialSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: SubUserSigningContribution): unknown {
+    const obj: any = {};
+    if (message.nonceCommitment !== undefined) {
+      obj.nonceCommitment = SigningCommitment.toJSON(message.nonceCommitment);
+    }
+    if (message.partialSignature.length !== 0) {
+      obj.partialSignature = base64FromBytes(message.partialSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SubUserSigningContribution>): SubUserSigningContribution {
+    return SubUserSigningContribution.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SubUserSigningContribution>): SubUserSigningContribution {
+    const message = createBaseSubUserSigningContribution();
+    message.nonceCommitment = (object.nonceCommitment !== undefined && object.nonceCommitment !== null)
+      ? SigningCommitment.fromPartial(object.nonceCommitment)
+      : undefined;
+    message.partialSignature = object.partialSignature ?? new Uint8Array(0);
     return message;
   },
 };
@@ -21895,6 +23360,19 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * Initiates a transfer whose sender is a multiparty (user-side MPC)
+     * group. The receiver may be any Spark user: everything receiver-facing
+     * is byte-identical to a single-party send.
+     */
+    start_transfer_mpc: {
+      name: "start_transfer_mpc",
+      requestType: StartTransferMpcRequest,
+      requestStream: false,
+      responseType: StartTransferResponse,
+      responseStream: false,
+      options: {},
+    },
     claim_transfer: {
       name: "claim_transfer",
       requestType: ClaimTransferRequest,
@@ -22107,6 +23585,15 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTransferV3Request,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
+  /**
+   * Initiates a transfer whose sender is a multiparty (user-side MPC)
+   * group. The receiver may be any Spark user: everything receiver-facing
+   * is byte-identical to a single-party send.
+   */
+  start_transfer_mpc(
+    request: StartTransferMpcRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<StartTransferResponse>>;
   claim_transfer(
     request: ClaimTransferRequest,
     context: CallContext & CallContextExt,
@@ -22294,6 +23781,15 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
   ): Promise<StartTransferResponse>;
   start_transfer_v3(
     request: DeepPartial<StartTransferV3Request>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<StartTransferResponse>;
+  /**
+   * Initiates a transfer whose sender is a multiparty (user-side MPC)
+   * group. The receiver may be any Spark user: everything receiver-facing
+   * is byte-identical to a single-party send.
+   */
+  start_transfer_mpc(
+    request: DeepPartial<StartTransferMpcRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
   claim_transfer(

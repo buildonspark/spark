@@ -77,6 +77,11 @@ service SparkService {
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc start_transfer_v3(StartTransferV3Request) returns (StartTransferResponse) {}
 
+    // Initiates a transfer whose sender is a multiparty (user-side MPC)
+    // group. The receiver may be any Spark user: everything receiver-facing
+    // is byte-identical to a single-party send.
+    rpc start_transfer_mpc(StartTransferMpcRequest) returns (StartTransferResponse) {}
+
     rpc claim_transfer(ClaimTransferRequest) returns (ClaimTransferResponse) {}
 
     rpc get_utxos_for_address(GetUtxosForAddressRequest) returns (GetUtxosForAddressResponse) {}
@@ -676,6 +681,11 @@ message UserSignedTxSigningJob {
     // the signing data for one additional root tx input (inputs 1..N).
     // Input 0 uses the fields above for backward compatibility.
     repeated InputSigningData additional_inputs = 7;
+    // Multiparty (user-side MPC) senders only: per-sub-user FROST
+    // contributions in place of the single-signer pair
+    // (signing_nonce_commitment, user_signature). Exactly one of the two
+    // forms may be present.
+    repeated SubUserSigningContribution subuser_contributions = 8;
 }
 
 // InputSigningData carries the per-input signing data for additional root tx
@@ -775,6 +785,175 @@ message SendLeafKeyTweak {
     bytes refund_signature = 6;
     bytes direct_refund_signature = 7;
     bytes direct_from_cpfp_refund_signature = 8;
+}
+
+// -----------------------------------------------------------------------------
+// User-side MPC transfer send.
+//
+// A multiparty sender is a group of sub-users holding Shamir shares of the
+// user's identity and leaf signing keys; an untrusted user-side coordinator
+// assembles their contributions into one submission. Two contracts shape the
+// messages: the group's signature covers the whole submission — directly for
+// its facts, participant positions, commitment vectors, and secret_cipher,
+// and through the perfectly-binding commitments for the value of every
+// operator's sealed sub-share — and every operator verifies it before its
+// prepare succeeds; and everything past operator-side verification is
+// byte-identical to a single-party transfer, so receivers are unaffected.
+//
+// Scalars are 32-byte big-endian, canonically reduced; points are 33-byte
+// SEC1 compressed unless noted. Operator-identifier map keys use the same
+// encoding as TransferPackage.key_tweak_package. Per-sub-user lists align to
+// MpcTransferPackage.positions: entry i belongs to positions[i].
+// -----------------------------------------------------------------------------
+
+// A transfer-send submission from a multiparty sender. Single-sender only.
+message StartTransferMpcRequest {
+    // Must equal mpc_transfer_package.authorization.transfer_id.
+    string transfer_id = 1;
+    // The sender group's identity public key. Must match the authenticated
+    // session identity.
+    bytes owner_identity_public_key = 2;
+    MpcTransferPackage mpc_transfer_package = 3;
+}
+
+// The MPC analogue of TransferPackage: per-leaf material travels in the clear
+// once for all operators (it is non-confidential), sealing moves to sub-share
+// granularity, and the single-signer user_signature + hash_variant pair is
+// replaced by the group-signed TransferAuthorization.
+message MpcTransferPackage {
+    // The leaf-id sets here, in the signing jobs, and in authorization.leaves
+    // must all be identical.
+    repeated MpcSendLeaf leaves = 1;
+    // Sealed key-tweak sub-shares: exactly one entry per operator in the
+    // cluster, keyed by operator identifier, readable only by that operator.
+    map<string, MpcOperatorShares> key_tweaks = 2;
+    // Refund-tx signing jobs in multi-sub-user form: subuser_contributions
+    // populated, the single-signer pair absent.
+    repeated UserSignedTxSigningJob leaves_to_send = 3;
+    repeated UserSignedTxSigningJob direct_leaves_to_send = 4;
+    repeated UserSignedTxSigningJob direct_from_cpfp_leaves_to_send = 5;
+    TransferAuthorization authorization = 6;
+    // The participating sub-users' Shamir positions: >= 1, strictly
+    // ascending. The single participant set for the whole submission; every
+    // per-sub-user list in this package aligns to it (entry i belongs to
+    // positions[i]).
+    repeated uint32 positions = 7;
+}
+
+// Public (non-sealed) per-leaf sender material. secret_cipher, signature, and
+// the refund signatures carry the same semantics and byte formats as their
+// SendLeafKeyTweak counterparts; only the carrier message differs.
+message MpcSendLeaf {
+    string leaf_id = 1;
+    // Feldman commitment vectors, aligned to the package positions.
+    repeated SubUserCommitment subuser_commitments = 2;
+    // ECIES encryption of the transfer mask to the receiver's identity public
+    // key — byte-identical to SendLeafKeyTweak.secret_cipher.
+    bytes secret_cipher = 3;
+    // Sender identity signature over Sha256(leaf_id||transfer_id||secret_cipher),
+    // verified by the receiver. Scheme-tagged so a multiparty sender may sign
+    // by threshold-Schnorr (FROST); a deployed single-party receiver verifies
+    // ECDSA only, so any sender — multiparty or not — that cannot assume a
+    // scheme-aware receiver should sign ECDSA.
+    common.Signature signature = 4;
+    bytes refund_signature = 5;
+    bytes direct_refund_signature = 6;
+    bytes direct_from_cpfp_refund_signature = 7;
+}
+
+// One sub-user's Feldman commitment vector for one leaf's key-tweak resharing.
+message SubUserCommitment {
+    // The coefficient commitments of the sub-user's resharing polynomial,
+    // constant term first; length equals the operator group's signing
+    // threshold.
+    repeated bytes proofs = 1;
+}
+
+// All sealed key-tweak sub-shares destined for one operator, aligned to the
+// package positions. Per-leaf coverage is validated after unsealing (the leaf
+// structure is inside the ciphertext).
+message MpcOperatorShares {
+    repeated MpcSealedShare shares = 1;
+}
+
+// One sub-user's key-tweak sub-shares for one operator, across all leaves,
+// ECIES encrypted by the sub-user directly to that operator's identity public
+// key — the user-side coordinator routes it but cannot read it. The plaintext
+// is a serialized MpcSealedSharePayload. No further slot binding is needed: a
+// blob moved to another operator fails to decrypt, and one moved to another
+// position slot fails validation against that slot's signed commitments.
+message MpcSealedShare {
+    bytes ecies = 1;
+}
+
+// The plaintext of MpcSealedShare.ecies.
+message MpcSealedSharePayload {
+    // Must equal the enclosing submission's transfer_id: pins the sub-shares
+    // to one transfer even if resharing material is ever reused across
+    // transfers.
+    string transfer_id = 1;
+    // One entry per leaf being sent.
+    repeated MpcLeafSubShare leaf_shares = 2;
+}
+
+// One leaf's sub-share within a sealed payload.
+message MpcLeafSubShare {
+    string leaf_id = 1;
+    // The sub-share scalar: the sub-user's resharing polynomial evaluated at
+    // the operator's identifier.
+    bytes secret_share = 2;
+}
+
+// The group-signed statement of intent for a multiparty send. It names every
+// fact the submission commits; operators verify each named fact against state
+// they independently hold or rebuild, aborting on any mismatch.
+message TransferAuthorization {
+    // Must equal the enclosing request's transfer_id.
+    string transfer_id = 1;
+    // One entry per leaf being sent.
+    repeated LeafAuthorization leaves = 2;
+    // Digest over the BIP-341 sighashes of all leaves' refund transactions
+    // (all three variants) — the sighash commits to every spending-relevant
+    // field while staying invariant to unsigned-tx serialization freedom.
+    // Operators recompute it from transactions they rebuild; the construction
+    // is fixed by the operator-side verifier.
+    bytes refund_sighashes_digest = 3;
+    // The transfer's expiry. Nanos must be 0.
+    google.protobuf.Timestamp expiry_time = 4;
+    // The sender group's identity-key threshold signature, over a
+    // domain-separated structured hash binding this authorization's fields,
+    // the package's participant positions, and each leaf's commitment vectors
+    // and secret_cipher — and thereby, since Feldman commitments fix the
+    // sub-shares they commit to, the contents of every operator's sealed
+    // key-tweak slice. The exact construction is fixed by the operator-side
+    // verifier. Scheme-tagged: operators accept ECDSA or Schnorr.
+    common.Signature signature = 5;
+}
+
+// The signed per-leaf facts of a TransferAuthorization.
+message LeafAuthorization {
+    string leaf_id = 1;
+    // The leaf's value in satoshis.
+    uint64 amount_sats = 2;
+    // The leaf's current owner signing public key.
+    bytes owner_signing_public_key = 3;
+    // Commitment to the leaf's transfer mask (mask * G).
+    bytes mask_commitment = 4;
+    // Who can claim this leaf. Per-leaf so multi-receiver MPC sends are a
+    // later validation relaxation rather than a schema change; initial
+    // validation requires all leaves to name the same receiver.
+    bytes receiver_identity_public_key = 5;
+}
+
+// One sub-user's FROST contribution to one refund-tx signing job, aligned to
+// the package positions. There is deliberately no client-side pre-aggregation
+// into one user pair: every contributing sub-user's nonce commitment must be
+// visible to the operators' aggregator.
+message SubUserSigningContribution {
+    common.SigningCommitment nonce_commitment = 1;
+    // 32-byte FROST signature share scalar, with the signer's within-group
+    // Lagrange coefficient already applied.
+    bytes partial_signature = 2;
 }
 
 message FinalizeTransferRequest {
