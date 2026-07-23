@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -75,6 +76,17 @@ type TwoPCEngine struct {
 	// (notification flush hooks, panic-recovery rollback, metric
 	// attribution, lazy tx-begin), with only the lifecycle differing.
 	sessionFactory db.SessionFactory
+	// commitCoordinatorTx commits the coordinator's request transaction — the
+	// atomic point of no return that persists the COMMITTED decision together
+	// with the coordinator's domain work. A field (defaulted to ent.DbCommit)
+	// so tests can inject the ambiguous outcome where the tx durably applies
+	// but Commit reports an error (lost ack from a DB failover, killed
+	// connection, or request-ctx cancellation mid-commit).
+	commitCoordinatorTx func(ctx context.Context) error
+	// readBackDecisionStatus re-reads the coordinator row's durable status on a
+	// fresh connection to resolve an ambiguous commit error. A field (defaulted
+	// to the real reader) for the same testing reason as commitCoordinatorTx.
+	readBackDecisionStatus func(ctx context.Context, id uuid.UUID) (st.FlowExecutionStatus, error)
 }
 
 // NewTwoPCEngine creates a TwoPCEngine backed by synchronous operator
@@ -87,11 +99,14 @@ type TwoPCEngine struct {
 // ConsensusEngineInterceptor; handlers fetch it through
 // consensus.GetEngine(ctx). Tests construct an engine directly per test.
 func NewTwoPCEngine(config *so.Config, gossip GossipSender, sessionFactory db.SessionFactory) *TwoPCEngine {
-	return &TwoPCEngine{
-		config:         config,
-		gossip:         gossip,
-		sessionFactory: sessionFactory,
+	e := &TwoPCEngine{
+		config:              config,
+		gossip:              gossip,
+		sessionFactory:      sessionFactory,
+		commitCoordinatorTx: ent.DbCommit,
 	}
+	e.readBackDecisionStatus = e.readBackDecisionStatusFromDB
+	return e
 }
 
 // Execute runs the full two-phase commit lifecycle for a consensus operation.
@@ -203,29 +218,41 @@ func (e *TwoPCEngine) Execute(
 	if err != nil {
 		logger.With(zap.Error(err)).Sugar().Infof(
 			"2PC commit: recording decision failed for op type %d, sending rollback", opType)
+		// The request tx is doomed; roll it back now to release its locks
+		// (flow.Prepare's leaf/node ForUpdate locks, the decision CAS) before the
+		// detached rollback bookkeeping, rather than holding them until the
+		// middleware rolls back after Execute returns.
+		_ = ent.DbRollback(ctx)
 		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("failed to record commit decision: %w", err)
 	}
 	if preempted {
 		// The self-sweep transitioned the row to ROLLED_BACK before we
 		// recorded the decision. The request tx (with the coordinator's
-		// domain work) is left uncommitted and rolled back by the middleware,
-		// so the coordinator converges with the participants on rolled-back —
-		// a benign coordinated rollback, not a divergence. Dispatch rollback
+		// domain work) is doomed; roll it back now to release its locks so the
+		// coordinator converges with the participants on rolled-back — a benign
+		// coordinated rollback, not a divergence. Rolling back before
+		// attemptRollback also frees the row so the detached markRolledBack CAS
+		// isn't contending with the request tx's own locks. Dispatch rollback
 		// gossip so peers don't wait for the reconciler to drive them there.
 		logger.Sugar().Warnf(
 			"2PC commit: coordinator row preempted by sweep for op type %d, rolling back", opType)
+		_ = ent.DbRollback(ctx)
 		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
 		return nil, fmt.Errorf("commit preempted: %w", ErrCoordinatorRowPreempted)
 	}
 
 	// Atomic point of no return: commits the coordinator's domain work and the
-	// COMMITTED decision together.
-	if commitErr := ent.DbCommit(ctx); commitErr != nil {
-		logger.With(zap.Error(commitErr)).Sugar().Infof(
-			"2PC commit: request tx commit failed for op type %d, sending rollback", opType)
-		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
-		return nil, fmt.Errorf("request tx commit failed: %w", commitErr)
+	// COMMITTED decision together. A commit error is NOT proof of abort (see
+	// resolveAmbiguousCommit), so it is resolved from durable state rather than
+	// assumed to be a rollback.
+	if commitErr := e.commitCoordinatorTx(ctx); commitErr != nil {
+		proceed, err := e.resolveAmbiguousCommit(ctx, detachedCtx, row, opType, flow, executionID, participants, commitErr)
+		if !proceed {
+			return nil, err
+		}
+		// proceed == true: the tx durably committed despite the error; fall
+		// through to the commit-gossip path exactly as the clean-success case.
 	}
 
 	logger.Sugar().Infof("2PC commit: sending gossip for op type %d to %d participants", opType, len(participants))
@@ -238,12 +265,106 @@ func (e *TwoPCEngine) Execute(
 	return commitOp, nil
 }
 
-// attemptRollback runs the abort path: mark the coordinator row
-// ROLLED_BACK (CAS — benign no-op if the sweep has already done so) and
-// send rollback gossip to participants. Errors on each step are logged but
-// not returned: the caller is already in an error path with a primary
-// failure reason that should propagate, and best-effort cleanup of the
-// row plus rollback gossip is what the system is designed for.
+// resolveAmbiguousCommit disambiguates a request-tx commit error and drives the
+// flow to a terminal outcome.
+//
+// A commit error is NOT proof of abort. PostgreSQL can durably apply the COMMIT
+// and then lose the acknowledgement — a DB failover, a killed connection, or the
+// request ctx being cancelled mid-commit (the commit rides the request ctx,
+// unlike the detached bookkeeping) all surface the same error whether the tx
+// aborted or committed-then-lost-its-ack. Treating the error as abort and
+// rolling back would strand a committed coordinator against participants driven
+// to ROLLED_BACK, with no path to reconcile (the reconciler only re-checks
+// IN_FLIGHT rows).
+//
+// The COMMITTED decision was written inside the request tx (recordCommitDecision)
+// while the row's IN_FLIGHT baseline was committed separately at row creation, so
+// a fresh-connection read of the row's status is authoritative: COMMITTED means
+// the tx applied; anything else means it did not.
+//
+// Returns proceed=true only when the decision is durably COMMITTED — the caller
+// must then dispatch commit gossip. For the aborted and unresolvable cases it
+// performs the terminal action itself (rollback dispatch, or nothing) and returns
+// proceed=false with the error to propagate.
+func (e *TwoPCEngine) resolveAmbiguousCommit(
+	ctx, detachedCtx context.Context,
+	row *ent.FlowExecution,
+	opType pbgossip.ConsensusOperationType,
+	flow CoordinatorFlow,
+	executionID string,
+	participants []string,
+	commitErr error,
+) (proceed bool, err error) {
+	logger := logging.GetLoggerFromContext(ctx)
+	status, readErr := e.readBackDecisionStatus(detachedCtx, row.ID)
+	switch {
+	case readErr != nil:
+		// Outcome genuinely unknown. Send NO gossip: a wrong rollback over a
+		// durably-committed decision is unrecoverable, whereas silence is safe —
+		// the participant reconciler drives peers to this coordinator's true
+		// outcome via ConsensusQueryOutcome once the coordinator is reachable
+		// again. (Trade-off: participants stay IN_FLIGHT with resources locked
+		// until the reconciler/self-sweep window elapses; that bounded delay is
+		// preferred over an unrecoverable wrong rollback.)
+		logger.With(zap.Error(commitErr)).Sugar().Errorf(
+			"2PC commit: request tx commit errored and decision read-back failed for op type %d (read-back err: %v); sending no gossip, leaving the reconciler to resolve peers",
+			opType, readErr)
+		return false, fmt.Errorf("request tx commit outcome unknown for op type %d (read-back failed: %w): %w", opType, readErr, commitErr)
+	case status == st.FlowExecutionStatusCommitted:
+		// The transaction actually committed despite the error. Honor it and
+		// dispatch commit gossip — that gossip (below, on detachedCtx) is what
+		// makes participants converge on COMMITTED, independent of the RPC result.
+		//
+		// The request tx is durably committed but the session's OnCommit hook did
+		// not clear its tracked handle (the error is neither nil, ErrTxDone, nor
+		// context.Canceled), so detach the spent tx here — otherwise the
+		// idempotency store and DatabaseSessionMiddleware would reuse the spent
+		// *sql.Tx and fail with ErrTxDone. With the handle detached, a still-live
+		// request ctx (e.g. a mid-commit DB failover) lets those interceptors
+		// begin a fresh tx and the RPC returns success. If the ambiguity came from
+		// the request ctx itself expiring (deadline/cancel), no further DB work is
+		// possible and the caller still sees an error — but consensus is already
+		// safe: the commit is durable and commit gossip has been dispatched.
+		ent.DiscardResolvedTx(ctx)
+		logger.With(zap.Error(commitErr)).Sugar().Warnf(
+			"2PC commit: request tx commit errored but decision is durably COMMITTED for op type %d; honoring the commit and dispatching commit gossip",
+			opType)
+		return true, nil
+	default:
+		// IN_FLIGHT (or an externally-swept ROLLED_BACK): the decision write was
+		// inside the failed tx, so a non-committed status proves the tx did not
+		// apply. Safe to roll back.
+		logger.With(zap.Error(commitErr)).Sugar().Infof(
+			"2PC commit: request tx commit failed for op type %d (durable status %s), sending rollback", opType, status)
+		e.attemptRollback(detachedCtx, row, opType, flow, executionID, participants)
+		return false, fmt.Errorf("request tx commit failed: %w", commitErr)
+	}
+}
+
+// attemptRollback runs the abort path: mark the coordinator row ROLLED_BACK
+// (CAS — benign no-op if the sweep has already done so) and send rollback gossip
+// to participants. The error is not returned: the caller is already in an error
+// path with a primary failure reason that should propagate, and best-effort
+// cleanup of the row plus rollback gossip is what the system is designed for.
+//
+// Rollback gossip is dispatched ONLY when markRolledBack returns nil — i.e. it
+// positively confirmed the coordinator row is ROLLED_BACK (we transitioned it, or
+// it already was). On ANY markRolledBack error the gossip is withheld: whether the
+// row is durably COMMITTED, its terminal status is unreadable, or the transition
+// UPDATE itself failed, we have NOT confirmed the coordinator is uncommitted, and
+// a rollback we can't justify risks contradicting a committed coordinator. This
+// mirrors resolveAmbiguousCommit's "unknown outcome → send nothing" rule.
+//
+// Convergence is still guaranteed in the withheld case: the participant reconciler
+// and SweepStaleCoordinatorFlows drive peers to the coordinator's true outcome via
+// ConsensusQueryOutcome. The cost is a bounded delay releasing locked resources on
+// the rare markRolledBack error, preferred over an unjustified rollback.
+//
+// For context, every current caller reaches attemptRollback with a row that is
+// structurally NOT COMMITTED (prepare/build-commit failure run before
+// recordCommitDecision; preemption means the CAS missed to a swept ROLLED_BACK;
+// resolveAmbiguousCommit's rollback branch runs only after a read-back showed a
+// non-COMMITTED status). The COMMITTED case is thus a defensive invariant guard.
 func (e *TwoPCEngine) attemptRollback(
 	ctx context.Context,
 	row *ent.FlowExecution,
@@ -255,7 +376,8 @@ func (e *TwoPCEngine) attemptRollback(
 	logger := logging.GetLoggerFromContext(ctx)
 	if markErr := e.markRolledBack(ctx, row); markErr != nil {
 		logger.With(zap.Error(markErr)).Sugar().Errorf(
-			"failed to mark FlowExecution rolled back for op type %d", opType)
+			"2PC rollback: withholding rollback gossip for op type %d — could not confirm the coordinator is uncommitted; leaving convergence to the reconciler", opType)
+		return
 	}
 	if rollbackErr := e.rollback(ctx, opType, flow.RollbackPayload(), executionID, participants); rollbackErr != nil {
 		logger.With(zap.Error(rollbackErr)).Sugar().Errorf(
@@ -394,29 +516,85 @@ func (e *TwoPCEngine) recordCommitDecision(ctx context.Context, row *ent.FlowExe
 	return rowsAffected == 0, nil
 }
 
+// readBackDecisionStatusFromDB re-reads the coordinator row's status on a fresh
+// engine session (a new connection, not the request tx whose commit just
+// errored). This is the authoritative oracle for an ambiguous commit: the
+// COMMITTED decision was written inside the request tx, so it is durable iff
+// that tx actually committed.
+//
+// The read MUST target the primary. Each SO owns its Postgres and the engine's
+// session factory routes to that primary (no read-replica layer here), so under
+// READ COMMITTED this observes the just-committed status. If a lagging read
+// replica were ever placed behind this client, a stale IN_FLIGHT read on a
+// durably-committed row would wrongly roll back a committed coordinator — the
+// whole disambiguation rests on reading the primary.
+func (e *TwoPCEngine) readBackDecisionStatusFromDB(ctx context.Context, id uuid.UUID) (st.FlowExecutionStatus, error) {
+	var status st.FlowExecutionStatus
+	if err := e.inEngineSession(ctx, func(sessionCtx context.Context) error {
+		client, err := ent.GetDbFromContext(sessionCtx)
+		if err != nil {
+			return err
+		}
+		row, err := client.FlowExecution.Get(sessionCtx, id)
+		if err != nil {
+			return err
+		}
+		status = row.Status
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	return status, nil
+}
+
+// errRollbackUnsafe signals that markRolledBack's CAS missed and the row is
+// durably COMMITTED — an invariant violation, since a rollback must never be
+// attempted over a committed decision (attemptRollback callers never pass a
+// committed row; see the doc there). It is a distinct sentinel mainly so tests
+// and logs can single out this case; attemptRollback withholds gossip on ANY
+// markRolledBack error regardless.
+var errRollbackUnsafe = errors.New("cannot safely roll back FlowExecution: coordinator decision is durably COMMITTED")
+
 // markRolledBack transitions the coordinator row to ROLLED_BACK.
 // decision_payload already contains the rollback bytes from row creation,
 // so no payload update is needed.
 //
-// Like recordCommitDecision, uses a conditional UPDATE so a row that's already
-// terminal (most likely already-rolled-back via the self-sweep) isn't
-// touched again. Unlike the commit case, a CAS conflict here is benign:
-// the row is already in the rolled-back state we wanted, so the
-// zero-rows-affected case is silently treated as success.
+// Like recordCommitDecision, uses a conditional UPDATE (CAS on status=IN_FLIGHT)
+// so a row that's already terminal isn't touched again. It returns nil ONLY when
+// it has positively confirmed the row is ROLLED_BACK — either it transitioned the
+// row, or a CAS-miss re-read showed it was already ROLLED_BACK. Every other
+// outcome is a non-nil error on which attemptRollback withholds rollback gossip:
+//   - CAS miss + re-read shows COMMITTED → errRollbackUnsafe (invariant violation).
+//   - CAS miss + re-read fails → wrapped error (terminal status unconfirmable).
+//   - UPDATE itself errors → the error (row state unconfirmed).
 func (e *TwoPCEngine) markRolledBack(ctx context.Context, row *ent.FlowExecution) error {
 	return e.inEngineSession(ctx, func(sessionCtx context.Context) error {
 		client, err := ent.GetDbFromContext(sessionCtx)
 		if err != nil {
 			return err
 		}
-		_, err = client.FlowExecution.Update().
+		rowsAffected, err := client.FlowExecution.Update().
 			Where(
 				flowexecution.ID(row.ID),
 				flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
 			).
 			SetStatus(st.FlowExecutionStatusRolledBack).
 			Save(sessionCtx)
-		return err
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			current, getErr := client.FlowExecution.Get(sessionCtx, row.ID)
+			if getErr != nil {
+				// Terminal row (CAS missed) whose status we can't read — can't
+				// prove it isn't COMMITTED, so treat as unconfirmed (withholds).
+				return fmt.Errorf("re-read of terminal FlowExecution %s failed: %w", row.ID, getErr)
+			}
+			if current.Status == st.FlowExecutionStatusCommitted {
+				return errRollbackUnsafe
+			}
+		}
+		return nil
 	})
 }
 

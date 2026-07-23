@@ -93,6 +93,50 @@ func TestSession_GetCurrentTxReturnsNilAfterSuccessfulCommit(t *testing.T) {
 	require.Nil(t, currentTx, "Expected no current transaction to exist after commit")
 }
 
+func TestDiscardResolvedTx_ClearsTrackedTxAndYieldsFreshUsableTx(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
+	ctx := ent.Inject(t.Context(), session)
+
+	tx1, err := session.GetOrBeginTx(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, session.GetTxIfExists(), "precondition: a tx is tracked")
+
+	ent.DiscardResolvedTx(ctx)
+
+	require.Nil(t, session.GetTxIfExists(),
+		"DiscardResolvedTx must detach the session's tracked tx so downstream code does not reuse it")
+
+	// The detached handle is replaced by a FRESH, usable transaction — this is what
+	// lets the idempotency interceptor / session middleware proceed after an
+	// honored ambiguous commit instead of reusing a spent *sql.Tx.
+	tx2, err := session.GetOrBeginTx(ctx)
+	require.NoError(t, err)
+	require.NotSame(t, tx1, tx2, "GetOrBeginTx after discard must begin a new transaction")
+	_, err = tx2.Client().FlowExecution.Query().Count(ctx)
+	require.NoError(t, err, "the fresh transaction must be usable")
+}
+
+func TestDiscardResolvedTx_NoTrackedTx_IsNoOp(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
+	ctx := ent.Inject(t.Context(), session)
+	require.Nil(t, session.GetTxIfExists(), "precondition: no tx tracked")
+
+	// Must not panic or begin a new transaction.
+	ent.DiscardResolvedTx(ctx)
+	require.Nil(t, session.GetTxIfExists())
+}
+
+func TestDiscardResolvedTx_NoSession_IsNoOp(t *testing.T) {
+	// No session injected into the context — must be a safe no-op, not a panic.
+	ent.DiscardResolvedTx(t.Context())
+}
+
 func TestSession_CleanCommitClearsCurrentTx(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()

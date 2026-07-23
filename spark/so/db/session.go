@@ -202,6 +202,30 @@ func (s *Session) Notify(ctx context.Context, n ent.Notification) error {
 	return s.currentNotifications.Notify(ctx, n)
 }
 
+// FlushBufferedNotifications flushes the notifications buffered in the current
+// transaction, asynchronously — the same delivery the OnCommit hook performs on a
+// clean commit. It exists for callers that have confirmed the transaction's work
+// is durable out of band (a commit whose acknowledgement was lost, so the
+// OnCommit success-path flush never ran); without it those notifications would be
+// silently dropped when the tx handle is detached. Safe no-op when nothing is
+// buffered. MUST only be called once the tx's work is known to be committed —
+// flushing notifications for uncommitted work would emit events for changes that
+// never landed.
+func (s *Session) FlushBufferedNotifications(ctx context.Context) {
+	if s.currentNotifications == nil {
+		return
+	}
+	logger := logging.GetLoggerFromContext(ctx)
+	notifier := s.currentNotifications
+	go func() {
+		fctx, cancel := context.WithTimeout(context.Background(), DefaultNotificationFlushTimeout)
+		defer cancel()
+		if flushErr := notifier.Flush(fctx); flushErr != nil {
+			logger.Error("Failed to flush notifications after settling committed transaction", zap.Error(flushErr))
+		}
+	}()
+}
+
 // ReadOnlySession is a simplified session for read-only database operations.
 // It doesn't support transactions or notifications, making it lightweight and safe
 // for query-only endpoints.
