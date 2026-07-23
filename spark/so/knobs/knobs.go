@@ -184,29 +184,6 @@ const (
 	KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds = "spark.so.finalize_revealed_token_transactions.max_runtime_seconds"
 
 	KnobEnablePartnerJWT = "spark.so.enable_partner_jwt"
-	// KnobUseConsensusTransfer routes StartTransferV3 through the 2PC engine
-	// instead of the legacy syncTransferV3Init + syncSettleSenderKeyTweaks fanout.
-	//
-	// The sweep does not need to undo coordinator domain writes: the engine
-	// records the COMMITTED decision atomically with the coordinator's
-	// SENDER_KEY_TWEAKED write (single request-tx DbCommit), so a crash before
-	// that commit leaves the transfer untweaked with an IN_FLIGHT row (sweep →
-	// ROLLED_BACK, consistent) and a crash after it leaves a COMMITTED row the
-	// reconciler drives forward (SP-3195).
-	KnobUseConsensusTransfer = "spark.so.use_consensus_transfer"
-	// KnobUseConsensusClaim routes ClaimTransfer through the 2PC engine
-	// instead of the legacy settleReceiverKeyTweakWithClaimPackage + finalize
-	// gossip fanout. Interpreted as binary (any non-zero value enables) — not
-	// a percentage rollout.
-	//
-	// The sweep does not need to undo coordinator domain writes: the engine
-	// records the COMMITTED decision atomically with the coordinator's
-	// RECEIVER_KEY_TWEAK_LOCKED / key-tweak writes (single request-tx DbCommit),
-	// so a crash before that commit rolls those writes back with an IN_FLIGHT
-	// row (sweep → ROLLED_BACK, consistent) and a crash after it leaves a
-	// COMMITTED row the reconciler drives forward (SP-3195).
-	KnobUseConsensusClaim = "spark.so.use_consensus_claim"
-
 	// KnobUseConsensusInitiatePreimageSwap routes InitiatePreimageSwapV3 through
 	// the 2PC engine instead of the legacy initiatePreimageSwap fanout
 	// (InitiatePreimageSwapV2 -> GetPreimageShare) + PreimageSwap gossip.

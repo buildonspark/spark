@@ -8,19 +8,14 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/uuids"
-	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
-	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
@@ -30,206 +25,9 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/mimo"
-	"github.com/lightsparkdev/spark/so/partner"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-func (h *TransferHandler) startTransferV3Internal(
-	ctx context.Context,
-	req *pb.StartTransferV3Request,
-) (resp *pb.StartTransferResponse, retErr error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
-	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Internal")
-	defer span.End()
-
-	if req == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
-	}
-
-	// MVP: single sender only.
-	if len(req.GetSenderPackages()) != 1 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 sender package, got %d", len(req.GetSenderPackages())))
-	}
-	senderPkg := req.GetSenderPackages()[0]
-	if senderPkg == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender_package is required"))
-	}
-
-	if senderPkg.GetTransferPackage() == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
-	}
-
-	// Auth
-	senderIDPK, err := keys.ParsePublicKey(senderPkg.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
-	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPK); err != nil {
-		return nil, err
-	}
-	if err := authz.EnforceWalletNotKillSwitched(ctx, senderIDPK); err != nil {
-		return nil, err
-	}
-
-	transferID, err := uuid.Parse(req.GetTransferId())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
-	}
-
-	leafReceiverMap, receivers, err := parseSendTransferReceivers(senderPkg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Multi-receiver transfers require the MIMO knob to be enabled.
-	if len(receivers) > 1 {
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) == 0 {
-			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("multi-receiver transfers are not enabled"))
-		}
-	}
-
-	// Validate transfer package.
-	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.GetTransferPackage(), senderIDPK, true /* requireDirectFromCpfpLeaves */)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", transferID, err)
-	}
-	if len(leafTweakMap) == 0 {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer package contains no key tweaks"))
-	}
-
-	// Verify the transfer size doesn't exceed the transfer limit.
-	transferLimit := knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoTransferLimit, 0)
-	if transferLimit > 0 && len(leafTweakMap) > int(transferLimit) {
-		return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
-	}
-
-	pkg, err := transferpkg.ParsePackage(senderPkg.GetTransferPackage())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer package: %w", err))
-	}
-	leafCpfpRefundMap := stringKeyedRefundMap(pkg.CPFPRefundTxByLeafID())
-	leafDirectRefundMap := stringKeyedRefundMap(pkg.DirectRefundTxByLeafID())
-	leafDirectFromCpfpRefundMap := stringKeyedRefundMap(pkg.DirectFromCPFPRefundTxByLeafID())
-
-	// Mutual exclusivity
-	if err := createPendingSendTransferAndCommit(ctx, transferID); err != nil {
-		return nil, err
-	}
-
-	// Rollback PendingSendTransfer on any failure between here and the success
-	// point. cancelGossip is set to true before syncTransferV3Init so that a
-	// sync failure also cancels the gossip messages sent to other SOs.
-	needsRollback := true
-	cancelGossip := false
-	defer func() {
-		if !needsRollback || retErr == nil {
-			return
-		}
-		if rbErr := h.rollbackTransferInit(ctx, transferID, cancelGossip); rbErr != nil {
-			retErr = fmt.Errorf("rollback failed: %w while processing transfer %s: %w", rbErr, transferID, retErr)
-		}
-	}()
-
-	// Create transfer with multiple receivers.
-	spec := &transferSpec{
-		transferID:      transferID,
-		senderIDPK:      senderIDPK,
-		receivers:       receivers,
-		leafReceiverMap: leafReceiverMap,
-		expiryTime:      req.GetExpiryTime().AsTime(),
-		pkgLeafIDs:      transferPackageLeafIDLists(senderPkg.GetTransferPackage()),
-		cpfpRefunds:     leafCpfpRefundMap,
-		directRefunds:   leafDirectRefundMap,
-		dfcRefunds:      leafDirectFromCpfpRefundMap,
-		keyTweaks:       leafTweakMap,
-		// sparkInvoice stays empty: the v3 request carries no invoice.
-	}
-	transfer, leafMap, err := h.createTransferV3(ctx, spec, st.TransferTypeTransfer, TransferRoleCoordinator, true /* requireDirectTx */)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", transferID, err)
-	}
-
-	refundSignatures, err := h.signAggregateAndUpdateRefunds(
-		ctx, transfer, transferID.String(), senderPkg.GetTransferPackage(), leafMap,
-		keys.Public{}, keys.Public{}, keys.Public{}, nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build signing result protos for the response.
-	signingResultProtos, err := buildSigningResultProtos(leafMap, refundSignatures.cpfpSigningResultMap, refundSignatures.directSigningResultMap, refundSignatures.directFromCpfpSigningResultMap)
-	if err != nil {
-		return nil, err
-	}
-
-	// Gossip sync: notify other SOs using InitiateTransferV2.
-	senderKeyTweakProofs := make(map[string]*pb.SecretProof)
-	for _, leaf := range leafTweakMap {
-		senderKeyTweakProofs[leaf.Proto().GetLeafId()] = &pb.SecretProof{
-			Proofs: leaf.Proto().GetSecretShareTweak().GetProofs(),
-		}
-	}
-
-	cancelGossip = true
-	err = h.syncTransferV3Init(
-		ctx,
-		req,
-		senderPkg,
-		senderKeyTweakProofs,
-		refundSignatures.finalCpfpSignatureMap,
-		refundSignatures.finalDirectSignatureMap,
-		refundSignatures.finalDfcSignatureMap,
-	)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to sync transfer V3 init for transfer %s", transferID)
-		return nil, fmt.Errorf("failed to sync transfer V3 init for transfer %s: %w", transferID, err)
-	}
-
-	// After this point, the transfer send is considered successful.
-	needsRollback = false
-
-	// Attribute the transfer to the partner before committing, mirroring the
-	// TransferTypeTransfer case in startTransferInternal.
-	partner.SaveTransferPartner(ctx, transfer.ID, st.TransferPartnerTypeTransfer)
-
-	// Commit and settle key tweaks.
-	entTx, err := ent.GetTxFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get db before key tweak settlement: %w", err)
-	}
-	if err := entTx.Commit(); err != nil {
-		return nil, fmt.Errorf("unable to commit db before key tweak settlement: %w", err)
-	}
-
-	// Settle sender key tweaks via gossip.
-	if err := h.syncSettleSenderKeyTweaks(ctx, transfer.ID.String(), senderKeyTweakProofs); err != nil {
-		return nil, err
-	}
-
-	transfer, err = h.loadTransferForUpdate(ctx, transferID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load transfer: %w", err)
-	}
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get database transaction: %w", err)
-	}
-	_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
-	}
-
-	transferProto, err := transfer.MarshalProto(ctx)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Unable to marshal transfer %s", transfer.ID)
-	}
-
-	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResultProtos}, nil
-}
 
 // convertV2ToV3SendTransferRequest maps a v2 StartTransferRequest onto the v3
 // StartTransferV3Request shape consumed by the consensus engine. A v2 request
@@ -265,9 +63,16 @@ func convertV2ToV3SendTransferRequest(req *pb.StartTransferRequest) *pb.StartTra
 }
 
 // startTransferV3Consensus runs the v3 send-transfer flow through the 2PC
-// consensus engine instead of the legacy syncTransferV3Init +
-// syncSettleSenderKeyTweaks fanout. Gated by KnobUseConsensusTransfer at the
-// public StartTransferV3 entry point.
+// consensus engine. It is the only path for v3 send-transfers, reached from
+// StartTransferV3 and from StartTransferV2 for TransferPackage-carrying
+// requests.
+//
+// The stale-flow sweep does not need to undo coordinator domain writes: the
+// engine records the COMMITTED decision atomically with the coordinator's
+// SENDER_KEY_TWEAKED write (single request-tx DbCommit), so a crash before
+// that commit leaves the transfer untweaked with an IN_FLIGHT row (sweep →
+// ROLLED_BACK, consistent) and a crash after it leaves a COMMITTED row the
+// reconciler drives forward (SP-3195).
 //
 // This is intentionally a thin entry point: only the cheap structural checks,
 // session-identity auth, and the MIMO multi-receiver knob guard run on the
@@ -312,8 +117,8 @@ func (h *TransferHandler) startTransferV3Consensus(
 		// Coordinator-only by design (matches legacy InitiateTransferV2).
 		// Participants don't re-check this — during the multi-receiver
 		// rollout, set KnobMimoTransferMultiReceiverEnabled on every SO
-		// before flipping the coordinator-routing knob to avoid
-		// coordinator-accepts-but-participants-reject divergence.
+		// before letting multi-receiver traffic reach the coordinator, to
+		// avoid coordinator-accepts-but-participants-reject divergence.
 		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) == 0 {
 			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("multi-receiver transfers are not enabled"))
 		}
@@ -368,48 +173,6 @@ func (h *TransferHandler) startTransferV3Consensus(
 		return nil, fmt.Errorf("internal: consensus send transfer for %s succeeded but produced no response", req.GetTransferId())
 	}
 	return flow.response, nil
-}
-
-func (h *TransferHandler) syncTransferV3Init(
-	ctx context.Context,
-	req *pb.StartTransferV3Request,
-	senderPkg *pb.SenderTransferPackage,
-	senderKeyTweakProofs map[string]*pb.SecretProof,
-	cpfpRefundSignatures map[string][]byte,
-	directRefundSignatures map[string][]byte,
-	directFromCpfpRefundSignatures map[string][]byte,
-) error {
-	ctx, span := tracer.Start(ctx, "TransferHandler.syncTransferV3Init")
-	defer span.End()
-
-	initReq := &pbinternal.InitiateTransferV2Request{
-		TransferId: req.GetTransferId(),
-		SenderPackages: []*pbinternal.InitiateTransferSenderPackage{{
-			SenderIdentityPublicKey:        senderPkg.GetOwnerIdentityPublicKey(),
-			TransferPackage:                senderPkg.GetTransferPackage(),
-			ReceiverIdentityPublicKeys:     senderPkg.GetReceiverIdentityPublicKeys(),
-			RefundSignatures:               cpfpRefundSignatures,
-			DirectRefundSignatures:         directRefundSignatures,
-			DirectFromCpfpRefundSignatures: directFromCpfpRefundSignatures,
-		}},
-		SenderKeyTweakProofs: senderKeyTweakProofs,
-		ExpiryTime:           req.GetExpiryTime(),
-	}
-
-	selection := helper.OperatorSelection{
-		Option: helper.OperatorSelectionOptionExcludeSelf,
-	}
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		return client.InitiateTransferV2(ctx, initReq)
-	})
-	return err
 }
 
 // finishQueryFromIDs wraps the post-SQL-scan tail shared by every MIMO query

@@ -54,9 +54,9 @@ func runClaimPrepare(ctx context.Context, t *testing.T, transfer *ent.Transfer, 
 
 // TestClaimTransferPrepare_ClaimableStatusesPassGate confirms the status gate
 // admits every claimable status — including the already-applied states
-// (RKA/RRS). Those are resumable, not terminal: a prior attempt (or a legacy
-// claim that committed the settle phase before refund signing during the
-// KnobUseConsensusClaim cutover) can leave a durable RKA/RRS transfer that still
+// (RKA/RRS). Those are resumable, not terminal: a prior attempt (or a durable
+// row left by the retired pre-consensus claim path, which committed the settle
+// phase before refund signing) can leave an RKA/RRS transfer that still
 // needs its refunds signed and a finalize to reach COMPLETED. Returning
 // AlreadyExists for them would strand such partials (the codex-P1 bug). Prepare
 // resumes them instead (predicted owner = the already-post-tweak owner; sign
@@ -258,4 +258,41 @@ func TestClaimTransferPrepare_AppliedResume_ValidatesAgainstPostTweakOwner(t *te
 	resp, err := handler.Prepare(ctx, req)
 	require.NoError(t, err, "applied-resume must validate refunds against the post-tweak owner and pass")
 	assert.Nil(t, resp, "non-signing SO returns nil shares after the applied-resume validation")
+}
+
+// TestClaimTransferPrepare_LockedStatusesUseStoredKeyTweaks pins the
+// shouldUseStoredKeyTweaks routing at the Prepare boundary. At the pre-apply
+// locked statuses — ReceiverKeyTweaked, still durably reachable via rows
+// written by the retired pre-consensus claim path, and ReceiverKeyTweakLocked
+// from a prior Phase-1 commit — Prepare must source tweaks from
+// transfer_leaf.key_tweak instead of decrypting the fresh claim package: with
+// nothing stored it must surface the stored-tweak error without ever touching
+// the package ciphertext. At SENDER_KEY_TWEAKED the same request must take the
+// fresh-package branch instead, observable as the package-decrypt error since
+// the fixture package carries no ciphertext for this SO. The reuse branch's
+// success behavior with an anchored polynomial is covered end-to-end by
+// TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL in the
+// minikube integration suite.
+func TestClaimTransferPrepare_LockedStatusesUseStoredKeyTweaks(t *testing.T) {
+	cases := []struct {
+		status  st.TransferStatus
+		wantErr string
+	}{
+		{st.TransferStatusReceiverKeyTweaked, "has no stored key tweak"},
+		{st.TransferStatusReceiverKeyTweakLocked, "has no stored key tweak"},
+		{st.TransferStatusSenderKeyTweaked, "no encrypted claim key tweaks found"},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.status), func(t *testing.T) {
+			ctx, sessionCtx := db.ConnectToTestPostgres(t)
+			cfg := sparktesting.TestConfig(t)
+			req := buildAppliedClaimRequest(t, ctx, sessionCtx.Client, cfg, tc.status)
+
+			handler := NewClaimTransferFlowHandler(cfg)
+			_, err := handler.Prepare(ctx, req)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr,
+				"status %s must route to the expected key-tweak source", tc.status)
+		})
+	}
 }
