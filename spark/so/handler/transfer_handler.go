@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"maps"
 	"math/big"
@@ -3106,15 +3107,16 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	return nil
 }
 
-func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, keyshare *ent.SigningKeyshare, req *pb.ClaimLeafKeyTweak, ownerIdentityPubKey keys.Public) (*ent.TreeNodeKeyUpdateInput, error) {
-	ctx, span := tracer.Start(ctx, "TransferHandler.claimLeafTweakKey")
-	defer span.End()
-
+// validateClaimLeafTweak validates a stored receiver key tweak against the
+// leaf and returns the parsed tweak components. The keyshare rotation itself
+// is applied for all leaves at once via ent.TweakSigningKeyshares in the
+// SettleReceiverKeyTweak commit loop.
+func (h *TransferHandler) validateClaimLeafTweak(leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak) (keys.Private, keys.Public, map[string]keys.Public, error) {
 	if req.GetSecretShareTweak() == nil {
-		return nil, fmt.Errorf("secret share tweak is required")
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("secret share tweak is required")
 	}
 	if len(req.GetSecretShareTweak().GetSecretShare()) == 0 {
-		return nil, fmt.Errorf("secret share is required")
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("secret share is required")
 	}
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
@@ -3128,7 +3130,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to validate share: %w", err)
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("unable to validate share: %w", err)
 	}
 
 	// A leaf that exited (or is exiting) to L1 mid-transfer stays claimable:
@@ -3137,37 +3139,27 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	// exit of the transfer's remaining leaves. Only ownership and the keyshare
 	// are updated — the leaf keeps its on-chain status.
 	if leaf.Status != st.TreeNodeStatusTransferLocked && !leaf.Status.IsExitedToL1() {
-		return nil, sparkerrors.FailedPreconditionInvalidState(
+		return keys.Private{}, keys.Public{}, nil, sparkerrors.FailedPreconditionInvalidState(
 			fmt.Errorf("leaf %s must be %s or exited to L1 to claim receiver key tweak, got %s", leaf.ID, st.TreeNodeStatusTransferLocked, leaf.Status),
 		)
 	}
 
 	secretShare, err := keys.ParsePrivateKey(req.GetSecretShareTweak().GetSecretShare())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse secret share: %w", err)
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("unable to parse secret share: %w", err)
 	}
 	pubKeyTweak, err := keys.ParsePublicKey(req.GetSecretShareTweak().GetProofs()[0])
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse public key: %w", err)
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("unable to parse public key: %w", err)
 	}
 	pubKeySharesTweak, err := keys.ParsePublicKeyMap(req.GetPubkeySharesTweak())
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse public key shares tweaks: %w", err)
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("unable to parse public key shares tweaks: %w", err)
 	}
 	if err := helper.ValidatePubkeySharesTweak(h.config, req.GetSecretShareTweak().GetProofs(), pubKeySharesTweak); err != nil {
-		return nil, fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", leaf.ID, err)
+		return keys.Private{}, keys.Public{}, nil, fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", leaf.ID, err)
 	}
-	tweakedKeyshare, err := keyshare.TweakKeyShare(ctx, secretShare, pubKeyTweak, pubKeySharesTweak)
-	if err != nil {
-		return nil, fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)
-	}
-
-	signingPubKey := leaf.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
-	return &ent.TreeNodeKeyUpdateInput{
-		ID:                  leaf.ID,
-		OwnerIdentityPubkey: ownerIdentityPubKey,
-		OwnerSigningPubkey:  signingPubKey,
-	}, nil
+	return secretShare, pubKeyTweak, pubKeySharesTweak, nil
 }
 
 func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *ent.Transfer) (map[string]*ent.TreeNode, error) {
@@ -4729,14 +4721,17 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			return err
 		}
 
-		// Track successful leaf IDs to clear key_tweak in a single batch.
-		clearedIDs := make([]uuid.UUID, 0, len(leaves))
-		builders := make([]*ent.TreeNodeCreate, 0, len(leaves))
-		appliedLogs := make([]struct {
-			leafID     uuid.UUID
-			numProofs  int
-			proofsHash string
-		}, 0, len(leaves))
+		// Validate every leaf's stored tweak and collect the keyshare tweaks,
+		// then rotate all keyshares in one batched call — the per-leaf rotation
+		// (ephemeral version bump + main CAS update) dominated large claims.
+		type pendingClaimLeaf struct {
+			transferLeaf *ent.TransferLeaf
+			treeNode     *ent.TreeNode
+			keyTweak     *pb.ClaimLeafKeyTweak
+			keyshareID   uuid.UUID
+		}
+		pending := make([]pendingClaimLeaf, 0, len(leaves))
+		tweaks := make([]*ent.SigningKeyshareTweak, 0, len(leaves))
 		for _, leaf := range leaves {
 			// Leaf and keyshare edges were validated non-nil by
 			// lockAndHydrateLeafKeyshares over this same slice.
@@ -4753,16 +4748,62 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 				return sparkerrors.InternalDataInconsistency(fmt.Errorf(
 					"signing keyshare %s for leaf %s not found during claim commit", treeNode.Edges.SigningKeyshare.ID, treeNode.ID))
 			}
-			// claimLeafTweakKey now returns the key update instead of mutating the leaf
-			keyUpdate, err := h.claimLeafTweakKey(ctx, treeNode, keyshare, keyTweakProto, *receiverIdentityPublicKey)
+			secretTweak, pubKeyTweak, pubSharesTweak, err := h.validateClaimLeafTweak(treeNode, keyTweakProto)
 			if err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}
+			tweaks = append(tweaks, &ent.SigningKeyshareTweak{
+				Keyshare:       keyshare,
+				SecretTweak:    secretTweak,
+				PubKeyTweak:    pubKeyTweak,
+				PubSharesTweak: pubSharesTweak,
+			})
+			pending = append(pending, pendingClaimLeaf{
+				transferLeaf: leaf,
+				treeNode:     treeNode,
+				keyTweak:     keyTweakProto,
+				keyshareID:   keyshare.ID,
+			})
+		}
+
+		rotatedKeyshares, err := ent.TweakSigningKeyshares(ctx, tweaks)
+		if err != nil {
+			// Restore per-leaf attribution: the batch error names the failing
+			// keyshare; map it back to the leaf an operator would look up.
+			var rotationErr *ent.KeyshareRotationError
+			if errors.As(err, &rotationErr) {
+				for _, p := range pending {
+					if p.keyshareID == rotationErr.KeyshareID {
+						return fmt.Errorf("unable to tweak keyshare %s for leaf %s in transfer %s: %w",
+							rotationErr.KeyshareID, p.treeNode.ID, transferID, err)
+					}
+				}
+			}
+			return fmt.Errorf("unable to tweak keyshares for transfer %s: %w", transferID, err)
+		}
+
+		// Track successful leaf IDs to clear key_tweak in a single batch.
+		clearedIDs := make([]uuid.UUID, 0, len(leaves))
+		builders := make([]*ent.TreeNodeCreate, 0, len(leaves))
+		appliedLogs := make([]struct {
+			leafID     uuid.UUID
+			numProofs  int
+			proofsHash string
+		}, 0, len(leaves))
+		for _, p := range pending {
+			leaf := p.transferLeaf
+			treeNode := p.treeNode
+			tweakedKeyshare, ok := rotatedKeyshares[p.keyshareID]
+			if !ok {
+				return sparkerrors.InternalDataInconsistency(fmt.Errorf(
+					"rotated signing keyshare %s for leaf %s missing from batch result", p.keyshareID, treeNode.ID))
+			}
+			ownerSigningPubkey := treeNode.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
 			appliedLogs = append(appliedLogs, struct {
 				leafID     uuid.UUID
 				numProofs  int
 				proofsHash string
-			}{leaf.ID, len(keyTweakProto.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(keyTweakProto)})
+			}{leaf.ID, len(p.keyTweak.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(p.keyTweak)})
 
 			// Build upsert for batch update. Since records always exist (queried above),
 			// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
@@ -4774,8 +4815,8 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 					SetSigningKeyshare(treeNode.Edges.SigningKeyshare).
 					SetValue(treeNode.Value).
 					SetVerifyingPubkey(treeNode.VerifyingPubkey).
-					SetOwnerIdentityPubkey(keyUpdate.OwnerIdentityPubkey).
-					SetOwnerSigningPubkey(keyUpdate.OwnerSigningPubkey).
+					SetOwnerIdentityPubkey(*receiverIdentityPublicKey).
+					SetOwnerSigningPubkey(ownerSigningPubkey).
 					SetRawTx(treeNode.RawTx).
 					SetVout(treeNode.Vout).
 					SetStatus(treeNode.Status),
@@ -4795,7 +4836,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 					// Status is intentionally excluded from the update set:
 					// claiming must never rewrite a leaf's status here — in
 					// particular an exited-to-L1 leaf keeps its on-chain
-					// status (see claimLeafTweakKey), and adding
+					// status (see validateClaimLeafTweak), and adding
 					// UpdateStatus() would let a stale read revive it.
 					u.UpdateOwnerIdentityPubkey()
 					u.UpdateOwnerSigningPubkey()

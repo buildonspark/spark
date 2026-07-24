@@ -1,12 +1,15 @@
 package entephemeral
 
 import (
+	"cmp"
 	"context"
 	dbSql "database/sql"
 	"errors"
 	"fmt"
 	"hash/fnv"
 	"math"
+	"slices"
+	"strings"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
@@ -86,6 +89,87 @@ func getLatestSigningKeyshareSecretVersionForUpdateLocked(
 		return nil, err
 	}
 	return secret, nil
+}
+
+// GetLatestSigningKeyshareSecretVersionsForUpdate is the batch form of
+// GetLatestSigningKeyshareSecretVersionForUpdate: it acquires every
+// keyshare's advisory lock in one statement (in sorted key order, so
+// overlapping batch callers cannot deadlock), then locks and returns the
+// latest secret version row per keyshare from a single query. Keyshares with
+// no version yet are absent from the returned map.
+func GetLatestSigningKeyshareSecretVersionsForUpdate(
+	ctx context.Context,
+	signingKeyshareIDs []uuid.UUID,
+) (map[uuid.UUID]*SigningKeyshareSecret, error) {
+	if len(signingKeyshareIDs) == 0 {
+		return map[uuid.UUID]*SigningKeyshareSecret{}, nil
+	}
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := lockSigningKeyshareIDsForVersioning(ctx, tx, signingKeyshareIDs); err != nil {
+		return nil, err
+	}
+
+	// One statement reads and locks atomically — a read-then-lock two-step
+	// would let the orphan purge (which takes no advisory locks) delete a
+	// selected row in between and silently drop that keyshare from the
+	// result. Locking every version row of these keyshares is slightly wider
+	// than the single-row variant's latest-only lock, but a keyshare holds
+	// only its current version plus rare short-lived orphans, and callers'
+	// batches never overlap (keyshares are transfer-scoped).
+	query := tx.SigningKeyshareSecret.Query().
+		Where(signingkeysharesecret.SigningKeyshareIDIn(signingKeyshareIDs...))
+	if tx.config.driver.Dialect() == dialect.Postgres {
+		query = query.ForUpdate()
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	latest := make(map[uuid.UUID]*SigningKeyshareSecret, len(signingKeyshareIDs))
+	for _, row := range rows {
+		if current, ok := latest[row.SigningKeyshareID]; !ok || row.Version > current.Version {
+			latest[row.SigningKeyshareID] = row
+		}
+	}
+	return latest, nil
+}
+
+// SigningKeyshareSecretVersionInput describes one row for
+// CreateSigningKeyshareSecretVersionsLocked.
+type SigningKeyshareSecretVersionInput struct {
+	SigningKeyshareID uuid.UUID
+	Version           int32
+	SecretShare       keys.Private
+}
+
+// CreateSigningKeyshareSecretVersionsLocked inserts one secret version row
+// per input in a single bulk INSERT. Callers MUST already hold the advisory
+// locks for every referenced keyshare (e.g. via
+// GetLatestSigningKeyshareSecretVersionsForUpdate) — this function does not
+// acquire them. A duplicate (signingKeyshareID, version) pair returns a
+// constraint error.
+func CreateSigningKeyshareSecretVersionsLocked(
+	ctx context.Context,
+	items []SigningKeyshareSecretVersionInput,
+) error {
+	if len(items) == 0 {
+		return nil
+	}
+	tx, err := GetTxFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	builders := make([]*SigningKeyshareSecretCreate, len(items))
+	for i, item := range items {
+		builders[i] = tx.SigningKeyshareSecret.Create().
+			SetSigningKeyshareID(item.SigningKeyshareID).
+			SetVersion(item.Version).
+			SetSecretShare(item.SecretShare)
+	}
+	return tx.SigningKeyshareSecret.CreateBulk(builders...).Exec(ctx)
 }
 
 // CreateSigningKeyshareSecretVersion inserts a secret version with the given version number.
@@ -264,6 +348,67 @@ func DeleteSigningKeyshareSecretVersion(
 	}
 	if affected == 0 {
 		return ErrNoSecretVersion
+	}
+	return nil
+}
+
+// lockSigningKeyshareIDsForVersioning acquires the advisory locks for all
+// given keyshares in one statement. Locks are taken in sorted key order so
+// two batch callers with overlapping keyshare sets always acquire them in the
+// same sequence and cannot deadlock (pg_advisory_xact_lock is volatile, which
+// pins the row-by-row evaluation order of the VALUES scan).
+func lockSigningKeyshareIDsForVersioning(ctx context.Context, tx *Tx, signingKeyshareIDs []uuid.UUID) error {
+	switch tx.config.driver.Dialect() {
+	case dialect.Postgres:
+	case dialect.SQLite:
+		// See lockSigningKeyshareIDForVersioning: SQLite serializes writes.
+		return nil
+	default:
+		return fmt.Errorf(
+			"advisory locking for signing keyshare versioning is only supported on Postgres/SQLite, got %q",
+			tx.config.driver.Dialect(),
+		)
+	}
+
+	lockKeys := make([][2]int32, 0, len(signingKeyshareIDs))
+	seen := make(map[[2]int32]struct{}, len(signingKeyshareIDs))
+	for _, id := range signingKeyshareIDs {
+		hi, lo := signingKeyshareIDToAdvisoryLockKey(id)
+		key := [2]int32{hi, lo}
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		lockKeys = append(lockKeys, key)
+	}
+	slices.SortFunc(lockKeys, func(a, b [2]int32) int {
+		if c := cmp.Compare(a[0], b[0]); c != 0 {
+			return c
+		}
+		return cmp.Compare(a[1], b[1])
+	})
+
+	txDriver, ok := tx.config.driver.(*txDriver)
+	if !ok {
+		return fmt.Errorf("unexpected tx driver type: %T", tx.config.driver)
+	}
+
+	// The ORDER BY subquery makes the acquisition order part of the query's
+	// contract — a bare VALUES scan has no guaranteed output order. The Go-side
+	// sort keeps the literal deterministic; the ORDER BY enforces it.
+	var sb strings.Builder
+	args := make([]any, 0, len(lockKeys)*2)
+	sb.WriteString("SELECT pg_advisory_xact_lock(v.hi, v.lo) FROM (SELECT hi, lo FROM (VALUES ")
+	for i, key := range lockKeys {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		fmt.Fprintf(&sb, "($%d::int4, $%d::int4)", len(args)+1, len(args)+2)
+		args = append(args, key[0], key[1])
+	}
+	sb.WriteString(") AS x(hi, lo) ORDER BY hi, lo) AS v")
+	if _, err := txDriver.ExecContext(ctx, sb.String(), args...); err != nil {
+		return err
 	}
 	return nil
 }

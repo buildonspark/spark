@@ -199,6 +199,66 @@ func deleteSigningKeyshareSecretVersionBestEffort(ctx context.Context, signingKe
 	return true
 }
 
+// deleteSigningKeyshareSecretVersionRefsBestEffort deletes a mixed set of
+// (keyshare, version) ephemeral rows in one best-effort transaction. Used by
+// the batched rotation cleanup, where retired base versions differ per
+// keyshare.
+func deleteSigningKeyshareSecretVersionRefsBestEffort(ctx context.Context, refs []signingKeyshareSecretVersionRef, reason string) bool {
+	if len(refs) == 0 {
+		return true
+	}
+	logger := logging.GetLoggerFromContext(ctx)
+
+	ephemeralDB, err := entephemeral.GetDbFromContext(ctx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "get_db", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to get ephemeral db client to cleanup %d signing keyshare secret versions (%s)",
+			len(refs), reason,
+		)
+		return false
+	}
+
+	ephemeralTx, err := ephemeralDB.Tx(ctx)
+	if err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "begin_tx", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to begin ephemeral cleanup tx for %d signing keyshare secret versions (%s)",
+			len(refs), reason,
+		)
+		return false
+	}
+	defer func() { _ = ephemeralTx.Rollback() }()
+
+	predicates := make([]predicate.SigningKeyshareSecret, 0, len(refs))
+	for _, ref := range refs {
+		predicates = append(predicates, signingkeysharesecret.And(
+			signingkeysharesecret.SigningKeyshareIDEQ(ref.signingKeyshareID),
+			signingkeysharesecret.VersionEQ(ref.version),
+		))
+	}
+	if _, err := ephemeralTx.SigningKeyshareSecret.Delete().
+		Where(signingkeysharesecret.Or(predicates...)).
+		Exec(ctx); err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "delete", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to delete %d signing keyshare secret versions (%s)",
+			len(refs), reason,
+		)
+		return false
+	}
+
+	if err := ephemeralTx.Commit(); err != nil {
+		recordSigningKeyshareSecretCleanupFailure(ctx, "commit", reason)
+		logger.With(zap.Error(err)).Sugar().Warnf(
+			"failed to commit ephemeral cleanup tx for %d signing keyshare secret versions (%s)",
+			len(refs), reason,
+		)
+		return false
+	}
+	return true
+}
+
 type signingKeyshareRotationOutcome struct {
 	mainSaveSucceeded  bool
 	commitAttempted    bool
