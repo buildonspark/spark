@@ -175,6 +175,11 @@ export type TokenOptimizationOptions = {
   readonly enabled?: boolean;
   readonly intervalMs?: number;
   readonly minOutputsThreshold?: number;
+  /**
+   * Maximum number of token outputs to consolidate in a single optimization
+   * transaction. Capped at MAX_TOKEN_OUTPUTS_TX regardless of the value set here.
+   */
+  readonly maxOutputsToOptimize?: number;
 };
 
 export type TlsOptions = {
@@ -291,6 +296,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     enabled: true,
     intervalMs: 300000, // 5 minutes
     minOutputsThreshold: 50,
+    maxOutputsToOptimize: 300,
   },
   tokenOutputLockExpiryMs: 20000, // 20 seconds
   tokenTransactionVersion: "V3",
