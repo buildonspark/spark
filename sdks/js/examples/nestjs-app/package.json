@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/nestjs-app",
-  "version": "0.0.134",
+  "version": "0.0.135",
   "description": "",
   "author": "",
   "private": true,
@@ -23,7 +23,7 @@
     "test:e2e": "NODE_OPTIONS=\"--experimental-vm-modules\" yarn jest --config ./test/jest-e2e.json --detectOpenHandles --forceExit"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.8.8",
+    "@buildonspark/spark-sdk": "0.9.0",
     "@nestjs/common": "^11.1.28",
     "@nestjs/core": "^11.1.28",
     "@nestjs/platform-express": "^11.1.28",

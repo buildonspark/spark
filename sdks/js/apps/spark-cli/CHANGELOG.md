@@ -1,5 +1,24 @@
 # @buildonspark/spark-cli
 
+## 0.0.134
+
+### Patch Changes
+
+- 89c9f7b: Fix the installed `spark-cli` executable, ensure published packages include its build, and preserve Node.js 18 runtime compatibility.
+- 5809793: Add signTransferManifest/verifyTransferManifestSignature — the sender's identity-key ECDSA signature over manifest_hash (the transfer-package signing scheme applied to the manifest digest). Signatures are verify-checked, not byte-pinned (ECDSA is nonce-dependent); only the manifest hash stays byte-identical across languages. The CLI gains dev-only signmanifest/verifymanifest commands for cross-checking.
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies [5809793]
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies [49d0fb9]
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.9.0
+  - @buildonspark/issuer-sdk@0.1.45
+
 ## 0.0.133
 
 ### Patch Changes
