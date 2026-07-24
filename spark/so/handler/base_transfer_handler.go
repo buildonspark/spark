@@ -1747,6 +1747,14 @@ func wrapLeafValidationError(err error, msg string, leafID uuid.UUID) error {
 	return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s: %w", msg, err))
 }
 
+// refundTimelockAnchorTx, when non-empty, is the refund tx whose input-0
+// sequence anchors the expected-timelock computation instead of
+// node.RawRefundTx. The claim path passes the transfer leaf's immutable
+// previous_refund_tx: claim Prepare overwrites node.RawRefundTx with the
+// claimer's unsigned refund tx and a consensus rollback does not restore it,
+// so anchoring on the node would demand a double-decremented timelock from
+// the next claim attempt. Send-side callers pass nil (the node value is the
+// correct baseline there).
 func validateSingleLeafRefundTxs(
 	ctx context.Context,
 	node *ent.TreeNode,
@@ -1755,6 +1763,7 @@ func validateSingleLeafRefundTxs(
 	directRefundTx []byte,
 	refundDestPubkey keys.Public,
 	transferType st.TransferType,
+	refundTimelockAnchorTx []byte,
 ) error {
 	if len(cpfpRefundTx) == 0 {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing required CPFP refund tx for leaf"))
@@ -1762,13 +1771,23 @@ func validateSingleLeafRefundTxs(
 
 	networkString := node.Network.String()
 
-	if err := bitcointransaction.VerifyTransactionWithDatabase(
+	timelockAnchorTx := refundTimelockAnchorTx
+	if len(timelockAnchorTx) == 0 {
+		timelockAnchorTx = node.RawRefundTx
+	}
+	cpfpRefundTxTimelock, err := bitcointransaction.GetCpfpTimelockFromRawRefundTx(timelockAnchorTx)
+	if err != nil {
+		return wrapLeafValidationError(err, "failed to get CPFP timelock anchor for leaf", node.ID)
+	}
+
+	if err := bitcointransaction.VerifyTransactionWithDatabaseTimelock(
 		ctx,
 		cpfpRefundTx,
 		node,
 		bitcointransaction.TxTypeRefundCPFP,
 		refundDestPubkey,
 		networkString,
+		cpfpRefundTxTimelock,
 	); err != nil {
 		return wrapLeafValidationError(err, "CPFP refund tx validation failed for leaf", node.ID)
 	}
@@ -1786,13 +1805,14 @@ func validateSingleLeafRefundTxs(
 			if requireDirectFromCpfpRefund {
 				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing required direct from CPFP refund tx for leaf"))
 			}
-		} else if err := bitcointransaction.VerifyTransactionWithDatabase(
+		} else if err := bitcointransaction.VerifyTransactionWithDatabaseTimelock(
 			ctx,
 			directFromCpfpRefundTx,
 			node,
 			bitcointransaction.TxTypeRefundDirectFromCPFP,
 			refundDestPubkey,
 			networkString,
+			cpfpRefundTxTimelock,
 		); err != nil {
 			return wrapLeafValidationError(err, "direct from CPFP refund tx validation failed for leaf", node.ID)
 		}
@@ -1809,13 +1829,14 @@ func validateSingleLeafRefundTxs(
 			if isZeroNode {
 				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("leaf %s is a zero node, zero nodes must not have a direct refund tx", node.ID))
 			}
-			if err := bitcointransaction.VerifyTransactionWithDatabase(
+			if err := bitcointransaction.VerifyTransactionWithDatabaseTimelock(
 				ctx,
 				directRefundTx,
 				node,
 				bitcointransaction.TxTypeRefundDirect,
 				refundDestPubkey,
 				networkString,
+				cpfpRefundTxTimelock,
 			); err != nil {
 				return wrapLeafValidationError(err, "direct refund tx validation failed for leaf", node.ID)
 			}
@@ -2206,6 +2227,7 @@ func validateLegacyLeavesToSend_transfer(
 			directRefundTx,
 			refundDestPubkey,
 			st.TransferTypeTransfer,
+			nil,
 		); err != nil {
 			return fmt.Errorf("leaf %s validation for legacy transfer failed: %w", leafID, err)
 		}
@@ -2289,6 +2311,7 @@ func validateLeaves_transfer(
 			directRefundTx,
 			refundDestPubkey,
 			st.TransferTypeTransfer,
+			nil,
 		); err != nil {
 			return fmt.Errorf("leaf %s validation for transfer failed: %w", leafID, err)
 		}
@@ -2320,6 +2343,7 @@ func validateLeaves_swap(
 			leafDirectRefundMap[leafID],
 			refundDestPubkey,
 			transferType,
+			nil,
 		); err != nil {
 			return fmt.Errorf("leaf %s validation for %s failed: %w", leafID, transferType, err)
 		}
@@ -2419,6 +2443,7 @@ func validateTransactionCooperativeExitLeavesToSend(
 				modifiedDirectRefundTx,
 				refundDestPubkey,
 				st.TransferTypeTransfer,
+				nil,
 			); err != nil {
 				return fmt.Errorf("leaf %s validation for legacy transfer failed: %w", leafID, err)
 			}
