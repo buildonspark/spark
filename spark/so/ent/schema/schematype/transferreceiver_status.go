@@ -33,3 +33,27 @@ func (TransferReceiverStatus) Values() []string {
 		string(TransferReceiverStatusCancelled),
 	}
 }
+
+// IsTerminal reports whether a receiver row has finished its claim
+// lifecycle: COMPLETED claims and CANCELLED rows (whose transfer was
+// returned/cancelled before the receiver could claim) never re-enter it.
+func (s TransferReceiverStatus) IsTerminal() bool {
+	switch s {
+	case TransferReceiverStatusCompleted, TransferReceiverStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// NonTerminalTransferReceiverStatuses returns every status IsTerminal
+// rejects, in Values() order.
+func NonTerminalTransferReceiverStatuses() []TransferReceiverStatus {
+	var out []TransferReceiverStatus
+	for _, v := range (TransferReceiverStatus("")).Values() {
+		if s := TransferReceiverStatus(v); !s.IsTerminal() {
+			out = append(out, s)
+		}
+	}
+	return out
+}

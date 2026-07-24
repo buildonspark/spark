@@ -70,6 +70,68 @@ func TestTransferOccupancyCells_CountsNonTerminalAndZeroFills(t *testing.T) {
 	_ = transferB
 }
 
+func TestTransferReceiverOccupancyCells_CountsNonTerminalAndZeroFills(t *testing.T) {
+	t.Parallel()
+
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	client := sessionCtx.Client
+
+	rng := rand.NewChaCha8([32]byte{93})
+	sender := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverA := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverB := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	_, rowA := createSenderInitiatedExpiryTransferWithReceiver(
+		t, ctx, client, st.TransferTypeTransfer, sender, receiverA, time.Now().Add(time.Hour))
+	createSenderInitiatedExpiryTransferWithReceiver(
+		t, ctx, client, st.TransferTypeTransfer, sender, receiverB, time.Now().Add(time.Hour))
+	_, completedRow := createSenderInitiatedExpiryTransferWithReceiver(
+		t, ctx, client, st.TransferTypeCooperativeExit, sender, receiverA, time.Now().Add(time.Hour))
+	_, err := completedRow.Update().SetStatus(st.TransferReceiverStatusCompleted).Save(ctx)
+	require.NoError(t, err)
+
+	now := time.Now()
+	cells, err := transferReceiverOccupancyCells(ctx, client, []btcnetwork.Network{btcnetwork.Regtest}, now)
+	require.NoError(t, err)
+
+	// Pin the non-terminal set to its literal members: a cell-count check
+	// derived from the helper alone would silently absorb a terminal status
+	// (COMPLETED or CANCELLED) being reclassified as non-terminal.
+	assert.ElementsMatch(t, []st.TransferReceiverStatus{
+		st.TransferReceiverStatusInitiated,
+		st.TransferReceiverStatusReceiverClaimPending,
+		st.TransferReceiverStatusKeyTweaked,
+		st.TransferReceiverStatusKeyTweakLocked,
+		st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned,
+	}, st.NonTerminalTransferReceiverStatuses())
+	assert.Len(t, cells, len(st.NonTerminalTransferReceiverStatuses())*len((st.TransferType("")).Values()))
+
+	// The network dimension comes from the parent-transfer join, so a
+	// populated Regtest cell proves the join wiring, not just the count.
+	got := cells[transferReceiverCellKey{
+		network:      btcnetwork.Regtest,
+		status:       st.TransferReceiverStatusInitiated,
+		transferType: st.TransferTypeTransfer,
+	}]
+	assert.EqualValues(t, 2, got.count)
+	assert.InDelta(t, now.Sub(rowA.UpdateTime).Seconds(), got.oldestAge.Seconds(), 5.0)
+
+	_, exists := cells[transferReceiverCellKey{
+		network:      btcnetwork.Regtest,
+		status:       st.TransferReceiverStatusCompleted,
+		transferType: st.TransferTypeCooperativeExit,
+	}]
+	assert.False(t, exists)
+	empty := cells[transferReceiverCellKey{
+		network:      btcnetwork.Regtest,
+		status:       st.TransferReceiverStatusKeyTweaked,
+		transferType: st.TransferTypeSwap,
+	}]
+	assert.EqualValues(t, 0, empty.count)
+	assert.Equal(t, time.Duration(0), empty.oldestAge)
+}
+
 func TestPublishOccupancyMetricsTask_IsRegisteredAndRuns(t *testing.T) {
 	t.Parallel()
 
