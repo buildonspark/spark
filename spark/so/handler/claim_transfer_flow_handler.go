@@ -462,7 +462,15 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 		}
 	}
 
-	signingJobsResult, err := h.prepareClaimRefundSigningJobs(ctx, parsed.claimPackage, leavesByID, transferEnt, predictedOwnerByLeaf)
+	// Timelock anchor per leaf: previous_refund_tx, not leaf.RawRefundTx — a
+	// rolled-back prior Prepare leaves its decremented refund tx on the node
+	// and would reject every retry (see validateSingleLeafRefundTxs).
+	refundAnchorByLeaf := make(map[string][]byte, len(transferLeavesPre))
+	for _, transferLeaf := range transferLeavesPre {
+		refundAnchorByLeaf[transferLeaf.Edges.Leaf.ID.String()] = transferLeaf.PreviousRefundTx
+	}
+
+	signingJobsResult, err := h.prepareClaimRefundSigningJobs(ctx, parsed.claimPackage, leavesByID, transferEnt, predictedOwnerByLeaf, refundAnchorByLeaf)
 	if err != nil {
 		return nil, err
 	}

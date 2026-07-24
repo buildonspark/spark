@@ -3433,7 +3433,10 @@ func validateRefundSigningRetryMatchesStored(job *pb.LeafRefundTxSigningJob, lea
 // fires. The consensus claim flow passes a per-leaf predicted owner pubkey
 // (leaf.OwnerSigningPubkey - pubkey_tweak) so it can validate without first
 // mutating the on-disk keyshare; the durable apply happens in Commit.
-func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType, expectedOwnerSigningPubKey *keys.Public) error {
+//
+// refundTimelockAnchorTx (the transfer leaf's previous_refund_tx) anchors the
+// expected-timelock derivation (see validateSingleLeafRefundTxs).
+func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundTxSigningJob, leaf *ent.TreeNode, transferType st.TransferType, expectedOwnerSigningPubKey *keys.Public, refundTimelockAnchorTx []byte) error {
 	if job.GetRefundTxSigningJob() == nil {
 		return fmt.Errorf("missing RefundTxSigningJob for leaf %s", job.GetLeafId())
 	}
@@ -3477,6 +3480,7 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 		getRawTx(job.GetDirectRefundTxSigningJob()),
 		refundDestPubKey,
 		transferType,
+		refundTimelockAnchorTx,
 	); err != nil {
 		return fmt.Errorf("refund transaction validation failed for leaf %s: %w", job.GetLeafId(), err)
 	}
@@ -3645,12 +3649,16 @@ func leafSigningKeyshare(ctx context.Context, leaf *ent.TreeNode) (*ent.SigningK
 //   - non-nil (consensus claim flow): this runs BEFORE applying the tweak, so
 //     callers pass a per-leaf predicted post-tweak owner pubkey
 //     (leaf.OwnerSigningPubkey - pubkey_tweak) for validation to use.
+//
+// refundAnchorByLeaf maps leaf id to the transfer leaf's previous_refund_tx,
+// the expected-timelock anchor (see validateSingleLeafRefundTxs).
 func (h *TransferHandler) prepareClaimRefundSigningJobs(
 	ctx context.Context,
 	claimPackage *pb.ClaimPackage,
 	leaves map[string]*ent.TreeNode,
 	transfer *ent.Transfer,
 	predictedOwnerByLeaf map[string]keys.Public,
+	refundAnchorByLeaf map[string][]byte,
 ) (*claimRefundSigningJobsResult, error) {
 	leafJobMap := make(map[uuid.UUID]*ent.TreeNode)
 	jobIsDirectRefund := make(map[uuid.UUID]bool)
@@ -3712,7 +3720,14 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 				expectedOwner = &predicted
 			}
 		}
-		if err := validateReceivedRefundTransactions(ctx, leafRefundJob, leaf, transfer.Type, expectedOwner); err != nil {
+		// previous_refund_tx is schema-NotEmpty, so a missing anchor for a
+		// claim leaf is always a plumbing bug — fail loudly instead of
+		// silently anchoring on the possibly-poisoned node refund tx.
+		refundAnchorTx, ok := refundAnchorByLeaf[job.GetLeafId()]
+		if !ok || len(refundAnchorTx) == 0 {
+			return nil, fmt.Errorf("internal: missing previous refund tx timelock anchor for leaf %s", job.GetLeafId())
+		}
+		if err := validateReceivedRefundTransactions(ctx, leafRefundJob, leaf, transfer.Type, expectedOwner, refundAnchorTx); err != nil {
 			return nil, err
 		}
 
@@ -3975,12 +3990,14 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 
 	keyTweakProofs := map[string]*pb.SecretProof{}
 	leavesByID := make(map[string]*ent.TreeNode, len(leavesToTransfer))
+	refundAnchorByLeaf := make(map[string][]byte, len(leavesToTransfer))
 	for _, leaf := range leavesToTransfer {
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID, err)
 		}
 		leavesByID[treeNode.ID.String()] = treeNode
+		refundAnchorByLeaf[treeNode.ID.String()] = leaf.PreviousRefundTx
 		leafKeyTweak := &pb.ClaimLeafKeyTweak{}
 		if leaf.KeyTweak != nil {
 			err = proto.Unmarshal(leaf.KeyTweak, leafKeyTweak)
@@ -4081,7 +4098,13 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 
 		if isSupportedTransferType {
-			if err := validateReceivedRefundTransactions(ctx, job, leaf, transfer.Type, nil); err != nil {
+			// Same fail-loud contract as prepareClaimRefundSigningJobs: an
+			// absent anchor on the claim path is a plumbing bug.
+			refundAnchorTx, ok := refundAnchorByLeaf[job.GetLeafId()]
+			if !ok || len(refundAnchorTx) == 0 {
+				return nil, fmt.Errorf("internal: missing previous refund tx timelock anchor for leaf %s", job.GetLeafId())
+			}
+			if err := validateReceivedRefundTransactions(ctx, job, leaf, transfer.Type, nil, refundAnchorTx); err != nil {
 				return nil, err
 			}
 		}

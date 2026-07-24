@@ -28,12 +28,19 @@ const (
 
 // VerifyTransactionWithDatabase validates a Bitcoin transaction by reconstructing it based on node in the database
 func VerifyTransactionWithDatabase(ctx context.Context, clientRawTxBytes []byte, dbLeaf *ent.TreeNode, txType TxType, refundDestPubkey keys.Public, networkString string) error {
-	var sourceRawTxBytes []byte
-
 	cpfpRefundTxTimelock, err := GetCpfpTimelockFromLeaf(dbLeaf)
 	if err != nil {
 		return fmt.Errorf("failed to get CPFP timelock from leaf: %w, tx type: %d", err, txType)
 	}
+	return VerifyTransactionWithDatabaseTimelock(ctx, clientRawTxBytes, dbLeaf, txType, refundDestPubkey, networkString, cpfpRefundTxTimelock)
+}
+
+// VerifyTransactionWithDatabaseTimelock is VerifyTransactionWithDatabase with
+// an explicit current CPFP refund timelock, for callers whose timelock
+// baseline is not dbLeaf.RawRefundTx (the claim path anchors on the transfer
+// leaf's previous_refund_tx).
+func VerifyTransactionWithDatabaseTimelock(ctx context.Context, clientRawTxBytes []byte, dbLeaf *ent.TreeNode, txType TxType, refundDestPubkey keys.Public, networkString string, cpfpRefundTxTimelock uint32) error {
+	var sourceRawTxBytes []byte
 
 	switch txType {
 	// valid types
@@ -46,7 +53,7 @@ func VerifyTransactionWithDatabase(ctx context.Context, clientRawTxBytes []byte,
 	default:
 		return fmt.Errorf("unknown transaction type: %d", txType)
 	}
-	err = VerifyTransactionWithSource(ctx, clientRawTxBytes, sourceRawTxBytes, 0, cpfpRefundTxTimelock, txType, refundDestPubkey, networkString)
+	err := VerifyTransactionWithSource(ctx, clientRawTxBytes, sourceRawTxBytes, 0, cpfpRefundTxTimelock, txType, refundDestPubkey, networkString)
 	if err != nil {
 		return sparkerrors.WrapErrorWithMetadata(
 			fmt.Errorf("failed to verify transaction of leaf %s: %w", dbLeaf.ID, err),
@@ -394,7 +401,11 @@ func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence 
 }
 
 func GetCpfpTimelockFromLeaf(dbLeaf *ent.TreeNode) (uint32, error) {
-	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
+	return GetCpfpTimelockFromRawRefundTx(dbLeaf.RawRefundTx)
+}
+
+func GetCpfpTimelockFromRawRefundTx(rawRefundTxBytes []byte) (uint32, error) {
+	rawRefundTx, err := common.TxFromRawTxBytes(rawRefundTxBytes)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse CPFP refund transaction: %w", err)
 	}

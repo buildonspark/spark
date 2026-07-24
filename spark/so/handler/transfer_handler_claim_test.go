@@ -196,10 +196,14 @@ func createTestTransfer(t *testing.T, ctx context.Context, rng io.Reader, client
 }
 
 func createTestTransferLeaf(t *testing.T, ctx context.Context, client *ent.Client, transfer *ent.Transfer, leaf *ent.TreeNode) *ent.TransferLeaf {
+	// previous_refund_tx mirrors production: the leaf's refund tx as captured
+	// at send-start (createTransferLeaves). Claim validation anchors its
+	// expected timelock on it, so an arbitrary value here would skew every
+	// claim-path test.
 	transferLeaf, err := client.TransferLeaf.Create().
 		SetTransfer(transfer).
 		SetLeaf(leaf).
-		SetPreviousRefundTx(createTestTxBytes(t, 2000)).
+		SetPreviousRefundTx(leaf.RawRefundTx).
 		SetIntermediateRefundTx(createTestTxBytes(t, 2001)).
 		Save(ctx)
 	require.NoError(t, err)
@@ -392,7 +396,7 @@ func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil, nil)
 	require.NoError(t, err)
 }
 
@@ -403,7 +407,7 @@ func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, true /* isSwap */)
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil, nil)
 	require.NoError(t, err)
 }
 
@@ -422,7 +426,7 @@ func TestValidateReceivedRefundTransactions_RejectsNonCanonicalDestination(t *te
 	attackerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	job := createSigningJobForLeafWithDest(t, rng, leaf, attackerPubKey, false /* isSwap */)
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not match expected owner signing pubkey")
 }
@@ -446,11 +450,55 @@ func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 
 	// When bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) is true,
 	// validation should be skipped and return nil
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil, nil)
 	require.NoError(t, err)
 
 	// Also works for swap
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil, nil)
+	require.NoError(t, err)
+}
+
+// TestValidateReceivedRefundTransactions_PoisonedNodeRefundTx_AnchoredOnPreviousRefundTx
+// reproduces the rolled-back-claim poisoning: a claim Prepare that consensus
+// later rolled back leaves its unsigned refund tx (timelock already
+// decremented by one interval) on leaf.RawRefundTx, because Rollback does not
+// restore the pre-claim value. A retried claim submits the protocol-correct
+// timelock (previous - interval), so deriving the expected timelock from the
+// poisoned node demands a double decrement and rejects every retry. Anchoring
+// on the transfer leaf's immutable previous_refund_tx accepts it.
+//
+// Tested at this level because the poisoned state only arises from a
+// mid-consensus failure on a peer SO (prepare committed there, rollback
+// decided later) — not reachable through a single SO's public API in a unit
+// test. Public-boundary coverage belongs in a multi-SO grpc_test.
+func TestValidateReceivedRefundTransactions_PoisonedNodeRefundTx_AnchoredOnPreviousRefundTx(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{42})
+	ctx, _ := db.ConnectToTestPostgres(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+
+	// The pristine pre-claim refund tx (timelock 1900), as captured on the
+	// transfer leaf's previous_refund_tx at send time.
+	previousRefundTx := leaf.RawRefundTx
+
+	// A correct retry: timelock 1800 (= 1900 - TimeLockInterval), built from
+	// the pristine leaf state before poisoning.
+	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
+
+	// Poison the node the way a rolled-back Prepare does: unsigned refund tx
+	// at timelock 1800, paying the earlier claim attempt's (different)
+	// destination so the byte-equality retry fast path does not fire.
+	earlierAttemptDest := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf.RawRefundTx = createRefundTxBytes(t, leaf.RawTx, earlierAttemptDest, 1800, false)
+
+	// Anchored on the poisoned node, the retry is rejected: expected timelock
+	// becomes 1700 while the client correctly submits 1800.
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match expected timelock")
+
+	// Anchored on previous_refund_tx, the same retry passes.
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer, nil, previousRefundTx)
 	require.NoError(t, err)
 }
 
@@ -492,7 +540,7 @@ func TestValidateReceivedRefundTransactions_RetryWithDifferentDirectTx_RunsValid
 	}
 
 	// This should NOT be treated as a retry because DirectRefundTx differs.
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer, nil)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer, nil, nil)
 	require.Error(t, err, "Expected validation to run and fail for mismatched direct txs, but it passed (retry detection bypassed validation)")
 }
 
@@ -524,7 +572,7 @@ func TestValidateReceivedRefundTransactions_MissingRefundTxSigningJob(t *testing
 		RefundTxSigningJob: nil,
 	}
 
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing RefundTxSigningJob")
 }
@@ -555,7 +603,7 @@ func TestValidateReceivedRefundTransactions_Transfer_MissingDirectFromCpfp(t *te
 		// DirectFromCpfpRefundTxSigningJob is nil - this is required for transfers
 	}
 
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "direct from CPFP refund tx")
 }
@@ -586,7 +634,7 @@ func TestValidateReceivedRefundTransactions_Swap_DoesNotRequireDirectTx(t *testi
 	}
 
 	// For swaps, only CPFP refund tx is required
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil)
+	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil, nil)
 	require.NoError(t, err)
 }
 

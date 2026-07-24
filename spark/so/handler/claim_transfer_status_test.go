@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -17,6 +19,8 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -258,6 +262,44 @@ func TestClaimTransferPrepare_AppliedResume_ValidatesAgainstPostTweakOwner(t *te
 	resp, err := handler.Prepare(ctx, req)
 	require.NoError(t, err, "applied-resume must validate refunds against the post-tweak owner and pass")
 	assert.Nil(t, resp, "non-signing SO returns nil shares after the applied-resume validation")
+}
+
+// TestClaimTransferPrepare_PoisonedNodeRefundTx_HealsViaTransferLeafAnchor
+// drives the real Prepare wiring — loadClaimReceiverLeaves →
+// refundAnchorByLeaf built from the transfer_leafs row →
+// prepareClaimRefundSigningJobs — against a tree node poisoned the way a
+// rolled-back prior Prepare leaves it: an unsigned refund tx with an
+// already-decremented timelock paying the earlier attempt's key, which
+// Rollback never restores. The submitted refunds carry the protocol-correct
+// timelock (previous − interval) and must pass because the expected timelock
+// is anchored on the DB row's previous_refund_tx, not the poisoned node.
+// Anchored on the node this exact request is rejected (double decrement
+// demanded), so a wiring regression that drops the anchor fails this test.
+func TestClaimTransferPrepare_PoisonedNodeRefundTx_HealsViaTransferLeafAnchor(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	req := buildAppliedClaimRequest(t, ctx, sessionCtx.Client, cfg, st.TransferStatusReceiverKeyTweakApplied)
+
+	transferID, err := uuid.Parse(req.GetOriginalRequest().GetTransferId())
+	require.NoError(t, err)
+	transferLeaf, err := sessionCtx.Client.TransferLeaf.Query().
+		Where(enttransferleaf.HasTransferWith(enttransfer.IDEQ(transferID))).
+		WithLeaf().
+		Only(ctx)
+	require.NoError(t, err)
+	leaf := transferLeaf.Edges.Leaf
+
+	prevTimelock, err := bitcointransaction.GetCpfpTimelockFromRawRefundTx(transferLeaf.PreviousRefundTx)
+	require.NoError(t, err)
+	earlierAttemptDest := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{9})).Public()
+	poisonedRefundTx := createRefundTxBytes(t, leaf.RawTx, earlierAttemptDest, prevTimelock-100, false)
+	_, err = leaf.Update().SetRawRefundTx(poisonedRefundTx).Save(ctx)
+	require.NoError(t, err)
+
+	handler := NewClaimTransferFlowHandler(cfg)
+	resp, err := handler.Prepare(ctx, req)
+	require.NoError(t, err, "retry with the protocol-correct timelock must pass against a poisoned node via the previous_refund_tx anchor")
+	assert.Nil(t, resp, "non-signing SO returns nil shares after validation")
 }
 
 // TestClaimTransferPrepare_LockedStatusesUseStoredKeyTweaks pins the

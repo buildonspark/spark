@@ -1,13 +1,19 @@
 package grpctest
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
+	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -90,6 +96,128 @@ func TestClaimTransfer_Consensus_HappyPath(t *testing.T) {
 		assert.Equal(t, st.TransferStatusCompleted, row.Status,
 			"operator %d transfer status mismatch after claim", i)
 	}
+}
+
+// TestClaimTransfer_Consensus_RetrySucceedsWithPeerPoisonedByRolledBackPrepare
+// reproduces the production claim deadlock fixed by anchoring the claim
+// timelock validation on transfer_leafs.previous_refund_tx. A prior consensus
+// claim attempt whose Prepare committed on a peer but whose 2PC outcome was
+// ROLLBACK leaves that peer's tree_nodes.raw_refund_tx overwritten with the
+// unsigned, already-decremented refund tx (Rollback restores statuses and key
+// tweaks, not the node's refund columns). Anchored on the node, that peer
+// demands a double-decremented timelock while clean SOs demand the single
+// decrement — no retry satisfies both and the transfer is stuck permanently.
+// Anchored on previous_refund_tx, the retry must complete on every SO.
+func TestClaimTransfer_Consensus_RetrySucceedsWithPeerPoisonedByRolledBackPrepare(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+	senderConfig := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+
+	leavesToTransfer := []wallet.LeafKeyTweak{{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+	leafReceiverMap := map[string]keys.Public{
+		rootNode.GetId(): receiverPrivKey.Public(),
+	}
+
+	senderTransfer, err := wallet.SendTransferV3WithKeyTweaks(
+		t.Context(), senderConfig, leavesToTransfer, leafReceiverMap,
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send V3 transfer")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
+
+	// Poison a non-coordinator peer before the claim, exactly as a rolled-back
+	// prior Prepare would have left it.
+	var poisonedPeer *so.SigningOperator
+	for identifier, op := range senderConfig.SigningOperators {
+		if identifier == senderConfig.CoordinatorIdentifier {
+			continue
+		}
+		poisonedPeer = op
+		break
+	}
+	require.NotNil(t, poisonedPeer, "test cluster must have at least one non-coordinator peer")
+	poisonPeerNodeRefundTx(t, poisonedPeer, rootNode.GetId())
+
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err)
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+
+	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err)
+	require.Len(t, pending.GetTransfers(), 1)
+
+	finalLeafPrivKey := keys.GeneratePrivateKey()
+	claimLeaves := []wallet.LeafKeyTweak{{
+		Leaf:              pending.GetTransfers()[0].GetLeaves()[0].GetLeaf(),
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}}
+	claimed, err := wallet.ClaimTransferV2(receiverCtx, pending.GetTransfers()[0], receiverConfig, claimLeaves)
+	require.NoError(t, err, "claim must succeed against a peer whose node refund tx was poisoned by a rolled-back Prepare")
+	assert.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, claimed.GetStatus())
+
+	transferUUID, err := uuid.Parse(senderTransfer.GetId())
+	require.NoError(t, err)
+	for _, i := range operatorIndicesFromConfig(senderConfig) {
+		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
+		t.Cleanup(func() { _ = entClient.Close() })
+		row, err := entClient.Transfer.Query().Where(transferent.IDEQ(transferUUID)).Only(t.Context())
+		require.NoError(t, err, "operator %d missing transfer row", i)
+		assert.Equal(t, st.TransferStatusCompleted, row.Status,
+			"operator %d transfer status mismatch after claim against poisoned peer", i)
+	}
+}
+
+// poisonPeerNodeRefundTx overwrites one operator's tree_nodes.raw_refund_tx
+// with the artifact a rolled-back claim Prepare leaves behind: an unsigned
+// refund tx at the already-decremented timelock paying an abandoned claim
+// attempt's key.
+func poisonPeerNodeRefundTx(t *testing.T, operator *so.SigningOperator, leafIDStr string) {
+	t.Helper()
+	leafID, err := uuid.Parse(leafIDStr)
+	require.NoError(t, err)
+	client := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, int(operator.ID)))
+	t.Cleanup(func() { _ = client.Close() })
+
+	node, err := client.TreeNode.Get(t.Context(), leafID)
+	require.NoError(t, err)
+
+	currTimelock, err := bitcointransaction.GetCpfpTimelockFromRawRefundTx(node.RawRefundTx)
+	require.NoError(t, err)
+	require.Greater(t, currTimelock, uint32(spark.TimeLockInterval), "leaf refund timelock too small to decrement")
+
+	nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
+	require.NoError(t, err)
+	require.NotEmpty(t, nodeTx.TxOut)
+
+	abandonedDest := keys.GeneratePrivateKey().Public()
+	script, err := common.P2TRScriptFromPubKey(abandonedDest)
+	require.NoError(t, err)
+
+	poison := wire.NewMsgTx(3)
+	poison.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
+		Sequence:         currTimelock - spark.TimeLockInterval,
+	})
+	poison.AddTxOut(&wire.TxOut{Value: nodeTx.TxOut[0].Value, PkScript: script})
+	poison.AddTxOut(common.EphemeralAnchorOutput())
+	var buf bytes.Buffer
+	require.NoError(t, poison.Serialize(&buf))
+
+	_, err = node.Update().SetRawRefundTx(buf.Bytes()).Save(t.Context())
+	require.NoError(t, err, "operator %d: poison tree node refund tx", operator.ID)
 }
 
 // TestClaimTransfer_Consensus_WritesFlowExecutionRows asserts that every
