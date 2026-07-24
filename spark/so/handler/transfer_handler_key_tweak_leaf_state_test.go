@@ -357,6 +357,9 @@ func TestSettleReceiverKeyTweakSurfacesPerKeyshareErrorWhenHydrationFails(t *tes
 	require.Error(t, err)
 	require.ErrorContains(t, err, starvedKeyshare.ID.String())
 	require.ErrorContains(t, err, "ephemeral DB is unavailable")
+	// The batched rotation must keep per-leaf attribution: the error names the
+	// leaf whose keyshare failed, not just the transfer.
+	require.ErrorContains(t, err, transferLeaves[0].Edges.Leaf.ID.String())
 }
 
 // TestSettleReceiverKeyTweakHoldsKeyshareRowLocksUntilCommit proves the batch
