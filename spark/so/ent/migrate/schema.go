@@ -1607,6 +1607,11 @@ var (
 					Where: "status = 'INITIATED'",
 				},
 			},
+			{
+				Name:    "idx_transferreceiver_status_type_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransferReceiversColumns[4], TransferReceiversColumns[6], TransferReceiversColumns[2], TransferReceiversColumns[7]},
+			},
 		},
 	}
 	// TransferSendersColumns holds the columns for the "transfer_senders" table.
