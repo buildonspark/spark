@@ -170,15 +170,9 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		}
 	}
 
-	var nodes []*pb.TreeNode
-	var internalNodes []*pbinternal.TreeNode
-	for _, nodeSignatures := range req.GetNodeSignatures() {
-		node, internalNode, err := o.updateNode(ctx, nodeSignatures, req.GetIntent(), requireDirectTx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-		}
-		nodes = append(nodes, node)
-		internalNodes = append(internalNodes, internalNode)
+	nodes, internalNodes, err := o.updateNodesFromSignatures(ctx, req.GetNodeSignatures(), req.GetIntent(), requireDirectTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 
 	// Send gossip message to other SOs
@@ -509,36 +503,91 @@ func validateFinalizeNodeSignatureTransferLeafStates(ctx context.Context, db *en
 	return nil
 }
 
-func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent, requireDirectTx bool) (*pb.TreeNode, *pbinternal.TreeNode, error) {
+// loadNodesForFinalize batch-loads every tree node referenced by
+// nodeSignatures with the edges the finalize path needs (children, parent,
+// tree, signing keyshare), returned in request order. Loading everything up
+// front keeps updateLoadedNode free of per-node queries — the consensus claim
+// commit runs it for hundreds of leaves inside one request tx, where N+1
+// loads dominated large-claim latency.
+func loadNodesForFinalize(ctx context.Context, nodeSignatures []*pb.NodeSignatures) ([]*ent.TreeNode, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	nodeID, err := uuid.Parse(nodeSignatures.GetNodeId())
-	if err != nil {
-		return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+	nodeIDs := make([]uuid.UUID, 0, len(nodeSignatures))
+	seen := make(map[uuid.UUID]struct{}, len(nodeSignatures))
+	for _, sig := range nodeSignatures {
+		nodeID, err := uuid.Parse(sig.GetNodeId())
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid node id in %s: %w", logging.FormatProto("node_signatures", sig), err))
+		}
+		// Callers reject duplicates upstream; this guard is defense in depth
+		// because duplicates would alias one preloaded node and apply the
+		// second entry against a stale snapshot of the first's write.
+		if _, dup := seen[nodeID]; dup {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate node id %s in request", nodeID))
+		}
+		seen[nodeID] = struct{}{}
+		nodeIDs = append(nodeIDs, nodeID)
 	}
 
-	// Read the tree node
-	node, err := db.TreeNode.Query().
-		Where(treenode.ID(nodeID)).
-		WithChildren().
+	nodes, err := db.TreeNode.Query().
+		Where(treenode.IDIn(nodeIDs...)).
+		// Children are only consulted for a has-children check, so load IDs
+		// only rather than materializing full child rows.
+		WithChildren(func(q *ent.TreeNodeQuery) { q.Select(treenode.FieldID) }).
+		WithParent().
 		WithTree().
 		WithSigningKeyshare().
-		Only(ctx)
+		All(ctx)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
-		}
-		return nil, nil, fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+		return nil, fmt.Errorf("failed to get nodes: %w", err)
 	}
-	if node == nil {
-		return nil, nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("node not found in %s", logging.FormatProto("node_signatures", nodeSignatures)))
+	nodesByID := make(map[uuid.UUID]*ent.TreeNode, len(nodes))
+	for _, node := range nodes {
+		nodesByID[node.ID] = node
 	}
 
+	ordered := make([]*ent.TreeNode, 0, len(nodeSignatures))
+	for i, sig := range nodeSignatures {
+		node, ok := nodesByID[nodeIDs[i]]
+		if !ok {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get node in %s", logging.FormatProto("node_signatures", sig)))
+		}
+		ordered = append(ordered, node)
+	}
+	return ordered, nil
+}
+
+// updateNodesFromSignatures applies each NodeSignatures entry to its tree
+// node, with all node data batch-loaded once up front.
+func (o *FinalizeSignatureHandler) updateNodesFromSignatures(ctx context.Context, nodeSignatures []*pb.NodeSignatures, intent pbcommon.SignatureIntent, requireDirectTx bool) ([]*pb.TreeNode, []*pbinternal.TreeNode, error) {
+	loadedNodes, err := loadNodesForFinalize(ctx, nodeSignatures)
+	if err != nil {
+		return nil, nil, err
+	}
+	nodes := make([]*pb.TreeNode, 0, len(nodeSignatures))
+	internalNodes := make([]*pbinternal.TreeNode, 0, len(nodeSignatures))
+	for i, sig := range nodeSignatures {
+		node, internalNode, err := o.updateLoadedNode(ctx, sig, loadedNodes[i], intent, requireDirectTx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to update node %s: %w", sig.GetNodeId(), err)
+		}
+		nodes = append(nodes, node)
+		internalNodes = append(internalNodes, internalNode)
+	}
+	return nodes, internalNodes, nil
+}
+
+// updateLoadedNode applies one NodeSignatures entry to a tree node preloaded
+// by loadNodesForFinalize. It must not re-query data available on the node's
+// eager-loaded edges (see loadNodesForFinalize); the query fallbacks below
+// exist only for defense in depth if an edge is missing.
+func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, node *ent.TreeNode, intent pbcommon.SignatureIntent, requireDirectTx bool) (*pb.TreeNode, *pbinternal.TreeNode, error) {
 	signingKeyshare := node.Edges.SigningKeyshare
 	if signingKeyshare == nil {
+		var err error
 		signingKeyshare, err = node.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get signing keyshare for node %s: %w", node.ID, err)
@@ -546,14 +595,30 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 	treeEnt := node.Edges.Tree
 	if treeEnt == nil {
+		var err error
 		treeEnt, err = node.QueryTree().Only(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get tree for node %s: %w", node.ID, err)
 		}
 	}
+	// A nil parent with a loaded edge means the node is a root; only fall
+	// back to a query when the edge wasn't loaded at all.
+	nodeParent := node.Edges.Parent
+	if nodeParent == nil {
+		if _, edgeErr := node.Edges.ParentOrErr(); ent.IsNotLoaded(edgeErr) {
+			p, qErr := node.QueryParent().Only(ctx)
+			if qErr != nil && !ent.IsNotFound(qErr) {
+				return nil, nil, fmt.Errorf("failed to get parent for node %s: %w", node.ID, qErr)
+			}
+			nodeParent = p
+		}
+	}
 
-	hasChildren, err := node.QueryChildren().Exist(ctx)
-	if err != nil {
+	var err error
+	var hasChildren bool
+	if children, childrenErr := node.Edges.ChildrenOrErr(); childrenErr == nil {
+		hasChildren = len(children) > 0
+	} else if hasChildren, err = node.QueryChildren().Exist(ctx); err != nil {
 		return nil, nil, fmt.Errorf("failed to check node children in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 	nodeCanBecomeAvailable := treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) && !hasChildren
@@ -574,14 +639,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		} else if len(nodeSignatures.GetDirectNodeTxSignature()) == 0 && requireDirectTx && len(node.DirectTx) > 0 {
 			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version"))
 		}
-		// Node may not have parent if it is the root node
-		nodeParent := node.Edges.Parent
-		if node.Edges.Parent == nil {
-			p, err := node.QueryParent().Only(ctx)
-			if err == nil {
-				nodeParent = p
-			}
-		}
+		// Node may not have a parent if it is the root node.
 		if nodeParent != nil {
 			cpfpTreeNodeTx, err := common.TxFromRawTxBytes(cpfpNodeTxBytes)
 			if err != nil {
@@ -725,9 +783,14 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update node: %w", err)
 	}
-	// Preserve eagerly-loaded edges for downstream marshaling logic.
+	// Preserve eagerly-loaded edges for downstream marshaling logic. For root
+	// nodes (nil parent) the marshal falls back to a parent lookup that finds
+	// nothing, matching prior behavior.
 	node.Edges.SigningKeyshare = signingKeyshare
 	node.Edges.Tree = treeEnt
+	if nodeParent != nil {
+		node.Edges.Parent = nodeParent
+	}
 
 	nodeSparkProto, err := node.MarshalSparkProto(ctx)
 	if err != nil {
