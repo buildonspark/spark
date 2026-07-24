@@ -403,6 +403,7 @@ describe("WalletConfigService nested option merging", () => {
       enabled: true,
       intervalMs: 60000,
       minOutputsThreshold: 50,
+      maxOutputsToOptimize: 300,
     });
   });
 });

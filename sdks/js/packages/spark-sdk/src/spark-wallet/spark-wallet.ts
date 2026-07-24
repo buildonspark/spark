@@ -933,9 +933,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   /**
    * Optimizes token outputs by consolidating them when there are more than the configured
-   * threshold. Processes as many token outputs as possible in one transaction, up to
-   * MAX_TOKEN_OUTPUTS_TX. Consolidates each eligible token identifier into a single output for
-   * this wallet address.
+   * threshold. Processes as many token outputs as possible in one transaction, up to the
+   * configured maxOutputsToOptimize (default 300, capped at MAX_TOKEN_OUTPUTS_TX). Consolidates
+   * each eligible token identifier into a single output for this wallet address.
    */
   public async optimizeTokenOutputs(): Promise<void> {
     if (this.tokenOptimizationInProgress) {
@@ -949,6 +949,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       const tokenOptConfig = this.config.getTokenOptimizationOptions();
       const minOutputsThreshold = tokenOptConfig?.minOutputsThreshold ?? 50;
+      const maxOutputsToOptimize = Math.min(
+        tokenOptConfig?.maxOutputsToOptimize ?? 300,
+        MAX_TOKEN_OUTPUTS_TX,
+      );
 
       const entries = await this.tokenOutputManager.entries();
       const acquireRequests = entries
@@ -967,7 +971,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       const outputsByToken = await this.tokenOutputManager.acquireOutputsBatch(
         acquireRequests,
-        MAX_TOKEN_OUTPUTS_TX,
+        maxOutputsToOptimize,
         "optimize-token-outputs",
       );
 
