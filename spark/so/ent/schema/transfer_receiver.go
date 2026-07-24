@@ -120,5 +120,11 @@ func (TransferReceiver) Indexes() []ent.Index {
 				entsql.IndexWhere("status = 'INITIATED'"),
 			).
 			StorageKey("idx_transferreceiver_initiated_pubkey_type_time"),
+
+		// Serves the occupancy-gauge aggregate (publish_occupancy_metrics):
+		// GROUP BY status/type + MIN(update_time). Covers every status so
+		// it also serves status-scoped queries beyond the occupancy set.
+		index.Fields("status", "transfer_type", "update_time", "transfer_id").
+			StorageKey("idx_transferreceiver_status_type_time"),
 	}
 }
