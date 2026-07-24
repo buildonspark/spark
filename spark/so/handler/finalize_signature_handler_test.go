@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/db"
@@ -30,6 +31,18 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// updateNode is a single-node convenience wrapper so tests can exercise the
+// finalize logic for one node; production code always goes through
+// updateNodesFromSignatures (see finalize_signature_batch_load_test.go for
+// the query-batching contract tests).
+func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent, requireDirectTx bool) (*pb.TreeNode, *pbinternal.TreeNode, error) {
+	nodes, internalNodes, err := o.updateNodesFromSignatures(ctx, []*pb.NodeSignatures{nodeSignatures}, intent, requireDirectTx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return nodes[0], internalNodes[0], nil
+}
 
 func TestNewFinalizeSignatureHandler(t *testing.T) {
 	t.Parallel()

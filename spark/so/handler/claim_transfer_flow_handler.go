@@ -775,26 +775,30 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	// receive the gossip payload and must not trust its completeness — a
 	// short or duplicate-collapsed payload would otherwise mark
 	// receiver/transfer Completed below while leaving some leaves unsigned
-	// (the updateNode loop iterates the payload, not the leaf set).
+	// (updateNodesFromSignatures iterates the payload, not the leaf set).
 	leafSignatures := req.GetLeafSignatures()
 	if err := assertLeafSignaturesCover(ctx, transferEnt, receiver, leafSignatures); err != nil {
 		return err
 	}
 
-	// Apply aggregated signatures to each TreeNode.
+	// Apply aggregated signatures to the TreeNodes, batch-loading node data
+	// once — this loop runs for every leaf of the transfer on the coordinator
+	// and on each participant, so per-leaf loads are the dominant cost of
+	// large claims.
 	finalizeHandler := NewFinalizeSignatureHandler(h.config)
+	nodeSigs := make([]*pb.NodeSignatures, 0, len(leafSignatures))
 	for _, sig := range leafSignatures {
-		nodeSig := &pb.NodeSignatures{
+		nodeSigs = append(nodeSigs, &pb.NodeSignatures{
 			NodeId:                          sig.GetLeafId(),
 			NodeTxSignature:                 []byte{},
 			DirectNodeTxSignature:           []byte{},
 			RefundTxSignature:               sig.GetRefundSignature(),
 			DirectRefundTxSignature:         sig.GetDirectRefundSignature(),
 			DirectFromCpfpRefundTxSignature: sig.GetDirectFromCpfpRefundSignature(),
-		}
-		if _, _, err := finalizeHandler.updateNode(ctx, nodeSig, pbcommon.SignatureIntent_TRANSFER, true); err != nil {
-			return fmt.Errorf("failed to update node %s during commit: %w", sig.GetLeafId(), err)
-		}
+		})
+	}
+	if _, _, err := finalizeHandler.updateNodesFromSignatures(ctx, nodeSigs, pbcommon.SignatureIntent_TRANSFER, true); err != nil {
+		return fmt.Errorf("failed to update nodes during commit: %w", err)
 	}
 
 	// Mark Completed (MIMO: all receivers must be completed for the transfer
