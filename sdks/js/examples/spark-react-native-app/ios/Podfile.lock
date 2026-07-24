@@ -1803,7 +1803,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - Yoga
   - SocketRocket (0.7.1)
-  - spark-sdk (0.8.8):
+  - spark-sdk (0.9.0):
     - gRPC-Swift
     - React
     - React-Core
@@ -2291,7 +2291,7 @@ SPEC CHECKSUMS:
   ReactCommon: 2bc79208d91eda74edeff759d82c93460b07612f
   RNScreens: ff9b889ead6100d019d236599741efc1c4586128
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  spark-sdk: f1178388224433dd6a536d0ffc5a5831f6e0df07
+  spark-sdk: c363cc875315930a038f022f80a44682504582e5
   SwiftNIO: 829958aab300642625091f82fc2f49cb7cf4ef24
   SwiftNIOConcurrencyHelpers: 697370136789b1074e4535eaae75cbd7f900370e
   SwiftNIOCore: 473fdfe746534d7aa25766916459eeaf6f92ef49

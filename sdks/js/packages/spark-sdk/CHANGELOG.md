@@ -1,5 +1,30 @@
 # @buildonspark/spark-sdk
 
+## 0.9.0
+
+### Minor Changes
+
+- 5809793: Add signTransferManifest/verifyTransferManifestSignature — the sender's identity-key ECDSA signature over manifest_hash (the transfer-package signing scheme applied to the manifest digest). Signatures are verify-checked, not byte-pinned (ECDSA is nonce-dependent); only the manifest hash stays byte-identical across languages. The CLI gains dev-only signmanifest/verifymanifest commands for cross-checking.
+- Promote instant static deposit from experimental to the stable API: `getInstantStaticDepositQuote` and `claimInstantStaticDeposit` replace the `experimental_*` methods, which remain as deprecated aliases. Also drops the unused `partnerId` parameter from the quote request.
+
+### Patch Changes
+
+- Stop sending the legacy `transfer` field (and its now-dead refund-signing prelude) on `initiate_preimage_swap_v3` calls, now that the SO and SSP only need `transferRequest`.
+- Fix bugs.
+- - Make the token output optimization cap configurable via maxOutputsToOptimize (default 300).
+  - Promote instant static deposit to the stable API (getInstantStaticDepositQuote, claimInstantStaticDeposit).
+  - Fix intermittent SSP/GraphQL blob-resolution failures in React Native.
+  - Drop the legacy transfer field from initiate_preimage_swap_v3.
+  - Repoint by-id transfer lookups to query_transfers_by_id.
+  - Retry React Native unary calls rejected before a server response.
+  - Fix optimizationOptions/tokenOptimizationOptions partial-override merging.
+  - Fix bugs.
+- Fix `optimizationOptions` and `tokenOptimizationOptions` so a partial override merges key-by-key against the defaults instead of replacing the whole object, so unspecified fields like `auto` or `enabled` no longer get silently dropped.
+- Repoint by-id transfer lookups (`SparkWallet.getTransfer`, `SparkReadonlyClient.getTransfersByIds`) at the dedicated `query_transfers_by_id` endpoint instead of the overloaded `query_all_transfers`, whose whole-transfer status filter is ambiguous under MIMO.
+- Retry React Native unary calls that are rejected before the server produces a response (e.g. a stale pooled connection or a reused GOAWAY), instead of surfacing them as a non-retryable "stream closed" error.
+- 49d0fb9: Scope transfer claims to the wallet's own receiver leaves before verification and claim, so a full multi-receiver query result claims only the caller's leaves. No-op for single-receiver and legacy transfers.
+- Fix intermittent `Unable to resolve data for blob: <uuid>` failures on SSP/GraphQL reads in React Native under memory pressure, by reading responses as `ArrayBuffer` via a custom XHR-backed `fetch` instead of relying on the `whatwg-fetch` blob-backed polyfill.
+
 ## 0.8.8
 
 ### Patch Changes
