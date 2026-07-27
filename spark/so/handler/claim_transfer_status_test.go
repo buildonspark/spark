@@ -302,26 +302,24 @@ func TestClaimTransferPrepare_PoisonedNodeRefundTx_HealsViaTransferLeafAnchor(t 
 	assert.Nil(t, resp, "non-signing SO returns nil shares after validation")
 }
 
-// TestClaimTransferPrepare_LockedStatusesUseStoredKeyTweaks pins the
-// shouldUseStoredKeyTweaks routing at the Prepare boundary. At the pre-apply
-// locked statuses — ReceiverKeyTweaked, still durably reachable via rows
-// written by the retired pre-consensus claim path, and ReceiverKeyTweakLocked
-// from a prior Phase-1 commit — Prepare must source tweaks from
-// transfer_leaf.key_tweak instead of decrypting the fresh claim package: with
-// nothing stored it must surface the stored-tweak error without ever touching
-// the package ciphertext. At SENDER_KEY_TWEAKED the same request must take the
-// fresh-package branch instead, observable as the package-decrypt error since
-// the fixture package carries no ciphertext for this SO. The reuse branch's
-// success behavior with an anchored polynomial is covered end-to-end by
-// TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL in the
-// minikube integration suite.
-func TestClaimTransferPrepare_LockedStatusesUseStoredKeyTweaks(t *testing.T) {
+// TestClaimTransferPrepare_PreApplyStatusesDecryptFreshPackage pins the
+// tweak-source routing at the Prepare boundary: at EVERY pre-apply status —
+// SENDER_KEY_TWEAKED, and the locked statuses a prior attempt can leave
+// behind (ReceiverKeyTweaked from the retired pre-consensus path,
+// ReceiverKeyTweakLocked from a partial Phase-1) — Prepare decrypts the fresh
+// claim package, observable as the package-decrypt error since the fixture
+// package carries no ciphertext for this SO. A stale stored tweak must never
+// be silently reused: per-SO reuse is how a retry used to commit divergent
+// polynomials across SOs (see
+// TestClaimTransferPrepare_AdoptsFreshPackageOverDivergentStoredTweak and the
+// minikube suite's TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL).
+func TestClaimTransferPrepare_PreApplyStatusesDecryptFreshPackage(t *testing.T) {
 	cases := []struct {
 		status  st.TransferStatus
 		wantErr string
 	}{
-		{st.TransferStatusReceiverKeyTweaked, "has no stored key tweak"},
-		{st.TransferStatusReceiverKeyTweakLocked, "has no stored key tweak"},
+		{st.TransferStatusReceiverKeyTweaked, "no encrypted claim key tweaks found"},
+		{st.TransferStatusReceiverKeyTweakLocked, "no encrypted claim key tweaks found"},
 		{st.TransferStatusSenderKeyTweaked, "no encrypted claim key tweaks found"},
 	}
 	for _, tc := range cases {

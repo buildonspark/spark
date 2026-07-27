@@ -115,8 +115,19 @@ func TestClaimTransfer_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing.T
 	// Verify keyshare consistency across SOs for the claimed leaf.
 	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
 	require.NoError(t, err)
+	assertKeysharesConsistentAcrossOperators(t, receiverConfig, leafID)
+}
 
-	keysharesByOperatorID := readKeyshareFromAllOperators(t, receiverConfig, leafID)
+// assertKeysharesConsistentAcrossOperators asserts every SO's local view of
+// the leaf's SigningKeyshare agrees with every other SO's — both the
+// constant-term invariant (PublicKey) and per-operator pubshare agreement
+// (PublicShares). The latter is what breaks when a claim commits divergent
+// tweak polynomials across SOs: same aggregate pubkey, per-SO shares on
+// different polynomials, after which any signing set spanning both
+// polynomials produces invalid signatures.
+func assertKeysharesConsistentAcrossOperators(t *testing.T, config *wallet.TestWalletConfig, leafID uuid.UUID) {
+	t.Helper()
+	keysharesByOperatorID := readKeyshareFromAllOperators(t, config, leafID)
 	require.NotEmpty(t, keysharesByOperatorID)
 
 	// Pick any one operator as the reference; all others must agree.
@@ -144,10 +155,12 @@ func TestClaimTransfer_SettleAtomicity_KeysharesConsistentAcrossSOs(t *testing.T
 			refOpID, opID, leafID, ref.PublicKey.Serialize(), ks.PublicKey.Serialize())
 
 		// Per-operator pubshare agreement: every SO must hold the SAME
-		// view of every other SO's post-tweak public share. This is the
-		// invariant the bug broke — the coordinator thought a peer held
-		// P_X(idx)·G while the peer actually held P_Y(idx)·G after
-		// divergent Phase 2 commits across the two halves of the 2PC.
+		// view of every other SO's post-tweak public share. Compare sizes
+		// first so an extra entry on either side fails regardless of which
+		// operator the map iteration picked as reference.
+		require.Len(t, ks.PublicShares, len(ref.PublicShares),
+			"operator %d holds %d PublicShares entries but operator %d holds %d",
+			opID, len(ks.PublicShares), refOpID, len(ref.PublicShares))
 		for identifier, refShare := range ref.PublicShares {
 			thisShare, ok := ks.PublicShares[identifier]
 			require.True(t, ok,
@@ -180,31 +193,26 @@ func readKeyshareFromAllOperators(
 	return result
 }
 
-// TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL is the
-// anti-replay companion to the override-at-RKT test. The override-allowed
-// pre-condition is "no peer has committed Phase 1 yet"; this test pins
-// down what must still happen when that pre-condition is false.
+// TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL pins what a claim
+// retry must do when a prior attempt stranded ONE peer at
+// RECEIVER_KEY_TWEAK_LOCKED with polynomial proofs_X while the other SOs
+// never locked (a partial Phase-1 whose rollback missed the peer — the
+// durable mid-2PC state reachable in production, and the trigger of the
+// 2026-07 prod incident where a retry silently committed proofs_X on the
+// stranded SO and fresh proofs_Y everywhere else, permanently diverging the
+// leaf's keyshare).
 //
-// The "mid-2PC" state that's actually reachable in production is: attempt
-// 1's Phase 1 fan-out partially succeeded (some peer durably committed
-// Phase 1 with proofs_X — peer middleware committed RKL with proofs_X)
-// before Phase 1 fan-out's aggregate error returned codes.Unavailable to
-// the coordinator. Attempt 2 with a fresh polynomial proofs_Y must NOT
-// silently override and apply proofs_Y on the peers that haven't locked
-// yet while leaving the RKL peer holding proofs_X — that's the
-// divergent-keyshare state the fix prevents.
-//
-// The protection comes from peer InitiateSettleReceiverKeyTweak's
-// alreadyLocked branch combined with ValidateKeyTweakProof: a peer at RKL
-// keeps its stored proofs_X, then validates the incoming request's proofs
-// against them and returns AbortedConcurrentClaimConflict on mismatch. The
-// coordinator promotes that to action=ROLLBACK and the 2PC cleanup runs.
+// Under the digest-unanimity fix, the stranded peer's Prepare OVERWRITES its
+// stale proofs_X with the freshly validated package's proofs_Y (the stale
+// tweak is not applied anywhere, so the fresh package is authoritative),
+// every SO reports the proofs_Y digest, the coordinator verifies unanimity,
+// and Commit binds the digest so no SO can apply anything else. The claim
+// must therefore SUCCEED and leave every operator's keyshare view identical.
 //
 // Setup: stage a non-coordinator peer at RECEIVER_KEY_TWEAK_LOCKED with
-// proofs_X. ClaimTransferV2 then dispatches with fresh proofs_Y. Test
-// asserts the call fails with the proof-mismatch error class — i.e. the
-// peer-side check fired before any divergent commit could land.
-func TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL(t *testing.T) {
+// proofs_X. ClaimTransferV2 then dispatches with fresh proofs_Y. Assert the
+// claim completes and all operators' keyshares agree.
+func TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -261,15 +269,16 @@ func TestClaimTransferV2_FreshPolynomialRejectedWhenPeerLockedAtRKL(t *testing.T
 	)
 
 	// Drive the unified claim — wallet.ClaimTransferV2 generates fresh
-	// polynomial P_Y, which must NOT silently overwrite the RKL peer's
-	// proofs_X. Expect ValidateKeyTweakProof on the RKL peer to fire and
-	// surface as the proof-mismatch error class.
-	_, err = wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
-	require.Error(t, err, "ClaimTransferV2 must reject a fresh-polynomial retry when a peer is locked at RKL with the prior polynomial")
-	assert.Contains(t, err.Error(), "key tweak proof",
-		"rejection must surface from ValidateKeyTweakProof on the locked peer; "+
-			"the exact wording (\"key tweak proof for leaf %%s is invalid, the proof provided is not the same as key tweak proof\") "+
-			"is what guards the divergent-commit failure mode the fix prevents.\n  got: %v", err)
+	// polynomial P_Y. The RKL peer must overwrite its stale proofs_X with
+	// P_Y during Prepare, the digest-unanimity check must pass, and the
+	// claim must complete with every SO on P_Y.
+	claimed, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
+	require.NoError(t, err, "a fresh-polynomial retry must heal a peer stranded at RKL with a stale polynomial, not wedge or diverge")
+	require.NotNil(t, claimed)
+
+	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
+	require.NoError(t, err)
+	assertKeysharesConsistentAcrossOperators(t, receiverConfig, leafID)
 }
 
 // buildClaimLeafTweaksAcrossOperators returns a polynomial-derived

@@ -4,20 +4,17 @@ package handler
 
 import (
 	"context"
-	"math/big"
 	"math/rand/v2"
 	"testing"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
-	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -192,36 +189,6 @@ func createReceiverKeyTweakSettlementFixture(
 	require.NoError(t, err)
 
 	return leaf, transfer, transferLeaf
-}
-
-func createReceiverClaimKeyTweakBytes(t *testing.T, cfg *so.Config, rng *rand.ChaCha8, leafID uuid.UUID) []byte {
-	t.Helper()
-
-	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	secretInt := new(big.Int).SetBytes(tweakPrivKey.Serialize())
-	shares, err := secretsharing.SplitSecretWithProofs(
-		secretInt,
-		secp256k1.S256().N,
-		int(cfg.Threshold),
-		len(cfg.SigningOperatorMap),
-	)
-	require.NoError(t, err)
-	require.NotEmpty(t, shares)
-
-	secretShareBytes := make([]byte, 32)
-	shares[0].Share.FillBytes(secretShareBytes)
-
-	claimKeyTweak := &pb.ClaimLeafKeyTweak{
-		LeafId: leafID.String(),
-		SecretShareTweak: &pb.SecretShare{
-			SecretShare: secretShareBytes,
-			Proofs:      shares[0].Proofs,
-		},
-		PubkeySharesTweak: buildValidPubkeySharesTweak(t, cfg, shares[0].Proofs),
-	}
-	keyTweakBytes, err := proto.Marshal(claimKeyTweak)
-	require.NoError(t, err)
-	return keyTweakBytes
 }
 
 // createMultiLeafReceiverKeyTweakSettlementFixture builds one transfer at
