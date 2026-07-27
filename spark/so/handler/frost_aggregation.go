@@ -19,7 +19,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -246,11 +245,11 @@ func (b *frostAggregationBatch) addSigningResultJob(
 }
 
 // aggregate dispatches every queued job and returns the aggregated signatures
-// keyed by the jobKey passed to addJob or addRequest. When
-// KnobFrostAggregateBatchEnabled is on it issues aggregate_frost_batch RPCs
-// (the signer fans each batch's jobs out across cores), chunked to respect
-// the signer's per-request job and message-size limits; otherwise it falls
-// back to one aggregate_frost call per job in deterministic key order.
+// keyed by the jobKey passed to addJob or addRequest. It issues
+// aggregate_frost_batch RPCs (the signer fans each batch's jobs out across
+// cores), chunked to respect the signer's per-request job and message-size
+// limits. A signer that does not serve the batch RPC degrades to one
+// aggregate_frost call per job in deterministic key order.
 func (b *frostAggregationBatch) aggregate(ctx context.Context, frostClient pbfrost.FrostServiceClient) (map[string][]byte, error) {
 	signatures := make(map[string][]byte, len(b.requests))
 	if len(b.requests) == 0 {
@@ -258,21 +257,18 @@ func (b *frostAggregationBatch) aggregate(ctx context.Context, frostClient pbfro
 	}
 	jobKeys := slices.Sorted(maps.Keys(b.requests))
 
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobFrostAggregateBatchEnabled, 0) > 0 {
-		err := b.aggregateBatched(ctx, frostClient, jobKeys, signatures)
-		switch {
-		case err == nil:
-			return signatures, nil
-		case errors.Is(err, errAggregateBatchUnimplemented):
-			// Self-healing rollout: a signer that predates the
-			// aggregate_frost_batch RPC answers Unimplemented. Degrade to the
-			// serial path instead of failing every signing flow until an
-			// operator flips the knob back.
-			logging.GetLoggerFromContext(ctx).Sugar().Warnf("frost signer does not implement aggregate_frost_batch; falling back to per-job aggregation")
-			clear(signatures)
-		default:
-			return nil, err
-		}
+	err := b.aggregateBatched(ctx, frostClient, jobKeys, signatures)
+	switch {
+	case err == nil:
+		return signatures, nil
+	case errors.Is(err, errAggregateBatchUnimplemented):
+		// A signer that predates the aggregate_frost_batch RPC answers
+		// Unimplemented. Degrade to the serial path instead of failing every
+		// signing flow until the signer is upgraded.
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf("frost signer does not implement aggregate_frost_batch; falling back to per-job aggregation")
+		clear(signatures)
+	default:
+		return nil, err
 	}
 
 	for _, jobKey := range jobKeys {
