@@ -2947,13 +2947,15 @@ func claimLockConflictError(ctx context.Context, transferID uuid.UUID, lockErr e
 		fmt.Errorf("transfer %s is currently locked by another operation; please retry", transferID))
 }
 
-// hashClaimLeafKeyTweakProofs returns a hex-encoded SHA-256 over the ordered
-// VSS proofs in a ClaimLeafKeyTweak. Same proofs hash to the same value on
-// every SO, so the digest can be compared across operator logs to detect when
-// a receiver-claim key tweak was committed with divergent proofs.
-func hashClaimLeafKeyTweakProofs(tweak *pb.ClaimLeafKeyTweak) string {
+// claimLeafKeyTweakProofsDigest returns a SHA-256 over the ordered VSS proofs
+// in a ClaimLeafKeyTweak. The proofs are the tweak polynomial's public
+// commitments and identical across every SO's slice, so equal digests mean
+// equal polynomials. Used to detect (and refuse) claims that would tweak
+// keyshares with divergent polynomials across SOs. Returns nil for a tweak
+// with no secret share tweak.
+func claimLeafKeyTweakProofsDigest(tweak *pb.ClaimLeafKeyTweak) []byte {
 	if tweak == nil || tweak.GetSecretShareTweak() == nil {
-		return "<nil>"
+		return nil
 	}
 	h := sha256.New()
 	var lenBuf [4]byte
@@ -2962,7 +2964,17 @@ func hashClaimLeafKeyTweakProofs(tweak *pb.ClaimLeafKeyTweak) string {
 		h.Write(lenBuf[:])
 		h.Write(p)
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return h.Sum(nil)
+}
+
+// hashClaimLeafKeyTweakProofs is the hex form of claimLeafKeyTweakProofsDigest
+// for operator logs.
+func hashClaimLeafKeyTweakProofs(tweak *pb.ClaimLeafKeyTweak) string {
+	digest := claimLeafKeyTweakProofsDigest(tweak)
+	if digest == nil {
+		return "<nil>"
+	}
+	return hex.EncodeToString(digest)
 }
 
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
@@ -4375,11 +4387,6 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 
 	hasClaimPackage := len(req.GetEncryptedClaimKeyTweakPackage()) > 0
 
-	// When the transfer is already at KeyTweakLocked or later, the key tweaks from a previous
-	// Phase 1 are already stored on this SO. We must not accept a new claim package because it
-	// could contain different key tweaks, leading to a mismatch between SOs.
-	alreadyLocked := false
-
 	// Read logic determined by MIMO receive state
 	if isMimoReceiveEnabled {
 		if receiver != nil {
@@ -4388,10 +4395,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 				if !hasClaimPackage {
 					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status %s but no encrypted_claim_key_tweak_package provided", receiver.ID, receiver.Status))
 				}
-			case st.TransferReceiverStatusKeyTweaked:
-				// do nothing
-			case st.TransferReceiverStatusKeyTweakLocked:
-				alreadyLocked = true
+			case st.TransferReceiverStatusKeyTweaked,
+				st.TransferReceiverStatusKeyTweakLocked:
+				// Pre-apply state left by a prior attempt — the fresh package
+				// (when provided) supersedes whatever is stored; see the
+				// store-or-overwrite loop below.
 			case st.TransferReceiverStatusKeyTweakApplied,
 				st.TransferReceiverStatusRefundSigned:
 				// The key tweak is already applied, return early.
@@ -4407,10 +4415,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			if !hasClaimPackage {
 				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID))
 			}
-		case st.TransferStatusReceiverKeyTweaked:
-			// do nothing
-		case st.TransferStatusReceiverKeyTweakLocked:
-			alreadyLocked = true
+		case st.TransferStatusReceiverKeyTweaked,
+			st.TransferStatusReceiverKeyTweakLocked:
+			// Pre-apply state left by a prior attempt — the fresh package
+			// (when provided) supersedes whatever is stored; see the
+			// store-or-overwrite loop below.
 		case st.TransferStatusReceiverKeyTweakApplied,
 			st.TransferStatusReceiverRefundSigned:
 			// The key tweak is already applied, return early.
@@ -4420,10 +4429,16 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
-	// If encrypted claim key tweak package is provided AND we haven't already locked the key
-	// tweaks from a prior Phase 1 commit, verify signature, decrypt, and store.
-	// When already locked, skip this block entirely — the stored key tweaks must be used.
-	if hasClaimPackage && !alreadyLocked {
+	// If an encrypted claim key tweak package is provided, verify the
+	// signature, decrypt, and store — OVERWRITING any stored tweak whose
+	// polynomial differs. A stored tweak at a pre-apply status is a leftover
+	// from a prior attempt (a partial Phase-1 whose rollback never reached
+	// this SO, or a wedged pre-consensus claim); it is not applied anywhere
+	// yet, so the freshly validated package is authoritative. The applied
+	// case (where overwriting WOULD be unsafe) returned early above; a
+	// cluster where some other SO already applied is caught by the
+	// coordinator's tweak-digest unanimity check before any commit.
+	if hasClaimPackage {
 		// Verify receiver signature over the full encrypted key tweak package.
 		signingPayload := common.GetClaimPackageSigningPayload(transferID, req.GetEncryptedClaimKeyTweakPackage())
 		if err := common.VerifyECDSASignature(*receiverIdentityPublicKey, req.GetClaimSignature(), signingPayload); err != nil {
@@ -4473,21 +4488,38 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 				return fmt.Errorf("unexpected leaf id %s in claim key tweaks", leafTweak.GetLeafId())
 			}
 
-			// Only store if not already stored.
-			if len(leaf.KeyTweak) == 0 {
-				leafTweakBytes, err := proto.Marshal(leafTweak)
-				if err != nil {
-					return fmt.Errorf("unable to marshal leaf tweak: %w", err)
+			// Store when empty; overwrite when the stored polynomial differs
+			// (stale leftover, see the block comment above); skip the
+			// re-stamp when identical.
+			if len(leaf.KeyTweak) > 0 {
+				storedTweak := &pb.ClaimLeafKeyTweak{}
+				if unmarshalErr := proto.Unmarshal(leaf.KeyTweak, storedTweak); unmarshalErr != nil {
+					// A durable proof anchor that no longer parses is data
+					// corruption; preserve it as evidence and surface loudly
+					// rather than silently replacing it.
+					return sparkerrors.InternalDataInconsistency(fmt.Errorf(
+						"stored key tweak for transfer %s leaf %s is unreadable: %w", transferID, leafTweak.GetLeafId(), unmarshalErr))
 				}
-				_, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
-				if err != nil {
-					return fmt.Errorf("unable to update leaf %s: %w", leafTweak.GetLeafId(), err)
+				if bytes.Equal(claimLeafKeyTweakProofsDigest(storedTweak), claimLeafKeyTweakProofsDigest(leafTweak)) {
+					continue
 				}
-				logging.GetLoggerFromContext(ctx).Sugar().Infof(
-					"claim key tweak stored (peer) for transfer %s leaf %s: num_proofs=%d proofs_hash=%s",
-					transferID, leafTweak.GetLeafId(), len(leafTweak.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(leafTweak),
+				logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+					"claim key tweak overwritten for transfer %s leaf %s: stale stored proofs_hash=%s superseded by fresh proofs_hash=%s",
+					transferID, leafTweak.GetLeafId(), hashClaimLeafKeyTweakProofs(storedTweak), hashClaimLeafKeyTweakProofs(leafTweak),
 				)
 			}
+			leafTweakBytes, err := proto.Marshal(leafTweak)
+			if err != nil {
+				return fmt.Errorf("unable to marshal leaf tweak: %w", err)
+			}
+			_, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update leaf %s: %w", leafTweak.GetLeafId(), err)
+			}
+			logging.GetLoggerFromContext(ctx).Sugar().Infof(
+				"claim key tweak stored (peer) for transfer %s leaf %s: num_proofs=%d proofs_hash=%s",
+				transferID, leafTweak.GetLeafId(), len(leafTweak.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(leafTweak),
+			)
 		}
 
 		// Skipped when receiver status is authoritative — parent stays at SenderKeyTweaked.
@@ -4744,6 +4776,16 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			return err
 		}
 
+		// When the commit payload binds tweak digests, every stored tweak must
+		// match before ANY keyshare is mutated — applying a tweak from a
+		// different polynomial than the one the cluster signed with silently
+		// diverges this SO's keyshare from its peers. Absent digests (an
+		// old-binary coordinator) skip the check.
+		expectedDigests := make(map[string][]byte, len(req.GetLeafTweakDigests()))
+		for _, d := range req.GetLeafTweakDigests() {
+			expectedDigests[d.GetLeafId()] = d.GetProofsHash()
+		}
+
 		// Validate every leaf's stored tweak and collect the keyshare tweaks,
 		// then rotate all keyshares in one batched call — the per-leaf rotation
 		// (ephemeral version bump + main CAS update) dominated large claims.
@@ -4765,6 +4807,18 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			keyTweakProto := &pb.ClaimLeafKeyTweak{}
 			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
 				return fmt.Errorf("unable to unmarshal key tweak for leaf %v: %w", leaf.ID, err)
+			}
+			if len(expectedDigests) > 0 {
+				expected, ok := expectedDigests[treeNode.ID.String()]
+				if !ok {
+					return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+						"commit payload for transfer %s carries tweak digests but none for leaf %s; refusing to apply an unbound tweak", transferID, treeNode.ID))
+				}
+				if stored := claimLeafKeyTweakProofsDigest(keyTweakProto); !bytes.Equal(stored, expected) {
+					return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+						"stored key tweak for transfer %s leaf %s has proofs digest %x but the commit bound tweak digest %x; applying it would tweak this SO's keyshare with a different polynomial than its peers",
+						transferID, treeNode.ID, stored, expected))
+				}
 			}
 			keyshare, ok := keysharesByID[treeNode.Edges.SigningKeyshare.ID]
 			if !ok {

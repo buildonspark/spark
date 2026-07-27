@@ -276,6 +276,17 @@ const (
 	// knobs above does not apply to this one.
 	KnobUseConsensusClaimInstantStaticDepositUtxoSwap = "spark.so.use_consensus_claim_instant_static_deposit_utxo_swap"
 
+	// KnobClaimTransferRequireTweakDigests makes the claim-transfer coordinator
+	// require a tweak-digest report from EVERY participant during consensus
+	// Prepare (0 = tolerate non-reporters, >0 = require). A non-reporting SO is
+	// a legacy binary whose staged tweak is invisible to the digest-unanimity
+	// check and which ignores the commit digest binding — a stale tweak
+	// stranded there can still be committed alongside fresh tweaks elsewhere,
+	// permanently diverging the leaf keyshare. Enable once every SO (including
+	// external operators) reports digests; until then leaving it off preserves
+	// rolling-deploy compatibility at the cost of that residual window.
+	KnobClaimTransferRequireTweakDigests = "spark.so.claim_transfer.require_tweak_digests"
+
 	// KnobUseConsensusInitiateSwapPrimaryTransfer routes the swap v3 primary leg
 	// (initiate_swap_primary_transfer) through the 2PC consensus engine (0 = legacy,
 	// >0 = consensus; binary, not a percentage rollout), replacing the legacy

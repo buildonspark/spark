@@ -353,6 +353,11 @@ message SettleReceiverKeyTweakRequest {
     string transfer_id = 1;
     SettleKeyTweakAction action = 3;
     bytes receiver_identity_public_key = 4;
+    // Expected per-leaf digest of the receiver key tweak VSS proofs. When
+    // non-empty on a COMMIT, the SO must refuse to apply a stored tweak whose
+    // proofs digest differs — applying a tweak from a different polynomial
+    // than the one the cluster signed with silently diverges the keyshare.
+    repeated ClaimLeafTweakDigest leaf_tweak_digests = 5;
 
     reserved 2;
 }
@@ -1015,6 +1020,39 @@ message SendTransferRollbackRequest {
 // the receiver's refund transactions (cpfp/direct/direct-from-cpfp variants).
 message ClaimTransferPrepareRequest {
     spark.ClaimTransferRequest original_request = 1;
+    // When true, the SO responds with ClaimTransferPrepareResponse (digest
+    // report + round-2 shares) instead of a bare FrostRound2Response. Set by
+    // coordinators that enforce cross-SO tweak-polynomial unanimity; kept as
+    // an opt-in so a new participant never sends a response type an
+    // old-binary coordinator can't unmarshal during a rolling deploy.
+    bool report_tweak_digests = 2;
+}
+
+// ClaimLeafTweakDigest identifies the receiver key tweak polynomial an SO has
+// staged (or been asked to apply) for one leaf: a SHA-256 over the ordered VSS
+// proofs. The proofs are the polynomial's public commitments and identical
+// across SOs' slices, so equal digests mean equal polynomials.
+message ClaimLeafTweakDigest {
+    // Tree node id of the leaf.
+    string leaf_id = 1;
+    bytes proofs_hash = 2;
+}
+
+// ClaimTransferPrepareResponse is returned from claim-transfer Prepare when the
+// coordinator requested a tweak-digest report. It carries the FROST round-2
+// shares (absent for SOs outside the signing set) plus the per-leaf digest of
+// the tweak polynomial this SO staged and will apply at Commit. The
+// coordinator aborts the claim unless every reporting SO staged the same
+// polynomial per leaf — the invariant that, when silently violated, permanently
+// diverges the leaf's signing keyshare across SOs.
+message ClaimTransferPrepareResponse {
+    FrostRound2Response round2 = 1;
+    repeated ClaimLeafTweakDigest leaf_tweak_digests = 2;
+    // True when this SO already applied the receiver key tweak durably (a
+    // resumed RKA/RRS claim). Such an SO stages nothing and reports no
+    // digests; mixing applied and pre-apply SOs in one claim is not safely
+    // committable and must abort.
+    bool tweaks_already_applied = 3;
 }
 
 // ClaimTransferCommitRequest is the 2PC commit payload built by the coordinator
@@ -1032,6 +1070,12 @@ message ClaimTransferCommitRequest {
     string transfer_id = 1;
     repeated ClaimTransferLeafSignatures leaf_signatures = 2;
     bytes receiver_identity_public_key = 3;
+    // Per-leaf digest of the tweak polynomial the cluster reached unanimity on
+    // during Prepare. Participants must refuse to apply a stored tweak whose
+    // proofs digest differs (see SettleReceiverKeyTweakRequest.leaf_tweak_digests).
+    // Empty when sent by a pre-digest coordinator; participants then apply
+    // without the digest check.
+    repeated ClaimLeafTweakDigest leaf_tweak_digests = 4;
 }
 
 // ClaimTransferLeafSignatures carries the aggregated FROST signatures for a

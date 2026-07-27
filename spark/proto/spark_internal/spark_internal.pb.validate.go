@@ -4199,6 +4199,40 @@ func (m *SettleReceiverKeyTweakRequest) validate(all bool) error {
 
 	// no validation rules for ReceiverIdentityPublicKey
 
+	for idx, item := range m.GetLeafTweakDigests() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SettleReceiverKeyTweakRequestValidationError{
+						field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SettleReceiverKeyTweakRequestValidationError{
+						field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SettleReceiverKeyTweakRequestValidationError{
+					field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return SettleReceiverKeyTweakRequestMultiError(errors)
 	}
@@ -12772,6 +12806,8 @@ func (m *ClaimTransferPrepareRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for ReportTweakDigests
+
 	if len(errors) > 0 {
 		return ClaimTransferPrepareRequestMultiError(errors)
 	}
@@ -12853,6 +12889,280 @@ var _ interface {
 	ErrorName() string
 } = ClaimTransferPrepareRequestValidationError{}
 
+// Validate checks the field values on ClaimLeafTweakDigest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ClaimLeafTweakDigest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClaimLeafTweakDigest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ClaimLeafTweakDigestMultiError, or nil if none found.
+func (m *ClaimLeafTweakDigest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClaimLeafTweakDigest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for ProofsHash
+
+	if len(errors) > 0 {
+		return ClaimLeafTweakDigestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClaimLeafTweakDigestMultiError is an error wrapping multiple validation
+// errors returned by ClaimLeafTweakDigest.ValidateAll() if the designated
+// constraints aren't met.
+type ClaimLeafTweakDigestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClaimLeafTweakDigestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClaimLeafTweakDigestMultiError) AllErrors() []error { return m }
+
+// ClaimLeafTweakDigestValidationError is the validation error returned by
+// ClaimLeafTweakDigest.Validate if the designated constraints aren't met.
+type ClaimLeafTweakDigestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClaimLeafTweakDigestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClaimLeafTweakDigestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClaimLeafTweakDigestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClaimLeafTweakDigestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClaimLeafTweakDigestValidationError) ErrorName() string {
+	return "ClaimLeafTweakDigestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ClaimLeafTweakDigestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClaimLeafTweakDigest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClaimLeafTweakDigestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClaimLeafTweakDigestValidationError{}
+
+// Validate checks the field values on ClaimTransferPrepareResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ClaimTransferPrepareResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClaimTransferPrepareResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ClaimTransferPrepareResponseMultiError, or nil if none found.
+func (m *ClaimTransferPrepareResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClaimTransferPrepareResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetRound2()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ClaimTransferPrepareResponseValidationError{
+					field:  "Round2",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ClaimTransferPrepareResponseValidationError{
+					field:  "Round2",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRound2()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ClaimTransferPrepareResponseValidationError{
+				field:  "Round2",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetLeafTweakDigests() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ClaimTransferPrepareResponseValidationError{
+						field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ClaimTransferPrepareResponseValidationError{
+						field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ClaimTransferPrepareResponseValidationError{
+					field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for TweaksAlreadyApplied
+
+	if len(errors) > 0 {
+		return ClaimTransferPrepareResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClaimTransferPrepareResponseMultiError is an error wrapping multiple
+// validation errors returned by ClaimTransferPrepareResponse.ValidateAll() if
+// the designated constraints aren't met.
+type ClaimTransferPrepareResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClaimTransferPrepareResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClaimTransferPrepareResponseMultiError) AllErrors() []error { return m }
+
+// ClaimTransferPrepareResponseValidationError is the validation error returned
+// by ClaimTransferPrepareResponse.Validate if the designated constraints
+// aren't met.
+type ClaimTransferPrepareResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClaimTransferPrepareResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClaimTransferPrepareResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClaimTransferPrepareResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClaimTransferPrepareResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClaimTransferPrepareResponseValidationError) ErrorName() string {
+	return "ClaimTransferPrepareResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ClaimTransferPrepareResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClaimTransferPrepareResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClaimTransferPrepareResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClaimTransferPrepareResponseValidationError{}
+
 // Validate checks the field values on ClaimTransferCommitRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -12912,6 +13222,40 @@ func (m *ClaimTransferCommitRequest) validate(all bool) error {
 	}
 
 	// no validation rules for ReceiverIdentityPublicKey
+
+	for idx, item := range m.GetLeafTweakDigests() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ClaimTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ClaimTransferCommitRequestValidationError{
+						field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ClaimTransferCommitRequestValidationError{
+					field:  fmt.Sprintf("LeafTweakDigests[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return ClaimTransferCommitRequestMultiError(errors)
