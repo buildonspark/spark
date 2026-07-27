@@ -171,6 +171,22 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	}
 
 	protoNodeMap := make(map[string]*pb.TreeNode)
+	includeParents := req.GetIncludeParents()
+	var requestedNodeIDs map[string]struct{}
+	var ancestorChainElapsed time.Duration
+	if includeParents {
+		// Populated upfront (not incrementally in the loop below) so it always reflects every
+		// requested node, even if the loop is interrupted by an error partway through: otherwise
+		// a not-yet-processed requested node reached early as another node's ancestor would be
+		// miscounted as an "additional" ancestor in the failure-path metric below.
+		requestedNodeIDs = make(map[string]struct{}, len(nodes))
+		for _, node := range nodes {
+			requestedNodeIDs[node.ID.String()] = struct{}{}
+		}
+	}
+	recordAncestorChain := func(err error) {
+		recordAncestorChainDuration(ctx, ancestorChainPathLegacy, ancestorChainElapsed, additionalAncestorNodeCount(protoNodeMap, requestedNodeIDs), err)
+	}
 	for _, node := range nodes {
 		protoNode, err := node.MarshalSparkProto(ctx)
 		if err != nil {
@@ -180,12 +196,18 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			protoNode.OwnerIdentityPublicKey = bitcointransaction.NUMSPoint().Serialize()
 		}
 		protoNodeMap[node.ID.String()] = protoNode
-		if req.GetIncludeParents() {
+		if includeParents {
+			chainStart := time.Now()
 			err := getAncestorChain(ctx, db, node, protoNodeMap, isSSP)
+			ancestorChainElapsed += time.Since(chainStart)
 			if err != nil {
+				recordAncestorChain(err)
 				return nil, err
 			}
 		}
+	}
+	if includeParents {
+		recordAncestorChain(nil)
 	}
 
 	response := &pb.QueryNodesResponse{Nodes: protoNodeMap}
