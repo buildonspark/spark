@@ -639,8 +639,7 @@ func parseSendTransferReceivers(senderPkg *pb.SenderTransferPackage) (map[string
 
 // parseSendTransferRequest extracts and validates the structural fields shared
 // by every call site (Prepare on each SO, buildSendTransferCoordinatorFlow).
-// MVP: single sender; multi-receiver is supported but gated behind
-// KnobMimoTransferMultiReceiverEnabled in the public StartTransferV3 handler.
+// MVP: single sender, any number of receivers.
 func parseSendTransferRequest(req *pb.StartTransferV3Request) (parsedSendTransferRequest, error) {
 	var empty parsedSendTransferRequest
 	senderPkg, senderIDPK, err := parseSendTransferEnvelope(req)

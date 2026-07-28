@@ -62,9 +62,9 @@ import (
 //  1. parse the request (transferID, ownerIDPK, claimPackage)
 //  2. session-auth the parsed owner identity pubkey
 //  3. NoWait FOR UPDATE on the transfer row (fast-fail on concurrent claims)
-//  4. load receiver under FOR UPDATE
-//  5. non-MIMO: rejectLegacyAggregateClaimForMultiReceiverTransfer + identity match
-//     MIMO: validateTransferReadyForReceiverClaim + checkCoopExitTxBroadcasted
+//  4. load receiver under FOR UPDATE — resolving the row by the claimer's own
+//     pubkey is what enforces claimer identity
+//  5. validateTransferReadyForReceiverClaim + checkCoopExitTxBroadcasted
 //  6. validateClaimStatus (claimable status switch)
 //  7. loadClaimReceiverLeaves + leaf-count parity vs claimPackage.LeavesToClaim
 //  8. validateClaimPackageStructure (DFC coverage, KeyTweakPackage non-empty)
@@ -116,38 +116,25 @@ func (h *TransferHandler) claimTransferConsensus(ctx context.Context, req *pb.Cl
 	// Match legacy: tag the span with transfer_type so tracing of consensus-
 	// path claims carries the same dimension as legacy.
 	span.SetAttributes(transferTypeKey.String(string(transferEnt.Type)))
-	_, receiver, err := handler.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
+	receiver, err := handler.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
 	if err != nil {
 		return nil, err
 	}
-	isMimo := isMimoReceiveEnabled(ctx, receiver)
-
 	// Coordinator-side gates BEFORE the engine fan-out. The same gates run
 	// again inside each SO's Prepare (defense-in-depth); this layer just
 	// gives us fast-fail behavior + deterministic gRPC codes back to the
-	// SDK. Check ordering is pinned by tests: non-MIMO does
-	// rejectLegacyAggregate before the identity check; MIMO does readiness +
-	// coop-exit guards.
-	if !isMimo {
-		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transferEnt); err != nil {
-			return nil, err
-		}
-		if !transferEnt.ReceiverIdentityPubkey.Equals(parsed.ownerIDPK) {
-			return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", parsed.transferID)
-		}
-	} else {
-		if err := validateTransferReadyForReceiverClaim(transferEnt); err != nil {
-			return nil, err
-		}
-		db, err := ent.GetDbFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get db: %w", err)
-		}
-		if err := checkCoopExitTxBroadcasted(ctx, db, transferEnt); err != nil {
-			return nil, err
-		}
+	// SDK. Claimer identity is enforced by the receiver load above.
+	if err := validateTransferReadyForReceiverClaim(transferEnt); err != nil {
+		return nil, err
 	}
-	if err := validateClaimStatus(parsed.transferID, transferEnt, receiver, isMimo); err != nil {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db: %w", err)
+	}
+	if err := checkCoopExitTxBroadcasted(ctx, db, transferEnt); err != nil {
+		return nil, err
+	}
+	if err := validateClaimStatus(parsed.transferID, receiver); err != nil {
 		return nil, err
 	}
 
@@ -296,41 +283,20 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	if err != nil {
 		return nil, err
 	}
-	isMimo := isMimoReceiveEnabled(ctx, receiver)
-
-	// Non-MIMO gates — ordered to match the claimTransferConsensus
-	// coordinator preflight: rejectLegacyAggregate (multi-receiver
-	// guard) runs BEFORE the identity check so a multi-receiver request
-	// with a wrong claimer surfaces the same error code at every layer.
-	if !isMimo {
-		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transferEnt); err != nil {
-			return nil, err
-		}
-		// loadTransferReceiverByPublicKeyForUpdate returns (false, nil, nil)
-		// for non-MIMO when no receiver row matches; without this guard a
-		// wrong claimer would slip past validation.
-		if !transferEnt.ReceiverIdentityPubkey.Equals(parsed.ownerIDPK) {
-			return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", parsed.transferID)
-		}
+	// Readiness checks, ordered to match the coordinator preflight so error
+	// precedence is identical at every layer.
+	if err := validateTransferReadyForReceiverClaim(transferEnt); err != nil {
+		return nil, err
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db: %w", err)
+	}
+	if err := checkCoopExitTxBroadcasted(ctx, db, transferEnt); err != nil {
+		return nil, err
 	}
 
-	// MIMO-only readiness checks: transfer must be past the sender's key
-	// tweak (validateTransferReadyForReceiverClaim) and the cooperative-exit
-	// tx must not have broadcast yet.
-	if isMimo {
-		if err := validateTransferReadyForReceiverClaim(transferEnt); err != nil {
-			return nil, err
-		}
-		db, err := ent.GetDbFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get db: %w", err)
-		}
-		if err := checkCoopExitTxBroadcasted(ctx, db, transferEnt); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := validateClaimStatus(parsed.transferID, transferEnt, receiver, isMimo); err != nil {
+	if err := validateClaimStatus(parsed.transferID, receiver); err != nil {
 		return nil, err
 	}
 
@@ -369,7 +335,7 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	//   - pre-apply (SKT/RKT/RKL): stage the tweak (Phase-1 lock) and sign with an
 	//     in-memory post-tweak key package; the durable keyshare apply waits for
 	//     Commit.
-	applied := isCommittedClaim(ctx, transferEnt, receiver)
+	applied := isCommittedClaim(receiver)
 
 	predictedOwnerByLeaf := make(map[string]keys.Public, len(parsed.claimPackage.GetLeavesToClaim()))
 	// tweaksByLeaf is only needed on the pre-apply path (Phase-1 lock + in-memory
@@ -431,15 +397,11 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 		// signing keyshare and tree node ownership, which under the consensus
 		// engine must wait until Commit. The engine's ent.Tx is rolled back on
 		// any Prepare failure, undoing this Phase-1 lock cleanly.
-		var receiverIDPKBytes []byte
-		if isMimo {
-			receiverIDPKBytes = receiver.IdentityPubkey.Serialize()
-		}
 		settleReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
 			TransferId:                    parsed.transferID.String(),
 			KeyTweakProofs:                keyTweakProofs,
 			UserPublicKeys:                userPublicKeys,
-			ReceiverIdentityPublicKey:     receiverIDPKBytes,
+			ReceiverIdentityPublicKey:     receiver.IdentityPubkey.Serialize(),
 			EncryptedClaimKeyTweakPackage: encryptedPackage,
 			ClaimSignature:                claimSignature,
 		}
@@ -792,10 +754,9 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	}
 
 	// Pick the receiver identity from the commit payload when the coordinator
-	// provided one (MIMO transfers can have multiple receivers — the claimer's
-	// identity differs from transferEnt.ReceiverIdentityPubkey). Fall back to
-	// the transfer's primary receiver when the field is empty (non-MIMO, or
-	// a legacy gossip payload).
+	// provided one — with multiple receivers the claimer's identity differs from
+	// transferEnt.ReceiverIdentityPubkey. Fall back to the transfer's primary
+	// receiver when the field is empty (legacy gossip payload).
 	receiverPK := transferEnt.ReceiverIdentityPubkey
 	if rawPK := req.GetReceiverIdentityPublicKey(); len(rawPK) > 0 {
 		parsedPK, err := keys.ParsePublicKey(rawPK)
@@ -804,39 +765,23 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 		}
 		receiverPK = parsedPK
 	}
-	_, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &receiverPK)
+	receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &receiverPK)
 	if err != nil {
 		return err
 	}
 
-	if isMimoReceiveEnabled(ctx, receiver) {
-		switch receiver.Status {
-		case st.TransferReceiverStatusKeyTweakLocked,
-			st.TransferReceiverStatusKeyTweakApplied,
-			st.TransferReceiverStatusRefundSigned:
-			// fall through
-		case st.TransferReceiverStatusCompleted:
-			logging.GetLoggerFromContext(ctx).Sugar().Infof(
-				"claim transfer 2pc commit: receiver for transfer %s already completed, treating as idempotent retry",
-				transferID)
-			return nil
-		default:
-			return fmt.Errorf("claim transfer 2pc commit: receiver for transfer %s is in unexpected status %s", transferID, receiver.Status)
-		}
-	} else {
-		switch transferEnt.Status {
-		case st.TransferStatusReceiverKeyTweakLocked,
-			st.TransferStatusReceiverKeyTweakApplied,
-			st.TransferStatusReceiverRefundSigned:
-			// fall through
-		case st.TransferStatusCompleted:
-			logging.GetLoggerFromContext(ctx).Sugar().Infof(
-				"claim transfer 2pc commit: transfer %s already completed, treating as idempotent retry",
-				transferID)
-			return nil
-		default:
-			return fmt.Errorf("claim transfer 2pc commit: transfer %s is in unexpected status %s", transferID, transferEnt.Status)
-		}
+	switch receiver.Status {
+	case st.TransferReceiverStatusKeyTweakLocked,
+		st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned:
+		// fall through
+	case st.TransferReceiverStatusCompleted:
+		logging.GetLoggerFromContext(ctx).Sugar().Infof(
+			"claim transfer 2pc commit: receiver for transfer %s already completed, treating as idempotent retry",
+			transferID)
+		return nil
+	default:
+		return fmt.Errorf("claim transfer 2pc commit: receiver for transfer %s is in unexpected status %s", transferID, receiver.Status)
 	}
 
 	// Phase-2 apply: mutate the signing keyshare + tree node ownership using
@@ -848,14 +793,10 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	// before FROST aggregation (so leaf.OwnerSigningPubkey holds the
 	// receiver's new pubkey when the aggregation jobs are built); this second
 	// call is a no-op there.
-	var receiverIDPKBytes []byte
-	if receiver != nil {
-		receiverIDPKBytes = receiver.IdentityPubkey.Serialize()
-	}
 	applyReq := &pbinternal.SettleReceiverKeyTweakRequest{
 		TransferId:                transferID.String(),
 		Action:                    pbinternal.SettleKeyTweakAction_COMMIT,
-		ReceiverIdentityPublicKey: receiverIDPKBytes,
+		ReceiverIdentityPublicKey: receiver.IdentityPubkey.Serialize(),
 		LeafTweakDigests:          req.GetLeafTweakDigests(),
 	}
 	if err := h.SettleReceiverKeyTweak(ctx, applyReq); err != nil {
@@ -867,21 +808,11 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("unable to reload transfer %s after settle: %w", transferID, err)
 	}
-	if receiver != nil {
-		_, receiver, err = h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &receiver.IdentityPubkey)
-		if err != nil {
-			return err
-		}
+	receiver, err = h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &receiver.IdentityPubkey)
+	if err != nil {
+		return err
 	}
 
-	// Move transfer + receiver to RECEIVER_REFUND_SIGNED before applying
-	// signatures. Updates are independently gated: for MIMO, transferEnt is
-	// often already at ReceiverRefundSigned (from a prior receiver's claim)
-	// while THIS receiver row is still at KeyTweakApplied — the receiver
-	// update must still fire so each receiver passes through RefundSigned
-	// before reaching Completed (matches the legacy claim path's dual-write).
-	// The parent advance is skipped when receiver status is authoritative —
-	// parent stays SenderKeyTweaked until COMPLETED.
 	isReceiverAuthoritative, authErr := isMimoReceiverStatusAuthoritative(ctx, transferEnt)
 	if authErr != nil {
 		return authErr
@@ -893,8 +824,7 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 			return fmt.Errorf("unable to update transfer status to RECEIVER_REFUND_SIGNED for %s: %w", transferID, err)
 		}
 	}
-	if receiver != nil &&
-		receiver.Status != st.TransferReceiverStatusRefundSigned &&
+	if receiver.Status != st.TransferReceiverStatusRefundSigned &&
 		receiver.Status != st.TransferReceiverStatusCompleted {
 		if _, err := receiver.Update().SetStatus(st.TransferReceiverStatusRefundSigned).Save(ctx); err != nil {
 			return fmt.Errorf("unable to update receiver status to RECEIVER_REFUND_SIGNED for %s: %w", transferID, err)
@@ -934,28 +864,20 @@ func (h *ClaimTransferFlowHandler) applyClaimTransferCommit(ctx context.Context,
 		return fmt.Errorf("failed to update nodes during commit: %w", err)
 	}
 
-	// Mark Completed (MIMO: all receivers must be completed for the transfer
-	// to be considered done).
 	completionTime := time.Now()
-	if receiver != nil {
-		if _, err := receiver.Update().
-			SetStatus(st.TransferReceiverStatusCompleted).
-			SetCompletionTime(completionTime).
-			Save(ctx); err != nil {
-			return fmt.Errorf("unable to complete transfer receiver for %s: %w", transferID, err)
-		}
+	if _, err := receiver.Update().
+		SetStatus(st.TransferReceiverStatusCompleted).
+		SetCompletionTime(completionTime).
+		Save(ctx); err != nil {
+		return fmt.Errorf("unable to complete transfer receiver for %s: %w", transferID, err)
 	}
-	allReceiversComplete := true
-	if isMimoReceiveEnabled(ctx, receiver) {
-		incomplete, err := transferEnt.QueryTransferReceivers().
-			Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
-			Count(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to count incomplete receivers for transfer %s: %w", transferID, err)
-		}
-		allReceiversComplete = incomplete == 0
+	incomplete, err := transferEnt.QueryTransferReceivers().
+		Where(enttransferreceiver.StatusNEQ(st.TransferReceiverStatusCompleted)).
+		Count(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to count incomplete receivers for transfer %s: %w", transferID, err)
 	}
-	if !isMimoReceiveEnabled(ctx, receiver) || allReceiversComplete {
+	if incomplete == 0 {
 		if _, err := transferEnt.Update().
 			SetStatus(st.TransferStatusCompleted).
 			SetCompletionTime(completionTime).
@@ -1000,7 +922,7 @@ func (h *ClaimTransferFlowHandler) rollbackClaimTransfer(ctx context.Context, tr
 	if receiverPK != nil {
 		loadPK = *receiverPK
 	}
-	_, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &loadPK)
+	receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &loadPK)
 	if err != nil {
 		return err
 	}
@@ -1012,11 +934,11 @@ func (h *ClaimTransferFlowHandler) rollbackClaimTransfer(ctx context.Context, tr
 	// cannot revert it". The gossip rollback dispatcher only treats
 	// codes.AlreadyExists as success, so a bare error would leave the row
 	// IN_FLIGHT and the reconciler would loop. Surface it as AlreadyExists.
-	if isCommittedClaim(ctx, transferEnt, receiver) {
+	if isCommittedClaim(receiver) {
 		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s rollback: claim already committed, treating as idempotent success", transferID))
 	}
 
-	leaves, err := getTransferLeavesForReceiverQuery(ctx, transferEnt, receiver).All(ctx)
+	leaves, err := getTransferLeavesForReceiverQuery(transferEnt, receiver).All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load transfer leaves for rollback of %s: %w", transferID, err)
 	}
@@ -1053,7 +975,7 @@ func assertLeafSignaturesCover(ctx context.Context, transferEnt *ent.Transfer, r
 		}
 	}
 
-	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transferEnt, receiver).WithLeaf().All(ctx)
+	transferLeaves, err := getTransferLeavesForReceiverQuery(transferEnt, receiver).WithLeaf().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load receiver leaves for transfer %s: %w", transferEnt.ID, err)
 	}
@@ -1076,25 +998,15 @@ func assertLeafSignaturesCover(ctx context.Context, transferEnt *ent.Transfer, r
 }
 
 // isCommittedClaim reports whether the claim has already landed Phase-2
-// (KeyTweakApplied or later) for the given receiver. MIMO uses the receiver's
-// per-row status; non-MIMO uses the transfer-level status. Completed is
-// included: it's the primary case for the Rollback caller (a finalized claim
-// can't be rolled back), and in Prepare it's unreachable because
-// validateClaimStatus returns AlreadyExists for Completed before this is called.
-func isCommittedClaim(ctx context.Context, transferEnt *ent.Transfer, receiver *ent.TransferReceiver) bool {
-	if isMimoReceiveEnabled(ctx, receiver) {
-		switch receiver.Status { //nolint:exhaustive // only post-apply states gate the already-committed branch
-		case st.TransferReceiverStatusKeyTweakApplied,
-			st.TransferReceiverStatusRefundSigned,
-			st.TransferReceiverStatusCompleted:
-			return true
-		}
-		return false
-	}
-	switch transferEnt.Status { //nolint:exhaustive // only post-apply states gate the already-committed branch
-	case st.TransferStatusReceiverKeyTweakApplied,
-		st.TransferStatusReceiverRefundSigned,
-		st.TransferStatusCompleted:
+// (KeyTweakApplied or later) for the given receiver. Completed is included:
+// it's the primary case for the Rollback caller (a finalized claim can't be
+// rolled back), and in Prepare it's unreachable because validateClaimStatus
+// returns AlreadyExists for Completed before this is called.
+func isCommittedClaim(receiver *ent.TransferReceiver) bool {
+	switch receiver.Status { //nolint:exhaustive // only post-apply states gate the already-committed branch
+	case st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned,
+		st.TransferReceiverStatusCompleted:
 		return true
 	}
 	return false
@@ -1216,11 +1128,6 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("unable to reload transfer %s after commit: %w", f.parsed.transferID, err)
 	}
-	_, receiver, err := f.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &f.parsed.ownerIDPK)
-	if err != nil {
-		return nil, err
-	}
-	isMimo := isMimoReceiveEnabled(ctx, receiver)
 	freshDb, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get db for marshal: %w", err)
@@ -1235,12 +1142,7 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("unable to reload transfer for marshal: %w", err)
 	}
-	var transferProto *pb.Transfer
-	if isMimo {
-		transferProto, err = freshTransfer.MarshalProtoForReceiver(ctx, f.parsed.ownerIDPK)
-	} else {
-		transferProto, err = freshTransfer.MarshalProto(ctx)
-	}
+	transferProto, err := freshTransfer.MarshalProtoForReceiver(ctx, f.parsed.ownerIDPK)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer %s for response: %w", f.parsed.transferID, err)
 	}
@@ -1537,19 +1439,15 @@ func (h *ClaimTransferFlowHandler) loadClaimContext(ctx context.Context, parsed 
 		}
 		return nil, nil, fmt.Errorf("unable to load transfer %s: %w", parsed.transferID, err)
 	}
-	_, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
+	receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transferEnt, &parsed.ownerIDPK)
 	if err != nil {
 		return nil, nil, err
 	}
 	return transferEnt, receiver, nil
 }
 
-// validateClaimStatus enforces the same status preconditions as the legacy
-// ClaimTransfer entry point. Branches on isMimoReceiveEnabled (not just
-// receiver != nil) to match the legacy semantics — when the MIMO knob is off
-// but a TransferReceiver row happens to exist for the requested pubkey (loader
-// returns (false, receiver, nil)), legacy checks transfer.Status, not
-// receiver.Status.
+// validateClaimStatus enforces the claimable-status precondition for the
+// requesting receiver; terminal transfer states are rejected upstream.
 //
 // The already-applied states (KeyTweakApplied / RefundSigned) are claimable, not
 // terminal: a prior attempt — or a durable row left by the retired
@@ -1560,34 +1458,18 @@ func (h *ClaimTransferFlowHandler) loadClaimContext(ctx context.Context, parsed 
 // already-post-tweak owner and Commit's apply no-ops. Returning AlreadyExists
 // here instead would strand such partials — their refunds would never get
 // signed and the SDK would stop retrying.
-func validateClaimStatus(transferID uuid.UUID, transferEnt *ent.Transfer, receiver *ent.TransferReceiver, isMimo bool) error {
-	if isMimo && receiver != nil {
-		switch receiver.Status {
-		case st.TransferReceiverStatusReceiverClaimPending,
-			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusKeyTweakLocked,
-			st.TransferReceiverStatusKeyTweakApplied,
-			st.TransferReceiverStatusRefundSigned:
-			return nil
-		case st.TransferReceiverStatusCompleted:
-			return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed by this receiver", transferID))
-		default:
-			return fmt.Errorf("transfer %s receiver is not in a claimable status, current status: %s", transferID, receiver.Status)
-		}
-	}
-	switch transferEnt.Status {
-	case st.TransferStatusSenderKeyTweaked,
-		st.TransferStatusReceiverKeyTweaked,
-		st.TransferStatusReceiverKeyTweakLocked,
-		st.TransferStatusReceiverKeyTweakApplied,
-		st.TransferStatusReceiverRefundSigned:
+func validateClaimStatus(transferID uuid.UUID, receiver *ent.TransferReceiver) error {
+	switch receiver.Status {
+	case st.TransferReceiverStatusReceiverClaimPending,
+		st.TransferReceiverStatusKeyTweaked,
+		st.TransferReceiverStatusKeyTweakLocked,
+		st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned:
 		return nil
-	case st.TransferStatusCompleted:
-		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", transferID))
-	case st.TransferStatusExpired, st.TransferStatusReturned:
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be claimed", transferID, transferEnt.Status))
+	case st.TransferReceiverStatusCompleted:
+		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed by this receiver", transferID))
 	default:
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is not in a claimable status, current status: %s", transferID, transferEnt.Status))
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s receiver is not in a claimable status, current status: %s", transferID, receiver.Status))
 	}
 }
 
@@ -1695,7 +1577,7 @@ func decryptClaimKeyTweaks(config *so.Config, pkg *pb.ClaimPackage) (map[string]
 // for the useStoredKeyTweaks retry path while still getting the TreeNode map
 // downstream callers need.
 func loadClaimReceiverLeaves(ctx context.Context, transferEnt *ent.Transfer, receiver *ent.TransferReceiver) ([]*ent.TransferLeaf, map[string]*ent.TreeNode, error) {
-	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transferEnt, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
+	transferLeaves, err := getTransferLeavesForReceiverQuery(transferEnt, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
 		tnq.WithTree().WithSigningKeyshare()
 	}).All(ctx)
 	if err != nil {

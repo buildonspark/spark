@@ -67,7 +67,6 @@ knobs:
     # Lightning
     spark.so.shutdown_hodl_invoices: 0
     # MIMO
-    spark.so.mimo_transfer_multi_receiver_enabled: 1
     spark.so.mimo_authoritative_receiver_status_enabled: 1
     # Multiparty (user-side MPC) transfer send — fail-closed endpoint; off until the flow lands.
     spark.so.mpc_transfer.enabled: 0

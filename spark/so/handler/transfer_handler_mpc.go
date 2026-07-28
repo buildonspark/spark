@@ -30,8 +30,7 @@ import (
 //     MaxLeavesToSend), checked on the raw list length before any parsing work.
 //  4. Structure: ParseMpcSubmission; malformed submissions are InvalidArgument.
 //  5. Receiver shape: the wire carries a per-leaf receiver map so multi-receiver MPC sends are a later validation
-//     relaxation, but the MVP accepts exactly one distinct receiver, mirroring the single-party multi-receiver knob
-//     discipline (FailedPrecondition, matching startTransferV3Consensus).
+//     relaxation, but the MVP accepts exactly one distinct receiver (FailedPrecondition).
 func (h *TransferHandler) StartTransferMpc(ctx context.Context, req *pb.StartTransferMpcRequest) (*pb.StartTransferResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.StartTransferMpc")
 	defer span.End()

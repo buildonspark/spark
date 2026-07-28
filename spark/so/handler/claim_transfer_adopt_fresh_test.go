@@ -121,6 +121,7 @@ func buildFreshClaimRequestWithRealTweak(
 		Save(ctx)
 	require.NoError(t, err)
 	transferLeaf := createTestTransferLeaf(t, ctx, client, transfer, leaf)
+	createTestTransferReceiver(t, ctx, client, transfer)
 
 	// Fresh polynomial for tweak = origOwner - newOwner, so the predicted
 	// post-tweak owner (leaf.OwnerSigningPubkey - Proofs[0]) is newOwner.
@@ -331,27 +332,21 @@ func TestClaimTransferPrepare_FencesTweakReplacementWhileClaimFlowUnresolved(t *
 	})
 }
 
-// TestClaimTransferPrepare_MIMOAdoptsFreshPackageOverDivergentStoredTweak
-// drives the same stale-tweak-overwrite contract through the MIMO
-// receiver.Status branch (TransferReceiver row at KEY_TWEAK_LOCKED) instead of
-// the legacy transfer.Status branch.
-func TestClaimTransferPrepare_MIMOAdoptsFreshPackageOverDivergentStoredTweak(t *testing.T) {
+// TestClaimTransferPrepare_AdoptsFreshPackageOverStoredTweakAtLockedReceiver
+// drives the same stale-tweak-overwrite contract with the TransferReceiver row
+// at KEY_TWEAK_LOCKED.
+func TestClaimTransferPrepare_AdoptsFreshPackageOverStoredTweakAtLockedReceiver(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	ctx = mimoEnabledContext(ctx)
 	cfg := sparktesting.TestConfig(t)
 	req, transferLeaf, freshProofs := buildFreshClaimRequestWithRealTweak(t, ctx, sessionCtx.Client, cfg, st.TransferStatusSenderKeyTweaked)
 
 	transferID := uuid.MustParse(req.GetOriginalRequest().GetTransferId())
-	receiverPK, err := keys.ParsePublicKey(req.GetOriginalRequest().GetOwnerIdentityPublicKey())
+	transferEnt, err := sessionCtx.Client.Transfer.Get(ctx, transferID)
 	require.NoError(t, err)
-	receiver, err := sessionCtx.Client.TransferReceiver.Create().
-		SetTransferID(transferID).
-		SetIdentityPubkey(receiverPK).
-		SetStatus(st.TransferReceiverStatusKeyTweakLocked).
-		SetTransferType(st.TransferTypeTransfer).
-		Save(ctx)
+	receivers, err := transferEnt.QueryTransferReceivers().All(ctx)
 	require.NoError(t, err)
-	transferLeaf, err = transferLeaf.Update().SetTransferReceiverID(receiver.ID).Save(ctx)
+	require.Len(t, receivers, 1)
+	_, err = receivers[0].Update().SetStatus(st.TransferReceiverStatusKeyTweakLocked).Save(ctx)
 	require.NoError(t, err)
 
 	staleBytes := createReceiverClaimKeyTweakBytes(t, cfg, rand.NewChaCha8([32]byte{46}), transferLeafLeafID(t, ctx, transferLeaf))

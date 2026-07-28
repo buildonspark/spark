@@ -64,99 +64,64 @@ func runClaimPrepare(ctx context.Context, t *testing.T, transfer *ent.Transfer, 
 // needs its refunds signed and a finalize to reach COMPLETED. Returning
 // AlreadyExists for them would strand such partials (the codex-P1 bug). Prepare
 // resumes them instead (predicted owner = the already-post-tweak owner; sign
-// with the on-disk keyshare; Commit's apply no-ops). Both MIMO and non-MIMO are
-// covered. These requests proceed past the gate and then fail later on the
+// with the on-disk keyshare; Commit's apply no-ops).
+// These requests proceed past the gate and then fail later on the
 // deliberately-minimal claim package (no leaves), so the assertion is only that
 // the error is NOT the terminal AlreadyExists code.
 func TestClaimTransferPrepare_ClaimableStatusesPassGate(t *testing.T) {
-	t.Run("non-MIMO", func(t *testing.T) {
-		claimable := []st.TransferStatus{
-			st.TransferStatusSenderKeyTweaked,
-			st.TransferStatusReceiverKeyTweaked,
-			st.TransferStatusReceiverKeyTweakLocked,
-			st.TransferStatusReceiverKeyTweakApplied,
-			st.TransferStatusReceiverRefundSigned,
-		}
-		for _, transferStatus := range claimable {
-			t.Run(string(transferStatus), func(t *testing.T) {
-				ctx, sessionCtx := db.ConnectToTestPostgres(t)
-				rng := rand.NewChaCha8([32]byte{1})
-				transfer := createTestTransfer(t, ctx, rng, sessionCtx.Client, transferStatus)
+	claimable := []st.TransferReceiverStatus{
+		st.TransferReceiverStatusReceiverClaimPending,
+		st.TransferReceiverStatusKeyTweaked,
+		st.TransferReceiverStatusKeyTweakLocked,
+		st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned,
+	}
+	for _, receiverStatus := range claimable {
+		t.Run(string(receiverStatus), func(t *testing.T) {
+			ctx, sessionCtx := db.ConnectToTestPostgres(t)
+			rng := rand.NewChaCha8([32]byte{2})
+			receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-				err := runClaimPrepare(ctx, t, transfer, transfer.ReceiverIdentityPubkey)
-				require.Error(t, err)
-				require.NotEqual(t, codes.AlreadyExists, status.Code(err), "status %s must remain claimable (resumable)", transferStatus)
-			})
-		}
-	})
+			transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusReceiverKeyTweakApplied)
+			_, err := sessionCtx.Client.TransferReceiver.Create().
+				SetTransferID(transfer.ID).
+				SetIdentityPubkey(receiverPubKey).
+				SetStatus(receiverStatus).
+				SetTransferType(transfer.Type).
+				Save(ctx)
+			require.NoError(t, err)
 
-	t.Run("MIMO", func(t *testing.T) {
-		claimable := []st.TransferReceiverStatus{
-			st.TransferReceiverStatusReceiverClaimPending,
-			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusKeyTweakLocked,
-			st.TransferReceiverStatusKeyTweakApplied,
-			st.TransferReceiverStatusRefundSigned,
-		}
-		for _, receiverStatus := range claimable {
-			t.Run(string(receiverStatus), func(t *testing.T) {
-				ctx, sessionCtx := db.ConnectToTestPostgres(t)
-				ctx = mimoEnabledContext(ctx)
-				rng := rand.NewChaCha8([32]byte{2})
-				receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-				senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-				transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusReceiverKeyTweakApplied)
-				_, err := sessionCtx.Client.TransferReceiver.Create().
-					SetTransferID(transfer.ID).
-					SetIdentityPubkey(receiverPubKey).
-					SetStatus(receiverStatus).
-					SetTransferType(transfer.Type).
-					Save(ctx)
-				require.NoError(t, err)
-
-				err = runClaimPrepare(ctx, t, transfer, receiverPubKey)
-				require.Error(t, err)
-				require.NotEqual(t, codes.AlreadyExists, status.Code(err), "receiver status %s must remain claimable (resumable)", receiverStatus)
-			})
-		}
-	})
+			err = runClaimPrepare(ctx, t, transfer, receiverPubKey)
+			require.Error(t, err)
+			require.NotEqual(t, codes.AlreadyExists, status.Code(err), "receiver status %s must remain claimable (resumable)", receiverStatus)
+			// Reachable only past the status gate, so this fails if the status stops being claimable.
+			require.ErrorContains(t, err, "has no leaves to claim")
+		})
+	}
 }
 
 // TestClaimTransferPrepare_CompletedReturnsAlreadyExists confirms a fully
 // completed claim is the only terminal status — re-claiming returns the
 // deterministic AlreadyExists the SDK treats as idempotent success.
 func TestClaimTransferPrepare_CompletedReturnsAlreadyExists(t *testing.T) {
-	t.Run("non-MIMO", func(t *testing.T) {
-		ctx, sessionCtx := db.ConnectToTestPostgres(t)
-		rng := rand.NewChaCha8([32]byte{3})
-		transfer := createTestTransfer(t, ctx, rng, sessionCtx.Client, st.TransferStatusCompleted)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{4})
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-		err := runClaimPrepare(ctx, t, transfer, transfer.ReceiverIdentityPubkey)
-		require.Error(t, err)
-		require.Equal(t, codes.AlreadyExists, status.Code(err))
-	})
+	transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusReceiverKeyTweakApplied)
+	_, err := sessionCtx.Client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(receiverPubKey).
+		SetStatus(st.TransferReceiverStatusCompleted).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
 
-	t.Run("MIMO", func(t *testing.T) {
-		ctx, sessionCtx := db.ConnectToTestPostgres(t)
-		ctx = mimoEnabledContext(ctx)
-		rng := rand.NewChaCha8([32]byte{4})
-		receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-		transfer := createTestTransferForMIMO(t, ctx, sessionCtx.Client, senderPubKey, receiverPubKey, st.TransferStatusReceiverKeyTweakApplied)
-		_, err := sessionCtx.Client.TransferReceiver.Create().
-			SetTransferID(transfer.ID).
-			SetIdentityPubkey(receiverPubKey).
-			SetStatus(st.TransferReceiverStatusCompleted).
-			SetTransferType(transfer.Type).
-			Save(ctx)
-		require.NoError(t, err)
-
-		err = runClaimPrepare(ctx, t, transfer, receiverPubKey)
-		require.Error(t, err)
-		require.Equal(t, codes.AlreadyExists, status.Code(err))
-	})
+	err = runClaimPrepare(ctx, t, transfer, receiverPubKey)
+	require.Error(t, err)
+	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }
 
 // buildAppliedClaimRequest builds a single-leaf transfer at the given status
@@ -192,6 +157,7 @@ func buildAppliedClaimRequest(t *testing.T, ctx context.Context, client *ent.Cli
 		Save(ctx)
 	require.NoError(t, err)
 	createTestTransferLeaf(t, ctx, client, transfer, leaf)
+	createTestTransferReceiver(t, ctx, client, transfer)
 
 	// SE round-1 commitments for two operators OTHER than this SO, so the
 	// signing-set filter drops this SO (non-signer) and Prepare returns before

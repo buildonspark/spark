@@ -1620,50 +1620,29 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 	return transfer, nil
 }
 
-// Fetch all TransferReceivers for this Transfer, returns the one associated with this request
-// Returns whether MIMO receive is enabled, the receiver, and an error if one occurred
-func (h *BaseTransferHandler) loadTransferReceiverByPublicKeyForUpdate(ctx context.Context, transfer *ent.Transfer, pubkey *keys.Public) (bool, *ent.TransferReceiver, error) {
+// Returns a non-nil receiver or an error. Resolving the row by the requester's
+// own pubkey is what enforces claimer identity on the claim paths.
+func (h *BaseTransferHandler) loadTransferReceiverByPublicKeyForUpdate(ctx context.Context, transfer *ent.Transfer, pubkey *keys.Public) (*ent.TransferReceiver, error) {
 	if transfer == nil || pubkey == nil {
-		return false, nil, nil
+		return nil, sparkerrors.InternalObjectNull(fmt.Errorf("transfer and receiver identity public key are both required"))
 	}
-
-	isMimoReceiveEnabled := knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) > 0
 
 	receivers, err := transfer.QueryTransferReceivers().
 		Where(enttransferreceiver.IdentityPubkeyEQ(*pubkey)).
 		ForUpdate(sql.WithLockAction(sql.NoWait)).
 		All(ctx)
 	if err != nil {
-		return false, nil, fmt.Errorf("unable to query transfer receivers: %w", err)
+		return nil, fmt.Errorf("unable to query transfer receivers: %w", err)
 	}
 
-	// MIMO receive is enabled IFF the knob is enabled and there is a corresponding receiver.
 	switch len(receivers) {
 	case 0:
-		if isMimoReceiveEnabled {
-			return false, nil, fmt.Errorf("no transfer receivers found for transfer %s", transfer.ID)
-		}
-		return false, nil, nil
+		return nil, fmt.Errorf("no transfer receivers found for transfer %s matching identity public key %s", transfer.ID, pubkey)
 	case 1:
-		return isMimoReceiveEnabled, receivers[0], nil
+		return receivers[0], nil
 	default:
-		return false, nil, fmt.Errorf("multiple transfer receivers found for transfer %s", transfer.ID)
+		return nil, fmt.Errorf("multiple transfer receivers found for transfer %s", transfer.ID)
 	}
-}
-
-func rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx context.Context, transfer *ent.Transfer) error {
-	receivers, err := transfer.QueryTransferReceivers().
-		ForUpdate(sql.WithLockAction(sql.NoWait)).
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to query transfer receivers for transfer %s: %w", transfer.ID, err)
-	}
-	if len(receivers) <= 1 {
-		return nil
-	}
-	return sparkerrors.FailedPreconditionInvalidState(
-		fmt.Errorf("multi-receiver transfer %s requires receiver-scoped MIMO claim handling", transfer.ID),
-	)
 }
 
 // isMimoReceiverStatusAuthoritative reports whether the per-receiver

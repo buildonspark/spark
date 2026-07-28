@@ -23,7 +23,6 @@ import (
 	enttransfersender "github.com/lightsparkdev/spark/so/ent/transfersender"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/mimo"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -88,8 +87,8 @@ func rejectUnboundTransferManifest(req *pb.StartTransferV3Request) error {
 // reconciler drives forward (SP-3195).
 //
 // This is intentionally a thin entry point: only the cheap structural checks,
-// session-identity auth, the manifest refusal, and the MIMO multi-receiver knob
-// guard run on the coordinator before the engine fans out. The expensive package validation
+// session-identity auth, and the manifest refusal run on the coordinator before
+// the engine fans out. The expensive package validation
 // (ValidateTransferPackage / createTransferV3 / transfer-size limit) lives
 // inside Prepare so it runs concurrently across all SOs rather than serially
 // on the coordinator first.
@@ -105,13 +104,9 @@ func (h *TransferHandler) startTransferV3Consensus(
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferV3Consensus")
 	defer span.End()
 
-	// Entry-gate precedence is pinned by tests (e.g. the multi-receiver knob
-	// gate fires before any package parsing): envelope checks, then session
-	// auth, then the manifest refusal, then the receiver gates, and only then
-	// the full parse — whose
-	// result is threaded into buildSendTransferCoordinatorFlow so the
-	// coordinator parses the request body once.
-	senderPkg, senderIDPK, err := parseSendTransferEnvelope(req)
+	// Entry-gate precedence is pinned by tests: envelope checks, then session
+	// auth, then the manifest refusal, and only then the full parse.
+	_, senderIDPK, err := parseSendTransferEnvelope(req)
 	if err != nil {
 		return nil, err
 	}
@@ -125,21 +120,6 @@ func (h *TransferHandler) startTransferV3Consensus(
 
 	if err := rejectUnboundTransferManifest(req); err != nil {
 		return nil, err
-	}
-
-	_, entryReceivers, err := parseSendTransferReceivers(senderPkg)
-	if err != nil {
-		return nil, err
-	}
-	if len(entryReceivers) > 1 {
-		// Coordinator-only by design (matches legacy InitiateTransferV2).
-		// Participants don't re-check this — during the multi-receiver
-		// rollout, set KnobMimoTransferMultiReceiverEnabled on every SO
-		// before letting multi-receiver traffic reach the coordinator, to
-		// avoid coordinator-accepts-but-participants-reject divergence.
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) == 0 {
-			return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("multi-receiver transfers are not enabled"))
-		}
 	}
 
 	// No PendingSendTransfer guard on the consensus path — the engine's
