@@ -187,6 +187,12 @@ func (s *SparkServer) InitiatePreimageSwapV3(ctx context.Context, req *pb.Initia
 	return lightningHandler.InitiatePreimageSwapV3(ctx, req)
 }
 
+// InitiatePreimageSwapV4 is registered ahead of its implementation so clients have a stable target to
+// generate against. FEATURE_NOT_IMPLEMENTED, not the earlier versions' METHOD_DISABLED: this one is coming.
+func (s *SparkServer) InitiatePreimageSwapV4(ctx context.Context, req *pb.InitiatePreimageSwapV4Request) (*pb.InitiatePreimageSwapResponse, error) {
+	return nil, errors.UnimplementedFeatureIncomplete(fmt.Errorf("initiate preimage swap v4 is not yet implemented"))
+}
+
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
