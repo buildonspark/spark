@@ -55,6 +55,12 @@ func TestTransferManifestHashJSONCases(t *testing.T) {
 				t.Fatalf("protojson unmarshal TransferManifest: %v", err)
 			}
 
+			// A wire rule stricter than these agreed-buildable shapes would make a
+			// legitimate manifest unsendable while the hashing assertions stayed green.
+			if err := msg.Validate(); err != nil {
+				t.Fatalf("proto validation rejected a valid fixture: %v", err)
+			}
+
 			got, err := HashTransferManifest(&msg)
 			if err != nil {
 				t.Fatalf("hash transfer manifest: %v", err)

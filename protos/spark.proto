@@ -74,6 +74,7 @@ service SparkService {
     rpc finalize_node_signatures_v2(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc initiate_preimage_swap_v3(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc initiate_preimage_swap_v4(InitiatePreimageSwapV4Request) returns (InitiatePreimageSwapResponse) {}
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc start_transfer_v3(StartTransferV3Request) returns (StartTransferResponse) {}
 
@@ -736,6 +737,9 @@ message SenderTransferPackage {
     // The transfer package contains leaves that may be meant for multiple receivers.
     // This maps leaf_id to receiver_identity_public_key for each leaf.
     map<string, bytes> receiver_identity_public_keys = 3;
+    // This sender's strict-DER, low-S ECDSA signature over the transfer_manifest
+    // hash, made with its identity key.
+    bytes manifest_hash_signature = 4;
 }
 
 // Request to transfer leaves from multiple senders to multiple receivers
@@ -746,6 +750,9 @@ message StartTransferV3Request {
     repeated SenderTransferPackage sender_packages = 2;
     // Expiry time for the entire transfer
     google.protobuf.Timestamp expiry_time = 3;
+    // Every sender contributing leaves must include a `manifest_hash_signature` over
+    // the hash of this manifest with their `SenderTransferPackage`.
+    TransferManifest transfer_manifest = 4;
 }
 
 /**
@@ -1294,6 +1301,17 @@ message InitiatePreimageSwapRequest {
     bytes receiver_identity_public_key = 5;
     uint64 fee_sats = 6;
     StartTransferRequest transfer_request = 7;
+}
+
+// The preimage swap whose transfer_manifest the operator binds.
+message InitiatePreimageSwapV4Request {
+    bytes payment_hash = 1 [(validate.rules).bytes.len = 32];
+    InvoiceAmount invoice_amount = 2;
+    InitiatePreimageSwapRequest.Reason reason = 3;
+    // The party opposite the sender: the lightning service on REASON_SEND, the
+    // invoice owner on REASON_RECEIVE. Keys the preimage request.
+    bytes counterparty_identity_public_key = 4 [(validate.rules).bytes.len = 33];
+    StartTransferV3Request transfer_v3_request = 5 [(validate.rules).message.required = true];
 }
 
 message InitiatePreimageSwapResponse {

@@ -1574,6 +1574,11 @@ export interface SenderTransferPackage {
    * This maps leaf_id to receiver_identity_public_key for each leaf.
    */
   receiverIdentityPublicKeys: { [key: string]: Uint8Array };
+  /**
+   * This sender's strict-DER, low-S ECDSA signature over the transfer_manifest
+   * hash, made with its identity key.
+   */
+  manifestHashSignature: Uint8Array;
 }
 
 export interface SenderTransferPackage_ReceiverIdentityPublicKeysEntry {
@@ -1590,7 +1595,14 @@ export interface StartTransferV3Request {
   /** One entry per sender. Leaf IDs must be disjoint across entries. */
   senderPackages: SenderTransferPackage[];
   /** Expiry time for the entire transfer */
-  expiryTime: Date | undefined;
+  expiryTime:
+    | Date
+    | undefined;
+  /**
+   * Every sender contributing leaves must include a `manifest_hash_signature` over
+   * the hash of this manifest with their `SenderTransferPackage`.
+   */
+  transferManifest: TransferManifest | undefined;
 }
 
 /**
@@ -2172,6 +2184,19 @@ export function initiatePreimageSwapRequest_ReasonToJSON(object: InitiatePreimag
     default:
       return "UNRECOGNIZED";
   }
+}
+
+/** The preimage swap whose transfer_manifest the operator binds. */
+export interface InitiatePreimageSwapV4Request {
+  paymentHash: Uint8Array;
+  invoiceAmount: InvoiceAmount | undefined;
+  reason: InitiatePreimageSwapRequest_Reason;
+  /**
+   * The party opposite the sender: the lightning service on REASON_SEND, the
+   * invoice owner on REASON_RECEIVE. Keys the preimage request.
+   */
+  counterpartyIdentityPublicKey: Uint8Array;
+  transferV3Request: StartTransferV3Request | undefined;
 }
 
 export interface InitiatePreimageSwapResponse {
@@ -9026,7 +9051,12 @@ export const StartTransferResponse: MessageFns<StartTransferResponse> = {
 };
 
 function createBaseSenderTransferPackage(): SenderTransferPackage {
-  return { ownerIdentityPublicKey: new Uint8Array(0), transferPackage: undefined, receiverIdentityPublicKeys: {} };
+  return {
+    ownerIdentityPublicKey: new Uint8Array(0),
+    transferPackage: undefined,
+    receiverIdentityPublicKeys: {},
+    manifestHashSignature: new Uint8Array(0),
+  };
 }
 
 export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
@@ -9041,6 +9071,9 @@ export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
       SenderTransferPackage_ReceiverIdentityPublicKeysEntry.encode({ key: key as any, value }, writer.uint32(26).fork())
         .join();
     });
+    if (message.manifestHashSignature.length !== 0) {
+      writer.uint32(34).bytes(message.manifestHashSignature);
+    }
     return writer;
   },
 
@@ -9078,6 +9111,14 @@ export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
           }
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.manifestHashSignature = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9102,6 +9143,9 @@ export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
           {},
         )
         : {},
+      manifestHashSignature: isSet(object.manifestHashSignature)
+        ? bytesFromBase64(object.manifestHashSignature)
+        : new Uint8Array(0),
     };
   },
 
@@ -9121,6 +9165,9 @@ export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
           obj.receiverIdentityPublicKeys[k] = base64FromBytes(v);
         });
       }
+    }
+    if (message.manifestHashSignature.length !== 0) {
+      obj.manifestHashSignature = base64FromBytes(message.manifestHashSignature);
     }
     return obj;
   },
@@ -9142,6 +9189,7 @@ export const SenderTransferPackage: MessageFns<SenderTransferPackage> = {
       }
       return acc;
     }, {});
+    message.manifestHashSignature = object.manifestHashSignature ?? new Uint8Array(0);
     return message;
   },
 };
@@ -9232,7 +9280,7 @@ export const SenderTransferPackage_ReceiverIdentityPublicKeysEntry: MessageFns<
 };
 
 function createBaseStartTransferV3Request(): StartTransferV3Request {
-  return { transferId: "", senderPackages: [], expiryTime: undefined };
+  return { transferId: "", senderPackages: [], expiryTime: undefined, transferManifest: undefined };
 }
 
 export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
@@ -9245,6 +9293,9 @@ export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
     }
     if (message.expiryTime !== undefined) {
       Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(26).fork()).join();
+    }
+    if (message.transferManifest !== undefined) {
+      TransferManifest.encode(message.transferManifest, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -9280,6 +9331,14 @@ export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
           message.expiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.transferManifest = TransferManifest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9296,6 +9355,7 @@ export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
         ? object.senderPackages.map((e: any) => SenderTransferPackage.fromJSON(e))
         : [],
       expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
+      transferManifest: isSet(object.transferManifest) ? TransferManifest.fromJSON(object.transferManifest) : undefined,
     };
   },
 
@@ -9310,6 +9370,9 @@ export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
     if (message.expiryTime !== undefined) {
       obj.expiryTime = message.expiryTime.toISOString();
     }
+    if (message.transferManifest !== undefined) {
+      obj.transferManifest = TransferManifest.toJSON(message.transferManifest);
+    }
     return obj;
   },
 
@@ -9321,6 +9384,9 @@ export const StartTransferV3Request: MessageFns<StartTransferV3Request> = {
     message.transferId = object.transferId ?? "";
     message.senderPackages = object.senderPackages?.map((e) => SenderTransferPackage.fromPartial(e)) || [];
     message.expiryTime = object.expiryTime ?? undefined;
+    message.transferManifest = (object.transferManifest !== undefined && object.transferManifest !== null)
+      ? TransferManifest.fromPartial(object.transferManifest)
+      : undefined;
     return message;
   },
 };
@@ -15240,6 +15306,144 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     message.feeSats = object.feeSats ?? 0;
     message.transferRequest = (object.transferRequest !== undefined && object.transferRequest !== null)
       ? StartTransferRequest.fromPartial(object.transferRequest)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseInitiatePreimageSwapV4Request(): InitiatePreimageSwapV4Request {
+  return {
+    paymentHash: new Uint8Array(0),
+    invoiceAmount: undefined,
+    reason: 0,
+    counterpartyIdentityPublicKey: new Uint8Array(0),
+    transferV3Request: undefined,
+  };
+}
+
+export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Request> = {
+  encode(message: InitiatePreimageSwapV4Request, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    if (message.invoiceAmount !== undefined) {
+      InvoiceAmount.encode(message.invoiceAmount, writer.uint32(18).fork()).join();
+    }
+    if (message.reason !== 0) {
+      writer.uint32(24).int32(message.reason);
+    }
+    if (message.counterpartyIdentityPublicKey.length !== 0) {
+      writer.uint32(34).bytes(message.counterpartyIdentityPublicKey);
+    }
+    if (message.transferV3Request !== undefined) {
+      StartTransferV3Request.encode(message.transferV3Request, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InitiatePreimageSwapV4Request {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInitiatePreimageSwapV4Request();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.invoiceAmount = InvoiceAmount.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.reason = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.counterpartyIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.transferV3Request = StartTransferV3Request.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InitiatePreimageSwapV4Request {
+    return {
+      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
+      invoiceAmount: isSet(object.invoiceAmount) ? InvoiceAmount.fromJSON(object.invoiceAmount) : undefined,
+      reason: isSet(object.reason) ? initiatePreimageSwapRequest_ReasonFromJSON(object.reason) : 0,
+      counterpartyIdentityPublicKey: isSet(object.counterpartyIdentityPublicKey)
+        ? bytesFromBase64(object.counterpartyIdentityPublicKey)
+        : new Uint8Array(0),
+      transferV3Request: isSet(object.transferV3Request)
+        ? StartTransferV3Request.fromJSON(object.transferV3Request)
+        : undefined,
+    };
+  },
+
+  toJSON(message: InitiatePreimageSwapV4Request): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    if (message.invoiceAmount !== undefined) {
+      obj.invoiceAmount = InvoiceAmount.toJSON(message.invoiceAmount);
+    }
+    if (message.reason !== 0) {
+      obj.reason = initiatePreimageSwapRequest_ReasonToJSON(message.reason);
+    }
+    if (message.counterpartyIdentityPublicKey.length !== 0) {
+      obj.counterpartyIdentityPublicKey = base64FromBytes(message.counterpartyIdentityPublicKey);
+    }
+    if (message.transferV3Request !== undefined) {
+      obj.transferV3Request = StartTransferV3Request.toJSON(message.transferV3Request);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InitiatePreimageSwapV4Request>): InitiatePreimageSwapV4Request {
+    return InitiatePreimageSwapV4Request.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InitiatePreimageSwapV4Request>): InitiatePreimageSwapV4Request {
+    const message = createBaseInitiatePreimageSwapV4Request();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    message.invoiceAmount = (object.invoiceAmount !== undefined && object.invoiceAmount !== null)
+      ? InvoiceAmount.fromPartial(object.invoiceAmount)
+      : undefined;
+    message.reason = object.reason ?? 0;
+    message.counterpartyIdentityPublicKey = object.counterpartyIdentityPublicKey ?? new Uint8Array(0);
+    message.transferV3Request = (object.transferV3Request !== undefined && object.transferV3Request !== null)
+      ? StartTransferV3Request.fromPartial(object.transferV3Request)
       : undefined;
     return message;
   },
@@ -23344,6 +23548,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    initiate_preimage_swap_v4: {
+      name: "initiate_preimage_swap_v4",
+      requestType: InitiatePreimageSwapV4Request,
+      requestStream: false,
+      responseType: InitiatePreimageSwapResponse,
+      responseStream: false,
+      options: {},
+    },
     start_transfer_v2: {
       name: "start_transfer_v2",
       requestType: StartTransferRequest,
@@ -23577,6 +23789,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiatePreimageSwapRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
+  initiate_preimage_swap_v4(
+    request: InitiatePreimageSwapV4Request,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
   start_transfer_v2(
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
@@ -23773,6 +23989,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
   ): Promise<InitiatePreimageSwapResponse>;
   initiate_preimage_swap_v3(
     request: DeepPartial<InitiatePreimageSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<InitiatePreimageSwapResponse>;
+  initiate_preimage_swap_v4(
+    request: DeepPartial<InitiatePreimageSwapV4Request>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiatePreimageSwapResponse>;
   start_transfer_v2(

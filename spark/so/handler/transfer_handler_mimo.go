@@ -62,6 +62,19 @@ func convertV2ToV3SendTransferRequest(req *pb.StartTransferRequest) *pb.StartTra
 	}
 }
 
+// Accepting a manifest nothing verifies would hand back a guarantee this operator cannot make.
+func rejectUnboundTransferManifest(req *pb.StartTransferV3Request) error {
+	if req.GetTransferManifest() != nil {
+		return sparkerrors.UnimplementedFeatureIncomplete(fmt.Errorf("transfer manifest binding is not yet implemented"))
+	}
+	for _, senderPkg := range req.GetSenderPackages() {
+		if len(senderPkg.GetManifestHashSignature()) > 0 {
+			return sparkerrors.UnimplementedFeatureIncomplete(fmt.Errorf("transfer manifest binding is not yet implemented"))
+		}
+	}
+	return nil
+}
+
 // startTransferV3Consensus runs the v3 send-transfer flow through the 2PC
 // consensus engine. It is the only path for v3 send-transfers, reached from
 // StartTransferV3 and from StartTransferV2 for TransferPackage-carrying
@@ -75,8 +88,8 @@ func convertV2ToV3SendTransferRequest(req *pb.StartTransferRequest) *pb.StartTra
 // reconciler drives forward (SP-3195).
 //
 // This is intentionally a thin entry point: only the cheap structural checks,
-// session-identity auth, and the MIMO multi-receiver knob guard run on the
-// coordinator before the engine fans out. The expensive package validation
+// session-identity auth, the manifest refusal, and the MIMO multi-receiver knob
+// guard run on the coordinator before the engine fans out. The expensive package validation
 // (ValidateTransferPackage / createTransferV3 / transfer-size limit) lives
 // inside Prepare so it runs concurrently across all SOs rather than serially
 // on the coordinator first.
@@ -94,7 +107,8 @@ func (h *TransferHandler) startTransferV3Consensus(
 
 	// Entry-gate precedence is pinned by tests (e.g. the multi-receiver knob
 	// gate fires before any package parsing): envelope checks, then session
-	// auth, then the receiver gates, and only then the full parse — whose
+	// auth, then the manifest refusal, then the receiver gates, and only then
+	// the full parse — whose
 	// result is threaded into buildSendTransferCoordinatorFlow so the
 	// coordinator parses the request body once.
 	senderPkg, senderIDPK, err := parseSendTransferEnvelope(req)
@@ -106,6 +120,10 @@ func (h *TransferHandler) startTransferV3Consensus(
 		return nil, err
 	}
 	if err := authz.EnforceWalletNotKillSwitched(ctx, senderIDPK); err != nil {
+		return nil, err
+	}
+
+	if err := rejectUnboundTransferManifest(req); err != nil {
 		return nil, err
 	}
 
