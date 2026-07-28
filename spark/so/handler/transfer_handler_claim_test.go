@@ -227,6 +227,8 @@ func createTestTransferLeaf(t *testing.T, ctx context.Context, client *ent.Clien
 		SetTransfer(transfer).
 		SetLeaf(leaf).
 		SetPreviousRefundTx(leaf.RawRefundTx).
+		SetPreviousDirectRefundTx(leaf.DirectRefundTx).
+		SetPreviousDirectFromCpfpRefundTx(leaf.DirectFromCpfpRefundTx).
 		SetIntermediateRefundTx(createTestTxBytes(t, 2001)).
 		Save(ctx)
 	require.NoError(t, err)
@@ -523,6 +525,200 @@ func TestValidateReceivedRefundTransactions_PoisonedNodeRefundTx_AnchoredOnPrevi
 	// Anchored on previous_refund_tx, the same retry passes.
 	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer, nil, previousRefundTx)
 	require.NoError(t, err)
+}
+
+// TestRevertClaimTransfer_RestoresNodeRefundTxsFromPreviousSnapshots verifies
+// the rollback compensation for claim Prepare's tree-node overwrite: rollback
+// restores the refund tx columns from the transfer leaf's previous_*
+// snapshots on claim-accepted node statuses (txids recomputed by the ent
+// hooks), restores only the columns whose snapshot exists, and leaves a node
+// in any other status untouched. Driven through rollbackClaimTransfer — the
+// entry point shared by the consensus Rollback path — so the WithLeaf
+// eager-load and receiver resolution run too.
+func TestRevertClaimTransfer_RestoresNodeRefundTxsFromPreviousSnapshots(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{12})
+	handler := NewClaimTransferFlowHandler(sparktesting.TestConfig(t))
+	// All fixture writes and assertions go through the ctx-bound client so
+	// they share the transaction rollbackClaimTransfer uses.
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, dbTx)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tree := createTestTreeForClaim(t, ctx, ownerPubKey, dbTx)
+
+	poisonAllRefundColumns := func(t *testing.T, leaf *ent.TreeNode) *ent.TreeNode {
+		poisonDest := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		poisoned, err := leaf.Update().
+			SetRawRefundTx(createRefundTxBytes(t, leaf.RawTx, poisonDest, 1800, false)).
+			SetDirectRefundTx(createRefundTxBytes(t, leaf.DirectTx, poisonDest, 1850, true)).
+			SetDirectFromCpfpRefundTx(createRefundTxBytes(t, leaf.RawTx, poisonDest, 1850, true)).
+			Save(ctx)
+		require.NoError(t, err)
+		return poisoned
+	}
+
+	t.Run("TRANSFER_LOCKED node is restored", func(t *testing.T) {
+		leaf := createTestTreeNode(t, ctx, rng, dbTx, tree, keyshare)
+		transfer := createTestTransfer(t, ctx, rng, dbTx, st.TransferStatusReceiverKeyTweakLocked)
+		createTestTransferLeaf(t, ctx, dbTx, transfer, leaf)
+		createTestTransferReceiver(t, ctx, dbTx, transfer)
+
+		pristineCpfp := leaf.RawRefundTx
+		pristineDirect := leaf.DirectRefundTx
+		pristineDfc := leaf.DirectFromCpfpRefundTx
+		poisonAllRefundColumns(t, leaf)
+
+		require.NoError(t, handler.rollbackClaimTransfer(ctx, transfer.ID, nil))
+
+		restored, err := dbTx.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, pristineCpfp, restored.RawRefundTx)
+		assert.Equal(t, pristineDirect, restored.DirectRefundTx)
+		assert.Equal(t, pristineDfc, restored.DirectFromCpfpRefundTx)
+
+		pristineTx, err := common.TxFromRawTxBytes(pristineCpfp)
+		require.NoError(t, err)
+		assert.Equal(t, st.NewTxID(pristineTx.TxHash()), restored.RawRefundTxid,
+			"raw_refund_txid must be recomputed for the restored tx")
+		pristineDirectTx, err := common.TxFromRawTxBytes(pristineDirect)
+		require.NoError(t, err)
+		assert.Equal(t, st.NewTxID(pristineDirectTx.TxHash()), restored.DirectRefundTxid,
+			"direct_refund_txid must be recomputed for the restored tx")
+		pristineDfcTx, err := common.TxFromRawTxBytes(pristineDfc)
+		require.NoError(t, err)
+		assert.Equal(t, st.NewTxID(pristineDfcTx.TxHash()), restored.DirectFromCpfpRefundTxid,
+			"direct_from_cpfp_refund_txid must be recomputed for the restored tx")
+	})
+
+	t.Run("exited-to-L1 node is restored", func(t *testing.T) {
+		leaf := createTestTreeNode(t, ctx, rng, dbTx, tree, keyshare)
+		transfer := createTestTransfer(t, ctx, rng, dbTx, st.TransferStatusReceiverKeyTweakLocked)
+		createTestTransferLeaf(t, ctx, dbTx, transfer, leaf)
+		createTestTransferReceiver(t, ctx, dbTx, transfer)
+
+		pristineCpfp := leaf.RawRefundTx
+		poisoned := poisonAllRefundColumns(t, leaf)
+		_, err := poisoned.Update().SetStatus(st.TreeNodeStatusOnChain).Save(ctx)
+		require.NoError(t, err)
+
+		require.NoError(t, handler.rollbackClaimTransfer(ctx, transfer.ID, nil))
+
+		after, err := dbTx.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, pristineCpfp, after.RawRefundTx,
+			"an exited-to-L1 leaf stays claimable and its overwritten refund txs must be restored too")
+	})
+
+	t.Run("pre-capture row without DFC snapshot restores the other two columns", func(t *testing.T) {
+		leaf := createTestTreeNode(t, ctx, rng, dbTx, tree, keyshare)
+		transfer := createTestTransfer(t, ctx, rng, dbTx, st.TransferStatusReceiverKeyTweakLocked)
+		_, err := dbTx.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(leaf).
+			SetPreviousRefundTx(leaf.RawRefundTx).
+			SetPreviousDirectRefundTx(leaf.DirectRefundTx).
+			SetIntermediateRefundTx(createTestTxBytes(t, 2001)).
+			Save(ctx)
+		require.NoError(t, err)
+		createTestTransferReceiver(t, ctx, dbTx, transfer)
+
+		pristineCpfp := leaf.RawRefundTx
+		pristineDirect := leaf.DirectRefundTx
+		poisoned := poisonAllRefundColumns(t, leaf)
+
+		require.NoError(t, handler.rollbackClaimTransfer(ctx, transfer.ID, nil))
+
+		after, err := dbTx.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, pristineCpfp, after.RawRefundTx)
+		assert.Equal(t, pristineDirect, after.DirectRefundTx)
+		assert.Equal(t, poisoned.DirectFromCpfpRefundTx, after.DirectFromCpfpRefundTx,
+			"a row predating direct_from_cpfp snapshot capture must leave that column as-is")
+	})
+
+	t.Run("node in another status is untouched", func(t *testing.T) {
+		leaf := createTestTreeNode(t, ctx, rng, dbTx, tree, keyshare)
+		transfer := createTestTransfer(t, ctx, rng, dbTx, st.TransferStatusReceiverKeyTweakLocked)
+		createTestTransferLeaf(t, ctx, dbTx, transfer, leaf)
+		createTestTransferReceiver(t, ctx, dbTx, transfer)
+
+		poisoned := poisonAllRefundColumns(t, leaf)
+		_, err := poisoned.Update().SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
+		require.NoError(t, err)
+
+		require.NoError(t, handler.rollbackClaimTransfer(ctx, transfer.ID, nil))
+
+		after, err := dbTx.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, poisoned.RawRefundTx, after.RawRefundTx,
+			"a node outside the claim-accepted statuses must not be clobbered by revert")
+		assert.Equal(t, poisoned.DirectRefundTx, after.DirectRefundTx)
+		assert.Equal(t, poisoned.DirectFromCpfpRefundTx, after.DirectFromCpfpRefundTx)
+	})
+
+	// The compare-and-swap guard is the safety property the restore leans on,
+	// and it is invisible above restoreLeafNodeRefundTxs: rollbackClaimTransfer
+	// re-reads the node inside its own transaction, so the stale-read race
+	// cannot be constructed through that entry point.
+	t.Run("concurrent node write after the read is not clobbered", func(t *testing.T) {
+		leaf := createTestTreeNode(t, ctx, rng, dbTx, tree, keyshare)
+		transfer := createTestTransfer(t, ctx, rng, dbTx, st.TransferStatusReceiverKeyTweakLocked)
+		transferLeaf := createTestTransferLeaf(t, ctx, dbTx, transfer, leaf)
+
+		// The stale in-memory view: poisoned columns as the rollback read them.
+		stale := poisonAllRefundColumns(t, leaf)
+
+		// A concurrent writer (e.g. a finalization committing newer refund
+		// txs) updates one column after that read.
+		newerDest := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		newer, err := stale.Update().
+			SetRawRefundTx(createRefundTxBytes(t, leaf.RawTx, newerDest, 1700, false)).
+			Save(ctx)
+		require.NoError(t, err)
+
+		transferLeaf.Edges.Leaf = stale
+		require.NoError(t, restoreLeafNodeRefundTxs(ctx, transferLeaf))
+
+		after, err := dbTx.TreeNode.Get(ctx, leaf.ID)
+		require.NoError(t, err)
+		assert.Equal(t, newer.RawRefundTx, after.RawRefundTx,
+			"the predicate miss must turn the restore into a no-op, never clobber the newer write")
+		assert.Equal(t, newer.DirectRefundTx, after.DirectRefundTx)
+		assert.Equal(t, newer.DirectFromCpfpRefundTx, after.DirectFromCpfpRefundTx)
+	})
+}
+
+// TestCreateTransferLeaves_CapturesPreviousRefundSnapshots locks in the
+// send-time capture the rollback restore depends on: every transfer leaf row
+// must snapshot all three of the tree node's refund tx columns.
+func TestCreateTransferLeaves_CapturesPreviousRefundSnapshots(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{13})
+	client := sessionCtx.Client
+
+	keyshare := createTestSigningKeyshare(t, ctx, rng, client)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tree := createTestTreeForClaim(t, ctx, ownerPubKey, client)
+	leaf := createTestTreeNode(t, ctx, rng, client, tree, keyshare)
+	transfer := createTestTransfer(t, ctx, rng, client, st.TransferStatusSenderInitiated)
+	sender, err := createTransferSender(ctx, client, transfer, transfer.SenderIdentityPubkey)
+	require.NoError(t, err)
+	receiver, err := createTransferReceiver(ctx, client, transfer, transfer.ReceiverIdentityPubkey, st.TransferReceiverStatusInitiated)
+	require.NoError(t, err)
+
+	require.NoError(t, createTransferLeaves(
+		ctx, client, transfer, sender, receiver, []*ent.TreeNode{leaf},
+		map[string][]byte{leaf.ID.String(): createTestTxBytes(t, 2001)},
+		nil, nil, nil,
+	))
+
+	row, err := transfer.QueryTransferLeaves().Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, leaf.RawRefundTx, row.PreviousRefundTx)
+	assert.Equal(t, leaf.DirectRefundTx, row.PreviousDirectRefundTx)
+	assert.Equal(t, leaf.DirectFromCpfpRefundTx, row.PreviousDirectFromCpfpRefundTx)
 }
 
 func TestValidateReceivedRefundTransactions_RetryWithDifferentDirectTx_RunsValidation(t *testing.T) {

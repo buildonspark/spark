@@ -934,11 +934,17 @@ func (h *ClaimTransferFlowHandler) rollbackClaimTransfer(ctx context.Context, tr
 	// cannot revert it". The gossip rollback dispatcher only treats
 	// codes.AlreadyExists as success, so a bare error would leave the row
 	// IN_FLIGHT and the reconciler would loop. Surface it as AlreadyExists.
+	// Known gap: an applied-resume Prepare (RKA/RRS) also overwrites the node
+	// refund columns, and a rollback landing here short-circuits without
+	// restoring them. The leftover unsigned refunds are harmless — validation
+	// anchors on previous_refund_tx — and the next successful claim's
+	// finalize overwrites them with signed txs.
 	if isCommittedClaim(receiver) {
 		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s rollback: claim already committed, treating as idempotent success", transferID))
 	}
 
-	leaves, err := getTransferLeavesForReceiverQuery(transferEnt, receiver).All(ctx)
+	// WithLeaf: revertClaimTransfer restores each leaf tree node's refund txs.
+	leaves, err := getTransferLeavesForReceiverQuery(transferEnt, receiver).WithLeaf().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to load transfer leaves for rollback of %s: %w", transferID, err)
 	}
