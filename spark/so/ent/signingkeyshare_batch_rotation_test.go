@@ -226,6 +226,45 @@ func TestTweakSigningKeyshares_MissingEphemeralRowsNeverRegressVersion(t *testin
 	require.True(t, ephemeralSecret.SecretShare.Equals(secret.Add(shareTweak)))
 }
 
+// The batch path shares the single-row version allocator, so it inherits the SP-3668 guarantee: a
+// keyshare whose ephemeral latest is one behind the main pointer must not allocate the base version
+// its commit hook retires. Reaching the allocator at all requires the legacy main secret column to
+// still hold the current secret — otherwise the pre-rotation read fails on the missing ephemeral row
+// before any version is allocated, which is why the reshare path is the only caller exposed in prod.
+func TestTweakSigningKeyshares_EphemeralLatestBehindMainPointerSurvivesCommit(t *testing.T) {
+	ctx, tc := newBatchRotationContext(t, 0)
+
+	secret := keys.GeneratePrivateKey()
+	mainVersion := int32(4)
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, &secret, &mainVersion)
+	_, err := entephemeral.CreateSigningKeyshareSecretVersion(ctx, keyshare.ID, mainVersion-1, keys.GeneratePrivateKey())
+	require.NoError(t, err)
+
+	shareTweak := keys.GeneratePrivateKey()
+	updated, err := ent.TweakSigningKeyshares(ctx, []*ent.SigningKeyshareTweak{{
+		Keyshare:       keyshare,
+		SecretTweak:    shareTweak,
+		PubKeyTweak:    shareTweak.Public(),
+		PubSharesTweak: map[string]keys.Public{"1": shareTweak.Public()},
+	}})
+	require.NoError(t, err)
+
+	got := updated[keyshare.ID]
+	require.NotNil(t, got.SecretVersion)
+	require.Equal(t, mainVersion+1, *got.SecretVersion, "rotation must allocate above the base version it retires")
+
+	commitMainTxFromContext(t, ctx)
+
+	persisted, err := tc.Client.SigningKeyshare.Get(ctx, keyshare.ID)
+	require.NoError(t, err)
+	require.NotNil(t, persisted.SecretVersion)
+	require.Equal(t, mainVersion+1, *persisted.SecretVersion)
+
+	newVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, *persisted.SecretVersion)
+	require.NoError(t, err)
+	require.True(t, newVersionSecret.SecretShare.Equals(secret.Add(shareTweak)), "the committed main pointer must resolve to the rotated secret")
+}
+
 func TestTweakSigningKeyshares_RejectsDuplicateKeyshares(t *testing.T) {
 	ctx, tc := newBatchRotationContext(t, 100)
 	tweaks := createRotatableKeyshares(t, ctx, tc, 1)

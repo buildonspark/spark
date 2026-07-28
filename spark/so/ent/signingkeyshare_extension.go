@@ -304,14 +304,32 @@ func nextSigningKeyshareSecretVersion(signingKeyshareID uuid.UUID, ephemeralLate
 	return next, nil
 }
 
+// recordSigningKeyshareSecretRetireCollision reports a rotation whose allocated version is the same
+// version its commit hook would retire. nextSigningKeyshareSecretVersion allocates strictly above
+// the base, so this is unreachable; retiring anyway would delete the row the rotation just wrote and
+// leave the committed main pointer dangling while every step still reported success (SP-3668).
+func recordSigningKeyshareSecretRetireCollision(ctx context.Context, signingKeyshareID uuid.UUID, version int32) {
+	recordSigningKeyshareSecretCleanupOutcome(ctx, "commit_base_collision_preserved")
+	logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+		"refusing to retire signing keyshare %s secret version %d: the rotation allocated the version it would retire",
+		signingKeyshareID,
+		version,
+	)
+}
+
 // prepareSigningKeyshareSecretRotation writes the next ephemeral secret version and registers
-// cleanup hooks for the main transaction. Cleanup never re-reads main state: a version can become
-// current only through the rotation that created it, the main update is guarded by an exact
-// secret_version CAS, and committed rotations only move the pointer forward. Once a committed
-// rotation points main at N, every version below N is permanently unreachable.
+// cleanup hooks for the main transaction. expectedBaseVersion is the CAS base the caller will retire
+// on commit (nil for creates and for keyshares that have never been versioned); the new version is
+// allocated strictly above it, so the retire can never target this rotation's own write.
+//
+// Cleanup never re-reads main state: a version can become current only through the rotation that
+// created it, the main update is guarded by an exact secret_version CAS, and committed rotations only
+// move the pointer forward. Once a committed rotation points main at N, every version below N is
+// permanently unreachable.
 func prepareSigningKeyshareSecretRotation(
 	ctx context.Context,
 	signingKeyshareID uuid.UUID,
+	expectedBaseVersion *int32,
 	newSecretShare keys.Private,
 	cleanupMode signingKeyshareSecretCleanupMode,
 ) (*signingKeyshareSecretRotation, error) {
@@ -332,12 +350,13 @@ func prepareSigningKeyshareSecretRotation(
 		return nil, err
 	}
 
-	var newVersion int32
+	var ephemeralLatest *int32
 	if latest != nil {
-		if latest.Version == math.MaxInt32 {
-			return nil, fmt.Errorf("signing keyshare secret version overflow for keyshare %s", signingKeyshareID)
-		}
-		newVersion = latest.Version + 1
+		ephemeralLatest = &latest.Version
+	}
+	newVersion, err := nextSigningKeyshareSecretVersion(signingKeyshareID, ephemeralLatest, expectedBaseVersion)
+	if err != nil {
+		return nil, err
 	}
 
 	if _, err := entephemeral.CreateSigningKeyshareSecretVersion(ctx, signingKeyshareID, newVersion, newSecretShare); err != nil {
@@ -379,6 +398,8 @@ func prepareSigningKeyshareSecretRotation(
 				// Creation commits reference this newly-created version. There is no older version to
 				// retire, and if the caller never saved the main INSERT then the row is only a purgeable
 				// orphan.
+			case err == nil && outcome.mainSaveSucceeded && outcome.retiredBaseVersion != nil && *outcome.retiredBaseVersion == newVersion:
+				recordSigningKeyshareSecretRetireCollision(cleanupCtx, signingKeyshareID, newVersion)
 			case err == nil && outcome.mainSaveSucceeded && outcome.retiredBaseVersion != nil:
 				if deleteSigningKeyshareSecretVersionBestEffort(cleanupCtx, signingKeyshareID, *outcome.retiredBaseVersion, "main tx commit") {
 					recordSigningKeyshareSecretCleanupOutcome(cleanupCtx, "commit_deleted_base")
@@ -429,6 +450,7 @@ func UpdateSigningKeyshareWithRotatedSecret(
 	rotation, err := prepareSigningKeyshareSecretRotation(
 		ctx,
 		signingKeyshareID,
+		expectedBaseVersion,
 		newSecretShare,
 		signingKeyshareSecretCleanupModeRotation,
 	)
@@ -496,9 +518,12 @@ func PrepareSigningKeyshareCreateWithSecret(
 	signingKeyshareID uuid.UUID,
 	secretShare keys.Private,
 ) (*SigningKeyshareCreate, error) {
+	// A create has no CAS base to advance past — the row does not exist yet — and its commit hook
+	// retires nothing, so the ephemeral latest alone determines the first version.
 	rotation, err := prepareSigningKeyshareSecretRotation(
 		ctx,
 		signingKeyshareID,
+		nil,
 		secretShare,
 		signingKeyshareSecretCleanupModeCreate,
 	)

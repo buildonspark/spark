@@ -670,6 +670,71 @@ func TestUpdateSigningKeyshareWithRotatedSecret_MainCommitDeletesOnlyExpectedBas
 	require.True(t, newVersionSecret.SecretShare.Equals(newSecret))
 }
 
+// SP-3668: the ephemeral latest can sit exactly one behind the main pointer, which is the shape
+// fix_keyshare exists to repair. Allocating from the ephemeral store alone lands on the base version
+// the commit hook retires, so the rotation deletes the row it just wrote and reports success with the
+// main pointer left dangling. The reshare path is the only rotation caller that reaches this shape:
+// the others read the current secret first and fail before rotating. No sequence of public rotations
+// produces this state, so the test seeds it the same way the sibling cleanup tests seed theirs.
+func TestUpdateSigningKeyshareWithRotatedSecret_EphemeralLatestBehindMainPointerSurvivesCommit(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 0,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	strandedSecret := keys.MustParsePrivateKeyHex("1a0f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f11")
+	newSecret := keys.MustParsePrivateKeyHex("2b3389bf1649f6f4f56cfd6f1fff404a08dbcf65f1d95f18dd1265f832f2b22e")
+	mainVersion := int32(4)
+
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, &mainVersion)
+	_, err := entephemeral.CreateSigningKeyshareSecretVersion(ctx, keyshare.ID, mainVersion-1, strandedSecret)
+	require.NoError(t, err)
+
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(ctx, keyshare.ID, keyshare.SecretVersion, newSecret, nil)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, mainVersion+1, *updated.SecretVersion, "rotation must allocate above the base version it retires")
+
+	commitMainTxFromContext(t, ctx)
+
+	persisted, err := tc.Client.SigningKeyshare.Get(ctx, keyshare.ID)
+	require.NoError(t, err)
+	require.NotNil(t, persisted.SecretVersion)
+	require.Equal(t, mainVersion+1, *persisted.SecretVersion)
+
+	newVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, *persisted.SecretVersion)
+	require.NoError(t, err)
+	require.True(t, newVersionSecret.SecretShare.Equals(newSecret), "the committed main pointer must resolve to the rotated secret")
+}
+
+// A concurrent orphan purge takes no advisory locks, so it can leave a versioned keyshare with no
+// ephemeral rows at all. Allocating from the ephemeral store alone restarts at 0, regressing the
+// pointer past versions the retire-below-N cleanup contract has already declared unreachable.
+func TestUpdateSigningKeyshareWithRotatedSecret_MissingEphemeralRowsNeverRegressVersion(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobSoSigningKeyshareDualWriteSecret: 0,
+	}))
+	ctx = withPostgresEphemeralSession(t, ctx, tc)
+
+	newSecret := keys.MustParsePrivateKeyHex("3c0f0f4bc26b635f8146bc06d130ad2fbde7f93334e9e48f9697e66b4dcf3f33")
+	mainVersion := int32(2)
+
+	keyshare := mustCreateSigningKeyshare(t, ctx, tc.Client, nil, &mainVersion)
+
+	updated, err := ent.UpdateSigningKeyshareWithRotatedSecret(ctx, keyshare.ID, keyshare.SecretVersion, newSecret, nil)
+	require.NoError(t, err)
+	require.NotNil(t, updated.SecretVersion)
+	require.Equal(t, mainVersion+1, *updated.SecretVersion, "rotation must move the version forward from the CAS base, not restart at 0")
+
+	commitMainTxFromContext(t, ctx)
+
+	newVersionSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, *updated.SecretVersion)
+	require.NoError(t, err)
+	require.True(t, newVersionSecret.SecretShare.Equals(newSecret))
+}
+
 func TestUpdateSigningKeyshareWithRotatedSecret_CASConflictReturnsAbortedAndRollbackDeletesNewVersion(t *testing.T) {
 	ctx, tc := db.ConnectToTestPostgres(t)
 	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
