@@ -187,6 +187,7 @@ func createReceiverKeyTweakSettlementFixture(
 	keyTweakBytes := createReceiverClaimKeyTweakBytes(t, cfg, rng, leaf.ID)
 	transferLeaf, err := transferLeaf.Update().SetKeyTweak(keyTweakBytes).Save(ctx)
 	require.NoError(t, err)
+	createTestTransferReceiver(t, ctx, client, transfer)
 
 	return leaf, transfer, transferLeaf
 }
@@ -220,6 +221,7 @@ func createMultiLeafReceiverKeyTweakSettlementFixture(
 		leaves = append(leaves, leaf)
 		transferLeaves = append(transferLeaves, transferLeaf)
 	}
+	createTestTransferReceiver(t, ctx, client, transfer)
 	return transfer, leaves, transferLeaves
 }
 
@@ -277,6 +279,7 @@ func TestSettleReceiverKeyTweakRejectsSharedKeyshareAcrossLeaves(t *testing.T) {
 		require.NoError(t, err)
 		leaves = append(leaves, leaf)
 	}
+	createTestTransferReceiver(t, ctx, sessionCtx.Client, transfer)
 
 	err := handler.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
 		TransferId: transfer.ID.String(),
@@ -416,6 +419,7 @@ func TestInitiateSettleReceiverKeyTweakRejectsSharedKeyshareAcrossLeaves(t *test
 		require.NoError(t, proto.Unmarshal(createReceiverClaimKeyTweakBytes(t, cfg, rng, leaf.ID), leafTweak))
 		claimKeyTweaks.LeavesToReceive = append(claimKeyTweaks.LeavesToReceive, leafTweak)
 	}
+	createTestTransferReceiver(t, ctx, sessionCtx.Client, transfer)
 
 	// Encrypt this SO's slice to its own identity key and sign the package
 	// with the receiver identity key, mirroring the SDK's claim package.

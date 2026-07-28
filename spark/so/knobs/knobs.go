@@ -312,11 +312,6 @@ const (
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
 
-	// KnobMimoTransferMultiReceiverEnabled enables multi-input multi-output transfer support
-	// with multiple independent receivers. When enabled, ClaimTransfer resolves the receiver
-	// by identity public key and tracks per-receiver claim status.
-	KnobMimoTransferMultiReceiverEnabled = "spark.so.mimo_transfer_multi_receiver_enabled"
-
 	// When enabled, rotate_static_deposit_address creates a new address instead
 	// of returning NotFound when no existing default address exists.
 

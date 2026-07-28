@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -193,6 +194,28 @@ func createTestTransfer(t *testing.T, ctx context.Context, rng io.Reader, client
 		Save(ctx)
 	require.NoError(t, err)
 	return transfer
+}
+
+// Mirrors production shape: a receiver row plus leaf edges. Call it after the
+// transfer's leaves exist — receiver-scoped leaf queries need the edge.
+func createTestTransferReceiver(t *testing.T, ctx context.Context, client *ent.Client, transfer *ent.Transfer) *ent.TransferReceiver {
+	t.Helper()
+
+	receiver, err := client.TransferReceiver.Create().
+		SetTransferID(transfer.ID).
+		SetIdentityPubkey(transfer.ReceiverIdentityPubkey).
+		SetStatus(transferpkg.MapTransferToReceiverStatus(transfer.Status)).
+		SetTransferType(transfer.Type).
+		Save(ctx)
+	require.NoError(t, err)
+
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	require.NoError(t, err)
+	for _, transferLeaf := range transferLeaves {
+		_, err := transferLeaf.Update().SetTransferReceiverID(receiver.ID).Save(ctx)
+		require.NoError(t, err)
+	}
+	return receiver
 }
 
 func createTestTransferLeaf(t *testing.T, ctx context.Context, client *ent.Client, transfer *ent.Transfer, leaf *ent.TreeNode) *ent.TransferLeaf {
@@ -661,6 +684,7 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	leaf := createTestTreeNode(t, ctx, rng, sessionCtx.Client, tree, keyshare)
 	transfer := createTestTransfer(t, ctx, rng, sessionCtx.Client, st.TransferStatusReceiverKeyTweaked)
 	transferLeaf := createTestTransferLeaf(t, ctx, sessionCtx.Client, transfer, leaf)
+	createTestTransferReceiver(t, ctx, sessionCtx.Client, transfer)
 
 	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	secretInt := new(big.Int).SetBytes(tweakPrivKey.Serialize())

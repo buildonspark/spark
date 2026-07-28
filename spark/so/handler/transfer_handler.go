@@ -3239,7 +3239,7 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 	))
 	defer span.End()
 
-	if isMimoReceiveEnabled(ctx, receiver) {
+	if receiver != nil {
 		switch receiver.Status {
 		case st.TransferReceiverStatusKeyTweakApplied,
 			st.TransferReceiverStatusRefundSigned,
@@ -3303,9 +3303,10 @@ func (h *TransferHandler) settleReceiverKeyTweakInternal(ctx context.Context, tr
 	))
 	defer span.End()
 
-	// Send the receiver identity public key IFF MIMO receive is enabled
+	// receiver is nil only for a transfer carrying no receiver rows at all, in
+	// which case the peer's settle fails resolving one rather than proceeding.
 	var receiverIdentityPublicKeyBytes []byte
-	if isMimoReceiveEnabled(ctx, receiver) {
+	if receiver != nil {
 		receiverIdentityPublicKeyBytes = receiver.IdentityPubkey.Serialize()
 	}
 
@@ -3515,47 +3516,11 @@ func verifyClaimPackageSignature(transferID uuid.UUID, claimPackage *pb.ClaimPac
 	return nil
 }
 
-// MIMO receive is enabled IFF the knob is enabled and there is a corresponding receiver.
-func isMimoReceiveEnabled(ctx context.Context, receiver *ent.TransferReceiver) bool {
-	return receiver != nil && knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoTransferMultiReceiverEnabled, 0) > 0
-}
-
-// buildFinalizeGossipMessage constructs the gossip message for transfer finalization.
-// MIMO-enabled transfers use a per-receiver message; legacy transfers use a transfer-level message.
-func buildFinalizeGossipMessage(
-	mimoEnabled bool,
-	transferID uuid.UUID,
-	receiver *ent.TransferReceiver,
-	internalNodes []*pbinternal.TreeNode,
-	completionTimestamp *timestamppb.Timestamp,
-) *pbgossip.GossipMessage {
-	if mimoEnabled {
-		return &pbgossip.GossipMessage{
-			Message: &pbgossip.GossipMessage_FinalizeTransferReceiver{
-				FinalizeTransferReceiver: &pbgossip.GossipMessageFinalizeTransferReceiver{
-					TransferId:                transferID.String(),
-					ReceiverIdentityPublicKey: receiver.IdentityPubkey.Serialize(),
-					InternalNodes:             internalNodes,
-					CompletionTimestamp:       completionTimestamp,
-				},
-			},
-		}
-	}
-	return &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_FinalizeTransfer{
-			FinalizeTransfer: &pbgossip.GossipMessageFinalizeTransfer{
-				TransferId:          transferID.String(),
-				InternalNodes:       internalNodes,
-				CompletionTimestamp: completionTimestamp,
-			},
-		},
-	}
-}
-
-// Create a query to fetch all the leaves for the current transfer; scoped to the receiver if one is provided.
-func getTransferLeavesForReceiverQuery(ctx context.Context, transfer *ent.Transfer, receiver *ent.TransferReceiver) *ent.TransferLeafQuery {
+// Create a query to fetch all the leaves for the current transfer; scoped to the receiver if one is
+// provided. No current caller passes nil — the unscoped branch is defensive.
+func getTransferLeavesForReceiverQuery(transfer *ent.Transfer, receiver *ent.TransferReceiver) *ent.TransferLeafQuery {
 	transferLeavesQuery := transfer.QueryTransferLeaves()
-	if isMimoReceiveEnabled(ctx, receiver) {
+	if receiver != nil {
 		transferLeavesQuery = transferLeavesQuery.Where(enttransferleaf.TransferReceiverID(receiver.ID))
 	}
 	return transferLeavesQuery
@@ -4354,14 +4319,9 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	} else {
 		receiverIdentityPublicKey = &transfer.ReceiverIdentityPubkey
 	}
-	isMimoReceiveEnabled, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
+	receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
 	if err != nil {
 		return err
-	}
-	if !isMimoReceiveEnabled {
-		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transfer); err != nil {
-			return err
-		}
 	}
 
 	isReceiverAuthoritative, err := isMimoReceiverStatusAuthoritative(ctx, transfer)
@@ -4369,64 +4329,32 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		return err
 	}
 
-	// Read logic determined by MIMO receive state
-	if isMimoReceiveEnabled {
-		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
-			return err
-		}
-		if receiver.Status == st.TransferReceiverStatusCompleted {
-			// This receiver has already completed their claim, return early.
-			return nil
-		}
-	} else {
-		if transfer.Status == st.TransferStatusCompleted {
-			// The key tweak is already applied, return early.
-			return nil
-		}
+	if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+		return err
+	}
+	if receiver.Status == st.TransferReceiverStatusCompleted {
+		// This receiver has already completed their claim, return early.
+		return nil
 	}
 
 	hasClaimPackage := len(req.GetEncryptedClaimKeyTweakPackage()) > 0
 
-	// Read logic determined by MIMO receive state
-	if isMimoReceiveEnabled {
-		if receiver != nil {
-			switch receiver.Status {
-			case st.TransferReceiverStatusReceiverClaimPending:
-				if !hasClaimPackage {
-					return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status %s but no encrypted_claim_key_tweak_package provided", receiver.ID, receiver.Status))
-				}
-			case st.TransferReceiverStatusKeyTweaked,
-				st.TransferReceiverStatusKeyTweakLocked:
-				// Pre-apply state left by a prior attempt — the fresh package
-				// (when provided) supersedes whatever is stored; see the
-				// store-or-overwrite loop below.
-			case st.TransferReceiverStatusKeyTweakApplied,
-				st.TransferReceiverStatusRefundSigned:
-				// The key tweak is already applied, return early.
-				return nil
-			default:
-				return fmt.Errorf("unexpected transfer receiver status %s for receiver %s", receiver.Status, receiver.ID)
-			}
+	switch receiver.Status {
+	case st.TransferReceiverStatusReceiverClaimPending:
+		if !hasClaimPackage {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver %s is at status %s but no encrypted_claim_key_tweak_package provided", receiver.ID, receiver.Status))
 		}
-	} else {
-		switch transfer.Status {
-		case st.TransferStatusSenderKeyTweaked:
-			// Only valid when encrypted claim key tweak package is provided (from claim_transfer endpoint).
-			if !hasClaimPackage {
-				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer %s is at status SenderKeyTweaked but no encrypted_claim_key_tweak_package provided", transferID))
-			}
-		case st.TransferStatusReceiverKeyTweaked,
-			st.TransferStatusReceiverKeyTweakLocked:
-			// Pre-apply state left by a prior attempt — the fresh package
-			// (when provided) supersedes whatever is stored; see the
-			// store-or-overwrite loop below.
-		case st.TransferStatusReceiverKeyTweakApplied,
-			st.TransferStatusReceiverRefundSigned:
-			// The key tweak is already applied, return early.
-			return nil
-		default:
-			return fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderKeyTweaked, TransferStatusReceiverKeyTweaked, TransferStatusReceiverKeyTweakLocked, TransferStatusReceiverKeyTweakApplied, or TransferStatusReceiverRefundSigned but %s found", transferID, transfer.Status)
-		}
+	case st.TransferReceiverStatusKeyTweaked,
+		st.TransferReceiverStatusKeyTweakLocked:
+		// Pre-apply state left by a prior attempt — the fresh package
+		// (when provided) supersedes whatever is stored; see the
+		// store-or-overwrite loop below.
+	case st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned:
+		// The key tweak is already applied, return early.
+		return nil
+	default:
+		return fmt.Errorf("unexpected transfer receiver status %s for receiver %s", receiver.Status, receiver.ID)
 	}
 
 	// If an encrypted claim key tweak package is provided, verify the
@@ -4460,7 +4388,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 			return fmt.Errorf("unable to unmarshal claim key tweaks: %w", err)
 		}
 
-		transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
+		transferLeaves, err := getTransferLeavesForReceiverQuery(transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
 			tnq.WithSigningKeyshare()
 		}).All(ctx)
 		if err != nil {
@@ -4542,7 +4470,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		}
 	}
 
-	transferLeaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf().All(ctx)
+	transferLeaves, err := getTransferLeavesForReceiverQuery(transfer, receiver).WithLeaf().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 	}
@@ -4702,64 +4630,42 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	} else {
 		receiverIdentityPublicKey = &transfer.ReceiverIdentityPubkey
 	}
-	isMimoReceiveEnabled, receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
+	receiver, err := h.loadTransferReceiverByPublicKeyForUpdate(ctx, transfer, receiverIdentityPublicKey)
 	if err != nil {
 		return err
 	}
-	if !isMimoReceiveEnabled {
-		if err := rejectLegacyAggregateClaimForMultiReceiverTransfer(ctx, transfer); err != nil {
+
+	if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
+		if req.GetAction() == pbinternal.SettleKeyTweakAction_COMMIT {
 			return err
 		}
+		// ROLLBACK always proceeds even when the transfer is not ready for receiver claim,
+		// to prevent resource leaks in the two-phase commit protocol.
+		logging.GetLoggerFromContext(ctx).Warn("SettleReceiverKeyTweak ROLLBACK proceeding despite transfer not ready for receiver claim",
+			zap.Stringer("transfer_id", transferID),
+			zap.String("transfer_status", string(transfer.Status)),
+			zap.Error(err),
+		)
 	}
-
-	if isMimoReceiveEnabled {
-		if err := validateTransferReadyForReceiverClaim(transfer); err != nil {
-			if req.GetAction() == pbinternal.SettleKeyTweakAction_COMMIT {
-				return err
-			}
-			// ROLLBACK always proceeds even when the transfer is not ready for receiver claim,
-			// to prevent resource leaks in the two-phase commit protocol.
-			logging.GetLoggerFromContext(ctx).Warn("SettleReceiverKeyTweak ROLLBACK proceeding despite transfer not ready for receiver claim",
-				zap.Stringer("transfer_id", transferID),
-				zap.String("transfer_status", string(transfer.Status)),
-				zap.Error(err),
-			)
-		}
-		switch receiver.Status {
-		case st.TransferReceiverStatusKeyTweakApplied,
-			st.TransferReceiverStatusRefundSigned,
-			st.TransferReceiverStatusCompleted:
-			// The receiver key tweak is already applied, return early.
-			return nil
-		case st.TransferReceiverStatusKeyTweakLocked,
-			st.TransferReceiverStatusKeyTweaked,
-			st.TransferReceiverStatusReceiverClaimPending:
-			// Do nothing
-		default:
-			if req.GetAction() == pbinternal.SettleKeyTweakAction_COMMIT {
-				return fmt.Errorf("transfer receiver %s is in an invalid status %s to settle receiver key tweak", receiver.ID, receiver.Status)
-			}
-		}
-	} else {
-		switch transfer.Status {
-		case st.TransferStatusReceiverKeyTweakApplied,
-			st.TransferStatusCompleted,
-			st.TransferStatusReceiverRefundSigned:
-			// The receiver key tweak is already applied, return early.
-			return nil
-		case st.TransferStatusReceiverKeyTweakLocked,
-			st.TransferStatusReceiverKeyTweaked:
-			// Do nothing
-		default:
-			if req.GetAction() == pbinternal.SettleKeyTweakAction_COMMIT {
-				return fmt.Errorf("transfer %s is in an invalid status %s to settle receiver key tweak", transfer.ID, transfer.Status)
-			}
+	switch receiver.Status {
+	case st.TransferReceiverStatusKeyTweakApplied,
+		st.TransferReceiverStatusRefundSigned,
+		st.TransferReceiverStatusCompleted:
+		// The receiver key tweak is already applied, return early.
+		return nil
+	case st.TransferReceiverStatusKeyTweakLocked,
+		st.TransferReceiverStatusKeyTweaked,
+		st.TransferReceiverStatusReceiverClaimPending:
+		// Do nothing
+	default:
+		if req.GetAction() == pbinternal.SettleKeyTweakAction_COMMIT {
+			return fmt.Errorf("transfer receiver %s is in an invalid status %s to settle receiver key tweak", receiver.ID, receiver.Status)
 		}
 	}
 
 	switch req.GetAction() {
 	case pbinternal.SettleKeyTweakAction_COMMIT:
-		leaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
+		leaves, err := getTransferLeavesForReceiverQuery(transfer, receiver).WithLeaf(func(tnq *ent.TreeNodeQuery) {
 			tnq.WithTree().WithSigningKeyshare()
 		}).All(ctx)
 		if err != nil {
@@ -4953,7 +4859,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		}
 
 	case pbinternal.SettleKeyTweakAction_ROLLBACK:
-		leaves, err := getTransferLeavesForReceiverQuery(ctx, transfer, receiver).All(ctx)
+		leaves, err := getTransferLeavesForReceiverQuery(transfer, receiver).All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 		}
