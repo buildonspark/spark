@@ -178,5 +178,15 @@ func (Transfer) Indexes() []ent.Index {
 				entsql.IndexWhere("CAST(status AS TEXT) IN ('SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED', 'COMPLETED')"),
 			).
 			StorageKey("idx_transfers_spark_invoice_completed"),
+
+		// Serves the "invoice already paid or in flight" existence check in
+		// createAndLockSparkInvoice (status NOT IN ('RETURNED')). That predicate
+		// does not imply the status lists of the two partial unique indexes
+		// above, so without this index the check seq-scans the whole table.
+		index.Fields("spark_invoice_id").
+			Annotations(
+				entsql.IndexWhere("spark_invoice_id IS NOT NULL"),
+			).
+			StorageKey("idx_transfers_spark_invoice_id"),
 	}
 }

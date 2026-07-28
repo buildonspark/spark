@@ -1323,6 +1323,14 @@ var (
 					Where: "CAST(status AS TEXT) IN ('SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED', 'COMPLETED')",
 				},
 			},
+			{
+				Name:    "idx_transfers_spark_invoice_id",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[12]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "spark_invoice_id IS NOT NULL",
+				},
+			},
 		},
 	}
 	// TransferLeafsColumns holds the columns for the "transfer_leafs" table.
