@@ -25,8 +25,7 @@ var (
 )
 
 func sortedKeys(keys ...[]byte) [][]byte {
-	out := make([][]byte, len(keys))
-	copy(out, keys)
+	out := slices.Clone(keys)
 	slices.SortFunc(out, bytes.Compare)
 	return out
 }

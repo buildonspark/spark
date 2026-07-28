@@ -2575,9 +2575,7 @@ func normalizeTransferPagination(limit, offset int64) (int, int) {
 	if limit <= 0 || limit > maxTransferPageSize {
 		limit = maxTransferPageSize
 	}
-	if offset < 0 {
-		offset = 0
-	}
+	offset = max(offset, 0)
 	return int(limit), int(offset)
 }
 

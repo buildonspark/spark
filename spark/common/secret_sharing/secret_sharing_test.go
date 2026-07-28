@@ -3,6 +3,7 @@ package secretsharing_test
 import (
 	"crypto/rand"
 	mathrand "math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -108,8 +109,7 @@ func TestVerifiableSecretSharing(t *testing.T) {
 	t.Run("CatchInvalidProofLengthTooFew", func(t *testing.T) {
 		// Use shares[4] (untouched by other sub-tests) and make a shallow copy.
 		share := *shares[4]
-		originalProofs := make([][]byte, len(shares[4].Proofs))
-		copy(originalProofs, shares[4].Proofs)
+		originalProofs := slices.Clone(shares[4].Proofs)
 		// Remove a proof to make the length less than threshold.
 		share.Proofs = originalProofs[:len(originalProofs)-1]
 		err := secretsharing.ValidateShare(&share)

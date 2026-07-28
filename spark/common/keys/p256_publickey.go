@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
@@ -115,9 +116,7 @@ func (p P256Public) Serialize() []byte {
 	if p.IsZero() {
 		return nil
 	}
-	out := make([]byte, 33)
-	copy(out, p.b[:])
-	return out
+	return bytes.Clone(p.b[:])
 }
 
 // ToHex returns the key as a hex-encoded compressed representation.

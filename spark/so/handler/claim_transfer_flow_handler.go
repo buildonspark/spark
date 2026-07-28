@@ -2,11 +2,13 @@ package handler
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"math/big"
-	"sort"
+	"slices"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -518,7 +520,7 @@ func claimPrepareResponse(reportDigests bool, round2 *pbinternal.FrostRound2Resp
 			ProofsHash: claimLeafKeyTweakProofsDigest(tweak),
 		})
 	}
-	sort.Slice(digests, func(i, j int) bool { return digests[i].GetLeafId() < digests[j].GetLeafId() })
+	slices.SortFunc(digests, func(a, b *pbinternal.ClaimLeafTweakDigest) int { return cmp.Compare(a.GetLeafId(), b.GetLeafId()) })
 	return &pbinternal.ClaimTransferPrepareResponse{
 		Round2:               round2,
 		LeafTweakDigests:     digests,
@@ -1228,8 +1230,8 @@ func validateClaimTweakDigestUnanimity(transferID uuid.UUID, reports map[string]
 			stagingOps = append(stagingOps, opID)
 		}
 	}
-	sort.Strings(appliedOps)
-	sort.Strings(stagingOps)
+	slices.Sort(appliedOps)
+	slices.Sort(stagingOps)
 	if len(appliedOps) > 0 && len(stagingOps) > 0 {
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
 			"claim transfer %s: key tweak already applied on SOs %v but still pre-apply on SOs %v; committing would tweak keyshares with divergent polynomials",
@@ -1283,7 +1285,7 @@ func validateClaimTweakDigestUnanimity(transferID uuid.UUID, reports map[string]
 // silently bypassing the unanimity check and the commit digest binding.
 func validateClaimTweakDigestReporters(transferID uuid.UUID, participants []string, reports map[string]*pbinternal.ClaimTransferPrepareResponse) error {
 	sorted := append([]string(nil), participants...)
-	sort.Strings(sorted)
+	slices.Sort(sorted)
 	for _, opID := range sorted {
 		if _, ok := reports[opID]; !ok {
 			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
@@ -1298,11 +1300,7 @@ func validateClaimTweakDigestReporters(transferID uuid.UUID, participants []stri
 // in deterministic order. Empty when every reporter already applied (nothing
 // left to bind) or when no SO reported (old binaries only).
 func unanimousClaimTweakDigests(reports map[string]*pbinternal.ClaimTransferPrepareResponse) []*pbinternal.ClaimLeafTweakDigest {
-	opIDs := make([]string, 0, len(reports))
-	for opID := range reports {
-		opIDs = append(opIDs, opID)
-	}
-	sort.Strings(opIDs)
+	opIDs := slices.Sorted(maps.Keys(reports))
 	for _, opID := range opIDs {
 		if r := reports[opID]; !r.GetTweaksAlreadyApplied() && len(r.GetLeafTweakDigests()) > 0 {
 			return r.GetLeafTweakDigests()
@@ -1371,7 +1369,7 @@ func (f *claimTransferCoordinatorFlow) refreshLeafOwnership(ctx context.Context)
 		for _, leaf := range fresh {
 			freshIDs[leaf.ID.String()] = struct{}{}
 		}
-		missing := make([]string, 0)
+		var missing []string
 		for id := range f.signingJobsByLeaf {
 			if _, ok := freshIDs[id]; !ok {
 				missing = append(missing, id)

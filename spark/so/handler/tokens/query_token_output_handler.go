@@ -123,16 +123,13 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(ctx context.Context, req *t
 	}
 
 	limit := DefaultTokenOutputPageSize
-	if pageRequest != nil {
-		if pageRequest.GetPageSize() > 0 {
-			limit = int(pageRequest.GetPageSize())
-		} else if pageRequest.GetUnsafePageSize() > 0 {
-			limit = int(pageRequest.GetUnsafePageSize())
-		}
+	if pageRequest.GetPageSize() > 0 {
+		limit = int(pageRequest.GetPageSize())
+	} else if pageRequest.GetUnsafePageSize() > 0 {
+		limit = int(pageRequest.GetUnsafePageSize())
 	}
-	if limit > MaxTokenOutputPageSize {
-		limit = MaxTokenOutputPageSize
-	}
+
+	limit = min(limit, MaxTokenOutputPageSize)
 
 	// Check for unsupported backward pagination
 	if direction == sparkpb.Direction_PREVIOUS {

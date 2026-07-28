@@ -1,6 +1,7 @@
 package frost
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"encoding/hex"
 	"errors"
@@ -48,9 +49,7 @@ func (s *SigningCommitment) Scan(src any) error {
 		return nil
 	}
 
-	asBytes := make([]byte, len(value))
-	copy(asBytes, value)
-
+	asBytes := bytes.Clone(value)
 	if err := s.UnmarshalBinary(asBytes); err != nil {
 		return fmt.Errorf("failed to scan SigningCommitment: %w", err)
 	}

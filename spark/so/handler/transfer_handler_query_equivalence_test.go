@@ -5,7 +5,7 @@ package handler
 import (
 	"context"
 	"math/rand/v2"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -400,21 +400,20 @@ func transferIDsOf(resp *pb.QueryTransfersResponse) []string {
 	if resp == nil {
 		return nil
 	}
-	ids := make([]string, 0, len(resp.GetTransfers()))
-	for _, t := range resp.GetTransfers() {
-		ids = append(ids, t.GetId())
+	ids := make([]string, len(resp.GetTransfers()))
+	for i, t := range resp.GetTransfers() {
+		ids[i] = t.GetId()
 	}
 	return ids
 }
 
-// leafIDSetOf returns the sorted set of leaf-row IDs on a transfer proto,
-// independent of order.
+// leafIDSetOf returns the sorted set of leaf-row IDs on a transfer proto, independent of order.
 func leafIDSetOf(t *pb.Transfer) []string {
-	ids := make([]string, 0, len(t.GetLeaves()))
-	for _, l := range t.GetLeaves() {
-		ids = append(ids, l.GetLeaf().GetId())
+	ids := make([]string, len(t.GetLeaves()))
+	for i, l := range t.GetLeaves() {
+		ids[i] = l.GetLeaf().GetId()
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	return ids
 }
 
@@ -985,19 +984,14 @@ func TestQueryPendingTransfers_Equivalence_TiedCreateTime(t *testing.T) {
 	idsDESC := transferIDsOf(respDESC)
 
 	// MIMO must be self-consistent across order direction on ties.
-	reversed := make([]string, len(idsASC))
-	for i, id := range idsASC {
-		reversed[len(idsASC)-1-i] = id
-	}
+	reversed := slices.Clone(idsASC)
+	slices.Reverse(reversed)
 	assert.Equal(t, idsDESC, reversed,
 		"MIMO DESC must be the exact reverse of MIMO ASC on tied-create_time rows; pre-fix, step-2 hardcoded id DESC for both directions and reversed tied-row order in ASC mode")
 
 	// MIMO ASC ties must come back in id ASC order (the step-1 SQL contract).
-	asciiSortedASC := make([]string, len(idsASC))
-	copy(asciiSortedASC, idsASC)
-	sort.Strings(asciiSortedASC)
-	assert.Equal(t, asciiSortedASC, idsASC,
-		"MIMO ASC must return tied rows in id ASC order")
+	asciiSortedASC := slices.Sorted(slices.Values(idsASC))
+	assert.Equal(t, asciiSortedASC, idsASC, "MIMO ASC must return tied rows in id ASC order")
 
 	// SET-equivalence with legacy on ties (order may differ — legacy has no
 	// secondary sort).

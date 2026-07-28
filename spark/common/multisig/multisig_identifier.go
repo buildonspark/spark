@@ -54,8 +54,7 @@ func NormalizeMultisigConfig(config *pb.MultisigConfig) *pb.MultisigConfig {
 	if config == nil {
 		return nil
 	}
-	sorted := make([][]byte, len(config.GetPublicKeys()))
-	copy(sorted, config.GetPublicKeys())
+	sorted := slices.Clone(config.GetPublicKeys())
 	slices.SortFunc(sorted, bytes.Compare)
 	return &pb.MultisigConfig{
 		Version:    config.GetVersion(),

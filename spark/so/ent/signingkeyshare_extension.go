@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -845,7 +845,7 @@ func HydrateSigningKeyshareSecrets(ctx context.Context, keyshares []*SigningKeys
 			setExternalSecret(keyshare, secret.SecretShare)
 		}
 	}
-	missing := make([]string, 0)
+	var missing []string
 	for lookupKey, keyshareSet := range keysharesByLookup {
 		allHydrated := true
 		for _, keyshare := range keyshareSet {
@@ -860,7 +860,7 @@ func HydrateSigningKeyshareSecrets(ctx context.Context, keyshares []*SigningKeys
 		missing = append(missing, fmt.Sprintf("%s@v%d", lookupKey.id, lookupKey.version))
 	}
 	if len(missing) > 0 {
-		sort.Strings(missing)
+		slices.Sort(missing)
 		return fmt.Errorf(
 			"%w: signing keyshares not found in ephemeral store: %s",
 			ErrSigningKeyshareSecretMissing,
@@ -1328,14 +1328,12 @@ func sumOfSigningKeyshares(ctx context.Context, keyshares []*SigningKeyshare) (*
 	}
 
 	sum := &SigningKeyshare{
-		ID:           keyshares[0].ID,
-		PublicKey:    keyshares[0].PublicKey,
-		SecretShare:  new(*firstSecret),
-		PublicShares: make(map[string]keys.Public, len(keyshares[0].PublicShares)),
+		ID:            keyshares[0].ID,
+		PublicKey:     keyshares[0].PublicKey,
+		SecretShare:   new(*firstSecret),
+		PublicShares:  maps.Clone(keyshares[0].PublicShares),
+		SecretVersion: nil,
 	}
-	sum.SecretVersion = nil
-	maps.Copy(sum.PublicShares, keyshares[0].PublicShares)
-
 	for _, keyshare := range keyshares[1:] {
 		keyshareSecret, secretErr := keyshare.GetSecretShare(ctx)
 		if secretErr != nil {

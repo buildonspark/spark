@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"bytes"
 	cryptorand "crypto/rand"
 	"database/sql"
 	"database/sql/driver"
@@ -181,8 +182,7 @@ func (p *Private) Scan(src any) error {
 	if value == nil {
 		return nil
 	}
-	asBytes := make([]byte, len(value))
-	copy(asBytes, value)
+	asBytes := bytes.Clone(value)
 	key, err := ParsePrivateKey(asBytes)
 	if err != nil {
 		return err

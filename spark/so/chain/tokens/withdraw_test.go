@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -152,13 +153,9 @@ func assertOutputStillSpendable(t *testing.T, ctx context.Context, config *so.Co
 	require.NoError(t, err)
 
 	// Verify the specific output IS in the response
-	found := false
-	for _, output := range resp.GetOutputsWithPreviousTransactionData() {
-		if bytes.Equal(output.GetPreviousTransactionHash(), sparkTxHash) {
-			found = true
-			break
-		}
-	}
+	found := slices.ContainsFunc(resp.GetOutputsWithPreviousTransactionData(), func(output *tokenpb.OutputWithPreviousTransactionData) bool {
+		return bytes.Equal(output.GetPreviousTransactionHash(), sparkTxHash)
+	})
 	assert.True(t, found, "Output with sparkTxHash %x should still appear in spendable outputs since withdrawal was rejected", sparkTxHash)
 }
 

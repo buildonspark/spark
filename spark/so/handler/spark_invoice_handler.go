@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -373,8 +375,8 @@ func buildQueryResponseForStatus(transferResponses []*ent.Transfer, invoiceRespo
 			return nil, nil, nil, err
 		}
 	}
-	notFoundSatsInvoiceIDs = setToSlice(notFoundSatsInvoiceMap)
-	notFoundTokenInvoiceIDs = setToSlice(notFoundTokenInvoiceMap)
+	notFoundSatsInvoiceIDs = slices.Collect(maps.Keys(notFoundSatsInvoiceMap))
+	notFoundTokenInvoiceIDs = slices.Collect(maps.Keys(notFoundTokenInvoiceMap))
 	return invoiceResponseMap, notFoundSatsInvoiceIDs, notFoundTokenInvoiceIDs, nil
 }
 
@@ -423,14 +425,6 @@ func mapSliceToSet(ids []uuid.UUID) map[uuid.UUID]struct{} {
 	result := make(map[uuid.UUID]struct{}, len(ids))
 	for _, id := range ids {
 		result[id] = struct{}{}
-	}
-	return result
-}
-
-func setToSlice(set map[uuid.UUID]struct{}) []uuid.UUID {
-	result := make([]uuid.UUID, 0, len(set))
-	for id := range set {
-		result = append(result, id)
 	}
 	return result
 }

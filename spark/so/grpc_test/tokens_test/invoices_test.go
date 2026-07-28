@@ -1,6 +1,7 @@
 package tokens_test
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/binary"
 	"math/rand/v2"
@@ -256,8 +257,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	var invoiceAttachments []*tokenpb.InvoiceAttachment
 	for _, output := range transferTransaction.GetTokenOutputs() {
 		receiverPublicKey, _ := keys.ParsePublicKey(output.GetOwnerPublicKey())
-		newTokenIdentifier := make([]byte, len(output.GetTokenIdentifier()))
-		copy(newTokenIdentifier, output.GetTokenIdentifier())
+		newTokenIdentifier := bytes.Clone(output.GetTokenIdentifier())
 		version := uint32(1)
 		senderPublicKey := config.IdentityPrivateKey.Public()
 		network := config.Network

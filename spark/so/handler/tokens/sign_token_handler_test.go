@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -727,8 +728,7 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 	// Create a different transaction and remap one input's spent mapping to it
 	go func() {
 		<-hit
-		otherHash := make([]byte, len(finalTxHash))
-		copy(otherHash, finalTxHash)
+		otherHash := bytes.Clone(finalTxHash)
 		otherHash[0] ^= 0xFF // make it different
 		otherTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(otherHash).

@@ -1799,8 +1799,7 @@ func TestHashFreezeTokensPayloadParameterChanges(t *testing.T) {
 	tokenPubKey := tokenPrivKey.Public()
 	operatorPrivKey := keys.MustGeneratePrivateKeyFromRand(seededRng)
 	operatorPubKey := operatorPrivKey.Public()
-	tokenIdentifier := make([]byte, 32)
-	copy(tokenIdentifier, "test_token_identifier_32bytes___")
+	tokenIdentifier := []byte("test_token_identifier_32bytes___")
 
 	ownerPrivKey2 := keys.MustGeneratePrivateKeyFromRand(seededRng)
 	ownerPubKey2 := ownerPrivKey2.Public()
@@ -1808,8 +1807,7 @@ func TestHashFreezeTokensPayloadParameterChanges(t *testing.T) {
 	tokenPubKey2 := tokenPrivKey2.Public()
 	operatorPrivKey2 := keys.MustGeneratePrivateKeyFromRand(seededRng)
 	operatorPubKey2 := operatorPrivKey2.Public()
-	tokenIdentifier2 := make([]byte, 32)
-	copy(tokenIdentifier2, "different_token_id_32bytes______")
+	tokenIdentifier2 := []byte("different_token_id_32bytes______")
 
 	// Test version 0 base payload with valid values
 	basePayloadV0 := &tokenpb.FreezeTokensPayload{
@@ -1993,8 +1991,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 	tokenPubKey := tokenPrivKey.Public()
 	operatorPrivKey := keys.MustGeneratePrivateKeyFromRand(seededRng)
 	operatorPubKey := operatorPrivKey.Public()
-	tokenIdentifier := make([]byte, 32)
-	copy(tokenIdentifier, "test_token_identifier_32bytes___")
+	tokenIdentifier := []byte("test_token_identifier_32bytes___")
 
 	validPayloadV0 := &tokenpb.FreezeTokensPayload{
 		Version:                   0,
@@ -2198,8 +2195,7 @@ func TestHashFreezeTokensPayloadVersionConsistency(t *testing.T) {
 	tokenPubKey := tokenPrivKey.Public()
 	operatorPrivKey := keys.MustGeneratePrivateKeyFromRand(seededRng)
 	operatorPubKey := operatorPrivKey.Public()
-	tokenIdentifier := make([]byte, 32)
-	copy(tokenIdentifier, "test_token_identifier_32bytes___")
+	tokenIdentifier := []byte("test_token_identifier_32bytes___")
 
 	// Create a v0 payload
 	payloadV0 := &tokenpb.FreezeTokensPayload{

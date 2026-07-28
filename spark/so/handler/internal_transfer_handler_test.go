@@ -1849,8 +1849,7 @@ func TestApplySignatures(t *testing.T) {
 	wrongAdaptorPubKey := wrongAdaptorPrivKey.Public()
 
 	// Create invalid adaptor signature by modifying the real signature
-	invalidAdaptorSig := make([]byte, len(signature)) // Use same length as original signature
-	copy(invalidAdaptorSig, signature)
+	invalidAdaptorSig := bytes.Clone(signature)
 	invalidAdaptorSig[0] = ^invalidAdaptorSig[0] // Flip first byte
 
 	tests := []struct {

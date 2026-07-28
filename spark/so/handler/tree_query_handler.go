@@ -99,9 +99,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			Order(ent.Desc(treenode.FieldID))
 
 		if limit > 0 {
-			if limit > 100 {
-				limit = 100
-			}
+			limit = min(limit, 100)
 			query = query.Offset(offset).Limit(limit)
 		} else {
 			offset = -1

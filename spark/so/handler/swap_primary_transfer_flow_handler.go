@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/google/uuid"
@@ -166,11 +167,7 @@ func aggregateSwapLeafSignatures(
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-	leafIDs := make([]string, 0, len(signingJobsByLeaf))
-	for id := range signingJobsByLeaf {
-		leafIDs = append(leafIDs, id)
-	}
-	slices.Sort(leafIDs)
+	leafIDs := slices.Sorted(maps.Keys(signingJobsByLeaf))
 
 	// The swap flow signs and commits only the CPFP refund — the adaptor point
 	// rides jobs.cpfp (attached by buildSigningJobForRefund). Aggregate those in

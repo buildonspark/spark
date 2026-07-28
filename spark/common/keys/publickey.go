@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
@@ -201,8 +202,7 @@ func (p *Public) Scan(src any) error {
 		return nil
 	}
 
-	asBytes := make([]byte, len(value))
-	copy(asBytes, value)
+	asBytes := bytes.Clone(value)
 	pubKey, err := secp256k1.ParsePubKey(asBytes) //nolint:forbidigo // This is the implementation of keys.
 	if err != nil {
 		return err

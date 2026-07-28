@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -173,8 +173,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		}, nil
 	case utils.TokenTransactionTypeTransfer:
 		// Include the coordinator's own signature when exchanging shares so peers validate against all operators
-		allOperatorSignatures := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(internalSignatures)+1)
-		maps.Copy(allOperatorSignatures, internalSignatures)
+		allOperatorSignatures := maps.Clone(internalSignatures)
 		allOperatorSignatures[h.config.Identifier] = localResp
 		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.GetFinalTokenTransaction(), allOperatorSignatures, req.GetFinalTokenTransactionHash()); err != nil {
 			return nil, err
@@ -660,19 +659,19 @@ func verifyOperatorSignatures(
 	operatorMap map[string]*so.SigningOperator,
 	finalTokenTransactionHash []byte,
 ) error {
-	var errors []string
+	var errs []error
 	for operatorID, sigBytes := range signatures {
 		operator, ok := operatorMap[operatorID]
 		if !ok {
 			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("operator %s not found in operator map", operatorID))
 		}
 		if err := verifyOperatorSignature(sigBytes, operator, finalTokenTransactionHash); err != nil {
-			errors = append(errors, err.Error())
+			errs = append(errs, err)
 		}
 	}
 
-	if len(errors) > 0 {
-		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("signature verification failed: %s", strings.Join(errors, "; ")))
+	if len(errs) > 0 {
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("signature verification failed: %w", errors.Join(errs...)))
 	}
 
 	return nil
