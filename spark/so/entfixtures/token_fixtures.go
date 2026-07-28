@@ -63,8 +63,9 @@ type TokenCreateOpts struct {
 
 // TokenTransactionOpts specifies options for creating a token transaction (mint or create).
 type TokenTransactionOpts struct {
-	Hash       []byte     // If nil, GetHash will generate random bytes
-	ExpiryTime *time.Time // If nil, no expiry time is set
+	Hash       []byte                      // If nil, GetHash will generate random bytes
+	ExpiryTime *time.Time                  // If nil, no expiry time is set
+	Version    *st.TokenTransactionVersion // If nil, uses the schema default (V0)
 }
 
 // GetHash returns the hash, generating and caching a random one if not set.
@@ -193,6 +194,9 @@ func (f *Fixtures) CreateMintTransactionWithOpts(tokenCreate *ent.TokenCreate, o
 		SetMint(mint)
 	if opts.ExpiryTime != nil {
 		txBuilder = txBuilder.SetExpiryTime(*opts.ExpiryTime)
+	}
+	if opts.Version != nil {
+		txBuilder = txBuilder.SetVersion(*opts.Version)
 	}
 	tx, err := txBuilder.Save(f.Ctx)
 	f.RequireNoError(err)

@@ -116,13 +116,14 @@ func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransaction(
 		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOutputs, tokenTransaction, stderrors.Join(invalidOutputs...))
 	}
 
-	// For MINT: re-validate max supply only for expired transactions. Non-expired SIGNED
-	// transactions are already counted in the current supply (FINALIZED + non-expired SIGNED),
-	// so finalizing them doesn't change the total. Expired SIGNED transactions are NOT counted
-	// in current supply, so we must verify that adding them won't exceed max supply. This guards
-	// against the race where an expired transaction's peer signatures arrive after a replacement
-	// transaction was signed.
-	if tokenTransaction.InferTokenTransactionTypeEnt() == utils.TokenTransactionTypeMint {
+	// For MINT: re-validate max supply only for expired v3+ transactions. Non-expired SIGNED
+	// transactions and all pre-v3 SIGNED transactions are already counted in the current
+	// supply, so finalizing them doesn't change the total and re-validating would count them
+	// twice. Expired SIGNED v3+ transactions are NOT counted in current supply, so we must
+	// verify that adding them won't exceed max supply. This guards against the race where an
+	// expired transaction's peer signatures arrive after a replacement transaction was signed.
+	if tokenTransaction.InferTokenTransactionTypeEnt() == utils.TokenTransactionTypeMint &&
+		tokenTransaction.Version >= st.TokenTransactionVersionV3 {
 		isExpired := !tokenTransaction.ExpiryTime.IsZero() && tokenTransaction.ExpiryTime.Before(time.Now().UTC())
 		if isExpired {
 			if err := tokens.ValidateMintDoesNotExceedMaxSupplyEnt(ctx, tokenTransaction); err != nil {

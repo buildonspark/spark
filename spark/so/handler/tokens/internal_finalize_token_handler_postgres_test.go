@@ -162,12 +162,15 @@ func TestFinalizeMintOrCreateTransaction(t *testing.T) {
 			st.TokenTransactionStatusFinalized,
 		)
 
-		// Create an expired SIGNED mint for 100 more — total 200, within 300
+		// Create an expired SIGNED v3 mint for 100 more — total 200, within 300. Version v3
+		// matters: only expired v3+ mints are excluded from current supply and re-validated
+		// on finalize.
+		v3 := st.TokenTransactionVersionV3
 		tx, _ := setup.fixtures.CreateMintTransactionWithOpts(
 			freshTokenCreate,
 			entfixtures.OutputSpecs(big.NewInt(100)),
 			st.TokenTransactionStatusSigned,
-			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(-time.Hour))},
+			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(-time.Hour)), Version: &v3},
 		)
 
 		txLoaded, err := setup.client.TokenTransaction.Query().
@@ -197,12 +200,13 @@ func TestFinalizeMintOrCreateTransaction(t *testing.T) {
 			st.TokenTransactionStatusFinalized,
 		)
 
-		// Create an expired SIGNED mint for 100 more — total 350, exceeds 300
+		// Create an expired SIGNED v3 mint for 100 more — total 350, exceeds 300
+		v3 := st.TokenTransactionVersionV3
 		tx, _ := setup.fixtures.CreateMintTransactionWithOpts(
 			freshTokenCreate,
 			entfixtures.OutputSpecs(big.NewInt(100)),
 			st.TokenTransactionStatusSigned,
-			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(-time.Hour))},
+			&entfixtures.TokenTransactionOpts{ExpiryTime: new(time.Now().Add(-time.Hour)), Version: &v3},
 		)
 
 		txLoaded, err := setup.client.TokenTransaction.Query().

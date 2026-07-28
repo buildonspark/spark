@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"entgo.io/ent/dialect"
 	esql "entgo.io/ent/dialect/sql"
@@ -107,22 +108,33 @@ func calculateCurrentSupplyByTokenIdentifier(ctx context.Context, tokenIdentifie
 }
 
 // calculateCurrentSupply is a helper function that executes the common query logic.
-// It counts outputs from FINALIZED mint transactions and non-expired SIGNED mint transactions.
+// It counts outputs from FINALIZED mint transactions, all pre-v3 SIGNED mint transactions,
+// and non-expired v3+ SIGNED mint transactions.
 func calculateCurrentSupply(ctx context.Context, whereClause func(*ent.TokenOutputQuery) *ent.TokenOutputQuery) (*big.Int, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
-	// Count outputs from both FINALIZED and SIGNED mint transactions.
-	// We include SIGNED because v3 mint transactions may be stuck in SIGNED status
-	// until a backfill task updates them to FINALIZED.
-	// Expiry checks will be added in a future PR after backfill completes.
+	// Count FINALIZED mints plus SIGNED mints, where the expiry filter on SIGNED mints only
+	// applies to v3+. The pre-v3 flow does not finalize mints — SIGNED is their terminal
+	// success state there — so a successful pre-v3 mint must keep counting after its expiry
+	// passes. For v3+ (which finalizes on broadcast), a non-expired SIGNED mint is a live
+	// reservation and counts against max supply; an expired SIGNED v3+ mint is abandoned and
+	// must not permanently consume a capped token's supply.
+	now := time.Now().UTC()
 	mintTransactionPredicate := tokentransaction.And(
 		tokentransaction.HasMint(),
 		tokentransaction.Or(
 			tokentransaction.StatusEQ(st.TokenTransactionStatusFinalized),
-			tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+			tokentransaction.And(
+				tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+				tokentransaction.Or(
+					tokentransaction.VersionLT(st.TokenTransactionVersionV3),
+					tokentransaction.ExpiryTimeIsNil(),
+					tokentransaction.ExpiryTimeGT(now),
+				),
+			),
 		),
 	)
 
