@@ -1,7 +1,10 @@
 package grpctest
 
 import (
+	"cmp"
+	"maps"
 	"math/big"
+	"slices"
 	"testing"
 	"time"
 
@@ -383,20 +386,7 @@ func stagePeerLockedAtRKL(
 	require.NoError(t, err, "operator %d: bump transfer status to RKL", operator.ID)
 }
 
-// orderedOperators returns operators sorted by their numeric ID so the
-// reference operator picked by the test is stable across runs.
+// orderedOperators returns SOs sorted by their numeric ID so the reference SO picked by the test is stable across runs.
 func orderedOperators(config *wallet.TestWalletConfig) []*so.SigningOperator {
-	ops := make([]*so.SigningOperator, 0, len(config.SigningOperators))
-	for _, op := range config.SigningOperators {
-		ops = append(ops, op)
-	}
-	// Simple insertion sort — n is small (≤5 in test envs).
-	for i := 1; i < len(ops); i++ {
-		j := i
-		for j > 0 && ops[j-1].ID > ops[j].ID {
-			ops[j-1], ops[j] = ops[j], ops[j-1]
-			j--
-		}
-	}
-	return ops
+	return slices.SortedFunc(maps.Values(config.SigningOperators), func(a, b *so.SigningOperator) int { return cmp.Compare(a.ID, b.ID) })
 }

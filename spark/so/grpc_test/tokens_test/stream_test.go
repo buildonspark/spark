@@ -2,6 +2,7 @@ package tokens_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 	"time"
 
@@ -98,13 +99,9 @@ func TestTokenTransactionStreamNotification(t *testing.T) {
 			assert.Equal(t, expectedHash, tokenEvent.GetTokenTransactionHash())
 			require.NotEmpty(t, tokenEvent.GetTokenIdentifiers(), "expected token identifiers")
 
-			found := false
-			for _, id := range tokenEvent.GetTokenIdentifiers() {
-				if bytes.Equal(id, tokenIdentifier) {
-					found = true
-					break
-				}
-			}
+			found := slices.ContainsFunc(tokenEvent.GetTokenIdentifiers(), func(id []byte) bool {
+				return bytes.Equal(id, tokenIdentifier)
+			})
 			assert.True(t, found, "expected token identifier %x in event identifiers", tokenIdentifier)
 			return
 		case <-timeout:

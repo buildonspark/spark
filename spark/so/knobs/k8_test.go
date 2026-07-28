@@ -97,8 +97,7 @@ func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
 
 			// Verify expected values
 			provider.lock.RLock()
-			actualValues := make(map[string]float64)
-			maps.Copy(actualValues, provider.values)
+			actualValues := maps.Clone(provider.values)
 			provider.lock.RUnlock()
 
 			assert.Equal(t, tt.expectedValues, actualValues, "ConfigMap values should match expected values")

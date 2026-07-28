@@ -530,10 +530,7 @@ func prepareResults(
 	for i, job := range jobs {
 		allPublicShares := signingKeyshares[job.SigningKeyshareID].GetPublicShares()
 		publicShares := make(map[string][]byte)
-		var keyshareOwnerIdentifiers []string
-		for i := range allPublicShares {
-			keyshareOwnerIdentifiers = append(keyshareOwnerIdentifiers, i)
-		}
+		keyshareOwnerIdentifiers := slices.Collect(maps.Keys(allPublicShares))
 		for _, participant := range signingParticipants {
 			publicShares[participant.Identifier] = allPublicShares[participant.Identifier]
 		}

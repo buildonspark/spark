@@ -246,13 +246,7 @@ func TestUUIDv7FromTime(t *testing.T) {
 		u1 := UUIDv7FromTime(t1)
 		u2 := UUIDv7FromTime(t2)
 
-		// Compare UUIDs as byte slices - u1 should be less than u2
-		for i := range 16 {
-			if u1[i] != u2[i] {
-				assert.Less(t, u1[i], u2[i], "Earlier UUID should be less than later UUID")
-				break
-			}
-		}
+		assert.Less(t, u1[:], u2[:], "Earlier UUID should be less than later UUID")
 	})
 
 	t.Run("handles past timestamps correctly", func(t *testing.T) {
@@ -285,14 +279,8 @@ func TestUUIDv7FromTime(t *testing.T) {
 		boundaryUUID := UUIDv7FromTime(boundaryTime)
 
 		// All real UUIDs (created now) should be greater than the boundary (created 1s ago)
-		for i, realUUID := range realUUIDs {
-			// Compare first 6 bytes (timestamp part)
-			for j := range 6 {
-				if boundaryUUID[j] != realUUID[j] {
-					assert.Less(t, boundaryUUID[j], realUUID[j], "Boundary UUID should be less than real UUID %d at byte %d", i, j)
-					break
-				}
-			}
+		for _, realUUID := range realUUIDs {
+			assert.Less(t, boundaryUUID.Time(), realUUID.Time(), "Boundary UUID should be less than real UUID")
 		}
 	})
 }
@@ -398,18 +386,7 @@ func TestUUIDRangeForDate(t *testing.T) {
 
 		for _, date := range dates {
 			from, to := UUIDRangeForDate(date)
-
-			// Compare UUIDs byte by byte
-			isLess := false
-			for i := range 16 {
-				if from[i] < to[i] {
-					isLess = true
-					break
-				} else if from[i] > to[i] {
-					break
-				}
-			}
-			assert.True(t, isLess, "From UUID should be less than To UUID for date %v", date)
+			assert.Less(t, from[:], to[:], "From UUID should be less than To UUID for date %v", date)
 		}
 	})
 

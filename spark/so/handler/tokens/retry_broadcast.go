@@ -62,8 +62,7 @@ func RetryIncompleteSignatureBroadcasts(ctx context.Context, config *so.Config) 
 				zap.Error(err))
 			errs = append(errs, fmt.Errorf("failed to retry tx %s: %w", id, err))
 		} else {
-			logger.Info("Successfully retried token transaction broadcast",
-				zap.Stringer("token_transaction_id", id))
+			logger.Info("Successfully retried token transaction broadcast", zap.Stringer("token_transaction_id", id))
 		}
 	}
 

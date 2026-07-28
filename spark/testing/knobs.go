@@ -184,8 +184,7 @@ func (k *KnobController) restoreOriginal(ctx context.Context) error {
 	}
 
 	// Replace entire data with original
-	configMap.Data = make(map[string]string)
-	maps.Copy(configMap.Data, k.original)
+	configMap.Data = maps.Clone(k.original)
 
 	_, err = k.client.CoreV1().ConfigMaps(knobsNamespace).Update(ctx, configMap, metav1.UpdateOptions{})
 	if err != nil {

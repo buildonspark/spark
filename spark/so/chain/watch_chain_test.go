@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"math/rand/v2"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -135,17 +136,11 @@ func TestProcessTransactions(t *testing.T) {
 			checkAddresses: func(t *testing.T, addresses []string, utxoMap map[string][]AddressDepositUtxo) {
 				assert.Len(t, addresses, 2)
 				assert.Len(t, utxoMap, 2)
-				foundSingleUtxoAddress := false
-				foundMultipleUtxoAddress := false
+				utxoCounts := make([]int, 0, len(utxoMap))
 				for _, utxos := range utxoMap {
-					if len(utxos) == 2 {
-						foundMultipleUtxoAddress = true
-					} else if len(utxos) == 1 {
-						foundSingleUtxoAddress = true
-					}
+					utxoCounts = append(utxoCounts, len(utxos))
 				}
-				assert.True(t, foundSingleUtxoAddress)
-				assert.True(t, foundMultipleUtxoAddress)
+				assert.ElementsMatch(t, []int{1, 2}, utxoCounts)
 			},
 		},
 		{
@@ -569,7 +564,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SupportedNetworks: []btcnetwork.Network{btcnetwork.Testnet},
 		BitcoindConfigs: map[string]so.BitcoindConfig{
 			"testnet": {
-				ProcessNodesForWatchtowers: func() *bool { ; return new(true) }(),
+				ProcessNodesForWatchtowers: func() *bool { return new(true) }(),
 			},
 		},
 		Lrc20Configs: map[string]so.Lrc20Config{
@@ -722,11 +717,8 @@ func TestHandleBlock_CoopExitProcessing(t *testing.T) {
 	// Create cooperative exits with reversed byte order (matching production behavior)
 	// Exit 1: Reversed bytes - should be found
 	txHash1 := coopExitTx1.TxHash()
-	reversedTxHash1 := make([]byte, len(txHash1))
-	copy(reversedTxHash1, txHash1[:])
-	for i := 0; i < len(reversedTxHash1)/2; i++ {
-		reversedTxHash1[i], reversedTxHash1[len(reversedTxHash1)-1-i] = reversedTxHash1[len(reversedTxHash1)-1-i], reversedTxHash1[i]
-	}
+	reversedTxHash1 := txHash1.CloneBytes()
+	slices.Reverse(reversedTxHash1)
 	exitTxid1, err := schematype.NewTxIDFromBytes(reversedTxHash1)
 	require.NoError(t, err)
 	_, err = dbTx.CooperativeExit.Create().
@@ -887,11 +879,8 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 
 	// Create coop exits with reversed byte order (matching production behavior)
 	txHash1 := txInOriginalBlock.TxHash()
-	reversedHash1 := make([]byte, chainhash.HashSize)
-	copy(reversedHash1, txHash1[:])
-	for i := 0; i < len(reversedHash1)/2; i++ {
-		reversedHash1[i], reversedHash1[len(reversedHash1)-1-i] = reversedHash1[len(reversedHash1)-1-i], reversedHash1[i]
-	}
+	reversedHash1 := txHash1.CloneBytes()
+	slices.Reverse(reversedHash1)
 	exitTxid1, err := schematype.NewTxIDFromBytes(reversedHash1)
 	require.NoError(t, err)
 	_, err = dbTx.CooperativeExit.Create().
@@ -901,11 +890,8 @@ func TestHandleBlock_CoopExitProcessing_Reorg(t *testing.T) {
 	require.NoError(t, err)
 
 	txHash2 := txOnlyInReorgBlock.TxHash()
-	reversedHash2 := make([]byte, chainhash.HashSize)
-	copy(reversedHash2, txHash2[:])
-	for i := 0; i < len(reversedHash2)/2; i++ {
-		reversedHash2[i], reversedHash2[len(reversedHash2)-1-i] = reversedHash2[len(reversedHash2)-1-i], reversedHash2[i]
-	}
+	reversedHash2 := txHash2.CloneBytes()
+	slices.Reverse(reversedHash2)
 	exitTxid2, err := schematype.NewTxIDFromBytes(reversedHash2)
 	require.NoError(t, err)
 	_, err = dbTx.CooperativeExit.Create().

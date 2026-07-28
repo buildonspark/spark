@@ -5,6 +5,7 @@ import (
 	"context"
 	"math/big"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -52,13 +53,7 @@ func (s *broadcastTokenPostgresTestSetup) sortedOperatorKeys() [][]byte {
 	for _, op := range s.config.GetSigningOperatorList() {
 		opKeys = append(opKeys, op.GetPublicKey())
 	}
-	for i := 0; i < len(opKeys); i++ {
-		for j := i + 1; j < len(opKeys); j++ {
-			if bytes.Compare(opKeys[i], opKeys[j]) > 0 {
-				opKeys[i], opKeys[j] = opKeys[j], opKeys[i]
-			}
-		}
-	}
+	slices.SortFunc(opKeys, bytes.Compare)
 	return opKeys
 }
 

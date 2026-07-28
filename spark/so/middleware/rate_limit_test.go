@@ -161,9 +161,7 @@ type mutableKnobs struct {
 }
 
 func newMutableKnobs(initial map[string]float64) *mutableKnobs {
-	cp := make(map[string]float64, len(initial))
-	maps.Copy(cp, initial)
-	return &mutableKnobs{values: cp}
+	return &mutableKnobs{values: maps.Clone(initial)}
 }
 
 func (m *mutableKnobs) keyString(knob string, target *string) string {

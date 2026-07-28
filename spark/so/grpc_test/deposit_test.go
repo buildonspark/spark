@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -218,18 +219,13 @@ func TestRotateStaticDepositAddress(t *testing.T) {
 	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 2)
 
 	// Verify the new default address is in the list
-	foundNewAddress := false
-	foundArchivedAddress := false
-	for _, addr := range queryStaticDepositAddresses.GetDepositAddresses() {
-		if addr.GetDepositAddress() == rotateResp.GetNewDepositAddress().GetAddress() {
-			foundNewAddress = true
-		}
-		if addr.GetDepositAddress() == rotateResp.GetArchivedDepositAddress().GetAddress() {
-			foundArchivedAddress = true
-		}
+	hasAddress := func(want string) bool {
+		return slices.ContainsFunc(queryStaticDepositAddresses.GetDepositAddresses(), func(addr *pb.DepositAddressQueryResult) bool {
+			return addr.GetDepositAddress() == want
+		})
 	}
-	assert.True(t, foundNewAddress, "New default address should be in the query results")
-	assert.True(t, foundArchivedAddress, "Archived address should still be in the query results")
+	assert.True(t, hasAddress(rotateResp.GetNewDepositAddress().GetAddress()), "New default address should be in the query results")
+	assert.True(t, hasAddress(rotateResp.GetArchivedDepositAddress().GetAddress()), "Archived address should still be in the query results")
 
 	// Calling GenerateStaticDepositAddress again should return the new rotated address, not create another one
 	resp2, err := wallet.GenerateStaticDepositAddress(ctx, config, pubKey)

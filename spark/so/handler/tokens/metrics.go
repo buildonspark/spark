@@ -2,7 +2,7 @@ package tokens
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -120,6 +120,6 @@ func buildFiltersAttribute(params *queryParams) string {
 		return filterNone
 	}
 
-	sort.Strings(filters)
+	slices.Sort(filters)
 	return strings.Join(filters, ",")
 }

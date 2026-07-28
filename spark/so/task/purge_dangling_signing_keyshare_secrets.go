@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -209,11 +211,7 @@ func collectDanglingSigningKeyshareSecretIDs(
 	reachedEndOfAgedData := false
 
 	for len(secretIDsToDelete) < batchSize && candidateCount < maxScanCount {
-		queryLimit := batchSize
-		remainingScanCapacity := maxScanCount - candidateCount
-		if remainingScanCapacity < queryLimit {
-			queryLimit = remainingScanCapacity
-		}
+		queryLimit := min(batchSize, maxScanCount-candidateCount)
 
 		query := ephemeralDB.SigningKeyshareSecret.Query().
 			Where(signingkeysharesecret.IDLT(cutoffID)).
@@ -275,10 +273,7 @@ func getDanglingSigningKeyshareSecretIDs(
 	for _, secret := range candidates {
 		signingKeyshareIDSet[secret.SigningKeyshareID] = struct{}{}
 	}
-	signingKeyshareIDs := make([]uuid.UUID, 0, len(signingKeyshareIDSet))
-	for signingKeyshareID := range signingKeyshareIDSet {
-		signingKeyshareIDs = append(signingKeyshareIDs, signingKeyshareID)
-	}
+	signingKeyshareIDs := slices.Collect(maps.Keys(signingKeyshareIDSet))
 
 	mainSigningKeyshares, err := mainDB.SigningKeyshare.Query().
 		Where(signingkeyshare.IDIn(signingKeyshareIDs...)).

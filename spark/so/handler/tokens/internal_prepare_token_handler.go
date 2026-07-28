@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"math/big"
 	"slices"
 	"strings"
@@ -1177,10 +1178,7 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 		}
 		sparkInvoiceIDs[parsedInvoice.Id] = struct{}{}
 	}
-	sparkInvoiceIDsToQuery := make([]uuid.UUID, 0, len(sparkInvoiceIDs))
-	for sparkInvoiceID := range sparkInvoiceIDs {
-		sparkInvoiceIDsToQuery = append(sparkInvoiceIDsToQuery, sparkInvoiceID)
-	}
+	sparkInvoiceIDsToQuery := slices.Collect(maps.Keys(sparkInvoiceIDs))
 	now := time.Now().UTC()
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {

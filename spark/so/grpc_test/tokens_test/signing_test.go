@@ -1,6 +1,7 @@
 package tokens_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -31,8 +32,7 @@ func testTransactionSigningScenarios(
 		t.Skip("Skipping double start/sign failure scenarios for V3 transactions which combines both steps into a single RPC.")
 	}
 
-	converted := make([]keys.Private, len(startOwnerPrivateKeys))
-	copy(converted, startOwnerPrivateKeys)
+	converted := slices.Clone(startOwnerPrivateKeys)
 	startResp, finalTxHash, startErr := startTokenTransactionOrBroadcast(
 		t,
 		t.Context(),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -516,9 +517,7 @@ func convertTransactionsToResponse(ctx context.Context, config *so.Config, trans
 
 	// For backward pagination, reverse the results to restore the original sort order
 	if isBackward {
-		for i, j := 0, len(resultTransactions)-1; i < j; i, j = i+1, j-1 {
-			resultTransactions[i], resultTransactions[j] = resultTransactions[j], resultTransactions[i]
-		}
+		slices.Reverse(resultTransactions)
 	}
 
 	transactionsWithStatus := make([]*tokenpb.TokenTransactionWithStatus, 0, len(resultTransactions))
@@ -600,9 +599,8 @@ func normalizeQueryParams(req *tokenpb.QueryTokenTransactionsRequest) (*queryPar
 	limit := req.GetLimit()
 	if limit == 0 {
 		limit = defaultTokenTransactionPageSize
-	} else if limit > maxTokenTransactionPageSize {
-		limit = maxTokenTransactionPageSize
 	}
+	limit = min(limit, maxTokenTransactionPageSize)
 
 	if req.GetByTxHash() != nil {
 		return &queryParams{

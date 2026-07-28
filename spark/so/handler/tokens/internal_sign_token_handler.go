@@ -778,13 +778,9 @@ func (h *InternalSignTokenHandler) getTokenOutputsWithSharesByUUID(ctx context.C
 		}
 	}
 
-	const batchSize = queryTokenOutputsWithPartialRevocationSecretSharesBatchSize
 	var outputsWithKeyShares []*ent.TokenOutput
 
-	for i := 0; i < len(uniqueTokenOutputIDs); i += batchSize {
-		end := min(i+batchSize, len(uniqueTokenOutputIDs))
-		batchOutputIDs := uniqueTokenOutputIDs[i:end]
-
+	for batchOutputIDs := range slices.Chunk(uniqueTokenOutputIDs, queryTokenOutputsWithPartialRevocationSecretSharesBatchSize) {
 		var excludeKeyshareTokenOutputIDs []any
 		for shareKey := range sharesByUUID {
 			if shareKey.OperatorIdentityPublicKey == thisOperatorIdentityPubkey && slices.Contains(batchOutputIDs, shareKey.TokenOutputID) {
@@ -804,12 +800,12 @@ func (h *InternalSignTokenHandler) getTokenOutputsWithSharesByUUID(ctx context.C
 			}).
 			All(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get token outputs with shares batch %d-%d: %w", i, end-1, err)
+			return nil, fmt.Errorf("failed to get token outputs with shares: %w", err)
 		}
 
 		partialSharesByOutput, err := h.getPartialRevocationSecretShares(ctx, db, batchOutputIDs, sharesByUUID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get partial shares batch %d-%d: %w", i, end-1, err)
+			return nil, fmt.Errorf("failed to get partial shares: %w", err)
 		}
 
 		for _, output := range batchOutputs {
@@ -846,13 +842,9 @@ func (h *InternalSignTokenHandler) getTokenOutputsWithSharesByHashVout(ctx conte
 		}
 	}
 
-	const batchSize = queryTokenOutputsWithPartialRevocationSecretSharesBatchSize
 	var outputsWithKeyShares []*ent.TokenOutput
 
-	for i := 0; i < len(uniqueOutpoints); i += batchSize {
-		end := min(i+batchSize, len(uniqueOutpoints))
-		batchOutpoints := uniqueOutpoints[i:end]
-
+	for batchOutpoints := range slices.Chunk(uniqueOutpoints, queryTokenOutputsWithPartialRevocationSecretSharesBatchSize) {
 		// Build OR predicates for (hash, vout) pairs
 		predicates := make([]predicate.TokenOutput, 0, len(batchOutpoints))
 		for _, op := range batchOutpoints {
@@ -867,7 +859,7 @@ func (h *InternalSignTokenHandler) getTokenOutputsWithSharesByHashVout(ctx conte
 			WithRevocationKeyshare().
 			All(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get token outputs by hash/vout batch %d-%d: %w", i, end-1, err)
+			return nil, fmt.Errorf("failed to get token outputs by hash/vout: %w", err)
 		}
 
 		// Build (hash, vout) -> output mapping and translate to ShareKey format for filtering
@@ -900,7 +892,7 @@ func (h *InternalSignTokenHandler) getTokenOutputsWithSharesByHashVout(ctx conte
 		if len(batchOutputIDs) > 0 {
 			partialSharesByOutput, err := h.getPartialRevocationSecretShares(ctx, db, batchOutputIDs, sharesByUUID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get partial shares for hash/vout batch %d-%d: %w", i, end-1, err)
+				return nil, fmt.Errorf("failed to get partial shares for hash/vout: %w", err)
 			}
 
 			for _, output := range batchOutputs {
@@ -1260,13 +1252,10 @@ func (h *InternalSignTokenHandler) loadPartialRevocationSecretSharesForOutputs(
 		outputsByID[output.ID] = output
 	}
 
-	const batchSize = queryTokenOutputsWithPartialRevocationSecretSharesBatchSize
-	for i := 0; i < len(outputIDs); i += batchSize {
-		end := min(i+batchSize, len(outputIDs))
-		batchOutputIDs := outputIDs[i:end]
+	for batchOutputIDs := range slices.Chunk(outputIDs, queryTokenOutputsWithPartialRevocationSecretSharesBatchSize) {
 		partialSharesByOutput, err := h.getPartialRevocationSecretShares(ctx, db, batchOutputIDs, nil)
 		if err != nil {
-			return fmt.Errorf("failed to load partial shares batch %d-%d: %w", i, end-1, err)
+			return fmt.Errorf("failed to load partial shares: %w", err)
 		}
 		for _, outputID := range batchOutputIDs {
 			outputsByID[outputID].Edges.TokenPartialRevocationSecretShares = partialSharesByOutput[outputID]

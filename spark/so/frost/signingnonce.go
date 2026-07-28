@@ -1,6 +1,7 @@
 package frost
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/hex"
@@ -62,8 +63,7 @@ func (s *SigningNonce) Scan(src any) error {
 		return nil
 	}
 
-	asBytes := make([]byte, len(value))
-	copy(asBytes, value)
+	asBytes := bytes.Clone(value)
 
 	if err := s.UnmarshalBinary(asBytes); err != nil {
 		return fmt.Errorf("failed to scan SigningNonce: %w", err)
