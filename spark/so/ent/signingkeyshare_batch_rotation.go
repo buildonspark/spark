@@ -318,14 +318,9 @@ func prepareBatchSecretRotations(ctx context.Context, items []*signingKeyshareRo
 			}
 			var retire, purge []signingKeyshareSecretVersionRef
 			for id, newVersion := range outcome.newVersions {
+				base, hasBase := outcome.retiredBase[id]
 				switch {
-				case outcome.mainSaved[id]:
-					// A committed CAS winner permanently unreferences its base
-					// version. Nil-base winners have no prior row to retire.
-					if base, ok := outcome.retiredBase[id]; ok {
-						retire = append(retire, signingKeyshareSecretVersionRef{signingKeyshareID: id, version: base})
-					}
-				default:
+				case !outcome.mainSaved[id]:
 					// The main row never pointed at this new version, so it is
 					// an unreachable orphan. Unreachable for the current
 					// all-or-nothing caller (a CAS miss errors out and the tx
@@ -334,6 +329,14 @@ func prepareBatchSecretRotations(ctx context.Context, items []*signingKeyshareRo
 					// single-row hook; re-verify before adding a
 					// continue-on-error caller.
 					purge = append(purge, signingKeyshareSecretVersionRef{signingKeyshareID: id, version: newVersion})
+				case !hasBase:
+					// Nil-base winners have no prior row to retire.
+				case base == newVersion:
+					recordSigningKeyshareSecretRetireCollision(cleanupCtx, id, newVersion)
+				default:
+					// A committed CAS winner permanently unreferences its base
+					// version.
+					retire = append(retire, signingKeyshareSecretVersionRef{signingKeyshareID: id, version: base})
 				}
 			}
 			if len(retire) > 0 && deleteSigningKeyshareSecretVersionRefsBestEffort(cleanupCtx, retire, "main tx commit") {
