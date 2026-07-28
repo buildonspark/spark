@@ -279,6 +279,31 @@ const (
 	signingKeyshareSecretCleanupModeCreate
 )
 
+// nextSigningKeyshareSecretVersion allocates the version for a keyshare's next ephemeral secret.
+// ephemeralLatest is the highest version currently in the ephemeral store (nil when the store holds
+// no row for this keyshare); base is the main row's secret_version at the moment the base secret was
+// read (nil when the keyshare has never been versioned).
+//
+// The version pointer must only move forward. The orphan purge takes no advisory locks, so a
+// keyshare's ephemeral rows can be missing (or behind the main pointer) here; restarting from the
+// ephemeral store alone would let the CAS regress the pointer and break the retire-below-N cleanup
+// contract. Allocating above both inputs also keeps the new version distinct from the base version
+// the commit hook retires, so a rotation can never delete the row it just wrote.
+func nextSigningKeyshareSecretVersion(signingKeyshareID uuid.UUID, ephemeralLatest, base *int32) (int32, error) {
+	if (ephemeralLatest != nil && *ephemeralLatest == math.MaxInt32) || (base != nil && *base == math.MaxInt32) {
+		return 0, fmt.Errorf("signing keyshare secret version overflow for keyshare %s", signingKeyshareID)
+	}
+
+	var next int32
+	if ephemeralLatest != nil {
+		next = *ephemeralLatest + 1
+	}
+	if base != nil && next <= *base {
+		next = *base + 1
+	}
+	return next, nil
+}
+
 // prepareSigningKeyshareSecretRotation writes the next ephemeral secret version and registers
 // cleanup hooks for the main transaction. Cleanup never re-reads main state: a version can become
 // current only through the rotation that created it, the main update is guarded by an exact

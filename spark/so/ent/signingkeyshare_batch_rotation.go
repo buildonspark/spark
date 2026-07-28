@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -253,22 +252,16 @@ func prepareBatchSecretRotations(ctx context.Context, items []*signingKeyshareRo
 	inserts := make([]entephemeral.SigningKeyshareSecretVersionInput, 0, len(items))
 	for _, item := range items {
 		id := item.tweak.Keyshare.ID
+		var ephemeralLatest *int32
 		if row, ok := latest[id]; ok {
-			if row.Version == math.MaxInt32 {
-				return false, nil, fmt.Errorf("signing keyshare secret version overflow for keyshare %s", id)
-			}
-			item.newVersion = row.Version + 1
+			version := row.Version
+			ephemeralLatest = &version
 		}
-		// The version pointer must only move forward. The orphan purge takes
-		// no advisory locks, so a keyshare's ephemeral rows can be missing (or
-		// behind the main pointer) here; restarting at 0 would let the CAS
-		// regress the pointer and break the retire-below-N cleanup contract.
-		if base := item.tweak.Keyshare.SecretVersion; base != nil && item.newVersion <= *base {
-			if *base == math.MaxInt32 {
-				return false, nil, fmt.Errorf("signing keyshare secret version overflow for keyshare %s", id)
-			}
-			item.newVersion = *base + 1
+		newVersion, err := nextSigningKeyshareSecretVersion(id, ephemeralLatest, item.tweak.Keyshare.SecretVersion)
+		if err != nil {
+			return false, nil, err
 		}
+		item.newVersion = newVersion
 		inserts = append(inserts, entephemeral.SigningKeyshareSecretVersionInput{
 			SigningKeyshareID: id,
 			Version:           item.newVersion,
