@@ -1150,6 +1150,7 @@ func createTransferLeaves(
 			SetTransferReceiver(transferReceiver).
 			SetPreviousRefundTx(leaf.RawRefundTx).
 			SetPreviousDirectRefundTx(leaf.DirectRefundTx).
+			SetPreviousDirectFromCpfpRefundTx(leaf.DirectFromCpfpRefundTx).
 			SetIntermediateRefundTx(rawRefundTx).
 			SetIntermediateDirectRefundTx(directRefundTx).
 			SetIntermediateDirectFromCpfpRefundTx(intermediateDirectFromCpfpRefundTx)

@@ -3283,12 +3283,98 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 		}
 	}
 
-	// Revert key tweaks for all leaves
+	// Revert key tweaks and restore each leaf tree node's refund txs. A
+	// Prepare that consensus later rolled back has already overwritten the
+	// node's refund columns with the claimer's unsigned txs; without the
+	// restore, readers of the node columns during the still-pending transfer
+	// (SSP SyncTransfer repair, lightning HTLC checks, unilateral exit) see
+	// an unsigned tx as the leaf's canonical exit tx.
 	for _, leaf := range transferLeaves {
 		_, err := leaf.Update().SetKeyTweak(nil).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update leaf %v: %w", leaf.ID, err)
 		}
+		if err := restoreLeafNodeRefundTxs(ctx, leaf); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// restoreLeafNodeRefundTxs restores the tree node's refund tx columns from
+// the transfer leaf's immutable previous_* snapshots captured at send start.
+// Restores exactly the statuses the claim path accepts and overwrites
+// (validateClaimLeafTweak): TRANSFER_LOCKED plus the exited-to-L1 set. Each
+// column restores only when its snapshot exists —
+// previous_direct_from_cpfp_refund_tx rows predating its capture stay
+// untouched. The tree node ent hooks recompute the txid columns.
+//
+// The update re-asserts the status set and the raw_refund_tx bytes just read
+// as predicates, so a concurrent transition (e.g. a finalization committing
+// newer refund txs) between the read and this write is never clobbered — the
+// predicate misses and the restore becomes a no-op.
+func restoreLeafNodeRefundTxs(ctx context.Context, transferLeaf *ent.TransferLeaf) error {
+	node := transferLeaf.Edges.Leaf
+	if node == nil {
+		var err error
+		node, err = transferLeaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to load tree node for transfer leaf %s: %w", transferLeaf.ID, err)
+		}
+	}
+	if node.Status != st.TreeNodeStatusTransferLocked && !node.Status.IsExitedToL1() {
+		return nil
+	}
+	update := node.Update()
+	changed := false
+	if len(transferLeaf.PreviousRefundTx) > 0 && !bytes.Equal(node.RawRefundTx, transferLeaf.PreviousRefundTx) {
+		update.SetRawRefundTx(transferLeaf.PreviousRefundTx)
+		changed = true
+	}
+	if len(transferLeaf.PreviousDirectRefundTx) > 0 && !bytes.Equal(node.DirectRefundTx, transferLeaf.PreviousDirectRefundTx) {
+		update.SetDirectRefundTx(transferLeaf.PreviousDirectRefundTx)
+		changed = true
+	}
+	if len(transferLeaf.PreviousDirectFromCpfpRefundTx) > 0 && !bytes.Equal(node.DirectFromCpfpRefundTx, transferLeaf.PreviousDirectFromCpfpRefundTx) {
+		update.SetDirectFromCpfpRefundTx(transferLeaf.PreviousDirectFromCpfpRefundTx)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	// One equality predicate per column this update can write, so the guard
+	// does not depend on every concurrent writer also touching
+	// raw_refund_tx. Empty reads assert IS NULL; a predicate miss skips the
+	// restore (fail-safe: never clobber, at worst leave debris for the next
+	// successful claim to overwrite).
+	preds := []predicate.TreeNode{
+		enttreenode.StatusIn(
+			st.TreeNodeStatusTransferLocked,
+			st.TreeNodeStatusOnChain,
+			st.TreeNodeStatusExited,
+			st.TreeNodeStatusParentExited,
+		),
+		enttreenode.RawRefundTxEQ(node.RawRefundTx),
+	}
+	if len(node.DirectRefundTx) > 0 {
+		preds = append(preds, enttreenode.DirectRefundTxEQ(node.DirectRefundTx))
+	} else {
+		preds = append(preds, enttreenode.DirectRefundTxIsNil())
+	}
+	if len(node.DirectFromCpfpRefundTx) > 0 {
+		preds = append(preds, enttreenode.DirectFromCpfpRefundTxEQ(node.DirectFromCpfpRefundTx))
+	} else {
+		preds = append(preds, enttreenode.DirectFromCpfpRefundTxIsNil())
+	}
+	update.Where(preds...)
+	if _, err := update.Save(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			logging.GetLoggerFromContext(ctx).Sugar().Warnf(
+				"claim rollback skipped refund tx restore for tree node %s (transfer leaf %s): node changed concurrently since read",
+				node.ID, transferLeaf.ID)
+			return nil
+		}
+		return fmt.Errorf("unable to restore refund txs for tree node %s: %w", node.ID, err)
 	}
 	return nil
 }
@@ -4859,7 +4945,8 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		}
 
 	case pbinternal.SettleKeyTweakAction_ROLLBACK:
-		leaves, err := getTransferLeavesForReceiverQuery(transfer, receiver).All(ctx)
+		// WithLeaf: revertClaimTransfer restores each leaf tree node's refund txs.
+		leaves, err := getTransferLeavesForReceiverQuery(transfer, receiver).WithLeaf().All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get leaves from transfer %s: %w", transferID, err)
 		}
