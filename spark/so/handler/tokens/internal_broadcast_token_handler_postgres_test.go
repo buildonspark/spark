@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/lightsparkdev/spark/common/btcnetwork"
+	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
@@ -318,4 +319,79 @@ func TestSignTokenTransaction_RejectsLocalCoordinatorOverInternalRPC(t *testing.
 	resp, err := setup.handler.SignTokenTransaction(internalCtx, req)
 	require.ErrorContains(t, err, "local coordinator public key cannot be used through token internal RPC")
 	require.Nil(t, resp)
+}
+
+func buildV3MintPayingInvoice(
+	t *testing.T,
+	f *entfixtures.Fixtures,
+	config *so.Config,
+	issuerPriv keys.Private,
+	tokenCreate *ent.TokenCreate,
+	receiver keys.Public,
+	invoiceStr string,
+) *tokeninternalpb.SignTokenTransactionRequest {
+	t.Helper()
+	ks := f.CreateKeyshare()
+	coordinator := testNonSelfCoordinator(t, config)
+	ks, err := f.Client.SigningKeyshare.UpdateOneID(ks.ID).SetCoordinatorIndex(coordinator.ID).Save(f.Ctx)
+	require.NoError(t, err)
+
+	now := time.Now()
+	validityDuration := uint64(300)
+	cfgVals := config.Lrc20Configs[strings.ToLower(btcnetwork.Regtest.String())]
+	txProto := &tokenpb.TokenTransaction{
+		Version: 3,
+		TokenInputs: &tokenpb.TokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: issuerPriv.Public().Serialize(),
+				TokenIdentifier: tokenCreate.TokenIdentifier,
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{{
+			Id:                            new(uuid.Must(uuid.NewV7()).String()),
+			OwnerPublicKey:                receiver.Serialize(),
+			TokenIdentifier:               tokenCreate.TokenIdentifier,
+			TokenAmount:                   []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+			RevocationCommitment:          ks.PublicKey.Serialize(),
+			WithdrawBondSats:              &cfgVals.WithdrawBondSats,
+			WithdrawRelativeBlockLocktime: &cfgVals.WithdrawRelativeBlockLocktime,
+		}},
+		ExpiryTime:              timestamppb.New(now.Add(24 * time.Hour)),
+		ClientCreatedTimestamp:  timestamppb.New(utils.ToMicrosecondPrecision(now)),
+		ValidityDurationSeconds: &validityDuration,
+		Network:                 sparkpb.Network_REGTEST,
+		InvoiceAttachments:      []*tokenpb.InvoiceAttachment{{SparkInvoice: invoiceStr}},
+	}
+	txProto.SparkOperatorIdentityPublicKeys = testSortedOperatorPublicKeys(config)
+
+	partialHash, err := utils.HashTokenTransaction(txProto, true)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(issuerPriv.ToBTCEC(), partialHash)
+	require.NoError(t, err)
+
+	return &tokeninternalpb.SignTokenTransactionRequest{
+		FinalTokenTransaction:      txProto,
+		TokenTransactionSignatures: []*tokenpb.SignatureWithIndex{{InputIndex: 0, Signature: sig.Serialize()}},
+		KeyshareIds:                []string{ks.ID.String()},
+		CoordinatorPublicKey:       coordinator.IdentityPublicKey.Serialize(),
+	}
+}
+
+// TestSignTokenTransaction_InvoiceReservedOnBroadcastPath exercises the invoice reservation on the
+// V3 sign/broadcast path — createTransactionEntities is shared with the prepare path, so the
+// reservation runs here too. The first signed transaction paying an invoice attaches it; a second
+// transaction paying the same invoice is rejected by the in-flight/finalized check.
+func TestSignTokenTransaction_InvoiceReservedOnBroadcastPath(t *testing.T) {
+	setup := setUpSignTokenTransactionTestHandlerPostgres(t)
+	f, config := setup.fixtures, setup.config
+
+	issuerPriv, tokenCreate := f.CreateTokenCreateWithIssuer(btcnetwork.Regtest, nil, nil)
+	receiver := keys.GeneratePrivateKey().Public()
+	invoiceStr := encodeTokenInvoice(t, btcnetwork.Regtest, receiver, tokenCreate.TokenIdentifier, uuid.New())
+
+	_, err := setup.handler.SignTokenTransaction(setup.ctx, buildV3MintPayingInvoice(t, f, config, issuerPriv, tokenCreate, receiver, invoiceStr))
+	require.NoError(t, err)
+
+	_, err = setup.handler.SignTokenTransaction(setup.ctx, buildV3MintPayingInvoice(t, f, config, issuerPriv, tokenCreate, receiver, invoiceStr))
+	require.ErrorContains(t, err, "in flight or finalized")
 }

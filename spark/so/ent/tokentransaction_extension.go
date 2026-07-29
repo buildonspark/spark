@@ -274,26 +274,15 @@ func createTransactionEntities(
 		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 	if tokenTransaction.GetVersion() >= 2 && tokenTransaction.GetInvoiceAttachments() != nil {
-		sparkInvoiceIDs, sparkInvoicesToCreate, err := prepareSparkInvoiceCreates(ctx, tokenTransaction, tokenTransactionEnt)
+		invoiceIDs, err := ReserveAndLockSparkInvoices(ctx, tokenTransaction)
 		if err != nil {
-			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to prepare spark invoices: %w", err))
+			return nil, err
 		}
-		if len(sparkInvoicesToCreate) > 0 {
-			err = db.SparkInvoice.CreateBulk(sparkInvoicesToCreate...).
-				OnConflictColumns(sparkinvoice.FieldID).
-				DoNothing().
-				Exec(ctx)
-			if err != nil {
-				return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create spark invoices: %w", err))
-			}
-			sparkInvoiceIDsToAdd := make([]uuid.UUID, 0, len(sparkInvoiceIDs))
-			for sparkInvoiceID := range sparkInvoiceIDs {
-				sparkInvoiceIDsToAdd = append(sparkInvoiceIDsToAdd, sparkInvoiceID)
-			}
+		if len(invoiceIDs) > 0 {
 			err = db.SparkInvoice.
 				Update().
 				Where(
-					sparkinvoice.IDIn(sparkInvoiceIDsToAdd...),
+					sparkinvoice.IDIn(invoiceIDs...),
 					sparkinvoice.Not(
 						sparkinvoice.HasTokenTransactionWith(tokentransaction.IDEQ(tokenTransactionEnt.ID)),
 					),
@@ -485,33 +474,122 @@ func fetchSignatureForInput(signaturesWithIndex []*tokenpb.SignatureWithIndex, i
 	return nil, fmt.Errorf("no signature found for input index %d", inputIndex)
 }
 
-func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionEnt *TokenTransaction) (map[uuid.UUID]struct{}, []*SparkInvoiceCreate, error) {
-	invoiceIDs := make(map[uuid.UUID]struct{})
-	var invoiceCreates []*SparkInvoiceCreate
+// ReserveAndLockSparkInvoices idempotently creates the transaction's invoice rows, takes a
+// FOR UPDATE lock on each (ids sorted into one global order so overlapping reservations can't
+// deadlock), and verifies none is already attached to an in-flight or finalized transaction. Call
+// it immediately before the edge attach, in the same DB transaction and after any just-in-time
+// input finalization (which commits mid-flow and would release an earlier lock), so the lock
+// serializes concurrent prepares and the loser sees the winner's attachment. The create omits the
+// token-transaction edge so the in-flight check doesn't see this transaction's own attachment; the
+// caller attaches it after.
+func ReserveAndLockSparkInvoices(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) ([]uuid.UUID, error) {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
+	createByID := make(map[uuid.UUID]*SparkInvoiceCreate)
+	sparkInvoiceByID := make(map[uuid.UUID]string)
+	ids := make([]uuid.UUID, 0, len(tokenTransaction.GetInvoiceAttachments()))
 	for _, invoiceAttachment := range tokenTransaction.GetInvoiceAttachments() {
 		if invoiceAttachment == nil {
-			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invoice attachment is nil"))
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invoice attachment is nil"))
 		}
-		parsedInvoice, err := common.ParseSparkInvoice(invoiceAttachment.GetSparkInvoice())
+		sparkInvoice := invoiceAttachment.GetSparkInvoice()
+		parsedInvoice, err := common.ParseSparkInvoice(sparkInvoice)
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice: %w", err))
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice %s: %w", sparkInvoice, err))
+		}
+		if _, seen := createByID[parsedInvoice.Id]; seen {
+			return nil, sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate spark invoice ID found in invoice %s: %s", sparkInvoice, parsedInvoice.Id))
 		}
 		invoiceToCreate := db.SparkInvoice.Create().
 			SetID(parsedInvoice.Id).
-			SetSparkInvoice(invoiceAttachment.GetSparkInvoice()).
-			SetReceiverPublicKey(parsedInvoice.ReceiverPublicKey).
-			AddTokenTransactionIDs(tokenTransactionEnt.ID)
+			SetSparkInvoice(sparkInvoice).
+			SetReceiverPublicKey(parsedInvoice.ReceiverPublicKey)
 		if expiry := parsedInvoice.ExpiryTime; expiry != nil {
 			invoiceToCreate = invoiceToCreate.SetExpiryTime(expiry.AsTime())
 		}
-		invoiceCreates = append(invoiceCreates, invoiceToCreate)
-		invoiceIDs[parsedInvoice.Id] = struct{}{}
+		createByID[parsedInvoice.Id] = invoiceToCreate
+		sparkInvoiceByID[parsedInvoice.Id] = sparkInvoice
+		ids = append(ids, parsedInvoice.Id)
 	}
-	return invoiceIDs, invoiceCreates, nil
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return bytes.Compare(a[:], b[:]) })
+	invoiceCreates := make([]*SparkInvoiceCreate, 0, len(ids))
+	for _, id := range ids {
+		invoiceCreates = append(invoiceCreates, createByID[id])
+	}
+	if err := db.SparkInvoice.CreateBulk(invoiceCreates...).
+		OnConflictColumns(sparkinvoice.FieldID).
+		DoNothing().
+		Exec(ctx); err != nil {
+		return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create spark invoices for lock: %w", err))
+	}
+	lockedInvoices, err := db.SparkInvoice.Query().
+		Where(sparkinvoice.IDIn(ids...)).
+		Order(sparkinvoice.ByID()).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to lock spark invoices: %w", err))
+	}
+	// A pre-existing row with the same id but a different encoded invoice means a different invoice
+	// is reusing this UUID; attaching to it would bind the transaction to the wrong invoice's stored
+	// receiver/payment fields. Mirrors createAndLockSparkInvoice on the sats-transfer path.
+	for _, locked := range lockedInvoices {
+		if locked.SparkInvoice != sparkInvoiceByID[locked.ID] {
+			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("conflicting invoices found for id %s", locked.ID))
+		}
+	}
+
+	now := time.Now().UTC()
+	inFlightOrFinalized := tokentransaction.Or(
+		tokentransaction.StatusIn(
+			st.TokenTransactionStatusFinalized,
+			st.TokenTransactionStatusRevealed,
+		),
+		tokentransaction.And(
+			tokentransaction.StatusIn(
+				st.TokenTransactionStatusStarted,
+				st.TokenTransactionStatusSigned,
+			),
+			tokentransaction.Or(
+				tokentransaction.ExpiryTimeIsNil(),
+				tokentransaction.ExpiryTimeGT(now),
+			),
+		),
+	)
+	conflicts, err := db.TokenTransaction.Query().
+		Where(
+			inFlightOrFinalized,
+			tokentransaction.HasSparkInvoiceWith(sparkinvoice.IDIn(ids...)),
+		).
+		WithSparkInvoice(func(q *SparkInvoiceQuery) {
+			q.Select(sparkinvoice.FieldID)
+		}).
+		All(ctx)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to check in-flight spark invoices: %w", err))
+	}
+	idSet := make(map[uuid.UUID]struct{}, len(ids))
+	for _, id := range ids {
+		idSet[id] = struct{}{}
+	}
+	var reserved []uuid.UUID
+	for _, conflict := range conflicts {
+		for _, invoice := range conflict.Edges.SparkInvoice {
+			if _, ok := idSet[invoice.ID]; ok {
+				reserved = append(reserved, invoice.ID)
+			}
+		}
+	}
+	if len(reserved) > 0 {
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("spark invoices %v are currently in flight or finalized and are not reassignable", reserved))
+	}
+	return ids, nil
 }
 
 // UpdateSignedTransaction updates the status and ownership signatures of the inputs + outputs

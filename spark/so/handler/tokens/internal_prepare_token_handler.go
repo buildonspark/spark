@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"maps"
 	"math/big"
 	"slices"
 	"strings"
@@ -32,7 +31,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
@@ -123,9 +121,6 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 
 	if finalTokenTx.GetVersion() >= 2 && finalTokenTx.GetInvoiceAttachments() != nil {
 		if err := validateSparkInvoicesForTransaction(ctx, finalTokenTx); err != nil {
-			return nil, err
-		}
-		if err := validateInvoiceAttachmentsNotInFlightOrFinalized(ctx, finalTokenTx); err != nil {
 			return nil, err
 		}
 	}
@@ -248,6 +243,7 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 	default:
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
+
 	return inputTtxos, nil
 }
 
@@ -1161,72 +1157,6 @@ func validateClientCreatedTimestamp(tokenTransaction *tokenpb.TokenTransaction) 
 		}
 		return nil
 	}
-}
-
-func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {
-	invoiceAttachments := tokenTransaction.GetInvoiceAttachments()
-	sparkInvoiceIDs := make(map[uuid.UUID]struct{})
-
-	for _, invoiceAttachment := range invoiceAttachments {
-		sparkInvoice := invoiceAttachment.GetSparkInvoice()
-		parsedInvoice, err := common.ParseSparkInvoice(sparkInvoice)
-		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse spark invoice ID in invoice %s: %w", sparkInvoice, err))
-		}
-		if _, exists := sparkInvoiceIDs[parsedInvoice.Id]; exists {
-			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate spark invoice ID found in invoice %s: %s", sparkInvoice, parsedInvoice.Id))
-		}
-		sparkInvoiceIDs[parsedInvoice.Id] = struct{}{}
-	}
-	sparkInvoiceIDsToQuery := slices.Collect(maps.Keys(sparkInvoiceIDs))
-	now := time.Now().UTC()
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return err
-	}
-	transactionFinalizedOrInFlight := tokentransaction.Or(
-		tokentransaction.StatusIn(
-			st.TokenTransactionStatusFinalized,
-			st.TokenTransactionStatusRevealed,
-		),
-		tokentransaction.And(
-			tokentransaction.StatusIn(
-				st.TokenTransactionStatusStarted,
-				st.TokenTransactionStatusSigned,
-			),
-			tokentransaction.Or(
-				tokentransaction.ExpiryTimeIsNil(),
-				tokentransaction.ExpiryTimeGT(now),
-			),
-		),
-	)
-
-	inFlightOrFinalizedTransactions, err := db.TokenTransaction.Query().
-		Where(
-			transactionFinalizedOrInFlight,
-			tokentransaction.HasSparkInvoiceWith(
-				sparkinvoice.IDIn(sparkInvoiceIDsToQuery...),
-			),
-		).
-		WithSparkInvoice(func(q *ent.SparkInvoiceQuery) {
-			q.Select(sparkinvoice.FieldID)
-		}).
-		All(ctx)
-	if err != nil {
-		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get token transactions: %w", err))
-	}
-	var inFlightOrFinalizedInvoices []uuid.UUID
-	for _, transaction := range inFlightOrFinalizedTransactions {
-		for _, invoice := range transaction.Edges.SparkInvoice {
-			if _, exists := sparkInvoiceIDs[invoice.ID]; exists {
-				inFlightOrFinalizedInvoices = append(inFlightOrFinalizedInvoices, invoice.ID)
-			}
-		}
-	}
-	if len(inFlightOrFinalizedInvoices) > 0 {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("spark invoices %v are currently in flight or finalized and are not reassignable", inFlightOrFinalizedInvoices))
-	}
-	return nil
 }
 
 // If sender pubkey is present, the owner of the spent outputs must match the expected sender public key.
