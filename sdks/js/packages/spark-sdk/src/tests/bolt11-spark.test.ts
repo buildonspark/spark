@@ -1,5 +1,39 @@
 import { describe, expect, it } from "@jest/globals";
+import { bech32 } from "@scure/base";
 import { decodeInvoice } from "../services/bolt11-spark.js";
+
+const SIGNATURE_WORD_COUNT = (65 * 8) / 5;
+
+/** Rewrites one bech32 word and recomputes the checksum, as an attacker would. */
+function tamperWithInvoice(invoice: string, wordIndex: number): string {
+  const humanReadablePart = invoice.slice(0, invoice.lastIndexOf("1"));
+  const { words } = bech32.decode(
+    invoice as `${string}1${string}`,
+    Number.MAX_SAFE_INTEGER,
+  );
+  const tampered = Array.from(words);
+  tampered[wordIndex] = (tampered[wordIndex]! + 1) % 32;
+  return bech32.encode(
+    humanReadablePart as "lnbc",
+    tampered,
+    Number.MAX_SAFE_INTEGER,
+  );
+}
+
+function corruptInvoiceSignature(invoice: string): string {
+  const humanReadablePart = invoice.slice(0, invoice.lastIndexOf("1"));
+  const { words } = bech32.decode(
+    invoice as `${string}1${string}`,
+    Number.MAX_SAFE_INTEGER,
+  );
+  const corrupted = Array.from(words);
+  corrupted.fill(0, -SIGNATURE_WORD_COUNT);
+  return bech32.encode(
+    humanReadablePart as "lnbc",
+    corrupted,
+    Number.MAX_SAFE_INTEGER,
+  );
+}
 
 // examples taken from BOLT-11 spec § Examples (2025-06-04)
 // https://github.com/lightning/bolts/blob/master/11-payment-encoding.md#examples
@@ -101,7 +135,7 @@ describe("spark bolt11 invoice decoding", () => {
     const invoice =
       "lnbc13u1p5xalmkpp5z79uwgne7znz76plf0q4zxmh8t3wke6gsnm5kn67h4satpgflkmssp5azht5ywc5s4m40jf9h0nwlr959a34n72pns50lfm93zz8lvs7nqsxq9z0rgqnp4q0p92sfan5vj2a4f8q3gsfsy8qp60maeuxz858c5x0hvt5u0p0h9jr9yqtqd37k2ya0pv8pqeyjs4lklcexjyw600g9qqp62r4j0ph8fcmlfwqqqqzfv7u6g85qqqqqqqqqqthqq9qpz9cat0ndmwmfx036y9fxfhdufta3mn95ta9xw34ynlwg7euxjck85ysq0gfqqqqq7u6egqrhxk2qqn3qqcqzpgdq2w3jhxap3xv9qyyssqfahd64hu0lffl7cw2e4evu400s09yeupypvnfjvjjyq8rh05y9gzd3dqnmkvuyd9jszyhmdey75dujz8xaufgahsxkqktf3wxny8ghsqpk4mg8";
 
-    const { amountMSats, fallbackAddress, paymentHash } =
+    const { amountMSats, fallbackAddress, paymentHash, signedPayeePubkey } =
       decodeInvoice(invoice);
 
     expect(amountMSats).toBe(1300000n);
@@ -111,5 +145,35 @@ describe("spark bolt11 invoice decoding", () => {
     expect(paymentHash).toBe(
       "178bc72279f0a62f683f4bc1511b773ae2eb674884f74b4f5ebd61d58509fdb7",
     );
+    expect(signedPayeePubkey).toBe(
+      "03c255413d9d192576a938228826043803a7efb9e1847a1f1433eec5d38f0bee59",
+    );
+  });
+
+  // Word 265 is the spark receiver pubkey in the sentinel route hint, the field a
+  // preferSpark payment is routed to.
+  it("rejects an invoice whose spark fallback was rewritten in transit", () => {
+    const invoice =
+      "lnbc13u1p5xalmkpp5z79uwgne7znz76plf0q4zxmh8t3wke6gsnm5kn67h4satpgflkmssp5azht5ywc5s4m40jf9h0nwlr959a34n72pns50lfm93zz8lvs7nqsxq9z0rgqnp4q0p92sfan5vj2a4f8q3gsfsy8qp60maeuxz858c5x0hvt5u0p0h9jr9yqtqd37k2ya0pv8pqeyjs4lklcexjyw600g9qqp62r4j0ph8fcmlfwqqqqzfv7u6g85qqqqqqqqqqthqq9qpz9cat0ndmwmfx036y9fxfhdufta3mn95ta9xw34ynlwg7euxjck85ysq0gfqqqqq7u6egqrhxk2qqn3qqcqzpgdq2w3jhxap3xv9qyyssqfahd64hu0lffl7cw2e4evu400s09yeupypvnfjvjjyq8rh05y9gzd3dqnmkvuyd9jszyhmdey75dujz8xaufgahsxkqktf3wxny8ghsqpk4mg8";
+
+    expect(() => {
+      decodeInvoice(tamperWithInvoice(invoice, 265));
+    }).toThrow("Invoice signature does not match invoice payee");
+  });
+
+  it("rejects an invoice with a malformed signature", () => {
+    const invoice =
+      "lnbc13u1p5xalmkpp5z79uwgne7znz76plf0q4zxmh8t3wke6gsnm5kn67h4satpgflkmssp5azht5ywc5s4m40jf9h0nwlr959a34n72pns50lfm93zz8lvs7nqsxq9z0rgqnp4q0p92sfan5vj2a4f8q3gsfsy8qp60maeuxz858c5x0hvt5u0p0h9jr9yqtqd37k2ya0pv8pqeyjs4lklcexjyw600g9qqp62r4j0ph8fcmlfwqqqqzfv7u6g85qqqqqqqqqqthqq9qpz9cat0ndmwmfx036y9fxfhdufta3mn95ta9xw34ynlwg7euxjck85ysq0gfqqqqq7u6egqrhxk2qqn3qqcqzpgdq2w3jhxap3xv9qyyssqfahd64hu0lffl7cw2e4evu400s09yeupypvnfjvjjyq8rh05y9gzd3dqnmkvuyd9jszyhmdey75dujz8xaufgahsxkqktf3wxny8ghsqpk4mg8";
+
+    expect(() => {
+      decodeInvoice(corruptInvoiceSignature(invoice));
+    }).toThrow("Invalid signature found in invoice");
+  });
+
+  it("reports no signed payee for invoices without a payee tag", () => {
+    const invoice =
+      "lnbc2500u1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qrsgquk0rl77nj30yxdy8j9vdx85fkpmdla2087ne0xh8nhedh8w27kyke0lp53ut353s06fv3qfegext0eh0ymjpf39tuven09sam30g4vgpfna3rh";
+
+    expect(decodeInvoice(invoice).signedPayeePubkey).toBeUndefined();
   });
 });

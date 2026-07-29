@@ -3916,6 +3916,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       return undefined;
     }
 
+    // Only the BOLT-11 signature binds this fallback to the payee, so with no
+    // payee tag to verify against, the address is unauthenticated. Warn rather
+    // than refuse until we know how many invoices that affects.
+    if (!decodedInvoice.signedPayeePubkey) {
+      this.logger.warn(
+        "Invoice has no payee tag, so its spark fallback address is unauthenticated",
+      );
+    }
+
     // Try bech32m spark address/invoice first
     // Auto-detect network from spark address prefix since REGTEST and LOCAL
     // share the same lightning invoice prefix (lnbcrt) but have different
