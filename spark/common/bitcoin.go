@@ -496,12 +496,12 @@ func ValidatePushBytes(script *bytes.Buffer) error {
 	return nil
 }
 
-// ReadBytes reads exactly 'want' bytes from the buffer.
+// ReadBytes reads exactly numBytes bytes from the buffer.
 // Returns an error if insufficient data is available.
-func ReadBytes(buf *bytes.Buffer, want int) ([]byte, error) {
-	asBytes := buf.Next(want)
-	if len(asBytes) != want {
-		return nil, fmt.Errorf("insufficient data: expected %d byte(s), got %d", want, len(asBytes))
+func ReadBytes(buf *bytes.Buffer, numBytes int) ([]byte, error) {
+	asBytes := buf.Next(numBytes)
+	if len(asBytes) != numBytes {
+		return nil, fmt.Errorf("insufficient data: expected %d byte(s), got %d", numBytes, len(asBytes))
 	}
 	return asBytes, nil
 }
