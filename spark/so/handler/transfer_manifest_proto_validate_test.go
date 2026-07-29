@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"math/rand/v2"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/ent"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,7 +134,7 @@ func TestStartTransferV3Request_RejectsMalformedManifest(t *testing.T) {
 
 // A sender must never be told a transfer was bound when nothing verified it. The guard runs
 // before any DB work, so no database setup is needed.
-func TestStartTransferV3_ManifestMaterialIsRefused(t *testing.T) {
+func TestStartTransferV3_RejectsOnlyAStraySignature(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{60})
 	sender := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	receiver := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -180,31 +184,31 @@ func TestStartTransferV3_ManifestMaterialIsRefused(t *testing.T) {
 		}
 	}
 
+	// start_transfer_v3 no longer refuses a manifest — it binds one when supplied and demands
+	// nothing. The only manifest shape it rejects outright is a signature with nothing to sign.
 	tests := []struct {
-		name       string
-		req        *pb.StartTransferV3Request
-		wantRefuse bool
+		name     string
+		req      *pb.StartTransferV3Request
+		wantCode codes.Code
+		wantMsg  string
 	}{
-		{"neither", request(false, nil, 1), false},
-		{"manifest only", request(true, nil, 1), true},
-		{"signature only", request(false, []byte{0x30, 0x44}, 1), true},
-		{"both", request(true, []byte{0x30, 0x44}, 1), true},
-		// The knob is off here, so Unimplemented proves the refusal ran before the
-		// receiver gate, which would have returned FailedPrecondition.
-		{"manifest with multiple receivers", request(true, nil, 2), true},
+		{"neither", request(false, nil, 1), codes.OK, ""},
+		{"manifest only", request(true, nil, 1), codes.OK, ""},
+		{"signature only", request(false, []byte{0x30, 0x44}, 1), codes.InvalidArgument, "manifest_hash_signature set without a transfer_manifest"},
+		{"both", request(true, []byte{0x30, 0x44}, 1), codes.OK, ""},
+		{"manifest with multiple receivers", request(true, nil, 2), codes.OK, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := handler.StartTransferV3(t.Context(), tc.req)
 			require.Error(t, err, "every case fails eventually; only the reason differs")
-			if tc.wantRefuse {
-				assert.Equal(t, codes.Unimplemented, status.Code(err))
-				assert.Contains(t, err.Error(), "transfer manifest binding is not yet implemented")
+			if tc.wantCode != codes.OK {
+				assert.Equal(t, tc.wantCode, status.Code(err))
+				assert.Contains(t, err.Error(), tc.wantMsg)
 				return
 			}
-			// Passes the guard and fails further in, where real work begins.
-			assert.NotEqual(t, codes.Unimplemented, status.Code(err))
-			assert.NotContains(t, err.Error(), "transfer manifest binding")
+			// Passes the gate and fails further in, where real work begins.
+			assert.NotContains(t, err.Error(), "manifest_hash_signature set without")
 		})
 	}
 }
@@ -287,4 +291,148 @@ func TestInitiatePreimageSwapV4Request_ValidatesInput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// start_transfer_v3 is the generic transfer path: it binds a manifest when given one, and never
+// requires one. Each fee flow requires the manifest on its own endpoint instead.
+func TestRejectStrayManifestSignature(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{61})
+	sender := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiver := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	transferID := uuid.New().String()
+
+	pkg := func(sig []byte) *pb.SenderTransferPackage {
+		return &pb.SenderTransferPackage{
+			OwnerIdentityPublicKey:     sender.Serialize(),
+			TransferPackage:            &pb.TransferPackage{},
+			ReceiverIdentityPublicKeys: map[string][]byte{"leaf-1": receiver.Serialize()},
+			ManifestHashSignature:      sig,
+		}
+	}
+	manifest := &pb.TransferManifest{
+		Version:    1,
+		TransferId: transferID,
+		Network:    pb.Network_REGTEST,
+		Edges: []*pb.ManifestEdge{{
+			SenderIdentityPublicKey:   sender.Serialize(),
+			ReceiverIdentityPublicKey: receiver.Serialize(),
+			Amount:                    &pb.ManifestAmount{Amount: &pb.ManifestAmount_Sats{Sats: 1000}},
+		}},
+	}
+
+	t.Run("a manifest alone is admitted", func(t *testing.T) {
+		require.NoError(t, rejectStrayManifestSignature(&pb.StartTransferV3Request{
+			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg(nil)}, TransferManifest: manifest,
+		}))
+	})
+
+	t.Run("a manifest with its signature is admitted", func(t *testing.T) {
+		require.NoError(t, rejectStrayManifestSignature(&pb.StartTransferV3Request{
+			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg([]byte{0x30, 0x44})}, TransferManifest: manifest,
+		}))
+	})
+
+	t.Run("a signature with no manifest is refused", func(t *testing.T) {
+		err := rejectStrayManifestSignature(&pb.StartTransferV3Request{
+			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg([]byte{0x30, 0x44})},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	t.Run("no manifest material at all is admitted", func(t *testing.T) {
+		require.NoError(t, rejectStrayManifestSignature(&pb.StartTransferV3Request{
+			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg(nil)},
+		}))
+	})
+}
+
+// The single manifest gate on the Prepare path: it no-ops for a feeless caller, and still catches
+// a signature with nothing to sign now that Prepare no longer checks that separately.
+func TestBindManifestIfPresentWithoutAManifest(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{62})
+	sender := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	t.Run("no manifest material at all is a no-op", func(t *testing.T) {
+		req := &pb.StartTransferV3Request{TransferId: uuid.New().String()}
+
+		require.NoError(t, bindManifestIfPresent(req, btcnetwork.Regtest, nil))
+	})
+
+	t.Run("a stray signature is still refused", func(t *testing.T) {
+		req := &pb.StartTransferV3Request{
+			TransferId: uuid.New().String(),
+			SenderPackages: []*pb.SenderTransferPackage{{
+				OwnerIdentityPublicKey: sender.Serialize(),
+				ManifestHashSignature:  []byte{0x30, 0x44},
+			}},
+		}
+
+		err := bindManifestIfPresent(req, btcnetwork.Regtest, nil)
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+}
+
+// The binding's own rules are covered where it lives; what is pinned here is the wiring — that a
+// manifest on the request reaches it at all, and that the owner and value it is judged against
+// come from the locked rows rather than from anything the requester supplied.
+func TestBindManifestIfPresentBindsAgainstTheLockedRows(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{63})
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	transferID := uuid.New().String()
+	const leafID = "leaf-a"
+	const leafSats = 1000
+
+	signedRequest := func(t *testing.T) *pb.StartTransferV3Request {
+		t.Helper()
+		manifest := &pb.TransferManifest{
+			Version:    1,
+			TransferId: transferID,
+			Network:    pb.Network_REGTEST,
+			Edges: []*pb.ManifestEdge{{
+				SenderIdentityPublicKey:   senderKey.Public().Serialize(),
+				ReceiverIdentityPublicKey: receiver.Serialize(),
+				Amount:                    &pb.ManifestAmount{Amount: &pb.ManifestAmount_Sats{Sats: leafSats}},
+			}},
+		}
+		hash, err := common.HashTransferManifest(manifest)
+		require.NoError(t, err)
+
+		return &pb.StartTransferV3Request{
+			TransferId: transferID,
+			SenderPackages: []*pb.SenderTransferPackage{{
+				OwnerIdentityPublicKey:     senderKey.Public().Serialize(),
+				ReceiverIdentityPublicKeys: map[string][]byte{leafID: receiver.Serialize()},
+				ManifestHashSignature:      ecdsa.Sign(senderKey.ToBTCEC(), hash).Serialize(),
+			}},
+			TransferManifest: manifest,
+		}
+	}
+	lockedLeaves := func(owner keys.Public, valueSats uint64) map[string]*ent.TreeNode {
+		return map[string]*ent.TreeNode{leafID: {OwnerIdentityPubkey: owner, Value: valueSats}}
+	}
+
+	t.Run("a manifest covering the locked rows binds", func(t *testing.T) {
+		err := bindManifestIfPresent(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats))
+
+		require.NoError(t, err)
+	})
+
+	t.Run("a manifest disagreeing with the locked value is refused", func(t *testing.T) {
+		err := bindManifestIfPresent(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats-1))
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	t.Run("a manifest disagreeing with the locked owner is refused", func(t *testing.T) {
+		otherOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+		err := bindManifestIfPresent(signedRequest(t), btcnetwork.Regtest, lockedLeaves(otherOwner, leafSats))
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
 }

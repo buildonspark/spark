@@ -61,14 +61,17 @@ func convertV2ToV3SendTransferRequest(req *pb.StartTransferRequest) *pb.StartTra
 	}
 }
 
-// Accepting a manifest nothing verifies would hand back a guarantee this operator cannot make.
-func rejectUnboundTransferManifest(req *pb.StartTransferV3Request) error {
+// A signature with no manifest covers nothing at all, so it is refused rather than ignored — a
+// sender that sent one believes something was bound. Presence of the manifest itself is not
+// required here: start_transfer_v3 is the generic path, and each fee flow requires the manifest on
+// its own endpoint.
+func rejectStrayManifestSignature(req *pb.StartTransferV3Request) error {
 	if req.GetTransferManifest() != nil {
-		return sparkerrors.UnimplementedFeatureIncomplete(fmt.Errorf("transfer manifest binding is not yet implemented"))
+		return nil
 	}
 	for _, senderPkg := range req.GetSenderPackages() {
 		if len(senderPkg.GetManifestHashSignature()) > 0 {
-			return sparkerrors.UnimplementedFeatureIncomplete(fmt.Errorf("transfer manifest binding is not yet implemented"))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("manifest_hash_signature set without a transfer_manifest"))
 		}
 	}
 	return nil
@@ -118,7 +121,7 @@ func (h *TransferHandler) startTransferV3Consensus(
 		return nil, err
 	}
 
-	if err := rejectUnboundTransferManifest(req); err != nil {
+	if err := rejectStrayManifestSignature(req); err != nil {
 		return nil, err
 	}
 
