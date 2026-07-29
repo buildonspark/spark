@@ -10,6 +10,7 @@ export * from "./network.js";
 export * from "./proof.js";
 export * from "./response-validation.js";
 export * from "./secret-sharing.js";
+export * from "./signature.js";
 export * from "./signing.js";
 export * from "./spark-invoice-comparison.js";
 export * from "./token-hashing.js";
