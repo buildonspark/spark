@@ -3546,23 +3546,23 @@ func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) 
 	// The cpfp loop is not the only one the refactor rewired. Routing the mismatch through the
 	// direct paths keeps a lookup that is wrong there — or absent — from passing unnoticed.
 	for _, path := range []struct {
-		name    string
-		place   func(job *pb.UserSignedTxSigningJob) (direct, directFromCpfp []*pb.UserSignedTxSigningJob)
-		wantErr string
+		name               string
+		place              func(job *pb.UserSignedTxSigningJob) (direct, directFromCpfp []*pb.UserSignedTxSigningJob)
+		expectedErrMessage string
 	}{
 		{
 			name: "direct",
 			place: func(j *pb.UserSignedTxSigningJob) ([]*pb.UserSignedTxSigningJob, []*pb.UserSignedTxSigningJob) {
 				return []*pb.UserSignedTxSigningJob{j}, none
 			},
-			wantErr: "invalid direct destination pubkey",
+			expectedErrMessage: "invalid direct destination pubkey",
 		},
 		{
 			name: "direct from cpfp",
 			place: func(j *pb.UserSignedTxSigningJob) ([]*pb.UserSignedTxSigningJob, []*pb.UserSignedTxSigningJob) {
 				return none, []*pb.UserSignedTxSigningJob{j}
 			},
-			wantErr: "invalid direct from cpfp destination pubkey",
+			expectedErrMessage: "invalid direct from cpfp destination pubkey",
 		},
 	} {
 		// The refund deliberately pays the COUNTERPARTY while the map routes its leaf to alice.
@@ -3579,7 +3579,7 @@ func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) 
 
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.Contains(t, err.Error(), path.wantErr)
+			require.Contains(t, err.Error(), path.expectedErrMessage)
 		})
 
 		t.Run(path.name+" refuses a leaf missing from the map", func(t *testing.T) {
