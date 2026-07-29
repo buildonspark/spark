@@ -18,6 +18,7 @@ linters:
     - loggercheck # Checks for key value pairs in zap.
     - mirror # Replaces e.g. someRegex.Match([]byte(str)) with someRegex.MatchString(str)
     - modernize
+    - namelint # Custom: reports identifiers named got/want instead of for the value they hold (requires custom-built binary)
     - nolintlint
     - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL
     - predeclared # Finds code that shadows one of Go's predeclared identifiers
@@ -46,6 +47,9 @@ linters:
       fmtlint:
         type: module
         description: Reports redundant or incorrect formatting of printf-style arguments and zap fields.
+      namelint:
+        type: module
+        description: Reports identifiers named got/want instead of for the value they hold.
     depguard:
       rules:
         logging:

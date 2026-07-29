@@ -1,10 +1,10 @@
 [tasks]
 build = "go build -tags=lightspark ./bin/operator"
 build-oss = "go build ./bin/operator"
-# Builds the custom golangci-lint binary (with the fmtlint plugin). mise reruns this only when a source is newer than
-# the binary: the plugin package (tools/fmtlint/*.go) or the pinned golangci-lint version (.custom-gcl.yml). So edits to
-# fmtlint or a version bump rebuild automatically — no stale binary, no manual delete.
-lint-build = { sources = ["tools/fmtlint/*.go", ".custom-gcl.yml"], outputs = ["bin/golangci-lint-spark"], run = "golangci-lint custom" }
+# Builds the custom golangci-lint binary (with the fmtlint and namelint plugins). mise reruns this only when a source is
+# newer than the binary: either plugin package or the pinned golangci-lint version (.custom-gcl.yml). So edits to a
+# plugin or a version bump rebuild automatically — no stale binary, no manual delete.
+lint-build = { sources = ["tools/fmtlint/*.go", "tools/namelint/*.go", ".custom-gcl.yml"], outputs = ["bin/golangci-lint-spark"], run = "golangci-lint custom" }
 # golangci-lint runs last so extra CLI args (e.g. `mise lint --fix`) are appended to it, not entfieldlint.
 lint = { depends = ["lint-build"], run = "go run ./tools/entfieldlint/cmd/entfieldlint check && ./bin/golangci-lint-spark run" }
 # Sadly, `mise fmt` is a built in command
