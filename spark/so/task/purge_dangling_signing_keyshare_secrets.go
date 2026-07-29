@@ -360,11 +360,32 @@ func purgeDanglingSigningKeyshareSecretsCursorKey(operatorIndex uint64) string {
 }
 
 func newPurgeDanglingSigningKeyshareSecretsMemcacheClient(cacheURI string) *memcache.Client {
-	addr := strings.TrimPrefix(cacheURI, "memcaches://")
-	addr = strings.TrimPrefix(addr, "memcache://")
-	mc := memcache.New(addr)
+	addrs := parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(cacheURI)
+	if len(addrs) == 0 {
+		return nil
+	}
+	mc := memcache.New(addrs...)
 	mc.Timeout = 2 * time.Second
 	return mc
+}
+
+// parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs splits a CacheURI into
+// individual server addresses. The URI carries an optional scheme and may list
+// several servers, e.g. memcaches://host:11211,host2:11211 — gomemcache resolves
+// each address separately, so a comma-joined string handed to it whole never
+// connects. Every cursor operation then fails and this task silently restarts at
+// the oldest row on each run, never reaching the tail of the table.
+func parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(cacheURI string) []string {
+	addrs := make([]string, 0, 1)
+	for addr := range strings.SplitSeq(cacheURI, ",") {
+		addr = strings.TrimSpace(addr)
+		addr = strings.TrimPrefix(addr, "memcaches://")
+		addr = strings.TrimPrefix(addr, "memcache://")
+		if addr != "" {
+			addrs = append(addrs, addr)
+		}
+	}
+	return addrs
 }
 
 // loadPurgeDanglingSigningKeyshareSecretsCursor returns the persisted scan
