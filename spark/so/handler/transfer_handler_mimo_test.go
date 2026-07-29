@@ -299,48 +299,48 @@ func TestClaimTransferMIMO_ReceiverNotClaimableStatus(t *testing.T) {
 
 func TestValidateTransferReadyForReceiverClaim(t *testing.T) {
 	tests := []struct {
-		name      string
-		status    st.TransferStatus
-		wantError bool
-		errSubstr string
+		name          string
+		status        st.TransferStatus
+		expectedError bool
+		errSubstr     string
 	}{
 		// Pre-SENDER_KEY_TWEAKED: reject
 		{
-			name:      "SenderInitiated",
-			status:    st.TransferStatusSenderInitiated,
-			wantError: true,
-			errSubstr: "not ready for receiver claim",
+			name:          "SenderInitiated",
+			status:        st.TransferStatusSenderInitiated,
+			expectedError: true,
+			errSubstr:     "not ready for receiver claim",
 		},
 		{
-			name:      "SenderInitiatedCoordinator",
-			status:    st.TransferStatusSenderInitiatedCoordinator,
-			wantError: true,
-			errSubstr: "not ready for receiver claim",
+			name:          "SenderInitiatedCoordinator",
+			status:        st.TransferStatusSenderInitiatedCoordinator,
+			expectedError: true,
+			errSubstr:     "not ready for receiver claim",
 		},
 		{
-			name:      "SenderKeyTweakPending",
-			status:    st.TransferStatusSenderKeyTweakPending,
-			wantError: true,
-			errSubstr: "not ready for receiver claim",
+			name:          "SenderKeyTweakPending",
+			status:        st.TransferStatusSenderKeyTweakPending,
+			expectedError: true,
+			errSubstr:     "not ready for receiver claim",
 		},
 		{
-			name:      "ApplyingSenderKeyTweak",
-			status:    st.TransferStatusApplyingSenderKeyTweak,
-			wantError: true,
-			errSubstr: "not ready for receiver claim",
+			name:          "ApplyingSenderKeyTweak",
+			status:        st.TransferStatusApplyingSenderKeyTweak,
+			expectedError: true,
+			errSubstr:     "not ready for receiver claim",
 		},
 		// Terminal: reject
 		{
-			name:      "Expired",
-			status:    st.TransferStatusExpired,
-			wantError: true,
-			errSubstr: "terminal state",
+			name:          "Expired",
+			status:        st.TransferStatusExpired,
+			expectedError: true,
+			errSubstr:     "terminal state",
 		},
 		{
-			name:      "Returned",
-			status:    st.TransferStatusReturned,
-			wantError: true,
-			errSubstr: "terminal state",
+			name:          "Returned",
+			status:        st.TransferStatusReturned,
+			expectedError: true,
+			errSubstr:     "terminal state",
 		},
 		// SENDER_KEY_TWEAKED and later: allow
 		{name: "SenderKeyTweaked", status: st.TransferStatusSenderKeyTweaked},
@@ -358,7 +358,7 @@ func TestValidateTransferReadyForReceiverClaim(t *testing.T) {
 				Status: tc.status,
 			}
 			err := validateTransferReadyForReceiverClaim(transfer)
-			if tc.wantError {
+			if tc.expectedError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errSubstr)
 			} else {
@@ -1488,18 +1488,18 @@ func TestMimoReceiverStatusAuthoritative(t *testing.T) {
 	knobOff := map[string]float64{}
 
 	t.Run("knob on, multi-receiver is receiver-authoritative", func(t *testing.T) {
-		got, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(2))
+		authoritative, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(2))
 		require.NoError(t, err)
-		assert.True(t, got)
+		assert.True(t, authoritative)
 	})
 	t.Run("knob on, single-receiver is not authoritative", func(t *testing.T) {
-		got, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(1))
+		authoritative, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(1))
 		require.NoError(t, err)
-		assert.False(t, got)
+		assert.False(t, authoritative)
 	})
 	t.Run("knob off, multi-receiver is not authoritative", func(t *testing.T) {
-		got, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOff), buildTransfer(2))
+		authoritative, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOff), buildTransfer(2))
 		require.NoError(t, err)
-		assert.False(t, got)
+		assert.False(t, authoritative)
 	})
 }

@@ -933,65 +933,65 @@ func TestRequiresFinalizeRefundSignatureForUnsignedActiveRefunds(t *testing.T) {
 	unsignedRefundTx := createTestTxBytes(t, 900)
 
 	tests := []struct {
-		name   string
-		node   *ent.TreeNode
-		intent pbcommon.SignatureIntent
-		want   bool
+		name             string
+		node             *ent.TreeNode
+		intent           pbcommon.SignatureIntent
+		expectedRequired bool
 	}{
 		{
-			name:   "creation creating unsigned refund",
-			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusCreating},
-			intent: pbcommon.SignatureIntent_CREATION,
-			want:   true,
+			name:             "creation creating unsigned refund",
+			node:             &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusCreating},
+			intent:           pbcommon.SignatureIntent_CREATION,
+			expectedRequired: true,
 		},
 		{
-			name:   "transfer locked unsigned refund",
-			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusTransferLocked},
-			intent: pbcommon.SignatureIntent_TRANSFER,
-			want:   true,
+			name:             "transfer locked unsigned refund",
+			node:             &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusTransferLocked},
+			intent:           pbcommon.SignatureIntent_TRANSFER,
+			expectedRequired: true,
 		},
 		{
-			name:   "transfer frozen by issuer unsigned refund",
-			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusFrozenByIssuer},
-			intent: pbcommon.SignatureIntent_TRANSFER,
-			want:   true,
+			name:             "transfer frozen by issuer unsigned refund",
+			node:             &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusFrozenByIssuer},
+			intent:           pbcommon.SignatureIntent_TRANSFER,
+			expectedRequired: true,
 		},
 		{
-			name:   "transfer renew locked unsigned refund",
-			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusRenewLocked},
-			intent: pbcommon.SignatureIntent_TRANSFER,
-			want:   true,
+			name:             "transfer renew locked unsigned refund",
+			node:             &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusRenewLocked},
+			intent:           pbcommon.SignatureIntent_TRANSFER,
+			expectedRequired: true,
 		},
 		{
-			name:   "transfer available replay",
-			node:   &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusAvailable},
-			intent: pbcommon.SignatureIntent_TRANSFER,
-			want:   false,
+			name:             "transfer available replay",
+			node:             &ent.TreeNode{RawRefundTx: unsignedRefundTx, Status: st.TreeNodeStatusAvailable},
+			intent:           pbcommon.SignatureIntent_TRANSFER,
+			expectedRequired: false,
 		},
 		{
-			name:   "no refund tx",
-			node:   &ent.TreeNode{Status: st.TreeNodeStatusTransferLocked},
-			intent: pbcommon.SignatureIntent_TRANSFER,
-			want:   false,
+			name:             "no refund tx",
+			node:             &ent.TreeNode{Status: st.TreeNodeStatusTransferLocked},
+			intent:           pbcommon.SignatureIntent_TRANSFER,
+			expectedRequired: false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := requiresFinalizeRefundSignature(test.node, test.intent)
+			required, err := requiresFinalizeRefundSignature(test.node, test.intent)
 			require.NoError(t, err)
-			require.Equal(t, test.want, got)
+			require.Equal(t, test.expectedRequired, required)
 		})
 	}
 }
 
 func TestRequiresFinalizeRefundSignatureRejectsMalformedStoredRefund(t *testing.T) {
-	got, err := requiresFinalizeRefundSignature(&ent.TreeNode{
+	required, err := requiresFinalizeRefundSignature(&ent.TreeNode{
 		ID:          uuid.New(),
 		RawRefundTx: []byte("not a transaction"),
 		Status:      st.TreeNodeStatusTransferLocked,
 	}, pbcommon.SignatureIntent_TRANSFER)
-	require.False(t, got)
+	require.False(t, required)
 	require.ErrorContains(t, err, "stored raw refund tx")
 }
 

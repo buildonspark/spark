@@ -280,15 +280,15 @@ func TestBindManifestAcceptsTheCollapsedEdgeForADualRoleKey(t *testing.T) {
 
 func TestBindManifestExactCoverViolations(t *testing.T) {
 	tests := map[string]struct {
-		mutate  func(*bindingFixture)
-		wantErr error
+		mutate      func(*bindingFixture)
+		expectedErr error
 	}{
 		"declared edge that moves no leaves": {
 			mutate: func(f *bindingFixture) {
 				orphan := keys.GeneratePrivateKey().Public()
 				f.manifest.Edges = append(f.manifest.Edges, edge(f.senders[0].key.Public(), orphan, 50))
 			},
-			wantErr: ErrManifestEdgeNotRealized,
+			expectedErr: ErrManifestEdgeNotRealized,
 		},
 		// Every declared edge stays realized here, so only the extra pair can be what fails —
 		// otherwise this would also trip the edge-not-realized check and prove nothing.
@@ -297,29 +297,29 @@ func TestBindManifestExactCoverViolations(t *testing.T) {
 				stray := keys.GeneratePrivateKey().Public()
 				f.senders[0].leafs = append(f.senders[0].leafs, leafSpec{id: "leaf-stray", receiver: stray, sats: 75})
 			},
-			wantErr: ErrManifestUnlistedTransfer,
+			expectedErr: ErrManifestUnlistedTransfer,
 		},
 		"edge amount above what the leaves move": {
-			mutate:  func(f *bindingFixture) { f.manifest.Edges[0].Amount = satsOf(601) },
-			wantErr: ErrManifestAmountMismatch,
+			mutate:      func(f *bindingFixture) { f.manifest.Edges[0].Amount = satsOf(601) },
+			expectedErr: ErrManifestAmountMismatch,
 		},
 		"edge amount below what the leaves move": {
-			mutate:  func(f *bindingFixture) { f.manifest.Edges[0].Amount = satsOf(599) },
-			wantErr: ErrManifestAmountMismatch,
+			mutate:      func(f *bindingFixture) { f.manifest.Edges[0].Amount = satsOf(599) },
+			expectedErr: ErrManifestAmountMismatch,
 		},
 		"server-side leaf no package routes": {
-			mutate:  func(f *bindingFixture) { f.extraLeafSats["leaf-stray"] = 25 },
-			wantErr: ErrManifestLeafNotRouted,
+			mutate:      func(f *bindingFixture) { f.extraLeafSats["leaf-stray"] = 25 },
+			expectedErr: ErrManifestLeafNotRouted,
 		},
 		"routed leaf with no server-side value": {
-			mutate:  func(f *bindingFixture) { f.dropLeafSats["leaf-b"] = true },
-			wantErr: ErrManifestUnknownLeaf,
+			mutate:      func(f *bindingFixture) { f.dropLeafSats["leaf-b"] = true },
+			expectedErr: ErrManifestUnknownLeaf,
 		},
 		"edge denominated in bps": {
 			mutate: func(f *bindingFixture) {
 				f.manifest.Edges[0].Amount = &spark.ManifestAmount{Amount: &spark.ManifestAmount_Bps{Bps: 100}}
 			},
-			wantErr: ErrManifestNonSatsEdge,
+			expectedErr: ErrManifestNonSatsEdge,
 		},
 	}
 
@@ -327,7 +327,7 @@ func TestBindManifestExactCoverViolations(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newBindingFixture(t)
 			test.mutate(f)
-			require.ErrorIs(t, f.bind(), test.wantErr)
+			require.ErrorIs(t, f.bind(), test.expectedErr)
 		})
 	}
 }
@@ -338,22 +338,22 @@ func satsOf(sats uint64) *spark.ManifestAmount {
 
 func TestBindManifestSignatureFailures(t *testing.T) {
 	tests := map[string]struct {
-		mutate  func(*bindingFixture)
-		wantErr error
+		mutate      func(*bindingFixture)
+		expectedErr error
 	}{
 		"signed by a key that is not the sender": {
-			mutate:  func(f *bindingFixture) { f.signWith[0] = keys.GeneratePrivateKey() },
-			wantErr: ErrManifestInvalidSignature,
+			mutate:      func(f *bindingFixture) { f.signWith[0] = keys.GeneratePrivateKey() },
+			expectedErr: ErrManifestInvalidSignature,
 		},
 		"no signature at all": {
-			mutate:  func(f *bindingFixture) { f.omitSignature[0] = true },
-			wantErr: ErrManifestMissingSignature,
+			mutate:      func(f *bindingFixture) { f.omitSignature[0] = true },
+			expectedErr: ErrManifestMissingSignature,
 		},
 		"malformed signature bytes": {
 			mutate: func(f *bindingFixture) {
 				f.mangleSignature[0] = func(sig []byte) []byte { return []byte{0x01, 0x02, 0x03} }
 			},
-			wantErr: ErrManifestInvalidSignature,
+			expectedErr: ErrManifestInvalidSignature,
 		},
 	}
 
@@ -361,7 +361,7 @@ func TestBindManifestSignatureFailures(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newBindingFixture(t)
 			test.mutate(f)
-			require.ErrorIs(t, f.bind(), test.wantErr)
+			require.ErrorIs(t, f.bind(), test.expectedErr)
 		})
 	}
 }

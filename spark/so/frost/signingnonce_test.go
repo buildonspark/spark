@@ -74,34 +74,34 @@ func TestSigningNonce_Scan(t *testing.T) {
 	data := nonce.MarshalBinary()
 
 	tests := []struct {
-		name  string
-		input any
-		want  SigningNonce
+		name          string
+		input         any
+		expectedNonce SigningNonce
 	}{
 		{
-			name:  "valid nonce",
-			input: data,
-			want:  nonce,
+			name:          "valid nonce",
+			input:         data,
+			expectedNonce: nonce,
 		},
 		{
-			name:  "valid wrapped nonce",
-			input: &sql.Null[[]byte]{V: data, Valid: true},
-			want:  nonce,
+			name:          "valid wrapped nonce",
+			input:         &sql.Null[[]byte]{V: data, Valid: true},
+			expectedNonce: nonce,
 		},
 		{
-			name:  "nil value",
-			input: nil,
-			want:  SigningNonce{},
+			name:          "nil value",
+			input:         nil,
+			expectedNonce: SigningNonce{},
 		},
 		{
-			name:  "nil sql.Null",
-			input: (*sql.Null[[]byte])(nil),
-			want:  SigningNonce{},
+			name:          "nil sql.Null",
+			input:         (*sql.Null[[]byte])(nil),
+			expectedNonce: SigningNonce{},
 		},
 		{
-			name:  "null value",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  SigningNonce{},
+			name:          "null value",
+			input:         &sql.Null[[]byte]{Valid: false},
+			expectedNonce: SigningNonce{},
 		},
 	}
 
@@ -111,25 +111,25 @@ func TestSigningNonce_Scan(t *testing.T) {
 			err := dest.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, *dest)
+			assert.Equal(t, tt.expectedNonce, *dest)
 		})
 	}
 }
 
 func TestSigningNonce_Scan_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   any
-		wantMsg string
+		name        string
+		input       any
+		expectedMsg string
 	}{
-		{name: "not bytes", input: "not bytes", wantMsg: "unexpected input for Scan: string"},
-		{name: "invalid bytes", input: make([]byte, 65), wantMsg: "failed to scan SigningNonce"},
+		{name: "not bytes", input: "not bytes", expectedMsg: "unexpected input for Scan: string"},
+		{name: "invalid bytes", input: make([]byte, 65), expectedMsg: "failed to scan SigningNonce"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nonce := &SigningNonce{}
 			err := nonce.Scan(tt.input)
-			require.ErrorContains(t, err, tt.wantMsg)
+			require.ErrorContains(t, err, tt.expectedMsg)
 		})
 	}
 }
@@ -166,39 +166,39 @@ func TestSigningNonce_UnmarshalBinary(t *testing.T) {
 func TestSigningNonce_UnmarshalBinary_InvalidInput_Errors(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:    "nil",
-			input:   nil,
-			wantErr: "invalid nonce length 0",
+			name:        "nil",
+			input:       nil,
+			expectedErr: "invalid nonce length 0",
 		},
 		{
-			name:    "empty",
-			input:   []byte{},
-			wantErr: "invalid nonce length 0",
+			name:        "empty",
+			input:       []byte{},
+			expectedErr: "invalid nonce length 0",
 		},
 		{
-			name:    "too short",
-			input:   make([]byte, 63),
-			wantErr: "invalid nonce length 63",
+			name:        "too short",
+			input:       make([]byte, 63),
+			expectedErr: "invalid nonce length 63",
 		},
 		{
-			name:    "too long",
-			input:   make([]byte, 65),
-			wantErr: "invalid nonce length 65",
+			name:        "too long",
+			input:       make([]byte, 65),
+			expectedErr: "invalid nonce length 65",
 		},
 		{
-			name:    "invalid binding",
-			input:   append(make([]byte, 32), keys.MustGeneratePrivateKeyFromRand(rng).Serialize()...),
-			wantErr: "invalid signing nonce binding",
+			name:        "invalid binding",
+			input:       append(make([]byte, 32), keys.MustGeneratePrivateKeyFromRand(rng).Serialize()...),
+			expectedErr: "invalid signing nonce binding",
 		},
 		{
-			name:    "invalid hiding",
-			input:   append(keys.MustGeneratePrivateKeyFromRand(rng).Serialize(), make([]byte, 32)...),
-			wantErr: "invalid signing nonce hiding",
+			name:        "invalid hiding",
+			input:       append(keys.MustGeneratePrivateKeyFromRand(rng).Serialize(), make([]byte, 32)...),
+			expectedErr: "invalid signing nonce hiding",
 		},
 	}
 
@@ -206,7 +206,7 @@ func TestSigningNonce_UnmarshalBinary_InvalidInput_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nonce := &SigningNonce{}
 			err := nonce.UnmarshalBinary(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -243,14 +243,14 @@ func TestSigningNonce_UnmarshalProto(t *testing.T) {
 func TestSigningNonce_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tests := []struct {
-		name    string
-		input   *pbfrost.SigningNonce
-		wantErr string
+		name        string
+		input       *pbfrost.SigningNonce
+		expectedErr string
 	}{
 		{
-			name:    "nil proto",
-			input:   nil,
-			wantErr: "nil proto",
+			name:        "nil proto",
+			input:       nil,
+			expectedErr: "nil proto",
 		},
 		{
 			name: "invalid binding",
@@ -258,7 +258,7 @@ func TestSigningNonce_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 				Binding: make([]byte, 32), // all zeros
 				Hiding:  keys.MustGeneratePrivateKeyFromRand(rng).Serialize(),
 			},
-			wantErr: "invalid signing nonce binding",
+			expectedErr: "invalid signing nonce binding",
 		},
 		{
 			name: "invalid hiding",
@@ -266,7 +266,7 @@ func TestSigningNonce_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 				Binding: keys.MustGeneratePrivateKeyFromRand(rng).Serialize(),
 				Hiding:  make([]byte, 32), // all zeros
 			},
-			wantErr: "invalid signing nonce hiding",
+			expectedErr: "invalid signing nonce hiding",
 		},
 	}
 
@@ -274,7 +274,7 @@ func TestSigningNonce_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nonce := &SigningNonce{}
 			err := nonce.UnmarshalProto(tt.input)
-			assert.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

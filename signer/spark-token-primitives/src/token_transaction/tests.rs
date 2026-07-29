@@ -664,11 +664,11 @@ fn hash_partial_token_transaction_matches_shared_hash_cases() {
         }
 
         let hash = hash_partial_token_transaction_impl(&derived_encoded_bytes).unwrap();
-        let got_hex = hex_string(&hash);
+        let actual_hex = hex_string(&hash);
 
         assert_eq!(
             tc.expected_hash.to_ascii_lowercase(),
-            got_hex,
+            actual_hex,
             "hash mismatch for {}",
             tc.name
         );
@@ -876,11 +876,11 @@ fn hash_final_token_transaction_matches_shared_hash_cases() {
         let derived_encoded_bytes = derived_final_transaction.encode_to_vec();
 
         let hash = hash_final_token_transaction_impl(&derived_encoded_bytes).unwrap();
-        let got_hex = hex_string(&hash);
+        let actual_hex = hex_string(&hash);
 
         assert_eq!(
             tc.expected_hash.to_ascii_lowercase(),
-            got_hex,
+            actual_hex,
             "final hash mismatch for {}",
             tc.name
         );

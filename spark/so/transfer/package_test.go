@@ -88,29 +88,29 @@ func TestParsePackage_MinimalValid(t *testing.T) {
 func TestParsePackage_PackageLevelErrors(t *testing.T) {
 	leaf := validSigningJob(t)
 	cases := []struct {
-		name    string
-		pkg     *spark.TransferPackage
-		wantErr error
+		name        string
+		pkg         *spark.TransferPackage
+		expectedErr error
 	}{
 		{
-			name:    "empty key tweak package",
-			pkg:     &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, UserSignature: []byte{0x01}},
-			wantErr: ErrEmptyKeyTweakPackage,
+			name:        "empty key tweak package",
+			pkg:         &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, UserSignature: []byte{0x01}},
+			expectedErr: ErrEmptyKeyTweakPackage,
 		},
 		{
-			name:    "key tweak package too large",
-			pkg:     &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, KeyTweakPackage: map[string][]byte{testOperatorID: make([]byte, MaxKeyTweakPackageSize+1)}, UserSignature: []byte{0x01}},
-			wantErr: ErrKeyTweakPackageTooLarge,
+			name:        "key tweak package too large",
+			pkg:         &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, KeyTweakPackage: map[string][]byte{testOperatorID: make([]byte, MaxKeyTweakPackageSize+1)}, UserSignature: []byte{0x01}},
+			expectedErr: ErrKeyTweakPackageTooLarge,
 		},
 		{
-			name:    "empty user signature",
-			pkg:     &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, KeyTweakPackage: validKeyTweakPackage()},
-			wantErr: ErrEmptyUserSignature,
+			name:        "empty user signature",
+			pkg:         &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, KeyTweakPackage: validKeyTweakPackage()},
+			expectedErr: ErrEmptyUserSignature,
 		},
 		{
-			name:    "user signature too large",
-			pkg:     &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, KeyTweakPackage: validKeyTweakPackage(), UserSignature: make([]byte, MaxSignatureSize+1)},
-			wantErr: ErrUserSignatureTooLarge,
+			name:        "user signature too large",
+			pkg:         &spark.TransferPackage{LeavesToSend: []*spark.UserSignedTxSigningJob{validSigningJob(t)}, KeyTweakPackage: validKeyTweakPackage(), UserSignature: make([]byte, MaxSignatureSize+1)},
+			expectedErr: ErrUserSignatureTooLarge,
 		},
 		{
 			name: "orphan direct leaf",
@@ -120,7 +120,7 @@ func TestParsePackage_PackageLevelErrors(t *testing.T) {
 				KeyTweakPackage:    validKeyTweakPackage(),
 				UserSignature:      []byte{0x01},
 			},
-			wantErr: ErrOrphanLeaf,
+			expectedErr: ErrOrphanLeaf,
 		},
 		{
 			name: "direct-from-cpfp count mismatch",
@@ -130,7 +130,7 @@ func TestParsePackage_PackageLevelErrors(t *testing.T) {
 				KeyTweakPackage:            validKeyTweakPackage(),
 				UserSignature:              []byte{0x01},
 			},
-			wantErr: ErrMismatchedLeafCount,
+			expectedErr: ErrMismatchedLeafCount,
 		},
 		{
 			// Count matches leaves-to-send (2 == 2), but the second entry references a leaf that isn't in
@@ -142,7 +142,7 @@ func TestParsePackage_PackageLevelErrors(t *testing.T) {
 				KeyTweakPackage:            validKeyTweakPackage(),
 				UserSignature:              []byte{0x01},
 			},
-			wantErr: ErrOrphanLeaf,
+			expectedErr: ErrOrphanLeaf,
 		},
 		{
 			name: "unknown hash variant",
@@ -152,13 +152,13 @@ func TestParsePackage_PackageLevelErrors(t *testing.T) {
 				UserSignature:   []byte{0x01},
 				HashVariant:     spark.HashVariant(99),
 			},
-			wantErr: ErrUnknownHashVariant,
+			expectedErr: ErrUnknownHashVariant,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParsePackage(tc.pkg)
-			require.ErrorIs(t, err, tc.wantErr)
+			require.ErrorIs(t, err, tc.expectedErr)
 		})
 	}
 }
@@ -292,41 +292,41 @@ func TestParseRefundSigningJob_FewerSigningInputsThanTxInputs(t *testing.T) {
 
 func TestParseRefundSigningJob_Errors(t *testing.T) {
 	cases := []struct {
-		name    string
-		mutate  func(*spark.UserSignedTxSigningJob)
-		wantErr error
+		name        string
+		mutate      func(*spark.UserSignedTxSigningJob)
+		expectedErr error
 	}{
 		{
-			name:    "invalid leaf id",
-			mutate:  func(j *spark.UserSignedTxSigningJob) { j.LeafId = "not-a-uuid" },
-			wantErr: ErrInvalidLeafID,
+			name:        "invalid leaf id",
+			mutate:      func(j *spark.UserSignedTxSigningJob) { j.LeafId = "not-a-uuid" },
+			expectedErr: ErrInvalidLeafID,
 		},
 		{
-			name:    "invalid signing public key",
-			mutate:  func(j *spark.UserSignedTxSigningJob) { j.SigningPublicKey = []byte{0x00} },
-			wantErr: ErrInvalidSigningPublicKey,
+			name:        "invalid signing public key",
+			mutate:      func(j *spark.UserSignedTxSigningJob) { j.SigningPublicKey = []byte{0x00} },
+			expectedErr: ErrInvalidSigningPublicKey,
 		},
 		{
-			name:    "invalid raw tx",
-			mutate:  func(j *spark.UserSignedTxSigningJob) { j.RawTx = []byte{0x01, 0x02} },
-			wantErr: ErrInvalidRefundTx,
+			name:        "invalid raw tx",
+			mutate:      func(j *spark.UserSignedTxSigningJob) { j.RawTx = []byte{0x01, 0x02} },
+			expectedErr: ErrInvalidRefundTx,
 		},
 		{
-			name:    "missing user signature",
-			mutate:  func(j *spark.UserSignedTxSigningJob) { j.UserSignature = nil },
-			wantErr: ErrMissingUserSignature,
+			name:        "missing user signature",
+			mutate:      func(j *spark.UserSignedTxSigningJob) { j.UserSignature = nil },
+			expectedErr: ErrMissingUserSignature,
 		},
 		{
 			name: "multiparty contributions on a single-signer job",
 			mutate: func(j *spark.UserSignedTxSigningJob) {
 				j.SubuserContributions = []*spark.SubUserSigningContribution{{PartialSignature: []byte{0x01}}}
 			},
-			wantErr: ErrUnexpectedSubUserContributions,
+			expectedErr: ErrUnexpectedSubUserContributions,
 		},
 		{
-			name:    "nil nonce commitment",
-			mutate:  func(j *spark.UserSignedTxSigningJob) { j.SigningNonceCommitment = nil },
-			wantErr: ErrInvalidNonceCommitment,
+			name:        "nil nonce commitment",
+			mutate:      func(j *spark.UserSignedTxSigningJob) { j.SigningNonceCommitment = nil },
+			expectedErr: ErrInvalidNonceCommitment,
 		},
 		{
 			name: "invalid operator commitment",
@@ -335,19 +335,19 @@ func TestParseRefundSigningJob_Errors(t *testing.T) {
 					SigningCommitments: map[string]*pbcommon.SigningCommitment{testOperatorID: {Hiding: []byte{0x00}, Binding: []byte{0x00}}},
 				}
 			},
-			wantErr: ErrInvalidOperatorCommitment,
+			expectedErr: ErrInvalidOperatorCommitment,
 		},
 		{
-			name:    "nil operator commitments",
-			mutate:  func(j *spark.UserSignedTxSigningJob) { j.SigningCommitments = nil },
-			wantErr: ErrMissingOperatorCommitment,
+			name:        "nil operator commitments",
+			mutate:      func(j *spark.UserSignedTxSigningJob) { j.SigningCommitments = nil },
+			expectedErr: ErrMissingOperatorCommitment,
 		},
 		{
 			name: "empty operator commitments",
 			mutate: func(j *spark.UserSignedTxSigningJob) {
 				j.SigningCommitments = &spark.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}}
 			},
-			wantErr: ErrMissingOperatorCommitment,
+			expectedErr: ErrMissingOperatorCommitment,
 		},
 		{
 			name: "more signing inputs than tx inputs",
@@ -362,7 +362,7 @@ func TestParseRefundSigningJob_Errors(t *testing.T) {
 					},
 				}
 			},
-			wantErr: ErrTooManySigningInputs,
+			expectedErr: ErrTooManySigningInputs,
 		},
 	}
 
@@ -371,7 +371,7 @@ func TestParseRefundSigningJob_Errors(t *testing.T) {
 			job := validSigningJob(t)
 			tc.mutate(job)
 			_, err := parseSingleJob(job)
-			require.ErrorIs(t, err, tc.wantErr)
+			require.ErrorIs(t, err, tc.expectedErr)
 		})
 	}
 }
@@ -391,10 +391,10 @@ func TestPackage_KeyTweakPackageIsCopy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	got := pkg.KeyTweakPackage()
-	got["op-1"] = []byte{0xff}
-	delete(got, "op-1")
-	got["injected"] = []byte{0x99}
+	copied := pkg.KeyTweakPackage()
+	copied["op-1"] = []byte{0xff}
+	delete(copied, "op-1")
+	copied["injected"] = []byte{0x99}
 
 	assert.Equal(t, []byte{0xaa}, pkg.KeyTweakPackage()["op-1"])
 	assert.NotContains(t, pkg.KeyTweakPackage(), "injected")

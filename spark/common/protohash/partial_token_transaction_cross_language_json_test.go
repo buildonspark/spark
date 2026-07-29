@@ -48,19 +48,19 @@ func TestPartialTokenTransactionJSONCases(t *testing.T) {
 				t.Fatalf("protojson unmarshal PartialTokenTransaction: %v", err)
 			}
 
-			got, err := Hash(&msg)
+			hash, err := Hash(&msg)
 			if err != nil {
 				t.Fatalf("hash PartialTokenTransaction: %v", err)
 			}
-			gotHex := hex.EncodeToString(got)
+			actualHex := hex.EncodeToString(hash)
 
 			if tc.ExpectedHashHex == "" {
-				t.Logf("COMPUTED_PARTIAL_CASE %s: hash=%s", tc.Name, gotHex)
+				t.Logf("COMPUTED_PARTIAL_CASE %s: hash=%s", tc.Name, actualHex)
 				return
 			}
 
-			if !strings.EqualFold(tc.ExpectedHashHex, gotHex) {
-				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, gotHex)
+			if !strings.EqualFold(tc.ExpectedHashHex, actualHex) {
+				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, actualHex)
 			}
 		})
 	}

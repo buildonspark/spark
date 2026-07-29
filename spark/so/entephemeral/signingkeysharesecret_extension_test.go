@@ -159,9 +159,9 @@ func TestCreateSigningKeyshareSecretVersionLocked_GetReturnsInsertedValue(t *tes
 	require.NoError(t, err)
 	require.Equal(t, int32(9), created.Version)
 
-	got, err := GetSigningKeyshareSecretVersion(ctx, signingKeyshareID, 9)
+	retrieved, err := GetSigningKeyshareSecretVersion(ctx, signingKeyshareID, 9)
 	require.NoError(t, err)
-	require.True(t, got.SecretShare.Equals(secretShare), "retrieved secret share should match the one that was inserted")
+	require.True(t, retrieved.SecretShare.Equals(secretShare), "retrieved secret share should match the one that was inserted")
 }
 
 func TestCreateSigningKeyshareSecretVersion_DuplicateVersionFails(t *testing.T) {
@@ -222,40 +222,40 @@ func TestSigningKeyshareIDToAdvisoryLockKey_AvoidsXORFoldCollisionCase(t *testin
 
 func TestNextVersion(t *testing.T) {
 	tests := []struct {
-		name        string
-		latest      *SigningKeyshareSecret
-		wantVersion int32
-		wantErr     bool
+		name            string
+		latest          *SigningKeyshareSecret
+		expectedVersion int32
+		expectedErr     bool
 	}{
 		{
-			name:        "nil returns 0",
-			latest:      nil,
-			wantVersion: 0,
+			name:            "nil returns 0",
+			latest:          nil,
+			expectedVersion: 0,
 		},
 		{
-			name:        "increments from 0",
-			latest:      &SigningKeyshareSecret{Version: 0},
-			wantVersion: 1,
+			name:            "increments from 0",
+			latest:          &SigningKeyshareSecret{Version: 0},
+			expectedVersion: 1,
 		},
 		{
-			name:        "increments from non-zero",
-			latest:      &SigningKeyshareSecret{Version: 5},
-			wantVersion: 6,
+			name:            "increments from non-zero",
+			latest:          &SigningKeyshareSecret{Version: 5},
+			expectedVersion: 6,
 		},
 		{
-			name:    "overflow returns error",
-			latest:  &SigningKeyshareSecret{Version: math.MaxInt32},
-			wantErr: true,
+			name:        "overflow returns error",
+			latest:      &SigningKeyshareSecret{Version: math.MaxInt32},
+			expectedErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := nextVersion(tt.latest)
-			if tt.wantErr {
+			version, err := nextVersion(tt.latest)
+			if tt.expectedErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.wantVersion, got)
+				require.Equal(t, tt.expectedVersion, version)
 			}
 		})
 	}

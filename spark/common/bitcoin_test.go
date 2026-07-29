@@ -334,51 +334,51 @@ func TestValidateBitcoinTxVersion(t *testing.T) {
 
 func TestReadVarInt(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     []byte
-		want      uint64
-		wantBytes int
+		name          string
+		input         []byte
+		expectedValue uint64
+		expectedBytes int
 	}{
 		// Single-byte values (discriminant < 0xFD)
-		{name: "zero", input: []byte{0x00}, want: 0, wantBytes: 1},
-		{name: "one", input: []byte{0x01}, want: 1, wantBytes: 1},
-		{name: "mid single byte", input: []byte{0x7F}, want: 127, wantBytes: 1},
-		{name: "max single byte", input: []byte{0xFC}, want: 252, wantBytes: 1},
+		{name: "zero", input: []byte{0x00}, expectedValue: 0, expectedBytes: 1},
+		{name: "one", input: []byte{0x01}, expectedValue: 1, expectedBytes: 1},
+		{name: "mid single byte", input: []byte{0x7F}, expectedValue: 127, expectedBytes: 1},
+		{name: "max single byte", input: []byte{0xFC}, expectedValue: 252, expectedBytes: 1},
 
 		// Two-byte values (0xFD prefix)
-		{name: "two-byte min", input: []byte{0xFD, 0xFD, 0x00}, want: 253, wantBytes: 3},
-		{name: "two-byte 256", input: []byte{0xFD, 0x00, 0x01}, want: 256, wantBytes: 3},
-		{name: "two-byte max", input: []byte{0xFD, 0xFF, 0xFF}, want: 65535, wantBytes: 3},
+		{name: "two-byte min", input: []byte{0xFD, 0xFD, 0x00}, expectedValue: 253, expectedBytes: 3},
+		{name: "two-byte 256", input: []byte{0xFD, 0x00, 0x01}, expectedValue: 256, expectedBytes: 3},
+		{name: "two-byte max", input: []byte{0xFD, 0xFF, 0xFF}, expectedValue: 65535, expectedBytes: 3},
 
 		// Four-byte values (0xFE prefix)
-		{name: "four-byte min", input: []byte{0xFE, 0x00, 0x00, 0x01, 0x00}, want: 65536, wantBytes: 5},
-		{name: "four-byte example", input: []byte{0xFE, 0x01, 0x02, 0x03, 0x04}, want: 0x04030201, wantBytes: 5},
-		{name: "four-byte max", input: []byte{0xFE, 0xFF, 0xFF, 0xFF, 0xFF}, want: 0xFFFFFFFF, wantBytes: 5},
+		{name: "four-byte min", input: []byte{0xFE, 0x00, 0x00, 0x01, 0x00}, expectedValue: 65536, expectedBytes: 5},
+		{name: "four-byte example", input: []byte{0xFE, 0x01, 0x02, 0x03, 0x04}, expectedValue: 0x04030201, expectedBytes: 5},
+		{name: "four-byte max", input: []byte{0xFE, 0xFF, 0xFF, 0xFF, 0xFF}, expectedValue: 0xFFFFFFFF, expectedBytes: 5},
 
 		// Eight-byte values (0xFF prefix)
-		{name: "eight-byte min", input: []byte{0xFF, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}, want: 0x100000000, wantBytes: 9},
-		{name: "eight-byte example", input: []byte{0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, want: 0x0807060504030201, wantBytes: 9},
-		{name: "eight-byte max", input: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, want: 0xFFFFFFFFFFFFFFFF, wantBytes: 9},
+		{name: "eight-byte min", input: []byte{0xFF, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}, expectedValue: 0x100000000, expectedBytes: 9},
+		{name: "eight-byte example", input: []byte{0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, expectedValue: 0x0807060504030201, expectedBytes: 9},
+		{name: "eight-byte max", input: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, expectedValue: 0xFFFFFFFFFFFFFFFF, expectedBytes: 9},
 
 		// Error cases: empty or truncated buffers
-		{name: "empty buffer", input: []byte{}, want: 0, wantBytes: 0},
-		{name: "truncated two-byte (1 byte)", input: []byte{0xFD}, want: 0, wantBytes: 0},
-		{name: "truncated two-byte (2 bytes)", input: []byte{0xFD, 0x00}, want: 0, wantBytes: 0},
-		{name: "truncated four-byte (1 byte)", input: []byte{0xFE}, want: 0, wantBytes: 0},
-		{name: "truncated four-byte (4 bytes)", input: []byte{0xFE, 0x00, 0x00, 0x00}, want: 0, wantBytes: 0},
-		{name: "truncated eight-byte (1 byte)", input: []byte{0xFF}, want: 0, wantBytes: 0},
-		{name: "truncated eight-byte (8 bytes)", input: []byte{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, want: 0, wantBytes: 0},
+		{name: "empty buffer", input: []byte{}, expectedValue: 0, expectedBytes: 0},
+		{name: "truncated two-byte (1 byte)", input: []byte{0xFD}, expectedValue: 0, expectedBytes: 0},
+		{name: "truncated two-byte (2 bytes)", input: []byte{0xFD, 0x00}, expectedValue: 0, expectedBytes: 0},
+		{name: "truncated four-byte (1 byte)", input: []byte{0xFE}, expectedValue: 0, expectedBytes: 0},
+		{name: "truncated four-byte (4 bytes)", input: []byte{0xFE, 0x00, 0x00, 0x00}, expectedValue: 0, expectedBytes: 0},
+		{name: "truncated eight-byte (1 byte)", input: []byte{0xFF}, expectedValue: 0, expectedBytes: 0},
+		{name: "truncated eight-byte (8 bytes)", input: []byte{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, expectedValue: 0, expectedBytes: 0},
 
 		// Extra trailing bytes should be ignored
-		{name: "single byte with trailing", input: []byte{0x42, 0xFF, 0xFF}, want: 0x42, wantBytes: 1},
-		{name: "two-byte with trailing", input: []byte{0xFD, 0x01, 0x00, 0xFF}, want: 1, wantBytes: 3},
+		{name: "single byte with trailing", input: []byte{0x42, 0xFF, 0xFF}, expectedValue: 0x42, expectedBytes: 1},
+		{name: "two-byte with trailing", input: []byte{0xFD, 0x01, 0x00, 0xFF}, expectedValue: 1, expectedBytes: 3},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, gotBytes := readVarInt(tc.input)
-			assert.Equal(t, tc.want, got)
-			assert.Equal(t, tc.wantBytes, gotBytes)
+			actualValue, actualBytes := readVarInt(tc.input)
+			assert.Equal(t, tc.expectedValue, actualValue)
+			assert.Equal(t, tc.expectedBytes, actualBytes)
 		})
 	}
 }

@@ -730,8 +730,8 @@ func assertSenderKeyTweakTransferStateForTest(
 	client *ent.Client,
 	transferID uuid.UUID,
 	status st.TransferStatus,
-	wantKeyTweak bool,
-	wantCommittedMaterial bool,
+	expectedKeyTweak bool,
+	expectedCommittedMaterial bool,
 ) {
 	t.Helper()
 
@@ -745,12 +745,12 @@ func assertSenderKeyTweakTransferStateForTest(
 	leaves, err := transfer.QueryTransferLeaves().All(ctx)
 	require.NoError(t, err)
 	require.Len(t, leaves, 1)
-	if wantKeyTweak {
+	if expectedKeyTweak {
 		assert.NotEmpty(t, leaves[0].KeyTweak)
 	} else {
 		assert.Empty(t, leaves[0].KeyTweak)
 	}
-	if wantCommittedMaterial {
+	if expectedCommittedMaterial {
 		assert.NotEmpty(t, leaves[0].SecretCipher)
 		assert.NotEmpty(t, leaves[0].Signature)
 	} else {

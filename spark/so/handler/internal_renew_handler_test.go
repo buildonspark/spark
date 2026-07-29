@@ -31,25 +31,25 @@ func TestCheckRefundTimelockMonotonicity(t *testing.T) {
 		name             string
 		currentTimelock  uint32
 		incomingTimelock uint32
-		wantCode         codes.Code // OK == nil
+		expectedCode     codes.Code // OK == nil
 	}{
 		{
 			name:             "incoming strictly lower — legitimate refund renewal",
 			currentTimelock:  spark.InitialTimeLock,
 			incomingTimelock: spark.InitialTimeLock - spark.TimeLockInterval,
-			wantCode:         codes.OK,
+			expectedCode:     codes.OK,
 		},
 		{
 			name:             "incoming equal to current — stale (byte-equality short-circuit handles true redelivery elsewhere)",
 			currentTimelock:  spark.InitialTimeLock - spark.TimeLockInterval,
 			incomingTimelock: spark.InitialTimeLock - spark.TimeLockInterval,
-			wantCode:         codes.AlreadyExists,
+			expectedCode:     codes.AlreadyExists,
 		},
 		{
 			name:             "incoming strictly higher — stale replay from before a newer refund landed",
 			currentTimelock:  spark.InitialTimeLock - 2*spark.TimeLockInterval,
 			incomingTimelock: spark.InitialTimeLock - spark.TimeLockInterval,
-			wantCode:         codes.AlreadyExists,
+			expectedCode:     codes.AlreadyExists,
 		},
 	}
 
@@ -60,14 +60,14 @@ func TestCheckRefundTimelockMonotonicity(t *testing.T) {
 
 			err := checkRefundTimelockMonotonicity(currentTx, incomingTx, leafID)
 
-			if tt.wantCode == codes.OK {
+			if tt.expectedCode == codes.OK {
 				if err != nil {
 					t.Fatalf("expected nil, got %v", err)
 				}
 				return
 			}
-			if got := status.Code(err); got != tt.wantCode {
-				t.Fatalf("expected gRPC code %v, got %v (err=%v)", tt.wantCode, got, err)
+			if code := status.Code(err); code != tt.expectedCode {
+				t.Fatalf("expected gRPC code %v, got %v (err=%v)", tt.expectedCode, code, err)
 			}
 		})
 	}
@@ -77,23 +77,23 @@ func TestFinalizeRenewTimelockRejectsMalformedRequestsWithoutPanic(t *testing.T)
 	handler := NewInternalRenewLeafHandler(nil)
 
 	tests := []struct {
-		name    string
-		call    func() error
-		wantErr string
+		name        string
+		call        func() error
+		expectedErr string
 	}{
 		{
 			name: "node finalize nil request",
 			call: func() error {
 				return handler.FinalizeRenewNodeTimelock(t.Context(), nil)
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "node finalize missing node",
 			call: func() error {
 				return handler.FinalizeRenewNodeTimelock(t.Context(), &pbinternal.FinalizeRenewNodeTimelockRequest{})
 			},
-			wantErr: "node is required",
+			expectedErr: "node is required",
 		},
 		{
 			name: "node finalize missing split node",
@@ -102,21 +102,21 @@ func TestFinalizeRenewTimelockRejectsMalformedRequestsWithoutPanic(t *testing.T)
 					Node: &pbinternal.TreeNode{},
 				})
 			},
-			wantErr: "split_node is required",
+			expectedErr: "split_node is required",
 		},
 		{
 			name: "refund finalize nil request",
 			call: func() error {
 				return handler.FinalizeRenewRefundTimelock(t.Context(), nil)
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "refund finalize missing node",
 			call: func() error {
 				return handler.FinalizeRenewRefundTimelock(t.Context(), &pbinternal.FinalizeRenewRefundTimelockRequest{})
 			},
-			wantErr: "node is required",
+			expectedErr: "node is required",
 		},
 	}
 
@@ -126,7 +126,7 @@ func TestFinalizeRenewTimelockRejectsMalformedRequestsWithoutPanic(t *testing.T)
 			require.NotPanics(t, func() {
 				err = tt.call()
 			})
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
 		})
 	}
@@ -281,32 +281,32 @@ func TestCheckNodeRenewPrecondition(t *testing.T) {
 	tests := []struct {
 		name            string
 		currentTimelock uint32
-		wantCode        codes.Code
+		expectedCode    codes.Code
 	}{
 		{
 			name:            "current at zero — eligible for renew-node-zero",
 			currentTimelock: 0,
-			wantCode:        codes.OK,
+			expectedCode:    codes.OK,
 		},
 		{
 			name:            "current well below threshold — eligible for renew-node",
 			currentTimelock: 100,
-			wantCode:        codes.OK,
+			expectedCode:    codes.OK,
 		},
 		{
 			name:            "current exactly at threshold — eligible (matches validateAndConstructNodeTimelock's <=)",
 			currentTimelock: spark.RenewTimelockThreshold,
-			wantCode:        codes.OK,
+			expectedCode:    codes.OK,
 		},
 		{
 			name:            "current just above threshold — stale payload (a newer renew-node already happened)",
 			currentTimelock: spark.RenewTimelockThreshold + 1,
-			wantCode:        codes.AlreadyExists,
+			expectedCode:    codes.AlreadyExists,
 		},
 		{
 			name:            "current near InitialTimeLock — clearly stale",
 			currentTimelock: spark.InitialTimeLock - spark.TimeLockInterval,
-			wantCode:        codes.AlreadyExists,
+			expectedCode:    codes.AlreadyExists,
 		},
 	}
 
@@ -316,14 +316,14 @@ func TestCheckNodeRenewPrecondition(t *testing.T) {
 
 			err := checkNodeRenewPrecondition(currentTx, leafID)
 
-			if tt.wantCode == codes.OK {
+			if tt.expectedCode == codes.OK {
 				if err != nil {
 					t.Fatalf("expected nil, got %v", err)
 				}
 				return
 			}
-			if got := status.Code(err); got != tt.wantCode {
-				t.Fatalf("expected gRPC code %v, got %v (err=%v)", tt.wantCode, got, err)
+			if code := status.Code(err); code != tt.expectedCode {
+				t.Fatalf("expected gRPC code %v, got %v (err=%v)", tt.expectedCode, code, err)
 			}
 		})
 	}

@@ -18,26 +18,26 @@ func init() {
 func TestLightsparkSparkSspInternalPoliciesPresent(t *testing.T) {
 	// Verify both classes of SSP-internal methods are represented.
 	tests := []struct {
-		name         string
-		method       string
-		wantAuthMode AuthMode
+		name             string
+		method           string
+		expectedAuthMode AuthMode
 	}{
 		{
-			name:         "anonymous ops query",
-			method:       pbssp.SparkSspInternalService_QueryLostNodes_FullMethodName,
-			wantAuthMode: AuthUnauthenticated,
+			name:             "anonymous ops query",
+			method:           pbssp.SparkSspInternalService_QueryLostNodes_FullMethodName,
+			expectedAuthMode: AuthUnauthenticated,
 		},
 		{
-			name:         "session-required SSP flow",
-			method:       pbssp.SparkSspInternalService_QueryPendingPreimageSwapTransfer_FullMethodName,
-			wantAuthMode: AuthSession,
+			name:             "session-required SSP flow",
+			method:           pbssp.SparkSspInternalService_QueryPendingPreimageSwapTransfer_FullMethodName,
+			expectedAuthMode: AuthSession,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			p, ok := LookUp(tc.method)
 			require.True(t, ok)
-			assert.Equal(t, tc.wantAuthMode, p.AuthMode)
+			assert.Equal(t, tc.expectedAuthMode, p.AuthMode)
 			assert.True(t, p.InternalOnly)
 		})
 	}

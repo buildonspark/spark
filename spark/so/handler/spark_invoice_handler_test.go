@@ -187,7 +187,7 @@ func TestQuerySparkInvoicesAmountMismatch(t *testing.T) {
 	for _, tt := range []struct {
 		name           string
 		transferStatus st.TransferStatus
-		want           sparkpb.InvoiceStatus
+		expectedStatus sparkpb.InvoiceStatus
 	}{
 		{"finalized", st.TransferStatusSenderKeyTweaked, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED},
 		{"pending", st.TransferStatusSenderInitiatedCoordinator, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_PENDING},
@@ -207,10 +207,10 @@ func TestQuerySparkInvoicesAmountMismatch(t *testing.T) {
 			queriedAmount := uint64(2_000)
 			queriedStr := buildSatsInvoiceStr(t, id, receiver, &queriedAmount, nil)
 
-			got := querySingleStatus(t, ctx, config, queriedStr)
-			require.Equal(t, tt.want, got.GetStatus())
-			require.Equal(t, storedStr, got.GetInvoice(), "mismatch response must keep the stored canonical encoding")
-			require.NotNil(t, got.GetSatsTransfer(), "mismatch response must keep transfer details")
+			invoiceStatus := querySingleStatus(t, ctx, config, queriedStr)
+			require.Equal(t, tt.expectedStatus, invoiceStatus.GetStatus())
+			require.Equal(t, storedStr, invoiceStatus.GetInvoice(), "mismatch response must keep the stored canonical encoding")
+			require.NotNil(t, invoiceStatus.GetSatsTransfer(), "mismatch response must keep transfer details")
 		})
 	}
 }
@@ -230,8 +230,8 @@ func TestQuerySparkInvoicesReceiverMismatch(t *testing.T) {
 
 	queriedStr := buildSatsInvoiceStr(t, id, keys.GeneratePrivateKey().Public(), &amount, nil)
 
-	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.GetStatus())
+	invoiceStatus := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, invoiceStatus.GetStatus())
 }
 
 // TestQuerySparkInvoicesOpenAmountMismatch verifies that an open-amount queried
@@ -249,8 +249,8 @@ func TestQuerySparkInvoicesOpenAmountMismatch(t *testing.T) {
 
 	queriedStr := buildSatsInvoiceStr(t, id, receiver, nil, nil)
 
-	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.GetStatus())
+	invoiceStatus := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, invoiceStatus.GetStatus())
 }
 
 // TestQuerySparkInvoicesMatchingEncodingUnchanged verifies that querying with an
@@ -270,8 +270,8 @@ func TestQuerySparkInvoicesMatchingEncodingUnchanged(t *testing.T) {
 	memo := "different memo"
 	queriedStr := buildSatsInvoiceStr(t, id, receiver, &amount, &memo)
 
-	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, got.GetStatus(),
+	invoiceStatus := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceStatus.GetStatus(),
 		"matching money fields must not be flagged even when memo differs")
 }
 
@@ -291,8 +291,8 @@ func TestQuerySparkInvoicesTokenAmountMismatch(t *testing.T) {
 
 	queriedStr := buildTokenInvoiceStr(t, id, receiver, tokenIdentifier, []byte{0x07, 0xd0})
 
-	got := querySingleStatus(t, ctx, config, queriedStr)
-	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, got.GetStatus())
+	invoiceStatus := querySingleStatus(t, ctx, config, queriedStr)
+	require.Equal(t, sparkpb.InvoiceStatus_MISMATCHED_INVOICE_FINALIZED, invoiceStatus.GetStatus())
 }
 
 // TestQuerySparkInvoicesDuplicateIDMatchingAndMismatched verifies that a single

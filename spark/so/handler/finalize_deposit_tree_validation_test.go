@@ -19,56 +19,56 @@ import (
 
 func TestValidateFinalizeDepositTreeCreationRequestRejectsMissingFields(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		req     *pb.FinalizeDepositTreeCreationRequest
-		wantErr string
+		name        string
+		req         *pb.FinalizeDepositTreeCreationRequest
+		expectedErr string
 	}{
 		{
-			name:    "nil request",
-			req:     nil,
-			wantErr: "request is required",
+			name:        "nil request",
+			req:         nil,
+			expectedErr: "request is required",
 		},
 		{
 			name: "missing on chain utxo",
 			req: finalizeDepositTreeCreationRequestWith(func(req *pb.FinalizeDepositTreeCreationRequest) {
 				req.OnChainUtxo = nil
 			}),
-			wantErr: "on_chain_utxo is required",
+			expectedErr: "on_chain_utxo is required",
 		},
 		{
 			name: "missing root signing job",
 			req: finalizeDepositTreeCreationRequestWith(func(req *pb.FinalizeDepositTreeCreationRequest) {
 				req.RootTxSigningJob = nil
 			}),
-			wantErr: "root_tx_signing_job is required",
+			expectedErr: "root_tx_signing_job is required",
 		},
 		{
 			name: "missing refund signing job",
 			req: finalizeDepositTreeCreationRequestWith(func(req *pb.FinalizeDepositTreeCreationRequest) {
 				req.RefundTxSigningJob = nil
 			}),
-			wantErr: "refund_tx_signing_job is required",
+			expectedErr: "refund_tx_signing_job is required",
 		},
 		{
 			name: "missing direct from cpfp refund signing job",
 			req: finalizeDepositTreeCreationRequestWith(func(req *pb.FinalizeDepositTreeCreationRequest) {
 				req.DirectFromCpfpRefundTxSigningJob = nil
 			}),
-			wantErr: "direct_from_cpfp_refund_tx_signing_job is required",
+			expectedErr: "direct_from_cpfp_refund_tx_signing_job is required",
 		},
 		{
 			name: "empty signing commitments map",
 			req: finalizeDepositTreeCreationRequestWith(func(req *pb.FinalizeDepositTreeCreationRequest) {
 				req.RootTxSigningJob.SigningCommitments = &pb.SigningCommitments{}
 			}),
-			wantErr: "root_tx_signing_job.signing_commitments.signing_commitments map is empty",
+			expectedErr: "root_tx_signing_job.signing_commitments.signing_commitments map is empty",
 		},
 		{
 			name: "too many additional utxos",
 			req: finalizeDepositTreeCreationRequestWith(func(req *pb.FinalizeDepositTreeCreationRequest) {
 				req.AdditionalOnChainUtxos = make([]*pb.UTXO, 11)
 			}),
-			wantErr: "too many additional UTXOs",
+			expectedErr: "too many additional UTXOs",
 		},
 		{
 			name: "nil additional on chain utxo",
@@ -76,7 +76,7 @@ func TestValidateFinalizeDepositTreeCreationRequestRejectsMissingFields(t *testi
 				req.AdditionalOnChainUtxos = []*pb.UTXO{nil}
 				req.RootTxSigningJob.AdditionalInputs = []*pb.InputSigningData{validInputSigningDataForValidation()}
 			}),
-			wantErr: "additional_on_chain_utxos[0] is required",
+			expectedErr: "additional_on_chain_utxos[0] is required",
 		},
 		{
 			name: "additional input count mismatch",
@@ -84,7 +84,7 @@ func TestValidateFinalizeDepositTreeCreationRequestRejectsMissingFields(t *testi
 				req.AdditionalOnChainUtxos = []*pb.UTXO{{Network: pb.Network_REGTEST}}
 				req.RootTxSigningJob.AdditionalInputs = nil
 			}),
-			wantErr: "additional_inputs count (0) must match additional_on_chain_utxos count (1)",
+			expectedErr: "additional_inputs count (0) must match additional_on_chain_utxos count (1)",
 		},
 		{
 			name: "nil additional input",
@@ -92,7 +92,7 @@ func TestValidateFinalizeDepositTreeCreationRequestRejectsMissingFields(t *testi
 				req.AdditionalOnChainUtxos = []*pb.UTXO{{Network: pb.Network_REGTEST}}
 				req.RootTxSigningJob.AdditionalInputs = []*pb.InputSigningData{nil}
 			}),
-			wantErr: "root_tx_signing_job.additional_inputs[0] is required",
+			expectedErr: "root_tx_signing_job.additional_inputs[0] is required",
 		},
 		{
 			name: "additional input missing commitments",
@@ -103,14 +103,14 @@ func TestValidateFinalizeDepositTreeCreationRequestRejectsMissingFields(t *testi
 					UserSignature:          []byte{0x03},
 				}}
 			}),
-			wantErr: "root_tx_signing_job.additional_inputs[0].signing_commitments is required",
+			expectedErr: "root_tx_signing_job.additional_inputs[0].signing_commitments is required",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateFinalizeDepositTreeCreationRequest(tc.req)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
 }
@@ -139,9 +139,9 @@ func TestVerifyMultiInputRootTransactionRejectsMutatedRoots(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
-		name        string
-		mutate      func(*wire.MsgTx)
-		wantErrText string
+		name            string
+		mutate          func(*wire.MsgTx)
+		expectedErrText string
 	}{
 		{
 			name: "wrong version",
@@ -154,7 +154,7 @@ func TestVerifyMultiInputRootTransactionRejectsMutatedRoots(t *testing.T) {
 			mutate: func(tx *wire.MsgTx) {
 				tx.Version = 1
 			},
-			wantErrText: "root tx version validation failed",
+			expectedErrText: "root tx version validation failed",
 		},
 		{
 			name: "nonzero locktime",
@@ -212,14 +212,14 @@ func TestVerifyMultiInputRootTransactionRejectsMutatedRoots(t *testing.T) {
 					Sequence:         spark.ZeroSequence,
 				})
 			},
-			wantErrText: "expected 3 inputs, got 4",
+			expectedErrText: "expected 3 inputs, got 4",
 		},
 		{
 			name: "missing additional input",
 			mutate: func(tx *wire.MsgTx) {
 				tx.TxIn = tx.TxIn[:2]
 			},
-			wantErrText: "expected 3 inputs, got 2",
+			expectedErrText: "expected 3 inputs, got 2",
 		},
 		{
 			name: "missing ephemeral anchor output",
@@ -268,14 +268,14 @@ func TestVerifyMultiInputRootTransactionRejectsMutatedRoots(t *testing.T) {
 			mutate: func(tx *wire.MsgTx) {
 				tx.TxIn[0].Sequence = spark.ZeroSequence | 1<<16
 			},
-			wantErrText: "sequence contains unsupported high bits",
+			expectedErrText: "sequence contains unsupported high bits",
 		},
 		{
 			name: "additional sequence high bit changed",
 			mutate: func(tx *wire.MsgTx) {
 				tx.TxIn[1].Sequence = spark.ZeroSequence | 1<<16
 			},
-			wantErrText: "sequence contains unsupported high bits",
+			expectedErrText: "sequence contains unsupported high bits",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -284,11 +284,11 @@ func TestVerifyMultiInputRootTransactionRejectsMutatedRoots(t *testing.T) {
 
 			err := verifyMultiInputRootTransaction(mutatedRoot, primaryTx, 0, primaryTx.TxOut[0], additionalUtxos)
 			require.Error(t, err)
-			wantErrText := tc.wantErrText
-			if wantErrText == "" {
-				wantErrText = "multi-input root tx does not match expected construction"
+			expectedErrText := tc.expectedErrText
+			if expectedErrText == "" {
+				expectedErrText = "multi-input root tx does not match expected construction"
 			}
-			require.ErrorContains(t, err, wantErrText)
+			require.ErrorContains(t, err, expectedErrText)
 		})
 	}
 }
@@ -304,9 +304,9 @@ func TestLoadAndValidateDepositAddressRejectsInvalidAdditionalUtxos(t *testing.T
 	wrongAddressTx := newTestDepositFundingTx(t, 30_000, wrongDepositScript, testDepositSourceHash(3))
 
 	for _, tc := range []struct {
-		name        string
-		additional  []*pb.UTXO
-		wantErrText string
+		name            string
+		additional      []*pb.UTXO
+		expectedErrText string
 	}{
 		{
 			name: "duplicate additional outpoint",
@@ -314,14 +314,14 @@ func TestLoadAndValidateDepositAddressRejectsInvalidAdditionalUtxos(t *testing.T
 				testDepositUtxo(t, additionalTx, 0),
 				testDepositUtxo(t, additionalTx, 0),
 			},
-			wantErrText: "duplicate utxo",
+			expectedErrText: "duplicate utxo",
 		},
 		{
 			name: "additional outpoint pays to different address",
 			additional: []*pb.UTXO{
 				testDepositUtxo(t, wrongAddressTx, 0),
 			},
-			wantErrText: "additional utxo 0 pays to different address than primary utxo",
+			expectedErrText: "additional utxo 0 pays to different address than primary utxo",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -332,7 +332,7 @@ func TestLoadAndValidateDepositAddressRejectsInvalidAdditionalUtxos(t *testing.T
 
 			_, _, _, _, err := loadAndValidateDepositAddress(t.Context(), btcnetwork.Regtest, req, keys.GeneratePrivateKey().Public(), false)
 			require.Error(t, err)
-			require.ErrorContains(t, err, tc.wantErrText)
+			require.ErrorContains(t, err, tc.expectedErrText)
 		})
 	}
 }

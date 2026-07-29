@@ -24,47 +24,47 @@ func TestFmtlint(t *testing.T) {
 
 func TestParseVerbsReliable(t *testing.T) {
 	tests := []struct {
-		name   string
-		format string
-		want   []verbArg
+		name          string
+		format        string
+		expectedVerbs []verbArg
 	}{
 		{
-			name:   "simple",
-			format: "%s and %d",
-			want:   []verbArg{{verb: 's', argIndex: 0, offset: 1}, {verb: 'd', argIndex: 1, offset: 8}},
+			name:          "simple",
+			format:        "%s and %d",
+			expectedVerbs: []verbArg{{verb: 's', argIndex: 0, offset: 1}, {verb: 'd', argIndex: 1, offset: 8}},
 		},
 		{
-			name:   "escaped percent",
-			format: "100%% done: %v",
-			want:   []verbArg{{verb: 'v', argIndex: 0, offset: 13}},
+			name:          "escaped percent",
+			format:        "100%% done: %v",
+			expectedVerbs: []verbArg{{verb: 'v', argIndex: 0, offset: 13}},
 		},
 		{
-			name:   "flags width precision",
-			format: "%+d %-5.2f %#x",
-			want:   []verbArg{{verb: 'd', argIndex: 0, offset: 2}, {verb: 'f', argIndex: 1, offset: 9, hasPrecision: true}, {verb: 'x', argIndex: 2, offset: 13, sharpFlag: true}},
+			name:          "flags width precision",
+			format:        "%+d %-5.2f %#x",
+			expectedVerbs: []verbArg{{verb: 'd', argIndex: 0, offset: 2}, {verb: 'f', argIndex: 1, offset: 9, hasPrecision: true}, {verb: 'x', argIndex: 2, offset: 13, sharpFlag: true}},
 		},
 		{
-			name:   "sharp flag on v",
-			format: "%#v and %v",
-			want:   []verbArg{{verb: 'v', argIndex: 0, offset: 2, sharpFlag: true}, {verb: 'v', argIndex: 1, offset: 9}},
+			name:          "sharp flag on v",
+			format:        "%#v and %v",
+			expectedVerbs: []verbArg{{verb: 'v', argIndex: 0, offset: 2, sharpFlag: true}, {verb: 'v', argIndex: 1, offset: 9}},
 		},
 		{
-			name:   "space flag and precision",
-			format: "% s and %.4d",
-			want:   []verbArg{{verb: 's', argIndex: 0, offset: 2, spaceFlag: true}, {verb: 'd', argIndex: 1, offset: 11, hasPrecision: true}},
+			name:          "space flag and precision",
+			format:        "% s and %.4d",
+			expectedVerbs: []verbArg{{verb: 's', argIndex: 0, offset: 2, spaceFlag: true}, {verb: 'd', argIndex: 1, offset: 11, hasPrecision: true}},
 		},
 		{
-			name:   "escaped percent at end",
-			format: "done 100%%",
-			want:   nil,
+			name:          "escaped percent at end",
+			format:        "done 100%%",
+			expectedVerbs: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, reliable := parseVerbs(tt.format)
+			verbs, reliable := parseVerbs(tt.format)
 			require.True(t, reliable)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.expectedVerbs, verbs)
 		})
 	}
 }

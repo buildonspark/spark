@@ -36,36 +36,36 @@ func TestParseP256PublicKey_Uncompressed(t *testing.T) {
 
 func TestParseP256PublicKey_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:    "nil",
-			input:   nil,
-			wantErr: "malformed public key: invalid length: 0",
+			name:        "nil",
+			input:       nil,
+			expectedErr: "malformed public key: invalid length: 0",
 		},
 		{
-			name:    "empty",
-			input:   []byte{},
-			wantErr: "malformed public key: invalid length: 0",
+			name:        "empty",
+			input:       []byte{},
+			expectedErr: "malformed public key: invalid length: 0",
 		},
 		{
-			name:    "too short",
-			input:   bytes.Repeat([]byte{1}, 3),
-			wantErr: "malformed public key: invalid length: 3",
+			name:        "too short",
+			input:       bytes.Repeat([]byte{1}, 3),
+			expectedErr: "malformed public key: invalid length: 3",
 		},
 		{
-			name:    "wrong length",
-			input:   bytes.Repeat([]byte{1}, 34),
-			wantErr: "malformed public key: invalid length: 34",
+			name:        "wrong length",
+			input:       bytes.Repeat([]byte{1}, 34),
+			expectedErr: "malformed public key: invalid length: 34",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParseP256PublicKey(tt.input)
-			assert.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -108,47 +108,47 @@ func TestP256Public_Equals(t *testing.T) {
 	key2 := GenerateP256PublicKey()
 
 	tests := []struct {
-		name string
-		a    P256Public
-		b    P256Public
-		want bool
+		name           string
+		a              P256Public
+		b              P256Public
+		expectedEquals bool
 	}{
 		{
-			name: "same keys",
-			a:    key1,
-			b:    key1,
-			want: true,
+			name:           "same keys",
+			a:              key1,
+			b:              key1,
+			expectedEquals: true,
 		},
 		{
-			name: "different keys",
-			a:    key1,
-			b:    key2,
-			want: false,
+			name:           "different keys",
+			a:              key1,
+			b:              key2,
+			expectedEquals: false,
 		},
 		{
-			name: "both zero",
-			a:    P256Public{},
-			b:    P256Public{},
-			want: true,
+			name:           "both zero",
+			a:              P256Public{},
+			b:              P256Public{},
+			expectedEquals: true,
 		},
 		{
-			name: "left zero",
-			a:    P256Public{},
-			b:    key1,
-			want: false,
+			name:           "left zero",
+			a:              P256Public{},
+			b:              key1,
+			expectedEquals: false,
 		},
 		{
-			name: "right zero",
-			a:    key1,
-			b:    P256Public{},
-			want: false,
+			name:           "right zero",
+			a:              key1,
+			b:              P256Public{},
+			expectedEquals: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.a.Equals(tt.b))
-			assert.Equal(t, tt.want, tt.b.Equals(tt.a))
+			assert.Equal(t, tt.expectedEquals, tt.a.Equals(tt.b))
+			assert.Equal(t, tt.expectedEquals, tt.b.Equals(tt.a))
 		})
 	}
 }
@@ -170,25 +170,25 @@ func TestP256Public_String(t *testing.T) {
 
 func TestP256Public_IsZero(t *testing.T) {
 	tests := []struct {
-		name     string
-		key      P256Public
-		wantZero bool
+		name         string
+		key          P256Public
+		expectedZero bool
 	}{
 		{
-			name:     "zero value",
-			key:      P256Public{},
-			wantZero: true,
+			name:         "zero value",
+			key:          P256Public{},
+			expectedZero: true,
 		},
 		{
-			name:     "generated key",
-			key:      GenerateP256PublicKey(),
-			wantZero: false,
+			name:         "generated key",
+			key:          GenerateP256PublicKey(),
+			expectedZero: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.wantZero, tt.key.IsZero())
+			assert.Equal(t, tt.expectedZero, tt.key.IsZero())
 		})
 	}
 }
@@ -210,29 +210,29 @@ func TestP256Public_Scan(t *testing.T) {
 	key := GenerateP256PublicKey()
 
 	tests := []struct {
-		name  string
-		input any
-		want  P256Public
+		name        string
+		input       any
+		expectedKey P256Public
 	}{
 		{
-			name:  "valid key",
-			input: &sql.Null[[]byte]{V: key.Serialize(), Valid: true},
-			want:  key,
+			name:        "valid key",
+			input:       &sql.Null[[]byte]{V: key.Serialize(), Valid: true},
+			expectedKey: key,
 		},
 		{
-			name:  "nil value",
-			input: nil,
-			want:  P256Public{},
+			name:        "nil value",
+			input:       nil,
+			expectedKey: P256Public{},
 		},
 		{
-			name:  "nil sql.Null",
-			input: (*sql.Null[[]byte])(nil),
-			want:  P256Public{},
+			name:        "nil sql.Null",
+			input:       (*sql.Null[[]byte])(nil),
+			expectedKey: P256Public{},
 		},
 		{
-			name:  "null value",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  P256Public{},
+			name:        "null value",
+			input:       &sql.Null[[]byte]{Valid: false},
+			expectedKey: P256Public{},
 		},
 	}
 
@@ -242,7 +242,7 @@ func TestP256Public_Scan(t *testing.T) {
 			err := dest.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, dest)
+			assert.Equal(t, tt.expectedKey, dest)
 		})
 	}
 }
@@ -257,19 +257,19 @@ func TestP256Public_MarshalJSON(t *testing.T) {
 	key := GenerateP256PublicKey()
 
 	tests := []struct {
-		name string
-		key  P256Public
-		want []byte
+		name          string
+		key           P256Public
+		expectedBytes []byte
 	}{
 		{
-			name: "valid key",
-			key:  key,
-			want: key.Serialize(),
+			name:          "valid key",
+			key:           key,
+			expectedBytes: key.Serialize(),
 		},
 		{
-			name: "empty key",
-			key:  P256Public{},
-			want: nil,
+			name:          "empty key",
+			key:           P256Public{},
+			expectedBytes: nil,
 		},
 	}
 
@@ -280,7 +280,7 @@ func TestP256Public_MarshalJSON(t *testing.T) {
 
 			var unmarshaled []byte
 			require.NoError(t, json.Unmarshal(data, &unmarshaled))
-			assert.Equal(t, tt.want, unmarshaled)
+			assert.Equal(t, tt.expectedBytes, unmarshaled)
 		})
 	}
 }
@@ -310,9 +310,9 @@ func TestP256PublicFromECDSA(t *testing.T) {
 	require.NoError(t, err)
 
 	// Round-trip: the ECDSA key we get back should have the same coordinates.
-	got := pub.ToECDSA()
-	assert.Equal(t, priv.PublicKey.X, got.X)
-	assert.Equal(t, priv.PublicKey.Y, got.Y)
+	ecdsaKey := pub.ToECDSA()
+	assert.Equal(t, priv.PublicKey.X, ecdsaKey.X)
+	assert.Equal(t, priv.PublicKey.Y, ecdsaKey.Y)
 }
 
 func TestP256PublicFromECDSA_WrongCurve(t *testing.T) {

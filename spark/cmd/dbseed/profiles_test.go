@@ -34,11 +34,11 @@ func TestRealisticSSPDistribution(t *testing.T) {
 
 	// Pending counts are exact (no rng on count itself — only on per-row
 	// status/type sampling).
-	if got := mainnet.phaseRows["pending"]; got != 92 {
-		t.Errorf("ssp-mainnet/pending: want 92 receivers, got %d", got)
+	if pendingReceivers := mainnet.phaseRows["pending"]; pendingReceivers != 92 {
+		t.Errorf("ssp-mainnet/pending: want 92 receivers, got %d", pendingReceivers)
 	}
-	if got := regtest.phaseRows["pending"]; got != 64 {
-		t.Errorf("ssp-regtest/pending: want 64 receivers, got %d", got)
+	if pendingReceivers := regtest.phaseRows["pending"]; pendingReceivers != 64 {
+		t.Errorf("ssp-regtest/pending: want 64 receivers, got %d", pendingReceivers)
 	}
 
 	// Receiver rows for both SSP wallets must always have the wallet's pubkey
@@ -76,10 +76,10 @@ func TestRealisticSSPDistribution(t *testing.T) {
 	}
 
 	// Both pending phases must use the appropriate network on transfers.network.
-	if got := mainnet.networks["pending"]["MAINNET"]; got != mainnet.phaseRows["pending"] {
+	if mainnetNetworkRows := mainnet.networks["pending"]["MAINNET"]; mainnetNetworkRows != mainnet.phaseRows["pending"] {
 		t.Errorf("ssp-mainnet/pending: expected all rows on MAINNET, got %v", mainnet.networks["pending"])
 	}
-	if got := regtest.networks["pending"]["REGTEST"]; got != regtest.phaseRows["pending"] {
+	if regtestNetworkRows := regtest.networks["pending"]["REGTEST"]; regtestNetworkRows != regtest.phaseRows["pending"] {
 		t.Errorf("ssp-regtest/pending: expected all rows on REGTEST, got %v", regtest.networks["pending"])
 	}
 }
@@ -108,17 +108,17 @@ func TestStuckUserDistribution(t *testing.T) {
 			len(expectedGroups), len(cfg.WalletGroups))
 	}
 	results := drainProfile(t, cfg)
-	for label, wantPending := range expectedGroups {
+	for label, expectedPending := range expectedGroups {
 		group, ok := results.byGroup[label]
 		if !ok {
 			t.Errorf("missing group %q in results; have %v", label, results.groupLabels())
 			continue
 		}
-		if got := group.phaseRows["pending"]; got != wantPending {
-			t.Errorf("%s/pending: want %d receivers, got %d", label, wantPending, got)
+		if pendingReceivers := group.phaseRows["pending"]; pendingReceivers != expectedPending {
+			t.Errorf("%s/pending: want %d receivers, got %d", label, expectedPending, pendingReceivers)
 		}
 		// Every stuck-user wallet must be MAINNET.
-		if got := group.networks["pending"]["MAINNET"]; got != group.phaseRows["pending"] {
+		if mainnetNetworkRows := group.networks["pending"]["MAINNET"]; mainnetNetworkRows != group.phaseRows["pending"] {
 			t.Errorf("%s/pending: expected all rows on MAINNET, got %v", label, group.networks["pending"])
 		}
 	}
@@ -140,15 +140,15 @@ func TestStuckUserDistribution(t *testing.T) {
 
 	// The completed phase must exist for the primary wallet only — secondaries
 	// are pending-phase-only by design.
-	if got := primary.phaseRows["completed"]; got != 2_447 {
-		t.Errorf("stuck-user-primary/completed: want 2447 receivers, got %d", got)
+	if completedReceivers := primary.phaseRows["completed"]; completedReceivers != 2_447 {
+		t.Errorf("stuck-user-primary/completed: want 2447 receivers, got %d", completedReceivers)
 	}
 	for label := range expectedGroups {
 		if label == "stuck-user-primary" {
 			continue
 		}
-		if got := results.byGroup[label].phaseRows["completed"]; got != 0 {
-			t.Errorf("%s: secondary stuck-user must have no completed phase, got %d", label, got)
+		if completedReceivers := results.byGroup[label].phaseRows["completed"]; completedReceivers != 0 {
+			t.Errorf("%s: secondary stuck-user must have no completed phase, got %d", label, completedReceivers)
 		}
 	}
 }
@@ -167,7 +167,7 @@ func TestFullProfileUnchanged(t *testing.T) {
 	if len(cfg.WalletGroups) != 0 {
 		t.Errorf("full profile must not introduce wallet groups; got %d", len(cfg.WalletGroups))
 	}
-	wantTiers := []struct {
+	expectedTiers := []struct {
 		label    string
 		wallets  int
 		countMin int
@@ -180,18 +180,18 @@ func TestFullProfileUnchanged(t *testing.T) {
 		{"T5", 3, 50_000, 75_000},
 		{"TAIL", 1000, 10, 500},
 	}
-	if len(cfg.Tiers) != len(wantTiers) {
-		t.Fatalf("full profile tier count regressed: want %d, got %d", len(wantTiers), len(cfg.Tiers))
+	if len(cfg.Tiers) != len(expectedTiers) {
+		t.Fatalf("full profile tier count regressed: want %d, got %d", len(expectedTiers), len(cfg.Tiers))
 	}
-	for i, want := range wantTiers {
-		got := cfg.Tiers[i]
-		if got.Label != want.label || got.WalletsInTier != want.wallets ||
-			got.CountMin != want.countMin || got.CountMax != want.countMax {
-			t.Errorf("tier %d: want %+v, got %+v", i, want, got)
+	for i, expectedTier := range expectedTiers {
+		tier := cfg.Tiers[i]
+		if tier.Label != expectedTier.label || tier.WalletsInTier != expectedTier.wallets ||
+			tier.CountMin != expectedTier.countMin || tier.CountMax != expectedTier.countMax {
+			t.Errorf("tier %d: want %+v, got %+v", i, expectedTier, tier)
 		}
 	}
-	if got := cfg.totalTransfers(); got != 61_542_500 {
-		t.Errorf("full profile totalTransfers regressed: want 61542500, got %d", got)
+	if totalTransfers := cfg.totalTransfers(); totalTransfers != 61_542_500 {
+		t.Errorf("full profile totalTransfers regressed: want 61542500, got %d", totalTransfers)
 	}
 }
 
@@ -355,28 +355,28 @@ func drainProfile(t *testing.T, cfg *Config) *drainResults {
 	return results
 }
 
-func isMostCommonType(counts map[st.TransferType]int, want st.TransferType) bool {
-	wantCount := counts[want]
+func isMostCommonType(counts map[st.TransferType]int, transferType st.TransferType) bool {
+	expectedCount := counts[transferType]
 	for k, v := range counts {
-		if k == want {
+		if k == transferType {
 			continue
 		}
-		if v >= wantCount {
+		if v >= expectedCount {
 			return false
 		}
 	}
-	return wantCount > 0
+	return expectedCount > 0
 }
 
-func isMostCommonReceiverStatus(counts map[st.TransferReceiverStatus]int, want st.TransferReceiverStatus) bool {
-	wantCount := counts[want]
+func isMostCommonReceiverStatus(counts map[st.TransferReceiverStatus]int, receiverStatus st.TransferReceiverStatus) bool {
+	expectedCount := counts[receiverStatus]
 	for k, v := range counts {
-		if k == want {
+		if k == receiverStatus {
 			continue
 		}
-		if v >= wantCount {
+		if v >= expectedCount {
 			return false
 		}
 	}
-	return wantCount > 0
+	return expectedCount > 0
 }

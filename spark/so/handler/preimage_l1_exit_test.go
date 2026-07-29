@@ -31,9 +31,9 @@ func TestCommitSenderKeyTweaks_RejectsExitedLeaves(t *testing.T) {
 	client := dbCtx.Client
 
 	for _, tc := range []struct {
-		name       string
-		leafStatus st.TreeNodeStatus
-		wantReject bool
+		name           string
+		leafStatus     st.TreeNodeStatus
+		expectedReject bool
 	}{
 		{"exited leaf rejects key tweak commit", st.TreeNodeStatusExited, true},
 		{"on-chain leaf rejects key tweak commit", st.TreeNodeStatusOnChain, true},
@@ -109,7 +109,7 @@ func TestCommitSenderKeyTweaks_RejectsExitedLeaves(t *testing.T) {
 				Action:     pbinternal.SettleKeyTweakAction_COMMIT,
 			})
 
-			if tc.wantReject {
+			if tc.expectedReject {
 				require.Error(t, err)
 				grpcStatus, ok := status.FromError(err)
 				require.True(t, ok, "expected gRPC status error, got: %v", err)

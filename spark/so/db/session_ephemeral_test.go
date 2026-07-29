@@ -122,7 +122,7 @@ func TestEphemeralSession_GetOrBeginTxCancelledContextReturnsExistingTx(t *testi
 	canceledCtx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	gotTx, gotErr := session.GetOrBeginTx(canceledCtx)
-	require.NoError(t, gotErr)
-	require.Equal(t, tx, gotTx)
+	actualTx, actualErr := session.GetOrBeginTx(canceledCtx)
+	require.NoError(t, actualErr)
+	require.Equal(t, tx, actualTx)
 }

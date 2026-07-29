@@ -907,36 +907,36 @@ func TestBroadcastTokenTransaction_ExpiredExecuteBeforeTransferCanResubmit(t *te
 
 func TestBroadcastTokenTransaction_DuplicateMintRequest(t *testing.T) {
 	tests := []struct {
-		name          string
-		status        st.TokenTransactionStatus
-		expired       bool
-		wantErr       bool
-		wantStatus    tokenpb.CommitStatus
-		wantProgress  bool
-		wantErrReason string
+		name              string
+		status            st.TokenTransactionStatus
+		expired           bool
+		expectedErr       bool
+		expectedStatus    tokenpb.CommitStatus
+		expectedProgress  bool
+		expectedErrReason string
 	}{
 		{
-			name:         "finalized transaction returns finalized status",
-			status:       st.TokenTransactionStatusFinalized,
-			expired:      true, // expiry doesn't matter for finalized
-			wantErr:      false,
-			wantStatus:   tokenpb.CommitStatus_COMMIT_FINALIZED,
-			wantProgress: false,
+			name:             "finalized transaction returns finalized status",
+			status:           st.TokenTransactionStatusFinalized,
+			expired:          true, // expiry doesn't matter for finalized
+			expectedErr:      false,
+			expectedStatus:   tokenpb.CommitStatus_COMMIT_FINALIZED,
+			expectedProgress: false,
 		},
 		{
-			name:          "expired transaction returns error",
-			status:        st.TokenTransactionStatusSigned,
-			expired:       true,
-			wantErr:       true,
-			wantErrReason: sparkerrors.ReasonAlreadyExistsExpiredTransaction,
+			name:              "expired transaction returns error",
+			status:            st.TokenTransactionStatusSigned,
+			expired:           true,
+			expectedErr:       true,
+			expectedErrReason: sparkerrors.ReasonAlreadyExistsExpiredTransaction,
 		},
 		{
-			name:         "processing transaction returns progress",
-			status:       st.TokenTransactionStatusSigned,
-			expired:      false,
-			wantErr:      false,
-			wantStatus:   tokenpb.CommitStatus_COMMIT_PROCESSING,
-			wantProgress: true,
+			name:             "processing transaction returns progress",
+			status:           st.TokenTransactionStatusSigned,
+			expired:          false,
+			expectedErr:      false,
+			expectedStatus:   tokenpb.CommitStatus_COMMIT_PROCESSING,
+			expectedProgress: true,
 		},
 	}
 
@@ -964,17 +964,17 @@ func TestBroadcastTokenTransaction_DuplicateMintRequest(t *testing.T) {
 			req := setup.signAndBuildRequest(partial, issuerPriv)
 			resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
 
-			if tc.wantErr {
+			if tc.expectedErr {
 				require.Error(t, err)
 				require.Nil(t, resp)
 				_, reason := sparkerrors.CodeAndReasonFrom(err)
-				assert.Equal(t, tc.wantErrReason, reason)
+				assert.Equal(t, tc.expectedErrReason, reason)
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-				assert.Equal(t, tc.wantStatus, resp.GetCommitStatus())
+				assert.Equal(t, tc.expectedStatus, resp.GetCommitStatus())
 				assert.NotNil(t, resp.GetFinalTokenTransaction())
-				if tc.wantProgress {
+				if tc.expectedProgress {
 					require.NotNil(t, resp.GetCommitProgress())
 					assert.NotEmpty(t, resp.GetCommitProgress().GetCommittedOperatorPublicKeys())
 				} else {
@@ -1042,36 +1042,36 @@ func TestBroadcastTokenTransaction_TransferWithDuplicateOutputsToSpend(t *testin
 
 func TestBroadcastTokenTransaction_DuplicateTransferRequest(t *testing.T) {
 	tests := []struct {
-		name          string
-		status        st.TokenTransactionStatus
-		expired       bool
-		wantErr       bool
-		wantStatus    tokenpb.CommitStatus
-		wantProgress  bool
-		wantErrReason string
+		name              string
+		status            st.TokenTransactionStatus
+		expired           bool
+		expectedErr       bool
+		expectedStatus    tokenpb.CommitStatus
+		expectedProgress  bool
+		expectedErrReason string
 	}{
 		{
-			name:         "finalized transaction returns finalized status",
-			status:       st.TokenTransactionStatusFinalized,
-			expired:      true, // expiry doesn't matter for finalized
-			wantErr:      false,
-			wantStatus:   tokenpb.CommitStatus_COMMIT_FINALIZED,
-			wantProgress: false,
+			name:             "finalized transaction returns finalized status",
+			status:           st.TokenTransactionStatusFinalized,
+			expired:          true, // expiry doesn't matter for finalized
+			expectedErr:      false,
+			expectedStatus:   tokenpb.CommitStatus_COMMIT_FINALIZED,
+			expectedProgress: false,
 		},
 		{
-			name:          "expired transaction returns error",
-			status:        st.TokenTransactionStatusSigned,
-			expired:       true,
-			wantErr:       true,
-			wantErrReason: sparkerrors.ReasonAlreadyExistsExpiredTransaction,
+			name:              "expired transaction returns error",
+			status:            st.TokenTransactionStatusSigned,
+			expired:           true,
+			expectedErr:       true,
+			expectedErrReason: sparkerrors.ReasonAlreadyExistsExpiredTransaction,
 		},
 		{
-			name:         "processing transaction returns reveal progress",
-			status:       st.TokenTransactionStatusSigned,
-			expired:      false,
-			wantErr:      false,
-			wantStatus:   tokenpb.CommitStatus_COMMIT_PROCESSING,
-			wantProgress: true,
+			name:             "processing transaction returns reveal progress",
+			status:           st.TokenTransactionStatusSigned,
+			expired:          false,
+			expectedErr:      false,
+			expectedStatus:   tokenpb.CommitStatus_COMMIT_PROCESSING,
+			expectedProgress: true,
 		},
 	}
 
@@ -1105,17 +1105,17 @@ func TestBroadcastTokenTransaction_DuplicateTransferRequest(t *testing.T) {
 			req := setup.signAndBuildRequest(partial, ownerPriv)
 			resp, err := setup.handler.BroadcastTokenTransaction(ctx, req)
 
-			if tc.wantErr {
+			if tc.expectedErr {
 				require.Error(t, err)
 				require.Nil(t, resp)
 				_, reason := sparkerrors.CodeAndReasonFrom(err)
-				assert.Equal(t, tc.wantErrReason, reason)
+				assert.Equal(t, tc.expectedErrReason, reason)
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
-				assert.Equal(t, tc.wantStatus, resp.GetCommitStatus())
+				assert.Equal(t, tc.expectedStatus, resp.GetCommitStatus())
 				assert.NotNil(t, resp.GetFinalTokenTransaction())
-				if tc.wantProgress {
+				if tc.expectedProgress {
 					require.NotNil(t, resp.GetCommitProgress())
 					// Transfer uses reveal progress - only coordinator has keyshare
 					assert.Len(t, resp.GetCommitProgress().GetCommittedOperatorPublicKeys(), 1,

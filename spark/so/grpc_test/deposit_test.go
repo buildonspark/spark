@@ -219,9 +219,9 @@ func TestRotateStaticDepositAddress(t *testing.T) {
 	assert.Len(t, queryStaticDepositAddresses.GetDepositAddresses(), 2)
 
 	// Verify the new default address is in the list
-	hasAddress := func(want string) bool {
+	hasAddress := func(address string) bool {
 		return slices.ContainsFunc(queryStaticDepositAddresses.GetDepositAddresses(), func(addr *pb.DepositAddressQueryResult) bool {
-			return addr.GetDepositAddress() == want
+			return addr.GetDepositAddress() == address
 		})
 	}
 	assert.True(t, hasAddress(rotateResp.GetNewDepositAddress().GetAddress()), "New default address should be in the query results")

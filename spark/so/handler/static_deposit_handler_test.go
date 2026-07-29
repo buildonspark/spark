@@ -35,19 +35,19 @@ func TestInitiateStaticDepositUtxoRefundRejectsMalformedDirectRequests(t *testin
 	handler := NewStaticDepositHandler(cfg)
 
 	tests := []struct {
-		name    string
-		req     *pb.InitiateStaticDepositUtxoRefundRequest
-		wantErr string
+		name        string
+		req         *pb.InitiateStaticDepositUtxoRefundRequest
+		expectedErr string
 	}{
 		{
-			name:    "nil request",
-			req:     nil,
-			wantErr: "request is required",
+			name:        "nil request",
+			req:         nil,
+			expectedErr: "request is required",
 		},
 		{
-			name:    "nil on-chain UTXO",
-			req:     &pb.InitiateStaticDepositUtxoRefundRequest{},
-			wantErr: "on_chain_utxo is required",
+			name:        "nil on-chain UTXO",
+			req:         &pb.InitiateStaticDepositUtxoRefundRequest{},
+			expectedErr: "on_chain_utxo is required",
 		},
 	}
 
@@ -55,7 +55,7 @@ func TestInitiateStaticDepositUtxoRefundRejectsMalformedDirectRequests(t *testin
 		t.Run(tt.name, func(t *testing.T) {
 			resp, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, tt.req)
 			require.Nil(t, resp)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

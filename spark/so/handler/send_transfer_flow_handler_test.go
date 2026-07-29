@@ -326,66 +326,66 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 	}
 
 	cases := []struct {
-		name    string
-		mutate  func(*pb.StartTransferV3Request)
-		wantSub string
+		name        string
+		mutate      func(*pb.StartTransferV3Request)
+		expectedSub string
 	}{
 		{
-			name:    "empty request",
-			mutate:  func(r *pb.StartTransferV3Request) { *r = pb.StartTransferV3Request{} },
-			wantSub: "expected exactly 1 sender package",
+			name:        "empty request",
+			mutate:      func(r *pb.StartTransferV3Request) { *r = pb.StartTransferV3Request{} },
+			expectedSub: "expected exactly 1 sender package",
 		},
 		{
-			name:    "zero sender packages",
-			mutate:  func(r *pb.StartTransferV3Request) { r.SenderPackages = nil },
-			wantSub: "expected exactly 1 sender package",
+			name:        "zero sender packages",
+			mutate:      func(r *pb.StartTransferV3Request) { r.SenderPackages = nil },
+			expectedSub: "expected exactly 1 sender package",
 		},
 		{
 			name: "two sender packages",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages = append(r.SenderPackages, r.GetSenderPackages()[0])
 			},
-			wantSub: "expected exactly 1 sender package",
+			expectedSub: "expected exactly 1 sender package",
 		},
 		{
 			name: "nil sender package",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0] = nil
 			},
-			wantSub: "sender_package is required",
+			expectedSub: "sender_package is required",
 		},
 		{
 			name: "nil transfer package",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].TransferPackage = nil
 			},
-			wantSub: "transfer_package is required",
+			expectedSub: "transfer_package is required",
 		},
 		{
-			name:    "invalid transfer id",
-			mutate:  func(r *pb.StartTransferV3Request) { r.TransferId = "not-a-uuid" },
-			wantSub: "invalid transfer id",
+			name:        "invalid transfer id",
+			mutate:      func(r *pb.StartTransferV3Request) { r.TransferId = "not-a-uuid" },
+			expectedSub: "invalid transfer id",
 		},
 		{
 			name: "invalid sender pubkey",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].OwnerIdentityPublicKey = []byte{0x00}
 			},
-			wantSub: "owner identity public key",
+			expectedSub: "owner identity public key",
 		},
 		{
 			name: "no receivers",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].ReceiverIdentityPublicKeys = nil
 			},
-			wantSub: "at least one receiver",
+			expectedSub: "at least one receiver",
 		},
 		{
 			name: "invalid receiver pubkey",
 			mutate: func(r *pb.StartTransferV3Request) {
 				r.SenderPackages[0].ReceiverIdentityPublicKeys["leaf-1"] = []byte{0x00}
 			},
-			wantSub: "receiver public key",
+			expectedSub: "receiver public key",
 		},
 	}
 
@@ -394,7 +394,7 @@ func TestParseSendTransferRequest_Errors(t *testing.T) {
 			req := makeValid()
 			tc.mutate(req)
 			_, err := parseSendTransferRequest(req)
-			require.ErrorContains(t, err, tc.wantSub)
+			require.ErrorContains(t, err, tc.expectedSub)
 		})
 	}
 }
@@ -583,16 +583,16 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 	}
 
 	tests := []struct {
-		name    string
-		pkg     func() *pb.TransferPackage
-		wantErr string
+		name        string
+		pkg         func() *pb.TransferPackage
+		expectedErr string
 	}{
 		{
 			name: "cpfp leaves",
 			pkg: func() *pb.TransferPackage {
 				return withDummyPackageAuth(&pb.TransferPackage{LeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()}})
 			},
-			wantErr: "build cpfp signing job",
+			expectedErr: "build cpfp signing job",
 		},
 		{
 			name: "direct leaves",
@@ -602,7 +602,7 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 					DirectLeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()},
 				})
 			},
-			wantErr: "build direct signing job",
+			expectedErr: "build direct signing job",
 		},
 		{
 			name: "direct from cpfp leaves",
@@ -613,7 +613,7 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 					DirectFromCpfpLeavesToSend: []*pb.UserSignedTxSigningJob{makeWrongJob()},
 				})
 			},
-			wantErr: "build direct-from-cpfp signing job",
+			expectedErr: "build direct-from-cpfp signing job",
 		},
 	}
 
@@ -623,7 +623,7 @@ func TestBuildSendTransferAggregationJobsValidatesAllRefundPackageOutpoints(t *t
 			pkg, err := transferpkg.ParsePackage(tt.pkg())
 			require.NoError(t, err)
 			_, err = buildSendTransferAggregationJobs(ctx, uuid.New(), pkg, leafMap, TransferAdaptorPublicKeys{})
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 			require.ErrorContains(t, err, "refund tx input 0 must spend parent tx output 0")
 		})
 	}

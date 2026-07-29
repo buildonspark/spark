@@ -26,14 +26,14 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 	}
 
 	for _, tc := range []struct {
-		name    string
-		req     *pb.GetSigningCommitmentsRequest
-		wantErr string
+		name        string
+		req         *pb.GetSigningCommitmentsRequest
+		expectedErr string
 	}{
 		{
-			name:    "nil request",
-			req:     nil,
-			wantErr: "request is required",
+			name:        "nil request",
+			req:         nil,
+			expectedErr: "request is required",
 		},
 		{
 			name: "node ids and count both set",
@@ -41,7 +41,7 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 				NodeIds:     []string{uuid.NewString()},
 				NodeIdCount: 1,
 			},
-			wantErr: "can provide node_ids or node_id_count, but not both",
+			expectedErr: "can provide node_ids or node_id_count, but not both",
 		},
 		{
 			name: "malformed node id",
@@ -49,7 +49,7 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 				NodeIds: []string{"not-a-uuid"},
 				Count:   1,
 			},
-			wantErr: "unable to parse node id",
+			expectedErr: "unable to parse node id",
 		},
 		{
 			name: "too many node ids",
@@ -57,7 +57,7 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 				NodeIds: tooManyNodeIDs,
 				Count:   1,
 			},
-			wantErr: "there were 1001 node ids provided",
+			expectedErr: "there were 1001 node ids provided",
 		},
 		{
 			name: "node id count too large",
@@ -65,7 +65,7 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 				NodeIdCount: DefaultMaxSigningCommitmentNodes + 1,
 				Count:       1,
 			},
-			wantErr: "node ID count provided was 1001",
+			expectedErr: "node ID count provided was 1001",
 		},
 		{
 			name: "count too large",
@@ -73,7 +73,7 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 				NodeIdCount: 1,
 				Count:       DefaultMaxSigningCommitmentCount + 1,
 			},
-			wantErr: "number of signing commitments provided was 11",
+			expectedErr: "number of signing commitments provided was 11",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestGetSigningCommitmentsRejectsMalformedRequestsWithInvalidArgument(t *tes
 			require.Nil(t, resp)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
 }

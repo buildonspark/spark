@@ -28,41 +28,41 @@ func TestParsePubKey(t *testing.T) {
 
 func TestParsePubKey_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:    "nil",
-			input:   nil,
-			wantErr: "malformed public key: invalid length: 0",
+			name:        "nil",
+			input:       nil,
+			expectedErr: "malformed public key: invalid length: 0",
 		},
 		{
-			name:    "empty",
-			input:   []byte{},
-			wantErr: "malformed public key: invalid length: 0",
+			name:        "empty",
+			input:       []byte{},
+			expectedErr: "malformed public key: invalid length: 0",
 		},
 		{
-			name:    "too short",
-			input:   bytes.Repeat([]byte{1}, 32),
-			wantErr: "malformed public key: invalid length: 32",
+			name:        "too short",
+			input:       bytes.Repeat([]byte{1}, 32),
+			expectedErr: "malformed public key: invalid length: 32",
 		},
 		{
-			name:    "too long",
-			input:   bytes.Repeat([]byte{1}, 34),
-			wantErr: "malformed public key: invalid length: 34",
+			name:        "too long",
+			input:       bytes.Repeat([]byte{1}, 34),
+			expectedErr: "malformed public key: invalid length: 34",
 		},
 		{
-			name:    "invalid format",
-			input:   bytes.Repeat([]byte{0}, 33),
-			wantErr: "invalid public key: unsupported format",
+			name:        "invalid format",
+			input:       bytes.Repeat([]byte{0}, 33),
+			expectedErr: "invalid public key: unsupported format",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParsePublicKey(tt.input)
-			assert.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -75,11 +75,11 @@ func TestParsePubKeyMap(t *testing.T) {
 		"key2": pub2.Serialize(),
 	}
 
-	got, err := ParsePublicKeyMap(asBytes)
+	parsedKeys, err := ParsePublicKeyMap(asBytes)
 	require.NoError(t, err)
 
-	want := map[string]Public{"key1": pub1, "key2": pub2}
-	assert.Equal(t, want, got)
+	expectedKeys := map[string]Public{"key1": pub1, "key2": pub2}
+	assert.Equal(t, expectedKeys, parsedKeys)
 }
 
 func TestParsePubKeyMap_InvalidKey_Errors(t *testing.T) {
@@ -109,33 +109,33 @@ func TestPublic_Add(t *testing.T) {
 	privA := MustGeneratePrivateKeyFromRand(rng)
 	privB := MustGeneratePrivateKeyFromRand(rng)
 
-	got := privA.Public().Add(privB.Public())
+	sumOfPublics := privA.Public().Add(privB.Public())
 
 	// Verify that the sum equals the public key of (privA + privB)
-	want := privA.Add(privB).Public()
-	assert.Equal(t, want, got)
+	expectedSum := privA.Add(privB).Public()
+	assert.Equal(t, expectedSum, sumOfPublics)
 }
 
 func TestPublic_AddTweak(t *testing.T) {
 	privKey := MustGeneratePrivateKeyFromRand(rng)
 	tweak := MustGeneratePrivateKeyFromRand(rng)
 
-	got := privKey.Public().AddTweak(tweak)
+	tweakedPubKey := privKey.Public().AddTweak(tweak)
 
 	// Verify that the result equals the public key of (privKey + tweak)
-	want := privKey.Add(tweak).Public()
-	assert.Equal(t, want, got)
+	expectedPubKey := privKey.Add(tweak).Public()
+	assert.Equal(t, expectedPubKey, tweakedPubKey)
 }
 
 func TestPublic_Sub(t *testing.T) {
 	privA := MustGeneratePrivateKeyFromRand(rng)
 	privB := MustGeneratePrivateKeyFromRand(rng)
 
-	got := privA.Public().Sub(privB.Public())
+	difference := privA.Public().Sub(privB.Public())
 
 	// Verify that the difference equals the public key of (privA - privB)
-	want := privA.Sub(privB).Public()
-	assert.Equal(t, want, got)
+	expectedDifference := privA.Sub(privB).Public()
+	assert.Equal(t, expectedDifference, difference)
 }
 
 func TestPublic_Equals(t *testing.T) {
@@ -143,30 +143,30 @@ func TestPublic_Equals(t *testing.T) {
 	priv2 := MustGeneratePrivateKeyFromRand(rng)
 
 	tests := []struct {
-		name string
-		a    Public
-		b    Public
-		want bool
+		name           string
+		a              Public
+		b              Public
+		expectedEquals bool
 	}{
 		{
-			name: "same keys",
-			a:    priv1.Public(),
-			b:    priv1.Public(),
-			want: true,
+			name:           "same keys",
+			a:              priv1.Public(),
+			b:              priv1.Public(),
+			expectedEquals: true,
 		},
 		{
-			name: "different keys",
-			a:    priv1.Public(),
-			b:    priv2.Public(),
-			want: false,
+			name:           "different keys",
+			a:              priv1.Public(),
+			b:              priv2.Public(),
+			expectedEquals: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.a.Equals(tt.b))
+			assert.Equal(t, tt.expectedEquals, tt.a.Equals(tt.b))
 			// Ensure it's commutative
-			assert.Equal(t, tt.want, tt.b.Equals(tt.a))
+			assert.Equal(t, tt.expectedEquals, tt.b.Equals(tt.a))
 		})
 	}
 }
@@ -194,29 +194,29 @@ func TestSumPublicKeys(t *testing.T) {
 	public4 := priv4.Public()
 
 	tests := []struct {
-		name string
-		keys []Public
-		want Public
+		name        string
+		keys        []Public
+		expectedSum Public
 	}{
 		{
-			name: "single key",
-			keys: []Public{public1},
-			want: public1,
+			name:        "single key",
+			keys:        []Public{public1},
+			expectedSum: public1,
 		},
 		{
-			name: "two keys",
-			keys: []Public{public1, public2},
-			want: priv1.Add(priv2).Public(),
+			name:        "two keys",
+			keys:        []Public{public1, public2},
+			expectedSum: priv1.Add(priv2).Public(),
 		},
 		{
-			name: "three keys",
-			keys: []Public{public1, public2, public3},
-			want: priv1.Add(priv2).Add(priv3).Public(),
+			name:        "three keys",
+			keys:        []Public{public1, public2, public3},
+			expectedSum: priv1.Add(priv2).Add(priv3).Public(),
 		},
 		{
-			name: "four keys",
-			keys: []Public{public1, public2, public3, public4},
-			want: priv1.Add(priv2).Add(priv3).Add(priv4).Public(),
+			name:        "four keys",
+			keys:        []Public{public1, public2, public3, public4},
+			expectedSum: priv1.Add(priv2).Add(priv3).Add(priv4).Public(),
 		},
 	}
 
@@ -224,7 +224,7 @@ func TestSumPublicKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := SumPublicKeys(tt.keys)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, result)
+			assert.Equal(t, tt.expectedSum, result)
 		})
 	}
 }
@@ -247,29 +247,29 @@ func TestPublic_Scan(t *testing.T) {
 	pubKey := MustGeneratePrivateKeyFromRand(rng).Public()
 
 	tests := []struct {
-		name  string
-		input any
-		want  secp256k1.PublicKey
+		name        string
+		input       any
+		expectedKey secp256k1.PublicKey
 	}{
 		{
-			name:  "valid key",
-			input: &sql.Null[[]byte]{V: pubKey.Serialize(), Valid: true},
-			want:  pubKey.key,
+			name:        "valid key",
+			input:       &sql.Null[[]byte]{V: pubKey.Serialize(), Valid: true},
+			expectedKey: pubKey.key,
 		},
 		{
-			name:  "nil value",
-			input: nil,
-			want:  secp256k1.PublicKey{},
+			name:        "nil value",
+			input:       nil,
+			expectedKey: secp256k1.PublicKey{},
 		},
 		{
-			name:  "nil sql.Null",
-			input: (*sql.Null[[]byte])(nil),
-			want:  secp256k1.PublicKey{},
+			name:        "nil sql.Null",
+			input:       (*sql.Null[[]byte])(nil),
+			expectedKey: secp256k1.PublicKey{},
 		},
 		{
-			name:  "null value",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  secp256k1.PublicKey{},
+			name:        "null value",
+			input:       &sql.Null[[]byte]{Valid: false},
+			expectedKey: secp256k1.PublicKey{},
 		},
 	}
 
@@ -279,7 +279,7 @@ func TestPublic_Scan(t *testing.T) {
 			err := dest.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, dest.key)
+			assert.Equal(t, tt.expectedKey, dest.key)
 		})
 	}
 }
@@ -299,19 +299,19 @@ func TestPublic_Serialize_Empty_ReturnsEmpty(t *testing.T) {
 func TestPublic_MarshalJSON(t *testing.T) {
 	pubKey := MustGeneratePrivateKeyFromRand(rng).Public()
 	tests := []struct {
-		name string
-		key  Public
-		want []byte
+		name          string
+		key           Public
+		expectedBytes []byte
 	}{
 		{
-			name: "valid key",
-			key:  pubKey,
-			want: pubKey.Serialize(),
+			name:          "valid key",
+			key:           pubKey,
+			expectedBytes: pubKey.Serialize(),
 		},
 		{
-			name: "empty key",
-			key:  Public{},
-			want: nil,
+			name:          "empty key",
+			key:           Public{},
+			expectedBytes: nil,
 		},
 	}
 
@@ -323,7 +323,7 @@ func TestPublic_MarshalJSON(t *testing.T) {
 			// Check that the data can be unmarshaled back to the same bytes
 			var unmarshaled []byte
 			require.NoError(t, json.Unmarshal(data, &unmarshaled))
-			assert.Equal(t, tt.want, unmarshaled)
+			assert.Equal(t, tt.expectedBytes, unmarshaled)
 		})
 	}
 }
@@ -350,37 +350,37 @@ func TestToBytesMap(t *testing.T) {
 	public := private.Public()
 
 	tests := []struct {
-		name  string
-		value map[string]Public
-		want  map[string][]byte
+		name             string
+		value            map[string]Public
+		expectedBytesMap map[string][]byte
 	}{
 		{
-			name:  "nil",
-			value: nil,
-			want:  nil,
+			name:             "nil",
+			value:            nil,
+			expectedBytesMap: nil,
 		},
 		{
-			name:  "empty",
-			value: map[string]Public{},
-			want:  nil,
+			name:             "empty",
+			value:            map[string]Public{},
+			expectedBytesMap: nil,
 		},
 		{
-			name:  "public",
-			value: map[string]Public{"abc": public},
-			want:  map[string][]byte{"abc": public.Serialize()},
+			name:             "public",
+			value:            map[string]Public{"abc": public},
+			expectedBytesMap: map[string][]byte{"abc": public.Serialize()},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, ToBytesMap(tt.value))
+			assert.Equal(t, tt.expectedBytesMap, ToBytesMap(tt.value))
 		})
 	}
 
 	// We have to test this separately because [key] can only be used for generics.
 	t.Run("private", func(t *testing.T) {
-		got := ToBytesMap(map[string]Private{"abc": private})
-		want := map[string][]byte{"abc": private.Serialize()}
-		assert.Equal(t, want, got)
+		bytesMap := ToBytesMap(map[string]Private{"abc": private})
+		expectedBytesMap := map[string][]byte{"abc": private.Serialize()}
+		assert.Equal(t, expectedBytesMap, bytesMap)
 	})
 }

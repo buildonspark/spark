@@ -199,20 +199,20 @@ func TestValidateBaseURL_AllowlistedHosts(t *testing.T) {
 
 func TestMakeRequest(t *testing.T) {
 	tests := []struct {
-		name              string
-		opName            string
-		query             string
-		variables         map[string]any
-		identityPublicKey string
-		wantData          map[string]any
-		wantCompression   bool
+		name                string
+		opName              string
+		query               string
+		variables           map[string]any
+		identityPublicKey   string
+		expectedData        map[string]any
+		expectedCompression bool
 	}{
 		{
 			name:      "simple query",
 			opName:    "GetUser",
 			query:     "query GetUser { user { id name } }",
 			variables: map[string]any{"id": "123"},
-			wantData: map[string]any{
+			expectedData: map[string]any{
 				"user": map[string]any{
 					"id":   "123",
 					"name": "John Doe",
@@ -224,7 +224,7 @@ func TestMakeRequest(t *testing.T) {
 			opName:    "CreateUser",
 			query:     "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }",
 			variables: map[string]any{"name": "Jane Doe"},
-			wantData: map[string]any{
+			expectedData: map[string]any{
 				"createUser": map[string]any{
 					"id":   "456",
 					"name": "Jane Doe",
@@ -237,21 +237,21 @@ func TestMakeRequest(t *testing.T) {
 			query:             "query GetUser { user { id } }",
 			variables:         map[string]any{},
 			identityPublicKey: "test-public-key",
-			wantData:          map[string]any{"user": map[string]any{"id": "789"}},
+			expectedData:      map[string]any{"user": map[string]any{"id": "789"}},
 		},
 		{
-			name:      "with custom base URL",
-			opName:    "GetUser",
-			query:     "query GetUser { user { id } }",
-			variables: map[string]any{},
-			wantData:  map[string]any{"user": map[string]any{"id": "999"}},
+			name:         "with custom base URL",
+			opName:       "GetUser",
+			query:        "query GetUser { user { id } }",
+			variables:    map[string]any{},
+			expectedData: map[string]any{"user": map[string]any{"id": "999"}},
 		},
 		{
-			name:      "empty base URL",
-			opName:    "GetUser",
-			query:     "query GetUser { user { id } }",
-			variables: map[string]any{},
-			wantData:  map[string]any{"user": map[string]any{"id": "999"}},
+			name:         "empty base URL",
+			opName:       "GetUser",
+			query:        "query GetUser { user { id } }",
+			variables:    map[string]any{},
+			expectedData: map[string]any{"user": map[string]any{"id": "999"}},
 		},
 		{
 			name:   "large payload with compression",
@@ -260,39 +260,39 @@ func TestMakeRequest(t *testing.T) {
 			variables: map[string]any{
 				"largeParam": string(make([]byte, 2000)), // Large payload to trigger compression
 			},
-			wantData:        map[string]any{"largeData": map[string]any{"content": "large content"}},
-			wantCompression: true,
+			expectedData:        map[string]any{"largeData": map[string]any{"content": "large content"}},
+			expectedCompression: true,
 		},
 		{
 			name:      "compressed response decompression",
 			opName:    "GetCompressedData",
 			query:     "query GetCompressedData { compressedData { content } }",
 			variables: map[string]any{},
-			wantData: map[string]any{
+			expectedData: map[string]any{
 				"compressedData": map[string]any{
 					"content": "decompressed content from zstd",
 				},
 			},
-			wantCompression: false, // We're not compressing the request, but expecting compressed response
+			expectedCompression: false, // We're not compressing the request, but expecting compressed response
 		},
 		{
 			name:      "compressed response with large data",
 			opName:    "GetLargeCompressedData",
 			query:     "query GetLargeCompressedData { largeCompressedData { content } }",
 			variables: map[string]any{},
-			wantData: map[string]any{
+			expectedData: map[string]any{
 				"largeCompressedData": map[string]any{
 					"content": string(make([]byte, 5000)), // Large content that would benefit from compression
 				},
 			},
-			wantCompression: false,
+			expectedCompression: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opName := graphQLPattern.FindStringSubmatch(tt.query)[1]
-			server := newValidatingServer(t, tt.wantData, opName, tt.identityPublicKey, tt.wantCompression)
+			server := newValidatingServer(t, tt.expectedData, opName, tt.identityPublicKey, tt.expectedCompression)
 			defer server.Close()
 			requester, err := NewRequesterWithBaseURL(tt.identityPublicKey, server.URL)
 			require.NoError(t, err)
@@ -306,8 +306,8 @@ func TestMakeRequest(t *testing.T) {
 			err = requester.MakeRequest(t.Context(), request, response)
 
 			require.NoError(t, err)
-			want := &graphql.Response{Data: tt.wantData}
-			assert.Equal(t, want, response)
+			expectedResponse := &graphql.Response{Data: tt.expectedData}
+			assert.Equal(t, expectedResponse, response)
 		})
 	}
 }
@@ -319,27 +319,27 @@ func TestMakeRequest_Errors(t *testing.T) {
 		query          string
 		serverResponse map[string]any
 		serverStatus   int
-		wantErr        string
+		expectedErr    string
 	}{
 		{
-			name:    "invalid query payload",
-			opName:  "InvalidQuery",
-			query:   "invalid query",
-			wantErr: "invalid JSON",
+			name:        "invalid query payload",
+			opName:      "InvalidQuery",
+			query:       "invalid query",
+			expectedErr: "invalid JSON",
 		},
 		{
 			name:         "HTTP 400 error",
 			opName:       "GetUser",
 			query:        "query GetUser { user { id } }",
 			serverStatus: http.StatusBadRequest,
-			wantErr:      "lightspark request failed: 400:",
+			expectedErr:  "lightspark request failed: 400:",
 		},
 		{
 			name:         "HTTP 500 error",
 			opName:       "GetUser",
 			query:        "query GetUser { user { id } }",
 			serverStatus: http.StatusInternalServerError,
-			wantErr:      "lightspark request failed: 500:",
+			expectedErr:  "lightspark request failed: 500:",
 		},
 		{
 			name:   "GraphQL internal error",
@@ -352,7 +352,7 @@ func TestMakeRequest_Errors(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "lightspark request failed: Internal server error",
+			expectedErr: "lightspark request failed: Internal server error",
 		},
 		{
 			name:   "GraphQL user error",
@@ -368,7 +368,7 @@ func TestMakeRequest_Errors(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "USER_NOT_FOUND: User not found",
+			expectedErr: "USER_NOT_FOUND: User not found",
 		},
 		{
 			name:   "GraphQL error with extensions but no error_name",
@@ -384,7 +384,7 @@ func TestMakeRequest_Errors(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "lightspark request failed: Some error",
+			expectedErr: "lightspark request failed: Some error",
 		},
 	}
 
@@ -403,7 +403,7 @@ func TestMakeRequest_Errors(t *testing.T) {
 			response := &graphql.Response{}
 			err = requester.MakeRequest(t.Context(), request, response)
 
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -472,13 +472,13 @@ func newErrorServer(t *testing.T, status int, serverResponse map[string]any) *ht
 	}))
 }
 
-func newValidatingServer(t *testing.T, wantData map[string]any, wantOpName string, identityPubKey string, compression bool) *httptest.Server {
+func newValidatingServer(t *testing.T, expectedData map[string]any, expectedOpName string, identityPubKey string, compression bool) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		assert.Equal(t, "zstd", r.Header.Get("Accept-Encoding"))
 		assert.Equal(t, "spark", r.Header.Get("User-Agent"))
 		assert.Equal(t, "spark", r.Header.Get("X-Lightspark-SDK"))
-		assert.Equal(t, wantOpName, r.Header.Get("X-GraphQL-Operation"))
+		assert.Equal(t, expectedOpName, r.Header.Get("X-GraphQL-Operation"))
 
 		// Verify identity public key header if provided
 		if identityPubKey != "" {
@@ -490,7 +490,7 @@ func newValidatingServer(t *testing.T, wantData map[string]any, wantOpName strin
 			assert.Equal(t, "zstd", r.Header.Get("Content-Encoding"))
 		}
 
-		responseData, _ := json.Marshal(map[string]any{"data": wantData})
+		responseData, _ := json.Marshal(map[string]any{"data": expectedData})
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 

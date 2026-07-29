@@ -102,15 +102,15 @@ func TestWrappedConnRoundTrip(t *testing.T) {
 		}()
 
 		// Read in small chunks; brontide.Conn-style buffering should serve all reads from a single underlying record.
-		got := make([]byte, 0, len(payload))
+		received := make([]byte, 0, len(payload))
 		buf := make([]byte, 4)
-		for len(got) < len(payload) {
+		for len(received) < len(payload) {
 			n, err := p.server.Read(buf)
 			require.NoError(t, err)
-			got = append(got, buf[:n]...)
+			received = append(received, buf[:n]...)
 		}
 		require.NoError(t, <-writeErr)
-		assert.Equal(t, payload, got)
+		assert.Equal(t, payload, received)
 	})
 }
 
@@ -137,11 +137,11 @@ func TestWrappedConnChunkBoundaries(t *testing.T) {
 				writeErr <- err
 			}()
 
-			got := make([]byte, tc.size)
-			_, err = io.ReadFull(p.server, got)
+			received := make([]byte, tc.size)
+			_, err = io.ReadFull(p.server, received)
 			require.NoError(t, err)
 			require.NoError(t, <-writeErr)
-			assert.Equal(t, payload, got)
+			assert.Equal(t, payload, received)
 		})
 	}
 }

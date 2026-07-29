@@ -48,18 +48,18 @@ func TestQueryTransfersByID_FiltersByAccessAndMarshalsFull(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	got := make(map[string]*pb.Transfer)
+	transfersByID := make(map[string]*pb.Transfer)
 	for _, tr := range resp.GetTransfers() {
-		got[tr.GetId()] = tr
+		transfersByID[tr.GetId()] = tr
 	}
-	assert.Len(t, got, 2)
-	assert.Contains(t, got, asSender.ID.String())
-	assert.Contains(t, got, asReceiver.ID.String())
-	assert.NotContains(t, got, notAParticipant.ID.String(), "caller is not a participant — must not be returned")
+	assert.Len(t, transfersByID, 2)
+	assert.Contains(t, transfersByID, asSender.ID.String())
+	assert.Contains(t, transfersByID, asReceiver.ID.String())
+	assert.NotContains(t, transfersByID, notAParticipant.ID.String(), "caller is not a participant — must not be returned")
 
 	// Full per-participant detail is emitted (not a receiver-projected view).
-	assert.NotEmpty(t, got[asSender.ID.String()].GetSenders())
-	assert.NotEmpty(t, got[asSender.ID.String()].GetReceivers())
+	assert.NotEmpty(t, transfersByID[asSender.ID.String()].GetSenders())
+	assert.NotEmpty(t, transfersByID[asSender.ID.String()].GetReceivers())
 
 	// A by-id fetch is a bounded, terminal set — no next page.
 	assert.Equal(t, int64(-1), resp.GetOffset())
@@ -102,9 +102,9 @@ func TestQueryTransfersByID_ValidatesInput(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		req     *pb.QueryTransfersByIdRequest
-		wantErr bool
+		name        string
+		req         *pb.QueryTransfersByIdRequest
+		expectedErr bool
 	}{
 		{"valid", &pb.QueryTransfersByIdRequest{TransferIds: []string{validUUID}, Network: pb.Network_REGTEST}, false},
 		{"empty transfer_ids", &pb.QueryTransfersByIdRequest{Network: pb.Network_REGTEST}, true},
@@ -115,7 +115,7 @@ func TestQueryTransfersByID_ValidatesInput(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.wantErr {
+			if tc.expectedErr {
 				require.Error(t, tc.req.Validate())
 			} else {
 				require.NoError(t, tc.req.Validate())

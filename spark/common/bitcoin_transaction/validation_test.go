@@ -421,23 +421,23 @@ func TestP2TRScriptFromPubKey(t *testing.T) {
 
 func TestNextSequence(t *testing.T) {
 	tests := []struct {
-		name          string
-		currSeq       uint32
-		wantSeq       uint32
-		wantDirectSeq uint32
+		name              string
+		currSeq           uint32
+		expectedSeq       uint32
+		expectedDirectSeq uint32
 	}{
-		{name: "basic", currSeq: 1000, wantSeq: 900, wantDirectSeq: 950},
-		{name: "mixed upper-word pattern", currSeq: 0xAAAA0500, wantSeq: 0xAAAA049C, wantDirectSeq: 0xAAAA04CE},
-		{name: "large timelock value", currSeq: 65535, wantSeq: 65435, wantDirectSeq: 65485},
-		{name: "multiple higher-order bits", currSeq: 1<<30 | 1<<29 | 1<<16 | 2000, wantSeq: 1<<30 | 1<<29 | 1<<16 | 1900, wantDirectSeq: 1<<30 | 1<<29 | 1<<16 | 1950},
-		{name: "preserves higher-order bits", currSeq: 1<<30 | 1000, wantSeq: 1<<30 | 900, wantDirectSeq: 1<<30 | 950},
+		{name: "basic", currSeq: 1000, expectedSeq: 900, expectedDirectSeq: 950},
+		{name: "mixed upper-word pattern", currSeq: 0xAAAA0500, expectedSeq: 0xAAAA049C, expectedDirectSeq: 0xAAAA04CE},
+		{name: "large timelock value", currSeq: 65535, expectedSeq: 65435, expectedDirectSeq: 65485},
+		{name: "multiple higher-order bits", currSeq: 1<<30 | 1<<29 | 1<<16 | 2000, expectedSeq: 1<<30 | 1<<29 | 1<<16 | 1900, expectedDirectSeq: 1<<30 | 1<<29 | 1<<16 | 1950},
+		{name: "preserves higher-order bits", currSeq: 1<<30 | 1000, expectedSeq: 1<<30 | 900, expectedDirectSeq: 1<<30 | 950},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			nextSeq, nextDirectSeq, err := bitcointransaction.NextSequence(tc.currSeq)
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantSeq, nextSeq)
-			assert.Equal(t, tc.wantDirectSeq, nextDirectSeq)
+			assert.Equal(t, tc.expectedSeq, nextSeq)
+			assert.Equal(t, tc.expectedDirectSeq, nextDirectSeq)
 
 			inputTimelock := tc.currSeq & 0xFFFF
 			inputUpperBits := tc.currSeq & 0xFFFF0000

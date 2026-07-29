@@ -44,8 +44,8 @@ func TestIsProvidePreimageCommittableStatus(t *testing.T) {
 		}
 	}
 
-	for status, want := range committable {
-		assert.Equalf(t, want, isProvidePreimageCommittableStatus(status),
+	for status, expectedCommittable := range committable {
+		assert.Equalf(t, expectedCommittable, isProvidePreimageCommittableStatus(status),
 			"isProvidePreimageCommittableStatus(%s)", status)
 	}
 }

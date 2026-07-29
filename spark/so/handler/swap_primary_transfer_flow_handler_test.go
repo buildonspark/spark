@@ -75,13 +75,13 @@ func TestParseSwapTransferRequest_Validation(t *testing.T) {
 		name        string
 		transfer    *sparkProto.StartTransferRequest
 		adaptorKeys *sparkProto.AdaptorPublicKeyPackage
-		wantErr     string
+		expectedErr string
 	}{
 		{
 			name:        "nil transfer",
 			transfer:    nil,
 			adaptorKeys: validAdaptorKeys,
-			wantErr:     "transfer is required",
+			expectedErr: "transfer is required",
 		},
 		{
 			name: "missing transfer package",
@@ -91,7 +91,7 @@ func TestParseSwapTransferRequest_Validation(t *testing.T) {
 				return r
 			}(),
 			adaptorKeys: validAdaptorKeys,
-			wantErr:     "transfer_package is required",
+			expectedErr: "transfer_package is required",
 		},
 		{
 			name: "direct leaves rejected",
@@ -101,7 +101,7 @@ func TestParseSwapTransferRequest_Validation(t *testing.T) {
 				return r
 			}(),
 			adaptorKeys: validAdaptorKeys,
-			wantErr:     "direct transactions should not be provided",
+			expectedErr: "direct transactions should not be provided",
 		},
 		{
 			name: "direct-from-cpfp leaves rejected",
@@ -111,19 +111,19 @@ func TestParseSwapTransferRequest_Validation(t *testing.T) {
 				return r
 			}(),
 			adaptorKeys: validAdaptorKeys,
-			wantErr:     "direct transactions should not be provided",
+			expectedErr: "direct transactions should not be provided",
 		},
 		{
 			name:        "invalid adaptor public key",
 			transfer:    validTransfer(),
 			adaptorKeys: &sparkProto.AdaptorPublicKeyPackage{AdaptorPublicKey: []byte{0x1, 0x2}},
-			wantErr:     "unable to parse adaptor public key",
+			expectedErr: "unable to parse adaptor public key",
 		},
 		{
 			name:        "missing adaptor public key package",
 			transfer:    validTransfer(),
 			adaptorKeys: nil,
-			wantErr:     "unable to parse adaptor public key",
+			expectedErr: "unable to parse adaptor public key",
 		},
 		{
 			name: "invalid transfer id",
@@ -133,13 +133,13 @@ func TestParseSwapTransferRequest_Validation(t *testing.T) {
 				return r
 			}(),
 			adaptorKeys: validAdaptorKeys,
-			wantErr:     "invalid transfer id",
+			expectedErr: "invalid transfer id",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := parseSwapTransferRequest(tt.transfer, tt.adaptorKeys)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

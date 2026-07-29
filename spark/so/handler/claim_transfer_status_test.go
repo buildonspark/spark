@@ -281,8 +281,8 @@ func TestClaimTransferPrepare_PoisonedNodeRefundTx_HealsViaTransferLeafAnchor(t 
 // minikube suite's TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL).
 func TestClaimTransferPrepare_PreApplyStatusesDecryptFreshPackage(t *testing.T) {
 	cases := []struct {
-		status  st.TransferStatus
-		wantErr string
+		status      st.TransferStatus
+		expectedErr string
 	}{
 		{st.TransferStatusReceiverKeyTweaked, "no encrypted claim key tweaks found"},
 		{st.TransferStatusReceiverKeyTweakLocked, "no encrypted claim key tweaks found"},
@@ -297,7 +297,7 @@ func TestClaimTransferPrepare_PreApplyStatusesDecryptFreshPackage(t *testing.T) 
 			handler := NewClaimTransferFlowHandler(cfg)
 			_, err := handler.Prepare(ctx, req)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.wantErr,
+			assert.Contains(t, err.Error(), tc.expectedErr,
 				"status %s must route to the expected key-tweak source", tc.status)
 		})
 	}

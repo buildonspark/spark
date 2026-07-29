@@ -26,10 +26,10 @@ func TestGetSingleTransferSenderReceiver_Success(t *testing.T) {
 		},
 	}
 
-	gotSender, gotReceiver, err := mimo.GetSingleTransferSenderReceiver(transfer)
+	actualSender, actualReceiver, err := mimo.GetSingleTransferSenderReceiver(transfer)
 	require.NoError(t, err)
-	require.True(t, senderPub.Equals(gotSender))
-	require.True(t, receiverPub.Equals(gotReceiver))
+	require.True(t, senderPub.Equals(actualSender))
+	require.True(t, receiverPub.Equals(actualReceiver))
 }
 
 func TestGetSingleTransferSenderReceiver_ZeroSenders_ReturnsError(t *testing.T) {
@@ -119,7 +119,7 @@ func TestGetSingleTransferSender_Success(t *testing.T) {
 		},
 	}
 
-	got, err := mimo.GetSingleTransferSender(transfer)
+	sender, err := mimo.GetSingleTransferSender(transfer)
 	require.NoError(t, err)
-	require.True(t, senderPub.Equals(got))
+	require.True(t, senderPub.Equals(sender))
 }

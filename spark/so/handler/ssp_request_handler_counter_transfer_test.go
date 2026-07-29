@@ -26,19 +26,19 @@ func TestInitiateCounterTransferRejectsMalformedRequestWithoutPanic(t *testing.T
 	primaryTransferID := uuid.NewString()
 
 	tests := []struct {
-		name    string
-		req     *pbssp.CounterTransferRequest
-		wantErr string
+		name        string
+		req         *pbssp.CounterTransferRequest
+		expectedErr string
 	}{
 		{
-			name:    "nil request",
-			req:     nil,
-			wantErr: "request is required",
+			name:        "nil request",
+			req:         nil,
+			expectedErr: "request is required",
 		},
 		{
-			name:    "missing transfer",
-			req:     &pbssp.CounterTransferRequest{},
-			wantErr: "transfer is required",
+			name:        "missing transfer",
+			req:         &pbssp.CounterTransferRequest{},
+			expectedErr: "transfer is required",
 		},
 		{
 			name: "missing adaptor keys",
@@ -46,7 +46,7 @@ func TestInitiateCounterTransferRejectsMalformedRequestWithoutPanic(t *testing.T
 				Transfer:          validTransfer,
 				PrimaryTransferId: primaryTransferID,
 			},
-			wantErr: "adaptor_public_keys is required",
+			expectedErr: "adaptor_public_keys is required",
 		},
 		{
 			name: "missing transfer package",
@@ -57,7 +57,7 @@ func TestInitiateCounterTransferRejectsMalformedRequestWithoutPanic(t *testing.T
 				AdaptorPublicKeys: validAdaptorKeys,
 				PrimaryTransferId: primaryTransferID,
 			},
-			wantErr: "transfer_package is required",
+			expectedErr: "transfer_package is required",
 		},
 		{
 			name: "direct leaves provided",
@@ -76,7 +76,7 @@ func TestInitiateCounterTransferRejectsMalformedRequestWithoutPanic(t *testing.T
 				AdaptorPublicKeys: validAdaptorKeys,
 				PrimaryTransferId: primaryTransferID,
 			},
-			wantErr: "direct transactions should not be provided",
+			expectedErr: "direct transactions should not be provided",
 		},
 	}
 
@@ -87,7 +87,7 @@ func TestInitiateCounterTransferRejectsMalformedRequestWithoutPanic(t *testing.T
 				_, err = handler.InitiateCounterTransfer(t.Context(), tt.req)
 			})
 			require.Error(t, err)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

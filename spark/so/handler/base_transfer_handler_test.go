@@ -1690,9 +1690,9 @@ func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 	leafID := uuid.New().String()
 
 	tests := []struct {
-		name    string
-		pkg     *pbspark.TransferPackage
-		wantErr string
+		name        string
+		pkg         *pbspark.TransferPackage
+		expectedErr string
 	}{
 		{
 			name: "nil cpfp job",
@@ -1700,7 +1700,7 @@ func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 				KeyTweakPackage: map[string][]byte{"so-0": {1, 2, 3}},
 				LeavesToSend:    []*pbspark.UserSignedTxSigningJob{nil},
 			},
-			wantErr: "leaves_to_send[0] is required",
+			expectedErr: "leaves_to_send[0] is required",
 		},
 		{
 			name: "nil direct job",
@@ -1711,7 +1711,7 @@ func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 				},
 				DirectLeavesToSend: []*pbspark.UserSignedTxSigningJob{nil},
 			},
-			wantErr: "direct_leaves_to_send[0] is required",
+			expectedErr: "direct_leaves_to_send[0] is required",
 		},
 		{
 			name: "nil direct from cpfp job",
@@ -1722,7 +1722,7 @@ func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 				},
 				DirectFromCpfpLeavesToSend: []*pbspark.UserSignedTxSigningJob{nil},
 			},
-			wantErr: "direct_from_cpfp_leaves_to_send[0] is required",
+			expectedErr: "direct_from_cpfp_leaves_to_send[0] is required",
 		},
 	}
 
@@ -1732,7 +1732,7 @@ func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 			require.NotPanics(t, func() {
 				_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), tt.pkg, keys.GeneratePrivateKey().Public(), false)
 			})
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

@@ -54,9 +54,9 @@ func TestMarshalProto_V3_SortsOperatorKeysAndInvoices(t *testing.T) {
 	}
 
 	// Verify operator keys are sorted byte-wise ascending
-	gotOps := protoTx.GetSparkOperatorIdentityPublicKeys()
-	if len(gotOps) != 2 {
-		t.Fatalf("unexpected operator keys len %d", len(gotOps))
+	actualOps := protoTx.GetSparkOperatorIdentityPublicKeys()
+	if len(actualOps) != 2 {
+		t.Fatalf("unexpected operator keys len %d", len(actualOps))
 	}
 	// Compute expected sorted order from serialized keys
 	k1b := k1.Public().Serialize()
@@ -65,19 +65,19 @@ func TestMarshalProto_V3_SortsOperatorKeysAndInvoices(t *testing.T) {
 	if bytes.Compare(expectedOps[0], expectedOps[1]) > 0 {
 		expectedOps[0], expectedOps[1] = expectedOps[1], expectedOps[0]
 	}
-	if !reflect.DeepEqual(gotOps, expectedOps) {
-		t.Fatalf("operator keys not sorted as expected\n got: %x\nwant: %x", gotOps, expectedOps)
+	if !reflect.DeepEqual(actualOps, expectedOps) {
+		t.Fatalf("operator keys not sorted as expected\n got: %x\nwant: %x", actualOps, expectedOps)
 	}
 
 	// Verify invoices sorted lexicographically by string
-	gotInv := protoTx.GetInvoiceAttachments()
-	if len(gotInv) != 3 {
-		t.Fatalf("unexpected invoice attachments len %d", len(gotInv))
+	actualInv := protoTx.GetInvoiceAttachments()
+	if len(actualInv) != 3 {
+		t.Fatalf("unexpected invoice attachments len %d", len(actualInv))
 	}
-	wantInv := []string{"inv-a", "inv-b", "inv-c"}
-	for i, s := range wantInv {
-		if gotInv[i].GetSparkInvoice() != s {
-			t.Fatalf("invoice order mismatch at %d: got %s want %s", i, gotInv[i].GetSparkInvoice(), s)
+	expectedInv := []string{"inv-a", "inv-b", "inv-c"}
+	for i, s := range expectedInv {
+		if actualInv[i].GetSparkInvoice() != s {
+			t.Fatalf("invoice order mismatch at %d: got %s want %s", i, actualInv[i].GetSparkInvoice(), s)
 		}
 	}
 }
@@ -101,9 +101,9 @@ func TestSelectPartialTokenTransactionForHashPrefersFinalizedOverRevealed(t *tes
 		},
 	}
 
-	got := selectPartialTokenTransactionForHash([]*TokenTransaction{revealed, finalized}, now)
-	if got != finalized {
-		t.Fatalf("expected finalized transaction, got status %s", got.Status)
+	selected := selectPartialTokenTransactionForHash([]*TokenTransaction{revealed, finalized}, now)
+	if selected != finalized {
+		t.Fatalf("expected finalized transaction, got status %s", selected.Status)
 	}
 }
 
@@ -123,9 +123,9 @@ func TestSelectPartialTokenTransactionForHashPrefersTerminalWithTypeEdge(t *test
 		},
 	}
 
-	got := selectPartialTokenTransactionForHash([]*TokenTransaction{withoutTypeEdge, withTypeEdge}, now)
-	if got != withTypeEdge {
-		t.Fatalf("expected terminal transaction with type edge, got %s", got.ID)
+	selected := selectPartialTokenTransactionForHash([]*TokenTransaction{withoutTypeEdge, withTypeEdge}, now)
+	if selected != withTypeEdge {
+		t.Fatalf("expected terminal transaction with type edge, got %s", selected.ID)
 	}
 }
 
@@ -145,8 +145,8 @@ func TestSelectPartialTokenTransactionForHashPrefersAnchoredTerminalBeforeUnanch
 		},
 	}
 
-	got := selectPartialTokenTransactionForHash([]*TokenTransaction{unanchoredFinalized, anchoredRevealed}, now)
-	if got != anchoredRevealed {
-		t.Fatalf("expected anchored terminal transaction, got status %s", got.Status)
+	selected := selectPartialTokenTransactionForHash([]*TokenTransaction{unanchoredFinalized, anchoredRevealed}, now)
+	if selected != anchoredRevealed {
+		t.Fatalf("expected anchored terminal transaction, got status %s", selected.Status)
 	}
 }

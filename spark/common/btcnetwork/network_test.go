@@ -19,37 +19,37 @@ func TestGoEnumMatchesProtoEnum(t *testing.T) {
 
 func TestFromProtoNetwork(t *testing.T) {
 	tests := []struct {
-		name  string
-		proto pb.Network
-		want  Network
+		name            string
+		proto           pb.Network
+		expectedNetwork Network
 	}{
 		{
-			name:  "mainnet",
-			proto: pb.Network_MAINNET,
-			want:  Mainnet,
+			name:            "mainnet",
+			proto:           pb.Network_MAINNET,
+			expectedNetwork: Mainnet,
 		},
 		{
-			name:  "regtest",
-			proto: pb.Network_REGTEST,
-			want:  Regtest,
+			name:            "regtest",
+			proto:           pb.Network_REGTEST,
+			expectedNetwork: Regtest,
 		},
 		{
-			name:  "testnet",
-			proto: pb.Network_TESTNET,
-			want:  Testnet,
+			name:            "testnet",
+			proto:           pb.Network_TESTNET,
+			expectedNetwork: Testnet,
 		},
 		{
-			name:  "signet",
-			proto: pb.Network_SIGNET,
-			want:  Signet,
+			name:            "signet",
+			proto:           pb.Network_SIGNET,
+			expectedNetwork: Signet,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FromProtoNetwork(tt.proto)
+			network, err := FromProtoNetwork(tt.proto)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.expectedNetwork, network)
 		})
 	}
 }
@@ -61,37 +61,37 @@ func TestFromProtoNetworkUnknownValue(t *testing.T) {
 
 func TestToProtoNetwork(t *testing.T) {
 	tests := []struct {
-		name    string
-		network Network
-		want    pb.Network
+		name          string
+		network       Network
+		expectedProto pb.Network
 	}{
 		{
-			name:    "mainnet",
-			network: Mainnet,
-			want:    pb.Network_MAINNET,
+			name:          "mainnet",
+			network:       Mainnet,
+			expectedProto: pb.Network_MAINNET,
 		},
 		{
-			name:    "regtest",
-			network: Regtest,
-			want:    pb.Network_REGTEST,
+			name:          "regtest",
+			network:       Regtest,
+			expectedProto: pb.Network_REGTEST,
 		},
 		{
-			name:    "testnet",
-			network: Testnet,
-			want:    pb.Network_TESTNET,
+			name:          "testnet",
+			network:       Testnet,
+			expectedProto: pb.Network_TESTNET,
 		},
 		{
-			name:    "signet",
-			network: Signet,
-			want:    pb.Network_SIGNET,
+			name:          "signet",
+			network:       Signet,
+			expectedProto: pb.Network_SIGNET,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.network.ToProtoNetwork()
+			proto, err := tt.network.ToProtoNetwork()
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.expectedProto, proto)
 		})
 	}
 }
@@ -103,67 +103,67 @@ func TestToProtoNetworkUnknownValue(t *testing.T) {
 
 func TestFromString(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  Network
+		name            string
+		input           string
+		expectedNetwork Network
 	}{
 		{
-			name:  "mainnet uppercase",
-			input: "MAINNET",
-			want:  Mainnet,
+			name:            "mainnet uppercase",
+			input:           "MAINNET",
+			expectedNetwork: Mainnet,
 		},
 		{
-			name:  "mainnet lowercase",
-			input: "mainnet",
-			want:  Mainnet,
+			name:            "mainnet lowercase",
+			input:           "mainnet",
+			expectedNetwork: Mainnet,
 		},
 		{
-			name:  "regtest uppercase",
-			input: "REGTEST",
-			want:  Regtest,
+			name:            "regtest uppercase",
+			input:           "REGTEST",
+			expectedNetwork: Regtest,
 		},
 		{
-			name:  "regtest lowercase",
-			input: "regtest",
-			want:  Regtest,
+			name:            "regtest lowercase",
+			input:           "regtest",
+			expectedNetwork: Regtest,
 		},
 		{
-			name:  "testnet uppercase",
-			input: "TESTNET",
-			want:  Testnet,
+			name:            "testnet uppercase",
+			input:           "TESTNET",
+			expectedNetwork: Testnet,
 		},
 		{
-			name:  "testnet lowercase",
-			input: "testnet",
-			want:  Testnet,
+			name:            "testnet lowercase",
+			input:           "testnet",
+			expectedNetwork: Testnet,
 		},
 		{
-			name:  "signet uppercase",
-			input: "SIGNET",
-			want:  Signet,
+			name:            "signet uppercase",
+			input:           "SIGNET",
+			expectedNetwork: Signet,
 		},
 		{
-			name:  "signet lowercase",
-			input: "signet",
-			want:  Signet,
+			name:            "signet lowercase",
+			input:           "signet",
+			expectedNetwork: Signet,
 		},
 		{
-			name:  "unspecified uppercase",
-			input: "UNSPECIFIED",
-			want:  Unspecified,
+			name:            "unspecified uppercase",
+			input:           "UNSPECIFIED",
+			expectedNetwork: Unspecified,
 		},
 		{
-			name:  "unspecified lowercase",
-			input: "unspecified",
-			want:  Unspecified,
+			name:            "unspecified lowercase",
+			input:           "unspecified",
+			expectedNetwork: Unspecified,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FromString(tt.input)
+			network, err := FromString(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.expectedNetwork, network)
 		})
 	}
 }

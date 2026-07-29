@@ -112,11 +112,11 @@ func TestFrostAggregationUsesSingleBatchRPC(t *testing.T) {
 // requireCodeAndReason asserts the sparkerrors wrapping survived, so a
 // regression back to plain fmt.Errorf (losing the gRPC code/reason at the
 // boundary) fails the test.
-func requireCodeAndReason(t *testing.T, err error, wantCode codes.Code, wantReason string) {
+func requireCodeAndReason(t *testing.T, err error, expectedCode codes.Code, expectedReason string) {
 	t.Helper()
 	code, reason := sparkerrors.CodeAndReasonFrom(err)
-	require.Equal(t, wantCode, code)
-	require.Equal(t, wantReason, reason)
+	require.Equal(t, expectedCode, code)
+	require.Equal(t, expectedReason, reason)
 }
 
 func TestFrostAggregationBatchMissingResultErrors(t *testing.T) {

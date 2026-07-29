@@ -72,44 +72,44 @@ func TestNextSigningKeyshareSecretVersion(t *testing.T) {
 		name            string
 		ephemeralLatest *int32
 		base            *int32
-		want            int32
-		wantErr         bool
+		expectedVersion int32
+		expectedErr     bool
 	}{
 		{
-			name: "no ephemeral rows and no base starts at zero",
-			want: 0,
+			name:            "no ephemeral rows and no base starts at zero",
+			expectedVersion: 0,
 		},
 		{
 			name:            "ephemeral rows and no base advance past the ephemeral latest",
 			ephemeralLatest: new(int32(5)),
-			want:            6,
+			expectedVersion: 6,
 		},
 		{
 			name:            "ephemeral latest of zero and no base advances to one",
 			ephemeralLatest: new(int32(0)),
-			want:            1,
+			expectedVersion: 1,
 		},
 		{
-			name: "no ephemeral rows advances past the base instead of restarting at zero",
-			base: new(int32(7)),
-			want: 8,
+			name:            "no ephemeral rows advances past the base instead of restarting at zero",
+			base:            new(int32(7)),
+			expectedVersion: 8,
 		},
 		{
-			name: "no ephemeral rows and a base of zero advances to one",
-			base: new(int32(0)),
-			want: 1,
+			name:            "no ephemeral rows and a base of zero advances to one",
+			base:            new(int32(0)),
+			expectedVersion: 1,
 		},
 		{
 			name:            "ephemeral latest ahead of the base advances past the ephemeral latest",
 			ephemeralLatest: new(int32(9)),
 			base:            new(int32(4)),
-			want:            10,
+			expectedVersion: 10,
 		},
 		{
 			name:            "ephemeral latest level with the base advances past both",
 			ephemeralLatest: new(int32(4)),
 			base:            new(int32(4)),
-			want:            5,
+			expectedVersion: 5,
 		},
 		{
 			// SP-3668: allocating ephemeralLatest+1 here would collide with the
@@ -117,41 +117,41 @@ func TestNextSigningKeyshareSecretVersion(t *testing.T) {
 			name:            "ephemeral latest one behind the base advances past the base",
 			ephemeralLatest: new(int32(3)),
 			base:            new(int32(4)),
-			want:            5,
+			expectedVersion: 5,
 		},
 		{
 			name:            "ephemeral latest far behind the base advances past the base",
 			ephemeralLatest: new(int32(0)),
 			base:            new(int32(12)),
-			want:            13,
+			expectedVersion: 13,
 		},
 		{
 			name:            "ephemeral latest at the maximum overflows",
 			ephemeralLatest: new(int32(math.MaxInt32)),
-			wantErr:         true,
+			expectedErr:     true,
 		},
 		{
-			name:    "base at the maximum overflows",
-			base:    new(int32(math.MaxInt32)),
-			wantErr: true,
+			name:        "base at the maximum overflows",
+			base:        new(int32(math.MaxInt32)),
+			expectedErr: true,
 		},
 		{
 			name:            "ephemeral latest at the maximum overflows even with a low base",
 			ephemeralLatest: new(int32(math.MaxInt32)),
 			base:            new(int32(1)),
-			wantErr:         true,
+			expectedErr:     true,
 		},
 		{
 			name:            "base at the maximum overflows even with a low ephemeral latest",
 			ephemeralLatest: new(int32(1)),
 			base:            new(int32(math.MaxInt32)),
-			wantErr:         true,
+			expectedErr:     true,
 		},
 		{
 			name:            "both inputs at the maximum overflow",
 			ephemeralLatest: new(int32(math.MaxInt32)),
 			base:            new(int32(math.MaxInt32)),
-			wantErr:         true,
+			expectedErr:     true,
 		},
 	}
 
@@ -159,19 +159,19 @@ func TestNextSigningKeyshareSecretVersion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			id := uuid.New()
 
-			got, err := nextSigningKeyshareSecretVersion(id, test.ephemeralLatest, test.base)
+			version, err := nextSigningKeyshareSecretVersion(id, test.ephemeralLatest, test.base)
 
-			if test.wantErr {
+			if test.expectedErr {
 				require.ErrorContains(t, err, id.String())
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, test.want, got)
+			require.Equal(t, test.expectedVersion, version)
 			if test.base != nil {
-				require.Greater(t, got, *test.base, "allocated version must not collide with the retired base")
+				require.Greater(t, version, *test.base, "allocated version must not collide with the retired base")
 			}
 			if test.ephemeralLatest != nil {
-				require.Greater(t, got, *test.ephemeralLatest, "allocated version must not collide with an existing ephemeral row")
+				require.Greater(t, version, *test.ephemeralLatest, "allocated version must not collide with an existing ephemeral row")
 			}
 		})
 	}

@@ -342,21 +342,21 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 	})
 
 	for _, tc := range []struct {
-		name    string
-		shares  []*sparktokeninternal.OperatorRevocationShares
-		wantErr string
+		name        string
+		shares      []*sparktokeninternal.OperatorRevocationShares
+		expectedErr string
 	}{
 		{
-			name:    "nil operator share",
-			shares:  []*sparktokeninternal.OperatorRevocationShares{nil},
-			wantErr: "nil operator share",
+			name:        "nil operator share",
+			shares:      []*sparktokeninternal.OperatorRevocationShares{nil},
+			expectedErr: "nil operator share",
 		},
 		{
 			name: "malformed operator identity key",
 			shares: []*sparktokeninternal.OperatorRevocationShares{{
 				OperatorIdentityPublicKey: []byte{0x02},
 			}},
-			wantErr: "failed to parse operator identity public key",
+			expectedErr: "failed to parse operator identity public key",
 		},
 		{
 			name: "nil revocation share",
@@ -364,7 +364,7 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 				OperatorIdentityPublicKey: testOperatorPubKey,
 				Shares:                    []*sparktokeninternal.RevocationSecretShare{nil},
 			}},
-			wantErr: "nil share found",
+			expectedErr: "nil share found",
 		},
 		{
 			name: "malformed secret share",
@@ -375,7 +375,7 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 					InputTtxoId: uuid.NewString(),
 				}},
 			}},
-			wantErr: "failed to parse secret share",
+			expectedErr: "failed to parse secret share",
 		},
 		{
 			name: "malformed legacy uuid",
@@ -386,7 +386,7 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 					InputTtxoId: "not-a-uuid",
 				}},
 			}},
-			wantErr: "failed to parse token output id",
+			expectedErr: "failed to parse token output id",
 		},
 		{
 			name: "short input ttxo ref hash",
@@ -400,7 +400,7 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 					},
 				}},
 			}},
-			wantErr: "prev token transaction hash must be 32 bytes",
+			expectedErr: "prev token transaction hash must be 32 bytes",
 		},
 		{
 			name: "missing input ttxo reference",
@@ -410,7 +410,7 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 					SecretShare: testSecret,
 				}},
 			}},
-			wantErr: "missing input ttxo reference",
+			expectedErr: "missing input ttxo reference",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -418,7 +418,7 @@ func TestBuildInputOperatorShareMap(t *testing.T) {
 			require.Nil(t, result)
 			require.Error(t, err)
 			require.Equal(t, codes.Internal, status.Code(err))
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
 }

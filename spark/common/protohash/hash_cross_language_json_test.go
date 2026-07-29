@@ -50,21 +50,21 @@ func TestSparkInvoiceFieldsJSONCases(t *testing.T) {
 				t.Fatalf("protojson unmarshal SparkInvoiceFields: %v", err)
 			}
 
-			got, err := Hash(&msg)
+			hash, err := Hash(&msg)
 			if err != nil {
 				t.Fatalf("hash SparkInvoiceFields: %v", err)
 			}
 
-			gotHex := hex.EncodeToString(got)
+			actualHex := hex.EncodeToString(hash)
 
 			// If expected is missing or TBD, print computed to help update fixtures
 			if tc.ExpectedHashHex == "" || strings.EqualFold(tc.ExpectedHashHex, "TBD") {
-				t.Logf("COMPUTED_HASH %s: %s", tc.Name, gotHex)
+				t.Logf("COMPUTED_HASH %s: %s", tc.Name, actualHex)
 				return
 			}
 
-			if !strings.EqualFold(tc.ExpectedHashHex, gotHex) {
-				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, gotHex)
+			if !strings.EqualFold(tc.ExpectedHashHex, actualHex) {
+				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, actualHex)
 			}
 		})
 	}

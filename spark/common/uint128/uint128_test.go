@@ -29,85 +29,85 @@ func TestFromBytes_SetsCorrectEndianness(t *testing.T) {
 
 func TestFromUint(t *testing.T) {
 	tests := []struct {
-		name  string
-		input uint64
-		want  Uint128
+		name            string
+		input           uint64
+		expectedUint128 Uint128
 	}{
 		{
-			name:  "zero",
-			input: 0,
-			want:  Uint128{lo: 0, hi: 0},
+			name:            "zero",
+			input:           0,
+			expectedUint128: Uint128{lo: 0, hi: 0},
 		},
 		{
-			name:  "small value",
-			input: 42,
-			want:  Uint128{lo: 42, hi: 0},
+			name:            "small value",
+			input:           42,
+			expectedUint128: Uint128{lo: 42, hi: 0},
 		},
 		{
-			name:  "max uint64",
-			input: ^uint64(0),
-			want:  Uint128{lo: ^uint64(0), hi: 0},
+			name:            "max uint64",
+			input:           ^uint64(0),
+			expectedUint128: Uint128{lo: ^uint64(0), hi: 0},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := FromUint64(tt.input)
-			assert.Equal(t, tt.want, result)
+			assert.Equal(t, tt.expectedUint128, result)
 		})
 	}
 }
 
 func TestIsZero(t *testing.T) {
 	tests := []struct {
-		name string
-		u    Uint128
-		want bool
+		name           string
+		u              Uint128
+		expectedIsZero bool
 	}{
 		{
-			name: "zero value",
-			u:    Uint128{lo: 0, hi: 0},
-			want: true,
+			name:           "zero value",
+			u:              Uint128{lo: 0, hi: 0},
+			expectedIsZero: true,
 		},
 		{
-			name: "new",
-			u:    New(),
-			want: true,
+			name:           "new",
+			u:              New(),
+			expectedIsZero: true,
 		},
 		{
-			name: "non-zero lo",
-			u:    Uint128{lo: 1, hi: 0},
-			want: false,
+			name:           "non-zero lo",
+			u:              Uint128{lo: 1, hi: 0},
+			expectedIsZero: false,
 		},
 		{
-			name: "non-zero hi",
-			u:    Uint128{lo: 0, hi: 1},
-			want: false,
+			name:           "non-zero hi",
+			u:              Uint128{lo: 0, hi: 1},
+			expectedIsZero: false,
 		},
 		{
-			name: "both non-zero",
-			u:    Uint128{lo: 1, hi: 1},
-			want: false,
+			name:           "both non-zero",
+			u:              Uint128{lo: 1, hi: 1},
+			expectedIsZero: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.u.IsZero())
+			assert.Equal(t, tt.expectedIsZero, tt.u.IsZero())
 		})
 	}
 }
 
 func TestNewFromBytes(t *testing.T) {
 	tests := []struct {
-		name  string
-		input []byte
-		want  Uint128
+		name            string
+		input           []byte
+		expectedUint128 Uint128
 	}{
 		{
-			name:  "zero",
-			input: make([]byte, 16),
-			want:  Uint128{lo: 0, hi: 0},
+			name:            "zero",
+			input:           make([]byte, 16),
+			expectedUint128: Uint128{lo: 0, hi: 0},
 		},
 		{
 			name: "low value only",
@@ -116,7 +116,7 @@ func TestNewFromBytes(t *testing.T) {
 				binary.BigEndian.PutUint64(b[8:], 42)
 				return b
 			}(),
-			want: Uint128{lo: 42, hi: 0},
+			expectedUint128: Uint128{lo: 42, hi: 0},
 		},
 		{
 			name: "high value only",
@@ -125,7 +125,7 @@ func TestNewFromBytes(t *testing.T) {
 				binary.BigEndian.PutUint64(b[:8], 100)
 				return b
 			}(),
-			want: Uint128{lo: 0, hi: 100},
+			expectedUint128: Uint128{lo: 0, hi: 100},
 		},
 		{
 			name: "both values",
@@ -135,7 +135,7 @@ func TestNewFromBytes(t *testing.T) {
 				binary.BigEndian.PutUint64(b[:8], 456)
 				return b
 			}(),
-			want: Uint128{lo: 123, hi: 456},
+			expectedUint128: Uint128{lo: 123, hi: 456},
 		},
 		{
 			name: "max value",
@@ -145,7 +145,7 @@ func TestNewFromBytes(t *testing.T) {
 				binary.BigEndian.PutUint64(b[:8], ^uint64(0))
 				return b
 			}(),
-			want: Uint128{lo: ^uint64(0), hi: ^uint64(0)},
+			expectedUint128: Uint128{lo: ^uint64(0), hi: ^uint64(0)},
 		},
 	}
 
@@ -153,7 +153,7 @@ func TestNewFromBytes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := FromBytes(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, result)
+			assert.Equal(t, tt.expectedUint128, result)
 		})
 	}
 }
@@ -205,150 +205,150 @@ func TestBytes(t *testing.T) {
 
 func TestCmp(t *testing.T) {
 	tests := []struct {
-		name string
-		u    Uint128
-		v    Uint128
-		want int
+		name        string
+		u           Uint128
+		v           Uint128
+		expectedCmp int
 	}{
 		{
-			name: "equal - both zero",
-			u:    Uint128{lo: 0, hi: 0},
-			v:    Uint128{lo: 0, hi: 0},
-			want: 0,
+			name:        "equal - both zero",
+			u:           Uint128{lo: 0, hi: 0},
+			v:           Uint128{lo: 0, hi: 0},
+			expectedCmp: 0,
 		},
 		{
-			name: "equal - same values",
-			u:    Uint128{lo: 123, hi: 456},
-			v:    Uint128{lo: 123, hi: 456},
-			want: 0,
+			name:        "equal - same values",
+			u:           Uint128{lo: 123, hi: 456},
+			v:           Uint128{lo: 123, hi: 456},
+			expectedCmp: 0,
 		},
 		{
-			name: "less than - low only",
-			u:    Uint128{lo: 100, hi: 0},
-			v:    Uint128{lo: 200, hi: 0},
-			want: -1,
+			name:        "less than - low only",
+			u:           Uint128{lo: 100, hi: 0},
+			v:           Uint128{lo: 200, hi: 0},
+			expectedCmp: -1,
 		},
 		{
-			name: "less than - high different",
-			u:    Uint128{lo: 100, hi: 1},
-			v:    Uint128{lo: 50, hi: 2},
-			want: -1,
+			name:        "less than - high different",
+			u:           Uint128{lo: 100, hi: 1},
+			v:           Uint128{lo: 50, hi: 2},
+			expectedCmp: -1,
 		},
 		{
-			name: "less than - same high, different low",
-			u:    Uint128{lo: 100, hi: 5},
-			v:    Uint128{lo: 200, hi: 5},
-			want: -1,
+			name:        "less than - same high, different low",
+			u:           Uint128{lo: 100, hi: 5},
+			v:           Uint128{lo: 200, hi: 5},
+			expectedCmp: -1,
 		},
 		{
-			name: "greater than - low only",
-			u:    Uint128{lo: 200, hi: 0},
-			v:    Uint128{lo: 100, hi: 0},
-			want: 1,
+			name:        "greater than - low only",
+			u:           Uint128{lo: 200, hi: 0},
+			v:           Uint128{lo: 100, hi: 0},
+			expectedCmp: 1,
 		},
 		{
-			name: "greater than - high different",
-			u:    Uint128{lo: 50, hi: 2},
-			v:    Uint128{lo: 100, hi: 1},
-			want: 1,
+			name:        "greater than - high different",
+			u:           Uint128{lo: 50, hi: 2},
+			v:           Uint128{lo: 100, hi: 1},
+			expectedCmp: 1,
 		},
 		{
-			name: "greater than - same high, different low",
-			u:    Uint128{lo: 200, hi: 5},
-			v:    Uint128{lo: 100, hi: 5},
-			want: 1,
+			name:        "greater than - same high, different low",
+			u:           Uint128{lo: 200, hi: 5},
+			v:           Uint128{lo: 100, hi: 5},
+			expectedCmp: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.u.Cmp(tt.v))
-			assert.Equal(t, -tt.want, tt.v.Cmp(tt.u))
+			assert.Equal(t, tt.expectedCmp, tt.u.Cmp(tt.v))
+			assert.Equal(t, -tt.expectedCmp, tt.v.Cmp(tt.u))
 		})
 	}
 }
 
 func TestBigInt(t *testing.T) {
 	tests := []struct {
-		name string
-		u    Uint128
-		want *big.Int
+		name           string
+		u              Uint128
+		expectedBigInt *big.Int
 	}{
 		{
-			name: "zero",
-			u:    Uint128{lo: 0, hi: 0},
-			want: big.NewInt(0),
+			name:           "zero",
+			u:              Uint128{lo: 0, hi: 0},
+			expectedBigInt: big.NewInt(0),
 		},
 		{
-			name: "low value only",
-			u:    Uint128{lo: 42, hi: 0},
-			want: big.NewInt(42),
+			name:           "low value only",
+			u:              Uint128{lo: 42, hi: 0},
+			expectedBigInt: big.NewInt(42),
 		},
 		{
-			name: "high value only",
-			u:    Uint128{lo: 0, hi: 1},
-			want: new(big.Int).Lsh(big.NewInt(1), 64),
+			name:           "high value only",
+			u:              Uint128{lo: 0, hi: 1},
+			expectedBigInt: new(big.Int).Lsh(big.NewInt(1), 64),
 		},
 		{
-			name: "both values",
-			u:    Uint128{lo: 100, hi: 1},
-			want: new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(100)),
+			name:           "both values",
+			u:              Uint128{lo: 100, hi: 1},
+			expectedBigInt: new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 64), big.NewInt(100)),
 		},
 		{
-			name: "max uint64 in low",
-			u:    Uint128{lo: ^uint64(0), hi: 0},
-			want: new(big.Int).SetUint64(^uint64(0)),
+			name:           "max uint64 in low",
+			u:              Uint128{lo: ^uint64(0), hi: 0},
+			expectedBigInt: new(big.Int).SetUint64(^uint64(0)),
 		},
 		{
-			name: "max value",
-			u:    Uint128{lo: ^uint64(0), hi: ^uint64(0)},
-			want: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 128), big.NewInt(1)),
+			name:           "max value",
+			u:              Uint128{lo: ^uint64(0), hi: ^uint64(0)},
+			expectedBigInt: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 128), big.NewInt(1)),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.u.BigInt()
-			assert.Equal(t, tt.want, result)
+			assert.Equal(t, tt.expectedBigInt, result)
 		})
 	}
 }
 
 func TestString(t *testing.T) {
 	tests := []struct {
-		name string
-		u    Uint128
-		want string
+		name           string
+		u              Uint128
+		expectedString string
 	}{
 		{
-			name: "zero",
-			u:    Uint128{lo: 0, hi: 0},
-			want: "0",
+			name:           "zero",
+			u:              Uint128{lo: 0, hi: 0},
+			expectedString: "0",
 		},
 		{
-			name: "small value",
-			u:    Uint128{lo: 42, hi: 0},
-			want: "42",
+			name:           "small value",
+			u:              Uint128{lo: 42, hi: 0},
+			expectedString: "42",
 		},
 		{
-			name: "max uint64",
-			u:    Uint128{lo: ^uint64(0), hi: 0},
-			want: "18446744073709551615",
+			name:           "max uint64",
+			u:              Uint128{lo: ^uint64(0), hi: 0},
+			expectedString: "18446744073709551615",
 		},
 		{
-			name: "high value only",
-			u:    Uint128{lo: 0, hi: 1},
-			want: "18446744073709551616", // 2^64
+			name:           "high value only",
+			u:              Uint128{lo: 0, hi: 1},
+			expectedString: "18446744073709551616", // 2^64
 		},
 		{
-			name: "both values",
-			u:    Uint128{lo: 123, hi: 456},
-			want: new(big.Int).Add(new(big.Int).Lsh(big.NewInt(456), 64), big.NewInt(123)).String(),
+			name:           "both values",
+			u:              Uint128{lo: 123, hi: 456},
+			expectedString: new(big.Int).Add(new(big.Int).Lsh(big.NewInt(456), 64), big.NewInt(123)).String(),
 		},
 		{
-			name: "max value",
-			u:    Uint128{lo: ^uint64(0), hi: ^uint64(0)},
-			want: "340282366920938463463374607431768211455", // 2^128-1
+			name:           "max value",
+			u:              Uint128{lo: ^uint64(0), hi: ^uint64(0)},
+			expectedString: "340282366920938463463374607431768211455", // 2^128-1
 		},
 	}
 
@@ -356,7 +356,7 @@ func TestString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.u.String()
 
-			assert.Equal(t, tt.want, result)
+			assert.Equal(t, tt.expectedString, result)
 			assert.Equal(t, tt.u.BigInt().String(), result)
 		})
 	}
@@ -364,24 +364,24 @@ func TestString(t *testing.T) {
 
 func TestValue(t *testing.T) {
 	tests := []struct {
-		name string
-		u    Uint128
-		want string
+		name          string
+		u             Uint128
+		expectedValue string
 	}{
 		{
-			name: "zero",
-			u:    Uint128{lo: 0, hi: 0},
-			want: "0",
+			name:          "zero",
+			u:             Uint128{lo: 0, hi: 0},
+			expectedValue: "0",
 		},
 		{
-			name: "small value",
-			u:    Uint128{lo: 42, hi: 0},
-			want: "42",
+			name:          "small value",
+			u:             Uint128{lo: 42, hi: 0},
+			expectedValue: "42",
 		},
 		{
-			name: "max value",
-			u:    Uint128{lo: ^uint64(0), hi: ^uint64(0)},
-			want: "340282366920938463463374607431768211455",
+			name:          "max value",
+			u:             Uint128{lo: ^uint64(0), hi: ^uint64(0)},
+			expectedValue: "340282366920938463463374607431768211455",
 		},
 	}
 
@@ -389,66 +389,66 @@ func TestValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			value, err := tt.u.Value()
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, value)
+			assert.Equal(t, tt.expectedValue, value)
 		})
 	}
 }
 
 func TestScan(t *testing.T) {
 	tests := []struct {
-		name  string
-		input any
-		want  Uint128
+		name            string
+		input           any
+		expectedUint128 Uint128
 	}{
 		{
-			name:  "nil",
-			input: nil,
-			want:  Uint128{lo: 0, hi: 0},
+			name:            "nil",
+			input:           nil,
+			expectedUint128: Uint128{lo: 0, hi: 0},
 		},
 		{
-			name:  "string - zero",
-			input: "0",
-			want:  Uint128{lo: 0, hi: 0},
+			name:            "string - zero",
+			input:           "0",
+			expectedUint128: Uint128{lo: 0, hi: 0},
 		},
 		{
-			name:  "string - small value",
-			input: "42",
-			want:  Uint128{lo: 42, hi: 0},
+			name:            "string - small value",
+			input:           "42",
+			expectedUint128: Uint128{lo: 42, hi: 0},
 		},
 		{
-			name:  "string - max uint64",
-			input: "18446744073709551615",
-			want:  Uint128{lo: ^uint64(0), hi: 0},
+			name:            "string - max uint64",
+			input:           "18446744073709551615",
+			expectedUint128: Uint128{lo: ^uint64(0), hi: 0},
 		},
 		{
-			name:  "string - larger than uint64",
-			input: "18446744073709551616", // 2^64
-			want:  Uint128{lo: 0, hi: 1},
+			name:            "string - larger than uint64",
+			input:           "18446744073709551616", // 2^64
+			expectedUint128: Uint128{lo: 0, hi: 1},
 		},
 		{
-			name:  "string - max uint128",
-			input: "340282366920938463463374607431768211455",
-			want:  Uint128{lo: ^uint64(0), hi: ^uint64(0)},
+			name:            "string - max uint128",
+			input:           "340282366920938463463374607431768211455",
+			expectedUint128: Uint128{lo: ^uint64(0), hi: ^uint64(0)},
 		},
 		{
-			name:  "bytes - zero",
-			input: []byte("0"),
-			want:  Uint128{lo: 0, hi: 0},
+			name:            "bytes - zero",
+			input:           []byte("0"),
+			expectedUint128: Uint128{lo: 0, hi: 0},
 		},
 		{
-			name:  "bytes - value",
-			input: []byte("12345"),
-			want:  Uint128{lo: 12345, hi: 0},
+			name:            "bytes - value",
+			input:           []byte("12345"),
+			expectedUint128: Uint128{lo: 12345, hi: 0},
 		},
 		{
-			name:  "sql.Null - valid",
-			input: &sql.Null[[]byte]{V: []byte("42"), Valid: true},
-			want:  Uint128{lo: 42, hi: 0},
+			name:            "sql.Null - valid",
+			input:           &sql.Null[[]byte]{V: []byte("42"), Valid: true},
+			expectedUint128: Uint128{lo: 42, hi: 0},
 		},
 		{
-			name:  "sql.Null - null",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  Uint128{lo: 0, hi: 0},
+			name:            "sql.Null - null",
+			input:           &sql.Null[[]byte]{Valid: false},
+			expectedUint128: Uint128{lo: 0, hi: 0},
 		},
 	}
 
@@ -458,41 +458,41 @@ func TestScan(t *testing.T) {
 			err := dest.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, *dest)
+			assert.Equal(t, tt.expectedUint128, *dest)
 		})
 	}
 }
 
 func TestScan_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   any
-		wantErr string
+		name        string
+		input       any
+		expectedErr string
 	}{
 		{
-			name:    "invalid string",
-			input:   "not a number",
-			wantErr: "invalid numeric when scanning",
+			name:        "invalid string",
+			input:       "not a number",
+			expectedErr: "invalid numeric when scanning",
 		},
 		{
-			name:    "negative value",
-			input:   "-1",
-			wantErr: "uint128 out of range",
+			name:        "negative value",
+			input:       "-1",
+			expectedErr: "uint128 out of range",
 		},
 		{
-			name:    "too large",
-			input:   "340282366920938463463374607431768211456", // 2^128
-			wantErr: "uint128 out of range",
+			name:        "too large",
+			input:       "340282366920938463463374607431768211456", // 2^128
+			expectedErr: "uint128 out of range",
 		},
 		{
-			name:    "unsupported type",
-			input:   123,
-			wantErr: "unsupported src",
+			name:        "unsupported type",
+			input:       123,
+			expectedErr: "unsupported src",
 		},
 		{
-			name:    "bytes - invalid",
-			input:   []byte("invalid"),
-			wantErr: "invalid numeric when scanning",
+			name:        "bytes - invalid",
+			input:       []byte("invalid"),
+			expectedErr: "invalid numeric when scanning",
 		},
 	}
 
@@ -501,7 +501,7 @@ func TestScan_InvalidInput_Errors(t *testing.T) {
 			dest := &Uint128{}
 			err := dest.Scan(tt.input)
 
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

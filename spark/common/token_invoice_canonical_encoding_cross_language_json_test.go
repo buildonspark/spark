@@ -48,17 +48,17 @@ func TestTokenInvoiceCanonicalEncodingJSONCases(t *testing.T) {
 				t.Fatalf("protojson unmarshal SparkInvoiceFields: %v", err)
 			}
 
-			got, err := proto.MarshalOptions{Deterministic: true}.Marshal(&msg)
+			encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(&msg)
 			if err != nil {
 				t.Fatalf("marshal SparkInvoiceFields: %v", err)
 			}
 
-			gotHex := hex.EncodeToString(got)
-			if !strings.EqualFold(tc.ExpectedCanonicalEncoding, gotHex) {
+			actualHex := hex.EncodeToString(encoded)
+			if !strings.EqualFold(tc.ExpectedCanonicalEncoding, actualHex) {
 				t.Fatalf(
 					"canonical encoding mismatch: expected=%s got=%s",
 					tc.ExpectedCanonicalEncoding,
-					gotHex,
+					actualHex,
 				)
 			}
 		})

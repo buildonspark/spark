@@ -453,7 +453,7 @@ mod tests {
     fn test_next_sequence() {
         // Matches Go's TestNextSequence test cases exactly
         let cases = vec![
-            // (name, curr_seq, want_seq, want_direct_seq)
+            // (name, curr_seq, expected_seq, expected_direct_seq)
             ("basic", 1000u32, 900u32, 950u32),
             (
                 "mixed upper-word pattern",
@@ -482,13 +482,13 @@ mod tests {
             ),
         ];
 
-        for (name, curr_seq, want_seq, want_direct_seq) in cases {
+        for (name, curr_seq, expected_seq, expected_direct_seq) in cases {
             let (next_seq, next_direct_seq) =
                 next_sequence(curr_seq, TIME_LOCK_INTERVAL, DIRECT_TIMELOCK_OFFSET)
                     .unwrap_or_else(|e| panic!("{name}: {e}"));
-            assert_eq!(next_seq, want_seq, "{name}: next_seq mismatch");
+            assert_eq!(next_seq, expected_seq, "{name}: next_seq mismatch");
             assert_eq!(
-                next_direct_seq, want_direct_seq,
+                next_direct_seq, expected_direct_seq,
                 "{name}: next_direct_seq mismatch"
             );
 

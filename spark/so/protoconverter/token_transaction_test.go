@@ -36,9 +36,9 @@ var (
 
 func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 	tests := []struct {
-		name  string
-		input *tokenpb.TokenTransaction
-		want  *legacypb.TokenTransaction
+		name       string
+		input      *tokenpb.TokenTransaction
+		expectedTx *legacypb.TokenTransaction
 	}{
 		{
 			name: "valid mint transaction",
@@ -63,7 +63,7 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 				},
 				ClientCreatedTimestamp: timestamppb.New(time.UnixMilli(1234567890)),
 			},
-			want: &legacypb.TokenTransaction{
+			expectedTx: &legacypb.TokenTransaction{
 				TokenOutputs: []*legacypb.TokenOutput{
 					{
 						Id:                            new("output1"),
@@ -108,7 +108,7 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 				},
 				ClientCreatedTimestamp: timestamppb.New(time.UnixMilli(0)),
 			},
-			want: &legacypb.TokenTransaction{
+			expectedTx: &legacypb.TokenTransaction{
 				TokenOutputs: []*legacypb.TokenOutput{
 					{
 						Id:                            new("output1"),
@@ -161,7 +161,7 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 					},
 				},
 			},
-			want: &legacypb.TokenTransaction{
+			expectedTx: &legacypb.TokenTransaction{
 				TokenOutputs: []*legacypb.TokenOutput{
 					{
 						Id:                            new("output1"),
@@ -204,7 +204,7 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 				},
 				ClientCreatedTimestamp: timestamppb.New(time.UnixMilli(1234567890)),
 			},
-			want: &legacypb.TokenTransaction{
+			expectedTx: &legacypb.TokenTransaction{
 				TokenOutputs:                    []*legacypb.TokenOutput{},
 				SparkOperatorIdentityPublicKeys: [][]byte{},
 				Network:                         pb.Network_MAINNET,
@@ -220,12 +220,12 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SparkTokenTransactionFromTokenProto(tt.input)
+			converted, err := SparkTokenTransactionFromTokenProto(tt.input)
 			if err != nil {
 				t.Errorf("SparkTokenTransactionFromTokenProto() unexpected error = %v", err)
 				return
 			}
-			if diff := cmp.Diff(tt.want, got, protocmp.Transform()); diff != "" {
+			if diff := cmp.Diff(tt.expectedTx, converted, protocmp.Transform()); diff != "" {
 				t.Errorf("SparkTokenTransactionFromTokenProto() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -234,14 +234,14 @@ func TestSparkTokenTransactionFromTokenProto(t *testing.T) {
 
 func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   *tokenpb.TokenTransaction
-		wantErr string
+		name        string
+		input       *tokenpb.TokenTransaction
+		expectedErr string
 	}{
 		{
-			name:    "nil input",
-			input:   nil,
-			wantErr: "input token transaction cannot be nil",
+			name:        "nil input",
+			input:       nil,
+			expectedErr: "input token transaction cannot be nil",
 		},
 		{
 			name: "nil mint input",
@@ -251,7 +251,7 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 					MintInput: nil,
 				},
 			},
-			wantErr: "mint_input is nil",
+			expectedErr: "mint_input is nil",
 		},
 		{
 			name: "nil token output",
@@ -261,7 +261,7 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 					MintInput: &tokenpb.TokenMintInput{},
 				},
 			},
-			wantErr: "token output 0 is nil",
+			expectedErr: "token output 0 is nil",
 		},
 		{
 			name: "nil transfer input",
@@ -271,7 +271,7 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 					TransferInput: nil,
 				},
 			},
-			wantErr: "transfer_input is nil",
+			expectedErr: "transfer_input is nil",
 		},
 		{
 			name: "nil transfer output to spend",
@@ -283,7 +283,7 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "transfer output to spend 0 is nil",
+			expectedErr: "transfer output to spend 0 is nil",
 		},
 		{
 			name: "unknown token inputs type",
@@ -291,7 +291,7 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 				TokenOutputs: []*tokenpb.TokenOutput{},
 				TokenInputs:  nil,
 			},
-			wantErr: "unknown token_inputs type",
+			expectedErr: "unknown token_inputs type",
 		},
 	}
 
@@ -302,8 +302,8 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 				t.Errorf("SparkTokenTransactionFromTokenProto() expected error but got none")
 				return
 			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("SparkTokenTransactionFromTokenProto() error = %v, want error containing %q", err, tt.wantErr)
+			if !strings.Contains(err.Error(), tt.expectedErr) {
+				t.Errorf("SparkTokenTransactionFromTokenProto() error = %v, want error containing %q", err, tt.expectedErr)
 			}
 			if out != nil {
 				t.Errorf("SparkTokenTransactionFromTokenProto() want nil but got %v", out)
@@ -314,14 +314,14 @@ func TestSparkTokenTransactionFromTokenProto_Errors(t *testing.T) {
 
 func TestTokenProtoFromSparkTokenTransaction_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   *legacypb.TokenTransaction
-		wantErr string
+		name        string
+		input       *legacypb.TokenTransaction
+		expectedErr string
 	}{
 		{
-			name:    "nil input",
-			input:   nil,
-			wantErr: "input spark token transaction cannot be nil",
+			name:        "nil input",
+			input:       nil,
+			expectedErr: "input spark token transaction cannot be nil",
 		},
 		{
 			name: "nil token output",
@@ -331,7 +331,7 @@ func TestTokenProtoFromSparkTokenTransaction_Errors(t *testing.T) {
 					MintInput: &legacypb.TokenMintInput{},
 				},
 			},
-			wantErr: "token output 0 is nil",
+			expectedErr: "token output 0 is nil",
 		},
 		{
 			name: "nil transfer output to spend",
@@ -343,7 +343,7 @@ func TestTokenProtoFromSparkTokenTransaction_Errors(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "transfer output to spend 0 is nil",
+			expectedErr: "transfer output to spend 0 is nil",
 		},
 	}
 
@@ -354,8 +354,8 @@ func TestTokenProtoFromSparkTokenTransaction_Errors(t *testing.T) {
 				t.Errorf("TokenProtoFromSparkTokenTransaction() expected error but got none")
 				return
 			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("TokenProtoFromSparkTokenTransaction() error = %v, want error containing %q", err, tt.wantErr)
+			if !strings.Contains(err.Error(), tt.expectedErr) {
+				t.Errorf("TokenProtoFromSparkTokenTransaction() error = %v, want error containing %q", err, tt.expectedErr)
 			}
 			if out != nil {
 				t.Errorf("TokenProtoFromSparkTokenTransaction() want nil but got %v", out)
@@ -503,12 +503,12 @@ func TestConvertPartialToV2TxShape(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ConvertPartialToV2TxShape(tt.input)
+			converted, err := ConvertPartialToV2TxShape(tt.input)
 			if tt.input == nil {
 				if err != nil {
 					t.Fatalf("ConvertPartialToV2TxShape(nil) unexpected error: %v", err)
 				}
-				if got != nil {
+				if converted != nil {
 					t.Fatalf("ConvertPartialToV2TxShape(nil) expected nil")
 				}
 				return
@@ -516,7 +516,7 @@ func TestConvertPartialToV2TxShape(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ConvertPartialToV2TxShape() unexpected error: %v", err)
 			}
-			if diff := cmp.Diff(tt.expect, got, protocmp.Transform()); diff != "" {
+			if diff := cmp.Diff(tt.expect, converted, protocmp.Transform()); diff != "" {
 				t.Fatalf("ConvertPartialToV2TxShape() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -620,12 +620,12 @@ func TestConvertFinalToV2TxShape(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ConvertFinalToV2TxShape(tt.input)
+			converted, err := ConvertFinalToV2TxShape(tt.input)
 			if tt.input == nil {
 				if err != nil {
 					t.Fatalf("ConvertFinalToV2TxShape(nil) unexpected error: %v", err)
 				}
-				if got != nil {
+				if converted != nil {
 					t.Fatalf("ConvertFinalToV2TxShape(nil) expected nil")
 				}
 				return
@@ -633,7 +633,7 @@ func TestConvertFinalToV2TxShape(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ConvertFinalToV2TxShape() unexpected error: %v", err)
 			}
-			if diff := cmp.Diff(tt.expect, got, protocmp.Transform()); diff != "" {
+			if diff := cmp.Diff(tt.expect, converted, protocmp.Transform()); diff != "" {
 				t.Fatalf("ConvertFinalToV2TxShape() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -710,12 +710,12 @@ func TestConvertV2TxShapeToFinal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ConvertV2TxShapeToFinal(tt.input)
+			converted, err := ConvertV2TxShapeToFinal(tt.input)
 			if tt.input == nil {
 				if err != nil {
 					t.Fatalf("ConvertV2TxShapeToFinal(nil) unexpected error: %v", err)
 				}
-				if got != nil {
+				if converted != nil {
 					t.Fatalf("ConvertV2TxShapeToFinal(nil) expected nil")
 				}
 				return
@@ -723,7 +723,7 @@ func TestConvertV2TxShapeToFinal(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ConvertV2TxShapeToFinal() unexpected error: %v", err)
 			}
-			if diff := cmp.Diff(tt.expect, got, protocmp.Transform()); diff != "" {
+			if diff := cmp.Diff(tt.expect, converted, protocmp.Transform()); diff != "" {
 				t.Fatalf("ConvertV2TxShapeToFinal() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -762,22 +762,21 @@ func TestConvertBroadcastToStart(t *testing.T) {
 		TokenTransactionOwnerSignatures: ownerSigs,
 	}
 
-	got, err := ConvertBroadcastToStart(req)
+	startReq, err := ConvertBroadcastToStart(req)
 	if err != nil {
 		t.Fatalf("ConvertBroadcastToStart() unexpected error: %v", err)
 	}
-	if got.GetValidityDurationSeconds() != ptx.GetTokenTransactionMetadata().GetValidityDurationSeconds() {
+	if startReq.GetValidityDurationSeconds() != ptx.GetTokenTransactionMetadata().GetValidityDurationSeconds() {
 		t.Fatalf("ValidityDurationSeconds mismatch: want %d got %d",
-			ptx.GetTokenTransactionMetadata().GetValidityDurationSeconds(), got.GetValidityDurationSeconds())
+			ptx.GetTokenTransactionMetadata().GetValidityDurationSeconds(), startReq.GetValidityDurationSeconds())
 	}
-	if diff := cmp.Diff(op1Key, got.GetIdentityPublicKey()); diff != "" {
+	if diff := cmp.Diff(op1Key, startReq.GetIdentityPublicKey()); diff != "" {
 		t.Fatalf("IdentityPublicKey mismatch (-want +got):\n%s", diff)
 	}
-	if diff := cmp.Diff(ownerSigs, got.GetPartialTokenTransactionOwnerSignatures(), protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(ownerSigs, startReq.GetPartialTokenTransactionOwnerSignatures(), protocmp.Transform()); diff != "" {
 		t.Fatalf("OwnerSignatures mismatch (-want +got):\n%s", diff)
 	}
-	// Ensure partial got converted to legacy TokenTransaction
-	if got.GetPartialTokenTransaction() == nil {
+	if startReq.GetPartialTokenTransaction() == nil {
 		t.Fatalf("expected non-nil PartialTokenTransaction")
 	}
 

@@ -32,36 +32,36 @@ func TestNewTxIDFromBytes(t *testing.T) {
 
 func TestNewTxIDFromBytes_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:    "nil",
-			input:   nil,
-			wantErr: "invalid txid length: expected 32, got 0",
+			name:        "nil",
+			input:       nil,
+			expectedErr: "invalid txid length: expected 32, got 0",
 		},
 		{
-			name:    "empty",
-			input:   []byte{},
-			wantErr: "invalid txid length: expected 32, got 0",
+			name:        "empty",
+			input:       []byte{},
+			expectedErr: "invalid txid length: expected 32, got 0",
 		},
 		{
-			name:    "too short",
-			input:   make([]byte, 16),
-			wantErr: "invalid txid length: expected 32, got 16",
+			name:        "too short",
+			input:       make([]byte, 16),
+			expectedErr: "invalid txid length: expected 32, got 16",
 		},
 		{
-			name:    "too long",
-			input:   make([]byte, 64),
-			wantErr: "invalid txid length: expected 32, got 64",
+			name:        "too long",
+			input:       make([]byte, 64),
+			expectedErr: "invalid txid length: expected 32, got 64",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewTxIDFromBytes(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -79,36 +79,36 @@ func TestNewTxIDFromString(t *testing.T) {
 
 func TestNewTxIDFromString_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantErr string
+		name        string
+		input       string
+		expectedErr string
 	}{
 		{
-			name:    "empty",
-			input:   "",
-			wantErr: "invalid txid hex length: expected 64 hex chars, got 0",
+			name:        "empty",
+			input:       "",
+			expectedErr: "invalid txid hex length: expected 64 hex chars, got 0",
 		},
 		{
-			name:    "invalid hex",
-			input:   "not a valid hex string" + strings.Repeat("0", 42),
-			wantErr: "failed to parse txid string",
+			name:        "invalid hex",
+			input:       "not a valid hex string" + strings.Repeat("0", 42),
+			expectedErr: "failed to parse txid string",
 		},
 		{
-			name:    "too short",
-			input:   "abc123",
-			wantErr: "invalid txid hex length: expected 64 hex chars, got 6",
+			name:        "too short",
+			input:       "abc123",
+			expectedErr: "invalid txid hex length: expected 64 hex chars, got 6",
 		},
 		{
-			name:    "too long",
-			input:   strings.Repeat("0", 90),
-			wantErr: "invalid txid hex length: expected 64 hex chars, got 90",
+			name:        "too long",
+			input:       strings.Repeat("0", 90),
+			expectedErr: "invalid txid hex length: expected 64 hex chars, got 90",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewTxIDFromString(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -147,25 +147,25 @@ func TestTxID_IsZero(t *testing.T) {
 	hash := chainhash.HashH([]byte("test transaction"))
 
 	tests := []struct {
-		name string
-		txid TxID
-		want bool
+		name           string
+		txid           TxID
+		expectedIsZero bool
 	}{
 		{
-			name: "zero value",
-			txid: TxID{},
-			want: true,
+			name:           "zero value",
+			txid:           TxID{},
+			expectedIsZero: true,
 		},
 		{
-			name: "non-zero value",
-			txid: NewTxID(hash),
-			want: false,
+			name:           "non-zero value",
+			txid:           NewTxID(hash),
+			expectedIsZero: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.txid.IsZero())
+			assert.Equal(t, tt.expectedIsZero, tt.txid.IsZero())
 		})
 	}
 }
@@ -174,19 +174,19 @@ func TestTxID_Value(t *testing.T) {
 	hash := chainhash.HashH([]byte("test transaction"))
 
 	tests := []struct {
-		name string
-		txid TxID
-		want any
+		name          string
+		txid          TxID
+		expectedValue any
 	}{
 		{
-			name: "non-zero value",
-			txid: NewTxID(hash),
-			want: hash[:],
+			name:          "non-zero value",
+			txid:          NewTxID(hash),
+			expectedValue: hash[:],
 		},
 		{
-			name: "zero value",
-			txid: TxID{},
-			want: nil,
+			name:          "zero value",
+			txid:          TxID{},
+			expectedValue: nil,
 		},
 	}
 
@@ -194,7 +194,7 @@ func TestTxID_Value(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			value, err := tt.txid.Value()
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, value)
+			assert.Equal(t, tt.expectedValue, value)
 		})
 	}
 }
@@ -205,49 +205,49 @@ func TestTxID_Scan(t *testing.T) {
 	hashStr := hash.String()
 
 	tests := []struct {
-		name  string
-		input any
-		want  chainhash.Hash
+		name         string
+		input        any
+		expectedHash chainhash.Hash
 	}{
 		{
-			name:  "valid bytes",
-			input: hashBytes,
-			want:  hash,
+			name:         "valid bytes",
+			input:        hashBytes,
+			expectedHash: hash,
 		},
 		{
-			name:  "valid string",
-			input: hashStr,
-			want:  hash,
+			name:         "valid string",
+			input:        hashStr,
+			expectedHash: hash,
 		},
 		{
-			name:  "nil value",
-			input: nil,
-			want:  chainhash.Hash{},
+			name:         "nil value",
+			input:        nil,
+			expectedHash: chainhash.Hash{},
 		},
 		{
-			name:  "empty bytes",
-			input: []byte{},
-			want:  chainhash.Hash{},
+			name:         "empty bytes",
+			input:        []byte{},
+			expectedHash: chainhash.Hash{},
 		},
 		{
-			name:  "nil sql.Null",
-			input: (*sql.Null[[]byte])(nil),
-			want:  chainhash.Hash{},
+			name:         "nil sql.Null",
+			input:        (*sql.Null[[]byte])(nil),
+			expectedHash: chainhash.Hash{},
 		},
 		{
-			name:  "null value",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  chainhash.Hash{},
+			name:         "null value",
+			input:        &sql.Null[[]byte]{Valid: false},
+			expectedHash: chainhash.Hash{},
 		},
 		{
-			name:  "valid sql.Null",
-			input: &sql.Null[[]byte]{V: hashBytes, Valid: true},
-			want:  hash,
+			name:         "valid sql.Null",
+			input:        &sql.Null[[]byte]{V: hashBytes, Valid: true},
+			expectedHash: hash,
 		},
 		{
-			name:  "empty sql.Null",
-			input: &sql.Null[[]byte]{V: []byte{}, Valid: true},
-			want:  chainhash.Hash{},
+			name:         "empty sql.Null",
+			input:        &sql.Null[[]byte]{V: []byte{}, Valid: true},
+			expectedHash: chainhash.Hash{},
 		},
 	}
 
@@ -257,41 +257,41 @@ func TestTxID_Scan(t *testing.T) {
 			err := txid.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, txid.hash)
+			assert.Equal(t, tt.expectedHash, txid.hash)
 		})
 	}
 }
 
 func TestTxID_Scan_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   any
-		wantErr string
+		name        string
+		input       any
+		expectedErr string
 	}{
 		{
-			name:    "invalid type",
-			input:   123,
-			wantErr: "unexpected type for TxID: int",
+			name:        "invalid type",
+			input:       123,
+			expectedErr: "unexpected type for TxID: int",
 		},
 		{
-			name:    "invalid type struct",
-			input:   struct{}{},
-			wantErr: "unexpected type for TxID: struct {}",
+			name:        "invalid type struct",
+			input:       struct{}{},
+			expectedErr: "unexpected type for TxID: struct {}",
 		},
 		{
-			name:    "invalid bytes length",
-			input:   make([]byte, 16),
-			wantErr: "failed to deserialize txid bytes",
+			name:        "invalid bytes length",
+			input:       make([]byte, 16),
+			expectedErr: "failed to deserialize txid bytes",
 		},
 		{
-			name:    "invalid string",
-			input:   "not a valid hash",
-			wantErr: "failed to deserialize txid string",
+			name:        "invalid string",
+			input:       "not a valid hash",
+			expectedErr: "failed to deserialize txid string",
 		},
 		{
-			name:    "invalid sql.Null bytes",
-			input:   &sql.Null[[]byte]{V: make([]byte, 16), Valid: true},
-			wantErr: "failed to deserialize txid bytes",
+			name:        "invalid sql.Null bytes",
+			input:       &sql.Null[[]byte]{V: make([]byte, 16), Valid: true},
+			expectedErr: "failed to deserialize txid bytes",
 		},
 	}
 
@@ -299,7 +299,7 @@ func TestTxID_Scan_InvalidInput_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var txid TxID
 			err := txid.Scan(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

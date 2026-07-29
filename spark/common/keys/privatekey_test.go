@@ -31,46 +31,46 @@ func TestParsePrivateKey(t *testing.T) {
 
 func TestParsePrivateKey_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:    "nil",
-			input:   nil,
-			wantErr: "private key must be 32 bytes",
+			name:        "nil",
+			input:       nil,
+			expectedErr: "private key must be 32 bytes",
 		},
 		{
-			name:    "empty",
-			input:   []byte{},
-			wantErr: "private key must be 32 bytes",
+			name:        "empty",
+			input:       []byte{},
+			expectedErr: "private key must be 32 bytes",
 		},
 		{
-			name:    "too short",
-			input:   bytes.Repeat([]byte{1}, 31),
-			wantErr: "private key must be 32 bytes",
+			name:        "too short",
+			input:       bytes.Repeat([]byte{1}, 31),
+			expectedErr: "private key must be 32 bytes",
 		},
 		{
-			name:    "too long",
-			input:   bytes.Repeat([]byte{1}, 33),
-			wantErr: "private key must be 32 bytes",
+			name:        "too long",
+			input:       bytes.Repeat([]byte{1}, 33),
+			expectedErr: "private key must be 32 bytes",
 		},
 		{
-			name:    "zero key",
-			input:   bytes.Repeat([]byte{0}, 32),
-			wantErr: "private key must not be zero",
+			name:        "zero key",
+			input:       bytes.Repeat([]byte{0}, 32),
+			expectedErr: "private key must not be zero",
 		},
 		{
-			name:    "zero (mod curve order) key",
-			input:   secp256k1.S256().N.Bytes(),
-			wantErr: "private key must not be zero",
+			name:        "zero (mod curve order) key",
+			input:       secp256k1.S256().N.Bytes(),
+			expectedErr: "private key must not be zero",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParsePrivateKey(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -86,26 +86,26 @@ func TestPrivateKeyFromBigInt(t *testing.T) {
 
 func TestPrivateKeyFromBigInt_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   *big.Int
-		wantErr string
+		name        string
+		input       *big.Int
+		expectedErr string
 	}{
 		{
-			name:    "zero",
-			input:   big.NewInt(0),
-			wantErr: "private key must not be zero",
+			name:        "zero",
+			input:       big.NewInt(0),
+			expectedErr: "private key must not be zero",
 		},
 		{
-			name:    "too large",
-			input:   new(big.Int).Lsh(big.NewInt(1), 257), // 257 bits
-			wantErr: "private key must not be represented by an Int larger than 32 bytes",
+			name:        "too large",
+			input:       new(big.Int).Lsh(big.NewInt(1), 257), // 257 bits
+			expectedErr: "private key must not be represented by an Int larger than 32 bytes",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := PrivateKeyFromBigInt(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -122,12 +122,12 @@ func TestPrivate_Add(t *testing.T) {
 	privA := MustGeneratePrivateKeyFromRand(rng)
 	privB := MustGeneratePrivateKeyFromRand(rng)
 
-	got := privA.Add(privB)
+	sum := privA.Add(privB)
 
 	// Verify that the sum equals the private key of (privA + privB)
-	wantPubKey := privA.Public().Add(privB.Public())
-	gotPubKey := got.Public()
-	assert.Equal(t, wantPubKey, gotPubKey)
+	expectedPubKey := privA.Public().Add(privB.Public())
+	actualPubKey := sum.Public()
+	assert.Equal(t, expectedPubKey, actualPubKey)
 }
 
 func TestPrivate_Add_Overflow(t *testing.T) {
@@ -136,22 +136,22 @@ func TestPrivate_Add_Overflow(t *testing.T) {
 	mustOverflow, err := PrivateKeyFromBigInt(secp256k1.S256().N)
 	require.NoError(t, err)
 
-	got := privA.Add(mustOverflow)
+	sum := privA.Add(mustOverflow)
 
 	// Verify that the sum equals the private key of (privA + privB)
-	assert.Equal(t, privA, got)
+	assert.Equal(t, privA, sum)
 }
 
 func TestPrivate_Sub(t *testing.T) {
 	privA := MustGeneratePrivateKeyFromRand(rng)
 	privB := MustGeneratePrivateKeyFromRand(rng)
 
-	got := privA.Sub(privB)
+	difference := privA.Sub(privB)
 
 	// Verify that the difference equals the private key of (privA - privB)
-	wantPubKey := privA.Public().Sub(privB.Public())
-	gotPubKey := got.Public()
-	assert.Equal(t, wantPubKey, gotPubKey)
+	expectedPubKey := privA.Public().Sub(privB.Public())
+	actualPubKey := difference.Public()
+	assert.Equal(t, expectedPubKey, actualPubKey)
 }
 
 func TestPrivate_Equals(t *testing.T) {
@@ -159,30 +159,30 @@ func TestPrivate_Equals(t *testing.T) {
 	priv2 := MustGeneratePrivateKeyFromRand(rng)
 
 	tests := []struct {
-		name string
-		a    Private
-		b    Private
-		want bool
+		name           string
+		a              Private
+		b              Private
+		expectedEquals bool
 	}{
 		{
-			name: "same keys",
-			a:    priv1,
-			b:    priv1,
-			want: true,
+			name:           "same keys",
+			a:              priv1,
+			b:              priv1,
+			expectedEquals: true,
 		},
 		{
-			name: "different keys",
-			a:    priv1,
-			b:    priv2,
-			want: false,
+			name:           "different keys",
+			a:              priv1,
+			b:              priv2,
+			expectedEquals: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.a.Equals(tt.b))
+			assert.Equal(t, tt.expectedEquals, tt.a.Equals(tt.b))
 			// Ensure it's commutative
-			assert.Equal(t, tt.want, tt.b.Equals(tt.a))
+			assert.Equal(t, tt.expectedEquals, tt.b.Equals(tt.a))
 		})
 	}
 }
@@ -213,34 +213,34 @@ func TestPrivate_Scan(t *testing.T) {
 	privKey := MustGeneratePrivateKeyFromRand(rng)
 
 	tests := []struct {
-		name  string
-		input any
-		want  secp256k1.PrivateKey
+		name        string
+		input       any
+		expectedKey secp256k1.PrivateKey
 	}{
 		{
-			name:  "valid key",
-			input: &sql.Null[[]byte]{V: privKey.Serialize(), Valid: true},
-			want:  privKey.key,
+			name:        "valid key",
+			input:       &sql.Null[[]byte]{V: privKey.Serialize(), Valid: true},
+			expectedKey: privKey.key,
 		},
 		{
-			name:  "valid byte array",
-			input: privKey.Serialize(),
-			want:  privKey.key,
+			name:        "valid byte array",
+			input:       privKey.Serialize(),
+			expectedKey: privKey.key,
 		},
 		{
-			name:  "nil value",
-			input: nil,
-			want:  secp256k1.PrivateKey{},
+			name:        "nil value",
+			input:       nil,
+			expectedKey: secp256k1.PrivateKey{},
 		},
 		{
-			name:  "nil sql.Null",
-			input: (*sql.Null[[]byte])(nil),
-			want:  secp256k1.PrivateKey{},
+			name:        "nil sql.Null",
+			input:       (*sql.Null[[]byte])(nil),
+			expectedKey: secp256k1.PrivateKey{},
 		},
 		{
-			name:  "null value",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  secp256k1.PrivateKey{},
+			name:        "null value",
+			input:       &sql.Null[[]byte]{Valid: false},
+			expectedKey: secp256k1.PrivateKey{},
 		},
 	}
 
@@ -250,7 +250,7 @@ func TestPrivate_Scan(t *testing.T) {
 			err := dest.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, dest.key)
+			assert.Equal(t, tt.expectedKey, dest.key)
 		})
 	}
 }
@@ -268,19 +268,19 @@ func TestPrivate_Serialize_Empty_ReturnsEmpty(t *testing.T) {
 func TestPrivate_MarshalJSON(t *testing.T) {
 	privKey := MustGeneratePrivateKeyFromRand(rng)
 	tests := []struct {
-		name string
-		key  Private
-		want []byte
+		name          string
+		key           Private
+		expectedBytes []byte
 	}{
 		{
-			name: "valid key",
-			key:  privKey,
-			want: privKey.Serialize(),
+			name:          "valid key",
+			key:           privKey,
+			expectedBytes: privKey.Serialize(),
 		},
 		{
-			name: "empty key",
-			key:  Private{},
-			want: nil,
+			name:          "empty key",
+			key:           Private{},
+			expectedBytes: nil,
 		},
 	}
 
@@ -292,7 +292,7 @@ func TestPrivate_MarshalJSON(t *testing.T) {
 			// Check that the data can be unmarshaled back to the same bytes
 			var unmarshaled []byte
 			require.NoError(t, json.Unmarshal(data, &unmarshaled))
-			assert.Equal(t, tt.want, unmarshaled)
+			assert.Equal(t, tt.expectedBytes, unmarshaled)
 		})
 	}
 }

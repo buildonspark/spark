@@ -2423,12 +2423,12 @@ func TestQueryAllTransfers_ScopesLeavesToQueriedReceiver(t *testing.T) {
 			resp, err := f.handler.QueryAllTransfers(ctx, receiverFilter(tc.viewer), false)
 			require.NoError(t, err)
 			require.Len(t, resp.GetTransfers(), 1)
-			got := resp.GetTransfers()[0]
-			assert.Equal(t, transfer.ID.String(), got.GetId())
-			assert.Equal(t, []string{leafNodeIDFor(leaves, tc.viewer)}, leafIDSetOf(got),
+			returnedTransfer := resp.GetTransfers()[0]
+			assert.Equal(t, transfer.ID.String(), returnedTransfer.GetId())
+			assert.Equal(t, []string{leafNodeIDFor(leaves, tc.viewer)}, leafIDSetOf(returnedTransfer),
 				"receiver must see exactly its own leaf, never the sibling's")
-			require.Len(t, got.GetReceivers(), 1, "Receivers[] must be scoped to the queried receiver")
-			assert.Equal(t, tc.viewer.Serialize(), got.GetReceivers()[0].GetIdentityPublicKey())
+			require.Len(t, returnedTransfer.GetReceivers(), 1, "Receivers[] must be scoped to the queried receiver")
+			assert.Equal(t, tc.viewer.Serialize(), returnedTransfer.GetReceivers()[0].GetIdentityPublicKey())
 		})
 	}
 }
@@ -2465,12 +2465,12 @@ func TestQueryPendingTransfers_ScopesLeavesToQueriedReceiver(t *testing.T) {
 			resp, err := f.handler.QueryPendingTransfers(ctx, receiverFilter(tc.viewer))
 			require.NoError(t, err)
 			require.Len(t, resp.GetTransfers(), 1)
-			got := resp.GetTransfers()[0]
-			assert.Equal(t, transfer.ID.String(), got.GetId())
-			assert.Equal(t, []string{leafNodeIDFor(leaves, tc.viewer)}, leafIDSetOf(got),
+			returnedTransfer := resp.GetTransfers()[0]
+			assert.Equal(t, transfer.ID.String(), returnedTransfer.GetId())
+			assert.Equal(t, []string{leafNodeIDFor(leaves, tc.viewer)}, leafIDSetOf(returnedTransfer),
 				"receiver must see exactly its own leaf, never the sibling's")
-			require.Len(t, got.GetReceivers(), 1, "Receivers[] must be scoped to the queried receiver")
-			assert.Equal(t, tc.viewer.Serialize(), got.GetReceivers()[0].GetIdentityPublicKey())
+			require.Len(t, returnedTransfer.GetReceivers(), 1, "Receivers[] must be scoped to the queried receiver")
+			assert.Equal(t, tc.viewer.Serialize(), returnedTransfer.GetReceivers()[0].GetIdentityPublicKey())
 		})
 	}
 }
@@ -2500,11 +2500,11 @@ func TestQueryTransfers_LegacyParticipantPath_ScopesLeavesToReceiver(t *testing.
 	resp, err := f.handler.queryTransfers(ctx, receiverFilter(recvA), false, false)
 	require.NoError(t, err)
 	require.Len(t, resp.GetTransfers(), 1)
-	got := resp.GetTransfers()[0]
-	assert.Equal(t, []string{leafNodeIDFor(leaves, recvA)}, leafIDSetOf(got),
+	returnedTransfer := resp.GetTransfers()[0]
+	assert.Equal(t, []string{leafNodeIDFor(leaves, recvA)}, leafIDSetOf(returnedTransfer),
 		"legacy queryTransfers must scope leaves to the queried receiver")
-	require.Len(t, got.GetReceivers(), 1)
-	assert.Equal(t, recvA.Serialize(), got.GetReceivers()[0].GetIdentityPublicKey())
+	require.Len(t, returnedTransfer.GetReceivers(), 1)
+	assert.Equal(t, recvA.Serialize(), returnedTransfer.GetReceivers()[0].GetIdentityPublicKey())
 }
 
 // TestQueryTransfersByID_ReturnsAllLeavesUnscoped is the opposite lock: the
@@ -2535,17 +2535,17 @@ func TestQueryTransfersByID_ReturnsAllLeavesUnscoped(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.GetTransfers(), 1)
-	got := resp.GetTransfers()[0]
+	returnedTransfer := resp.GetTransfers()[0]
 	assert.ElementsMatch(t,
 		[]string{leafNodeIDFor(leaves, recvA), leafNodeIDFor(leaves, recvB)},
-		leafIDSetOf(got),
+		leafIDSetOf(returnedTransfer),
 		"by-id must return ALL leaves — no receiver scoping")
-	gotReceivers := make([][]byte, 0, len(got.GetReceivers()))
-	for _, r := range got.GetReceivers() {
-		gotReceivers = append(gotReceivers, r.GetIdentityPublicKey())
+	actualReceivers := make([][]byte, 0, len(returnedTransfer.GetReceivers()))
+	for _, r := range returnedTransfer.GetReceivers() {
+		actualReceivers = append(actualReceivers, r.GetIdentityPublicKey())
 	}
 	assert.ElementsMatch(t,
 		[][]byte{recvA.Serialize(), recvB.Serialize()},
-		gotReceivers,
+		actualReceivers,
 		"by-id must return exactly both receivers — no receiver scoping")
 }

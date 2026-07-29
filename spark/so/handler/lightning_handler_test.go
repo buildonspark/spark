@@ -289,14 +289,14 @@ func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
 	identityPubKey := []byte{1}
 
 	tests := []struct {
-		name    string
-		req     *pb.QueryHtlcRequest
-		wantErr string
+		name        string
+		req         *pb.QueryHtlcRequest
+		expectedErr string
 	}{
 		{
-			name:    "missing identity public key",
-			req:     &pb.QueryHtlcRequest{Limit: 1},
-			wantErr: "identity public key is required",
+			name:        "missing identity public key",
+			req:         &pb.QueryHtlcRequest{Limit: 1},
+			expectedErr: "identity public key is required",
 		},
 		{
 			name: "zero limit",
@@ -304,7 +304,7 @@ func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
 				IdentityPublicKey: identityPubKey,
 				Limit:             0,
 			},
-			wantErr: "expect limit to be greater than 0",
+			expectedErr: "expect limit to be greater than 0",
 		},
 		{
 			name: "negative limit",
@@ -312,7 +312,7 @@ func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
 				IdentityPublicKey: identityPubKey,
 				Limit:             -1,
 			},
-			wantErr: "expect limit to be greater than 0",
+			expectedErr: "expect limit to be greater than 0",
 		},
 		{
 			name: "negative offset",
@@ -321,7 +321,7 @@ func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
 				Limit:             1,
 				Offset:            -1,
 			},
-			wantErr: "expect non-negative offset",
+			expectedErr: "expect non-negative offset",
 		},
 	}
 
@@ -329,7 +329,7 @@ func TestQueryHTLCRejectsMalformedPaginationBeforeDB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, err := handler.QueryHTLC(ctx, tt.req)
 			require.Nil(t, resp)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -346,30 +346,30 @@ func TestQueryHTLCRejectsFilterResourceExhaustionBeforeDB(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		mutate func(*pb.QueryHtlcRequest)
-		want   string
+		name            string
+		mutate          func(*pb.QueryHtlcRequest)
+		expectedErrText string
 	}{
 		{
 			name: "transfer ids over limit",
 			mutate: func(req *pb.QueryHtlcRequest) {
 				req.TransferIds = make([]string, maxQueryHTLCFilterValues+1)
 			},
-			want: "too many transfer ids in filter",
+			expectedErrText: "too many transfer ids in filter",
 		},
 		{
 			name: "payment hashes over limit",
 			mutate: func(req *pb.QueryHtlcRequest) {
 				req.PaymentHashes = make([][]byte, maxQueryHTLCFilterValues+1)
 			},
-			want: "too many payment hashes in filter",
+			expectedErrText: "too many payment hashes in filter",
 		},
 		{
 			name: "malformed payment hash",
 			mutate: func(req *pb.QueryHtlcRequest) {
 				req.PaymentHashes = [][]byte{make([]byte, 31)}
 			},
-			want: "invalid payment hash length at index 0",
+			expectedErrText: "invalid payment hash length at index 0",
 		},
 	}
 
@@ -382,7 +382,7 @@ func TestQueryHTLCRejectsFilterResourceExhaustionBeforeDB(t *testing.T) {
 
 			require.Nil(t, resp)
 			require.Error(t, err)
-			require.ErrorContains(t, err, test.want)
+			require.ErrorContains(t, err, test.expectedErrText)
 		})
 	}
 }
@@ -870,24 +870,24 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 			leavesToSend         []*pb.UserSignedTxSigningJob
 			directLeavesToSend   []*pb.UserSignedTxSigningJob
 			directFromCpfpLeaves []*pb.UserSignedTxSigningJob
-			wantContains         string
+			expectedContains     string
 		}{
 			{
-				name:         "leaves_to_send",
-				leavesToSend: []*pb.UserSignedTxSigningJob{nil},
-				wantContains: "leaves_to_send[0] is required",
+				name:             "leaves_to_send",
+				leavesToSend:     []*pb.UserSignedTxSigningJob{nil},
+				expectedContains: "leaves_to_send[0] is required",
 			},
 			{
 				name:               "direct_leaves_to_send",
 				leavesToSend:       []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
 				directLeavesToSend: []*pb.UserSignedTxSigningJob{nil},
-				wantContains:       "direct_leaves_to_send[0] is required",
+				expectedContains:   "direct_leaves_to_send[0] is required",
 			},
 			{
 				name:                 "direct_from_cpfp_leaves_to_send",
 				leavesToSend:         []*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
 				directFromCpfpLeaves: []*pb.UserSignedTxSigningJob{nil},
-				wantContains:         "direct_from_cpfp_leaves_to_send[0] is required",
+				expectedContains:     "direct_from_cpfp_leaves_to_send[0] is required",
 			},
 		}
 
@@ -897,7 +897,7 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 				require.NotPanics(t, func() {
 					err = lightningHandler.ValidateDuplicateLeaves(ctx, tt.leavesToSend, tt.directLeavesToSend, tt.directFromCpfpLeaves)
 				})
-				require.ErrorContains(t, err, tt.wantContains)
+				require.ErrorContains(t, err, tt.expectedContains)
 				code, reason := sparkerrors.CodeAndReasonFrom(err)
 				require.Equal(t, codes.InvalidArgument, code)
 				require.Equal(t, "MISSING_FIELD", reason)
@@ -2161,10 +2161,10 @@ func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
 	anchorScript := common.EphemeralAnchorOutput().PkScript
 
 	for _, tc := range []struct {
-		name       string
-		refundOuts []*wire.TxOut
-		target     string // which signing-job list carries the refund
-		wantErr    string // empty means the request must validate successfully
+		name        string
+		refundOuts  []*wire.TxOut
+		target      string // which signing-job list carries the refund
+		expectedErr string // empty means the request must validate successfully
 	}{
 		{
 			name:       "cpfp allows single destination output without anchor",
@@ -2178,35 +2178,35 @@ func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
 		},
 		{
 			// A valid trailing anchor must not open the door to a further value output.
-			name:       "cpfp rejects value output after valid anchor",
-			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput(), {Value: 500, PkScript: attackerScript}},
-			target:     "cpfp",
-			wantErr:    "unexpected extra cpfp tx output 2",
+			name:        "cpfp rejects value output after valid anchor",
+			refundOuts:  []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput(), {Value: 500, PkScript: attackerScript}},
+			target:      "cpfp",
+			expectedErr: "unexpected extra cpfp tx output 2",
 		},
 		{
 			// The anchor script alone is not enough; the value must also be zero.
-			name:       "cpfp rejects anchor script with nonzero value",
-			refundOuts: []*wire.TxOut{destinationOut(), {Value: 1, PkScript: anchorScript}},
-			target:     "cpfp",
-			wantErr:    "unexpected extra cpfp tx output 1",
+			name:        "cpfp rejects anchor script with nonzero value",
+			refundOuts:  []*wire.TxOut{destinationOut(), {Value: 1, PkScript: anchorScript}},
+			target:      "cpfp",
+			expectedErr: "unexpected extra cpfp tx output 1",
 		},
 		{
-			name:       "cpfp rejects negative value output",
-			refundOuts: []*wire.TxOut{destinationOut(), {Value: -1, PkScript: attackerScript}},
-			target:     "cpfp",
-			wantErr:    "cpfp tx output 1 has negative value",
+			name:        "cpfp rejects negative value output",
+			refundOuts:  []*wire.TxOut{destinationOut(), {Value: -1, PkScript: attackerScript}},
+			target:      "cpfp",
+			expectedErr: "cpfp tx output 1 has negative value",
 		},
 		{
-			name:       "direct rejects ephemeral anchor",
-			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
-			target:     "direct",
-			wantErr:    "unexpected extra direct tx output 1",
+			name:        "direct rejects ephemeral anchor",
+			refundOuts:  []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
+			target:      "direct",
+			expectedErr: "unexpected extra direct tx output 1",
 		},
 		{
-			name:       "direct from cpfp rejects ephemeral anchor",
-			refundOuts: []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
-			target:     "directFromCpfp",
-			wantErr:    "unexpected extra direct from cpfp tx output 1",
+			name:        "direct from cpfp rejects ephemeral anchor",
+			refundOuts:  []*wire.TxOut{destinationOut(), common.EphemeralAnchorOutput()},
+			target:      "directFromCpfp",
+			expectedErr: "unexpected extra direct from cpfp tx output 1",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2276,11 +2276,11 @@ func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
 				false,
 			)
 
-			if tc.wantErr == "" {
+			if tc.expectedErr == "" {
 				require.NoError(t, err)
 				return
 			}
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 			code, reason := sparkerrors.CodeAndReasonFrom(err)
 			require.Equal(t, codes.InvalidArgument, code)
 			require.Equal(t, "MALFORMED_FIELD", reason)
@@ -2377,19 +2377,19 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths(t *testing
 		name           string
 		direct         []*pb.UserSignedTxSigningJob
 		directFromCpfp []*pb.UserSignedTxSigningJob
-		wantErr        string
+		expectedErr    string
 	}{
 		{
 			name:           "direct",
 			direct:         []*pb.UserSignedTxSigningJob{testTx},
 			directFromCpfp: empty,
-			wantErr:        "unexpected extra direct tx output 1",
+			expectedErr:    "unexpected extra direct tx output 1",
 		},
 		{
 			name:           "direct from cpfp",
 			direct:         empty,
 			directFromCpfp: []*pb.UserSignedTxSigningJob{testTx},
-			wantErr:        "unexpected extra direct from cpfp tx output 1",
+			expectedErr:    "unexpected extra direct from cpfp tx output 1",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2407,7 +2407,7 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths(t *testing
 				false,
 			)
 
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 			code, reason := sparkerrors.CodeAndReasonFrom(err)
 			require.Equal(t, codes.InvalidArgument, code)
 			require.Equal(t, "MALFORMED_FIELD", reason)

@@ -58,19 +58,19 @@ func TestTweakSigningKeyshares_RotatesAllKeysharesAndCleansUpOnCommit(t *testing
 	require.Len(t, updated, 3)
 
 	for _, tweak := range tweaks {
-		got, ok := updated[tweak.Keyshare.ID]
+		rotatedKeyshare, ok := updated[tweak.Keyshare.ID]
 		require.True(t, ok, "missing result for keyshare %s", tweak.Keyshare.ID)
 
-		wantSecret := tweak.Keyshare.SecretShare.Add(tweak.SecretTweak)
-		wantPubKey := tweak.Keyshare.PublicKey.Add(tweak.PubKeyTweak)
-		wantShare := tweak.Keyshare.PublicShares["1"].Add(tweak.PubSharesTweak["1"])
+		expectedSecret := tweak.Keyshare.SecretShare.Add(tweak.SecretTweak)
+		expectedPubKey := tweak.Keyshare.PublicKey.Add(tweak.PubKeyTweak)
+		expectedShare := tweak.Keyshare.PublicShares["1"].Add(tweak.PubSharesTweak["1"])
 
-		require.NotNil(t, got.SecretVersion)
-		require.Equal(t, int32(1), *got.SecretVersion)
-		require.Equal(t, wantPubKey, got.PublicKey)
-		require.Equal(t, wantShare, got.PublicShares["1"])
-		require.NotNil(t, got.SecretShare, "dual-write on: main secret must be set")
-		require.True(t, got.SecretShare.Equals(wantSecret))
+		require.NotNil(t, rotatedKeyshare.SecretVersion)
+		require.Equal(t, int32(1), *rotatedKeyshare.SecretVersion)
+		require.Equal(t, expectedPubKey, rotatedKeyshare.PublicKey)
+		require.Equal(t, expectedShare, rotatedKeyshare.PublicShares["1"])
+		require.NotNil(t, rotatedKeyshare.SecretShare, "dual-write on: main secret must be set")
+		require.True(t, rotatedKeyshare.SecretShare.Equals(expectedSecret))
 
 		// Persisted main row matches the returned entity.
 		dbTx, err := ent.GetDbFromContext(ctx)
@@ -79,12 +79,12 @@ func TestTweakSigningKeyshares_RotatesAllKeysharesAndCleansUpOnCommit(t *testing
 		require.NoError(t, err)
 		require.NotNil(t, row.SecretVersion)
 		require.Equal(t, int32(1), *row.SecretVersion)
-		require.Equal(t, wantPubKey, row.PublicKey)
+		require.Equal(t, expectedPubKey, row.PublicKey)
 
 		// Ephemeral v1 carries the rotated secret.
 		ephemeralSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, tweak.Keyshare.ID, 1)
 		require.NoError(t, err)
-		require.True(t, ephemeralSecret.SecretShare.Equals(wantSecret))
+		require.True(t, ephemeralSecret.SecretShare.Equals(expectedSecret))
 	}
 
 	commitMainTxFromContext(t, ctx)
@@ -217,9 +217,9 @@ func TestTweakSigningKeyshares_MissingEphemeralRowsNeverRegressVersion(t *testin
 	}})
 	require.NoError(t, err)
 
-	got := updated[keyshare.ID]
-	require.NotNil(t, got.SecretVersion)
-	require.Equal(t, base+1, *got.SecretVersion, "rotation must move the version forward from the CAS base, not restart at 0")
+	rotatedKeyshare := updated[keyshare.ID]
+	require.NotNil(t, rotatedKeyshare.SecretVersion)
+	require.Equal(t, base+1, *rotatedKeyshare.SecretVersion, "rotation must move the version forward from the CAS base, not restart at 0")
 
 	ephemeralSecret, err := entephemeral.GetSigningKeyshareSecretVersion(ctx, keyshare.ID, base+1)
 	require.NoError(t, err)
@@ -249,9 +249,9 @@ func TestTweakSigningKeyshares_EphemeralLatestBehindMainPointerSurvivesCommit(t 
 	}})
 	require.NoError(t, err)
 
-	got := updated[keyshare.ID]
-	require.NotNil(t, got.SecretVersion)
-	require.Equal(t, mainVersion+1, *got.SecretVersion, "rotation must allocate above the base version it retires")
+	rotatedKeyshare := updated[keyshare.ID]
+	require.NotNil(t, rotatedKeyshare.SecretVersion)
+	require.Equal(t, mainVersion+1, *rotatedKeyshare.SecretVersion, "rotation must allocate above the base version it retires")
 
 	commitMainTxFromContext(t, ctx)
 
@@ -304,10 +304,10 @@ func TestTweakSigningKeyshares_FallsBackToMainDBWhenEphemeralUnavailable(t *test
 	}})
 	require.NoError(t, err)
 
-	got := updated[keyshare.ID]
-	require.Nil(t, got.SecretVersion, "legacy fallback clears the version pointer")
-	require.NotNil(t, got.SecretShare)
-	require.True(t, got.SecretShare.Equals(secret.Add(shareTweak)))
+	rotatedKeyshare := updated[keyshare.ID]
+	require.Nil(t, rotatedKeyshare.SecretVersion, "legacy fallback clears the version pointer")
+	require.NotNil(t, rotatedKeyshare.SecretShare)
+	require.True(t, rotatedKeyshare.SecretShare.Equals(secret.Add(shareTweak)))
 }
 
 func TestTweakSigningKeyshares_WithoutDualWriteClearsMainSecret(t *testing.T) {
@@ -317,13 +317,13 @@ func TestTweakSigningKeyshares_WithoutDualWriteClearsMainSecret(t *testing.T) {
 	updated, err := ent.TweakSigningKeyshares(ctx, tweaks)
 	require.NoError(t, err)
 
-	got := updated[tweaks[0].Keyshare.ID]
-	require.Nil(t, got.SecretShare, "dual-write off: main secret column must be cleared")
-	require.NotNil(t, got.SecretVersion)
-	require.Equal(t, int32(1), *got.SecretVersion)
+	rotatedKeyshare := updated[tweaks[0].Keyshare.ID]
+	require.Nil(t, rotatedKeyshare.SecretShare, "dual-write off: main secret column must be cleared")
+	require.NotNil(t, rotatedKeyshare.SecretVersion)
+	require.Equal(t, int32(1), *rotatedKeyshare.SecretVersion)
 
-	require.NoError(t, ent.HydrateSigningKeyshareSecrets(ctx, []*ent.SigningKeyshare{got}))
-	resolved, err := got.GetSecretShare(ctx)
+	require.NoError(t, ent.HydrateSigningKeyshareSecrets(ctx, []*ent.SigningKeyshare{rotatedKeyshare}))
+	resolved, err := rotatedKeyshare.GetSecretShare(ctx)
 	require.NoError(t, err)
 	require.True(t, resolved.Equals(tweaks[0].Keyshare.SecretShare.Add(tweaks[0].SecretTweak)))
 }

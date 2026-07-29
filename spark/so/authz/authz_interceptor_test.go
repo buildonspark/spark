@@ -457,10 +457,10 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 	}
 
 	cases := []struct {
-		name     string
-		mode     Mode
-		ctx      func(*testing.T) context.Context
-		wantPath string
+		name         string
+		mode         Mode
+		ctx          func(*testing.T) context.Context
+		expectedPath string
 	}{
 		{
 			name: "brontide AuthInfo records path=brontide",
@@ -471,7 +471,7 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					AuthInfo: brontide.AuthInfo{Peer: brontidePeer},
 				})
 			},
-			wantPath: authPathBrontide,
+			expectedPath: authPathBrontide,
 		},
 		{
 			name: "internal VPC peer + VPC client IP records path=vpc-ip",
@@ -481,7 +481,7 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					"x-forwarded-for": []string{"10.1.2.3"},
 				}), &peer.Peer{Addr: &mockAddr{addr: "10.0.0.1:12345"}})
 			},
-			wantPath: authPathVPCIP,
+			expectedPath: authPathVPCIP,
 		},
 		{
 			name: "internal VPC peer + allowlisted client IP records path=allowlist-ip",
@@ -491,7 +491,7 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					"x-forwarded-for": []string{TestIPAllowed1},
 				}), &peer.Peer{Addr: &mockAddr{addr: "10.0.0.1:12345"}})
 			},
-			wantPath: authPathAllowlistIP,
+			expectedPath: authPathAllowlistIP,
 		},
 		{
 			name: "non-VPC peer records path=ip-rejected",
@@ -501,7 +501,7 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					Addr: &mockAddr{addr: TestIPDisallowed + ":12345"},
 				})
 			},
-			wantPath: authPathIPRejected,
+			expectedPath: authPathIPRejected,
 		},
 		{
 			name: "LogOnly mode still records path=ip-rejected for non-allowlisted client IP",
@@ -511,7 +511,7 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					"x-forwarded-for": []string{TestIPDisallowed},
 				}), &peer.Peer{Addr: &mockAddr{addr: "10.0.0.1:12345"}})
 			},
-			wantPath: authPathIPRejected,
+			expectedPath: authPathIPRejected,
 		},
 		{
 			// The external XFF client IP would also be ip-rejected by the later allowlist switch, but the non-VPC
@@ -525,7 +525,7 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					Addr: &mockAddr{addr: TestIPDisallowed + ":12345"},
 				})
 			},
-			wantPath: authPathIPRejected,
+			expectedPath: authPathIPRejected,
 		},
 	}
 	for _, tc := range cases {
@@ -557,15 +557,15 @@ func TestInternalAuthzPathMetric(t *testing.T) {
 					sum, ok := m.Data.(md.Sum[int64])
 					require.Truef(t, ok, "expected Sum[int64], got %T", m.Data)
 					for _, dp := range sum.DataPoints {
-						gotPath, _ := dp.Attributes.Value("path")
-						if gotPath.AsString() == tc.wantPath {
-							assert.EqualValuesf(t, 1, dp.Value, "exactly one increment expected for path=%s", tc.wantPath)
+						actualPath, _ := dp.Attributes.Value("path")
+						if actualPath.AsString() == tc.expectedPath {
+							assert.EqualValuesf(t, 1, dp.Value, "exactly one increment expected for path=%s", tc.expectedPath)
 							found = true
 						}
 					}
 				}
 			}
-			assert.Truef(t, found, "expected counter increment with path=%q", tc.wantPath)
+			assert.Truef(t, found, "expected counter increment with path=%q", tc.expectedPath)
 		})
 	}
 }

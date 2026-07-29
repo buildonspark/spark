@@ -19,26 +19,26 @@ func TestNewPreSelectedOperatorSelection_InvalidIDs_Errors(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	selectedIDs := []string{"not-a-real-id"}
 
-	got, err := helper.NewPreSelectedOperatorSelection(config, selectedIDs)
+	selection, err := helper.NewPreSelectedOperatorSelection(config, selectedIDs)
 	require.ErrorContains(t, err, "not found in signing operator map")
-	assert.Nil(t, got)
+	assert.Nil(t, selection)
 }
 
 func TestOperatorList_PreSelected(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	selectedIDs := slices.Collect(maps.Keys(config.SigningOperatorMap))[:2]
-	want := make([]*so.SigningOperator, 2)
+	expectedOperators := make([]*so.SigningOperator, 2)
 	for i, id := range selectedIDs {
-		want[i] = config.SigningOperatorMap[id]
+		expectedOperators[i] = config.SigningOperatorMap[id]
 	}
 
 	selection, err := helper.NewPreSelectedOperatorSelection(config, selectedIDs)
 	require.NoError(t, err)
 
 	assert.Equal(t, helper.OperatorSelectionOptionPreSelected, selection.Option)
-	got, err := selection.OperatorList(config)
+	operators, err := selection.OperatorList(config)
 	require.NoError(t, err)
-	assert.Equal(t, want, got)
+	assert.Equal(t, expectedOperators, operators)
 }
 
 func TestOperatorList_OperatorSelectionAll(t *testing.T) {
@@ -47,9 +47,9 @@ func TestOperatorList_OperatorSelectionAll(t *testing.T) {
 		Option: helper.OperatorSelectionOptionAll,
 	}
 
-	got, err := selection.OperatorList(config)
+	operators, err := selection.OperatorList(config)
 	require.NoError(t, err)
-	assert.Len(t, got, len(config.SigningOperatorMap))
+	assert.Len(t, operators, len(config.SigningOperatorMap))
 }
 
 func TestOperatorList_OptionThreshold(t *testing.T) {
@@ -59,9 +59,9 @@ func TestOperatorList_OptionThreshold(t *testing.T) {
 		Threshold: 2,
 	}
 
-	got, err := selection.OperatorList(config)
+	operators, err := selection.OperatorList(config)
 	require.NoError(t, err)
-	assert.Len(t, got, selection.Threshold)
+	assert.Len(t, operators, selection.Threshold)
 }
 
 func TestOperatorList_OptionThreshold_ThresholdTooHigh_Errors(t *testing.T) {
@@ -71,9 +71,9 @@ func TestOperatorList_OptionThreshold_ThresholdTooHigh_Errors(t *testing.T) {
 		Threshold: len(config.SigningOperatorMap) + 1, // Too high
 	}
 
-	got, err := selection.OperatorList(config)
+	operators, err := selection.OperatorList(config)
 	require.ErrorContains(t, err, "exceeds length of signing operator list")
-	assert.Empty(t, got)
+	assert.Empty(t, operators)
 }
 
 func TestOperatorList_ExcludeSelf(t *testing.T) {
@@ -82,12 +82,12 @@ func TestOperatorList_ExcludeSelf(t *testing.T) {
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 
-	got, err := selection.OperatorList(config)
+	operators, err := selection.OperatorList(config)
 	require.NoError(t, err)
 
-	wantLen := len(config.SigningOperatorMap) - 1
-	assert.Len(t, got, wantLen)
-	for _, op := range got {
+	expectedLen := len(config.SigningOperatorMap) - 1
+	assert.Len(t, operators, expectedLen)
+	for _, op := range operators {
 		assert.NotEqual(t, config.Identifier, op.Identifier, "operator list should not include self identifier %s", config.Identifier)
 	}
 }

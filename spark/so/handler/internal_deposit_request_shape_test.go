@@ -13,9 +13,9 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 	handler := NewInternalDepositHandler(nil)
 
 	tests := []struct {
-		name    string
-		call    func() error
-		wantErr string
+		name        string
+		call        func() error
+		expectedErr string
 	}{
 		{
 			name: "mark keyshare nil request",
@@ -23,7 +23,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.MarkKeyshareForDepositAddress(t.Context(), nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "generate static proofs nil request",
@@ -31,21 +31,21 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.GenerateStaticDepositAddressProofs(t.Context(), nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "finalize tree nil request",
 			call: func() error {
 				return handler.FinalizeTreeCreation(t.Context(), nil)
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "finalize tree empty nodes",
 			call: func() error {
 				return handler.FinalizeTreeCreation(t.Context(), &pbinternal.FinalizeTreeCreationRequest{})
 			},
-			wantErr: "at least one node is required",
+			expectedErr: "at least one node is required",
 		},
 		{
 			name: "finalize tree nil node",
@@ -54,7 +54,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 					Nodes: []*pbinternal.TreeNode{nil},
 				})
 			},
-			wantErr: "nodes[0] is required",
+			expectedErr: "nodes[0] is required",
 		},
 		{
 			name: "rollback nil request",
@@ -62,7 +62,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.RollbackUtxoSwap(t.Context(), nil, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "rollback missing utxo",
@@ -70,7 +70,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.RollbackUtxoSwap(t.Context(), nil, &pbinternal.RollbackUtxoSwapRequest{})
 				return err
 			},
-			wantErr: "on_chain_utxo is required",
+			expectedErr: "on_chain_utxo is required",
 		},
 		{
 			name: "instant rollback nil request",
@@ -78,7 +78,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.RollbackInstantUtxoSwap(t.Context(), nil, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "instant rollback missing utxo",
@@ -86,7 +86,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.RollbackInstantUtxoSwap(t.Context(), nil, &pbinternal.RollbackInstantUtxoSwapRequest{})
 				return err
 			},
-			wantErr: "on_chain_utxo is required",
+			expectedErr: "on_chain_utxo is required",
 		},
 		{
 			name: "completed nil request",
@@ -94,7 +94,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.UtxoSwapCompleted(t.Context(), nil, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "completed missing utxo",
@@ -102,7 +102,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 				_, err := handler.UtxoSwapCompleted(t.Context(), nil, &pbinternal.UtxoSwapCompletedRequest{})
 				return err
 			},
-			wantErr: "on_chain_utxo is required",
+			expectedErr: "on_chain_utxo is required",
 		},
 	}
 
@@ -112,7 +112,7 @@ func TestInternalDepositHandlerRejectsMalformedRequestsWithoutPanic(t *testing.T
 			require.NotPanics(t, func() {
 				err = tt.call()
 			})
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
 		})
 	}

@@ -370,9 +370,9 @@ func createTreeCreationRefundValidationFixture(t *testing.T, ctx context.Context
 
 func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) {
 	tests := []struct {
-		name      string
-		mutate    func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader)
-		wantError string
+		name          string
+		mutate        func(t *testing.T, f *treeCreationRefundValidationFixture, rng io.Reader)
+		expectedError string
 	}{
 		{
 			name: "cpfp refund pays attacker key",
@@ -388,7 +388,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.refundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "refund transaction verification failed",
+			expectedError: "refund transaction verification failed",
 		},
 		{
 			name: "cpfp refund disables relative timelock",
@@ -403,7 +403,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.refundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "refund transaction verification failed",
+			expectedError: "refund transaction verification failed",
 		},
 		{
 			name: "cpfp refund omits anchor",
@@ -417,7 +417,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.refundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "refund transaction verification failed",
+			expectedError: "refund transaction verification failed",
 		},
 		{
 			name: "cpfp refund pays wrong value",
@@ -432,7 +432,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.refundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "refund transaction verification failed",
+			expectedError: "refund transaction verification failed",
 		},
 		{
 			name: "cpfp refund uses wrong but enabled timelock",
@@ -447,7 +447,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.refundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "refund transaction verification failed",
+			expectedError: "refund transaction verification failed",
 		},
 		{
 			name: "direct refund pays attacker key",
@@ -462,7 +462,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct refund transaction verification failed",
+			expectedError: "direct refund transaction verification failed",
 		},
 		{
 			name: "direct refund disables relative timelock",
@@ -476,7 +476,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct refund transaction verification failed",
+			expectedError: "direct refund transaction verification failed",
 		},
 		{
 			name: "direct refund adds anchor",
@@ -491,7 +491,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct refund transaction verification failed",
+			expectedError: "direct refund transaction verification failed",
 		},
 		{
 			name: "direct from cpfp refund pays attacker key",
@@ -506,7 +506,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct-from-cpfp refund transaction verification failed",
+			expectedError: "direct-from-cpfp refund transaction verification failed",
 		},
 		{
 			name: "direct from cpfp refund disables relative timelock",
@@ -520,7 +520,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct-from-cpfp refund transaction verification failed",
+			expectedError: "direct-from-cpfp refund transaction verification failed",
 		},
 		{
 			name: "direct from cpfp refund adds anchor",
@@ -535,7 +535,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct-from-cpfp refund transaction verification failed",
+			expectedError: "direct-from-cpfp refund transaction verification failed",
 		},
 		{
 			name: "direct from cpfp refund deducts the fee three times",
@@ -550,7 +550,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 				)
 				f.directFromCpfpRefundTxSigningJob.RawTx = rawTx
 			},
-			wantError: "direct-from-cpfp refund transaction verification failed",
+			expectedError: "direct-from-cpfp refund transaction verification failed",
 		},
 	}
 
@@ -600,7 +600,7 @@ func TestPrepareSigningJobsRejectsMalformedLeafRefundTransactions(t *testing.T) 
 			tt.mutate(t, fixture, rng)
 
 			signingJobs, nodes, err := handler.prepareSigningJobs(ctx, fixture.req, true)
-			require.ErrorContains(t, err, tt.wantError)
+			require.ErrorContains(t, err, tt.expectedError)
 			require.Nil(t, signingJobs)
 			require.Nil(t, nodes)
 		})
@@ -3144,7 +3144,7 @@ func TestValidateTreeCreationLeafNodeOutputAnchorHandling(t *testing.T) {
 		name                 string
 		outputs              []*wire.TxOut
 		allowEphemeralAnchor bool
-		wantErr              string
+		expectedErr          string
 	}{
 		{
 			name:                 "single output with anchor allowed",
@@ -3164,34 +3164,34 @@ func TestValidateTreeCreationLeafNodeOutputAnchorHandling(t *testing.T) {
 			name:                 "anchor with nonzero value",
 			outputs:              []*wire.TxOut{leafOutput, {Value: 1, PkScript: anchor.PkScript}},
 			allowEphemeralAnchor: true,
-			wantErr:              "output 1 must be an ephemeral anchor output",
+			expectedErr:          "output 1 must be an ephemeral anchor output",
 		},
 		{
 			name:                 "anchor with wrong script",
 			outputs:              []*wire.TxOut{leafOutput, {Value: 0, PkScript: leafOutput.PkScript}},
 			allowEphemeralAnchor: true,
-			wantErr:              "output 1 must be an ephemeral anchor output",
+			expectedErr:          "output 1 must be an ephemeral anchor output",
 		},
 		{
-			name:    "anchor when disallowed",
-			outputs: []*wire.TxOut{leafOutput, common.EphemeralAnchorOutput()},
-			wantErr: "must have exactly one output, got 2",
+			name:        "anchor when disallowed",
+			outputs:     []*wire.TxOut{leafOutput, common.EphemeralAnchorOutput()},
+			expectedErr: "must have exactly one output, got 2",
 		},
 		{
 			name:                 "extra output beyond anchor",
 			outputs:              []*wire.TxOut{leafOutput, common.EphemeralAnchorOutput(), common.EphemeralAnchorOutput()},
 			allowEphemeralAnchor: true,
-			wantErr:              "got 3",
+			expectedErr:          "got 3",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tx, _ := createTreeCreationTestTx(t, wire.OutPoint{Hash: [32]byte{0x41}, Index: 0}, tt.outputs...)
 			err := validateTreeCreationLeafNodeOutput(tx, verifyingKey, leafOutput.Value, "node transaction", tt.allowEphemeralAnchor)
-			if tt.wantErr == "" {
+			if tt.expectedErr == "" {
 				require.NoError(t, err)
 			} else {
-				require.ErrorContains(t, err, tt.wantErr)
+				require.ErrorContains(t, err, tt.expectedErr)
 			}
 		})
 	}

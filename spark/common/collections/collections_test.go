@@ -103,9 +103,9 @@ func TestArrayOfMapToMapOfArray(t *testing.T) {
 
 func TestSwapMapKeys(t *testing.T) {
 	tests := []struct {
-		name  string
-		input map[string]map[int]string
-		want  map[int]map[string]string
+		name            string
+		input           map[string]map[int]string
+		expectedSwapped map[int]map[string]string
 	}{
 		{
 			name: "normal case",
@@ -113,22 +113,22 @@ func TestSwapMapKeys(t *testing.T) {
 				"a": {1: "b", 2: "c"},
 				"d": {1: "e", 2: "f"},
 			},
-			want: map[int]map[string]string{
+			expectedSwapped: map[int]map[string]string{
 				1: {"a": "b", "d": "e"},
 				2: {"a": "c", "d": "f"},
 			},
 		},
 		{
-			name:  "empty map",
-			input: map[string]map[int]string{},
-			want:  map[int]map[string]string{},
+			name:            "empty map",
+			input:           map[string]map[int]string{},
+			expectedSwapped: map[int]map[string]string{},
 		},
 		{
 			name: "single key",
 			input: map[string]map[int]string{
 				"x": {1: "y", 2: "z"},
 			},
-			want: map[int]map[string]string{
+			expectedSwapped: map[int]map[string]string{
 				1: {"x": "y"},
 				2: {"x": "z"},
 			},
@@ -139,14 +139,14 @@ func TestSwapMapKeys(t *testing.T) {
 				"a": {},
 				"b": {},
 			},
-			want: map[int]map[string]string{},
+			expectedSwapped: map[int]map[string]string{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SwapMapKeys(tt.input)
-			if diff := cmp.Diff(tt.want, got); diff != "" {
+			swapped := SwapMapKeys(tt.input)
+			if diff := cmp.Diff(tt.expectedSwapped, swapped); diff != "" {
 				t.Errorf("SwapMapKeys() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -163,9 +163,9 @@ func (s signingResult) MarshalProto() *common.SigningResult {
 
 func TestConvertObjectMapToProtoMap(t *testing.T) {
 	tests := []struct {
-		name  string
-		input map[string]*signingResult
-		want  map[string]*common.SigningResult
+		name             string
+		input            map[string]*signingResult
+		expectedProtoMap map[string]*common.SigningResult
 	}{
 		{
 			name: "normal case",
@@ -173,37 +173,37 @@ func TestConvertObjectMapToProtoMap(t *testing.T) {
 				"key1": {signatureShare: []byte{1, 2, 3}},
 				"key2": {signatureShare: []byte{4, 5, 6}},
 			},
-			want: map[string]*common.SigningResult{
+			expectedProtoMap: map[string]*common.SigningResult{
 				"key1": {SignatureShare: []byte{1, 2, 3}},
 				"key2": {SignatureShare: []byte{4, 5, 6}},
 			},
 		},
 		{
-			name:  "empty map",
-			input: map[string]*signingResult{},
-			want:  map[string]*common.SigningResult{},
+			name:             "empty map",
+			input:            map[string]*signingResult{},
+			expectedProtoMap: map[string]*common.SigningResult{},
 		},
 		{
-			name:  "single element",
-			input: map[string]*signingResult{"single": {signatureShare: []byte{1, 2, 3, 4, 5}}},
-			want:  map[string]*common.SigningResult{"single": {SignatureShare: []byte{1, 2, 3, 4, 5}}},
+			name:             "single element",
+			input:            map[string]*signingResult{"single": {signatureShare: []byte{1, 2, 3, 4, 5}}},
+			expectedProtoMap: map[string]*common.SigningResult{"single": {SignatureShare: []byte{1, 2, 3, 4, 5}}},
 		},
 		{
-			name:  "empty signature share",
-			input: map[string]*signingResult{"empty": {signatureShare: []byte{}}},
-			want:  map[string]*common.SigningResult{"empty": {SignatureShare: []byte{}}},
+			name:             "empty signature share",
+			input:            map[string]*signingResult{"empty": {signatureShare: []byte{}}},
+			expectedProtoMap: map[string]*common.SigningResult{"empty": {SignatureShare: []byte{}}},
 		},
 		{
-			name:  "nil signature share",
-			input: map[string]*signingResult{"nil": {signatureShare: nil}},
-			want:  map[string]*common.SigningResult{"nil": {SignatureShare: nil}},
+			name:             "nil signature share",
+			input:            map[string]*signingResult{"nil": {signatureShare: nil}},
+			expectedProtoMap: map[string]*common.SigningResult{"nil": {SignatureShare: nil}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ConvertObjectMapToProtoMap(tt.input)
-			if diff := cmp.Diff(tt.want, got, protocmp.Transform()); diff != "" {
+			protoMap := ConvertObjectMapToProtoMap(tt.input)
+			if diff := cmp.Diff(tt.expectedProtoMap, protoMap, protocmp.Transform()); diff != "" {
 				t.Errorf("ConvertObjectMapToProtoMap() mismatch (-want +got):\n%s", diff)
 			}
 		})

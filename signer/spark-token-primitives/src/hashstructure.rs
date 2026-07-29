@@ -57,11 +57,11 @@ mod tests {
     // transitively through the manifest golden vectors.
     #[test]
     fn matches_go_hashstructure_construction() {
-        let got = Hasher::new(&["spark", "transfer", "manifest"])
+        let hash = Hasher::new(&["spark", "transfer", "manifest"])
             .add_bytes(&[0u8; 32])
             .hash();
         assert_eq!(
-            hex(&got),
+            hex(&hash),
             "4d18d5d3166ebfde902314ab397790413893c736b41e18d72cd726d707de6c42"
         );
 

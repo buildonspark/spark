@@ -15,8 +15,8 @@ import (
 // is the load-bearing invariant that the new state machine relies on.
 func TestMapTransferToReceiverStatus(t *testing.T) {
 	cases := []struct {
-		transferStatus st.TransferStatus
-		want           st.TransferReceiverStatus
+		transferStatus         st.TransferStatus
+		expectedReceiverStatus st.TransferReceiverStatus
 	}{
 		// Pre-tweak transfer states map to INITIATED on the receiver side
 		// (sender hasn't completed key-tweak handoff yet).
@@ -42,7 +42,7 @@ func TestMapTransferToReceiverStatus(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.transferStatus), func(t *testing.T) {
-			assert.Equal(t, tc.want, MapTransferToReceiverStatus(tc.transferStatus))
+			assert.Equal(t, tc.expectedReceiverStatus, MapTransferToReceiverStatus(tc.transferStatus))
 		})
 	}
 }
