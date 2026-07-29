@@ -196,10 +196,10 @@ func TestKnobGatedInterceptor_Gating(t *testing.T) {
 	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
 
 	tests := []struct {
-		name           string
-		knobEnabled    bool
-		isCoordinator  bool
-		wantAttributed bool
+		name               string
+		knobEnabled        bool
+		isCoordinator      bool
+		expectedAttributed bool
 	}{
 		{"coordinator with knob on runs attribution", true, true, true},
 		{"non-coordinator passes through", true, false, false},
@@ -219,7 +219,7 @@ func TestKnobGatedInterceptor_Gating(t *testing.T) {
 			require.NoError(t, err)
 
 			_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
-			assert.Equal(t, tt.wantAttributed, ok)
+			assert.Equal(t, tt.expectedAttributed, ok)
 		})
 	}
 }
@@ -254,11 +254,11 @@ func TestPartnerJWTInterceptor_ValidES256JWT(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 	require.NoError(t, err)
 
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.True(t, ok)
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Equal(t, testLabel, got.Label)
-	assert.Equal(t, dbID, got.PartnerDBID)
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Equal(t, testLabel, partnerInfo.Label)
+	assert.Equal(t, dbID, partnerInfo.PartnerDBID)
 }
 
 func TestPartnerJWTInterceptor_ExpiredES256JWT(t *testing.T) {
@@ -387,10 +387,10 @@ func TestPartnerJWTInterceptor_CorrectlyIdentifiesEachPartner(t *testing.T) {
 		resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 		require.NoError(t, err)
 
-		got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+		partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 		assert.True(t, ok)
-		assert.Equal(t, partnerID, got.PartnerID)
-		assert.Equal(t, testLabel, got.Label)
+		assert.Equal(t, partnerID, partnerInfo.PartnerID)
+		assert.Equal(t, testLabel, partnerInfo.Label)
 	}
 }
 
@@ -412,10 +412,10 @@ func TestPartnerJWTInterceptor_ValidES256KJWT(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 
 	require.NoError(t, err)
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	assert.True(t, ok)
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Equal(t, testLabel, got.Label)
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Equal(t, testLabel, partnerInfo.Label)
 }
 
 func TestPartnerJWTInterceptor_ExpiredES256KJWT(t *testing.T) {
@@ -523,19 +523,19 @@ func TestPartnerJWTInterceptor_CorrectlyIdentifiesEachPartnerMixedKeyTypes(t *te
 	ctxA := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, tokenA))
 	respA, err := i.PartnerJWTInterceptor(ctxA, nil, info, noopHandler)
 	require.NoError(t, err)
-	gotA, ok := GetPartnerInfoFromContext(respCtx(t, respA))
+	actualA, ok := GetPartnerInfoFromContext(respCtx(t, respA))
 	assert.True(t, ok)
-	assert.Equal(t, "partner-a", gotA.PartnerID)
-	assert.Equal(t, testLabel, gotA.Label)
+	assert.Equal(t, "partner-a", actualA.PartnerID)
+	assert.Equal(t, testLabel, actualA.Label)
 
 	tokenB := makeES256KJWT(t, secpPriv, "partner-b", testLabel, time.Now().Add(time.Hour).Unix())
 	ctxB := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, tokenB))
 	respB, err := i.PartnerJWTInterceptor(ctxB, nil, info, noopHandler)
 	require.NoError(t, err)
-	gotB, ok := GetPartnerInfoFromContext(respCtx(t, respB))
+	actualB, ok := GetPartnerInfoFromContext(respCtx(t, respB))
 	assert.True(t, ok)
-	assert.Equal(t, "partner-b", gotB.PartnerID)
-	assert.Equal(t, testLabel, gotB.Label)
+	assert.Equal(t, "partner-b", actualB.PartnerID)
+	assert.Equal(t, testLabel, actualB.Label)
 }
 
 func TestPartnerJWTInterceptor_WrongAudience(t *testing.T) {
@@ -595,10 +595,10 @@ func TestPartnerJWTInterceptor_WrongLabel(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 	require.NoError(t, err)
 
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	require.True(t, ok, "JWT should still be verified even with wrong label")
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Equal(t, "wrong-label", got.Label)
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Equal(t, "wrong-label", partnerInfo.Label)
 }
 
 // Iss-only JWT (no sub) succeeds with read-only access (empty label).
@@ -623,10 +623,10 @@ func TestPartnerJWTInterceptor_MissingSubClaim_ReadOnly(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 	require.NoError(t, err)
 
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	require.True(t, ok, "iss-only JWT should succeed with read-only access")
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Empty(t, got.Label)
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Empty(t, partnerInfo.Label)
 }
 
 // Iss-only JWT fails when none of the registered keys match the signature.
@@ -685,11 +685,11 @@ func TestPartnerJWTInterceptor_AutoCreateOnNewLabel(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 	require.NoError(t, err)
 
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	require.True(t, ok)
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Equal(t, "new-label", got.Label)
-	assert.Equal(t, createdDBID, got.PartnerDBID)
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Equal(t, "new-label", partnerInfo.Label)
+	assert.Equal(t, createdDBID, partnerInfo.PartnerDBID)
 }
 
 // When createPartner fails, the interceptor should still return PartnerInfo with the label
@@ -716,11 +716,11 @@ func TestPartnerJWTInterceptor_AutoCreateFails_StillReturnsInfo(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 	require.NoError(t, err)
 
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	require.True(t, ok)
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Equal(t, "new-label", got.Label)
-	assert.Equal(t, uuid.Nil, got.PartnerDBID, "PartnerDBID should be empty when auto-create fails")
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Equal(t, "new-label", partnerInfo.Label)
+	assert.Equal(t, uuid.Nil, partnerInfo.PartnerDBID, "PartnerDBID should be empty when auto-create fails")
 }
 
 // Test dbCreatePartner directly with a real Postgres to verify the constraint error
@@ -773,9 +773,9 @@ func TestPartnerJWTInterceptor_Secp256k1KeyViaJWTPublicSumType(t *testing.T) {
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
 
 	require.NoError(t, err)
-	got, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
 	require.True(t, ok, "expected partner info in context for secp256k1 key")
-	assert.Equal(t, partnerID, got.PartnerID)
-	assert.Equal(t, testLabel, got.Label)
-	assert.Equal(t, dbID, got.PartnerDBID)
+	assert.Equal(t, partnerID, partnerInfo.PartnerID)
+	assert.Equal(t, testLabel, partnerInfo.Label)
+	assert.Equal(t, dbID, partnerInfo.PartnerDBID)
 }

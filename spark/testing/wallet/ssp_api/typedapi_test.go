@@ -118,7 +118,7 @@ func TestTypedSparkServiceAPI_InitiateCoopExit(t *testing.T) {
 	defer server.Close()
 	api := apiForServer(t, server)
 
-	coopExitID, txID, gotTX, err := api.InitiateCoopExit(
+	coopExitID, txID, actualTX, err := api.InitiateCoopExit(
 		t.Context(),
 		[]uuid.UUID{uuid.New(), uuid.New()},
 		"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
@@ -128,7 +128,7 @@ func TestTypedSparkServiceAPI_InitiateCoopExit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "coop-exit-123", coopExitID)
 	assert.NotNil(t, txID)
-	assert.NotNil(t, gotTX)
+	assert.NotNil(t, actualTX)
 }
 
 func TestTypedSparkServiceAPI_InitiateCoopExit_NetworkError(t *testing.T) {

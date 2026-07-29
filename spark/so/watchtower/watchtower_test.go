@@ -23,13 +23,13 @@ var nodeID = uuid.Must(uuid.Parse("f81d4fae-7dec-11d0-a765-00a0c91e6bf6"))
 var txHash = &chainhash.Hash{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
 func TestBroadcastTransaction(t *testing.T) {
-	txBytes, wantTX := createTestTransaction(t)
+	txBytes, expectedTX := createTestTransaction(t)
 	mockClient := &mockBitcoinClient{response: txHash}
 
 	err := BroadcastTransaction(t.Context(), mockClient, nodeID, txBytes)
 	require.NoError(t, err)
 
-	if diff := cmp.Diff(wantTX, mockClient.seenTX, cmpopts.IgnoreUnexported(wire.MsgTx{}), cmpopts.EquateEmpty()); diff != "" {
+	if diff := cmp.Diff(expectedTX, mockClient.seenTX, cmpopts.IgnoreUnexported(wire.MsgTx{}), cmpopts.EquateEmpty()); diff != "" {
 		t.Errorf("BroadcastTransaction returned unexpected diff (-want +got):\n%s", diff)
 	}
 }
@@ -92,9 +92,9 @@ func TestBroadcastTransaction_Errors(t *testing.T) {
 
 func TestAlreadyBroadcasted(t *testing.T) {
 	tests := []struct {
-		name string
-		err  error
-		want bool
+		name                string
+		err                 error
+		expectedBroadcasted bool
 	}{
 		{
 			name: "RPC error with code -27/ErrRPCVerifyAlreadyInChain",
@@ -102,7 +102,7 @@ func TestAlreadyBroadcasted(t *testing.T) {
 				Code:    btcjson.ErrRPCVerifyAlreadyInChain,
 				Message: "transaction already in mempool",
 			},
-			want: true,
+			expectedBroadcasted: true,
 		},
 		{
 			name: "RPC error with different code",
@@ -110,24 +110,24 @@ func TestAlreadyBroadcasted(t *testing.T) {
 				Code:    -25,
 				Message: "bad-txns-inputs-missingorspent",
 			},
-			want: false,
+			expectedBroadcasted: false,
 		},
 		{
-			name: "Non-RPC error",
-			err:  fmt.Errorf("network error"),
-			want: false,
+			name:                "Non-RPC error",
+			err:                 fmt.Errorf("network error"),
+			expectedBroadcasted: false,
 		},
 		{
-			name: "Nil error",
-			err:  nil,
-			want: false,
+			name:                "Nil error",
+			err:                 nil,
+			expectedBroadcasted: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := alreadyBroadcasted(tt.err)
-			assert.Equal(t, tt.want, got)
+			broadcasted := alreadyBroadcasted(tt.err)
+			assert.Equal(t, tt.expectedBroadcasted, broadcasted)
 		})
 	}
 }

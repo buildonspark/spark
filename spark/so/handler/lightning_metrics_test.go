@@ -14,60 +14,60 @@ import (
 
 func TestClassifyLightningMetricResult(t *testing.T) {
 	tests := []struct {
-		name string
-		err  error
-		want string
+		name           string
+		err            error
+		expectedResult string
 	}{
 		{
-			name: "success",
-			err:  nil,
-			want: lightningResultSuccess,
+			name:           "success",
+			err:            nil,
+			expectedResult: lightningResultSuccess,
 		},
 		{
-			name: "context canceled",
-			err:  context.Canceled,
-			want: lightningResultCanceled,
+			name:           "context canceled",
+			err:            context.Canceled,
+			expectedResult: lightningResultCanceled,
 		},
 		{
-			name: "grpc canceled",
-			err:  status.Error(codes.Canceled, "client canceled"),
-			want: lightningResultCanceled,
+			name:           "grpc canceled",
+			err:            status.Error(codes.Canceled, "client canceled"),
+			expectedResult: lightningResultCanceled,
 		},
 		{
-			name: "wrapped grpc canceled",
-			err:  fmt.Errorf("flow failed: %w", status.Error(codes.Canceled, "client canceled")),
-			want: lightningResultCanceled,
+			name:           "wrapped grpc canceled",
+			err:            fmt.Errorf("flow failed: %w", status.Error(codes.Canceled, "client canceled")),
+			expectedResult: lightningResultCanceled,
 		},
 		{
-			name: "context deadline exceeded",
-			err:  context.DeadlineExceeded,
-			want: lightningResultTimeout,
+			name:           "context deadline exceeded",
+			err:            context.DeadlineExceeded,
+			expectedResult: lightningResultTimeout,
 		},
 		{
-			name: "wrapped grpc deadline exceeded",
-			err:  fmt.Errorf("flow failed: %w", status.Error(codes.DeadlineExceeded, "deadline exceeded")),
-			want: lightningResultTimeout,
+			name:           "wrapped grpc deadline exceeded",
+			err:            fmt.Errorf("flow failed: %w", status.Error(codes.DeadlineExceeded, "deadline exceeded")),
+			expectedResult: lightningResultTimeout,
 		},
 		{
-			name: "grpc unavailable",
-			err:  status.Error(codes.Unavailable, "unavailable"),
-			want: lightningResultUnavailable,
+			name:           "grpc unavailable",
+			err:            status.Error(codes.Unavailable, "unavailable"),
+			expectedResult: lightningResultUnavailable,
 		},
 		{
-			name: "wrapped grpc unavailable",
-			err:  fmt.Errorf("flow failed: %w", status.Error(codes.Unavailable, "unavailable")),
-			want: lightningResultUnavailable,
+			name:           "wrapped grpc unavailable",
+			err:            fmt.Errorf("flow failed: %w", status.Error(codes.Unavailable, "unavailable")),
+			expectedResult: lightningResultUnavailable,
 		},
 		{
-			name: "generic error",
-			err:  errors.New("boom"),
-			want: lightningResultError,
+			name:           "generic error",
+			err:            errors.New("boom"),
+			expectedResult: lightningResultError,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.want, classifyLightningMetricResult(test.err))
+			require.Equal(t, test.expectedResult, classifyLightningMetricResult(test.err))
 		})
 	}
 }

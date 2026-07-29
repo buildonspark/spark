@@ -42,61 +42,61 @@ func TestDecodeGetUtxosForIdentityCursor(t *testing.T) {
 	})
 
 	for _, tc := range []struct {
-		name    string
-		cursor  string
-		wantErr string
+		name        string
+		cursor      string
+		expectedErr string
 	}{
 		{
-			name:    "malformed base64",
-			cursor:  "not@@base64",
-			wantErr: "invalid cursor",
+			name:        "malformed base64",
+			cursor:      "not@@base64",
+			expectedErr: "invalid cursor",
 		},
 		{
-			name:    "invalid json payload",
-			cursor:  base64.RawURLEncoding.EncodeToString([]byte("{")),
-			wantErr: "invalid cursor payload",
+			name:        "invalid json payload",
+			cursor:      base64.RawURLEncoding.EncodeToString([]byte("{")),
+			expectedErr: "invalid cursor payload",
 		},
 		{
 			name: "unsupported version",
 			cursor: encodeGetUtxosCursorPayload(t, cursorPayloadWith(validPayload, func(payload *getUtxosForIdentityCursor) {
 				payload.Version = getUtxosForIdentityCursorVersion + 1
 			}), false),
-			wantErr: "unsupported cursor version",
+			expectedErr: "unsupported cursor version",
 		},
 		{
 			name: "invalid txid hex",
 			cursor: encodeGetUtxosCursorPayload(t, cursorPayloadWith(validPayload, func(payload *getUtxosForIdentityCursor) {
 				payload.Txid = "not-hex"
 			}), false),
-			wantErr: "invalid cursor txid",
+			expectedErr: "invalid cursor txid",
 		},
 		{
 			name: "short txid",
 			cursor: encodeGetUtxosCursorPayload(t, cursorPayloadWith(validPayload, func(payload *getUtxosForIdentityCursor) {
 				payload.Txid = "00"
 			}), false),
-			wantErr: "invalid cursor txid length",
+			expectedErr: "invalid cursor txid length",
 		},
 		{
 			name: "long txid",
 			cursor: encodeGetUtxosCursorPayload(t, cursorPayloadWith(validPayload, func(payload *getUtxosForIdentityCursor) {
 				payload.Txid = strings.Repeat("00", 33)
 			}), false),
-			wantErr: "invalid cursor txid length",
+			expectedErr: "invalid cursor txid length",
 		},
 		{
 			name: "invalid uuid",
 			cursor: encodeGetUtxosCursorPayload(t, cursorPayloadWith(validPayload, func(payload *getUtxosForIdentityCursor) {
 				payload.ID = "not-a-uuid"
 			}), false),
-			wantErr: "invalid cursor id",
+			expectedErr: "invalid cursor id",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, _, err := decodeGetUtxosForIdentityCursor(tc.cursor)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
 }

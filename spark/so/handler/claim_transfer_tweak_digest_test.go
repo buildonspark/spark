@@ -40,9 +40,9 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 	hashY := []byte{0x03, 0x04}
 
 	tests := []struct {
-		name    string
-		reports map[string]*pbinternal.ClaimTransferPrepareResponse
-		wantErr string
+		name        string
+		reports     map[string]*pbinternal.ClaimTransferPrepareResponse
+		expectedErr string
 	}{
 		{
 			name: "unanimous digests pass",
@@ -57,7 +57,7 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 				"0001": digestReport(false, map[string][]byte{leafA: hashX}),
 				"0002": digestReport(false, map[string][]byte{leafA: hashY}),
 			},
-			wantErr: "tweak digest",
+			expectedErr: "tweak digest",
 		},
 		{
 			name: "reporter missing a leaf another reports fails",
@@ -65,7 +65,7 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 				"0001": digestReport(false, map[string][]byte{leafA: hashX, leafB: hashY}),
 				"0002": digestReport(false, map[string][]byte{leafA: hashX}),
 			},
-			wantErr: "tweak digest",
+			expectedErr: "tweak digest",
 		},
 		{
 			name: "all applied pass",
@@ -80,7 +80,7 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 				"0001": digestReport(true, nil),
 				"0002": digestReport(false, map[string][]byte{leafA: hashX}),
 			},
-			wantErr: "already applied",
+			expectedErr: "already applied",
 		},
 		{
 			name:    "no reporters (all old binaries) passes",
@@ -92,7 +92,7 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 				"0001": digestReport(false, nil),
 				"0002": digestReport(false, nil),
 			},
-			wantErr: "no leaf tweak digests",
+			expectedErr: "no leaf tweak digests",
 		},
 		{
 			name: "single reporter passes",
@@ -105,11 +105,11 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateClaimTweakDigestUnanimity(digestTestTransferID, tc.reports)
-			if tc.wantErr == "" {
+			if tc.expectedErr == "" {
 				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.Contains(t, err.Error(), tc.expectedErr)
 			}
 		})
 	}

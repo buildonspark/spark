@@ -37,21 +37,21 @@ func TestSignAndVerifyMessage(t *testing.T) {
 
 func TestRound1PackageHash(t *testing.T) {
 	tests := []struct {
-		name     string
-		packages []map[string][]byte
-		want     []byte
+		name         string
+		packages     []map[string][]byte
+		expectedHash []byte
 	}{
 		{
-			name:     "single package with one key",
-			packages: []map[string][]byte{{"key1": priv1.Serialize()}},
-			want:     mustDecodeHex(t, "bc22e1f564ac75c2b75313243e45eb3fa16323e433fb1e79bdf1dd1fdb584adb"),
+			name:         "single package with one key",
+			packages:     []map[string][]byte{{"key1": priv1.Serialize()}},
+			expectedHash: mustDecodeHex(t, "bc22e1f564ac75c2b75313243e45eb3fa16323e433fb1e79bdf1dd1fdb584adb"),
 		},
 		{
 			name: "single package with multiple keys",
 			packages: []map[string][]byte{
 				{"key1": priv1.Serialize(), "key2": priv2.Serialize(), "key3": priv3.Serialize()},
 			},
-			want: mustDecodeHex(t, "2e150e5aacd115b2b2a9a10a381f58f9377134993a8ed57171f690d45934bc58"),
+			expectedHash: mustDecodeHex(t, "2e150e5aacd115b2b2a9a10a381f58f9377134993a8ed57171f690d45934bc58"),
 		},
 		{
 			name: "multiple packages",
@@ -59,19 +59,19 @@ func TestRound1PackageHash(t *testing.T) {
 				{"key1": priv1.Serialize(), "key2": priv2.Serialize()},
 				{"key3": priv3.Serialize()},
 			},
-			want: mustDecodeHex(t, "30549d126f1965926f8f5b45ebad70b8e1e256fd84b8f238ddf2110ef40fb8c6"),
+			expectedHash: mustDecodeHex(t, "30549d126f1965926f8f5b45ebad70b8e1e256fd84b8f238ddf2110ef40fb8c6"),
 		},
 		{
-			name:     "empty packages",
-			packages: []map[string][]byte{},
-			want:     mustDecodeHex(t, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+			name:         "empty packages",
+			packages:     []map[string][]byte{},
+			expectedHash: mustDecodeHex(t, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := round1PackageHash(tt.packages)
-			assert.Equal(t, tt.want, got)
+			hash := round1PackageHash(tt.packages)
+			assert.Equal(t, tt.expectedHash, hash)
 		})
 	}
 }
@@ -172,31 +172,31 @@ func TestValidateRound1Signature_InvalidSignature(t *testing.T) {
 
 func TestRound2PackageHash(t *testing.T) {
 	tests := []struct {
-		name     string
-		packages [][]byte
-		want     []byte
+		name         string
+		packages     [][]byte
+		expectedHash []byte
 	}{
 		{
-			name:     "single package",
-			packages: [][]byte{[]byte("package1")},
-			want:     mustDecodeHex(t, "73893d30923f338108486f1a6388bac31603db30e1b954a1ab6a77b1ab9d148d"),
+			name:         "single package",
+			packages:     [][]byte{[]byte("package1")},
+			expectedHash: mustDecodeHex(t, "73893d30923f338108486f1a6388bac31603db30e1b954a1ab6a77b1ab9d148d"),
 		},
 		{
-			name:     "empty packages",
-			packages: [][]byte{},
-			want:     mustDecodeHex(t, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+			name:         "empty packages",
+			packages:     [][]byte{},
+			expectedHash: mustDecodeHex(t, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
 		},
 		{
-			name:     "multiple packages",
-			packages: [][]byte{[]byte("package1"), []byte("package2"), []byte("package3")},
-			want:     mustDecodeHex(t, "48d8d70b79712c52dfa87860293ee867b61c9127e17c270a2da867975b82d527"),
+			name:         "multiple packages",
+			packages:     [][]byte{[]byte("package1"), []byte("package2"), []byte("package3")},
+			expectedHash: mustDecodeHex(t, "48d8d70b79712c52dfa87860293ee867b61c9127e17c270a2da867975b82d527"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hash := round2PackageHash(tt.packages)
-			assert.Equal(t, tt.want, hash)
+			assert.Equal(t, tt.expectedHash, hash)
 
 			// Test package order sensitivity
 			if len(tt.packages) > 1 {

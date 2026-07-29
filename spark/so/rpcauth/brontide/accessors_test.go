@@ -18,20 +18,20 @@ import (
 
 func TestHandshakeDeadline(t *testing.T) {
 	t.Run("nil context uses fallback", func(t *testing.T) {
-		got := handshakeDeadline(nil, time.Second)
-		assert.WithinDuration(t, time.Now().Add(time.Second), got, 50*time.Millisecond)
+		deadline := handshakeDeadline(nil, time.Second)
+		assert.WithinDuration(t, time.Now().Add(time.Second), deadline, 50*time.Millisecond)
 	})
 
 	t.Run("context without deadline uses fallback", func(t *testing.T) {
-		got := handshakeDeadline(t.Context(), time.Second)
-		assert.WithinDuration(t, time.Now().Add(time.Second), got, 50*time.Millisecond)
+		deadline := handshakeDeadline(t.Context(), time.Second)
+		assert.WithinDuration(t, time.Now().Add(time.Second), deadline, 50*time.Millisecond)
 	})
 
 	t.Run("context deadline beyond fallback uses fallback", func(t *testing.T) {
 		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(time.Hour))
 		defer cancel()
-		got := handshakeDeadline(ctx, time.Second)
-		assert.WithinDuration(t, time.Now().Add(time.Second), got, 50*time.Millisecond)
+		deadline := handshakeDeadline(ctx, time.Second)
+		assert.WithinDuration(t, time.Now().Add(time.Second), deadline, 50*time.Millisecond)
 	})
 
 	t.Run("earlier context deadline wins over fallback", func(t *testing.T) {
@@ -39,8 +39,8 @@ func TestHandshakeDeadline(t *testing.T) {
 		ctx, cancel := context.WithDeadline(t.Context(), earlier)
 		t.Cleanup(cancel)
 
-		got := handshakeDeadline(ctx, time.Hour)
-		assert.Equal(t, earlier, got)
+		deadline := handshakeDeadline(ctx, time.Hour)
+		assert.Equal(t, earlier, deadline)
 	})
 }
 
@@ -51,9 +51,9 @@ func TestMachineRemoteStatic(t *testing.T) {
 
 	t.Run("initiator knows responder pubkey from construction", func(t *testing.T) {
 		m := brontide.NewBrontideMachine(true, newLocalECDH(initiator), responder.Public().ToBTCEC())
-		got, ok := machineRemoteStatic(m)
+		remoteStatic, ok := machineRemoteStatic(m)
 		require.True(t, ok)
-		assert.Equal(t, responder.Public(), got)
+		assert.Equal(t, responder.Public(), remoteStatic)
 	})
 
 	t.Run("responder has no remote static before handshake", func(t *testing.T) {
@@ -78,9 +78,9 @@ func TestMachineRemoteStatic(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, responderM.RecvActThree(actThree))
 
-		got, ok := machineRemoteStatic(responderM)
+		remoteStatic, ok := machineRemoteStatic(responderM)
 		require.True(t, ok)
-		assert.Equal(t, initiator.Public(), got)
+		assert.Equal(t, initiator.Public(), remoteStatic)
 	})
 }
 

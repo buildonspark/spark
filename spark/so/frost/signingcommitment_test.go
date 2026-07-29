@@ -63,29 +63,29 @@ func TestSigningCommitment_Scan(t *testing.T) {
 	data := commitment.MarshalBinary()
 
 	tests := []struct {
-		name  string
-		input any
-		want  SigningCommitment
+		name               string
+		input              any
+		expectedCommitment SigningCommitment
 	}{
 		{
-			name:  "valid commitment",
-			input: &sql.Null[[]byte]{V: data, Valid: true},
-			want:  commitment,
+			name:               "valid commitment",
+			input:              &sql.Null[[]byte]{V: data, Valid: true},
+			expectedCommitment: commitment,
 		},
 		{
-			name:  "nil value",
-			input: nil,
-			want:  SigningCommitment{},
+			name:               "nil value",
+			input:              nil,
+			expectedCommitment: SigningCommitment{},
 		},
 		{
-			name:  "nil sql.Null",
-			input: (*sql.Null[[]byte])(nil),
-			want:  SigningCommitment{},
+			name:               "nil sql.Null",
+			input:              (*sql.Null[[]byte])(nil),
+			expectedCommitment: SigningCommitment{},
 		},
 		{
-			name:  "null value",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  SigningCommitment{},
+			name:               "null value",
+			input:              &sql.Null[[]byte]{Valid: false},
+			expectedCommitment: SigningCommitment{},
 		},
 	}
 
@@ -95,25 +95,25 @@ func TestSigningCommitment_Scan(t *testing.T) {
 			err := dest.Scan(tt.input)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, *dest)
+			assert.Equal(t, tt.expectedCommitment, *dest)
 		})
 	}
 }
 
 func TestSigningCommitment_Scan_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   any
-		wantMsg string
+		name        string
+		input       any
+		expectedMsg string
 	}{
-		{name: "not bytes", input: "not bytes", wantMsg: "unexpected input for Scan: string"},
-		{name: "invalid bytes", input: make([]byte, 65), wantMsg: "failed to scan SigningCommitment"},
+		{name: "not bytes", input: "not bytes", expectedMsg: "unexpected input for Scan: string"},
+		{name: "invalid bytes", input: make([]byte, 65), expectedMsg: "failed to scan SigningCommitment"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			commitment := &SigningCommitment{}
 			err := commitment.Scan(tt.input)
-			require.ErrorContains(t, err, tt.wantMsg)
+			require.ErrorContains(t, err, tt.expectedMsg)
 		})
 	}
 }
@@ -150,39 +150,39 @@ func TestSigningCommitment_UnmarshalBinary(t *testing.T) {
 func TestSigningCommitment_UnmarshalBinary_InvalidInput_Errors(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:    "nil",
-			input:   nil,
-			wantErr: "invalid nonce commitment length 0",
+			name:        "nil",
+			input:       nil,
+			expectedErr: "invalid nonce commitment length 0",
 		},
 		{
-			name:    "empty",
-			input:   []byte{},
-			wantErr: "invalid nonce commitment length 0",
+			name:        "empty",
+			input:       []byte{},
+			expectedErr: "invalid nonce commitment length 0",
 		},
 		{
-			name:    "too short",
-			input:   make([]byte, 65),
-			wantErr: "invalid nonce commitment length 65",
+			name:        "too short",
+			input:       make([]byte, 65),
+			expectedErr: "invalid nonce commitment length 65",
 		},
 		{
-			name:    "too long",
-			input:   make([]byte, 67),
-			wantErr: "invalid nonce commitment length 67",
+			name:        "too long",
+			input:       make([]byte, 67),
+			expectedErr: "invalid nonce commitment length 67",
 		},
 		{
-			name:    "invalid binding",
-			input:   append(make([]byte, 33), keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()...),
-			wantErr: "invalid signing commitment binding",
+			name:        "invalid binding",
+			input:       append(make([]byte, 33), keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()...),
+			expectedErr: "invalid signing commitment binding",
 		},
 		{
-			name:    "invalid hiding",
-			input:   append(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(), make([]byte, 33)...),
-			wantErr: "invalid signing commitment hiding",
+			name:        "invalid hiding",
+			input:       append(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(), make([]byte, 33)...),
+			expectedErr: "invalid signing commitment hiding",
 		},
 	}
 
@@ -190,7 +190,7 @@ func TestSigningCommitment_UnmarshalBinary_InvalidInput_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			commitment := &SigningCommitment{}
 			err := commitment.UnmarshalBinary(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -228,14 +228,14 @@ func TestSigningCommitment_UnmarshalProto(t *testing.T) {
 func TestSigningCommitment_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	tests := []struct {
-		name    string
-		input   *pbcommon.SigningCommitment
-		wantErr string
+		name        string
+		input       *pbcommon.SigningCommitment
+		expectedErr string
 	}{
 		{
-			name:    "nil proto",
-			input:   nil,
-			wantErr: "nil proto",
+			name:        "nil proto",
+			input:       nil,
+			expectedErr: "nil proto",
 		},
 		{
 			name: "invalid binding",
@@ -243,7 +243,7 @@ func TestSigningCommitment_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 				Binding: make([]byte, 33), // all zeros
 				Hiding:  keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
 			},
-			wantErr: "invalid signing commitment binding",
+			expectedErr: "invalid signing commitment binding",
 		},
 		{
 			name: "invalid hiding",
@@ -251,7 +251,7 @@ func TestSigningCommitment_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 				Binding: keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
 				Hiding:  make([]byte, 33), // all zeros
 			},
-			wantErr: "invalid signing commitment hiding",
+			expectedErr: "invalid signing commitment hiding",
 		},
 	}
 
@@ -259,7 +259,7 @@ func TestSigningCommitment_UnmarshalProto_InvalidInput_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			commitment := &SigningCommitment{}
 			err := commitment.UnmarshalProto(tt.input)
-			assert.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

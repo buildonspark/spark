@@ -41,15 +41,15 @@ func TestTransferOccupancyCells_CountsNonTerminalAndZeroFills(t *testing.T) {
 	// Full zero-filled cross product: every non-terminal status × every type.
 	assert.Len(t, cells, len(st.NonTerminalTransferStatuses())*len((st.TransferType("")).Values()))
 
-	got := cells[transferCellKey{
+	cell := cells[transferCellKey{
 		network:      btcnetwork.Regtest,
 		status:       transferA.Status,
 		transferType: st.TransferTypeTransfer,
 	}]
-	assert.EqualValues(t, 2, got.count)
-	assert.Greater(t, got.oldestAge, time.Duration(0))
+	assert.EqualValues(t, 2, cell.count)
+	assert.Greater(t, cell.oldestAge, time.Duration(0))
 	// oldestAge derives from the earlier of the two rows.
-	assert.InDelta(t, now.Sub(transferA.UpdateTime).Seconds(), got.oldestAge.Seconds(), 5.0)
+	assert.InDelta(t, now.Sub(transferA.UpdateTime).Seconds(), cell.oldestAge.Seconds(), 5.0)
 
 	// Terminal rows are invisible: the COMPLETED coop exit contributes nowhere,
 	// so its (status, type) cell does not exist and untouched cells are zero.
@@ -109,13 +109,13 @@ func TestTransferReceiverOccupancyCells_CountsNonTerminalAndZeroFills(t *testing
 
 	// The network dimension comes from the parent-transfer join, so a
 	// populated Regtest cell proves the join wiring, not just the count.
-	got := cells[transferReceiverCellKey{
+	cell := cells[transferReceiverCellKey{
 		network:      btcnetwork.Regtest,
 		status:       st.TransferReceiverStatusInitiated,
 		transferType: st.TransferTypeTransfer,
 	}]
-	assert.EqualValues(t, 2, got.count)
-	assert.InDelta(t, now.Sub(rowA.UpdateTime).Seconds(), got.oldestAge.Seconds(), 5.0)
+	assert.EqualValues(t, 2, cell.count)
+	assert.InDelta(t, now.Sub(rowA.UpdateTime).Seconds(), cell.oldestAge.Seconds(), 5.0)
 
 	_, exists := cells[transferReceiverCellKey{
 		network:      btcnetwork.Regtest,

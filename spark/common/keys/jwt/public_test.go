@@ -36,30 +36,30 @@ func TestPublic_IsZero(t *testing.T) {
 	rng := &rand.ChaCha8{}
 
 	tests := []struct {
-		name string
-		key  Public
-		want bool
+		name           string
+		key            Public
+		expectedIsZero bool
 	}{
 		{
-			name: "zero value",
-			key:  Public{},
-			want: true,
+			name:           "zero value",
+			key:            Public{},
+			expectedIsZero: true,
 		},
 		{
-			name: "secp256k1",
-			key:  PublicFromSecp256k1(keys.MustGeneratePrivateKeyFromRand(rng).Public()),
-			want: false,
+			name:           "secp256k1",
+			key:            PublicFromSecp256k1(keys.MustGeneratePrivateKeyFromRand(rng).Public()),
+			expectedIsZero: false,
 		},
 		{
-			name: "P-256",
-			key:  PublicFromP256(keys.GenerateP256PublicKey()),
-			want: false,
+			name:           "P-256",
+			key:            PublicFromP256(keys.GenerateP256PublicKey()),
+			expectedIsZero: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.key.IsZero())
+			assert.Equal(t, tt.expectedIsZero, tt.key.IsZero())
 		})
 	}
 }
@@ -70,47 +70,47 @@ func TestPublic_Equals(t *testing.T) {
 	p256Key := keys.GenerateP256PublicKey()
 
 	tests := []struct {
-		name string
-		a    Public
-		b    Public
-		want bool
+		name           string
+		a              Public
+		b              Public
+		expectedEquals bool
 	}{
 		{
-			name: "same secp256k1",
-			a:    PublicFromSecp256k1(secpKey),
-			b:    PublicFromSecp256k1(secpKey),
-			want: true,
+			name:           "same secp256k1",
+			a:              PublicFromSecp256k1(secpKey),
+			b:              PublicFromSecp256k1(secpKey),
+			expectedEquals: true,
 		},
 		{
-			name: "same P-256",
-			a:    PublicFromP256(p256Key),
-			b:    PublicFromP256(p256Key),
-			want: true,
+			name:           "same P-256",
+			a:              PublicFromP256(p256Key),
+			b:              PublicFromP256(p256Key),
+			expectedEquals: true,
 		},
 		{
-			name: "different secp256k1",
-			a:    PublicFromSecp256k1(secpKey),
-			b:    PublicFromSecp256k1(keys.MustGeneratePrivateKeyFromRand(rng).Public()),
-			want: false,
+			name:           "different secp256k1",
+			a:              PublicFromSecp256k1(secpKey),
+			b:              PublicFromSecp256k1(keys.MustGeneratePrivateKeyFromRand(rng).Public()),
+			expectedEquals: false,
 		},
 		{
-			name: "different curves",
-			a:    PublicFromSecp256k1(secpKey),
-			b:    PublicFromP256(p256Key),
-			want: false,
+			name:           "different curves",
+			a:              PublicFromSecp256k1(secpKey),
+			b:              PublicFromP256(p256Key),
+			expectedEquals: false,
 		},
 		{
-			name: "both zero",
-			a:    Public{},
-			b:    Public{},
-			want: true,
+			name:           "both zero",
+			a:              Public{},
+			b:              Public{},
+			expectedEquals: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.a.Equals(tt.b))
-			assert.Equal(t, tt.want, tt.b.Equals(tt.a))
+			assert.Equal(t, tt.expectedEquals, tt.a.Equals(tt.b))
+			assert.Equal(t, tt.expectedEquals, tt.b.Equals(tt.a))
 		})
 	}
 }
@@ -176,29 +176,29 @@ func TestPublic_Scan(t *testing.T) {
 	serialized := k.Serialize()
 
 	tests := []struct {
-		name  string
-		input any
-		want  Public
+		name        string
+		input       any
+		expectedKey Public
 	}{
 		{
-			name:  "raw bytes",
-			input: serialized,
-			want:  k,
+			name:        "raw bytes",
+			input:       serialized,
+			expectedKey: k,
 		},
 		{
-			name:  "sql.Null valid",
-			input: &sql.Null[[]byte]{V: serialized, Valid: true},
-			want:  k,
+			name:        "sql.Null valid",
+			input:       &sql.Null[[]byte]{V: serialized, Valid: true},
+			expectedKey: k,
 		},
 		{
-			name:  "nil",
-			input: nil,
-			want:  Public{},
+			name:        "nil",
+			input:       nil,
+			expectedKey: Public{},
 		},
 		{
-			name:  "sql.Null invalid",
-			input: &sql.Null[[]byte]{Valid: false},
-			want:  Public{},
+			name:        "sql.Null invalid",
+			input:       &sql.Null[[]byte]{Valid: false},
+			expectedKey: Public{},
 		},
 	}
 
@@ -206,31 +206,31 @@ func TestPublic_Scan(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var dest Public
 			require.NoError(t, dest.Scan(tt.input))
-			assert.Equal(t, tt.want, dest)
+			assert.Equal(t, tt.expectedKey, dest)
 		})
 	}
 }
 
 func TestPublic_Scan_InvalidInput_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   any
-		wantErr string
+		name        string
+		input       any
+		expectedErr string
 	}{
 		{
-			name:    "wrong type",
-			input:   "not bytes",
-			wantErr: "unexpected input for Scan",
+			name:        "wrong type",
+			input:       "not bytes",
+			expectedErr: "unexpected input for Scan",
 		},
 		{
-			name:    "wrong length",
-			input:   []byte{0x01, 0x02, 0x03},
-			wantErr: "expected 34 bytes",
+			name:        "wrong length",
+			input:       []byte{0x01, 0x02, 0x03},
+			expectedErr: "expected 34 bytes",
 		},
 		{
-			name:    "unknown discriminator",
-			input:   append([]byte{0xFF}, make([]byte, 33)...),
-			wantErr: "unknown curve discriminator 0xff",
+			name:        "unknown discriminator",
+			input:       append([]byte{0xFF}, make([]byte, 33)...),
+			expectedErr: "unknown curve discriminator 0xff",
 		},
 	}
 
@@ -238,7 +238,7 @@ func TestPublic_Scan_InvalidInput_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var dest Public
 			err := dest.Scan(tt.input)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -248,19 +248,19 @@ func TestPublic_MarshalJSON(t *testing.T) {
 	k := PublicFromSecp256k1(keys.MustGeneratePrivateKeyFromRand(rng).Public())
 
 	tests := []struct {
-		name string
-		key  Public
-		want []byte
+		name          string
+		key           Public
+		expectedBytes []byte
 	}{
 		{
-			name: "valid key",
-			key:  k,
-			want: k.Serialize(),
+			name:          "valid key",
+			key:           k,
+			expectedBytes: k.Serialize(),
 		},
 		{
-			name: "zero value",
-			key:  Public{},
-			want: nil,
+			name:          "zero value",
+			key:           Public{},
+			expectedBytes: nil,
 		},
 	}
 
@@ -271,7 +271,7 @@ func TestPublic_MarshalJSON(t *testing.T) {
 
 			var unmarshaled []byte
 			require.NoError(t, json.Unmarshal(data, &unmarshaled))
-			assert.Equal(t, tt.want, unmarshaled)
+			assert.Equal(t, tt.expectedBytes, unmarshaled)
 		})
 	}
 }

@@ -130,22 +130,22 @@ func TestFixKeyshareParseRequestRejectsInvalidGoodOperatorSet(t *testing.T) {
 	tests := []struct {
 		name            string
 		goodOperatorIDs []string
-		wantError       string
+		expectedError   string
 	}{
 		{
 			name:            "duplicate good operator",
 			goodOperatorIDs: []string{goodOperator1.Identifier, goodOperator1.Identifier},
-			wantError:       "duplicate good signing operator ID: operator-1",
+			expectedError:   "duplicate good signing operator ID: operator-1",
 		},
 		{
 			name:            "bad operator also listed as good",
 			goodOperatorIDs: []string{badOperator.Identifier, goodOperator1.Identifier},
-			wantError:       "bad signing operator ID operator-0 cannot also be listed as a good signing operator",
+			expectedError:   "bad signing operator ID operator-0 cannot also be listed as a good signing operator",
 		},
 		{
 			name:            "bad operator listed after valid good operator",
 			goodOperatorIDs: []string{goodOperator1.Identifier, badOperator.Identifier},
-			wantError:       "bad signing operator ID operator-0 cannot also be listed as a good signing operator",
+			expectedError:   "bad signing operator ID operator-0 cannot also be listed as a good signing operator",
 		},
 	}
 
@@ -153,7 +153,7 @@ func TestFixKeyshareParseRequestRejectsInvalidGoodOperatorSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := handler.parseRequest(ctx, keyshare.ID.String(), badOperator.Identifier, tt.goodOperatorIDs)
-			require.ErrorContains(t, err, tt.wantError)
+			require.ErrorContains(t, err, tt.expectedError)
 		})
 	}
 }

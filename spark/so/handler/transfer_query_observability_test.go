@@ -9,8 +9,8 @@ import (
 
 func TestResultCountBucket(t *testing.T) {
 	tests := []struct {
-		n    int
-		want string
+		n              int
+		expectedBucket string
 	}{
 		{0, "0"},
 		{1, "1"},
@@ -27,7 +27,7 @@ func TestResultCountBucket(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("n=%d", tc.n), func(t *testing.T) {
-			require.Equal(t, tc.want, resultCountBucket(tc.n))
+			require.Equal(t, tc.expectedBucket, resultCountBucket(tc.n))
 		})
 	}
 }

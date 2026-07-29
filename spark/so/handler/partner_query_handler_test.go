@@ -74,18 +74,18 @@ func TestQuerySparkTransactionVolumes_NoLabel(t *testing.T) {
 
 	// Entries are ordered by (label, transaction_type); "LIGHTNING_SEND" sorts
 	// before "TRANSFER".
-	want := []*pbpartner.TransactionVolumeEntry{
+	expectedEntries := []*pbpartner.TransactionVolumeEntry{
 		{Label: "label-1", TransactionType: pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_LIGHTNING_SEND, VolumeSats: 20000, TransactionCount: 3},
 		{Label: "label-1", TransactionType: pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER, VolumeSats: 87000, TransactionCount: 17},
 		{Label: "label-2", TransactionType: pbpartner.SparkTransactionType_SPARK_TRANSACTION_TYPE_TRANSFER, VolumeSats: 99999, TransactionCount: 1},
 	}
-	require.Len(t, resp.GetEntries(), len(want))
-	for i, w := range want {
-		got := resp.GetEntries()[i]
-		assert.Equal(t, w.GetLabel(), got.GetLabel())
-		assert.Equal(t, w.GetTransactionType(), got.GetTransactionType())
-		assert.Equal(t, w.GetVolumeSats(), got.GetVolumeSats())
-		assert.Equal(t, w.GetTransactionCount(), got.GetTransactionCount())
+	require.Len(t, resp.GetEntries(), len(expectedEntries))
+	for i, w := range expectedEntries {
+		entry := resp.GetEntries()[i]
+		assert.Equal(t, w.GetLabel(), entry.GetLabel())
+		assert.Equal(t, w.GetTransactionType(), entry.GetTransactionType())
+		assert.Equal(t, w.GetVolumeSats(), entry.GetVolumeSats())
+		assert.Equal(t, w.GetTransactionCount(), entry.GetTransactionCount())
 	}
 }
 

@@ -647,11 +647,11 @@ func TestSignAndPersistTokenTransaction_DuplicateSignedMint(t *testing.T) {
 	tests := []struct {
 		name         string
 		outputStatus st.TokenOutputStatus
-		wantErr      string
+		expectedErr  string
 	}{
 		{name: "returns stored signature when outputs are created signed", outputStatus: st.TokenOutputStatusCreatedSigned},
 		{name: "returns stored signature when outputs are created finalized", outputStatus: st.TokenOutputStatusCreatedFinalized},
-		{name: "rejects when outputs are created started", outputStatus: st.TokenOutputStatusCreatedStarted, wantErr: "found invalid outputs"},
+		{name: "rejects when outputs are created started", outputStatus: st.TokenOutputStatusCreatedStarted, expectedErr: "found invalid outputs"},
 	}
 
 	for i, tt := range tests {
@@ -691,9 +691,9 @@ func TestSignAndPersistTokenTransaction_DuplicateSignedMint(t *testing.T) {
 				tx.FinalizedTokenTransactionHash,
 				nil,
 			)
-			if tt.wantErr != "" {
+			if tt.expectedErr != "" {
 				require.Error(t, err)
-				require.ErrorContains(t, err, tt.wantErr)
+				require.ErrorContains(t, err, tt.expectedErr)
 				return
 			}
 			require.NoError(t, err)

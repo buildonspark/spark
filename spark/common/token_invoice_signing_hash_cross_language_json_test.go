@@ -67,14 +67,14 @@ func TestTokenInvoiceSigningHashJSONCases(t *testing.T) {
 				t.Fatalf("parse network: %v", err)
 			}
 
-			got, err := HashSparkInvoiceFields(&msg, network, receiverPublicKey)
+			hash, err := HashSparkInvoiceFields(&msg, network, receiverPublicKey)
 			if err != nil {
 				t.Fatalf("hash token invoice signing payload: %v", err)
 			}
 
-			gotHex := hex.EncodeToString(got)
-			if !strings.EqualFold(tc.ExpectedHashHex, gotHex) {
-				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, gotHex)
+			actualHex := hex.EncodeToString(hash)
+			if !strings.EqualFold(tc.ExpectedHashHex, actualHex) {
+				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, actualHex)
 			}
 		})
 	}

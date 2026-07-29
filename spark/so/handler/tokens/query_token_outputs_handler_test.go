@@ -62,19 +62,19 @@ func TestQueryTokenOutputsRejectsInvalidNetwork(t *testing.T) {
 	ownerPublicKey := keys.GeneratePrivateKey().Public().Serialize()
 
 	for _, tc := range []struct {
-		name    string
-		network sparkpb.Network
-		wantErr string
+		name        string
+		network     sparkpb.Network
+		expectedErr string
 	}{
 		{
-			name:    "unspecified",
-			network: sparkpb.Network_UNSPECIFIED,
-			wantErr: "network must be specified",
+			name:        "unspecified",
+			network:     sparkpb.Network_UNSPECIFIED,
+			expectedErr: "network must be specified",
 		},
 		{
-			name:    "unknown enum",
-			network: sparkpb.Network(999),
-			wantErr: "failed to convert proto network",
+			name:        "unknown enum",
+			network:     sparkpb.Network(999),
+			expectedErr: "failed to convert proto network",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestQueryTokenOutputsRejectsInvalidNetwork(t *testing.T) {
 			require.Nil(t, resp)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
 }

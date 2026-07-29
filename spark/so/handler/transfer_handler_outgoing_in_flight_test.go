@@ -13,9 +13,9 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 	pkBytes := pk.Public().Serialize()
 
 	tests := []struct {
-		name   string
-		filter *pb.TransferFilter
-		want   bool
+		name                string
+		filter              *pb.TransferFilter
+		expectedShouldRoute bool
 	}{
 		{
 			name: "sender + 4-state full set — routes",
@@ -28,7 +28,7 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 					pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
 				},
 			},
-			want: true,
+			expectedShouldRoute: true,
 		},
 		{
 			name: "sender + 4-state subset — routes",
@@ -38,7 +38,7 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 					pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
 				},
 			},
-			want: true,
+			expectedShouldRoute: true,
 		},
 		{
 			name: "sender + status outside set (SENDER_KEY_TWEAKED) — falls through",
@@ -49,7 +49,7 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 					pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
 				},
 			},
-			want: false,
+			expectedShouldRoute: false,
 		},
 		{
 			name: "sender + receiver-named status — falls through",
@@ -59,7 +59,7 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 					pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
 				},
 			},
-			want: false,
+			expectedShouldRoute: false,
 		},
 		{
 			name: "sender + empty status set — falls through",
@@ -67,7 +67,7 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 				Participant: &pb.TransferFilter_SenderIdentityPublicKey{SenderIdentityPublicKey: pkBytes},
 				Statuses:    []pb.TransferStatus{},
 			},
-			want: false,
+			expectedShouldRoute: false,
 		},
 		{
 			name: "receiver participant — falls through",
@@ -77,7 +77,7 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 					pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
 				},
 			},
-			want: false,
+			expectedShouldRoute: false,
 		},
 		{
 			name: "SR1 participant — falls through",
@@ -87,17 +87,17 @@ func TestShouldRouteToOutgoingInFlight(t *testing.T) {
 					pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED,
 				},
 			},
-			want: false,
+			expectedShouldRoute: false,
 		},
 		{
-			name:   "nil participant — falls through",
-			filter: &pb.TransferFilter{Statuses: []pb.TransferStatus{pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED}},
-			want:   false,
+			name:                "nil participant — falls through",
+			filter:              &pb.TransferFilter{Statuses: []pb.TransferStatus{pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED}},
+			expectedShouldRoute: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, shouldRouteToOutgoingInFlight(tt.filter))
+			assert.Equal(t, tt.expectedShouldRoute, shouldRouteToOutgoingInFlight(tt.filter))
 		})
 	}
 }

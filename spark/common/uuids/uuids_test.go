@@ -16,32 +16,32 @@ func TestParseSlice(t *testing.T) {
 	validUUID2 := "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 	tests := []struct {
-		name  string
-		input []string
-		want  uuid.UUIDs
+		name          string
+		input         []string
+		expectedUUIDs uuid.UUIDs
 	}{
 		{
-			name:  "valid UUIDs",
-			input: []string{validUUID1, validUUID2},
-			want:  uuid.UUIDs{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
+			name:          "valid UUIDs",
+			input:         []string{validUUID1, validUUID2},
+			expectedUUIDs: uuid.UUIDs{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
 		},
 		{
-			name:  "empty array",
-			input: []string{},
-			want:  uuid.UUIDs{},
+			name:          "empty array",
+			input:         []string{},
+			expectedUUIDs: uuid.UUIDs{},
 		},
 		{
-			name:  "single valid UUID",
-			input: []string{validUUID1},
-			want:  uuid.UUIDs{uuid.MustParse(validUUID1)},
+			name:          "single valid UUID",
+			input:         []string{validUUID1},
+			expectedUUIDs: uuid.UUIDs{uuid.MustParse(validUUID1)},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSlice(tt.input)
+			parsedUUIDs, err := ParseSlice(tt.input)
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.expectedUUIDs, parsedUUIDs)
 		})
 	}
 }
@@ -66,9 +66,9 @@ func TestParseSlice_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSlice(tt.input)
+			parsedUUIDs, err := ParseSlice(tt.input)
 			require.Error(t, err)
-			require.Nil(t, got)
+			require.Nil(t, parsedUUIDs)
 		})
 	}
 }
@@ -82,32 +82,32 @@ func TestParseSliceFunc(t *testing.T) {
 	validUUID2 := "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 	tests := []struct {
-		name  string
-		input []testStruct
-		want  uuid.UUIDs
+		name          string
+		input         []testStruct
+		expectedUUIDs uuid.UUIDs
 	}{
 		{
-			name:  "valid UUIDs",
-			input: []testStruct{{id: validUUID1}, {id: validUUID2}},
-			want:  uuid.UUIDs{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
+			name:          "valid UUIDs",
+			input:         []testStruct{{id: validUUID1}, {id: validUUID2}},
+			expectedUUIDs: uuid.UUIDs{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
 		},
 		{
-			name:  "empty array",
-			input: []testStruct{},
-			want:  uuid.UUIDs{},
+			name:          "empty array",
+			input:         []testStruct{},
+			expectedUUIDs: uuid.UUIDs{},
 		},
 		{
-			name:  "single valid UUID",
-			input: []testStruct{{id: validUUID1}},
-			want:  uuid.UUIDs{uuid.MustParse(validUUID1)},
+			name:          "single valid UUID",
+			input:         []testStruct{{id: validUUID1}},
+			expectedUUIDs: uuid.UUIDs{uuid.MustParse(validUUID1)},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSliceFunc(tt.input, func(s testStruct) string { return s.id })
+			parsedUUIDs, err := ParseSliceFunc(tt.input, func(s testStruct) string { return s.id })
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.expectedUUIDs, parsedUUIDs)
 		})
 	}
 }
@@ -132,9 +132,9 @@ func TestParseSliceFunc_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSliceFunc(tt.input, func(s testStruct) string { return s.id })
+			parsedUUIDs, err := ParseSliceFunc(tt.input, func(s testStruct) string { return s.id })
 			require.Error(t, err)
-			require.Nil(t, got)
+			require.Nil(t, parsedUUIDs)
 		})
 	}
 }
@@ -144,32 +144,32 @@ func TestParseSeq(t *testing.T) {
 	validUUID2 := "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 	tests := []struct {
-		name  string
-		input []string
-		want  uuid.UUIDs
+		name          string
+		input         []string
+		expectedUUIDs uuid.UUIDs
 	}{
 		{
-			name:  "valid UUIDs",
-			input: []string{validUUID1, validUUID2},
-			want:  uuid.UUIDs{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
+			name:          "valid UUIDs",
+			input:         []string{validUUID1, validUUID2},
+			expectedUUIDs: uuid.UUIDs{uuid.MustParse(validUUID1), uuid.MustParse(validUUID2)},
 		},
 		{
-			name:  "empty sequence",
-			input: []string{},
-			want:  uuid.UUIDs(nil),
+			name:          "empty sequence",
+			input:         []string{},
+			expectedUUIDs: uuid.UUIDs(nil),
 		},
 		{
-			name:  "single valid UUID",
-			input: []string{validUUID1},
-			want:  uuid.UUIDs{uuid.MustParse(validUUID1)},
+			name:          "single valid UUID",
+			input:         []string{validUUID1},
+			expectedUUIDs: uuid.UUIDs{uuid.MustParse(validUUID1)},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSeq(slices.Values(tt.input))
+			parsedUUIDs, err := ParseSeq(slices.Values(tt.input))
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.expectedUUIDs, parsedUUIDs)
 		})
 	}
 }
@@ -194,9 +194,9 @@ func TestParseSeq_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSeq(slices.Values(tt.input))
+			parsedUUIDs, err := ParseSeq(slices.Values(tt.input))
 			require.Error(t, err)
-			require.Nil(t, got)
+			require.Nil(t, parsedUUIDs)
 		})
 	}
 }

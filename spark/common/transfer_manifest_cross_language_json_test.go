@@ -61,21 +61,21 @@ func TestTransferManifestHashJSONCases(t *testing.T) {
 				t.Fatalf("proto validation rejected a valid fixture: %v", err)
 			}
 
-			got, err := HashTransferManifest(&msg)
+			hash, err := HashTransferManifest(&msg)
 			if err != nil {
 				t.Fatalf("hash transfer manifest: %v", err)
 			}
 
-			gotHex := hex.EncodeToString(got)
+			actualHex := hex.EncodeToString(hash)
 
 			// If expected is missing or TBD, print computed to help update fixtures
 			if tc.ExpectedHashHex == "" || strings.EqualFold(tc.ExpectedHashHex, "TBD") {
-				t.Logf("COMPUTED_HASH %s: %s", tc.Name, gotHex)
+				t.Logf("COMPUTED_HASH %s: %s", tc.Name, actualHex)
 				return
 			}
 
-			if !strings.EqualFold(tc.ExpectedHashHex, gotHex) {
-				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, gotHex)
+			if !strings.EqualFold(tc.ExpectedHashHex, actualHex) {
+				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, actualHex)
 			}
 		})
 	}

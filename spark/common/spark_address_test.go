@@ -76,14 +76,14 @@ func TestEncodeDecodeSparkInvoiceSats(t *testing.T) {
 			decoded, err := DecodeSparkAddress(invoice)
 			require.NoError(t, err, "failed to decode spark address")
 
-			want := &DecodedSparkAddress{
+			expectedAddress := &DecodedSparkAddress{
 				Network: btcnetwork.Regtest,
 				SparkAddress: &pb.SparkAddress{
 					IdentityPublicKey:  testIDPubKey.Serialize(),
 					SparkInvoiceFields: invoiceFields,
 				},
 			}
-			assert.EqualExportedValues(t, want, decoded)
+			assert.EqualExportedValues(t, expectedAddress, decoded)
 		})
 	}
 }
@@ -196,14 +196,14 @@ func TestEncodeDecodeSparkInvoiceTokens(t *testing.T) {
 			decoded, err := DecodeSparkAddress(invoice)
 			require.NoError(t, err, "failed to decode spark address")
 
-			want := &DecodedSparkAddress{
+			expectedAddress := &DecodedSparkAddress{
 				Network: btcnetwork.Regtest,
 				SparkAddress: &pb.SparkAddress{
 					IdentityPublicKey:  testIDPubKey.Serialize(),
 					SparkInvoiceFields: invoiceFields,
 				},
 			}
-			assert.EqualExportedValues(t, want, decoded)
+			assert.EqualExportedValues(t, expectedAddress, decoded)
 		})
 	}
 }
@@ -218,7 +218,7 @@ func TestDecodeKnownTokensSparkInvoice(t *testing.T) {
 	expectedId, _ := hex.DecodeString("01992fa6dba47dc0a39d0f4f566cf82b")
 	expectedTokenId, _ := hex.DecodeString("093e4813f6463ae2b03b548500fe0f02c74b277f70955a8d9cb2a8ea39504614")
 	expectedSignature, _ := hex.DecodeString("9d69a7bbac4d5942d7dec0bb845d784333dc80b3bba88fd046345285939e0567339cd357a8337654bdd948a4a3cb6d3033c6bb0e6c8ac4fcb068f5433f437afb")
-	want := &DecodedSparkAddress{
+	expectedAddress := &DecodedSparkAddress{
 		Network: btcnetwork.Regtest,
 		SparkAddress: &pb.SparkAddress{
 			IdentityPublicKey: expectedIdentityPubKey,
@@ -233,7 +233,7 @@ func TestDecodeKnownTokensSparkInvoice(t *testing.T) {
 			Signature: expectedSignature,
 		},
 	}
-	require.EqualExportedValues(t, want, res)
+	require.EqualExportedValues(t, expectedAddress, res)
 }
 
 func TestDecodeKnownSatsSparkInvoice(t *testing.T) {
@@ -245,7 +245,7 @@ func TestDecodeKnownSatsSparkInvoice(t *testing.T) {
 	expectedIdentityPubKey, _ := hex.DecodeString("0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213")
 	expectedId, _ := hex.DecodeString("01992fa72c3a7872897d10f6726910ad")
 	expectedSignature, _ := hex.DecodeString("8a95af0beb5f2c73090d72a7dab2cb870d26ac6aa91374ceccfa9717b2602d48a0c3c47c7fc4dee18b1aaab7b58503744d274b25846ab46f1f2473c88851ea62")
-	want := &DecodedSparkAddress{
+	expectedAddress := &DecodedSparkAddress{
 		Network: btcnetwork.Regtest,
 		SparkAddress: &pb.SparkAddress{
 			IdentityPublicKey: expectedIdentityPubKey,
@@ -260,7 +260,7 @@ func TestDecodeKnownSatsSparkInvoice(t *testing.T) {
 			Signature: expectedSignature,
 		},
 	}
-	require.EqualExportedValues(t, want, res)
+	require.EqualExportedValues(t, expectedAddress, res)
 }
 
 func TestDecodeAndEncodeKnownSparkAddressProducesSameAddress(t *testing.T) {

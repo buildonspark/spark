@@ -24,19 +24,19 @@ func TestFinalizeNodeSignaturesV2RejectsMalformedAndMissingNodeIDs(t *testing.T)
 	})
 
 	tests := []struct {
-		name     string
-		nodeID   string
-		wantCode codes.Code
+		name         string
+		nodeID       string
+		expectedCode codes.Code
 	}{
 		{
-			name:     "malformed_node_id",
-			nodeID:   "not-a-uuid",
-			wantCode: codes.InvalidArgument,
+			name:         "malformed_node_id",
+			nodeID:       "not-a-uuid",
+			expectedCode: codes.InvalidArgument,
 		},
 		{
-			name:     "missing_node_id",
-			nodeID:   uuid.New().String(),
-			wantCode: codes.NotFound,
+			name:         "missing_node_id",
+			nodeID:       uuid.New().String(),
+			expectedCode: codes.NotFound,
 		},
 	}
 
@@ -51,7 +51,7 @@ func TestFinalizeNodeSignaturesV2RejectsMalformedAndMissingNodeIDs(t *testing.T)
 				}},
 			})
 			require.Nil(t, resp)
-			require.Equal(t, test.wantCode, status.Code(err))
+			require.Equal(t, test.expectedCode, status.Code(err))
 		})
 	}
 }

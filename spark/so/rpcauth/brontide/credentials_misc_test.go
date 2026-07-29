@@ -80,11 +80,11 @@ func TestCredentialsCloneIsIndependent(t *testing.T) {
 // overrideTrackingCreds records OverrideServerName calls so we can verify the brontide wrapper forwards them to the inner credentials.
 type overrideTrackingCreds struct {
 	passthroughCreds
-	got string
+	serverName string
 }
 
 func (o *overrideTrackingCreds) OverrideServerName(name string) error {
-	o.got = name
+	o.serverName = name
 	return nil
 }
 
@@ -106,7 +106,7 @@ func TestOverrideServerNameDelegatesToInner(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NoError(t, c.OverrideServerName("example.test"))
-		assert.Equal(t, "example.test", inner.got)
+		assert.Equal(t, "example.test", inner.serverName)
 	})
 
 	t.Run("server", func(t *testing.T) {
@@ -118,7 +118,7 @@ func TestOverrideServerNameDelegatesToInner(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NoError(t, c.OverrideServerName("example.test"))
-		assert.Equal(t, "example.test", inner.got)
+		assert.Equal(t, "example.test", inner.serverName)
 	})
 }
 

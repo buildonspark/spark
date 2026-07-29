@@ -81,19 +81,19 @@ func TestEquals(t *testing.T) {
 	c := MustParseHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 
 	tests := []struct {
-		name string
-		lhs  Hash
-		rhs  Hash
-		want bool
+		name           string
+		lhs            Hash
+		rhs            Hash
+		expectedEquals bool
 	}{
-		{name: "same value", lhs: a, rhs: b, want: true},
-		{name: "different value", lhs: a, rhs: c, want: false},
-		{name: "non-zero vs zero", lhs: a, rhs: Hash{}, want: false},
-		{name: "zero vs zero", lhs: Hash{}, rhs: Hash{}, want: true},
+		{name: "same value", lhs: a, rhs: b, expectedEquals: true},
+		{name: "different value", lhs: a, rhs: c, expectedEquals: false},
+		{name: "non-zero vs zero", lhs: a, rhs: Hash{}, expectedEquals: false},
+		{name: "zero vs zero", lhs: Hash{}, rhs: Hash{}, expectedEquals: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, tc.lhs.Equals(tc.rhs))
+			assert.Equal(t, tc.expectedEquals, tc.lhs.Equals(tc.rhs))
 		})
 	}
 }
@@ -104,34 +104,34 @@ func TestScan(t *testing.T) {
 	valid := MustParseHex(validHex)
 
 	tests := []struct {
-		name string
-		src  any
-		want Hash
+		name         string
+		src          any
+		expectedHash Hash
 	}{
-		{name: "[]byte (Value round-trip)", src: rawValid, want: valid},
-		{name: "nil", src: nil, want: Hash{}},
-		{name: "nil *sql.Null[[]byte]", src: (*sql.Null[[]byte])(nil), want: Hash{}},
-		{name: "valid *sql.Null[[]byte]", src: &sql.Null[[]byte]{V: rawValid, Valid: true}, want: valid},
+		{name: "[]byte (Value round-trip)", src: rawValid, expectedHash: valid},
+		{name: "nil", src: nil, expectedHash: Hash{}},
+		{name: "nil *sql.Null[[]byte]", src: (*sql.Null[[]byte])(nil), expectedHash: Hash{}},
+		{name: "valid *sql.Null[[]byte]", src: &sql.Null[[]byte]{V: rawValid, Valid: true}, expectedHash: valid},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Start non-zero so that the nil/null cases exercise Scan's reset behaviour.
-			got := MustParseHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-			require.NoError(t, got.Scan(tc.src))
-			assert.Equal(t, tc.want, got)
+			hash := MustParseHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+			require.NoError(t, hash.Scan(tc.src))
+			assert.Equal(t, tc.expectedHash, hash)
 		})
 	}
 }
 
 func TestScan_RejectsWrongType(t *testing.T) {
-	var got Hash
-	require.Error(t, got.Scan("string-not-bytes"))
+	var hash Hash
+	require.Error(t, hash.Scan("string-not-bytes"))
 }
 
 func TestScan_RejectsWrongLength(t *testing.T) {
-	var got Hash
-	require.Error(t, got.Scan(make([]byte, 16)))
+	var hash Hash
+	require.Error(t, hash.Scan(make([]byte, 16)))
 }
 
 func TestMarshalJSON_ZeroIsNull(t *testing.T) {
@@ -146,22 +146,22 @@ func TestMarshalJSON_RoundTrip(t *testing.T) {
 	out, err := json.Marshal(h)
 	require.NoError(t, err)
 
-	var got Hash
-	require.NoError(t, json.Unmarshal(out, &got))
-	assert.Equal(t, h, got)
+	var decoded Hash
+	require.NoError(t, json.Unmarshal(out, &decoded))
+	assert.Equal(t, h, decoded)
 }
 
 func TestUnmarshalJSON_NullSetsZero(t *testing.T) {
-	got := MustParseHex(validHex)
-	require.NoError(t, json.Unmarshal([]byte("null"), &got))
-	assert.Zero(t, got)
+	hash := MustParseHex(validHex)
+	require.NoError(t, json.Unmarshal([]byte("null"), &hash))
+	assert.Zero(t, hash)
 }
 
 func TestUnmarshalJSON_RejectsWrongLength(t *testing.T) {
 	short, err := json.Marshal(make([]byte, 16)) // Valid JSON, wrong length.
 	require.NoError(t, err)
-	var got Hash
-	assert.Error(t, json.Unmarshal(short, &got))
+	var hash Hash
+	assert.Error(t, json.Unmarshal(short, &hash))
 }
 
 func TestHashIsValueComparable(t *testing.T) {

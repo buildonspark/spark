@@ -679,8 +679,8 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 		schematype.TransferStatusSenderKeyTweaked:           pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED,
 	}
 
-	containsStatus := func(statuses []pb.TransferStatus, want pb.TransferStatus) bool {
-		return slices.Contains(statuses, want)
+	containsStatus := func(statuses []pb.TransferStatus, expectedStatus pb.TransferStatus) bool {
+		return slices.Contains(statuses, expectedStatus)
 	}
 
 	uniqueStatuses := func(statuses []pb.TransferStatus) []pb.TransferStatus {
@@ -696,11 +696,11 @@ func TestEventRouter_TransferNotifications(t *testing.T) {
 		return unique
 	}
 
-	waitForStatus := func(name string, stream *mockStream, getStatuses func(*mockStream) []pb.TransferStatus, want pb.TransferStatus) {
+	waitForStatus := func(name string, stream *mockStream, getStatuses func(*mockStream) []pb.TransferStatus, expectedStatus pb.TransferStatus) {
 		t.Helper()
 		require.Eventuallyf(t, func() bool {
-			return containsStatus(getStatuses(stream), want)
-		}, 5*time.Second, 50*time.Millisecond, "expected %s status %v", name, want)
+			return containsStatus(getStatuses(stream), expectedStatus)
+		}, 5*time.Second, 50*time.Millisecond, "expected %s status %v", name, expectedStatus)
 	}
 
 	// Create main transfer and update through all statuses

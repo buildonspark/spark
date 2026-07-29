@@ -95,57 +95,57 @@ func TestNoOrphanPolicies(t *testing.T) {
 
 func TestLookupBehavior(t *testing.T) {
 	tests := []struct {
-		name             string
-		method           string
-		wantAuthMode     AuthMode
-		wantInternalOnly bool
+		name                 string
+		method               string
+		expectedAuthMode     AuthMode
+		expectedInternalOnly bool
 	}{
 		{
-			name:         "public unauthenticated query",
-			method:       pbspark.SparkService_QueryNodes_FullMethodName,
-			wantAuthMode: AuthUnauthenticated,
+			name:             "public unauthenticated query",
+			method:           pbspark.SparkService_QueryNodes_FullMethodName,
+			expectedAuthMode: AuthUnauthenticated,
 		},
 		{
-			name:         "session-required transfer",
-			method:       pbspark.SparkService_StartTransferV3_FullMethodName,
-			wantAuthMode: AuthSession,
+			name:             "session-required transfer",
+			method:           pbspark.SparkService_StartTransferV3_FullMethodName,
+			expectedAuthMode: AuthSession,
 		},
 		{
-			name:         "session-required multiparty transfer",
-			method:       pbspark.SparkService_StartTransferMpc_FullMethodName,
-			wantAuthMode: AuthSession,
+			name:             "session-required multiparty transfer",
+			method:           pbspark.SparkService_StartTransferMpc_FullMethodName,
+			expectedAuthMode: AuthSession,
 		},
 		{
-			name:             "internal-only SO-to-SO",
-			method:           pbinternal.SparkInternalService_FinalizeTransfer_FullMethodName,
-			wantAuthMode:     AuthUnauthenticated,
-			wantInternalOnly: true,
+			name:                 "internal-only SO-to-SO",
+			method:               pbinternal.SparkInternalService_FinalizeTransfer_FullMethodName,
+			expectedAuthMode:     AuthUnauthenticated,
+			expectedInternalOnly: true,
 		},
 		{
-			name:         "auth challenge",
-			method:       pbauthn.SparkAuthnService_GetChallenge_FullMethodName,
-			wantAuthMode: AuthUnauthenticated,
+			name:             "auth challenge",
+			method:           pbauthn.SparkAuthnService_GetChallenge_FullMethodName,
+			expectedAuthMode: AuthUnauthenticated,
 		},
 		{
-			name:         "health probe",
-			method:       "/grpc.health.v1.Health/Check",
-			wantAuthMode: AuthUnauthenticated,
+			name:             "health probe",
+			method:           "/grpc.health.v1.Health/Check",
+			expectedAuthMode: AuthUnauthenticated,
 		},
 		{
-			name:         "partner basic-auth query",
-			method:       pbpartner.SparkPartnerService_QuerySparkTransactionVolumes_FullMethodName,
-			wantAuthMode: AuthPartnerBasic,
+			name:             "partner basic-auth query",
+			method:           pbpartner.SparkPartnerService_QuerySparkTransactionVolumes_FullMethodName,
+			expectedAuthMode: AuthPartnerBasic,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			p, ok := LookUp(tc.method)
 			require.True(t, ok, "policy must exist for %s", tc.method)
-			assert.Equal(t, tc.wantAuthMode, p.AuthMode)
-			assert.Equal(t, tc.wantInternalOnly, p.InternalOnly)
+			assert.Equal(t, tc.expectedAuthMode, p.AuthMode)
+			assert.Equal(t, tc.expectedInternalOnly, p.InternalOnly)
 			// Only AuthSession requires a session token; AuthPartnerBasic is authenticated downstream.
-			assert.Equal(t, tc.wantAuthMode == AuthSession, IsAuthenticated(tc.method))
-			assert.Equal(t, tc.wantInternalOnly, IsInternalOnly(tc.method))
+			assert.Equal(t, tc.expectedAuthMode == AuthSession, IsAuthenticated(tc.method))
+			assert.Equal(t, tc.expectedInternalOnly, IsInternalOnly(tc.method))
 		})
 	}
 }

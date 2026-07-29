@@ -94,9 +94,9 @@ func TestStartTransferV3Request_RejectsMalformedManifest(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		mutate  func(*pb.TransferManifest)
-		wantErr bool
+		name        string
+		mutate      func(*pb.TransferManifest)
+		expectedErr bool
 	}{
 		{"well-formed", func(*pb.TransferManifest) {}, false},
 		{"zero version", func(m *pb.TransferManifest) { m.Version = 0 }, true},
@@ -121,7 +121,7 @@ func TestStartTransferV3Request_RejectsMalformedManifest(t *testing.T) {
 				TransferManifest: manifest,
 			}
 			err := req.Validate()
-			if !tc.wantErr {
+			if !tc.expectedErr {
 				require.NoError(t, err)
 				return
 			}
@@ -187,10 +187,10 @@ func TestStartTransferV3_RejectsOnlyAStraySignature(t *testing.T) {
 	// start_transfer_v3 no longer refuses a manifest — it binds one when supplied and demands
 	// nothing. The only manifest shape it rejects outright is a signature with nothing to sign.
 	tests := []struct {
-		name     string
-		req      *pb.StartTransferV3Request
-		wantCode codes.Code
-		wantMsg  string
+		name         string
+		req          *pb.StartTransferV3Request
+		expectedCode codes.Code
+		expectedMsg  string
 	}{
 		{"neither", request(false, nil, 1), codes.OK, ""},
 		{"manifest only", request(true, nil, 1), codes.OK, ""},
@@ -202,9 +202,9 @@ func TestStartTransferV3_RejectsOnlyAStraySignature(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := handler.StartTransferV3(t.Context(), tc.req)
 			require.Error(t, err, "every case fails eventually; only the reason differs")
-			if tc.wantCode != codes.OK {
-				assert.Equal(t, tc.wantCode, status.Code(err))
-				assert.Contains(t, err.Error(), tc.wantMsg)
+			if tc.expectedCode != codes.OK {
+				assert.Equal(t, tc.expectedCode, status.Code(err))
+				assert.Contains(t, err.Error(), tc.expectedMsg)
 				return
 			}
 			// Passes the gate and fails further in, where real work begins.
@@ -242,9 +242,9 @@ func TestInitiatePreimageSwapV4Request_ValidatesInput(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		req     *pb.InitiatePreimageSwapV4Request
-		wantErr bool
+		name        string
+		req         *pb.InitiatePreimageSwapV4Request
+		expectedErr bool
 	}{
 		{
 			"valid",
@@ -284,7 +284,7 @@ func TestInitiatePreimageSwapV4Request_ValidatesInput(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.wantErr {
+			if tc.expectedErr {
 				require.Error(t, tc.req.Validate())
 			} else {
 				require.NoError(t, tc.req.Validate())

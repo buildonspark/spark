@@ -58,54 +58,54 @@ func TestErrorInterceptor_NoError_ReturnsValue(t *testing.T) {
 		return okVal, nil
 	}
 
-	got, err := ErrorInterceptor(true)(t.Context(), nil, serverInfo, okHandler)
+	resp, err := ErrorInterceptor(true)(t.Context(), nil, serverInfo, okHandler)
 
 	require.NoError(t, err)
-	assert.Equal(t, okVal, got)
+	assert.Equal(t, okVal, resp)
 }
 
 func TestInternalErrorDetailMasking(t *testing.T) {
 	tests := []struct {
-		name           string
-		detailedErrors bool
-		fullMethod     string
-		wantDetails    bool
-		handler        func(_ context.Context, _ any) (any, error)
-		expectedCode   codes.Code
-		expectedReason string
+		name            string
+		detailedErrors  bool
+		fullMethod      string
+		expectedDetails bool
+		handler         func(_ context.Context, _ any) (any, error)
+		expectedCode    codes.Code
+		expectedReason  string
 	}{
 		{
-			name:           "mask details if detailedErrors disabled",
-			detailedErrors: false,
-			fullMethod:     "/spark.SparkService/SomeMethod",
-			wantDetails:    false,
-			handler:        errHandler,
-			expectedCode:   codes.Internal,
-			expectedReason: "",
+			name:            "mask details if detailedErrors disabled",
+			detailedErrors:  false,
+			fullMethod:      "/spark.SparkService/SomeMethod",
+			expectedDetails: false,
+			handler:         errHandler,
+			expectedCode:    codes.Internal,
+			expectedReason:  "",
 		},
 		{
-			name:           "show details if detailedErrors enabled",
-			detailedErrors: true,
-			fullMethod:     "/spark.SparkService/SomeMethod",
-			wantDetails:    true,
-			handler:        errHandler,
-			expectedCode:   codes.Internal,
-			expectedReason: ReasonInternalUnhandled,
+			name:            "show details if detailedErrors enabled",
+			detailedErrors:  true,
+			fullMethod:      "/spark.SparkService/SomeMethod",
+			expectedDetails: true,
+			handler:         errHandler,
+			expectedCode:    codes.Internal,
+			expectedReason:  ReasonInternalUnhandled,
 		},
 		{
-			name:           "show details for internal service",
-			detailedErrors: true,
-			fullMethod:     "/spark_internal.SparkInternalService/SomeMethod",
-			wantDetails:    true,
-			handler:        errHandler,
-			expectedCode:   codes.Internal,
-			expectedReason: ReasonInternalUnhandled,
+			name:            "show details for internal service",
+			detailedErrors:  true,
+			fullMethod:      "/spark_internal.SparkInternalService/SomeMethod",
+			expectedDetails: true,
+			handler:         errHandler,
+			expectedCode:    codes.Internal,
+			expectedReason:  ReasonInternalUnhandled,
 		},
 		{
-			name:           "show details for failed precondition error",
-			detailedErrors: false,
-			fullMethod:     "/spark_internal.SparkInternalService/SomeMethod",
-			wantDetails:    false,
+			name:            "show details for failed precondition error",
+			detailedErrors:  false,
+			fullMethod:      "/spark_internal.SparkInternalService/SomeMethod",
+			expectedDetails: false,
 			handler: func(_ context.Context, _ any) (any, error) {
 				return nil, FailedPreconditionBadSignature(fmt.Errorf("bad signature"))
 			},
@@ -113,13 +113,13 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			expectedReason: ReasonFailedPreconditionBadSignature,
 		},
 		{
-			name:           "show details for internal service even if detailedErrors disabled",
-			detailedErrors: false,
-			fullMethod:     "/spark_internal.SparkInternalService/SomeMethod",
-			wantDetails:    true,
-			handler:        errHandler,
-			expectedCode:   codes.Internal,
-			expectedReason: ReasonInternalUnhandled,
+			name:            "show details for internal service even if detailedErrors disabled",
+			detailedErrors:  false,
+			fullMethod:      "/spark_internal.SparkInternalService/SomeMethod",
+			expectedDetails: true,
+			handler:         errHandler,
+			expectedCode:    codes.Internal,
+			expectedReason:  ReasonInternalUnhandled,
 		},
 	}
 
@@ -130,7 +130,7 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			require.Error(t, err)
 			st := status.Convert(err)
 			if tt.expectedCode == codes.Internal {
-				if tt.wantDetails {
+				if tt.expectedDetails {
 					require.ErrorContains(t, err, msg)
 					assert.GreaterOrEqual(t, len(st.Details()), 1)
 				} else {
@@ -180,28 +180,28 @@ func TestErrorInterceptor_ReactNativeMasking(t *testing.T) {
 
 func TestAsGRPCError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         error
-		wantErr     bool
-		wantErrCode codes.Code
+		name            string
+		err             error
+		expectedErr     bool
+		expectedErrCode codes.Code
 	}{
 		{
-			name:        "no error returns response and nil",
-			err:         nil,
-			wantErr:     false,
-			wantErrCode: codes.OK,
+			name:            "no error returns response and nil",
+			err:             nil,
+			expectedErr:     false,
+			expectedErrCode: codes.OK,
 		},
 		{
-			name:        "with error returns response and wrapped error",
-			err:         fmt.Errorf("test error"),
-			wantErr:     true,
-			wantErrCode: codes.Internal,
+			name:            "with error returns response and wrapped error",
+			err:             fmt.Errorf("test error"),
+			expectedErr:     true,
+			expectedErrCode: codes.Internal,
 		},
 		{
-			name:        "with custom error returns response and custom error",
-			err:         &fakeError{message: "custom error", grpcErr: status.Error(codes.InvalidArgument, "custom")},
-			wantErr:     true,
-			wantErrCode: codes.InvalidArgument,
+			name:            "with custom error returns response and custom error",
+			err:             &fakeError{message: "custom error", grpcErr: status.Error(codes.InvalidArgument, "custom")},
+			expectedErr:     true,
+			expectedErrCode: codes.InvalidArgument,
 		},
 	}
 
@@ -209,9 +209,9 @@ func TestAsGRPCError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := asGRPCError(tt.err)
 
-			if tt.wantErr {
+			if tt.expectedErr {
 				require.Error(t, err)
-				assert.Equal(t, tt.wantErrCode, status.Convert(err).Code())
+				assert.Equal(t, tt.expectedErrCode, status.Convert(err).Code())
 			} else {
 				require.NoError(t, err)
 			}
@@ -234,70 +234,70 @@ func TestToGRPCError_NilError_ReturnsNil(t *testing.T) {
 
 func TestToGRPCError(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         error
-		wantErrCode codes.Code
-		wantMessage string
+		name            string
+		err             error
+		expectedErrCode codes.Code
+		expectedMessage string
 	}{
 		{
-			name:        "regular error returns internal error",
-			err:         fmt.Errorf("test error"),
-			wantErrCode: codes.Internal,
-			wantMessage: "test error",
+			name:            "regular error returns internal error",
+			err:             fmt.Errorf("test error"),
+			expectedErrCode: codes.Internal,
+			expectedMessage: "test error",
 		},
 		{
-			name:        "custom error returns its gRPC error",
-			err:         &fakeError{message: "custom", grpcErr: status.Error(codes.InvalidArgument, "custom grpc")},
-			wantErrCode: codes.InvalidArgument,
-			wantMessage: "custom grpc",
+			name:            "custom error returns its gRPC error",
+			err:             &fakeError{message: "custom", grpcErr: status.Error(codes.InvalidArgument, "custom grpc")},
+			expectedErrCode: codes.InvalidArgument,
+			expectedMessage: "custom grpc",
 		},
 		{
-			name:        "existing grpcError returns same error",
-			err:         InvalidArgumentMalformedField(fmt.Errorf("not found")),
-			wantErrCode: codes.InvalidArgument,
-			wantMessage: "not found",
+			name:            "existing grpcError returns same error",
+			err:             InvalidArgumentMalformedField(fmt.Errorf("not found")),
+			expectedErrCode: codes.InvalidArgument,
+			expectedMessage: "not found",
 		},
 		{
-			name:        "not found error returns not found code",
-			err:         NotFoundMissingEntity(fmt.Errorf("resource not found")),
-			wantErrCode: codes.NotFound,
-			wantMessage: "resource not found",
+			name:            "not found error returns not found code",
+			err:             NotFoundMissingEntity(fmt.Errorf("resource not found")),
+			expectedErrCode: codes.NotFound,
+			expectedMessage: "resource not found",
 		},
 		{
-			name:        "failed precondition error returns failed precondition code",
-			err:         FailedPreconditionInvalidState(fmt.Errorf("precondition failed")),
-			wantErrCode: codes.FailedPrecondition,
-			wantMessage: "precondition failed",
+			name:            "failed precondition error returns failed precondition code",
+			err:             FailedPreconditionInvalidState(fmt.Errorf("precondition failed")),
+			expectedErrCode: codes.FailedPrecondition,
+			expectedMessage: "precondition failed",
 		},
 		{
-			name:        "unavailable error returns unavailable code",
-			err:         UnimplementedMethodDisabled(fmt.Errorf("service unavailable")),
-			wantErrCode: codes.Unimplemented,
-			wantMessage: "service unavailable",
+			name:            "unavailable error returns unavailable code",
+			err:             UnimplementedMethodDisabled(fmt.Errorf("service unavailable")),
+			expectedErrCode: codes.Unimplemented,
+			expectedMessage: "service unavailable",
 		},
 		{
-			name:        "context.Canceled returns canceled code",
-			err:         context.Canceled,
-			wantErrCode: codes.Canceled,
-			wantMessage: "context canceled",
+			name:            "context.Canceled returns canceled code",
+			err:             context.Canceled,
+			expectedErrCode: codes.Canceled,
+			expectedMessage: "context canceled",
 		},
 		{
-			name:        "wrapped context.Canceled returns canceled code",
-			err:         fmt.Errorf("operation failed: %w", context.Canceled),
-			wantErrCode: codes.Canceled,
-			wantMessage: "operation failed: context canceled",
+			name:            "wrapped context.Canceled returns canceled code",
+			err:             fmt.Errorf("operation failed: %w", context.Canceled),
+			expectedErrCode: codes.Canceled,
+			expectedMessage: "operation failed: context canceled",
 		},
 		{
-			name:        "context.DeadlineExceeded returns deadline exceeded code",
-			err:         context.DeadlineExceeded,
-			wantErrCode: codes.DeadlineExceeded,
-			wantMessage: "context deadline exceeded",
+			name:            "context.DeadlineExceeded returns deadline exceeded code",
+			err:             context.DeadlineExceeded,
+			expectedErrCode: codes.DeadlineExceeded,
+			expectedMessage: "context deadline exceeded",
 		},
 		{
-			name:        "wrapped context.DeadlineExceeded returns deadline exceeded code",
-			err:         fmt.Errorf("timeout during request: %w", context.DeadlineExceeded),
-			wantErrCode: codes.DeadlineExceeded,
-			wantMessage: "timeout during request: context deadline exceeded",
+			name:            "wrapped context.DeadlineExceeded returns deadline exceeded code",
+			err:             fmt.Errorf("timeout during request: %w", context.DeadlineExceeded),
+			expectedErrCode: codes.DeadlineExceeded,
+			expectedMessage: "timeout during request: context deadline exceeded",
 		},
 	}
 
@@ -307,8 +307,8 @@ func TestToGRPCError(t *testing.T) {
 
 			require.Error(t, err)
 			st := status.Convert(err)
-			assert.Equal(t, tt.wantErrCode, st.Code())
-			assert.Equal(t, tt.wantMessage, st.Message())
+			assert.Equal(t, tt.expectedErrCode, st.Code())
+			assert.Equal(t, tt.expectedMessage, st.Message())
 		})
 	}
 }
@@ -434,14 +434,14 @@ func TestWrapGRPC_CodeAndReasonOverride(t *testing.T) {
 func TestGRPCStatus_AttachesErrorInfo(t *testing.T) {
 	err := newGRPCError(codes.Unavailable, errors.New("db down"), ReasonResourceExhaustedConcurrencyLimitExceeded)
 	st := status.Convert(err)
-	var gotReason string
+	var actualReason string
 	for _, d := range st.Details() {
 		if ei, ok := d.(*errdetails.ErrorInfo); ok {
-			gotReason = ei.GetReason()
+			actualReason = ei.GetReason()
 			break
 		}
 	}
-	assert.Equal(t, ReasonResourceExhaustedConcurrencyLimitExceeded, gotReason)
+	assert.Equal(t, ReasonResourceExhaustedConcurrencyLimitExceeded, actualReason)
 }
 
 func TestInvalidArgumentMalformedField(t *testing.T) {
@@ -485,14 +485,14 @@ func TestReasonConstructor_ResourceExhaustedRateLimitExceeded(t *testing.T) {
 	st := status.Convert(err)
 	assert.Equal(t, codes.ResourceExhausted, st.Code())
 	assert.Equal(t, "rate limit exceeded", st.Message())
-	var gotReason string
+	var actualReason string
 	for _, d := range st.Details() {
 		if ei, ok := d.(*errdetails.ErrorInfo); ok {
-			gotReason = ei.GetReason()
+			actualReason = ei.GetReason()
 			break
 		}
 	}
-	assert.Equal(t, ReasonResourceExhaustedRateLimitExceeded, gotReason)
+	assert.Equal(t, ReasonResourceExhaustedRateLimitExceeded, actualReason)
 }
 
 func TestWrapGRPCErrorWithReasonPrefix(t *testing.T) {

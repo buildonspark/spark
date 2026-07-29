@@ -422,29 +422,29 @@ func TestStaticDepositUtxoSwapFlowHandler_Prepare_RejectsMissingFields(t *testin
 	transfer := &pbspark.StartTransferRequest{TransferPackage: &pbspark.TransferPackage{}}
 
 	cases := []struct {
-		name    string
-		req     *pbinternal.InitiateStaticDepositUtxoSwapRequest
-		wantErr string
+		name        string
+		req         *pbinternal.InitiateStaticDepositUtxoSwapRequest
+		expectedErr string
 	}{
 		{
-			name:    "missing utxo",
-			req:     &pbinternal.InitiateStaticDepositUtxoSwapRequest{Transfer: transfer},
-			wantErr: "on_chain_utxo is required",
+			name:        "missing utxo",
+			req:         &pbinternal.InitiateStaticDepositUtxoSwapRequest{Transfer: transfer},
+			expectedErr: "on_chain_utxo is required",
 		},
 		{
-			name:    "missing transfer",
-			req:     &pbinternal.InitiateStaticDepositUtxoSwapRequest{OnChainUtxo: utxo},
-			wantErr: "transfer is required",
+			name:        "missing transfer",
+			req:         &pbinternal.InitiateStaticDepositUtxoSwapRequest{OnChainUtxo: utxo},
+			expectedErr: "transfer is required",
 		},
 		{
-			name:    "missing transfer package",
-			req:     &pbinternal.InitiateStaticDepositUtxoSwapRequest{OnChainUtxo: utxo, Transfer: &pbspark.StartTransferRequest{}},
-			wantErr: "transfer_package is required",
+			name:        "missing transfer package",
+			req:         &pbinternal.InitiateStaticDepositUtxoSwapRequest{OnChainUtxo: utxo, Transfer: &pbspark.StartTransferRequest{}},
+			expectedErr: "transfer_package is required",
 		},
 		{
-			name:    "missing spend tx signing job",
-			req:     &pbinternal.InitiateStaticDepositUtxoSwapRequest{OnChainUtxo: utxo, Transfer: transfer},
-			wantErr: "spend_tx_signing_job is required",
+			name:        "missing spend tx signing job",
+			req:         &pbinternal.InitiateStaticDepositUtxoSwapRequest{OnChainUtxo: utxo, Transfer: transfer},
+			expectedErr: "spend_tx_signing_job is required",
 		},
 		{
 			name: "missing spend tx nonce commitment",
@@ -453,13 +453,13 @@ func TestStaticDepositUtxoSwapFlowHandler_Prepare_RejectsMissingFields(t *testin
 				Transfer:          transfer,
 				SpendTxSigningJob: &pbspark.SigningJob{RawTx: []byte{0x01}},
 			},
-			wantErr: "signing_nonce_commitment is required",
+			expectedErr: "signing_nonce_commitment is required",
 		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := handler.Prepare(t.Context(), &pbinternal.StaticDepositUtxoSwapPrepareRequest{OriginalRequest: tt.req})
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

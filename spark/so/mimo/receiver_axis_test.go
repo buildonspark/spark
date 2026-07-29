@@ -194,19 +194,19 @@ func TestReceiverArmFilters_Empty(t *testing.T) {
 }
 
 func TestReceiverStatusStrings_Dedupes(t *testing.T) {
-	got := mimo.ReceiverStatusStrings([]st.TransferReceiverStatus{
+	statuses := mimo.ReceiverStatusStrings([]st.TransferReceiverStatus{
 		st.TransferReceiverStatusCancelled,
 		st.TransferReceiverStatusCancelled,
 		st.TransferReceiverStatusInitiated,
 	})
-	assert.ElementsMatch(t, []string{"CANCELLED", "INITIATED"}, got)
+	assert.ElementsMatch(t, []string{"CANCELLED", "INITIATED"}, statuses)
 }
 
 func TestTransferStatusStrings_Dedupes(t *testing.T) {
-	got := mimo.TransferStatusStrings([]st.TransferStatus{
+	statuses := mimo.TransferStatusStrings([]st.TransferStatus{
 		st.TransferStatusSenderInitiated,
 		st.TransferStatusSenderInitiated,
 		st.TransferStatusSenderKeyTweaked,
 	})
-	assert.ElementsMatch(t, []string{"SENDER_INITIATED", "SENDER_KEY_TWEAKED"}, got)
+	assert.ElementsMatch(t, []string{"SENDER_INITIATED", "SENDER_KEY_TWEAKED"}, statuses)
 }

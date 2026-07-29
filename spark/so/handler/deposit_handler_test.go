@@ -459,9 +459,9 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 	handler := NewDepositHandler(cfg)
 
 	tests := []struct {
-		name    string
-		call    func() error
-		wantErr string
+		name        string
+		call        func() error
+		expectedErr string
 	}{
 		{
 			name: "GenerateDepositAddress nil request",
@@ -469,7 +469,7 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				_, err := handler.GenerateDepositAddress(ctx, cfg, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "GenerateDepositAddressInternal nil request",
@@ -477,7 +477,7 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				_, err := handler.GenerateDepositAddressInternal(ctx, cfg, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "GenerateStaticDepositAddress nil request",
@@ -485,7 +485,7 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				_, err := handler.GenerateStaticDepositAddress(ctx, cfg, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "StartDepositTreeCreation nil request",
@@ -493,7 +493,7 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				_, err := handler.StartDepositTreeCreation(ctx, cfg, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "StartDepositTreeCreation nil on-chain UTXO",
@@ -501,7 +501,7 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				_, err := handler.StartDepositTreeCreation(ctx, cfg, &pb.StartDepositTreeCreationRequest{})
 				return err
 			},
-			wantErr: "on_chain_utxo is required",
+			expectedErr: "on_chain_utxo is required",
 		},
 		{
 			name: "GetUtxosForAddress nil request",
@@ -509,7 +509,7 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				_, err := handler.GetUtxosForAddress(ctx, nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "GetUtxosForAddress offset overflow",
@@ -519,13 +519,13 @@ func TestDepositHandlersRejectMalformedDirectRequests(t *testing.T) {
 				})
 				return err
 			},
-			wantErr: "offset too large",
+			expectedErr: "offset too large",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorContains(t, tt.call(), tt.wantErr)
+			require.ErrorContains(t, tt.call(), tt.expectedErr)
 		})
 	}
 }
@@ -1934,13 +1934,13 @@ func TestGetUtxosForIdentity(t *testing.T) {
 		allResults := append(page1.Utxos, page2.GetUtxos()...)
 		require.Len(t, allResults, 4)
 
-		gotTxids := make([]string, 0, len(allResults))
-		gotAddresses := make(map[string]bool, len(allResults))
+		actualTxids := make([]string, 0, len(allResults))
+		actualAddresses := make(map[string]bool, len(allResults))
 		for _, utxo := range allResults {
 			require.NotNil(t, utxo.GetUtxo())
 			require.True(t, utxo.GetIsConfirmed())
-			gotTxids = append(gotTxids, string(utxo.GetUtxo().GetTxid()))
-			gotAddresses[utxo.GetAddress()] = true
+			actualTxids = append(actualTxids, string(utxo.GetUtxo().GetTxid()))
+			actualAddresses[utxo.GetAddress()] = true
 		}
 
 		require.Equal(t, []string{
@@ -1948,13 +1948,13 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			string(env.cancelledSwapUtxo.Txid),
 			string(env.claimedConfirmedUtxo.Txid),
 			string(env.confirmedUtxo.Txid),
-		}, gotTxids)
-		require.NotContains(t, gotAddresses, env.nonStaticAddress)
-		require.NotContains(t, gotAddresses, env.otherIdentityAddress)
-		require.NotContains(t, gotTxids, string(env.pendingUtxo.Txid))
-		require.NotContains(t, gotTxids, string(env.pendingClaimedUtxo.Txid))
-		require.NotContains(t, gotTxids, string(env.oneConfUtxo.Txid))
-		require.NotContains(t, gotTxids, string(env.otherIdentityUtxo.Txid))
+		}, actualTxids)
+		require.NotContains(t, actualAddresses, env.nonStaticAddress)
+		require.NotContains(t, actualAddresses, env.otherIdentityAddress)
+		require.NotContains(t, actualTxids, string(env.pendingUtxo.Txid))
+		require.NotContains(t, actualTxids, string(env.pendingClaimedUtxo.Txid))
+		require.NotContains(t, actualTxids, string(env.oneConfUtxo.Txid))
+		require.NotContains(t, actualTxids, string(env.otherIdentityUtxo.Txid))
 	})
 
 	t.Run("include_pending returns mixed utxos and marks confirmed status", func(t *testing.T) {
@@ -1970,21 +1970,21 @@ func TestGetUtxosForIdentity(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, response.GetUtxos(), 7)
 
-		type gotUtxo struct {
+		type utxoSummary struct {
 			txid        string
 			isConfirmed bool
 		}
 
-		got := make([]gotUtxo, 0, len(response.GetUtxos()))
+		utxos := make([]utxoSummary, 0, len(response.GetUtxos()))
 		for _, utxo := range response.GetUtxos() {
 			require.NotNil(t, utxo.GetUtxo())
-			got = append(got, gotUtxo{
+			utxos = append(utxos, utxoSummary{
 				txid:        string(utxo.GetUtxo().GetTxid()),
 				isConfirmed: utxo.GetIsConfirmed(),
 			})
 		}
 
-		require.Equal(t, []gotUtxo{
+		require.Equal(t, []utxoSummary{
 			{txid: string(env.oneConfUtxo.Txid), isConfirmed: false},
 			{txid: string(env.pendingClaimedUtxo.Txid), isConfirmed: false},
 			{txid: string(env.pendingUtxo.Txid), isConfirmed: false},
@@ -1992,7 +1992,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			{txid: string(env.cancelledSwapUtxo.Txid), isConfirmed: true},
 			{txid: string(env.claimedConfirmedUtxo.Txid), isConfirmed: true},
 			{txid: string(env.confirmedUtxo.Txid), isConfirmed: true},
-		}, got)
+		}, utxos)
 	})
 
 	t.Run("include_pending paginates deterministically across mixed results", func(t *testing.T) {
@@ -2006,7 +2006,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			},
 		}
 
-		var got []string
+		var txids []string
 		seen := make(map[string]bool)
 		pageNumber := 0
 		for {
@@ -2025,7 +2025,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 				txid := string(utxo.GetUtxo().GetTxid())
 				require.False(t, seen[txid], "duplicate txid %s returned across pages", txid)
 				seen[txid] = true
-				got = append(got, txid)
+				txids = append(txids, txid)
 			}
 
 			if !response.GetPage().GetHasNextPage() {
@@ -2042,7 +2042,7 @@ func TestGetUtxosForIdentity(t *testing.T) {
 			string(env.cancelledSwapUtxo.Txid),
 			string(env.claimedConfirmedUtxo.Txid),
 			string(env.confirmedUtxo.Txid),
-		}, got)
+		}, txids)
 	})
 
 	t.Run("exclude_claimed applies to both pending and confirmed utxos", func(t *testing.T) {
@@ -2376,22 +2376,22 @@ func TestFindPendingDepositRoot(t *testing.T) {
 		root2 := mkPendingRoot(tree2)
 		require.NotEqual(t, root1.ID, root2.ID)
 
-		got1, err := findPendingDepositRoot(ctx, client, tree1.ID, ownerIdentity, ownerSigning, value, vout)
+		foundRoot1, err := findPendingDepositRoot(ctx, client, tree1.ID, ownerIdentity, ownerSigning, value, vout)
 		require.NoError(t, err)
-		require.NotNil(t, got1)
-		assert.Equal(t, root1.ID, got1.ID)
+		require.NotNil(t, foundRoot1)
+		assert.Equal(t, root1.ID, foundRoot1.ID)
 
-		got2, err := findPendingDepositRoot(ctx, client, tree2.ID, ownerIdentity, ownerSigning, value, vout)
+		foundRoot2, err := findPendingDepositRoot(ctx, client, tree2.ID, ownerIdentity, ownerSigning, value, vout)
 		require.NoError(t, err)
-		require.NotNil(t, got2)
-		assert.Equal(t, root2.ID, got2.ID)
-		assert.NotEqual(t, root1.ID, got2.ID, "lookup for tree2 must not return tree1's root")
+		require.NotNil(t, foundRoot2)
+		assert.Equal(t, root2.ID, foundRoot2.ID)
+		assert.NotEqual(t, root1.ID, foundRoot2.ID, "lookup for tree2 must not return tree1's root")
 	})
 
 	t.Run("tree with no root returns nil", func(t *testing.T) {
 		noRoot := mkTree() // no pending root attached
-		got, err := findPendingDepositRoot(ctx, client, noRoot.ID, ownerIdentity, ownerSigning, value, vout)
+		root, err := findPendingDepositRoot(ctx, client, noRoot.ID, ownerIdentity, ownerSigning, value, vout)
 		require.NoError(t, err)
-		assert.Nil(t, got)
+		assert.Nil(t, root)
 	})
 }

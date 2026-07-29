@@ -121,13 +121,13 @@ func seedFenceParticipantRow(t *testing.T, ctx context.Context, transferID strin
 	return flowID
 }
 
-func assertFenceRowStatus(t *testing.T, ctx context.Context, flowID uuid.UUID, want st.FlowExecutionStatus) {
+func assertFenceRowStatus(t *testing.T, ctx context.Context, flowID uuid.UUID, expectedStatus st.FlowExecutionStatus) {
 	t.Helper()
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 	row, err := dbClient.FlowExecution.Get(ctx, flowID)
 	require.NoError(t, err)
-	assert.Equal(t, want, row.Status)
+	assert.Equal(t, expectedStatus, row.Status)
 }
 
 // TestConsensusDecisionFence_RollbackPayloadBinding proves the

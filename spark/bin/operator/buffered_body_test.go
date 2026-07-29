@@ -35,27 +35,27 @@ func TestBufferedBodyReadsFullContentAcrossSmallReads(t *testing.T) {
 	body := NewBufferedBody(newBody(content))
 
 	// Read one byte at a time to exercise the Position bookkeeping.
-	var got []byte
+	var readBytes []byte
 	buf := make([]byte, 1)
 	for {
 		n, err := body.Read(buf)
-		got = append(got, buf[:n]...)
+		readBytes = append(readBytes, buf[:n]...)
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, content, string(got))
+	assert.Equal(t, content, string(readBytes))
 }
 
 func TestBufferedBodyReadAllReturnsEntireBody(t *testing.T) {
 	const content = "the entire body in one shot"
 	body := NewBufferedBody(newBody(content))
 
-	got, err := io.ReadAll(body)
+	readBytes, err := io.ReadAll(body)
 	require.NoError(t, err)
-	assert.Equal(t, content, string(got))
+	assert.Equal(t, content, string(readBytes))
 }
 
 func TestBufferedBodyEmptyBodyReturnsEOF(t *testing.T) {
@@ -86,9 +86,9 @@ func TestBufferedBodyWithMaxBytesReaderUnderLimitSucceeds(t *testing.T) {
 	content := bytes.Repeat([]byte("a"), limit)
 	body := NewBufferedBody(http.MaxBytesReader(nil, io.NopCloser(bytes.NewReader(content)), limit))
 
-	got, err := io.ReadAll(body)
+	readBytes, err := io.ReadAll(body)
 	require.NoError(t, err, "reading a body within the limit should succeed")
-	assert.Len(t, got, limit)
+	assert.Len(t, readBytes, limit)
 }
 
 // A body exceeding the limit must surface an error rather than buffering unbounded memory, and must not hand back the prefix.
@@ -97,9 +97,9 @@ func TestBufferedBodyWithMaxBytesReaderOverLimitErrors(t *testing.T) {
 	content := bytes.Repeat([]byte("a"), limit+1)
 	body := NewBufferedBody(http.MaxBytesReader(nil, io.NopCloser(bytes.NewReader(content)), limit))
 
-	got, err := io.ReadAll(body)
+	readBytes, err := io.ReadAll(body)
 	require.Error(t, err, "expected an error reading a body that exceeds the MaxBytesReader limit")
-	assert.Empty(t, got, "a failed read must not yield any of the truncated prefix")
+	assert.Empty(t, readBytes, "a failed read must not yield any of the truncated prefix")
 }
 
 // A read error must be sticky.

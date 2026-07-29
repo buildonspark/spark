@@ -335,30 +335,30 @@ func TestReserveInstantFlowHandler_Prepare_RejectsMissingFields(t *testing.T) {
 	utxo := &pbspark.UTXO{Txid: make([]byte, 32), Vout: 0, Network: pbspark.Network_REGTEST}
 
 	cases := []struct {
-		name    string
-		req     *pbinternal.ReserveInstantStaticDepositUtxoSwapRequest
-		wantErr string
+		name        string
+		req         *pbinternal.ReserveInstantStaticDepositUtxoSwapRequest
+		expectedErr string
 	}{
 		{
-			name:    "missing utxo",
-			req:     &pbinternal.ReserveInstantStaticDepositUtxoSwapRequest{Transfer: &pbspark.StartTransferRequest{TransferPackage: &pbspark.TransferPackage{}}},
-			wantErr: "on_chain_utxo is required",
+			name:        "missing utxo",
+			req:         &pbinternal.ReserveInstantStaticDepositUtxoSwapRequest{Transfer: &pbspark.StartTransferRequest{TransferPackage: &pbspark.TransferPackage{}}},
+			expectedErr: "on_chain_utxo is required",
 		},
 		{
-			name:    "missing transfer",
-			req:     &pbinternal.ReserveInstantStaticDepositUtxoSwapRequest{OnChainUtxo: utxo},
-			wantErr: "transfer is required",
+			name:        "missing transfer",
+			req:         &pbinternal.ReserveInstantStaticDepositUtxoSwapRequest{OnChainUtxo: utxo},
+			expectedErr: "transfer is required",
 		},
 		{
-			name:    "missing transfer package",
-			req:     &pbinternal.ReserveInstantStaticDepositUtxoSwapRequest{OnChainUtxo: utxo, Transfer: &pbspark.StartTransferRequest{}},
-			wantErr: "transfer_package is required",
+			name:        "missing transfer package",
+			req:         &pbinternal.ReserveInstantStaticDepositUtxoSwapRequest{OnChainUtxo: utxo, Transfer: &pbspark.StartTransferRequest{}},
+			expectedErr: "transfer_package is required",
 		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := handler.Prepare(t.Context(), &pbinternal.ReserveInstantStaticDepositUtxoSwapPrepareRequest{OriginalRequest: tt.req})
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 		})
 	}
 }

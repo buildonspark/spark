@@ -15,33 +15,33 @@ func TestQueryTokenMetadataRejectsFilterResourceExhaustionBeforeDB(t *testing.T)
 	handler := NewQueryTokenMetadataHandler(nil)
 
 	tests := []struct {
-		name string
-		req  *tokenpb.QueryTokenMetadataRequest
-		want string
+		name            string
+		req             *tokenpb.QueryTokenMetadataRequest
+		expectedErrText string
 	}{
 		{
 			name: "token identifiers over limit",
 			req: &tokenpb.QueryTokenMetadataRequest{
 				TokenIdentifiers: make([][]byte, MaxTokenMetadataFilterValues+1),
 			},
-			want: "too many token identifiers in filter",
+			expectedErrText: "too many token identifiers in filter",
 		},
 		{
 			name: "issuer public keys over limit",
 			req: &tokenpb.QueryTokenMetadataRequest{
 				IssuerPublicKeys: make([][]byte, MaxTokenMetadataFilterValues+1),
 			},
-			want: "too many issuer public keys in filter",
+			expectedErrText: "too many issuer public keys in filter",
 		},
 		{
-			name: "missing filters",
-			req:  &tokenpb.QueryTokenMetadataRequest{},
-			want: "must provide at least one token identifier or issuer public key",
+			name:            "missing filters",
+			req:             &tokenpb.QueryTokenMetadataRequest{},
+			expectedErrText: "must provide at least one token identifier or issuer public key",
 		},
 		{
-			name: "nil request",
-			req:  nil,
-			want: "request is required",
+			name:            "nil request",
+			req:             nil,
+			expectedErrText: "request is required",
 		},
 	}
 
@@ -52,7 +52,7 @@ func TestQueryTokenMetadataRejectsFilterResourceExhaustionBeforeDB(t *testing.T)
 			require.Nil(t, resp)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.ErrorContains(t, err, test.want)
+			require.ErrorContains(t, err, test.expectedErrText)
 		})
 	}
 }

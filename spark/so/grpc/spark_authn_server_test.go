@@ -259,37 +259,37 @@ func TestVerifyChallenge_TamperedToken(t *testing.T) {
 	require.NoError(t, proto.Unmarshal(protectedBytes, protected))
 
 	tests := []struct {
-		name        string
-		tamper      func(protected *pbauthninternal.ProtectedSession)
-		wantErrType error
+		name            string
+		tamper          func(protected *pbauthninternal.ProtectedSession)
+		expectedErrType error
 	}{
 		{
 			name: "tampered nonce",
 			tamper: func(protected *pbauthninternal.ProtectedSession) {
 				protected.Session.Nonce = []byte("tampered nonce")
 			},
-			wantErrType: authninternal.ErrInvalidTokenHmac,
+			expectedErrType: authninternal.ErrInvalidTokenHmac,
 		},
 		{
 			name: "change key",
 			tamper: func(protected *pbauthninternal.ProtectedSession) {
 				protected.Session.PublicKey = []byte("tampered key")
 			},
-			wantErrType: authninternal.ErrInvalidTokenHmac,
+			expectedErrType: authninternal.ErrInvalidTokenHmac,
 		},
 		{
 			name: "tampered session protection version",
 			tamper: func(protected *pbauthninternal.ProtectedSession) {
 				protected.Version = 999
 			},
-			wantErrType: authninternal.ErrUnsupportedProtectionVersion,
+			expectedErrType: authninternal.ErrUnsupportedProtectionVersion,
 		},
 		{
 			name: "tampered session version",
 			tamper: func(protected *pbauthninternal.ProtectedSession) {
 				protected.Session.Version = 999
 			},
-			wantErrType: authninternal.ErrUnsupportedSessionVersion,
+			expectedErrType: authninternal.ErrUnsupportedSessionVersion,
 		},
 	}
 
@@ -303,7 +303,7 @@ func TestVerifyChallenge_TamperedToken(t *testing.T) {
 
 			_, err = tokenVerifier.VerifyToken(tamperedToken)
 
-			assert.ErrorIs(t, err, tt.wantErrType)
+			assert.ErrorIs(t, err, tt.expectedErrType)
 		})
 	}
 }

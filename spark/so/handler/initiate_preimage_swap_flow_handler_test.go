@@ -51,8 +51,8 @@ func TestIsPreimageSwapSettleableStatus(t *testing.T) {
 		}
 	}
 
-	for status, want := range settleable {
-		assert.Equalf(t, want, isPreimageSwapSettleableStatus(status), "isPreimageSwapSettleableStatus(%s)", status)
+	for status, expectedSettleable := range settleable {
+		assert.Equalf(t, expectedSettleable, isPreimageSwapSettleableStatus(status), "isPreimageSwapSettleableStatus(%s)", status)
 	}
 }
 

@@ -205,26 +205,26 @@ func TestFrostSigningHandler_FrostRound2RejectsMalformedRequestsBeforeDB(t *test
 	handler := NewFrostSigningHandler(&so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}})
 
 	for _, tc := range []struct {
-		name    string
-		req     *pb.FrostRound2Request
-		wantErr string
+		name        string
+		req         *pb.FrostRound2Request
+		expectedErr string
 	}{
 		{
-			name:    "nil request",
-			req:     nil,
-			wantErr: "request is required",
+			name:        "nil request",
+			req:         nil,
+			expectedErr: "request is required",
 		},
 		{
-			name:    "empty signing jobs",
-			req:     &pb.FrostRound2Request{},
-			wantErr: "signing_jobs is required",
+			name:        "empty signing jobs",
+			req:         &pb.FrostRound2Request{},
+			expectedErr: "signing_jobs is required",
 		},
 		{
 			name: "nil signing job",
 			req: &pb.FrostRound2Request{
 				SigningJobs: []*pb.SigningJob{nil},
 			},
-			wantErr: "signing_jobs[0] is required",
+			expectedErr: "signing_jobs[0] is required",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -232,7 +232,7 @@ func TestFrostSigningHandler_FrostRound2RejectsMalformedRequestsBeforeDB(t *test
 			require.Nil(t, resp)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
-			require.ErrorContains(t, err, tc.wantErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
 }

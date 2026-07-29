@@ -49,20 +49,20 @@ func TestTokenTransactionV3CrossLanguageJSONCases(t *testing.T) {
 			}
 
 			isPartial := strings.Contains(tc.Name, "partial")
-			got, err := HashTokenTransactionV3(&msg, isPartial)
+			hash, err := HashTokenTransactionV3(&msg, isPartial)
 			if err != nil {
 				t.Fatalf("hash TokenTransaction: %v", err)
 			}
 
-			gotHex := hex.EncodeToString(got)
+			actualHex := hex.EncodeToString(hash)
 
 			if tc.ExpectedHashHex == "" || strings.EqualFold(tc.ExpectedHashHex, "TBD") {
-				t.Logf("COMPUTED_HASH %s: %s", tc.Name, gotHex)
+				t.Logf("COMPUTED_HASH %s: %s", tc.Name, actualHex)
 				return
 			}
 
-			if !strings.EqualFold(tc.ExpectedHashHex, gotHex) {
-				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, gotHex)
+			if !strings.EqualFold(tc.ExpectedHashHex, actualHex) {
+				t.Fatalf("hash mismatch: expected=%s got=%s", tc.ExpectedHashHex, actualHex)
 			}
 		})
 	}

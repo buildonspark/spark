@@ -22,9 +22,9 @@ func TestSparkInternalServerInitiatePreimageSwapRejectsNilRequests(t *testing.T)
 	server := NewSparkInternalServer(nil)
 
 	tests := []struct {
-		name    string
-		call    func() error
-		wantErr string
+		name        string
+		call        func() error
+		expectedErr string
 	}{
 		{
 			name: "legacy nil request",
@@ -32,7 +32,7 @@ func TestSparkInternalServerInitiatePreimageSwapRejectsNilRequests(t *testing.T)
 				_, err := server.InitiatePreimageSwap(t.Context(), nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "v2 nil wrapper",
@@ -40,7 +40,7 @@ func TestSparkInternalServerInitiatePreimageSwapRejectsNilRequests(t *testing.T)
 				_, err := server.InitiatePreimageSwapV2(t.Context(), nil)
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "v2 nil inner request",
@@ -48,7 +48,7 @@ func TestSparkInternalServerInitiatePreimageSwapRejectsNilRequests(t *testing.T)
 				_, err := server.InitiatePreimageSwapV2(t.Context(), &pb.InitiatePreimageSwapRequest{})
 				return err
 			},
-			wantErr: "request is required",
+			expectedErr: "request is required",
 		},
 		{
 			name: "v2 nil inner transfer",
@@ -61,14 +61,14 @@ func TestSparkInternalServerInitiatePreimageSwapRejectsNilRequests(t *testing.T)
 				})
 				return err
 			},
-			wantErr: "transfer_request is required",
+			expectedErr: "transfer_request is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NotPanics(t, func() {
-				require.ErrorContains(t, tt.call(), tt.wantErr)
+				require.ErrorContains(t, tt.call(), tt.expectedErr)
 			})
 		})
 	}

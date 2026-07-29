@@ -82,13 +82,13 @@ func handshakeOverPipe(t *testing.T, clientCfg brontide.ClientConfig, serverCfg 
 
 	deadline := time.After(5 * time.Second)
 	var clientRes, serverRes out
-	gotClient, gotServer := false, false
-	for !gotClient || !gotServer {
+	actualClient, actualServer := false, false
+	for !actualClient || !actualServer {
 		select {
 		case clientRes = <-clientCh:
-			gotClient = true
+			actualClient = true
 		case serverRes = <-serverCh:
-			gotServer = true
+			actualServer = true
 		case <-deadline:
 			return handshakeResult{}, errors.New("handshake timed out")
 		}
@@ -187,11 +187,11 @@ func TestHandshakeRoundTrip(t *testing.T) {
 			_, err := res.clientConn.Write(payload)
 			writeErr <- err
 		}()
-		got := make([]byte, len(payload))
-		_, err = io.ReadFull(res.serverConn, got)
+		received := make([]byte, len(payload))
+		_, err = io.ReadFull(res.serverConn, received)
 		require.NoError(t, err)
 		require.NoError(t, <-writeErr)
-		assert.Equal(t, payload, got)
+		assert.Equal(t, payload, received)
 	})
 }
 

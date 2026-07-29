@@ -2061,58 +2061,58 @@ func TestCompareTxs(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name    string
-		tx1     []byte
-		tx2     []byte
-		want    bool
-		wantErr bool
+		name          string
+		tx1           []byte
+		tx2           []byte
+		expectedMatch bool
+		expectedErr   bool
 	}{
 		{
 			name: "both nil",
 			tx1:  nil, tx2: nil,
-			want: true,
+			expectedMatch: true,
 		},
 		{
 			name: "identical unsigned txs",
 			tx1:  unsignedTx, tx2: unsignedTx,
-			want: true,
+			expectedMatch: true,
 		},
 		{
 			name: "identical signed txs",
 			tx1:  signedTx, tx2: signedTx,
-			want: true,
+			expectedMatch: true,
 		},
 		{
 			name: "different outpoints",
 			tx1:  unsignedTx, tx2: differentOutpointTx,
-			want: false,
+			expectedMatch: false,
 		},
 		{
 			name: "different output values",
 			tx1:  unsignedTx, tx2: differentValueTx,
-			want: false,
+			expectedMatch: false,
 		},
 		{
 			name: "same structure, different witnesses",
 			tx1:  unsignedTx, tx2: signedTx,
-			want: false,
+			expectedMatch: false,
 		},
 		{
 			name: "one nil",
 			tx1:  nil, tx2: signedTx,
-			wantErr: true,
+			expectedErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := compareTxs(tt.tx1, tt.tx2)
-			if tt.wantErr {
+			matches, err := compareTxs(tt.tx1, tt.tx2)
+			if tt.expectedErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.expectedMatch, matches)
 		})
 	}
 }
@@ -2135,42 +2135,42 @@ func TestCompareAndVerifyTxs(t *testing.T) {
 	corruptedTx := corruptWitness(t, signedTx)
 
 	tests := []struct {
-		name    string
-		tx1     []byte
-		tx2     []byte
-		prevOut *wire.TxOut
-		want    bool
-		wantErr bool
+		name          string
+		tx1           []byte
+		tx2           []byte
+		prevOut       *wire.TxOut
+		expectedMatch bool
+		expectedErr   bool
 	}{
 		{
 			name: "both nil",
 			tx1:  nil, tx2: nil,
-			prevOut: nil,
-			want:    true,
+			prevOut:       nil,
+			expectedMatch: true,
 		},
 		{
 			name: "identical signed txs",
 			tx1:  signedTx, tx2: signedTx,
-			prevOut: prevOut,
-			want:    true,
+			prevOut:       prevOut,
+			expectedMatch: true,
 		},
 		{
 			name: "tx1 unsigned, tx2 has valid sig",
 			tx1:  unsignedTx, tx2: signedTx,
-			prevOut: prevOut,
-			want:    true,
+			prevOut:       prevOut,
+			expectedMatch: true,
 		},
 		{
 			name: "tx2 has corrupted signature",
 			tx1:  signedTx, tx2: corruptedTx,
-			prevOut: prevOut,
-			wantErr: true,
+			prevOut:     prevOut,
+			expectedErr: true,
 		},
 		{
 			name: "tx2 has no witness",
 			tx1:  signedTx, tx2: unsignedTx,
-			prevOut: prevOut,
-			wantErr: true,
+			prevOut:     prevOut,
+			expectedErr: true,
 		},
 		{
 			name: "structural mismatch - different outpoint",
@@ -2179,27 +2179,27 @@ func TestCompareAndVerifyTxs(t *testing.T) {
 				tx, _ := makeP2TRSpendTxUnsigned(wire.OutPoint{Hash: chainhash.Hash{2}, Index: 0}, 900, pkScript)
 				return tx
 			}(),
-			prevOut: prevOut,
-			want:    false,
+			prevOut:       prevOut,
+			expectedMatch: false,
 		},
 		{
-			name:    "structural mismatch - different value",
-			tx1:     signedTx,
-			tx2:     func() []byte { tx, _ := makeP2TRSpendTxUnsigned(outpoint, 800, pkScript); return tx }(),
-			prevOut: prevOut,
-			want:    false,
+			name:          "structural mismatch - different value",
+			tx1:           signedTx,
+			tx2:           func() []byte { tx, _ := makeP2TRSpendTxUnsigned(outpoint, 800, pkScript); return tx }(),
+			prevOut:       prevOut,
+			expectedMatch: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := compareAndVerifyTxs(tt.tx1, tt.tx2, tt.prevOut)
-			if tt.wantErr {
+			matches, err := compareAndVerifyTxs(tt.tx1, tt.tx2, tt.prevOut)
+			if tt.expectedErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.expectedMatch, matches)
 		})
 	}
 }

@@ -29,8 +29,8 @@ func TestBitMap_SetAndGet(t *testing.T) {
 
 	for _, tc := range testCases {
 		bm.Set(tc.index, tc.value)
-		if got := bm.Get(tc.index); got != tc.value {
-			t.Errorf("BitMap.Get(%d) = %v, want %v", tc.index, got, tc.value)
+		if bit := bm.Get(tc.index); bit != tc.value {
+			t.Errorf("BitMap.Get(%d) = %v, want %v", tc.index, bit, tc.value)
 		}
 	}
 }

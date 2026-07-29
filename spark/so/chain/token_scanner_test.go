@@ -60,20 +60,20 @@ func setUpIsolatedTest(t *testing.T) (context.Context, *ent.Client) {
 
 func TestParseTokenAnnouncement(t *testing.T) {
 	tests := []struct {
-		name   string
-		script []byte
-		want   *common.TokenMetadata
+		name             string
+		script           []byte
+		expectedMetadata *common.TokenMetadata
 	}{
-		{name: "empty script", script: []byte{}, want: nil},
-		{name: "nil", script: nil, want: nil},
-		{name: "not OP_RETURN", script: []byte{txscript.OP_DUP, txscript.OP_HASH160}, want: nil},
-		{name: "OP_RETURN but too short", script: []byte{txscript.OP_RETURN}, want: nil},
-		{name: "not announcement", script: directPush([]byte("NOTOK")), want: nil},
-		{name: "OP_RETURN with invalid kind", script: directPush(append([]byte(announcementPrefix), 9, 9)), want: nil},
+		{name: "empty script", script: []byte{}, expectedMetadata: nil},
+		{name: "nil", script: nil, expectedMetadata: nil},
+		{name: "not OP_RETURN", script: []byte{txscript.OP_DUP, txscript.OP_HASH160}, expectedMetadata: nil},
+		{name: "OP_RETURN but too short", script: []byte{txscript.OP_RETURN}, expectedMetadata: nil},
+		{name: "not announcement", script: directPush([]byte("NOTOK")), expectedMetadata: nil},
+		{name: "OP_RETURN with invalid kind", script: directPush(append([]byte(announcementPrefix), 9, 9)), expectedMetadata: nil},
 		{
-			name:   "valid token announcement",
-			script: directPush(createValidTokenData()),
-			want:   createExpectedTokenMetadata(),
+			name:             "valid token announcement",
+			script:           directPush(createValidTokenData()),
+			expectedMetadata: createExpectedTokenMetadata(),
 		},
 		{
 			name: "valid UTF-8 with unicode characters",
@@ -93,7 +93,7 @@ func TestParseTokenAnnouncement(t *testing.T) {
 					[]byte{0},
 				))
 			}(),
-			want: &common.TokenMetadata{
+			expectedMetadata: &common.TokenMetadata{
 				IssuerPublicKey:         issuerPubKey,
 				TokenName:               "🚀BTC",
 				TokenTicker:             "🚀",
@@ -110,42 +110,42 @@ func TestParseTokenAnnouncement(t *testing.T) {
 				txscript.OP_RETURN,
 				0xff, // Invalid push operation
 			},
-			want: nil,
+			expectedMetadata: nil,
 		},
 		{
-			name:   "valid direct push (OP_1 to OP_75)",
-			script: directPush(createValidTokenData()),
-			want:   createExpectedTokenMetadata(),
+			name:             "valid direct push (OP_1 to OP_75)",
+			script:           directPush(createValidTokenData()),
+			expectedMetadata: createExpectedTokenMetadata(),
 		},
 		{
-			name:   "valid OP_PUSHDATA1",
-			script: pushData1(createValidTokenData()),
-			want:   createExpectedTokenMetadata(),
+			name:             "valid OP_PUSHDATA1",
+			script:           pushData1(createValidTokenData()),
+			expectedMetadata: createExpectedTokenMetadata(),
 		},
 		{
-			name:   "valid OP_PUSHDATA2",
-			script: pushData2(createValidTokenData()),
-			want:   createExpectedTokenMetadata(),
+			name:             "valid OP_PUSHDATA2",
+			script:           pushData2(createValidTokenData()),
+			expectedMetadata: createExpectedTokenMetadata(),
 		},
 		{
-			name:   "valid OP_PUSHDATA4",
-			script: pushData4(createValidTokenData()),
-			want:   createExpectedTokenMetadata(),
+			name:             "valid OP_PUSHDATA4",
+			script:           pushData4(createValidTokenData()),
+			expectedMetadata: createExpectedTokenMetadata(),
 		},
 		{
-			name:   "incomplete OP_PUSHDATA1",
-			script: []byte{txscript.OP_RETURN, txscript.OP_PUSHDATA1}, // OP_PUSHDATA1 without length byte
-			want:   nil,
+			name:             "incomplete OP_PUSHDATA1",
+			script:           []byte{txscript.OP_RETURN, txscript.OP_PUSHDATA1}, // OP_PUSHDATA1 without length byte
+			expectedMetadata: nil,
 		},
 		{
-			name:   "incomplete OP_PUSHDATA2",
-			script: []byte{txscript.OP_RETURN, txscript.OP_PUSHDATA2, 0x01}, // Only one byte of length
-			want:   nil,
+			name:             "incomplete OP_PUSHDATA2",
+			script:           []byte{txscript.OP_RETURN, txscript.OP_PUSHDATA2, 0x01}, // Only one byte of length
+			expectedMetadata: nil,
 		},
 		{
-			name:   "incomplete OP_PUSHDATA4",
-			script: []byte{txscript.OP_RETURN, txscript.OP_PUSHDATA4, 0x01, 0x02, 0x03}, // Only one byte of length
-			want:   nil,
+			name:             "incomplete OP_PUSHDATA4",
+			script:           []byte{txscript.OP_RETURN, txscript.OP_PUSHDATA4, 0x01, 0x02, 0x03}, // Only one byte of length
+			expectedMetadata: nil,
 		},
 		{
 			name: "insufficient data after length",
@@ -155,12 +155,12 @@ func TestParseTokenAnnouncement(t *testing.T) {
 				10,      // Claim 10 bytes follow
 				1, 2, 3, // Only provide 3
 			},
-			want: nil,
+			expectedMetadata: nil,
 		},
 		{
-			name:   "extra data after push",
-			script: append(directPush(createValidTokenData()), 0), // Extra unwanted byte
-			want:   nil,
+			name:             "extra data after push",
+			script:           append(directPush(createValidTokenData()), 0), // Extra unwanted byte
+			expectedMetadata: nil,
 		},
 	}
 
@@ -169,24 +169,24 @@ func TestParseTokenAnnouncement(t *testing.T) {
 			result, err := parseTokenAnnouncement(tt.script, btcnetwork.Testnet)
 			require.NoError(t, err)
 
-			if tt.want == nil {
+			if tt.expectedMetadata == nil {
 				require.Nil(t, result)
 				return
 			}
 			require.NotNil(t, result)
 
-			got, err := result.ToTokenMetadata()
+			metadata, err := result.ToTokenMetadata()
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.expectedMetadata, metadata)
 		})
 	}
 }
 
 func TestParseTokenAnnouncement_Errors(t *testing.T) {
 	tests := []struct {
-		name    string
-		script  []byte
-		wantErr string
+		name        string
+		script      []byte
+		expectedErr string
 	}{
 		{
 			name: "extra data after push",
@@ -201,7 +201,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				[]byte{1},
 				[]byte{1}, // An extra, invalid byte
 			)),
-			wantErr: "unexpected data after token announcement",
+			expectedErr: "unexpected data after token announcement",
 		},
 		{
 			name: "name too short",
@@ -215,7 +215,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid length: expected between 3 and 20, got 2",
+			expectedErr: "invalid length: expected between 3 and 20, got 2",
 		},
 		{
 			name: "name too long",
@@ -229,7 +229,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid length: expected between 3 and 20, got 25",
+			expectedErr: "invalid length: expected between 3 and 20, got 25",
 		},
 		{
 			name: "ticker too short",
@@ -243,7 +243,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid length: expected between 3 and 6, got 2",
+			expectedErr: "invalid length: expected between 3 and 6, got 2",
 		},
 		{
 			name: "ticker too long",
@@ -257,7 +257,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid length: expected between 3 and 6, got 7",
+			expectedErr: "invalid length: expected between 3 and 6, got 7",
 		},
 		{
 			name: "invalid max supply length",
@@ -270,7 +270,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				[]byte{8},
 				maxSupply[:15], // 15 bytes for max supply
 			)),
-			wantErr: "invalid max supply: insufficient data",
+			expectedErr: "invalid max supply: insufficient data",
 		},
 		{
 			name: "missing is_freezable",
@@ -283,7 +283,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				[]byte{8},
 				maxSupply,
 			)),
-			wantErr: "invalid is_freezable: insufficient data",
+			expectedErr: "invalid is_freezable: insufficient data",
 		},
 		{
 			name: "invalid UTF-8 in name",
@@ -297,7 +297,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid name: invalid UTF-8",
+			expectedErr: "invalid name: invalid UTF-8",
 		},
 		{
 			name: "invalid UTF-8 in ticker",
@@ -311,7 +311,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid ticker: invalid UTF-8",
+			expectedErr: "invalid ticker: invalid UTF-8",
 		},
 		{
 			name: "valid non-normalized UFT-8 in name",
@@ -325,7 +325,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid name: not NFC-normalized",
+			expectedErr: "invalid name: not NFC-normalized",
 		},
 		{
 			name: "valid non-normalized UTF-8 in ticker",
@@ -339,14 +339,14 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 				maxSupply,
 				[]byte{1},
 			)),
-			wantErr: "invalid ticker: not NFC-normalized",
+			expectedErr: "invalid ticker: not NFC-normalized",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := parseTokenAnnouncement(tt.script, btcnetwork.Testnet)
-			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, tt.expectedErr)
 			assert.Nil(t, result)
 		})
 	}

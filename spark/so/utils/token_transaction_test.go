@@ -192,11 +192,11 @@ func TestHashTokenTransactionV0MintLegacyVector(t *testing.T) {
 		t.Fatalf("failed to hash token transaction: %v", err)
 	}
 
-	want := []byte{
+	expectedHash := []byte{
 		66, 235, 134, 101, 172, 110, 147, 77, 122, 48, 86, 240, 239, 9, 163, 82,
 		120, 234, 246, 206, 245, 242, 186, 180, 154, 41, 207, 179, 194, 31, 211, 36,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -229,11 +229,11 @@ func TestHashTokenTransactionMintV0(t *testing.T) {
 		t.Fatalf("failed to hash token transaction: %v", err)
 	}
 
-	want := []byte{
+	expectedHash := []byte{
 		0x8e, 0xad, 0xcb, 0x46, 0x25, 0x46, 0x88, 0x1d, 0xa9, 0x0f, 0xcc, 0x29, 0xba, 0x64, 0xba, 0xa6,
 		0xf9, 0x0d, 0x4c, 0xc8, 0xb1, 0x51, 0xcb, 0xae, 0x48, 0xbc, 0xd7, 0x77, 0x28, 0xb8, 0xc4, 0xa5,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -260,11 +260,11 @@ func TestHashTokenTransactionCreateV0(t *testing.T) {
 		t.Fatalf("failed to hash V0 create transaction: %v", err)
 	}
 
-	want := []byte{
+	expectedHash := []byte{
 		0x4c, 0xfb, 0xfe, 0x22, 0xcb, 0x4f, 0x07, 0xea, 0xac, 0x85, 0x2f, 0x94, 0xd9, 0x3e, 0x9d, 0xdb,
 		0xed, 0xa0, 0x97, 0xdb, 0x18, 0xb3, 0x5d, 0xb8, 0x26, 0x7c, 0x55, 0x41, 0x0b, 0x32, 0xa5, 0x94,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 		t.Logf("Actual hash: %x", hash)
 	}
@@ -303,11 +303,11 @@ func TestHashTokenTransactionTransferV0(t *testing.T) {
 		t.Fatalf("failed to hash V0 transfer transaction: %v", err)
 	}
 
-	want := []byte{
+	expectedHash := []byte{
 		0xe3, 0x34, 0xdf, 0x5b, 0x88, 0x59, 0x1f, 0x69, 0x4f, 0xe9, 0xb3, 0x9f, 0x31, 0x83, 0xe2, 0x10,
 		0x21, 0xff, 0x95, 0xd6, 0xbf, 0x2d, 0x4b, 0xb0, 0x13, 0xba, 0xc4, 0x4f, 0xd0, 0x9d, 0xba, 0xaf,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 		t.Logf("Actual hash: %x", hash)
 	}
@@ -600,11 +600,11 @@ func TestHashTokenTransactionMintV1(t *testing.T) {
 		t.Fatalf("failed to hash token transaction: %v", err)
 	}
 
-	want := []byte{
+	expectedHash := []byte{
 		0xfe, 0x93, 0x8b, 0x12, 0xbf, 0xed, 0x51, 0x79, 0xff, 0x29, 0x8d, 0x2e, 0xd9, 0x66, 0x2b, 0x4a,
 		0xf6, 0xf8, 0x35, 0x18, 0x8f, 0x4e, 0xa4, 0xb1, 0xb3, 0x3b, 0x61, 0x23, 0x14, 0x49, 0xdc, 0x81,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -636,11 +636,11 @@ func TestHashTokenTransactionCreateV1(t *testing.T) {
 	}
 
 	// Expected hash for V1 create transaction
-	want := []byte{
+	expectedHash := []byte{
 		0x04, 0x8a, 0xa2, 0xa0, 0x85, 0xab, 0xb9, 0xba, 0x96, 0x9c, 0x70, 0x7c, 0x5f, 0xc7, 0xb3, 0xf2,
 		0x14, 0x8c, 0x89, 0x18, 0x5e, 0x0f, 0x7b, 0x16, 0x17, 0xf8, 0xe8, 0x0d, 0x9e, 0x91, 0x48, 0x18,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 		t.Logf("Actual hash: %x", hash)
 	}
@@ -681,11 +681,11 @@ func TestHashTokenTransactionTransferV1(t *testing.T) {
 		t.Fatalf("failed to hash transfer transaction: %v", err)
 	}
 
-	want := []byte{
+	expectedHash := []byte{
 		0xa9, 0xfa, 0xe6, 0x24, 0x05, 0xbb, 0x08, 0xe8, 0xa1, 0xf1, 0x6f, 0x9d, 0xc8, 0xa5, 0x53, 0x03,
 		0xaf, 0x86, 0x6a, 0x67, 0x10, 0xb5, 0x50, 0x57, 0xca, 0x0c, 0x8d, 0x64, 0x70, 0x00, 0xa5, 0x8f,
 	}
-	if diff := cmp.Diff(want, hash); diff != "" {
+	if diff := cmp.Diff(expectedHash, hash); diff != "" {
 		t.Errorf("hash mismatch (-want +got):\n%s", diff)
 		t.Logf("Actual hash: %x", hash)
 	}
@@ -1466,21 +1466,21 @@ func TestValidateOwnershipSignature(t *testing.T) {
 		ownershipSignature []byte
 		txHash             []byte
 		ownerPublicKey     keys.Public
-		wantErr            bool
+		expectedErr        bool
 	}{
 		{
 			name:               "valid Schnorr signature",
 			ownershipSignature: schnorrSig.Serialize(),
 			txHash:             messageHash[:],
 			ownerPublicKey:     pubKey,
-			wantErr:            false,
+			expectedErr:        false,
 		},
 		{
 			name:               "valid ECDSA DER signature",
 			ownershipSignature: ecdsaSig.Serialize(),
 			txHash:             messageHash[:],
 			ownerPublicKey:     pubKey,
-			wantErr:            false,
+			expectedErr:        false,
 		},
 	}
 
@@ -1488,8 +1488,8 @@ func TestValidateOwnershipSignature(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := ValidateOwnershipSignature(tt.ownershipSignature, tt.txHash, tt.ownerPublicKey)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateOwnershipSignature() error = %v, wantErr %v", err, tt.wantErr)
+			if (err != nil) != tt.expectedErr {
+				t.Errorf("ValidateOwnershipSignature() error = %v, expectedErr %v", err, tt.expectedErr)
 			}
 		})
 	}
@@ -1506,56 +1506,56 @@ func TestValidateOwnershipSignatureErrors(t *testing.T) {
 		ownershipSignature []byte
 		txHash             []byte
 		ownerPublicKey     keys.Public
-		wantErr            string
+		expectedErr        string
 	}{
 		{
 			name:               "nil signature",
 			ownershipSignature: nil,
 			txHash:             messageHash[:],
 			ownerPublicKey:     pubKey,
-			wantErr:            "ownership signature cannot be nil",
+			expectedErr:        "ownership signature cannot be nil",
 		},
 		{
 			name:               "nil transaction hash",
 			ownershipSignature: validSig.Serialize(),
 			txHash:             nil,
 			ownerPublicKey:     pubKey,
-			wantErr:            "hash to verify cannot be nil",
+			expectedErr:        "hash to verify cannot be nil",
 		},
 		{
 			name:               "empty owner public key",
 			ownershipSignature: validSig.Serialize(),
 			txHash:             messageHash[:],
 			ownerPublicKey:     keys.Public{},
-			wantErr:            "owner public key cannot be zero",
+			expectedErr:        "owner public key cannot be zero",
 		},
 		{
 			name:               "invalid Schnorr signature",
 			ownershipSignature: bytes.Repeat([]byte("1"), 64),
 			txHash:             messageHash[:],
 			ownerPublicKey:     pubKey,
-			wantErr:            "failed to parse signature as either Schnorr or DER",
+			expectedErr:        "failed to parse signature as either Schnorr or DER",
 		},
 		{
 			name:               "too short Schnorr signature",
 			ownershipSignature: []byte{0x01, 0x02, 0x03}, // Too short for a valid Schnorr signature
 			txHash:             messageHash[:],
 			ownerPublicKey:     pubKey,
-			wantErr:            "malformed signature: too short",
+			expectedErr:        "malformed signature: too short",
 		},
 		{
 			name:               "invalid ECDSA DER signature",
 			ownershipSignature: []byte{0x30, 0x01, 0x02}, // Invalid DER format
 			txHash:             messageHash[:],
 			ownerPublicKey:     pubKey,
-			wantErr:            "failed to parse signature as either Schnorr or DER",
+			expectedErr:        "failed to parse signature as either Schnorr or DER",
 		},
 		{
 			name:               "valid Schnorr with different tx hash falls through to ECDSA and fails",
 			ownershipSignature: validSig.Serialize(),
 			txHash:             []byte("different message hash"), // Different message hash will cause verification to fail
 			ownerPublicKey:     pubKey,
-			wantErr:            "failed to parse signature as either Schnorr or DER",
+			expectedErr:        "failed to parse signature as either Schnorr or DER",
 		},
 	}
 
@@ -1563,9 +1563,9 @@ func TestValidateOwnershipSignatureErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if err := ValidateOwnershipSignature(tt.ownershipSignature, tt.txHash, tt.ownerPublicKey); err == nil {
-				t.Errorf("ValidateOwnershipSignature() expected error %v, got nil", tt.wantErr)
-			} else if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("ValidateOwnershipSignature() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateOwnershipSignature() expected error %v, got nil", tt.expectedErr)
+			} else if !strings.Contains(err.Error(), tt.expectedErr) {
+				t.Errorf("ValidateOwnershipSignature() error = %v, expectedErr %v", err, tt.expectedErr)
 			}
 		})
 	}
@@ -1576,52 +1576,52 @@ func TestIsNetworkSupported(t *testing.T) {
 		name              string
 		providedNetwork   btcnetwork.Network
 		supportedNetworks []btcnetwork.Network
-		want              bool
+		expectedSupported bool
 	}{
 		{
 			name:              "unspecified network",
 			providedNetwork:   btcnetwork.Unspecified,
 			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
-			want:              false,
+			expectedSupported: false,
 		},
 		{
 			name:              "mainnet in list",
 			providedNetwork:   btcnetwork.Mainnet,
 			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
-			want:              true,
+			expectedSupported: true,
 		},
 		{
 			name:              "testnet in list",
 			providedNetwork:   btcnetwork.Testnet,
 			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
-			want:              true,
+			expectedSupported: true,
 		},
 		{
 			name:              "regtest in list",
 			providedNetwork:   btcnetwork.Regtest,
 			supportedNetworks: []btcnetwork.Network{btcnetwork.Regtest},
-			want:              true,
+			expectedSupported: true,
 		},
 		{
 			name:              "network not in list",
 			providedNetwork:   btcnetwork.Signet,
 			supportedNetworks: []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Testnet},
-			want:              false,
+			expectedSupported: false,
 		},
 		{
 			name:              "empty supported list",
 			providedNetwork:   btcnetwork.Mainnet,
 			supportedNetworks: []btcnetwork.Network{},
-			want:              false,
+			expectedSupported: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := isNetworkSupported(tt.providedNetwork, tt.supportedNetworks)
-			if got != tt.want {
-				t.Errorf("isNetworkSupported(%v, %v) = %v, want %v", tt.providedNetwork, tt.supportedNetworks, got, tt.want)
+			isSupported := isNetworkSupported(tt.providedNetwork, tt.supportedNetworks)
+			if isSupported != tt.expectedSupported {
+				t.Errorf("isNetworkSupported(%v, %v) = %v, want %v", tt.providedNetwork, tt.supportedNetworks, isSupported, tt.expectedSupported)
 			}
 		})
 	}
@@ -1705,14 +1705,14 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 	operatorPubKey := keys.GeneratePrivateKey().Public()
 
 	tests := []struct {
-		name    string
-		payload *tokenpb.FreezeTokensPayload
-		wantErr string
+		name        string
+		payload     *tokenpb.FreezeTokensPayload
+		expectedErr string
 	}{
 		{
-			name:    "nil payload",
-			payload: nil,
-			wantErr: "freeze tokens payload cannot be nil",
+			name:        "nil payload",
+			payload:     nil,
+			expectedErr: "freeze tokens payload cannot be nil",
 		},
 		{
 			name: "empty owner public key v0",
@@ -1724,7 +1724,7 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 				IssuerProvidedTimestamp:   1234567890,
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
-			wantErr: "owner public key cannot be empty",
+			expectedErr: "owner public key cannot be empty",
 		},
 		{
 			name: "empty token public key v0",
@@ -1736,7 +1736,7 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 				IssuerProvidedTimestamp:   1234567890,
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
-			wantErr: "token public key cannot be empty",
+			expectedErr: "token public key cannot be empty",
 		},
 		{
 			name: "zero timestamp v0",
@@ -1748,7 +1748,7 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 				IssuerProvidedTimestamp:   0,
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
-			wantErr: "issuer provided timestamp cannot be 0",
+			expectedErr: "issuer provided timestamp cannot be 0",
 		},
 		{
 			name: "empty operator public key v0",
@@ -1760,7 +1760,7 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 				IssuerProvidedTimestamp:   1234567890,
 				OperatorIdentityPublicKey: []byte{},
 			},
-			wantErr: "operator identity public key cannot be empty",
+			expectedErr: "operator identity public key cannot be empty",
 		},
 		// V1 with empty owner_public_key is allowed (global pause), tested separately.
 		{
@@ -1772,7 +1772,7 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 				IssuerProvidedTimestamp:   1234567890,
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
-			wantErr: "token identifier cannot be nil",
+			expectedErr: "token identifier cannot be nil",
 		},
 	}
 
@@ -1781,11 +1781,11 @@ func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 			t.Parallel()
 			_, err := HashFreezeTokensPayload(tt.payload)
 			if err == nil {
-				t.Errorf("HashFreezeTokensPayload() expected error %v, got nil", tt.wantErr)
+				t.Errorf("HashFreezeTokensPayload() expected error %v, got nil", tt.expectedErr)
 				return
 			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("HashFreezeTokensPayload() error = %v, want error containing %q", err, tt.wantErr)
+			if !strings.Contains(err.Error(), tt.expectedErr) {
+				t.Errorf("HashFreezeTokensPayload() error = %v, want error containing %q", err, tt.expectedErr)
 			}
 		})
 	}
@@ -2015,13 +2015,13 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 		name                string
 		payload             *tokenpb.FreezeTokensPayload
 		expectedOperatorKey keys.Public
-		wantErr             string
+		expectedErr         string
 	}{
 		{
 			name:                "nil payload",
 			payload:             nil,
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "freeze tokens payload cannot be nil",
+			expectedErr:         "freeze tokens payload cannot be nil",
 		},
 		{
 			name: "invalid version",
@@ -2034,7 +2034,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 2",
+			expectedErr:         "invalid freeze tokens payload version: 2",
 		},
 		{
 			name: "v0 empty owner public key",
@@ -2047,7 +2047,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "v0 nil token public key",
@@ -2059,7 +2059,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "v0 with token identifier (should fail)",
@@ -2073,7 +2073,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "v1 nil token identifier",
@@ -2085,7 +2085,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "token identifier must be exactly 32 bytes, got 0",
+			expectedErr:         "token identifier must be exactly 32 bytes, got 0",
 		},
 		{
 			name: "v1 with token public key (should fail)",
@@ -2099,7 +2099,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "token public key must be nil for version 1",
+			expectedErr:         "token public key must be nil for version 1",
 		},
 		{
 			name: "v1 wrong token identifier length",
@@ -2112,7 +2112,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "token identifier must be exactly 32 bytes, got 5",
+			expectedErr:         "token identifier must be exactly 32 bytes, got 5",
 		},
 		{
 			name: "zero timestamp",
@@ -2125,7 +2125,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "empty operator public key",
@@ -2138,7 +2138,7 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: []byte{},
 			},
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name: "operator public key not in config",
@@ -2151,25 +2151,25 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 				OperatorIdentityPublicKey: []byte{0x03, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22},
 			},
 			expectedOperatorKey: operatorPubKey, // Different from the payload's operator key
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name:                "valid v0 payload with matching operator",
 			payload:             validPayloadV0,
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 		{
 			name:                "valid v1 payload with matching operator",
 			payload:             validPayloadV1,
 			expectedOperatorKey: operatorPubKey,
-			wantErr:             "",
+			expectedErr:         "",
 		},
 		{
 			name:                "valid payload with nil expected operator (should fail)",
 			payload:             validPayloadV0,
 			expectedOperatorKey: keys.Public{},
-			wantErr:             "invalid freeze tokens payload version: 0",
+			expectedErr:         "invalid freeze tokens payload version: 0",
 		},
 	}
 
@@ -2177,10 +2177,10 @@ func TestValidateFreezeTokensPayload(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := ValidateFreezeTokensPayload(tt.payload, tt.expectedOperatorKey)
-			if tt.wantErr == "" {
+			if tt.expectedErr == "" {
 				require.NoError(t, err)
 			} else {
-				require.ErrorContains(t, err, tt.wantErr)
+				require.ErrorContains(t, err, tt.expectedErr)
 			}
 		})
 	}
@@ -2378,11 +2378,11 @@ func TestHashTokenTransactionTransferV2(t *testing.T) {
 	}
 	hash, err := HashTokenTransactionV2(transferTransaction, false)
 	require.NoError(t, err)
-	want := []byte{
+	expectedHash := []byte{
 		0xb0, 0x98, 0xdc, 0x22, 0x8a, 0xd, 0x82, 0x64, 0x25, 0x4a, 0x2d, 0xef, 0x34, 0x42, 0x5c, 0xab,
 		0xe2, 0x23, 0xd, 0x4f, 0x7b, 0xa4, 0x3c, 0xf2, 0xa3, 0x2c, 0x27, 0xf0, 0x31, 0xae, 0x8, 0x83,
 	}
-	assert.Equal(t, want, hash)
+	assert.Equal(t, expectedHash, hash)
 }
 
 func TestValidateExecuteBefore(t *testing.T) {
@@ -2394,7 +2394,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 		executeBefore          *time.Time
 		clientCreatedTimestamp time.Time
 		maxWindow              time.Duration
-		wantErr                bool
+		expectedErr            bool
 		errContains            string
 	}{
 		{
@@ -2402,28 +2402,28 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          nil,
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                false,
+			expectedErr:            false,
 		},
 		{
 			name:                   "valid execute_before within window",
 			executeBefore:          new(now.Add(100 * time.Second)),
 			clientCreatedTimestamp: now.Add(-10 * time.Second),
 			maxWindow:              maxWindow,
-			wantErr:                false,
+			expectedErr:            false,
 		},
 		{
 			name:                   "execute_before at max window boundary",
 			executeBefore:          new(now.Add(maxWindow)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                false,
+			expectedErr:            false,
 		},
 		{
 			name:                   "execute_before 1 microsecond past max window",
 			executeBefore:          new(now.Add(maxWindow + time.Microsecond)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "exceeds max window",
 		},
 		{
@@ -2431,7 +2431,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          new(now.Add(maxWindow + time.Second)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "exceeds max window",
 		},
 		{
@@ -2439,7 +2439,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          new(now.Add(-10 * time.Second)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "must be after client_created_timestamp",
 		},
 		{
@@ -2447,7 +2447,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          new(now),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "must be after client_created_timestamp",
 		},
 		{
@@ -2455,14 +2455,14 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          new(now.Add(100 * time.Second)),
 			clientCreatedTimestamp: now.Add(100*time.Second - time.Microsecond),
 			maxWindow:              maxWindow,
-			wantErr:                false,
+			expectedErr:            false,
 		},
 		{
 			name:                   "zero max window rejects any execute_before",
 			executeBefore:          new(now.Add(time.Microsecond)),
 			clientCreatedTimestamp: now,
 			maxWindow:              0,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "exceeds max window",
 		},
 		{
@@ -2470,7 +2470,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          new(now.Add(-1 * time.Second)),
 			clientCreatedTimestamp: now.Add(-10 * time.Second),
 			maxWindow:              maxWindow,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "has already passed",
 		},
 		{
@@ -2478,7 +2478,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 			executeBefore:          new(now.Add(100*time.Second + 123*time.Nanosecond)),
 			clientCreatedTimestamp: now,
 			maxWindow:              maxWindow,
-			wantErr:                true,
+			expectedErr:            true,
 			errContains:            "sub-microsecond precision",
 		},
 	}
@@ -2486,7 +2486,7 @@ func TestValidateExecuteBefore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateExecuteBefore(tt.executeBefore, tt.clientCreatedTimestamp, tt.maxWindow)
-			if tt.wantErr {
+			if tt.expectedErr {
 				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)

@@ -92,11 +92,11 @@ func TestPeerOperator(t *testing.T) {
 
 	t.Run("returns peer when AuthInfo is brontide", func(t *testing.T) {
 		ctx := peer.NewContext(t.Context(), &peer.Peer{AuthInfo: brontide.AuthInfo{Peer: expected}})
-		got := brontide.PeerOperator(ctx)
-		require.NotNil(t, got)
+		operator := brontide.PeerOperator(ctx)
+		require.NotNil(t, operator)
 
-		assert.Equal(t, expected.Identifier, got.Identifier)
-		assert.Equal(t, expected.IdentityPublicKey, got.IdentityPublicKey)
+		assert.Equal(t, expected.Identifier, operator.Identifier)
+		assert.Equal(t, expected.IdentityPublicKey, operator.IdentityPublicKey)
 	})
 }
 
@@ -113,9 +113,9 @@ func TestPeerLookupFunc(t *testing.T) {
 		return nil
 	})
 
-	got := lookup.LookupPeer(pub)
-	require.NotNil(t, got)
-	assert.Equal(t, "match", got.Identifier)
+	peer := lookup.LookupPeer(pub)
+	require.NotNil(t, peer)
+	assert.Equal(t, "match", peer.Identifier)
 
 	assert.Nil(t, lookup.LookupPeer(other))
 	assert.Equal(t, 2, calls)

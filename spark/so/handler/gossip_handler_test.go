@@ -697,10 +697,10 @@ func TestClassifyConsensusOp(t *testing.T) {
 	unknown := uuid.New()
 
 	cases := []struct {
-		name    string
-		id      string
-		want    consensusOpDisposition
-		wantRow bool // the fence only carries the row on the applyOp disposition
+		name                string
+		id                  string
+		expectedDisposition consensusOpDisposition
+		expectedRow         bool // the fence only carries the row on the applyOp disposition
 	}{
 		{"participant row -> apply", participant.String(), applyOp, true},
 		{"coordinator row -> skip echo", coordinator.String(), skipCoordinatorEcho, false},
@@ -715,10 +715,10 @@ func TestClassifyConsensusOp(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, row, err := classifyConsensusOp(ctx, c.id, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
+			disposition, row, err := classifyConsensusOp(ctx, c.id, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER)
 			require.NoError(t, err)
-			require.Equal(t, c.want, got)
-			if c.wantRow {
+			require.Equal(t, c.expectedDisposition, disposition)
+			if c.expectedRow {
 				require.NotNil(t, row, "the applyOp disposition must carry the FlowExecution row the fence binds against")
 			} else {
 				require.Nil(t, row, "non-apply dispositions must not carry a row")
