@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/sighash"
@@ -172,9 +173,13 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		keyTweaks:       keyTweakMap,
 		sparkInvoice:    req.GetSparkInvoice(),
 	}
-	_, leafMap, err := h.createTransferV3(ctx, spec, h.transferType, TransferRoleParticipant, h.requireDirectRefunds)
+	transferEnt, leafMap, err := h.createTransferV3(ctx, spec, h.transferType, TransferRoleParticipant, h.requireDirectRefunds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer rows for %s: %w", parsed.transferID, err)
+	}
+
+	if err := bindManifestIfPresent(orig, transferEnt.Network, leafMap); err != nil {
+		return nil, err
 	}
 
 	jobs, err := buildSendTransferLocalSigningJobs(ctx, parsed.transferID, parsed.pkg, leafMap, TransferAdaptorPublicKeys{})
@@ -613,6 +618,31 @@ func parseSendTransferEnvelope(req *pb.StartTransferV3Request) (*pb.SenderTransf
 		return nil, keys.Public{}, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner identity public key: %w", err))
 	}
 	return senderPkg, senderIDPK, nil
+}
+
+// bindManifestIfPresent holds the executed transfer to the manifest every sender signed, when one
+// is supplied, and rejects manifest material that cannot be bound when one is not.
+// start_transfer_v3 is the generic transfer path and never demands a manifest; the flows that
+// treat one as part of their contract require it on their own endpoint instead.
+//
+// This is the single manifest gate on the Prepare path, and it runs after createTransferV3
+// because the cover check needs the locked rows' owners and amounts — which is also what keeps
+// those two facts out of the requester's hands. The coordinator entry additionally runs the
+// signature half up front, where it can reject before any of that work is done.
+func bindManifestIfPresent(req *pb.StartTransferV3Request, network btcnetwork.Network, leafMap map[string]*ent.TreeNode) error {
+	if req.GetTransferManifest() == nil {
+		return rejectStrayManifestSignature(req)
+	}
+
+	leaves := make(map[string]transferpkg.ExecutedLeaf, len(leafMap))
+	for leafID, leaf := range leafMap {
+		leaves[leafID] = transferpkg.ExecutedLeaf{Owner: leaf.OwnerIdentityPubkey, ValueSats: leaf.Value}
+	}
+
+	if err := transferpkg.BindManifest(req, network, leaves); err != nil {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer manifest does not bind this transfer: %w", err))
+	}
+	return nil
 }
 
 // parseSendTransferReceivers parses the sender package's leaf→receiver map and
