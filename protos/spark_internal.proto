@@ -545,6 +545,22 @@ message InitiatePreimageSwapPrepareRequest {
     spark.InitiatePreimageSwapRequest original_request = 1;
 }
 
+// InitiatePreimageSwapV4PrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4 2PC flow. It carries the
+// public InitiatePreimageSwapV4Request verbatim, whose embedded
+// StartTransferV3Request lets every SO prepare a multi-receiver transfer and
+// bind the sender-signed manifest against its own locked rows — neither of
+// which the v3 carrier can express, since its original_request is typed to the
+// single-receiver spark.InitiatePreimageSwapRequest.
+//
+// This is a separate op type rather than a second field on the v3 carrier
+// because participants and commit/rollback redelivery construct their handler
+// from the op type alone; a v4 payload arriving under the v3 type would be
+// prepared by the v3 handler on every SO but the coordinator.
+message InitiatePreimageSwapV4PrepareRequest {
+    spark.InitiatePreimageSwapV4Request original_request = 1;
+}
+
 // InitiatePreimageSwapPrepareResponse is each SO's Prepare result. The two
 // fields are populated on disjoint flow paths: frost_response carries this SO's
 // FROST round-2 signature shares over the HTLC refund txs (REASON_SEND with a

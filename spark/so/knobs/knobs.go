@@ -203,6 +203,26 @@ const (
 	// ProvidePreimage, not in this flow — matching legacy.
 	KnobUseConsensusInitiatePreimageSwap = "spark.so.use_consensus_initiate_preimage_swap"
 
+	// KnobInitiatePreimageSwapV4Enabled will admit InitiatePreimageSwapV4, the only
+	// preimage-swap version that accepts a transfer manifest and the only one that
+	// can pay more than one receiver. Interpreted as binary (any non-zero value
+	// enables) — not a percentage rollout.
+	//
+	// Nothing reads it yet: the endpoint answers Unimplemented at either setting
+	// until the handler lands, so flipping this on today changes nothing. Once the
+	// handler exists, off keeps that Unimplemented rather than silently degrading to
+	// v3 semantics, and v4 stays on the 2PC engine — with
+	// KnobUseConsensusInitiatePreimageSwap off it fails closed instead of falling
+	// back to the legacy fanout, which cannot carry the manifest to participants and
+	// would leave them binding nothing.
+	//
+	// Deploy precondition: do not flip this until every SO — and every pod, since a
+	// rolling deploy straddles builds — resolves the v4 consensus op type. This knob
+	// is per-SO and gates only the coordinator's entrypoint; a participant on a build
+	// that cannot resolve the op type aborts the prepare and then cannot process the
+	// rollback it caused.
+	KnobInitiatePreimageSwapV4Enabled = "spark.so.initiate_preimage_swap_v4.enabled"
+
 	// KnobUseConsensusStaticDepositUtxoRefund routes InitiateStaticDepositUtxoRefund
 	// through the 2PC engine instead of the legacy create_static_deposit_utxo_refund
 	// fanout + RollbackUtxoSwap gossip + best-effort UtxoSwapCompleted. Interpreted

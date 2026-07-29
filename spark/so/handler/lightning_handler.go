@@ -473,14 +473,15 @@ func (f *defaultFrostServiceClientConnection) Close() {
 	_ = f.conn.Close()
 }
 
-func (h *LightningHandler) ValidateGetPreimageRequest(
+func (h *LightningHandler) validateGetPreimageRequest(
 	ctx context.Context,
 	paymentHash []byte,
 	cpfpTransactions []*pbspark.UserSignedTxSigningJob,
 	directTransactions []*pbspark.UserSignedTxSigningJob,
 	directFromCpfpTransactions []*pbspark.UserSignedTxSigningJob,
 	amount *pbspark.InvoiceAmount,
-	destinationPubKey keys.Public,
+	counterpartyPubKey keys.Public,
+	destinations leafDestinations,
 	feeSats uint64,
 	reason pbspark.InitiatePreimageSwapRequest_Reason,
 	validateNodeOwnership bool,
@@ -489,7 +490,80 @@ func (h *LightningHandler) ValidateGetPreimageRequest(
 	if amount != nil {
 		invoiceAmountSats = amount.GetValueSats()
 	}
-	return h.validateGetPreimageRequestWithFrostServiceClientFactory(ctx, &defaultFrostServiceClientConnection{}, paymentHash, cpfpTransactions, directTransactions, directFromCpfpTransactions, invoiceAmountSats, destinationPubKey, feeSats, reason, validateNodeOwnership)
+	return h.validateGetPreimageRequestWithFrostServiceClientFactory(ctx, &defaultFrostServiceClientConnection{}, paymentHash, cpfpTransactions, directTransactions, directFromCpfpTransactions, invoiceAmountSats, counterpartyPubKey, destinations, feeSats, reason, validateNodeOwnership)
+}
+
+// leafDestinations answers which key a given leaf's refund output must pay. v3 pays one
+// counterparty for the whole swap; v4 may pay different receivers per leaf.
+// Exactly one field carries the answer, and which one is set decides the mode: an unset single is
+// the zero key, which is never a real destination, and an unset perLeaf is nil. Both set or
+// neither set is a construction error rather than a silently-preferred field.
+type leafDestinations struct {
+	single  keys.Public
+	perLeaf map[string]keys.Public
+}
+
+func singleLeafDestination(destinationPubKey keys.Public) leafDestinations {
+	return leafDestinations{single: destinationPubKey}
+}
+
+// Keys are canonicalized here and on lookup: the wire leaf_id is not canonical, so keying on it
+// raw would let one leaf occupy two entries. An unparseable id passes through unchanged, matching
+// only an entry spelled the same way.
+func perLeafDestinations(destinations map[string]keys.Public) (leafDestinations, error) {
+	canonical := make(map[string]keys.Public, len(destinations))
+	for leafID, destination := range destinations {
+		key := canonicalLeafID(leafID)
+		if _, duplicate := canonical[key]; duplicate {
+			// Two spellings of one leaf would otherwise race: the winner is decided by Go's
+			// randomized map order, so operators preparing the same request could route the leaf
+			// to different receivers and disagree on what they prepared.
+			return leafDestinations{}, sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("leaf_id named more than once: %s", key))
+		}
+		canonical[key] = destination
+	}
+	return leafDestinations{perLeaf: canonical}, nil
+}
+
+func canonicalLeafID(leafID string) string {
+	parsed, err := uuid.Parse(leafID)
+	if err != nil {
+		return leafID
+	}
+	return parsed.String()
+}
+
+// routesPerLeaf reports the mode and rejects the two states no constructor produces, so a
+// hand-built value cannot pick a field by accident.
+func (d leafDestinations) routesPerLeaf() (bool, error) {
+	hasSingle := !d.single.Equals(keys.Public{})
+	hasPerLeaf := d.perLeaf != nil
+	switch {
+	case hasSingle && hasPerLeaf:
+		return false, sparkerrors.InternalObjectMalformedField(fmt.Errorf("leaf destinations set both a single destination and a per-leaf map"))
+	case !hasSingle && !hasPerLeaf:
+		return false, sparkerrors.InternalObjectMalformedField(fmt.Errorf("leaf destinations set neither a single destination nor a per-leaf map"))
+	default:
+		return hasPerLeaf, nil
+	}
+}
+
+// forLeaf fails closed on a leaf the map does not name: an unrouted leaf has no destination to
+// check against, and treating that as "anything goes" would let a caller move a leaf by leaving
+// it out.
+func (d leafDestinations) forLeaf(leafID string) (keys.Public, error) {
+	routesPerLeaf, err := d.routesPerLeaf()
+	if err != nil {
+		return keys.Public{}, err
+	}
+	if !routesPerLeaf {
+		return d.single, nil
+	}
+	destination, ok := d.perLeaf[canonicalLeafID(leafID)]
+	if !ok {
+		return keys.Public{}, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no receiver for leaf_id: %s", leafID))
+	}
+	return destination, nil
 }
 
 func validatePreimageSwapDestinationOutputs(
@@ -536,11 +610,23 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	directTransactions []*pbspark.UserSignedTxSigningJob,
 	directFromCpfpTransactions []*pbspark.UserSignedTxSigningJob,
 	invoiceAmountSats uint64,
-	destinationPubKey keys.Public,
+	counterpartyPubKey keys.Public,
+	destinations leafDestinations,
 	feeSats uint64,
 	reason pbspark.InitiatePreimageSwapRequest_Reason,
 	validateNodeOwnership bool,
 ) error {
+	// One parameter used to serve both the refund check and the duplicate guard, so this equality
+	// was structural; splitting them made divergence expressible and silent. Only per-leaf routing
+	// has cause to pay anyone but the counterparty.
+	routesPerLeaf, err := destinations.routesPerLeaf()
+	if err != nil {
+		return err
+	}
+	if !routesPerLeaf && !destinations.single.Equals(counterpartyPubKey) {
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("single-destination routing must target the counterparty"))
+	}
+
 	// Validate input parameters
 	if len(paymentHash) != 32 {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(paymentHash)))
@@ -583,7 +669,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	// Check for existing preimage requests (duplicate prevention)
 	preimageRequests, err := tx.PreimageRequest.Query().Where(
 		preimagerequest.PaymentHashEQ(paymentHash),
-		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubKey),
+		preimagerequest.ReceiverIdentityPubkeyEQ(counterpartyPubKey),
 		preimagerequest.StatusNEQ(st.PreimageRequestStatusReturned),
 	).WithTransfers().All(ctx)
 	if err != nil {
@@ -903,7 +989,11 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get cpfp refund tx: %w", err))
 		}
 
-		amountSats, err := validatePreimageSwapDestinationOutputs(cpfpRefundTx, destinationPubKey, true, "cpfp", cpfpTransaction.GetLeafId())
+		cpfpDestination, err := destinations.forLeaf(cpfpTransaction.GetLeafId())
+		if err != nil {
+			return err
+		}
+		amountSats, err := validatePreimageSwapDestinationOutputs(cpfpRefundTx, cpfpDestination, true, "cpfp", cpfpTransaction.GetLeafId())
 		if err != nil {
 			return err
 		}
@@ -925,7 +1015,11 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct refund tx for directTransaction leaf_id: %s: %w", directTransaction.GetLeafId(), err))
 		}
 
-		if _, err := validatePreimageSwapDestinationOutputs(directRefundTx, destinationPubKey, false, "direct", directTransaction.GetLeafId()); err != nil {
+		directDestination, err := destinations.forLeaf(directTransaction.GetLeafId())
+		if err != nil {
+			return err
+		}
+		if _, err := validatePreimageSwapDestinationOutputs(directRefundTx, directDestination, false, "direct", directTransaction.GetLeafId()); err != nil {
 			return err
 		}
 	}
@@ -938,7 +1032,11 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction leaf_id: %s: %w", directFromCpfpTransaction.GetLeafId(), err))
 		}
 
-		if _, err := validatePreimageSwapDestinationOutputs(directFromCpfpRefundTx, destinationPubKey, false, "direct from cpfp", directFromCpfpTransaction.GetLeafId()); err != nil {
+		directFromCpfpDestination, err := destinations.forLeaf(directFromCpfpTransaction.GetLeafId())
+		if err != nil {
+			return err
+		}
+		if _, err := validatePreimageSwapDestinationOutputs(directFromCpfpRefundTx, directFromCpfpDestination, false, "direct from cpfp", directFromCpfpTransaction.GetLeafId()); err != nil {
 			return err
 		}
 	}
@@ -975,7 +1073,7 @@ func validatePreimageSwapPackageSize(ctx context.Context, pkg *pbspark.TransferP
 }
 
 // validatePackageOnlySendRequest runs the request guards a transfer-less SEND
-// loses by skipping ValidateGetPreimageRequest (it has no P2TR refunds): payment-hash
+// loses by skipping validateGetPreimageRequest (it has no P2TR refunds): payment-hash
 // shape, duplicate-request rejection, and amount sufficiency over the package leaves.
 func (h *LightningHandler) validatePackageOnlySendRequest(
 	ctx context.Context,
@@ -1241,7 +1339,7 @@ func (h *LightningHandler) GetPreimageShare(
 		if inputs.isPackageOnlySend {
 			err = h.validatePackageOnlySendRequest(validateCtx, req, inputs, invoiceAmount, receiverIdentityPubKey, false)
 		} else {
-			err = h.ValidateGetPreimageRequest(
+			err = h.validateGetPreimageRequest(
 				validateCtx,
 				req.GetPaymentHash(),
 				inputs.validationCpfp,
@@ -1249,6 +1347,7 @@ func (h *LightningHandler) GetPreimageShare(
 				inputs.validationDirectFromCpfp,
 				invoiceAmount,
 				receiverIdentityPubKey,
+				singleLeafDestination(receiverIdentityPubKey),
 				req.GetFeeSats(),
 				req.GetReason(),
 				false,
@@ -1438,7 +1537,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 		// TODO: we still need to build the refund transaction from the SSP here to validate.
 		// NOTE: until then, the transfer_package refund bytes returned here replace the
 		// req.Transfer refund txs (which ARE output-shape validated in
-		// ValidateGetPreimageRequest) without any validation of their outputs. These are
+		// validateGetPreimageRequest) without any validation of their outputs. These are
 		// HTLC-shaped txs built by the SSP, so the destination/output checks applied to
 		// req.Transfer cannot be reused as-is; reconstruct-and-compare (as done below for
 		// REASON_SEND) is the intended fix.
@@ -1718,7 +1817,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		if inputs.isPackageOnlySend {
 			err = h.validatePackageOnlySendRequest(validateCtx, req, inputs, invoiceAmount, receiverIdentityPubKey, true)
 		} else {
-			err = h.ValidateGetPreimageRequest(
+			err = h.validateGetPreimageRequest(
 				validateCtx,
 				req.GetPaymentHash(),
 				inputs.validationCpfp,
@@ -1726,6 +1825,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 				inputs.validationDirectFromCpfp,
 				invoiceAmount,
 				receiverIdentityPubKey,
+				singleLeafDestination(receiverIdentityPubKey),
 				req.GetFeeSats(),
 				req.GetReason(),
 				true,

@@ -282,7 +282,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		if err := h.lightning.validatePackageOnlySendRequest(ctx, req, inputs, invoiceAmount, receiverIdentityPubKey, false); err != nil {
 			return nil, fmt.Errorf("unable to validate request for payment hash %x: %w", req.GetPaymentHash(), err)
 		}
-	} else if err := h.lightning.ValidateGetPreimageRequest(
+	} else if err := h.lightning.validateGetPreimageRequest(
 		ctx,
 		req.GetPaymentHash(),
 		inputs.validationCpfp,
@@ -290,6 +290,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 		inputs.validationDirectFromCpfp,
 		invoiceAmount,
 		receiverIdentityPubKey,
+		singleLeafDestination(receiverIdentityPubKey),
 		req.GetFeeSats(),
 		req.GetReason(),
 		false, // validateNodeOwnership: coordinator-only (session-based), done in the entrypoint
@@ -1113,7 +1114,7 @@ func (h *LightningHandler) validateLeafOwnershipForPreimageSwap(ctx context.Cont
 	// nonexistent (or duplicate) leaf would otherwise slip past this gate and
 	// only fail later inside Prepare — after the engine flow has started. Surface
 	// it up front, matching the legacy path where missing nodes failed early in
-	// ValidateGetPreimageRequest. (Duplicate leaf ids also trip this; they are
+	// validateGetPreimageRequest. (Duplicate leaf ids also trip this; they are
 	// invalid anyway, and ValidateDuplicateLeaves only runs later in Prepare.)
 	if len(nodes) != len(leafIDs) {
 		return sparkerrors.InvalidArgumentMalformedField(

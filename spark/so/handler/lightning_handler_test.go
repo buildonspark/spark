@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1463,7 +1464,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := lightningHandler.ValidateGetPreimageRequest(
+			err := lightningHandler.validateGetPreimageRequest(
 				ctx,
 				[]byte("payment_hash_32_bytes_long______"),
 				tt.cpfpTransactions,
@@ -1471,6 +1472,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 				tt.directFromCpfpTransactions,
 				&pb.InvoiceAmount{ValueSats: 1000},
 				tt.destinationPubKey,
+				singleLeafDestination(tt.destinationPubKey),
 				0,
 				pb.InitiatePreimageSwapRequest_REASON_SEND,
 				false,
@@ -1506,7 +1508,7 @@ func TestValidateGetPreimageRequest_PaymentHashCollision(t *testing.T) {
 		MustExec(ctx)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
-	err = NewLightningHandler(config).ValidateGetPreimageRequest(
+	err = NewLightningHandler(config).validateGetPreimageRequest(
 		ctx,
 		preimageRequest.PaymentHash,
 		[]*pb.UserSignedTxSigningJob{createSigningJob("leaf1")},
@@ -1514,6 +1516,7 @@ func TestValidateGetPreimageRequest_PaymentHashCollision(t *testing.T) {
 		[]*pb.UserSignedTxSigningJob{},
 		&pb.InvoiceAmount{ValueSats: transfer.TotalValue},
 		validPubKey,
+		singleLeafDestination(validPubKey),
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
 		false,
@@ -1775,6 +1778,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			[]*pb.UserSignedTxSigningJob{},
 			1000,
 			wrongKey,
+			singleLeafDestination(wrongKey),
 			0,
 			pb.InitiatePreimageSwapRequest_REASON_SEND,
 			true, // validateNodeOwnership = true
@@ -1904,6 +1908,7 @@ func TestValidateGetPreimageRequestRejectsDuplicateCpfpLeafBeforeAmountAggregati
 		nil,
 		1500,
 		destinationPubKey,
+		singleLeafDestination(destinationPubKey),
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
 		false,
@@ -2007,6 +2012,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		[]*pb.UserSignedTxSigningJob{},       // empty directFromCpfp transactions
 		1000,                                 // Expected 1000 sats but getting 500
 		validPubKey,
+		singleLeafDestination(validPubKey),
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
 		false, // validateNodeOwnership = false for this test
@@ -2102,6 +2108,7 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutput(t *testing.T) {
 		[]*pb.UserSignedTxSigningJob{},
 		500,
 		destinationPubKey,
+		singleLeafDestination(destinationPubKey),
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
 		false,
@@ -2271,6 +2278,7 @@ func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
 				directFromCpfp,
 				500,
 				destinationPubKey,
+				singleLeafDestination(destinationPubKey),
 				0,
 				pb.InitiatePreimageSwapRequest_REASON_SEND,
 				false,
@@ -2402,6 +2410,7 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths(t *testing
 				tc.directFromCpfp,
 				500,
 				destinationPubKey,
+				singleLeafDestination(destinationPubKey),
 				0,
 				pb.InitiatePreimageSwapRequest_REASON_SEND,
 				false,
@@ -2497,6 +2506,7 @@ func TestValidateGetPreimageRequestAllowsUnspecifiedInvoiceAmount(t *testing.T) 
 			[]*pb.UserSignedTxSigningJob{},
 			0,
 			destinationPubKey,
+			singleLeafDestination(destinationPubKey),
 			0,
 			pb.InitiatePreimageSwapRequest_REASON_SEND,
 			false,
@@ -2593,6 +2603,7 @@ func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
 		[]*pb.UserSignedTxSigningJob{},
 		1000,
 		validPubKey,
+		singleLeafDestination(validPubKey),
 		0,
 		pb.InitiatePreimageSwapRequest_REASON_SEND,
 		false,
@@ -2754,6 +2765,7 @@ func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
 				tt.directFromCpfpTransactions,
 				1000,
 				destinationPubKey,
+				singleLeafDestination(destinationPubKey),
 				0,
 				pb.InitiatePreimageSwapRequest_REASON_SEND,
 				false,
@@ -2869,6 +2881,7 @@ func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *te
 			[]*pb.UserSignedTxSigningJob{},
 			1,
 			destinationPubKey,
+			singleLeafDestination(destinationPubKey),
 			0,
 			pb.InitiatePreimageSwapRequest_REASON_SEND,
 			false,
@@ -3169,7 +3182,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		}}, 0, 0)
 		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
 		_, err := lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), req)
-		// The package leaf reached ValidateGetPreimageRequest's per-leaf node
+		// The package leaf reached validateGetPreimageRequest's per-leaf node
 		// lookup — proof the plain machinery consumed the package lists.
 		require.ErrorContains(t, err, "unable to get cpfpTransaction tree_node")
 	})
@@ -3265,5 +3278,329 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String()}}, 100, 0)
 		_, err = authzHandler.InitiatePreimageSwapV2(sessionCtx, req)
 		require.ErrorContains(t, err, "not owned by the authenticated identity")
+	})
+}
+
+func mustPerLeaf(t *testing.T, destinations map[string]keys.Public) leafDestinations {
+	t.Helper()
+	resolved, err := perLeafDestinations(destinations)
+	require.NoError(t, err)
+	return resolved
+}
+
+// A v4 receive settles each leaf to its own receiver, so one key can no longer answer for the
+// whole swap. The unrouted case carries the security property: a leaf the map does not name has
+// nothing to check its refund against, and admitting it would let a caller move a leaf by leaving
+// it out of the map.
+func TestLeafDestinationsResolvesPerLeafAndFailsClosed(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{64})
+	alice := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	bob := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	t.Run("one destination answers for every leaf", func(t *testing.T) {
+		destinations := singleLeafDestination(alice)
+
+		for _, leafID := range []string{"leaf-a", "leaf-b", ""} {
+			destination, err := destinations.forLeaf(leafID)
+
+			require.NoError(t, err)
+			require.Equal(t, alice, destination)
+		}
+	})
+
+	t.Run("a per-leaf map answers each leaf with its own receiver", func(t *testing.T) {
+		destinations, err := perLeafDestinations(map[string]keys.Public{"leaf-a": alice, "leaf-b": bob})
+		require.NoError(t, err)
+
+		first, err := destinations.forLeaf("leaf-a")
+		require.NoError(t, err)
+		require.Equal(t, alice, first)
+
+		second, err := destinations.forLeaf("leaf-b")
+		require.NoError(t, err)
+		require.Equal(t, bob, second)
+	})
+
+	t.Run("an unrouted leaf is refused", func(t *testing.T) {
+		destinations, err := perLeafDestinations(map[string]keys.Public{"leaf-a": alice})
+		require.NoError(t, err)
+
+		_, err = destinations.forLeaf("leaf-b")
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	// An empty map is still a per-leaf map: it must refuse, not fall through to the zero key.
+	t.Run("an empty map refuses every leaf", func(t *testing.T) {
+		destinations, err := perLeafDestinations(map[string]keys.Public{})
+		require.NoError(t, err)
+
+		_, err = destinations.forLeaf("leaf-a")
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	// The two states no constructor produces. A hand-built value that sets both fields, or
+	// neither, has no defensible answer, so it errors rather than letting one field win.
+	t.Run("setting neither destination is refused", func(t *testing.T) {
+		_, err := leafDestinations{}.forLeaf("leaf-a")
+
+		require.Error(t, err)
+		require.Equal(t, codes.Internal, status.Code(err))
+		require.Contains(t, err.Error(), "neither a single destination nor a per-leaf map")
+	})
+
+	t.Run("setting both destinations is refused", func(t *testing.T) {
+		_, err := leafDestinations{single: alice, perLeaf: map[string]keys.Public{"leaf-a": bob}}.forLeaf("leaf-a")
+
+		require.Error(t, err)
+		require.Equal(t, codes.Internal, status.Code(err))
+		require.Contains(t, err.Error(), "both a single destination and a per-leaf map")
+	})
+
+	// Two spellings of one leaf must be refused outright: canonicalizing them into one entry would
+	// let Go's randomized map order pick the winner, so operators could disagree on the receiver.
+	t.Run("one leaf named twice is refused", func(t *testing.T) {
+		canonical := uuid.New().String()
+
+		_, err := perLeafDestinations(map[string]keys.Public{canonical: alice, strings.ToUpper(canonical): bob})
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.Contains(t, err.Error(), "named more than once")
+	})
+
+	// The wire leaf_id is not canonical, so the map and the lookup must agree on spelling or a
+	// legitimate leaf is refused and two spellings of one id become two routable entries.
+	t.Run("leaf ids match across uuid spellings", func(t *testing.T) {
+		canonical := uuid.New().String()
+		destinations, err := perLeafDestinations(map[string]keys.Public{strings.ToUpper(canonical): alice})
+		require.NoError(t, err)
+
+		for _, spelling := range []string{canonical, strings.ToUpper(canonical), strings.ReplaceAll(canonical, "-", "")} {
+			destination, err := destinations.forLeaf(spelling)
+
+			require.NoError(t, err, "spelling %s", spelling)
+			require.Equal(t, alice, destination)
+		}
+	})
+}
+
+// TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver drives the per-leaf routing through
+// the full validation path rather than the resolver alone. The resolver's own tests cannot catch a
+// loop that looks up the wrong leaf or skips the lookup, because every other caller routes with a
+// single destination — and in that mode the resolver answers before it ever reads the leaf id.
+func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{71})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	alice := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	bob := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	// Distinct from every leaf destination, so a dup-guard that keyed off a destination instead
+	// of the counterparty would stop matching.
+	counterparty := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHashBytes := sha256.Sum256([]byte("per leaf routing"))
+	paymentHash := paymentHashBytes[:]
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(ownerPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": ownerPubKey}).
+		SetPublicKey(ownerPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	ownerScript, err := common.P2TRScriptFromPubKey(ownerPubKey)
+	require.NoError(t, err)
+
+	newLeafPaying := func(t *testing.T, receiver keys.Public) *pb.UserSignedTxSigningJob {
+		t.Helper()
+		receiverScript, err := common.P2TRScriptFromPubKey(receiver)
+		require.NoError(t, err)
+		parentTx, refundTx := createParentAndRefundTxWithOutputs(t, ownerScript, 1000, []*wire.TxOut{{Value: 500, PkScript: receiverScript}})
+
+		nodeID := uuid.New()
+		_, err = tx.TreeNode.Create().
+			SetTree(tree).
+			SetNetwork(tree.Network).
+			SetID(nodeID).
+			SetValue(1000).
+			SetStatus(st.TreeNodeStatusAvailable).
+			SetVerifyingPubkey(verifyingPubKey).
+			SetOwnerIdentityPubkey(ownerPubKey).
+			SetOwnerSigningPubkey(ownerPubKey).
+			SetRawTx(parentTx).
+			SetDirectTx(parentTx).
+			SetVout(0).
+			SetSigningKeyshare(keyshare).
+			Save(ctx)
+		require.NoError(t, err)
+
+		return &pb.UserSignedTxSigningJob{
+			LeafId: nodeID.String(),
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: map[string]*pbcommon.SigningCommitment{
+					"test": {Hiding: []byte("test_hiding"), Binding: []byte("test_binding")},
+				},
+			},
+			SigningNonceCommitment: &pbcommon.SigningCommitment{
+				Hiding:  []byte("test_nonce_hiding"),
+				Binding: []byte("test_nonce_binding"),
+			},
+			UserSignature: []byte("test_signature"),
+			RawTx:         refundTx,
+		}
+	}
+
+	none := []*pb.UserSignedTxSigningJob{}
+	// Only the cpfp refunds carry value toward the invoice; direct and direct-from-cpfp are
+	// alternative spend paths for the same leaves, so their amounts are deliberately not summed.
+	validate := func(cpfp, direct, directFromCpfp []*pb.UserSignedTxSigningJob, destinations leafDestinations, invoiceSats uint64) error {
+		return lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+			ctx,
+			&mockFrostServiceClientConnection{},
+			paymentHash,
+			cpfp,
+			direct,
+			directFromCpfp,
+			invoiceSats,
+			counterparty,
+			destinations,
+			0,
+			pb.InitiatePreimageSwapRequest_REASON_SEND,
+			false,
+		)
+	}
+
+	t.Run("two leaves each settle to their own receiver", func(t *testing.T) {
+		toAlice, toBob := newLeafPaying(t, alice), newLeafPaying(t, bob)
+
+		err := validate([]*pb.UserSignedTxSigningJob{toAlice, toBob}, none, none, mustPerLeaf(t, map[string]keys.Public{
+			toAlice.GetLeafId(): alice,
+			toBob.GetLeafId():   bob,
+		}), 1000)
+
+		require.NoError(t, err)
+	})
+
+	// The case a cross-wired lookup would pass: both keys are in the map, so only matching each
+	// refund to ITS OWN leaf's entry rejects this.
+	t.Run("swapping the two receivers is rejected", func(t *testing.T) {
+		toAlice, toBob := newLeafPaying(t, alice), newLeafPaying(t, bob)
+
+		err := validate([]*pb.UserSignedTxSigningJob{toAlice, toBob}, none, none, mustPerLeaf(t, map[string]keys.Public{
+			toAlice.GetLeafId(): bob,
+			toBob.GetLeafId():   alice,
+		}), 1000)
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.Contains(t, err.Error(), "invalid cpfp destination pubkey")
+	})
+
+	t.Run("a leaf missing from the map is refused", func(t *testing.T) {
+		toAlice, toBob := newLeafPaying(t, alice), newLeafPaying(t, bob)
+
+		err := validate([]*pb.UserSignedTxSigningJob{toAlice, toBob}, none, none, mustPerLeaf(t, map[string]keys.Public{
+			toAlice.GetLeafId(): alice,
+		}), 1000)
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.Contains(t, err.Error(), "no receiver for leaf_id")
+	})
+
+	// Routing to one destination means routing to the counterparty. The two were one parameter
+	// before per-leaf routing existed, so nothing but this check keeps them from drifting apart.
+	t.Run("a single destination that is not the counterparty is refused", func(t *testing.T) {
+		toAlice := newLeafPaying(t, alice)
+
+		err := validate([]*pb.UserSignedTxSigningJob{toAlice}, none, none, singleLeafDestination(alice), 500)
+
+		require.Error(t, err)
+		require.Equal(t, codes.Internal, status.Code(err))
+		require.Contains(t, err.Error(), "must target the counterparty")
+	})
+
+	// The cpfp loop is not the only one the refactor rewired. Routing the mismatch through the
+	// direct paths keeps a lookup that is wrong there — or absent — from passing unnoticed.
+	for _, path := range []struct {
+		name    string
+		place   func(job *pb.UserSignedTxSigningJob) (direct, directFromCpfp []*pb.UserSignedTxSigningJob)
+		wantErr string
+	}{
+		{
+			name: "direct",
+			place: func(j *pb.UserSignedTxSigningJob) ([]*pb.UserSignedTxSigningJob, []*pb.UserSignedTxSigningJob) {
+				return []*pb.UserSignedTxSigningJob{j}, none
+			},
+			wantErr: "invalid direct destination pubkey",
+		},
+		{
+			name: "direct from cpfp",
+			place: func(j *pb.UserSignedTxSigningJob) ([]*pb.UserSignedTxSigningJob, []*pb.UserSignedTxSigningJob) {
+				return none, []*pb.UserSignedTxSigningJob{j}
+			},
+			wantErr: "invalid direct from cpfp destination pubkey",
+		},
+	} {
+		// The refund deliberately pays the COUNTERPARTY while the map routes its leaf to alice.
+		// A loop that skipped the lookup and fell back to the counterparty would accept this, so
+		// the case discriminates rather than merely rejecting for some reason.
+		t.Run(path.name+" refunds resolve their own leaf's receiver", func(t *testing.T) {
+			toAlice, toCounterparty := newLeafPaying(t, alice), newLeafPaying(t, counterparty)
+			direct, directFromCpfp := path.place(toCounterparty)
+
+			err := validate([]*pb.UserSignedTxSigningJob{toAlice}, direct, directFromCpfp, mustPerLeaf(t, map[string]keys.Public{
+				toAlice.GetLeafId():        alice,
+				toCounterparty.GetLeafId(): alice,
+			}), 500)
+
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.Contains(t, err.Error(), path.wantErr)
+		})
+
+		t.Run(path.name+" refuses a leaf missing from the map", func(t *testing.T) {
+			toAlice, toBob := newLeafPaying(t, alice), newLeafPaying(t, bob)
+			direct, directFromCpfp := path.place(toBob)
+
+			err := validate([]*pb.UserSignedTxSigningJob{toAlice}, direct, directFromCpfp, mustPerLeaf(t, map[string]keys.Public{
+				toAlice.GetLeafId(): alice,
+			}), 500)
+
+			require.Error(t, err)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.Contains(t, err.Error(), "no receiver for leaf_id")
+		})
+	}
+
+	t.Run("a single destination that is the counterparty is admitted", func(t *testing.T) {
+		first, second := newLeafPaying(t, counterparty), newLeafPaying(t, counterparty)
+
+		err := validate([]*pb.UserSignedTxSigningJob{first, second}, none, none, singleLeafDestination(counterparty), 1000)
+
+		require.NoError(t, err)
 	})
 }
