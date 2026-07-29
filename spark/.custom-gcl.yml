@@ -1,6 +1,6 @@
-# Builds a custom golangci-lint binary that includes the in-repo fmtlint module
-# plugin. Build with `golangci-lint custom` (run from this directory), then run
-# the produced ./bin/golangci-lint-spark binary instead of plain golangci-lint.
+# Builds a custom golangci-lint binary that includes the in-repo module plugins.
+# Build with `golangci-lint custom` (run from this directory), then run the
+# produced ./bin/golangci-lint-spark binary instead of plain golangci-lint.
 #
 # The version must match the golangci-lint version pinned in ../.mise.toml.
 version: v2.12.2
@@ -10,4 +10,7 @@ plugins:
   - module: github.com/lightsparkdev/spark
     import: github.com/lightsparkdev/spark/tools/fmtlint
     # Use the in-repo copy of the module rather than a published version.
+    path: .
+  - module: github.com/lightsparkdev/spark
+    import: github.com/lightsparkdev/spark/tools/namelint
     path: .
