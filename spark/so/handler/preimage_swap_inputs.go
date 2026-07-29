@@ -11,7 +11,7 @@ import (
 
 // preimageSwapInputs carries the request fields the preimage-swap paths read from the
 // transfer_request. The validation* lists feed the P2TR-refund validator
-// (ValidateGetPreimageRequest): they hold the package lists for a RECEIVE and are empty
+// (validateGetPreimageRequest): they hold the package lists for a RECEIVE and are empty
 // for a package-only SEND (isPackageOnlySend), whose HTLC refunds the byte-match and
 // signing paths validate.
 type preimageSwapInputs struct {

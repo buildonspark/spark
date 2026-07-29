@@ -61,6 +61,7 @@ knobs:
     spark.so.shutdown_hodl_invoices: 0
     spark.so.mimo_authoritative_receiver_status_enabled: 1
     spark.so.mpc_transfer.enabled: 0
+    spark.so.initiate_preimage_swap_v4.enabled: 1
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
     spark.so.tokens.coordinated_freeze_enabled: 0
