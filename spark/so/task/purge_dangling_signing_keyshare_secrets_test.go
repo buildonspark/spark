@@ -356,6 +356,52 @@ func TestPurgeDanglingSigningKeyshareSecrets_NoOpWithoutEphemeralSession(t *test
 	require.NoError(t, err)
 }
 
+// A cursor that silently fails to persist degrades this task to "head of the
+// table forever", which is invisible in its logs, so the URI parsing that decides
+// whether it persists at all is worth pinning down directly.
+func TestParsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		cacheURI      string
+		expectedAddrs []string
+	}{
+		{name: "empty", cacheURI: "", expectedAddrs: []string{}},
+		{name: "scheme only", cacheURI: "memcaches://", expectedAddrs: []string{}},
+		{name: "single host without scheme", cacheURI: "host:11211", expectedAddrs: []string{"host:11211"}},
+		{name: "single host with scheme", cacheURI: "memcaches://host:11211", expectedAddrs: []string{"host:11211"}},
+		{name: "insecure scheme", cacheURI: "memcache://host:11211", expectedAddrs: []string{"host:11211"}},
+		{
+			name:          "multiple hosts",
+			cacheURI:      "memcaches://host:11211,host2:11211",
+			expectedAddrs: []string{"host:11211", "host2:11211"},
+		},
+		{
+			name:          "multiple hosts with whitespace and empty entries",
+			cacheURI:      "memcaches://host:11211, ,host2:11211 ",
+			expectedAddrs: []string{"host:11211", "host2:11211"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, test.expectedAddrs, parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(test.cacheURI))
+		})
+	}
+}
+
+// A CacheURI that yields no server must produce no client, because that is the
+// value the load/save/delete cursor helpers interpret as "no cache available". A
+// client built over an empty server list instead fails every operation with
+// ErrNoServers, which those helpers would surface as cursor-persistence warnings
+// on every run.
+func TestNewPurgeDanglingSigningKeyshareSecretsMemcacheClient_NilWithoutServers(t *testing.T) {
+	t.Parallel()
+	require.Nil(t, newPurgeDanglingSigningKeyshareSecretsMemcacheClient(""))
+	require.Nil(t, newPurgeDanglingSigningKeyshareSecretsMemcacheClient("memcaches://"))
+	require.NotNil(t, newPurgeDanglingSigningKeyshareSecretsMemcacheClient("memcaches://host:11211"))
+}
+
 func newPurgeDanglingSigningKeyshareSecretsContext(t *testing.T) (context.Context, *ent.Client, *entephemeral.Client) {
 	t.Helper()
 
