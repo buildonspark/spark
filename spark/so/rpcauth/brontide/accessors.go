@@ -34,9 +34,9 @@ func init() {
 		panic("brontide internals changed: handshakeState.remoteStatic not found; update spark/so/rpcauth/brontide accessor")
 	}
 
-	want := reflect.TypeFor[*btcec.PublicKey]()
-	if rs.Type != want {
-		panic(fmt.Sprintf("brontide internals changed: handshakeState.remoteStatic type is %v, want %v", rs.Type, want))
+	expectedType := reflect.TypeFor[*btcec.PublicKey]()
+	if rs.Type != expectedType {
+		panic(fmt.Sprintf("brontide internals changed: handshakeState.remoteStatic type is %v, want %v", rs.Type, expectedType))
 	}
 
 	machineRemoteStaticOffset = hs.Offset + rs.Offset

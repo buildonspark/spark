@@ -237,19 +237,19 @@ func verifyArgon2idHash(secret, encoded string) (bool, error) {
 	if len(salt) == 0 {
 		return false, fmt.Errorf("empty argon2 salt in stored PHC string")
 	}
-	want, err := base64.RawStdEncoding.DecodeString(parts[5])
+	storedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
 		return false, fmt.Errorf("invalid argon2 hash: %w", err)
 	}
 	// Guard against an empty hash component (e.g. a stored string ending in "$"): with
 	// keyLen 0, argon2.IDKey returns an empty digest and ConstantTimeCompare of two empty
 	// slices returns 1, which would authenticate any secret.
-	if len(want) == 0 {
+	if len(storedHash) == 0 {
 		return false, fmt.Errorf("empty argon2 hash in stored PHC string")
 	}
 
-	got := argon2.IDKey([]byte(secret), salt, time, memory, parallelism, uint32(len(want)))
-	return subtle.ConstantTimeCompare(got, want) == 1, nil
+	computedHash := argon2.IDKey([]byte(secret), salt, time, memory, parallelism, uint32(len(storedHash)))
+	return subtle.ConstantTimeCompare(computedHash, storedHash) == 1, nil
 }
 
 // dbBasicAuthSecretHashLookup returns a lookup that fetches basic_auth_secret_hash for a
