@@ -34,6 +34,12 @@ const (
 	TreeNodeStatusParentExited TreeNodeStatus = "PARENT_EXITED"
 	// TreeNodeStatusRenewLocked is the status of a tree node that is locked for renewal.
 	TreeNodeStatusRenewLocked TreeNodeStatus = "RENEW_LOCKED"
+	// TreeNodeStatusConsolidated is the status of a node whose subtree was
+	// aggregated back into it (AggregateLeaves): it carries live exit
+	// transactions signed under the aggregated leaf key and is exit-only —
+	// not transferable, renewable, or splittable. It may be aggregated
+	// further up the tree.
+	TreeNodeStatusConsolidated TreeNodeStatus = "CONSOLIDATED"
 )
 
 // CanBecomeAvailable reports whether a tree node currently in this status is
@@ -47,7 +53,8 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 		TreeNodeStatusOnChain,
 		TreeNodeStatusExited,
 		TreeNodeStatusParentExited,
-		TreeNodeStatusReimbursed:
+		TreeNodeStatusReimbursed,
+		TreeNodeStatusConsolidated:
 		return false
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,
@@ -97,6 +104,7 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusReimbursed),
 		string(TreeNodeStatusParentExited),
 		string(TreeNodeStatusRenewLocked),
+		string(TreeNodeStatusConsolidated),
 	}
 }
 
@@ -124,7 +132,8 @@ func (s TreeNodeStatus) IsTerminal() bool {
 		TreeNodeStatusInvestigation,
 		TreeNodeStatusLost,
 		TreeNodeStatusParentExited,
-		TreeNodeStatusRenewLocked:
+		TreeNodeStatusRenewLocked,
+		TreeNodeStatusConsolidated:
 		return false
 	}
 	// A status added without classification defaults to non-terminal so it
@@ -139,10 +148,13 @@ func (s TreeNodeStatus) IsTerminal() bool {
 // signal the metrics exist for. SPLIT_LOCKED is excluded for the same
 // reason: it is the permanent resting status of renew-created split nodes
 // (no transition leaves it), so it grows with every leaf renewal by design.
+// CONSOLIDATED is likewise a healthy resting state (an exit-only node waiting
+// to be exited or aggregated further), not stuck work.
 func (s TreeNodeStatus) CountsForOccupancy() bool {
 	return !s.IsTerminal() &&
 		s != TreeNodeStatusAvailable &&
-		s != TreeNodeStatusSplitLocked
+		s != TreeNodeStatusSplitLocked &&
+		s != TreeNodeStatusConsolidated
 }
 
 // OccupancyTreeNodeStatuses returns the statuses counted by the
