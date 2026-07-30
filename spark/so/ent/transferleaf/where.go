@@ -77,6 +77,11 @@ func Signature(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldSignature, v))
 }
 
+// SignatureScheme applies equality check predicate on the "signature_scheme" field. It's identical to SignatureSchemeEQ.
+func SignatureScheme(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldSignatureScheme, v))
+}
+
 // PreviousRefundTx applies equality check predicate on the "previous_refund_tx" field. It's identical to PreviousRefundTxEQ.
 func PreviousRefundTx(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldPreviousRefundTx, v))
@@ -340,6 +345,56 @@ func SignatureIsNil() predicate.TransferLeaf {
 // SignatureNotNil applies the NotNil predicate on the "signature" field.
 func SignatureNotNil() predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNotNull(FieldSignature))
+}
+
+// SignatureSchemeEQ applies the EQ predicate on the "signature_scheme" field.
+func SignatureSchemeEQ(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldSignatureScheme, v))
+}
+
+// SignatureSchemeNEQ applies the NEQ predicate on the "signature_scheme" field.
+func SignatureSchemeNEQ(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldSignatureScheme, v))
+}
+
+// SignatureSchemeIn applies the In predicate on the "signature_scheme" field.
+func SignatureSchemeIn(vs ...int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldSignatureScheme, vs...))
+}
+
+// SignatureSchemeNotIn applies the NotIn predicate on the "signature_scheme" field.
+func SignatureSchemeNotIn(vs ...int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldSignatureScheme, vs...))
+}
+
+// SignatureSchemeGT applies the GT predicate on the "signature_scheme" field.
+func SignatureSchemeGT(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGT(FieldSignatureScheme, v))
+}
+
+// SignatureSchemeGTE applies the GTE predicate on the "signature_scheme" field.
+func SignatureSchemeGTE(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGTE(FieldSignatureScheme, v))
+}
+
+// SignatureSchemeLT applies the LT predicate on the "signature_scheme" field.
+func SignatureSchemeLT(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLT(FieldSignatureScheme, v))
+}
+
+// SignatureSchemeLTE applies the LTE predicate on the "signature_scheme" field.
+func SignatureSchemeLTE(v int32) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLTE(FieldSignatureScheme, v))
+}
+
+// SignatureSchemeIsNil applies the IsNil predicate on the "signature_scheme" field.
+func SignatureSchemeIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldSignatureScheme))
+}
+
+// SignatureSchemeNotNil applies the NotNil predicate on the "signature_scheme" field.
+func SignatureSchemeNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldSignatureScheme))
 }
 
 // PreviousRefundTxEQ applies the EQ predicate on the "previous_refund_tx" field.

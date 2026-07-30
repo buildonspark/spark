@@ -25,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -2586,10 +2587,9 @@ func (h *BaseTransferHandler) commitSenderKeyTweaksWithMode(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("unable to update tree node: %w", err)
 		}
-		_, err = leaf.Update().
+		_, err = applyLeafSignature(leaf.Update(), keyTweak.GetSignature(), keyTweak.GetTypedSignature()).
 			SetKeyTweak(nil).
 			SetSecretCipher(keyTweak.GetSecretCipher()).
-			SetSignature(keyTweak.GetSignature()).
 			Save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update leaf key tweak: %w", err)
@@ -2717,4 +2717,16 @@ func isSwapKeyTweakCommitStatus(status st.TransferStatus) bool {
 	return status == st.TransferStatusSenderKeyTweakPending ||
 		status == st.TransferStatusSenderInitiatedCoordinator ||
 		status == st.TransferStatusApplyingSenderKeyTweak
+}
+
+// applyLeafSignature records the sender's per-leaf authorization signature from
+// the wire's mutually exclusive sig oneof. A typed signature stores its scheme
+// alongside the bytes; legacy bare bytes clear any previously stored scheme
+// (e.g. left behind by a rolled-back typed attempt, since RollbackTransfer does
+// not touch this column) so bytes and scheme are always written together.
+func applyLeafSignature(update *ent.TransferLeafUpdateOne, legacy []byte, typed *pbcommon.Signature) *ent.TransferLeafUpdateOne {
+	if typed != nil {
+		return update.SetSignature(typed.GetSignature()).SetSignatureScheme(int32(typed.GetScheme()))
+	}
+	return update.SetSignature(legacy).ClearSignatureScheme()
 }

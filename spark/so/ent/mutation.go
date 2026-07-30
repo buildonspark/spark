@@ -27964,6 +27964,8 @@ type TransferLeafMutation struct {
 	update_time                                      *time.Time
 	secret_cipher                                    *[]byte
 	signature                                        *[]byte
+	signature_scheme                                 *int32
+	addsignature_scheme                              *int32
 	previous_refund_tx                               *[]byte
 	previous_direct_refund_tx                        *[]byte
 	previous_direct_from_cpfp_refund_tx              *[]byte
@@ -28268,6 +28270,76 @@ func (m *TransferLeafMutation) SignatureCleared() bool {
 func (m *TransferLeafMutation) ResetSignature() {
 	m.signature = nil
 	delete(m.clearedFields, transferleaf.FieldSignature)
+}
+
+// SetSignatureScheme sets the "signature_scheme" field.
+func (m *TransferLeafMutation) SetSignatureScheme(i int32) {
+	m.signature_scheme = &i
+	m.addsignature_scheme = nil
+}
+
+// SignatureScheme returns the value of the "signature_scheme" field in the mutation.
+func (m *TransferLeafMutation) SignatureScheme() (r int32, exists bool) {
+	v := m.signature_scheme
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSignatureScheme returns the old "signature_scheme" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldSignatureScheme(ctx context.Context) (v int32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSignatureScheme is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSignatureScheme requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSignatureScheme: %w", err)
+	}
+	return oldValue.SignatureScheme, nil
+}
+
+// AddSignatureScheme adds i to the "signature_scheme" field.
+func (m *TransferLeafMutation) AddSignatureScheme(i int32) {
+	if m.addsignature_scheme != nil {
+		*m.addsignature_scheme += i
+	} else {
+		m.addsignature_scheme = &i
+	}
+}
+
+// AddedSignatureScheme returns the value that was added to the "signature_scheme" field in this mutation.
+func (m *TransferLeafMutation) AddedSignatureScheme() (r int32, exists bool) {
+	v := m.addsignature_scheme
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSignatureScheme clears the value of the "signature_scheme" field.
+func (m *TransferLeafMutation) ClearSignatureScheme() {
+	m.signature_scheme = nil
+	m.addsignature_scheme = nil
+	m.clearedFields[transferleaf.FieldSignatureScheme] = struct{}{}
+}
+
+// SignatureSchemeCleared returns if the "signature_scheme" field was cleared in this mutation.
+func (m *TransferLeafMutation) SignatureSchemeCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldSignatureScheme]
+	return ok
+}
+
+// ResetSignatureScheme resets all changes to the "signature_scheme" field.
+func (m *TransferLeafMutation) ResetSignatureScheme() {
+	m.signature_scheme = nil
+	m.addsignature_scheme = nil
+	delete(m.clearedFields, transferleaf.FieldSignatureScheme)
 }
 
 // SetPreviousRefundTx sets the "previous_refund_tx" field.
@@ -29306,7 +29378,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -29318,6 +29390,9 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.signature != nil {
 		fields = append(fields, transferleaf.FieldSignature)
+	}
+	if m.signature_scheme != nil {
+		fields = append(fields, transferleaf.FieldSignatureScheme)
 	}
 	if m.previous_refund_tx != nil {
 		fields = append(fields, transferleaf.FieldPreviousRefundTx)
@@ -29386,6 +29461,8 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.SecretCipher()
 	case transferleaf.FieldSignature:
 		return m.Signature()
+	case transferleaf.FieldSignatureScheme:
+		return m.SignatureScheme()
 	case transferleaf.FieldPreviousRefundTx:
 		return m.PreviousRefundTx()
 	case transferleaf.FieldPreviousDirectRefundTx:
@@ -29437,6 +29514,8 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSecretCipher(ctx)
 	case transferleaf.FieldSignature:
 		return m.OldSignature(ctx)
+	case transferleaf.FieldSignatureScheme:
+		return m.OldSignatureScheme(ctx)
 	case transferleaf.FieldPreviousRefundTx:
 		return m.OldPreviousRefundTx(ctx)
 	case transferleaf.FieldPreviousDirectRefundTx:
@@ -29507,6 +29586,13 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSignature(v)
+		return nil
+	case transferleaf.FieldSignatureScheme:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSignatureScheme(v)
 		return nil
 	case transferleaf.FieldPreviousRefundTx:
 		v, ok := value.([]byte)
@@ -29635,6 +29721,9 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *TransferLeafMutation) AddedFields() []string {
 	var fields []string
+	if m.addsignature_scheme != nil {
+		fields = append(fields, transferleaf.FieldSignatureScheme)
+	}
 	if m.addintermediate_refund_timelock != nil {
 		fields = append(fields, transferleaf.FieldIntermediateRefundTimelock)
 	}
@@ -29652,6 +29741,8 @@ func (m *TransferLeafMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *TransferLeafMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case transferleaf.FieldSignatureScheme:
+		return m.AddedSignatureScheme()
 	case transferleaf.FieldIntermediateRefundTimelock:
 		return m.AddedIntermediateRefundTimelock()
 	case transferleaf.FieldIntermediateDirectRefundTimelock:
@@ -29667,6 +29758,13 @@ func (m *TransferLeafMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *TransferLeafMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case transferleaf.FieldSignatureScheme:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSignatureScheme(v)
+		return nil
 	case transferleaf.FieldIntermediateRefundTimelock:
 		v, ok := value.(int64)
 		if !ok {
@@ -29701,6 +29799,9 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(transferleaf.FieldSignature) {
 		fields = append(fields, transferleaf.FieldSignature)
+	}
+	if m.FieldCleared(transferleaf.FieldSignatureScheme) {
+		fields = append(fields, transferleaf.FieldSignatureScheme)
 	}
 	if m.FieldCleared(transferleaf.FieldPreviousDirectRefundTx) {
 		fields = append(fields, transferleaf.FieldPreviousDirectRefundTx)
@@ -29767,6 +29868,9 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 	case transferleaf.FieldSignature:
 		m.ClearSignature()
 		return nil
+	case transferleaf.FieldSignatureScheme:
+		m.ClearSignatureScheme()
+		return nil
 	case transferleaf.FieldPreviousDirectRefundTx:
 		m.ClearPreviousDirectRefundTx()
 		return nil
@@ -29831,6 +29935,9 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldSignature:
 		m.ResetSignature()
+		return nil
+	case transferleaf.FieldSignatureScheme:
+		m.ResetSignatureScheme()
 		return nil
 	case transferleaf.FieldPreviousRefundTx:
 		m.ResetPreviousRefundTx()

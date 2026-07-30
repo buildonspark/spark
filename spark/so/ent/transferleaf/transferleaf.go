@@ -24,6 +24,8 @@ const (
 	FieldSecretCipher = "secret_cipher"
 	// FieldSignature holds the string denoting the signature field in the database.
 	FieldSignature = "signature"
+	// FieldSignatureScheme holds the string denoting the signature_scheme field in the database.
+	FieldSignatureScheme = "signature_scheme"
 	// FieldPreviousRefundTx holds the string denoting the previous_refund_tx field in the database.
 	FieldPreviousRefundTx = "previous_refund_tx"
 	// FieldPreviousDirectRefundTx holds the string denoting the previous_direct_refund_tx field in the database.
@@ -105,6 +107,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldSecretCipher,
 	FieldSignature,
+	FieldSignatureScheme,
 	FieldPreviousRefundTx,
 	FieldPreviousDirectRefundTx,
 	FieldPreviousDirectFromCpfpRefundTx,
@@ -183,6 +186,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// BySignatureScheme orders the results by the signature_scheme field.
+func BySignatureScheme(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSignatureScheme, opts...).ToFunc()
 }
 
 // ByIntermediateRefundTimelock orders the results by the intermediate_refund_timelock field.

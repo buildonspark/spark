@@ -781,7 +781,10 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak for leaf %s: %w", leaf.ID, err)
 		}
-		_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.Proto().GetSignature()).SetSecretCipher(leafTweak.Proto().GetSecretCipher()).Save(ctx)
+		_, err = applyLeafSignature(transferLeaf.Update(), leafTweak.Proto().GetSignature(), leafTweak.Proto().GetTypedSignature()).
+			SetKeyTweak(leafTweakBinary).
+			SetSecretCipher(leafTweak.Proto().GetSecretCipher()).
+			Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update transfer leaf %s for leaf %s: %w", transferLeaf.ID, leaf.ID, err)
 		}

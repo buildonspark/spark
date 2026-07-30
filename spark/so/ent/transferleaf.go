@@ -31,6 +31,8 @@ type TransferLeaf struct {
 	SecretCipher []byte `json:"secret_cipher,omitempty"`
 	// Signature from the sender over the transfer leaf data.
 	Signature []byte `json:"signature,omitempty"`
+	// Scheme of `signature` as a common.SignatureScheme value; unspecified/0 is the legacy ECDSA interpretation.
+	SignatureScheme int32 `json:"signature_scheme,omitempty"`
 	// The previous owner's refund transaction (pre-signed), replaced by this transfer.
 	PreviousRefundTx []byte `json:"previous_refund_tx,omitempty"`
 	// The previous owner's direct refund transaction (pre-signed), if applicable.
@@ -143,7 +145,7 @@ func (*TransferLeaf) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case transferleaf.FieldIntermediateRefundTxid, transferleaf.FieldIntermediateDirectRefundTxid, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
 			values[i] = new(schematype.TxID)
-		case transferleaf.FieldIntermediateRefundTimelock, transferleaf.FieldIntermediateDirectRefundTimelock, transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		case transferleaf.FieldSignatureScheme, transferleaf.FieldIntermediateRefundTimelock, transferleaf.FieldIntermediateDirectRefundTimelock, transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
 			values[i] = new(sql.NullInt64)
 		case transferleaf.FieldCreateTime, transferleaf.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -197,6 +199,12 @@ func (tl *TransferLeaf) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field signature", values[i])
 			} else if value != nil {
 				tl.Signature = *value
+			}
+		case transferleaf.FieldSignatureScheme:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field signature_scheme", values[i])
+			} else if value.Valid {
+				tl.SignatureScheme = int32(value.Int64)
 			}
 		case transferleaf.FieldPreviousRefundTx:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -383,6 +391,9 @@ func (tl *TransferLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("signature=")
 	builder.WriteString(fmt.Sprintf("%v", tl.Signature))
+	builder.WriteString(", ")
+	builder.WriteString("signature_scheme=")
+	builder.WriteString(fmt.Sprintf("%v", tl.SignatureScheme))
 	builder.WriteString(", ")
 	builder.WriteString("previous_refund_tx=")
 	builder.WriteString(fmt.Sprintf("%v", tl.PreviousRefundTx))

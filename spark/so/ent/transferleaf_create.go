@@ -69,6 +69,20 @@ func (tlc *TransferLeafCreate) SetSignature(b []byte) *TransferLeafCreate {
 	return tlc
 }
 
+// SetSignatureScheme sets the "signature_scheme" field.
+func (tlc *TransferLeafCreate) SetSignatureScheme(i int32) *TransferLeafCreate {
+	tlc.mutation.SetSignatureScheme(i)
+	return tlc
+}
+
+// SetNillableSignatureScheme sets the "signature_scheme" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableSignatureScheme(i *int32) *TransferLeafCreate {
+	if i != nil {
+		tlc.SetSignatureScheme(*i)
+	}
+	return tlc
+}
+
 // SetPreviousRefundTx sets the "previous_refund_tx" field.
 func (tlc *TransferLeafCreate) SetPreviousRefundTx(b []byte) *TransferLeafCreate {
 	tlc.mutation.SetPreviousRefundTx(b)
@@ -424,6 +438,10 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 		_spec.SetField(transferleaf.FieldSignature, field.TypeBytes, value)
 		_node.Signature = value
 	}
+	if value, ok := tlc.mutation.SignatureScheme(); ok {
+		_spec.SetField(transferleaf.FieldSignatureScheme, field.TypeInt32, value)
+		_node.SignatureScheme = value
+	}
 	if value, ok := tlc.mutation.PreviousRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldPreviousRefundTx, field.TypeBytes, value)
 		_node.PreviousRefundTx = value
@@ -649,6 +667,30 @@ func (u *TransferLeafUpsert) UpdateSignature() *TransferLeafUpsert {
 // ClearSignature clears the value of the "signature" field.
 func (u *TransferLeafUpsert) ClearSignature() *TransferLeafUpsert {
 	u.SetNull(transferleaf.FieldSignature)
+	return u
+}
+
+// SetSignatureScheme sets the "signature_scheme" field.
+func (u *TransferLeafUpsert) SetSignatureScheme(v int32) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldSignatureScheme, v)
+	return u
+}
+
+// UpdateSignatureScheme sets the "signature_scheme" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateSignatureScheme() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldSignatureScheme)
+	return u
+}
+
+// AddSignatureScheme adds v to the "signature_scheme" field.
+func (u *TransferLeafUpsert) AddSignatureScheme(v int32) *TransferLeafUpsert {
+	u.Add(transferleaf.FieldSignatureScheme, v)
+	return u
+}
+
+// ClearSignatureScheme clears the value of the "signature_scheme" field.
+func (u *TransferLeafUpsert) ClearSignatureScheme() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldSignatureScheme)
 	return u
 }
 
@@ -1029,6 +1071,34 @@ func (u *TransferLeafUpsertOne) UpdateSignature() *TransferLeafUpsertOne {
 func (u *TransferLeafUpsertOne) ClearSignature() *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearSignature()
+	})
+}
+
+// SetSignatureScheme sets the "signature_scheme" field.
+func (u *TransferLeafUpsertOne) SetSignatureScheme(v int32) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetSignatureScheme(v)
+	})
+}
+
+// AddSignatureScheme adds v to the "signature_scheme" field.
+func (u *TransferLeafUpsertOne) AddSignatureScheme(v int32) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddSignatureScheme(v)
+	})
+}
+
+// UpdateSignatureScheme sets the "signature_scheme" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateSignatureScheme() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateSignatureScheme()
+	})
+}
+
+// ClearSignatureScheme clears the value of the "signature_scheme" field.
+func (u *TransferLeafUpsertOne) ClearSignatureScheme() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearSignatureScheme()
 	})
 }
 
@@ -1620,6 +1690,34 @@ func (u *TransferLeafUpsertBulk) UpdateSignature() *TransferLeafUpsertBulk {
 func (u *TransferLeafUpsertBulk) ClearSignature() *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearSignature()
+	})
+}
+
+// SetSignatureScheme sets the "signature_scheme" field.
+func (u *TransferLeafUpsertBulk) SetSignatureScheme(v int32) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetSignatureScheme(v)
+	})
+}
+
+// AddSignatureScheme adds v to the "signature_scheme" field.
+func (u *TransferLeafUpsertBulk) AddSignatureScheme(v int32) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddSignatureScheme(v)
+	})
+}
+
+// UpdateSignatureScheme sets the "signature_scheme" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateSignatureScheme() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateSignatureScheme()
+	})
+}
+
+// ClearSignatureScheme clears the value of the "signature_scheme" field.
+func (u *TransferLeafUpsertBulk) ClearSignatureScheme() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearSignatureScheme()
 	})
 }
 

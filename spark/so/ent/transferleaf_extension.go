@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"google.golang.org/protobuf/proto"
 )
@@ -25,6 +26,7 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 	var keyTweakProof []byte
 	secretCipher := t.SecretCipher
 	signature := t.Signature
+	signatureScheme := pbcommon.SignatureScheme(t.SignatureScheme)
 	if len(t.KeyTweak) != 0 {
 		leafKeyTweak := &pb.SendLeafKeyTweak{}
 		if err = proto.Unmarshal(t.KeyTweak, leafKeyTweak); err == nil {
@@ -33,7 +35,15 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 				secretCipher = leafKeyTweak.GetSecretCipher()
 			}
 			if len(signature) == 0 {
-				signature = leafKeyTweak.GetSignature()
+				if ts := leafKeyTweak.GetTypedSignature(); ts != nil {
+					signature = ts.GetSignature()
+					signatureScheme = ts.GetScheme()
+				} else {
+					// Source bytes and scheme together: the blob's legacy arm
+					// carries no scheme, so ignore any stale column value.
+					signature = leafKeyTweak.GetSignature()
+					signatureScheme = pbcommon.SignatureScheme_SIGNATURE_SCHEME_UNSPECIFIED
+				}
 			}
 		}
 	}
@@ -46,8 +56,17 @@ func (t *TransferLeaf) marshalTransferLeafProto(ctx context.Context, leaf *TreeN
 		IntermediateDirectFromCpfpRefundTx: t.IntermediateDirectFromCpfpRefundTx,
 		PendingKeyTweakPublicKey:           keyTweakProof,
 	}
+	// Re-split storage back into the wire's mutually-exclusive `sig` oneof: the
+	// legacy bytes form for ECDSA (unspecified scheme), the scheme-tagged form
+	// otherwise.
 	if len(signature) > 0 {
-		pbLeaf.Sig = &pb.TransferLeaf_Signature{Signature: signature}
+		if signatureScheme == pbcommon.SignatureScheme_SIGNATURE_SCHEME_UNSPECIFIED {
+			pbLeaf.Sig = &pb.TransferLeaf_Signature{Signature: signature}
+		} else {
+			pbLeaf.Sig = &pb.TransferLeaf_TypedSignature{
+				TypedSignature: &pbcommon.Signature{Scheme: signatureScheme, Signature: signature},
+			}
+		}
 	}
 	if t.TransferReceiverID != nil {
 		pbLeaf.TransferReceiverId = t.TransferReceiverID.String()

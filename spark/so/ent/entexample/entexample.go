@@ -5762,6 +5762,7 @@ type TransferLeafExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	SecretCipher                             *[]byte
 	Signature                                *[]byte
+	SignatureScheme                          *int32
 	PreviousRefundTx                         *[]byte
 	PreviousDirectRefundTx                   *[]byte
 	PreviousDirectFromCpfpRefundTx           *[]byte
@@ -5804,6 +5805,12 @@ func (tl *TransferLeafExample) SetSecretCipher(v []byte) *TransferLeafExample {
 // SetSignature sets the signature field.
 func (tl *TransferLeafExample) SetSignature(v []byte) *TransferLeafExample {
 	tl.Signature = &v
+	return tl
+}
+
+// SetSignatureScheme sets the signature_scheme field.
+func (tl *TransferLeafExample) SetSignatureScheme(v int32) *TransferLeafExample {
+	tl.SignatureScheme = &v
 	return tl
 }
 
@@ -5956,6 +5963,10 @@ func (tl *TransferLeafExample) MustExec(ctx context.Context) *ent.TransferLeaf {
 			b, _ := hex.DecodeString("ed9ffdb0a3a65a5e51e477cb6688c118e5bb4333a8bd8c8dbe4b5e7d4223f97b6c4947d300d34d4cf48d2d1bd03c8aec29f628175a5c7d37a6e7338270af8f4d")
 			return b
 		}())
+	}
+	if tl.SignatureScheme != nil {
+		create.SetSignatureScheme(*tl.SignatureScheme)
+	} else {
 	}
 	if tl.PreviousRefundTx != nil {
 		create.SetPreviousRefundTx(*tl.PreviousRefundTx)
@@ -6119,6 +6130,10 @@ func (tl *TransferLeafExample) Exec(ctx context.Context) (*ent.TransferLeaf, err
 			b, _ := hex.DecodeString("ed9ffdb0a3a65a5e51e477cb6688c118e5bb4333a8bd8c8dbe4b5e7d4223f97b6c4947d300d34d4cf48d2d1bd03c8aec29f628175a5c7d37a6e7338270af8f4d")
 			return b
 		}())
+	}
+	if tl.SignatureScheme != nil {
+		create.SetSignatureScheme(*tl.SignatureScheme)
+	} else {
 	}
 	if tl.PreviousRefundTx != nil {
 		create.SetPreviousRefundTx(*tl.PreviousRefundTx)

@@ -63,6 +63,33 @@ func (tlu *TransferLeafUpdate) ClearSignature() *TransferLeafUpdate {
 	return tlu
 }
 
+// SetSignatureScheme sets the "signature_scheme" field.
+func (tlu *TransferLeafUpdate) SetSignatureScheme(i int32) *TransferLeafUpdate {
+	tlu.mutation.ResetSignatureScheme()
+	tlu.mutation.SetSignatureScheme(i)
+	return tlu
+}
+
+// SetNillableSignatureScheme sets the "signature_scheme" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableSignatureScheme(i *int32) *TransferLeafUpdate {
+	if i != nil {
+		tlu.SetSignatureScheme(*i)
+	}
+	return tlu
+}
+
+// AddSignatureScheme adds i to the "signature_scheme" field.
+func (tlu *TransferLeafUpdate) AddSignatureScheme(i int32) *TransferLeafUpdate {
+	tlu.mutation.AddSignatureScheme(i)
+	return tlu
+}
+
+// ClearSignatureScheme clears the value of the "signature_scheme" field.
+func (tlu *TransferLeafUpdate) ClearSignatureScheme() *TransferLeafUpdate {
+	tlu.mutation.ClearSignatureScheme()
+	return tlu
+}
+
 // SetIntermediateRefundTx sets the "intermediate_refund_tx" field.
 func (tlu *TransferLeafUpdate) SetIntermediateRefundTx(b []byte) *TransferLeafUpdate {
 	tlu.mutation.SetIntermediateRefundTx(b)
@@ -428,6 +455,15 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tlu.mutation.SignatureCleared() {
 		_spec.ClearField(transferleaf.FieldSignature, field.TypeBytes)
 	}
+	if value, ok := tlu.mutation.SignatureScheme(); ok {
+		_spec.SetField(transferleaf.FieldSignatureScheme, field.TypeInt32, value)
+	}
+	if value, ok := tlu.mutation.AddedSignatureScheme(); ok {
+		_spec.AddField(transferleaf.FieldSignatureScheme, field.TypeInt32, value)
+	}
+	if tlu.mutation.SignatureSchemeCleared() {
+		_spec.ClearField(transferleaf.FieldSignatureScheme, field.TypeInt32)
+	}
 	if tlu.mutation.PreviousDirectRefundTxCleared() {
 		_spec.ClearField(transferleaf.FieldPreviousDirectRefundTx, field.TypeBytes)
 	}
@@ -619,6 +655,33 @@ func (tluo *TransferLeafUpdateOne) SetSignature(b []byte) *TransferLeafUpdateOne
 // ClearSignature clears the value of the "signature" field.
 func (tluo *TransferLeafUpdateOne) ClearSignature() *TransferLeafUpdateOne {
 	tluo.mutation.ClearSignature()
+	return tluo
+}
+
+// SetSignatureScheme sets the "signature_scheme" field.
+func (tluo *TransferLeafUpdateOne) SetSignatureScheme(i int32) *TransferLeafUpdateOne {
+	tluo.mutation.ResetSignatureScheme()
+	tluo.mutation.SetSignatureScheme(i)
+	return tluo
+}
+
+// SetNillableSignatureScheme sets the "signature_scheme" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableSignatureScheme(i *int32) *TransferLeafUpdateOne {
+	if i != nil {
+		tluo.SetSignatureScheme(*i)
+	}
+	return tluo
+}
+
+// AddSignatureScheme adds i to the "signature_scheme" field.
+func (tluo *TransferLeafUpdateOne) AddSignatureScheme(i int32) *TransferLeafUpdateOne {
+	tluo.mutation.AddSignatureScheme(i)
+	return tluo
+}
+
+// ClearSignatureScheme clears the value of the "signature_scheme" field.
+func (tluo *TransferLeafUpdateOne) ClearSignatureScheme() *TransferLeafUpdateOne {
+	tluo.mutation.ClearSignatureScheme()
 	return tluo
 }
 
@@ -1016,6 +1079,15 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if tluo.mutation.SignatureCleared() {
 		_spec.ClearField(transferleaf.FieldSignature, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.SignatureScheme(); ok {
+		_spec.SetField(transferleaf.FieldSignatureScheme, field.TypeInt32, value)
+	}
+	if value, ok := tluo.mutation.AddedSignatureScheme(); ok {
+		_spec.AddField(transferleaf.FieldSignatureScheme, field.TypeInt32, value)
+	}
+	if tluo.mutation.SignatureSchemeCleared() {
+		_spec.ClearField(transferleaf.FieldSignatureScheme, field.TypeInt32)
 	}
 	if tluo.mutation.PreviousDirectRefundTxCleared() {
 		_spec.ClearField(transferleaf.FieldPreviousDirectRefundTx, field.TypeBytes)
