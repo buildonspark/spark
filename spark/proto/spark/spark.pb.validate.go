@@ -15659,6 +15659,8 @@ func (m *InitiatePreimageSwapV4Request) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for CounterpartyManifestSignature
+
 	if m.GetTransferV3Request() == nil {
 		err := InitiatePreimageSwapV4RequestValidationError{
 			field:  "TransferV3Request",

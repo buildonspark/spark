@@ -1311,7 +1311,10 @@ message InitiatePreimageSwapV4Request {
     // The party opposite the sender: the lightning service on REASON_SEND, the
     // invoice owner on REASON_RECEIVE. Keys the preimage request.
     bytes counterparty_identity_public_key = 4 [(validate.rules).bytes.len = 33];
-    StartTransferV3Request transfer_v3_request = 5 [(validate.rules).message.required = true];
+    // The counterparty's signature over the manifest hash, made with the key above:
+    // attests that the invoice owner agreed to this edge set.
+    bytes counterparty_manifest_signature = 5;
+    StartTransferV3Request transfer_v3_request = 6 [(validate.rules).message.required = true];
 }
 
 message InitiatePreimageSwapResponse {
