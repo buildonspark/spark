@@ -26,9 +26,35 @@ func TestTreeNodeStatusIsTerminal(t *testing.T) {
 	assert.True(t, TreeNodeStatusAggregated.IsTerminal())
 }
 
+func TestTreeNodeStatusCanBecomeAvailable(t *testing.T) {
+	revivable := map[TreeNodeStatus]bool{
+		TreeNodeStatusCreating:       true,
+		TreeNodeStatusAvailable:      true,
+		TreeNodeStatusFrozenByIssuer: true,
+		TreeNodeStatusTransferLocked: true,
+		TreeNodeStatusSplitLocked:    true,
+		TreeNodeStatusAggregated:     true,
+		TreeNodeStatusAggregateLock:  true,
+		TreeNodeStatusInvestigation:  true,
+		TreeNodeStatusLost:           true,
+		TreeNodeStatusRenewLocked:    true,
+	}
+	for _, v := range (TreeNodeStatus("")).Values() {
+		s := TreeNodeStatus(v)
+		assert.Equal(t, revivable[s], s.CanBecomeAvailable(), "CanBecomeAvailable(%s)", s)
+	}
+	// A consolidated node's value lives in the exit package on the node
+	// itself; reviving it to AVAILABLE alongside its retired children would
+	// let the same value be claimed twice (the SP-3049 class).
+	assert.False(t, TreeNodeStatusConsolidated.CanBecomeAvailable())
+	// AGGREGATE_LOCK must stay revivable: rollback restores locked nodes to
+	// AVAILABLE.
+	assert.True(t, TreeNodeStatusAggregateLock.CanBecomeAvailable())
+}
+
 func TestOccupancyTreeNodeStatuses_ExcludesTerminalAndAvailable(t *testing.T) {
 	occupancy := OccupancyTreeNodeStatuses()
-	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-6)
+	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-7)
 	for _, s := range occupancy {
 		assert.True(t, s.CountsForOccupancy())
 		assert.False(t, s.IsTerminal())
@@ -41,6 +67,10 @@ func TestOccupancyTreeNodeStatuses_ExcludesTerminalAndAvailable(t *testing.T) {
 	// rest there permanently, so counting it would grow forever by design.
 	assert.False(t, TreeNodeStatusSplitLocked.CountsForOccupancy())
 	assert.NotContains(t, occupancy, TreeNodeStatusSplitLocked)
+	// CONSOLIDATED is non-terminal yet excluded: an exit-only node resting
+	// until it is exited or aggregated further, not stuck work.
+	assert.False(t, TreeNodeStatusConsolidated.CountsForOccupancy())
+	assert.NotContains(t, occupancy, TreeNodeStatusConsolidated)
 	// PARENT_EXITED counts: the watchtower still owes those children their
 	// own broadcast work during unilateral exits.
 	assert.Contains(t, occupancy, TreeNodeStatusParentExited)

@@ -337,8 +337,24 @@ const (
 
 	// Enable instant static deposit flow.
 	KnobEnableInstantStaticDeposit = "spark.so.enable_instant_static_deposit"
+
 	// Total number of sats that can be pending in the instant static deposit flow
 	KnobMaxPendingInstantStaticDepositAmount = "spark.so.max_pending_instant_static_deposit_amount"
+
+	// KnobEnableLeafAggregation gates the SSP-facing aggregate_leaves RPC (the
+	// AggregateLeaves 2PC flow). Binary: any non-zero value enables.
+	//
+	// Enabling is irreversible per subtree: commit retires the descendants to
+	// AGGREGATED and rotates the target's keyshare, and there is no un-aggregate
+	// flow. So enable only once every SO runs a binary that both
+	//
+	//   1. dispatches CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES — otherwise
+	//      participants reject the prepare fan-out, and
+	//   2. includes the watchtower's CONSOLIDATED support. Retiring the
+	//      descendants removes them from watchtower coverage, so without that
+	//      support the aggregated value has no automated unilateral-exit
+	//      defense at all.
+	KnobEnableLeafAggregation = "spark.so.enable_leaf_aggregation"
 
 	KnobPurgeDanglingSigningKeyshareSecretsBatchSize = "spark.so.purge_dangling_signing_keyshare_secrets_batch_size"
 	// Per-run cap on the number of aged candidates a single purge invocation

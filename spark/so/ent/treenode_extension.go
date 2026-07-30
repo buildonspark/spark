@@ -177,6 +177,8 @@ func TreeNodeStatusSchema(status pbspark.TreeNodeStatus) (st.TreeNodeStatus, err
 		return st.TreeNodeStatusExited, nil
 	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_RENEW_LOCKED:
 		return st.TreeNodeStatusRenewLocked, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_CONSOLIDATED:
+		return st.TreeNodeStatusConsolidated, nil
 	default:
 		return "", fmt.Errorf("unknown tree node status: %s", status)
 	}
