@@ -134,6 +134,18 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 		return nil, fmt.Errorf("failed to query refund-pending nodes: %w", err)
 	}
 
+	// Consolidated nodes need no query arm of their own: their exit package
+	// spends the parent's output, but the node row still satisfies one of the
+	// arms above — query 1 while its own node tx is unconfirmed, query 2 once
+	// it is — and CONSOLIDATED is not terminal. A third arm would only re-scan
+	// a persistent resting state every block and be deduplicated away.
+	//
+	// Being a candidate is not permission to broadcast. A consolidated ROOT
+	// reaches the loop via query 2, and what stops it is the funding-height
+	// check in checkAndBroadcastConsolidatedRefundTx: a root's package is
+	// funded by the long-confirmed deposit, so there is no exit-in-progress
+	// signal and broadcasting on sight would force-exit resting funds.
+
 	// Deduplicate nodes.
 	allNodes := slices.Concat(childNodes, refundNodes)
 
@@ -189,7 +201,46 @@ func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client,
 }
 
 // CheckExpiredTimeLocks checks for TXs with expired time locks and broadcasts them if needed.
-func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, blockHeight int64, network btcnetwork.Network) error {
+func CheckExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, bitcoinClient bitcoinClient, node *ent.TreeNode, blockHeight int64, network btcnetwork.Network) error {
+	// The candidate list is built once per block and processed node by node,
+	// so this snapshot's status can be stale by the time we get here — an
+	// aggregation may have locked the node in between, and broadcasting its
+	// pre-aggregation transaction would then conflict with the exit package
+	// that flow is about to install. Re-read the status before deciding.
+	node, err := refreshNodeStatus(ctx, dbClient, node)
+	if err != nil {
+		return err
+	}
+	if node == nil {
+		return nil
+	}
+
+	// A consolidated node's exit package spends its parent's tx output, so it
+	// has no node tx of its own to broadcast and its refund expiry keys off
+	// the parent confirmation rather than node_confirmation_height.
+	if node.Status == st.TreeNodeStatusConsolidated {
+		if node.RefundConfirmationHeight == 0 {
+			return checkAndBroadcastConsolidatedRefundTx(ctx, bitcoinClient, node, blockHeight, network)
+		}
+		return nil
+	}
+
+	// A node locked for aggregation is mid-flow: its stored refund package is
+	// about to be replaced, and broadcasting it would publish an old state, so
+	// leave it alone until the flow commits or rolls back.
+	//
+	// Two limits worth knowing. This only binds operators running this code:
+	// an older binary sharing the database has no such guard, which is why
+	// spark.so.enable_leaf_aggregation must stay off until the whole fleet is
+	// upgraded (nothing can reach AGGREGATE_LOCK before then). And the status
+	// is read, not held — a Prepare committing between the read above and the
+	// broadcast below is still possible; see refreshNodeStatus.
+	if node.Status == st.TreeNodeStatusAggregateLock {
+		return nil
+	}
+	if slices.Contains(terminalStatuses, node.Status) {
+		return nil
+	}
 
 	if len(node.DirectTx) > 0 && node.NodeConfirmationHeight == 0 {
 		return checkAndBroadcastNodeTx(ctx, bitcoinClient, node, network, blockHeight)
@@ -202,7 +253,119 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 	return nil
 }
 
-func checkAndBroadcastNodeTx(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, network btcnetwork.Network, blockHeight int64) error {
+// checkAndBroadcastConsolidatedRefundTx broadcasts a consolidated node's
+// watchtower refund (direct_from_cpfp_refund_tx: fee-deducted, relative
+// timelock DirectTimelockOffset) once its parent's node tx has confirmed —
+// an exit of the branch is underway — and the timelock has expired.
+//
+// A consolidated tree root is skipped: its exit package spends the deposit
+// outpoint, which is confirmed from the moment the tree exists, so there is
+// no signal distinguishing "an exit is happening" from "the funds are
+// resting". Broadcasting on that would force-exit resting funds and burn the
+// fee, while the owner's zero-timelock refund already lets them exit at will.
+func checkAndBroadcastConsolidatedRefundTx(ctx context.Context, btcClient bitcoinClient, node *ent.TreeNode, blockHeight int64, network btcnetwork.Network) error {
+	if blockHeight < 0 {
+		return fmt.Errorf("watchtower invalid block height: %d", blockHeight)
+	}
+	if len(node.DirectFromCpfpRefundTx) == 0 {
+		return fmt.Errorf("watchtower consolidated node %s has no watchtower refund tx", node.ID)
+	}
+
+	fundingHeight, fundingOutpoint, err := consolidatedParentConfirmationHeight(ctx, node)
+	if err != nil {
+		return err
+	}
+	if fundingHeight == 0 {
+		return nil
+	}
+
+	tx, err := common.TxFromRawTxBytes(node.DirectFromCpfpRefundTx)
+	if err != nil {
+		return fmt.Errorf("watchtower failed to parse consolidated refund tx for node %s: %w", node.ID, err)
+	}
+	if len(tx.TxIn) != 1 {
+		return fmt.Errorf("watchtower invalid consolidated refund tx for node %s: expected 1 input, got %d", node.ID, len(tx.TxIn))
+	}
+	// The height only starts this package's timelock if it is the confirmation
+	// of the very output the package spends.
+	if tx.TxIn[0].PreviousOutPoint != fundingOutpoint {
+		return fmt.Errorf("watchtower consolidated node %s spends %s but its parent's confirmed node tx output is %s", node.ID, tx.TxIn[0].PreviousOutPoint, fundingOutpoint)
+	}
+	sequence := tx.TxIn[0].Sequence
+	if (sequence & wire.SequenceLockTimeDisabled) != 0 {
+		return fmt.Errorf("watchtower invalid consolidated refund tx for node %s: timelock disabled", node.ID)
+	}
+	if (sequence & wire.SequenceLockTimeIsSeconds) != 0 {
+		return fmt.Errorf("watchtower invalid consolidated refund tx for node %s: expected block-based timelock, got time-based", node.ID)
+	}
+
+	timelockExpiryHeight := uint64(sequence&wire.SequenceLockTimeMask) + fundingHeight
+	if timelockExpiryHeight <= uint64(blockHeight) {
+		if err := broadcastWithMetric(ctx, btcClient, node.ID, node.DirectFromCpfpRefundTx, network, refundTxBroadcastCounter); err != nil {
+			return fmt.Errorf("watchtower failed to broadcast consolidated refund tx for node %s: %w", node.ID, err)
+		}
+	}
+	return nil
+}
+
+// refreshNodeStatus re-reads the node so broadcast decisions run against its
+// current state rather than the snapshot taken when the candidate list was
+// built. A node deleted in between returns (nil, nil) — nothing to broadcast.
+func refreshNodeStatus(ctx context.Context, dbClient *ent.Client, node *ent.TreeNode) (*ent.TreeNode, error) {
+	if dbClient == nil {
+		return node, nil
+	}
+	// A plain read, deliberately: a FOR UPDATE read would wait on a Prepare
+	// holding this row, but the watchtower runs outside a transaction, so the
+	// lock would be released before the broadcast anyway — it narrows the
+	// window without closing it — and it is unsupported by the SQLite-backed
+	// callers of this path.
+	fresh, err := dbClient.TreeNode.Get(ctx, node.ID)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("watchtower failed to re-read node %s: %w", node.ID, err)
+	}
+	return fresh, nil
+}
+
+// consolidatedParentConfirmationHeight returns the confirmation height of the
+// parent node tx whose output a consolidated node's exit package spends. Zero
+// means the branch is not exiting (or the node is a root, which this arm
+// deliberately does not broadcast).
+//
+// The parent row is re-read rather than taken from the eager-loaded edge:
+// broadcasting is irreversible, and the edge was populated when the candidate
+// list was built, which can be many nodes earlier — long enough for a reorg
+// to have cleared the height that justifies the broadcast.
+// consolidatedParentConfirmationHeight returns the height that starts the
+// consolidated package's relative timelock, and the outpoint that height is
+// claimed to fund.
+//
+// Callers must check the package actually spends that outpoint.
+// node_confirmation_height is set when either the parent's raw node tx or its
+// direct tx confirms (MarkExitingNodes), but a consolidated package only ever
+// spends the raw one. Without the outpoint check, a parent that exited via its
+// direct tx would start the clock off a confirmation of a transaction this
+// package does not spend, and the broadcast would target an outpoint that never
+// existed. Fully separating the two sources needs a per-source confirmation
+// height on the row; until then this fails closed rather than broadcasting.
+func consolidatedParentConfirmationHeight(ctx context.Context, node *ent.TreeNode) (uint64, wire.OutPoint, error) {
+	parent, err := node.QueryParent().Only(ctx)
+	if ent.IsNotFound(err) {
+		return 0, wire.OutPoint{}, nil
+	}
+	if err != nil {
+		return 0, wire.OutPoint{}, fmt.Errorf("watchtower failed to query parent for consolidated node %s: %w", node.ID, err)
+	}
+	if node.Vout < 0 {
+		return 0, wire.OutPoint{}, fmt.Errorf("watchtower consolidated node %s has negative vout %d", node.ID, node.Vout)
+	}
+	return parent.NodeConfirmationHeight, wire.OutPoint{Hash: parent.RawTxid.Hash(), Index: uint32(node.Vout)}, nil
+}
+
+func checkAndBroadcastNodeTx(ctx context.Context, bitcoinClient bitcoinClient, node *ent.TreeNode, network btcnetwork.Network, blockHeight int64) error {
 	// Sanity check since we cast this to uint64 later.
 	if blockHeight < 0 {
 		return fmt.Errorf("watchtower invalid block height: %d", blockHeight)
@@ -255,7 +418,7 @@ func checkAndBroadcastNodeTx(ctx context.Context, bitcoinClient *rpcclient.Clien
 	return nil
 }
 
-func checkAndBroadcastRefundTx(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, blockHeight int64, network btcnetwork.Network) error {
+func checkAndBroadcastRefundTx(ctx context.Context, bitcoinClient bitcoinClient, node *ent.TreeNode, blockHeight int64, network btcnetwork.Network) error {
 	// Sanity check since we cast this to uint64 later.
 	if blockHeight < 0 {
 		return fmt.Errorf("watchtower invalid block height: %d", blockHeight)
