@@ -68,8 +68,6 @@ knobs:
     spark.so.enable_leaf_aggregation: 1
     # Lightning
     spark.so.shutdown_hodl_invoices: 0
-    # MIMO
-    spark.so.mimo_authoritative_receiver_status_enabled: 1
     # Multiparty (user-side MPC) transfer send — fail-closed endpoint; off until the flow lands.
     spark.so.mpc_transfer.enabled: 0
     # Lightning preimage swap v4 — the manifest-bearing, multi-receiver version.

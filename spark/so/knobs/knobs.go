@@ -31,12 +31,6 @@ const (
 	KnobRateLimitMemcacheMaxIdleConns = "spark.so.ratelimit.memcache.max_idle_conns"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 
-	// KnobMimoAuthoritativeReceiverStatusEnabled, when >0, keeps multi-receiver
-	// (N>1) transfers at SENDER_KEY_TWEAKED through the claim and advances the
-	// parent straight to COMPLETED only once all receivers finish. Flip on all
-	// SOs together — the internal settle RPCs run on every operator.
-	KnobMimoAuthoritativeReceiverStatusEnabled = "spark.so.mimo_authoritative_receiver_status_enabled"
-
 	// Per-call sampling rate (0–100) for the "transfer query invoked" caller-attribution log.
 	// Default 0 = off; bump to 100 (or a small percentage) during diagnosis.
 	KnobLogTransferQueryInvocations = "spark.so.log_transfer_query_invocations"
