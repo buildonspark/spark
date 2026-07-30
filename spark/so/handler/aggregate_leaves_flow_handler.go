@@ -708,6 +708,11 @@ func applyAggregateLeavesCommit(ctx context.Context, config *so.Config, req *pbi
 	// success and marks the participant row terminal; anything else would be
 	// redelivered forever.
 	if node := firstAggregateLeavesOnChainNode(subtree); node != nil {
+		// AlreadyExists marks the flow terminal, so no rollback follows and
+		// nothing else ever clears AGGREGATE_LOCK.
+		if _, err := releaseAggregateLeavesLocks(ctx, subtree.leaves, "commit declined"); err != nil {
+			return err
+		}
 		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("aggregate leaves commit: declining to consolidate target %s, node %s is %s so the exit package's input is already spent", target.ID, node.ID, node.Status))
 	}
 
@@ -870,7 +875,7 @@ func (h *AggregateLeavesFlowHandler) Rollback(ctx context.Context, op proto.Mess
 		return err
 	}
 	logger := logging.GetLoggerFromContext(ctx)
-	restored := 0
+	leaves := make([]*ent.TreeNode, 0, len(leafIDStrs))
 	for _, idStr := range leafIDStrs {
 		leafID, err := uuid.Parse(idStr)
 		if err != nil {
@@ -883,36 +888,67 @@ func (h *AggregateLeavesFlowHandler) Rollback(ctx context.Context, op proto.Mess
 			}
 			return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query leaf %s: %w", leafID, err))
 		}
+		leaves = append(leaves, leaf)
+	}
+	released, err := releaseAggregateLeavesLocks(ctx, leaves, "rollback")
+	if err != nil {
+		return err
+	}
+	logger.Sugar().Infof("aggregate leaves rollback: target %s, restored %d of %d named leaves", targetNodeID, released, len(leafIDStrs))
+	return nil
+}
+
+// releaseAggregateLeavesLocks unlocks the leaves this flow locked. Skipping any
+// leaf not in AGGREGATE_LOCK keeps it from disturbing another flow's lock.
+func releaseAggregateLeavesLocks(ctx context.Context, leaves []*ent.TreeNode, reason string) (int, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	released := 0
+	logger := logging.GetLoggerFromContext(ctx)
+	for _, leaf := range leaves {
 		if leaf.Status != st.TreeNodeStatusAggregateLock {
-			logger.Sugar().Infof("aggregate leaves rollback: leaf %s is %s, not %s, leaving it alone", leaf.ID, leaf.Status, st.TreeNodeStatusAggregateLock)
+			logger.Sugar().Infof("aggregate leaves %s: leaf %s is %s, not %s, leaving it alone", reason, leaf.ID, leaf.Status, st.TreeNodeStatusAggregateLock)
 			continue
 		}
 		prior, err := aggregateLeavesPriorLeafStatus(ctx, db, leaf)
 		if err != nil {
-			return err
+			return released, err
 		}
 		if _, err := db.TreeNode.UpdateOne(leaf).SetStatus(prior).Save(ctx); err != nil {
-			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to restore leaf %s to %s: %w", leaf.ID, prior, err))
+			return released, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to restore leaf %s to %s: %w", leaf.ID, prior, err))
 		}
-		logger.Sugar().Infof("aggregate leaves rollback: restored leaf %s to %s", leaf.ID, prior)
-		restored++
+		logger.Sugar().Infof("aggregate leaves %s: restored leaf %s to %s", reason, leaf.ID, prior)
+		released++
 	}
-	logger.Sugar().Infof("aggregate leaves rollback: target %s, restored %d of %d named leaves", targetNodeID, restored, len(leafIDStrs))
-	return nil
+	return released, nil
 }
 
-// aggregateLeavesPriorLeafStatus recovers a locked leaf's pre-lock status from
-// this operator's own rows. Prepare only accepts AVAILABLE or CONSOLIDATED
-// leaves, and those two are distinguishable after the fact: a CONSOLIDATED
-// node is one that already absorbed a subtree, so it has children, while an
-// ordinary available leaf has none.
+// The parent-exit sweep skips locked nodes and runs only in the block carrying
+// the parent's transaction, so this is the last chance to record an exited parent.
 func aggregateLeavesPriorLeafStatus(ctx context.Context, db *ent.Client, leaf *ent.TreeNode) (st.TreeNodeStatus, error) {
 	children, err := db.TreeNode.Query().Where(enttreenode.HasParentWith(enttreenode.ID(leaf.ID))).Count(ctx)
 	if err != nil {
 		return "", sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to count children of leaf %s: %w", leaf.ID, err))
 	}
+	// Mirrors the sweep, which exempts CONSOLIDATED: that status is how the
+	// watchtower finds the node's exit package, and its direct tx is gone.
 	if children > 0 {
 		return st.TreeNodeStatusConsolidated, nil
+	}
+
+	// Share-locked: the sweep filters this leaf out while it is locked and
+	// never revisits, so reading a not-yet-committed zero height here would
+	// strand it AVAILABLE under an exited parent.
+	parent, err := leaf.QueryParent().ForShare().Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return "", sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query parent of leaf %s: %w", leaf.ID, err))
+	}
+	// Either height means one of the parent's transactions confirmed, which is
+	// what triggers the sweep; a refund confirmation sets only the latter.
+	if parent != nil && (parent.NodeConfirmationHeight > 0 || parent.RefundConfirmationHeight > 0) {
+		return st.TreeNodeStatusParentExited, nil
 	}
 	return st.TreeNodeStatusAvailable, nil
 }

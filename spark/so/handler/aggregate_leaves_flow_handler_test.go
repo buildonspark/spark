@@ -674,7 +674,8 @@ func TestApplyAggregateLeavesCommitDeclinesWhenSubtreeWentOnChain(t *testing.T) 
 	for _, leaf := range f.leaves {
 		reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
 		require.NoError(t, err)
-		assert.Equal(t, st.TreeNodeStatusAggregateLock, reloaded.Status, "leaves must not be retired")
+		assert.Equal(t, st.TreeNodeStatusAvailable, reloaded.Status,
+			"a declined commit must release the leaves it is abandoning, to their correct prior status")
 	}
 }
 
@@ -850,6 +851,72 @@ func TestAggregateLeavesRollback(t *testing.T) {
 			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
 			require.NoError(t, err)
 			assert.Equal(t, st.TreeNodeStatusAvailable, reloaded.Status)
+		}
+	})
+
+	t.Run("parent that exited while locked yields PARENT_EXITED", func(t *testing.T) {
+		ctx, dbClient, f, lockAll := setup(t, 33)
+		lockAll()
+		// Leaf 1 already absorbed a subtree, so it was CONSOLIDATED pre-lock.
+		_, err := dbClient.TreeNode.Create().
+			SetTree(f.tree).
+			SetParent(f.leaves[1]).
+			SetNetwork(btcnetwork.Regtest).
+			SetSigningKeyshare(f.leafKeyshares[1]).
+			SetValue(f.leaves[1].Value).
+			SetVerifyingPubkey(f.leaves[1].VerifyingPubkey).
+			SetOwnerIdentityPubkey(f.ownerIdentity.Public()).
+			SetOwnerSigningPubkey(f.leafUserPrivs[1].Public()).
+			SetRawTx(f.leaves[1].RawTx).
+			SetVout(0).
+			SetStatus(st.TreeNodeStatusAggregated).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = dbClient.TreeNode.UpdateOne(f.target).
+			SetStatus(st.TreeNodeStatusOnChain).
+			SetNodeConfirmationHeight(1_000).
+			Save(ctx)
+		require.NoError(t, err)
+
+		require.NoError(t, handler.Rollback(ctx, &pbinternal.AggregateLeavesRollbackRequest{
+			TargetNodeId: f.target.ID.String(),
+			LeafIds:      []string{f.leaves[0].ID.String(), f.leaves[1].ID.String()},
+		}))
+
+		plain, err := dbClient.TreeNode.Get(ctx, f.leaves[0].ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusParentExited, plain.Status,
+			"a leaf whose parent exited while it was locked must not come back AVAILABLE")
+
+		consolidated, err := dbClient.TreeNode.Get(ctx, f.leaves[1].ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusConsolidated, consolidated.Status,
+			"a consolidated leaf must keep the status its exit package is found by, even under an exited parent")
+	})
+
+	t.Run("parent exited by refund confirmation also yields PARENT_EXITED", func(t *testing.T) {
+		ctx, dbClient, f, lockAll := setup(t, 34)
+		lockAll()
+		_, err := dbClient.TreeNode.UpdateOne(f.target).
+			SetStatus(st.TreeNodeStatusExited).
+			SetRefundConfirmationHeight(1_000).
+			Save(ctx)
+		require.NoError(t, err)
+		reloadedTarget, err := dbClient.TreeNode.Get(ctx, f.target.ID)
+		require.NoError(t, err)
+		require.Zero(t, reloadedTarget.NodeConfirmationHeight, "this case is only meaningful with the node height unset")
+
+		require.NoError(t, handler.Rollback(ctx, &pbinternal.AggregateLeavesRollbackRequest{
+			TargetNodeId: f.target.ID.String(),
+			LeafIds:      []string{f.leaves[0].ID.String(), f.leaves[1].ID.String()},
+		}))
+
+		for _, leaf := range f.leaves {
+			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			assert.Equal(t, st.TreeNodeStatusParentExited, reloaded.Status,
+				"a parent that exited by refund confirmation must count as exited")
 		}
 	})
 
