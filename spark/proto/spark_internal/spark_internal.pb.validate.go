@@ -14572,3 +14572,413 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ConsensusQueryOutcomeResponseValidationError{}
+
+// Validate checks the field values on AggregateLeavesPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AggregateLeavesPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateLeavesPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// AggregateLeavesPrepareRequestMultiError, or nil if none found.
+func (m *AggregateLeavesPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateLeavesPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TargetNodeId
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := AggregateLeavesPrepareRequestValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AggregateLeavesPrepareRequestValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AggregateLeavesPrepareRequestValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AggregateLeavesPrepareRequestValidationError{
+				field:  "RefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetWatchtowerRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AggregateLeavesPrepareRequestValidationError{
+					field:  "WatchtowerRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AggregateLeavesPrepareRequestValidationError{
+					field:  "WatchtowerRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetWatchtowerRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AggregateLeavesPrepareRequestValidationError{
+				field:  "WatchtowerRefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return AggregateLeavesPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateLeavesPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by AggregateLeavesPrepareRequest.ValidateAll()
+// if the designated constraints aren't met.
+type AggregateLeavesPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateLeavesPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateLeavesPrepareRequestMultiError) AllErrors() []error { return m }
+
+// AggregateLeavesPrepareRequestValidationError is the validation error
+// returned by AggregateLeavesPrepareRequest.Validate if the designated
+// constraints aren't met.
+type AggregateLeavesPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateLeavesPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateLeavesPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateLeavesPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateLeavesPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateLeavesPrepareRequestValidationError) ErrorName() string {
+	return "AggregateLeavesPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateLeavesPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateLeavesPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateLeavesPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateLeavesPrepareRequestValidationError{}
+
+// Validate checks the field values on AggregateLeavesCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AggregateLeavesCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateLeavesCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AggregateLeavesCommitRequestMultiError, or nil if none found.
+func (m *AggregateLeavesCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateLeavesCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TargetNodeId
+
+	// no validation rules for SignedRefundTx
+
+	// no validation rules for SignedWatchtowerRefundTx
+
+	if len(m.GetAggregatedOwnerSigningPublicKey()) != 33 {
+		err := AggregateLeavesCommitRequestValidationError{
+			field:  "AggregatedOwnerSigningPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := AggregateLeavesCommitRequestValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return AggregateLeavesCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateLeavesCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by AggregateLeavesCommitRequest.ValidateAll() if
+// the designated constraints aren't met.
+type AggregateLeavesCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateLeavesCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateLeavesCommitRequestMultiError) AllErrors() []error { return m }
+
+// AggregateLeavesCommitRequestValidationError is the validation error returned
+// by AggregateLeavesCommitRequest.Validate if the designated constraints
+// aren't met.
+type AggregateLeavesCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateLeavesCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateLeavesCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateLeavesCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateLeavesCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateLeavesCommitRequestValidationError) ErrorName() string {
+	return "AggregateLeavesCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateLeavesCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateLeavesCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateLeavesCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateLeavesCommitRequestValidationError{}
+
+// Validate checks the field values on AggregateLeavesRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AggregateLeavesRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AggregateLeavesRollbackRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// AggregateLeavesRollbackRequestMultiError, or nil if none found.
+func (m *AggregateLeavesRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AggregateLeavesRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TargetNodeId
+
+	if len(errors) > 0 {
+		return AggregateLeavesRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// AggregateLeavesRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by AggregateLeavesRollbackRequest.ValidateAll()
+// if the designated constraints aren't met.
+type AggregateLeavesRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AggregateLeavesRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AggregateLeavesRollbackRequestMultiError) AllErrors() []error { return m }
+
+// AggregateLeavesRollbackRequestValidationError is the validation error
+// returned by AggregateLeavesRollbackRequest.Validate if the designated
+// constraints aren't met.
+type AggregateLeavesRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AggregateLeavesRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AggregateLeavesRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AggregateLeavesRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AggregateLeavesRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AggregateLeavesRollbackRequestValidationError) ErrorName() string {
+	return "AggregateLeavesRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AggregateLeavesRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAggregateLeavesRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AggregateLeavesRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AggregateLeavesRollbackRequestValidationError{}

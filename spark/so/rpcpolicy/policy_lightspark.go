@@ -43,6 +43,7 @@ func sparkSspInternalServicePolicies() map[string]Policy {
 		pbssp.SparkSspInternalService_ExitTrees_FullMethodName:                           sessionInternal,
 		pbssp.SparkSspInternalService_TweakKeysForCoopExit_FullMethodName:                sessionInternal,
 		pbssp.SparkSspInternalService_InitiateStaticDepositUtxoSwap_FullMethodName:       sessionInternal,
+		pbssp.SparkSspInternalService_AggregateLeaves_FullMethodName:                     sessionInternal,
 		pbssp.SparkSspInternalService_ReserveInstantStaticDepositUtxoSwap_FullMethodName: sessionInternal,
 		pbssp.SparkSspInternalService_ClaimInstantStaticDepositUtxoSwap_FullMethodName:   sessionInternal,
 		pbssp.SparkSspInternalService_PrepareTreeAddress_FullMethodName:                  sessionInternal,
