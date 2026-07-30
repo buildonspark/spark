@@ -1349,6 +1349,17 @@ func sumOfSigningKeyshares(ctx context.Context, keyshares []*SigningKeyshare) (*
 	return sum, nil
 }
 
+// SumOfSigningKeyshares returns the in-memory aggregate of the given
+// keyshares after hydrating their secrets; nothing is persisted. Same field
+// semantics as sumOfSigningKeyshares: only ID, SecretShare, PublicKey, and
+// PublicShares are set on the result.
+func SumOfSigningKeyshares(ctx context.Context, keyshares []*SigningKeyshare) (*SigningKeyshare, error) {
+	if err := HydrateSigningKeyshareSecrets(ctx, keyshares); err != nil {
+		return nil, err
+	}
+	return sumOfSigningKeyshares(ctx, keyshares)
+}
+
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
 func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
