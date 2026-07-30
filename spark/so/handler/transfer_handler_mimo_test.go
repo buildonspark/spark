@@ -20,7 +20,6 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1454,11 +1453,8 @@ func TestSettleReceiverKeyTweak_AcceptsReceiverClaimPendingOnRollback(t *testing
 		"ROLLBACK on RECEIVER_CLAIM_PENDING is a no-op; status must not change")
 }
 
-// TestMimoReceiverStatusAuthoritative covers the gate that decides whether a
-// claim skips advancing the parent transfers.status: knob on AND receiver count > 1.
-// Tested directly because the gate is otherwise only reachable through the full
-// claim/settle crypto paths; the end-to-end "parent stays SENDER_KEY_TWEAKED until
-// the last receiver completes" behavior is exercised via scenario testing.
+// The >1-receiver gate is tested directly because it is otherwise reachable only
+// through the full claim/settle crypto paths; the end-to-end case is scenario-tested.
 func TestMimoReceiverStatusAuthoritative(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	rng := rand.NewChaCha8([32]byte{77})
@@ -1479,26 +1475,13 @@ func TestMimoReceiverStatusAuthoritative(t *testing.T) {
 		return transfer
 	}
 
-	withKnobs := func(values map[string]float64) context.Context {
-		return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(values))
-	}
-	knobOn := map[string]float64{
-		knobs.KnobMimoAuthoritativeReceiverStatusEnabled: 1,
-	}
-	knobOff := map[string]float64{}
-
-	t.Run("knob on, multi-receiver is receiver-authoritative", func(t *testing.T) {
-		authoritative, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(2))
+	t.Run("multi-receiver is receiver-authoritative", func(t *testing.T) {
+		authoritative, err := isMimoReceiverStatusAuthoritative(ctx, buildTransfer(2))
 		require.NoError(t, err)
 		assert.True(t, authoritative)
 	})
-	t.Run("knob on, single-receiver is not authoritative", func(t *testing.T) {
-		authoritative, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOn), buildTransfer(1))
-		require.NoError(t, err)
-		assert.False(t, authoritative)
-	})
-	t.Run("knob off, multi-receiver is not authoritative", func(t *testing.T) {
-		authoritative, err := isMimoReceiverStatusAuthoritative(withKnobs(knobOff), buildTransfer(2))
+	t.Run("single-receiver is not authoritative", func(t *testing.T) {
+		authoritative, err := isMimoReceiverStatusAuthoritative(ctx, buildTransfer(1))
 		require.NoError(t, err)
 		assert.False(t, authoritative)
 	})

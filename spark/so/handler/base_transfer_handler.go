@@ -39,7 +39,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/mimo"
 	transferpkg "github.com/lightsparkdev/spark/so/transfer"
 	"google.golang.org/protobuf/proto"
@@ -1646,14 +1645,9 @@ func (h *BaseTransferHandler) loadTransferReceiverByPublicKeyForUpdate(ctx conte
 	}
 }
 
-// isMimoReceiverStatusAuthoritative reports whether the per-receiver
-// transfer_receivers.status is the authoritative status source for this transfer:
-// the knob is on AND it has >1 receiver. When true, callers leave the parent
-// transfers.status at SENDER_KEY_TWEAKED instead of advancing it.
+// isMimoReceiverStatusAuthoritative holds for >1 receiver: callers then leave the
+// parent transfers.status at SENDER_KEY_TWEAKED until every receiver finishes.
 func isMimoReceiverStatusAuthoritative(ctx context.Context, transfer *ent.Transfer) (bool, error) {
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobMimoAuthoritativeReceiverStatusEnabled, 0) == 0 {
-		return false, nil
-	}
 	count, err := transfer.QueryTransferReceivers().Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("unable to count transfer receivers for transfer %s: %w", transfer.ID, err)
