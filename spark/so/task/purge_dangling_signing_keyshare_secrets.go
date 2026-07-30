@@ -75,7 +75,13 @@ func runPurgeDanglingSigningKeyshareSecrets(ctx context.Context, config *so.Conf
 		return nil
 	}
 
-	mc := newScanCursorMemcacheClient(config.CacheURI)
+	mc, cacheErr := newScanCursorMemcacheClient(config.CacheURI)
+	if cacheErr != nil {
+		// Not fatal: a nil client just means every run restarts at the oldest row.
+		// Worth a warning because at ~94.6M rows and a bounded per-run budget, the
+		// cursor is the only reason a full pass is reachable at all.
+		sugar.Warnf("purge_dangling_signing_keyshare_secrets: cursor cache unavailable, each run will restart from the oldest row: %v", cacheErr)
+	}
 	cursorKey := scanCursorKey(purgeDanglingSigningKeyshareSecretsCursorKeyPrefix, config.Index)
 	startCursor := loadScanCursor(mc, cursorKey)
 

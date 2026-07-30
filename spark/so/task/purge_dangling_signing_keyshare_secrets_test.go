@@ -356,6 +356,31 @@ func TestPurgeDanglingSigningKeyshareSecrets_NoOpWithoutEphemeralSession(t *test
 	require.NoError(t, err)
 }
 
+// An unusable CacheURI must not stop the task. The cursor is an optimisation:
+// without it every run restarts at the oldest row, which costs coverage rather than
+// correctness, so the run has to complete and still delete what it finds.
+//
+// Deliberately not parallel. runPurgeDanglingSigningKeyshareSecrets opens with a
+// TryLock on a process-wide mutex and returns nil when it loses, so two overlapping
+// RunOnce calls leave one of them having done nothing. Any test asserting on this
+// task's side effects has to be serial; only the ones asserting NoError can survive
+// losing that lock.
+func TestPurgeDanglingSigningKeyshareSecrets_RunsWithoutUsableCursorCache(t *testing.T) {
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
+
+	danglingSecretID := createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, uuid.New(), 1, time.Now().Add(-time.Hour))
+
+	cfg := sparktesting.TestConfig(t)
+	cfg.CacheURI = "192.0.2.1:1:2"
+
+	purgeTask := getScheduledTaskByName(t, "purge_dangling_signing_keyshare_secrets")
+	require.NoError(t, purgeTask.RunOnce(t.Context(), cfg, mainClient, ephemeralClient, knobs.NewEmptyFixedKnobs()))
+
+	remaining, err := ephemeralClient.SigningKeyshareSecret.Query().IDs(t.Context())
+	require.NoError(t, err)
+	require.NotContains(t, remaining, danglingSecretID, "the scan must still run and purge when no cursor cache is available")
+}
+
 func newSigningKeyshareSecretTaskContext(t *testing.T) (context.Context, *ent.Client, *entephemeral.Client) {
 	t.Helper()
 
