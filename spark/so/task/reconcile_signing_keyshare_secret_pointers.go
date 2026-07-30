@@ -101,7 +101,13 @@ func runReconcileSigningKeyshareSecretPointers(ctx context.Context, config *so.C
 		return nil
 	}
 
-	mc := newScanCursorMemcacheClient(config.CacheURI)
+	mc, cacheErr := newScanCursorMemcacheClient(config.CacheURI)
+	if cacheErr != nil {
+		// Not fatal: a nil client just means every run restarts at the oldest row.
+		// Worth a warning because that silently costs coverage on a table too large
+		// to scan in one run.
+		sugar.Warnf("reconcile_signing_keyshare_secret_pointers: cursor cache unavailable, each run will restart from the oldest row: %v", cacheErr)
+	}
 	cursorKey := scanCursorKey(reconcileSigningKeyshareSecretPointersCursorKeyPrefix, config.Index)
 	startCursor := loadScanCursor(mc, cursorKey)
 
