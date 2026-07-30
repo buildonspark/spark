@@ -824,6 +824,11 @@ const (
 	TreeNodeStatus_TREE_NODE_STATUS_RENEW_LOCKED     TreeNodeStatus = 10
 	TreeNodeStatus_TREE_NODE_STATUS_UNAVAILABLE      TreeNodeStatus = 11
 	TreeNodeStatus_TREE_NODE_STATUS_PARENT_EXITED    TreeNodeStatus = 12
+	// The node's subtree was aggregated back into it (AggregateLeaves): it
+	// carries live exit transactions signed under the aggregated leaf key and
+	// is exit-only — not transferable, renewable, or splittable. It may be
+	// aggregated further up the tree.
+	TreeNodeStatus_TREE_NODE_STATUS_CONSOLIDATED TreeNodeStatus = 13
 )
 
 // Enum value maps for TreeNodeStatus.
@@ -842,6 +847,7 @@ var (
 		10: "TREE_NODE_STATUS_RENEW_LOCKED",
 		11: "TREE_NODE_STATUS_UNAVAILABLE",
 		12: "TREE_NODE_STATUS_PARENT_EXITED",
+		13: "TREE_NODE_STATUS_CONSOLIDATED",
 	}
 	TreeNodeStatus_value = map[string]int32{
 		"TREE_NODE_STATUS_CREATING":         0,
@@ -857,6 +863,7 @@ var (
 		"TREE_NODE_STATUS_RENEW_LOCKED":     10,
 		"TREE_NODE_STATUS_UNAVAILABLE":      11,
 		"TREE_NODE_STATUS_PARENT_EXITED":    12,
+		"TREE_NODE_STATUS_CONSOLIDATED":     13,
 	}
 )
 
@@ -13812,7 +13819,7 @@ const file_spark_proto_rawDesc = "" +
 	"\bRETURNED\x10\x04\x12 \n" +
 	"\x1cMISMATCHED_INVOICE_FINALIZED\x10\x05\x12\x1e\n" +
 	"\x1aMISMATCHED_INVOICE_PENDING\x10\x06\x12\x1f\n" +
-	"\x1bMISMATCHED_INVOICE_RETURNED\x10\a\"\x04\b\x03\x10\x03*\xc9\x03\n" +
+	"\x1bMISMATCHED_INVOICE_RETURNED\x10\a\"\x04\b\x03\x10\x03*\xec\x03\n" +
 	"\x0eTreeNodeStatus\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_CREATING\x10\x00\x12\x1e\n" +
 	"\x1aTREE_NODE_STATUS_AVAILABLE\x10\x01\x12%\n" +
@@ -13827,7 +13834,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x1dTREE_NODE_STATUS_RENEW_LOCKED\x10\n" +
 	"\x12 \n" +
 	"\x1cTREE_NODE_STATUS_UNAVAILABLE\x10\v\x12\"\n" +
-	"\x1eTREE_NODE_STATUS_PARENT_EXITED\x10\f2\xc5\x1f\n" +
+	"\x1eTREE_NODE_STATUS_PARENT_EXITED\x10\f\x12!\n" +
+	"\x1dTREE_NODE_STATUS_CONSOLIDATED\x10\r2\xc5\x1f\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12v\n" +

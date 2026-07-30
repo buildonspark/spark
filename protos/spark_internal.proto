@@ -1204,3 +1204,68 @@ message ConsensusQueryOutcomeResponse {
     // ConsensusCommit / ConsensusRollback gossip payload).
     google.protobuf.Any decision_payload = 3;
 }
+
+// AggregateLeavesPrepareRequest is the prepare op for the
+// CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES 2PC flow. The flow retires every
+// node strictly below the target (the LCA of the leaves through one-child
+// renew chains) and gives the target a two-transaction exit package spending
+// the target's defining outpoint (target.parent.raw_tx : target.vout; the
+// on-chain deposit outpoint when the target is the tree root), signed under
+// the aggregated key sum(leaf verifying keys) == target verifying key.
+//
+// Every SO independently re-derives and validates the subtree shape, locks
+// only the leaves (AGGREGATE_LOCK) — the target and any intermediates keep
+// their status, so rollback has nothing to restore for them and never needs a
+// status carried over the wire — reconstructs both
+// transactions byte-exactly, and produces FROST round-2 shares using an
+// in-memory sum of the leaves' keyshares (nothing persisted until commit).
+// The SO round-1 commitments ride inside the signing jobs (client-fetched via
+// get_signing_commitments), so no coordinator-side prefetch is needed.
+message AggregateLeavesPrepareRequest {
+    // The consolidation target: LCA of leaf_ids through one-child chains.
+    string target_node_id = 1;
+    // Must be exactly the leaf set of the target's subtree.
+    repeated string leaf_ids = 2;
+    bytes owner_identity_public_key = 3 [(validate.rules).bytes = {min_len: 33, max_len: 33}];
+    // Zero-timelock exit tx: full prevout value to P2TR(sum(leaf owner
+    // signing keys)) plus an ephemeral anchor. Stored as the target's
+    // raw_refund_tx.
+    spark.UserSignedTxSigningJob refund_tx_signing_job = 4;
+    // Watchtower variant: same outpoint, timelock DirectTimelockOffset (50),
+    // fee-deducted, no anchor. Stored as the target's
+    // direct_from_cpfp_refund_tx.
+    spark.UserSignedTxSigningJob watchtower_refund_tx_signing_job = 5;
+}
+
+// AggregateLeavesCommitRequest is the 2PC commit payload: the fully signed,
+// coordinator-verified exit package plus the final key material. Each SO
+// rotates the target's keyshare to the sum of the leaves' keyshares, writes
+// the signed txs and new owner keys on the target (status CONSOLIDATED,
+// direct_tx cleared), and retires every node below it (status AGGREGATED).
+// Retired nodes keep their transaction bytes: AGGREGATED already stops the
+// watchtower from broadcasting them, and retaining the bytes leaves a recovery
+// path if the target's old node tx ever confirms and kills the consolidated
+// package. Idempotent: a target already CONSOLIDATED carrying both of the same
+// txids is a no-op.
+message AggregateLeavesCommitRequest {
+    string target_node_id = 1;
+    repeated string leaf_ids = 2;
+    bytes signed_refund_tx = 3;
+    bytes signed_watchtower_refund_tx = 4;
+    // sum(leaf owner_signing_pubkey); becomes the target's
+    // owner_signing_pubkey. Commit re-derives this from the locked leaves and
+    // rejects a mismatch, so the value is a cross-check, not an authority.
+    bytes aggregated_owner_signing_public_key = 5 [(validate.rules).bytes = {min_len: 33, max_len: 33}];
+    bytes owner_identity_public_key = 6 [(validate.rules).bytes = {min_len: 33, max_len: 33}];
+}
+
+// AggregateLeavesRollbackRequest is the 2PC rollback payload. Each SO unlocks
+// the leaves it locked in Prepare, restoring each from its own local state:
+// only leaves are locked, and a leaf's pre-lock status is unambiguous from its
+// shape (children => CONSOLIDATED, none => AVAILABLE). No status is carried
+// over the wire, so a participant never restores a node to a status the
+// coordinator observed rather than one it observed itself.
+message AggregateLeavesRollbackRequest {
+    string target_node_id = 1;
+    repeated string leaf_ids = 2;
+}

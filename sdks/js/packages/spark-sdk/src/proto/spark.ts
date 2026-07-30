@@ -763,6 +763,13 @@ export enum TreeNodeStatus {
   TREE_NODE_STATUS_RENEW_LOCKED = 10,
   TREE_NODE_STATUS_UNAVAILABLE = 11,
   TREE_NODE_STATUS_PARENT_EXITED = 12,
+  /**
+   * TREE_NODE_STATUS_CONSOLIDATED - The node's subtree was aggregated back into it (AggregateLeaves): it
+   * carries live exit transactions signed under the aggregated leaf key and
+   * is exit-only — not transferable, renewable, or splittable. It may be
+   * aggregated further up the tree.
+   */
+  TREE_NODE_STATUS_CONSOLIDATED = 13,
   UNRECOGNIZED = -1,
 }
 
@@ -807,6 +814,9 @@ export function treeNodeStatusFromJSON(object: any): TreeNodeStatus {
     case 12:
     case "TREE_NODE_STATUS_PARENT_EXITED":
       return TreeNodeStatus.TREE_NODE_STATUS_PARENT_EXITED;
+    case 13:
+    case "TREE_NODE_STATUS_CONSOLIDATED":
+      return TreeNodeStatus.TREE_NODE_STATUS_CONSOLIDATED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -842,6 +852,8 @@ export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
       return "TREE_NODE_STATUS_UNAVAILABLE";
     case TreeNodeStatus.TREE_NODE_STATUS_PARENT_EXITED:
       return "TREE_NODE_STATUS_PARENT_EXITED";
+    case TreeNodeStatus.TREE_NODE_STATUS_CONSOLIDATED:
+      return "TREE_NODE_STATUS_CONSOLIDATED";
     case TreeNodeStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

@@ -1873,6 +1873,11 @@ enum TreeNodeStatus {
     TREE_NODE_STATUS_RENEW_LOCKED = 10;
     TREE_NODE_STATUS_UNAVAILABLE = 11;
     TREE_NODE_STATUS_PARENT_EXITED = 12;
+    // The node's subtree was aggregated back into it (AggregateLeaves): it
+    // carries live exit transactions signed under the aggregated leaf key and
+    // is exit-only — not transferable, renewable, or splittable. It may be
+    // aggregated further up the tree.
+    TREE_NODE_STATUS_CONSOLIDATED = 13;
 }
 
 message WalletSetting {

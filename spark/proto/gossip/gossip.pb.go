@@ -50,6 +50,7 @@ const (
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_COUNTER_TRANSFER                ConsensusOperationType = 14
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_MPC_SEND_TRANSFER                        ConsensusOperationType = 15
 	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4                ConsensusOperationType = 16
+	ConsensusOperationType_CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES                         ConsensusOperationType = 17
 )
 
 // Enum value maps for ConsensusOperationType.
@@ -72,6 +73,7 @@ var (
 		14: "CONSENSUS_OPERATION_TYPE_INITIATE_COUNTER_TRANSFER",
 		15: "CONSENSUS_OPERATION_TYPE_MPC_SEND_TRANSFER",
 		16: "CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4",
+		17: "CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES",
 	}
 	ConsensusOperationType_value = map[string]int32{
 		"CONSENSUS_OPERATION_TYPE_UNSPECIFIED":                              0,
@@ -91,6 +93,7 @@ var (
 		"CONSENSUS_OPERATION_TYPE_INITIATE_COUNTER_TRANSFER":                14,
 		"CONSENSUS_OPERATION_TYPE_MPC_SEND_TRANSFER":                        15,
 		"CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4":                16,
+		"CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES":                         17,
 	}
 )
 
@@ -1959,7 +1962,7 @@ const file_gossip_proto_rawDesc = "" +
 	"\x1eGossipMessageConsensusRollback\x127\n" +
 	"\aop_type\x18\x01 \x01(\x0e2\x1e.gossip.ConsensusOperationTypeR\x06opType\x122\n" +
 	"\toperation\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\toperation\x12*\n" +
-	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\x90\a\n" +
+	"\x11flow_execution_id\x18\x03 \x01(\tR\x0fflowExecutionId*\xbf\a\n" +
 	"\x16ConsensusOperationType\x12(\n" +
 	"$CONSENSUS_OPERATION_TYPE_UNSPECIFIED\x10\x00\x122\n" +
 	".CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE\x10\x01\x121\n" +
@@ -1978,7 +1981,8 @@ const file_gossip_proto_rawDesc = "" +
 	"7CONSENSUS_OPERATION_TYPE_INITIATE_SWAP_PRIMARY_TRANSFER\x10\r\x126\n" +
 	"2CONSENSUS_OPERATION_TYPE_INITIATE_COUNTER_TRANSFER\x10\x0e\x12.\n" +
 	"*CONSENSUS_OPERATION_TYPE_MPC_SEND_TRANSFER\x10\x0f\x126\n" +
-	"2CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4\x10\x102H\n" +
+	"2CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4\x10\x10\x12-\n" +
+	")CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES\x10\x112H\n" +
 	"\rGossipService\x127\n" +
 	"\x06gossip\x12\x15.gossip.GossipMessage\x1a\x16.google.protobuf.EmptyB-Z+github.com/lightsparkdev/spark/proto/gossipb\x06proto3"
 
