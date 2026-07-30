@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uuids"
@@ -34,10 +32,6 @@ const (
 	purgeDanglingSigningKeyshareSecretsDefaultBatchSize    = 1000
 	purgeDanglingSigningKeyshareSecretsDefaultMaxScanCount = 100_000
 	purgeDanglingSigningKeyshareSecretsCursorKeyPrefix     = "purge_dangling_signing_keyshare_secrets_cursor"
-	// Cursor TTL exceeds the run interval by a wide margin so a transient
-	// memcache outage doesn't reset progress on a healthy table. Loss of the
-	// cursor is harmless — the next run just restarts at the oldest row.
-	purgeDanglingSigningKeyshareSecretsCursorTTL = 7 * 24 * 3600
 )
 
 type purgeDanglingSigningKeyshareSecretsBatchResult struct {
@@ -81,12 +75,9 @@ func runPurgeDanglingSigningKeyshareSecrets(ctx context.Context, config *so.Conf
 		return nil
 	}
 
-	var mc *memcache.Client
-	if config.CacheURI != "" {
-		mc = newPurgeDanglingSigningKeyshareSecretsMemcacheClient(config.CacheURI)
-	}
-	cursorKey := purgeDanglingSigningKeyshareSecretsCursorKey(config.Index)
-	startCursor := loadPurgeDanglingSigningKeyshareSecretsCursor(mc, cursorKey)
+	mc := newScanCursorMemcacheClient(config.CacheURI)
+	cursorKey := scanCursorKey(purgeDanglingSigningKeyshareSecretsCursorKeyPrefix, config.Index)
+	startCursor := loadScanCursor(mc, cursorKey)
 
 	cutoffID := uuids.UUIDv7FromTime(time.Now().Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 	result, err := purgeDanglingSigningKeyshareSecretsBatch(ctx, cutoffID, batchSize, maxScanCount, startCursor)
@@ -95,11 +86,11 @@ func runPurgeDanglingSigningKeyshareSecrets(ctx context.Context, config *so.Conf
 	}
 
 	if result.NextCursor != nil {
-		if cacheErr := savePurgeDanglingSigningKeyshareSecretsCursor(mc, cursorKey, *result.NextCursor); cacheErr != nil {
+		if cacheErr := saveScanCursor(mc, cursorKey, *result.NextCursor); cacheErr != nil {
 			sugar.Warnf("purge_dangling_signing_keyshare_secrets: failed to persist cursor (will resume from previous cursor or start over on next run): %v", cacheErr)
 		}
 	} else {
-		if cacheErr := deletePurgeDanglingSigningKeyshareSecretsCursor(mc, cursorKey); cacheErr != nil {
+		if cacheErr := deleteScanCursor(mc, cursorKey); cacheErr != nil {
 			sugar.Warnf("purge_dangling_signing_keyshare_secrets: failed to clear cursor at end of pass (next run may rescan from stale cursor): %v", cacheErr)
 		}
 	}
@@ -353,76 +344,4 @@ func getCurrentSigningKeyshareSecretExistence(
 		existsByKeyshareID[secret.SigningKeyshareID] = true
 	}
 	return existsByKeyshareID, nil
-}
-
-func purgeDanglingSigningKeyshareSecretsCursorKey(operatorIndex uint64) string {
-	return fmt.Sprintf("%s:%d", purgeDanglingSigningKeyshareSecretsCursorKeyPrefix, operatorIndex)
-}
-
-func newPurgeDanglingSigningKeyshareSecretsMemcacheClient(cacheURI string) *memcache.Client {
-	addrs := parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(cacheURI)
-	if len(addrs) == 0 {
-		return nil
-	}
-	mc := memcache.New(addrs...)
-	mc.Timeout = 2 * time.Second
-	return mc
-}
-
-// parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs splits a CacheURI into
-// individual server addresses. The URI carries an optional scheme and may list
-// several servers, e.g. memcaches://host:11211,host2:11211 — gomemcache resolves
-// each address separately, so a comma-joined string handed to it whole never
-// connects. Every cursor operation then fails and this task silently restarts at
-// the oldest row on each run, never reaching the tail of the table.
-func parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(cacheURI string) []string {
-	addrs := make([]string, 0, 1)
-	for addr := range strings.SplitSeq(cacheURI, ",") {
-		addr = strings.TrimSpace(addr)
-		addr = strings.TrimPrefix(addr, "memcaches://")
-		addr = strings.TrimPrefix(addr, "memcache://")
-		if addr != "" {
-			addrs = append(addrs, addr)
-		}
-	}
-	return addrs
-}
-
-// loadPurgeDanglingSigningKeyshareSecretsCursor returns the persisted scan
-// cursor, or nil if no usable cursor is available (no client, cache miss, or
-// malformed value). nil means "start from the oldest aged row".
-func loadPurgeDanglingSigningKeyshareSecretsCursor(mc *memcache.Client, key string) *uuid.UUID {
-	if mc == nil {
-		return nil
-	}
-	item, err := mc.Get(key)
-	if err != nil {
-		return nil
-	}
-	parsed, err := uuid.Parse(string(item.Value))
-	if err != nil {
-		return nil
-	}
-	return &parsed
-}
-
-func savePurgeDanglingSigningKeyshareSecretsCursor(mc *memcache.Client, key string, cursor uuid.UUID) error {
-	if mc == nil {
-		return nil
-	}
-	return mc.Set(&memcache.Item{
-		Key:        key,
-		Value:      []byte(cursor.String()),
-		Expiration: purgeDanglingSigningKeyshareSecretsCursorTTL,
-	})
-}
-
-func deletePurgeDanglingSigningKeyshareSecretsCursor(mc *memcache.Client, key string) error {
-	if mc == nil {
-		return nil
-	}
-	if err := mc.Delete(key); err != nil && !errors.Is(err, memcache.ErrCacheMiss) {
-		return err
-	}
-	return nil
 }

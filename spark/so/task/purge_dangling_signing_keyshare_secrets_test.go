@@ -24,7 +24,7 @@ import (
 
 func TestPurgeDanglingSigningKeyshareSecrets_DeletesSupersededOldVersion(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -46,7 +46,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesSupersededOldVersion(t *test
 
 func TestPurgeDanglingSigningKeyshareSecrets_PreservesCurrentlyReferencedVersion(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -70,7 +70,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_PreservesCurrentlyReferencedVersion
 
 func TestPurgeDanglingSigningKeyshareSecrets_AllCandidatesAreActive_NoDeletes(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -93,7 +93,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_AllCandidatesAreActive_NoDeletes(t 
 
 func TestPurgeDanglingSigningKeyshareSecrets_DeletesLoneOrphan(t *testing.T) {
 	t.Parallel()
-	ctx, _, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, _, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -113,7 +113,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesLoneOrphan(t *testing.T) {
 
 func TestPurgeDanglingSigningKeyshareSecrets_DeletesWhenMainSecretVersionIsNil(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -134,7 +134,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesWhenMainSecretVersionIsNil(t
 
 func TestPurgeDanglingSigningKeyshareSecrets_PreservesUnreferencedNewVersionBeforeGracePeriod(t *testing.T) {
 	t.Parallel()
-	ctx, _, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, _, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -154,7 +154,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_PreservesUnreferencedNewVersionBefo
 
 func TestPurgeDanglingSigningKeyshareSecrets_DeletesUnreferencedVersionAfterGracePeriod(t *testing.T) {
 	t.Parallel()
-	ctx, _, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, _, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 
 	createEphemeralSigningKeyshareSecret(t, ctx, ephemeralClient, uuid.New(), 1, now.Add(-9*time.Minute))
@@ -174,7 +174,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_DeletesUnreferencedVersionAfterGrac
 
 func TestPurgeDanglingSigningKeyshareSecrets_PreservesAgedRowsWhenMainPointsToMissingVersion(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -196,7 +196,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_PreservesAgedRowsWhenMainPointsToMi
 
 func TestPurgeDanglingSigningKeyshareSecrets_ScansPastActivePrefixToFindDanglingRows(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -222,7 +222,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_ScansPastActivePrefixToFindDangling
 
 func TestPurgeDanglingSigningKeyshareSecrets_FillsDeleteBatchAcrossMultiplePages(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -256,7 +256,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_FillsDeleteBatchAcrossMultiplePages
 // and reached the end of the aged data. The cursor should reset.
 func TestPurgeDanglingSigningKeyshareSecrets_FullDeleteBatchOnFinalShortPageResetsCursor(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -290,7 +290,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_FullDeleteBatchOnFinalShortPageRese
 // reproduce what happens across two scheduled runs.
 func TestPurgeDanglingSigningKeyshareSecrets_CursorAdvancesUntilDanglingRowFound(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -327,7 +327,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_CursorAdvancesUntilDanglingRowFound
 // rather than reset it.
 func TestPurgeDanglingSigningKeyshareSecrets_BudgetExhaustionAdvancesCursor(t *testing.T) {
 	t.Parallel()
-	ctx, mainClient, ephemeralClient := newPurgeDanglingSigningKeyshareSecretsContext(t)
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	now := time.Date(2026, 3, 6, 12, 0, 0, 0, time.UTC)
 	cutoffID := uuids.UUIDv7FromTime(now.Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
 
@@ -356,53 +356,7 @@ func TestPurgeDanglingSigningKeyshareSecrets_NoOpWithoutEphemeralSession(t *test
 	require.NoError(t, err)
 }
 
-// A cursor that silently fails to persist degrades this task to "head of the
-// table forever", which is invisible in its logs, so the URI parsing that decides
-// whether it persists at all is worth pinning down directly.
-func TestParsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name          string
-		cacheURI      string
-		expectedAddrs []string
-	}{
-		{name: "empty", cacheURI: "", expectedAddrs: []string{}},
-		{name: "scheme only", cacheURI: "memcaches://", expectedAddrs: []string{}},
-		{name: "single host without scheme", cacheURI: "host:11211", expectedAddrs: []string{"host:11211"}},
-		{name: "single host with scheme", cacheURI: "memcaches://host:11211", expectedAddrs: []string{"host:11211"}},
-		{name: "insecure scheme", cacheURI: "memcache://host:11211", expectedAddrs: []string{"host:11211"}},
-		{
-			name:          "multiple hosts",
-			cacheURI:      "memcaches://host:11211,host2:11211",
-			expectedAddrs: []string{"host:11211", "host2:11211"},
-		},
-		{
-			name:          "multiple hosts with whitespace and empty entries",
-			cacheURI:      "memcaches://host:11211, ,host2:11211 ",
-			expectedAddrs: []string{"host:11211", "host2:11211"},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, test.expectedAddrs, parsePurgeDanglingSigningKeyshareSecretsMemcacheAddrs(test.cacheURI))
-		})
-	}
-}
-
-// A CacheURI that yields no server must produce no client, because that is the
-// value the load/save/delete cursor helpers interpret as "no cache available". A
-// client built over an empty server list instead fails every operation with
-// ErrNoServers, which those helpers would surface as cursor-persistence warnings
-// on every run.
-func TestNewPurgeDanglingSigningKeyshareSecretsMemcacheClient_NilWithoutServers(t *testing.T) {
-	t.Parallel()
-	require.Nil(t, newPurgeDanglingSigningKeyshareSecretsMemcacheClient(""))
-	require.Nil(t, newPurgeDanglingSigningKeyshareSecretsMemcacheClient("memcaches://"))
-	require.NotNil(t, newPurgeDanglingSigningKeyshareSecretsMemcacheClient("memcaches://host:11211"))
-}
-
-func newPurgeDanglingSigningKeyshareSecretsContext(t *testing.T) (context.Context, *ent.Client, *entephemeral.Client) {
+func newSigningKeyshareSecretTaskContext(t *testing.T) (context.Context, *ent.Client, *entephemeral.Client) {
 	t.Helper()
 
 	mainClient := db.NewTestSQLiteClient(t)

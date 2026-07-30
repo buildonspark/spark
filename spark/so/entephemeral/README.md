@@ -126,6 +126,47 @@ Operational behavior:
 - If a batch is full, logs note that additional candidates may remain for later runs.
 - Recently created unreferenced rows (inside grace period) are intentionally preserved until they age out.
 
+## Pointer Reconciliation Job (Dangling Pointers)
+
+The purge job answers "is this ephemeral row still referenced?". The inverse question — "does this
+main pointer still resolve?" — needs its own scan, because a keyshare whose ephemeral rows are all
+gone leaves nothing in the ephemeral table for the purge job to examine. Its `missing_current` guard
+only fires for keyshares that still have at least one stale row.
+
+- Task: `reconcile_signing_keyshare_secret_pointers`
+- Schedule: every 5 minutes
+- Purpose: measure how many `signing_keyshares` rows have a `secret_version` that does not resolve to
+  a row in the ephemeral store
+
+Selection/safety model:
+
+- Only considers rows with a non-null `secret_version` whose `update_time` predates a 10 minute grace
+  period. A rotation commits the ephemeral secret before the main pointer, so a keyshare mid-rotation
+  can legitimately read as unresolvable across the task's two independent queries.
+- Scans in `id` order in bounded pages, resuming from a cursor persisted in memcache. The per-run scan
+  cap bounds DB load while still giving eventual full coverage.
+- Candidates are re-read before being reported, so a rotation that commits between the main read and
+  the ephemeral read is not mistaken for a dangling pointer.
+- `secret_share` is never loaded; only whether the column is populated.
+
+Operational behavior:
+
+- Read-only. Repair needs a per-keyshare decision (roll the pointer back to a surviving version, or
+  reshare), so the task measures and logs rather than acting.
+- If ephemeral DB session is not present, task is a no-op.
+- Outcomes are counted in metric `spark_so_task_signing_keyshare_pointer_reconciliation_outcomes_total`
+  with an `outcome` attribute:
+  - `dangling` — pointer unresolvable and no main `secret_share`, so the keyshare cannot sign today.
+  - `dangling_with_main_fallback` — pointer unresolvable but `secret_share` is still populated, so
+    `GetSecretShare` still resolves. These become `dangling` once
+    `clear_signing_keyshare_secret_shares` reaches them.
+  - `pass_complete` — a scan reached the end of the eligible rows, meaning the population was fully
+    covered as of that run. It doubles as cursor evidence only once the eligible population exceeds
+    the per-run scan cap, since only then does a pass span multiple runs: a cursor that is not
+    persisting restarts at the oldest row every run, so none reaches the end and this flattens to
+    zero. Below the cap every run covers everything and this increments regardless of cursor health,
+    which is accurate — coverage is complete and the cursor is not load-bearing at that size.
+
 ## Secret Version APIs
 
 `signingkeysharesecret_extension.go` provides explicit helpers for versioned secret lifecycle:

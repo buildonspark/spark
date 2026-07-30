@@ -346,6 +346,13 @@ const (
 	// per-run DB load while still giving eventual full coverage of the table.
 	KnobPurgeDanglingSigningKeyshareSecretsMaxScanCount = "spark.so.purge_dangling_signing_keyshare_secrets_max_scan_count"
 
+	// Page size for the main-table scan in reconcile_signing_keyshare_secret_pointers.
+	KnobReconcileSigningKeyshareSecretPointersBatchSize = "spark.so.reconcile_signing_keyshare_secret_pointers_batch_size"
+	// Per-run cap on the number of signing keyshares a single reconciliation
+	// invocation will scan. Combined with the cursor persisted in memcache, this
+	// bounds per-run DB load while still giving eventual full coverage of the table.
+	KnobReconcileSigningKeyshareSecretPointersMaxScanCount = "spark.so.reconcile_signing_keyshare_secret_pointers_max_scan_count"
+
 	// Seconds a PARTICIPANT FlowExecution row can stay IN_FLIGHT before the
 	// reconciliation task considers it stuck and asks the coordinator for
 	// the final outcome. Must exceed the gossip retry interval so gossip

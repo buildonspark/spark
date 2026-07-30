@@ -1004,6 +1004,14 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 5 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
+				Name:         "reconcile_signing_keyshare_secret_pointers",
+				RunInTestEnv: true,
+				Task:         runReconcileSigningKeyshareSecretPointers,
+			},
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_idempotency_keys",
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
