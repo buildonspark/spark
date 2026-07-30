@@ -111,7 +111,7 @@ func processWatchtowerBroadcasts(
 		attribute.String("network", network.String()),
 	))
 	for _, node := range nodes {
-		if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight, network); err != nil {
+		if err := watchtower.CheckExpiredTimeLocks(ctx, dbClient, bitcoinClient, node, blockHeight, network); err != nil {
 			logger.Sugar().Errorf("Failed to check expired time locks for node %s: %v", node.ID, err)
 		}
 	}
