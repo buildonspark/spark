@@ -45,6 +45,9 @@ func (TransferLeaf) Fields() []ent.Field {
 			Annotations(entexample.Default(
 				"ed9ffdb0a3a65a5e51e477cb6688c118e5bb4333a8bd8c8dbe4b5e7d4223f97b6c4947d300d34d4cf48d2d1bd03c8aec29f628175a5c7d37a6e7338270af8f4d",
 			)),
+		field.Int32("signature_scheme").
+			Optional().
+			Comment("Scheme of `signature` as a common.SignatureScheme value; unspecified/0 is the legacy ECDSA interpretation."),
 		field.Bytes("previous_refund_tx").
 			NotEmpty().
 			Immutable().

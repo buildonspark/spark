@@ -1340,6 +1340,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "secret_cipher", Type: field.TypeBytes, Nullable: true},
 		{Name: "signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "signature_scheme", Type: field.TypeInt32, Nullable: true},
 		{Name: "previous_refund_tx", Type: field.TypeBytes},
 		{Name: "previous_direct_refund_tx", Type: field.TypeBytes, Nullable: true},
 		{Name: "previous_direct_from_cpfp_refund_tx", Type: field.TypeBytes, Nullable: true},
@@ -1368,25 +1369,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_leafs_transfers_transfer",
-				Columns:    []*schema.Column{TransferLeafsColumns[20]},
+				Columns:    []*schema.Column{TransferLeafsColumns[21]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_tree_nodes_leaf",
-				Columns:    []*schema.Column{TransferLeafsColumns[21]},
+				Columns:    []*schema.Column{TransferLeafsColumns[22]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_transfer_receivers_transfer_receiver",
-				Columns:    []*schema.Column{TransferLeafsColumns[22]},
+				Columns:    []*schema.Column{TransferLeafsColumns[23]},
 				RefColumns: []*schema.Column{TransferReceiversColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "transfer_leafs_transfer_senders_transfer_sender",
-				Columns:    []*schema.Column{TransferLeafsColumns[23]},
+				Columns:    []*schema.Column{TransferLeafsColumns[24]},
 				RefColumns: []*schema.Column{TransferSendersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1395,12 +1396,12 @@ var (
 			{
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[20]},
+				Columns: []*schema.Column{TransferLeafsColumns[21]},
 			},
 			{
 				Name:    "transferleaf_transfer_leaf_leaf",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[21]},
+				Columns: []*schema.Column{TransferLeafsColumns[22]},
 			},
 			{
 				Name:    "transfer_leafs_update_time_id_idx",
@@ -1410,7 +1411,7 @@ var (
 			{
 				Name:    "transferleaf_intermediate_refund_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[11]},
+				Columns: []*schema.Column{TransferLeafsColumns[12]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "intermediate_refund_txid is not null",
 				},
@@ -1418,7 +1419,7 @@ var (
 			{
 				Name:    "transferleaf_intermediate_direct_refund_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[12]},
+				Columns: []*schema.Column{TransferLeafsColumns[13]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "intermediate_direct_refund_txid is not null",
 				},
@@ -1426,7 +1427,7 @@ var (
 			{
 				Name:    "transferleaf_intermediate_direct_from_cpfp_refund_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[13]},
+				Columns: []*schema.Column{TransferLeafsColumns[14]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "intermediate_direct_from_cpfp_refund_txid is not null",
 				},
@@ -1434,7 +1435,7 @@ var (
 			{
 				Name:    "transferleaf_intermediate_refund_timelock",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[14]},
+				Columns: []*schema.Column{TransferLeafsColumns[15]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "intermediate_refund_timelock is not null",
 				},
@@ -1442,7 +1443,7 @@ var (
 			{
 				Name:    "transferleaf_intermediate_direct_refund_timelock",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[15]},
+				Columns: []*schema.Column{TransferLeafsColumns[16]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "intermediate_direct_refund_timelock is not null",
 				},
@@ -1450,7 +1451,7 @@ var (
 			{
 				Name:    "transferleaf_intermediate_direct_from_cpfp_refund_timelock",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[16]},
+				Columns: []*schema.Column{TransferLeafsColumns[17]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "intermediate_direct_from_cpfp_refund_timelock is not null",
 				},
@@ -1458,7 +1459,7 @@ var (
 			{
 				Name:    "transferleaf_transfer_receiver_id",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[22]},
+				Columns: []*schema.Column{TransferLeafsColumns[23]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "transfer_receiver_id is not null",
 				},
@@ -1466,7 +1467,7 @@ var (
 			{
 				Name:    "transferleaf_transfer_sender_id",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[23]},
+				Columns: []*schema.Column{TransferLeafsColumns[24]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "transfer_sender_id is not null",
 				},

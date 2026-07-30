@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -589,4 +590,97 @@ func TestValidateTransferPackage_MissingPubkeyShareForOperator(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pubkey share tweak missing for operator")
+}
+
+func TestValidateTransferPackage_AcceptsValidTypedSignature(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{52})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := buildKeyTweakPackageWithMutation(t, cfg, rng, leafID, func(lt *pb.SendLeafKeyTweak) {
+		lt.Sig = &pb.SendLeafKeyTweak_TypedSignature{TypedSignature: &pbcommon.Signature{
+			Scheme:    pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR,
+			Signature: []byte("mock_signature_for_testing"),
+		}}
+	})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	tweaksMap, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.NoError(t, err)
+	typed := tweaksMap[leafID.String()].Proto().GetTypedSignature()
+	require.NotNil(t, typed)
+	assert.Equal(t, pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR, typed.GetScheme())
+}
+
+func TestValidateTransferPackage_RejectsTypedSignatureWithUnspecifiedScheme(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{53})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := buildKeyTweakPackageWithMutation(t, cfg, rng, leafID, func(lt *pb.SendLeafKeyTweak) {
+		lt.Sig = &pb.SendLeafKeyTweak_TypedSignature{TypedSignature: &pbcommon.Signature{
+			Scheme:    pbcommon.SignatureScheme_SIGNATURE_SCHEME_UNSPECIFIED,
+			Signature: []byte("mock_signature_for_testing"),
+		}}
+	})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid typed signature")
+}
+
+func TestValidateTransferPackage_RejectsTypedSignatureWithUndefinedScheme(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{54})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := buildKeyTweakPackageWithMutation(t, cfg, rng, leafID, func(lt *pb.SendLeafKeyTweak) {
+		lt.Sig = &pb.SendLeafKeyTweak_TypedSignature{TypedSignature: &pbcommon.Signature{
+			Scheme:    pbcommon.SignatureScheme(99),
+			Signature: []byte("mock_signature_for_testing"),
+		}}
+	})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid typed signature")
+}
+
+func TestValidateTransferPackage_RejectsTypedSignatureWithEmptyBytes(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{55})
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+	leafID := uuid.New()
+
+	keyTweakPackage := buildKeyTweakPackageWithMutation(t, cfg, rng, leafID, func(lt *pb.SendLeafKeyTweak) {
+		lt.Sig = &pb.SendLeafKeyTweak_TypedSignature{TypedSignature: &pbcommon.Signature{
+			Scheme: pbcommon.SignatureScheme_SIGNATURE_SCHEME_ECDSA,
+		}}
+	})
+	pkg := singleLeafPackage(t, leafID, keyTweakPackage)
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid typed signature")
 }

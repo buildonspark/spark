@@ -262,6 +262,16 @@ func (h *BaseTransferHandler) decryptOwnKeyTweaks(
 			return nil, fmt.Errorf("too many pubkey shares: %d (max: %d)", len(leafTweak.GetPubkeySharesTweak()), maxPubkeySharesTweakCount)
 		}
 
+		// The tweaks arrive ECIES-encrypted, so the gRPC validation interceptor
+		// never sees them. Enforce the typed signature's proto contract (defined
+		// non-zero scheme, non-empty bytes) here, before it is stored and
+		// forwarded to the receiver.
+		if ts := leafTweak.GetTypedSignature(); ts != nil {
+			if err := ts.Validate(); err != nil {
+				return nil, fmt.Errorf("invalid typed signature for leaf %s: %w", leafID, err)
+			}
+		}
+
 		leafTweaksMap[leafID] = leafTweak
 	}
 

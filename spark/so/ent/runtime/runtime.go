@@ -942,11 +942,11 @@ func init() {
 	// transferleaf.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	transferleaf.UpdateDefaultUpdateTime = transferleafDescUpdateTime.UpdateDefault.(func() time.Time)
 	// transferleafDescPreviousRefundTx is the schema descriptor for previous_refund_tx field.
-	transferleafDescPreviousRefundTx := transferleafFields[2].Descriptor()
+	transferleafDescPreviousRefundTx := transferleafFields[3].Descriptor()
 	// transferleaf.PreviousRefundTxValidator is a validator for the "previous_refund_tx" field. It is called by the builders before save.
 	transferleaf.PreviousRefundTxValidator = transferleafDescPreviousRefundTx.Validators[0].(func([]byte) error)
 	// transferleafDescIntermediateRefundTx is the schema descriptor for intermediate_refund_tx field.
-	transferleafDescIntermediateRefundTx := transferleafFields[5].Descriptor()
+	transferleafDescIntermediateRefundTx := transferleafFields[6].Descriptor()
 	// transferleaf.IntermediateRefundTxValidator is a validator for the "intermediate_refund_tx" field. It is called by the builders before save.
 	transferleaf.IntermediateRefundTxValidator = transferleafDescIntermediateRefundTx.Validators[0].(func([]byte) error)
 	// transferleafDescID is the schema descriptor for id field.

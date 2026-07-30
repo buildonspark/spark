@@ -5053,7 +5053,10 @@ func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfe
 			if err != nil {
 				return fmt.Errorf("failed to marshal key tweak for leaf %s: %w", leaf.ID, err)
 			}
-			_, err = transferLeaf.Update().SetKeyTweak(keyTweakBinary).SetSecretCipher(keyTweak.Proto().GetSecretCipher()).SetSignature(keyTweak.Proto().GetSignature()).Save(ctx)
+			_, err = applyLeafSignature(transferLeaf.Update(), keyTweak.Proto().GetSignature(), keyTweak.Proto().GetTypedSignature()).
+				SetKeyTweak(keyTweakBinary).
+				SetSecretCipher(keyTweak.Proto().GetSecretCipher()).
+				Save(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to set key tweak for transfer leaf %s: %w", transferLeaf.ID, err)
 			}

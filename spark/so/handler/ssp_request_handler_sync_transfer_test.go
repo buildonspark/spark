@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbssp "github.com/lightsparkdev/spark/proto/spark_ssp_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -192,6 +193,130 @@ func TestUpdateTransferAcceptsRemoteDirectRefundTxs(t *testing.T) {
 	require.Len(t, transferLeafs, 1)
 	require.Equal(t, remoteTransfer.GetLeaves()[0].GetIntermediateDirectRefundTx(), transferLeafs[0].IntermediateDirectRefundTx)
 	require.Equal(t, remoteTransfer.GetLeaves()[0].GetIntermediateDirectFromCpfpRefundTx(), transferLeafs[0].IntermediateDirectFromCpfpRefundTx)
+}
+
+func TestUpdateTransferPersistsTypedSignatureOnNewLeaf(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	owner := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
+	addSyncTransferDirectRefunds(t, remoteTransfer, node, receiver)
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_TypedSignature{
+		TypedSignature: &pbcommon.Signature{
+			Scheme:    pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR,
+			Signature: []byte("remote-typed-signature"),
+		},
+	}
+
+	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+		ctx,
+		remoteTransfer,
+		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+	)
+	require.NoError(t, err)
+
+	transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, transferLeafs, 1)
+	require.Equal(t, []byte("remote-typed-signature"), transferLeafs[0].Signature)
+	require.Equal(t, int32(pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR), transferLeafs[0].SignatureScheme)
+}
+
+func TestUpdateTransferPersistsTypedSignatureOnExistingLeaf(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	owner := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+	localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, owner, receiver)
+	localLeaf, err := dbTx.TransferLeaf.Create().
+		SetTransfer(localTransfer).
+		SetLeaf(node).
+		SetPreviousRefundTx(node.RawRefundTx).
+		SetIntermediateRefundTx(createTestTxBytes(t, 3000)).
+		SetSecretCipher([]byte("local-secret")).
+		SetSignature([]byte("local-signature")).
+		Save(ctx)
+	require.NoError(t, err)
+
+	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
+	remoteTransfer.Id = localTransfer.ID.String()
+	setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
+	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_TypedSignature{
+		TypedSignature: &pbcommon.Signature{
+			Scheme:    pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR,
+			Signature: []byte("remote-typed-signature"),
+		},
+	}
+
+	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+		ctx,
+		remoteTransfer,
+		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+	)
+	require.NoError(t, err)
+
+	refreshedLeaf, err := dbTx.TransferLeaf.Get(ctx, localLeaf.ID)
+	require.NoError(t, err)
+	require.Equal(t, []byte("remote-typed-signature"), refreshedLeaf.Signature)
+	require.Equal(t, int32(pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR), refreshedLeaf.SignatureScheme)
+}
+
+func TestUpdateTransferRejectsInvalidTypedSignature(t *testing.T) {
+	testCases := []struct {
+		name  string
+		typed *pbcommon.Signature
+	}{
+		{
+			name: "unspecified scheme",
+			typed: &pbcommon.Signature{
+				Scheme:    pbcommon.SignatureScheme_SIGNATURE_SCHEME_UNSPECIFIED,
+				Signature: []byte("remote-typed-signature"),
+			},
+		},
+		{
+			name: "empty signature bytes",
+			typed: &pbcommon.Signature{
+				Scheme: pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			dbTx, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			owner := keys.GeneratePrivateKey().Public()
+			receiver := keys.GeneratePrivateKey().Public()
+			node := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+			remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
+			remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_TypedSignature{TypedSignature: tc.typed}
+
+			err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+				ctx,
+				remoteTransfer,
+				&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+			)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "invalid typed signature")
+
+			refreshed, err := dbTx.TreeNode.Get(ctx, node.ID)
+			require.NoError(t, err)
+			require.Equal(t, st.TreeNodeStatusAvailable, refreshed.Status)
+
+			transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
+			require.NoError(t, err)
+			require.Empty(t, transferLeafs)
+		})
+	}
 }
 
 func TestUpdateTransferRejectsMalformedRemoteDirectRefundTxs(t *testing.T) {
