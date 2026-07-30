@@ -30,7 +30,8 @@ const (
 	reconcileSigningKeyshareSecretPointersGracePeriod         = 10 * time.Minute
 	reconcileSigningKeyshareSecretPointersDefaultBatchSize    = 1000
 	reconcileSigningKeyshareSecretPointersDefaultMaxScanCount = 100_000
-	reconcileSigningKeyshareSecretPointersCursorKeyPrefix     = "reconcile_signing_keyshare_secret_pointers_cursor"
+	// Also the scheduler's name for this task, and the prefix of its cursor key.
+	reconcileSigningKeyshareSecretPointersTaskName = "reconcile_signing_keyshare_secret_pointers"
 	// Cap on per-keyshare warn logs in a single run. The count is what drives the
 	// dashboard; the ids are for an operator following up, and a large population
 	// should not be able to flood the log to get them.
@@ -59,9 +60,11 @@ type reconcileSigningKeyshareSecretPointersResult struct {
 
 // runReconcileSigningKeyshareSecretPointers walks main-DB signing_keyshares in id
 // order and reports every row whose secret_version does not resolve to a row in
-// the ephemeral store. Such a keyshare cannot sign: GetSecretShare fails with
-// ErrSigningKeyshareSecretMissing, and every flow that needs the share fails
-// with it.
+// the ephemeral store. Such a keyshare cannot sign once the legacy main-DB
+// secret_share column is gone: GetSecretShare falls back to that column first, and
+// only when it is null does the unresolvable pointer surface as
+// ErrSigningKeyshareSecretMissing and fail every flow needing the share. The two
+// outcome buckets below separate those cases.
 //
 // This is the main-table counterpart to purge_dangling_signing_keyshare_secrets,
 // which walks the ephemeral table. That direction can only see a broken keyshare
@@ -90,42 +93,23 @@ func runReconcileSigningKeyshareSecretPointers(ctx context.Context, config *so.C
 		return fmt.Errorf("failed to get ephemeral db from context: %w", err)
 	}
 
-	batchSize := int(knobsService.GetValue(knobs.KnobReconcileSigningKeyshareSecretPointersBatchSize, reconcileSigningKeyshareSecretPointersDefaultBatchSize))
-	if batchSize <= 0 {
-		sugar.Warnf("reconcile_signing_keyshare_secret_pointers: invalid batchSize %d (knob %s), skipping run", batchSize, knobs.KnobReconcileSigningKeyshareSecretPointersBatchSize)
+	batchSize, ok := positiveIntKnob(sugar, knobsService, reconcileSigningKeyshareSecretPointersTaskName, knobs.KnobReconcileSigningKeyshareSecretPointersBatchSize, reconcileSigningKeyshareSecretPointersDefaultBatchSize)
+	if !ok {
 		return nil
 	}
-	maxScanCount := int(knobsService.GetValue(knobs.KnobReconcileSigningKeyshareSecretPointersMaxScanCount, reconcileSigningKeyshareSecretPointersDefaultMaxScanCount))
-	if maxScanCount <= 0 {
-		sugar.Warnf("reconcile_signing_keyshare_secret_pointers: invalid maxScanCount %d (knob %s), skipping run", maxScanCount, knobs.KnobReconcileSigningKeyshareSecretPointersMaxScanCount)
+	maxScanCount, ok := positiveIntKnob(sugar, knobsService, reconcileSigningKeyshareSecretPointersTaskName, knobs.KnobReconcileSigningKeyshareSecretPointersMaxScanCount, reconcileSigningKeyshareSecretPointersDefaultMaxScanCount)
+	if !ok {
 		return nil
 	}
 
-	mc, cacheErr := newScanCursorMemcacheClient(config.CacheURI)
-	if cacheErr != nil {
-		// Not fatal: a nil client just means every run restarts at the oldest row.
-		// Worth a warning because that silently costs coverage on a table too large
-		// to scan in one run.
-		sugar.Warnf("reconcile_signing_keyshare_secret_pointers: cursor cache unavailable, each run will restart from the oldest row: %v", cacheErr)
-	}
-	cursorKey := scanCursorKey(reconcileSigningKeyshareSecretPointersCursorKeyPrefix, config.Index)
-	startCursor := loadScanCursor(mc, cursorKey)
+	cursor := newScanCursor(ctx, reconcileSigningKeyshareSecretPointersTaskName, config)
 
 	cutoffTime := time.Now().Add(-reconcileSigningKeyshareSecretPointersGracePeriod)
-	result, err := reconcileSigningKeyshareSecretPointersScan(ctx, cutoffTime, batchSize, maxScanCount, startCursor)
+	result, err := reconcileSigningKeyshareSecretPointersScan(ctx, cutoffTime, batchSize, maxScanCount, cursor.load())
 	if err != nil {
 		return err
 	}
-
-	if result.NextCursor != nil {
-		if cacheErr := saveScanCursor(mc, cursorKey, *result.NextCursor); cacheErr != nil {
-			sugar.Warnf("reconcile_signing_keyshare_secret_pointers: failed to persist cursor (will resume from previous cursor or start over on next run): %v", cacheErr)
-		}
-	} else {
-		if cacheErr := deleteScanCursor(mc, cursorKey); cacheErr != nil {
-			sugar.Warnf("reconcile_signing_keyshare_secret_pointers: failed to clear cursor at end of pass (next run may rescan from stale cursor): %v", cacheErr)
-		}
-	}
+	cursor.persist(result.NextCursor)
 
 	reportDanglingSigningKeysharePointers(ctx, result)
 	return nil
@@ -157,19 +141,14 @@ func reportDanglingSigningKeysharePointers(ctx context.Context, result reconcile
 
 	recordSigningKeysharePointerReconciliationOutcome(ctx, "dangling", unusableCount)
 	recordSigningKeysharePointerReconciliationOutcome(ctx, "dangling_with_main_fallback", len(result.Dangling)-unusableCount)
+	// A completed pass means the population was fully covered as of this run. It is
+	// cursor evidence only above the per-run scan cap; see the reconciliation
+	// section of so/entephemeral/README.md.
+	passComplete := 0
 	if result.NextCursor == nil {
-		// Emitted only when a scan walks off the end of the eligible rows, so it
-		// means "the population was fully covered as of this run".
-		//
-		// It doubles as cursor evidence only when the eligible population exceeds
-		// the per-run scan cap, because only then does a pass need more than one
-		// run to finish: a cursor that is not persisting restarts every run at the
-		// oldest row, so no run reaches the end and this flattens to zero. Below
-		// the cap every run covers everything and this increments whether or not
-		// the cursor works — correctly, since coverage genuinely is complete and
-		// the cursor is not load-bearing at that size.
-		recordSigningKeysharePointerReconciliationOutcome(ctx, "pass_complete", 1)
+		passComplete = 1
 	}
+	recordSigningKeysharePointerReconciliationOutcome(ctx, "pass_complete", passComplete)
 
 	if result.NextCursor != nil {
 		sugar.Infof(
@@ -382,6 +361,11 @@ func confirmDanglingSigningKeysharePointers(
 
 	confirmed := make([]danglingSigningKeysharePointer, 0, len(current))
 	for _, keyshare := range current {
+		// Both conditions are unreachable today: candidateIDs are keys of observed,
+		// and the page query filters SecretVersionNotNil. They are kept because the
+		// invariant is enforced in a different function, and a page projection that
+		// stopped selecting secret_version would turn the deref below into a nil
+		// panic rather than a compile error.
 		observedKeyshare, ok := observed[keyshare.ID]
 		if !ok || observedKeyshare.SecretVersion == nil {
 			continue

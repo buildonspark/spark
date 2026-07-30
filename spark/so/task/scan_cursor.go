@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -8,6 +9,10 @@ import (
 
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/knobs"
+	"go.uber.org/zap"
 )
 
 // Tasks that walk a table too large to cover in a single run persist their scan
@@ -40,8 +45,68 @@ const (
 	scanCursorMemcacheTimeout = 2 * time.Second
 )
 
-func scanCursorKey(prefix string, operatorIndex uint64) string {
-	return fmt.Sprintf("%s:%d", prefix, operatorIndex)
+// positiveIntKnob reads a knob that only makes sense above zero — a batch size or
+// a per-run scan budget. A non-positive value would make the owning task either a
+// silent no-op or an unbounded scan, so it returns false and the caller skips the
+// run rather than guessing a default.
+func positiveIntKnob(sugar *zap.SugaredLogger, knobsService knobs.Knobs, taskName, knob string, defaultValue float64) (int, bool) {
+	value := int(knobsService.GetValue(knob, defaultValue))
+	if value <= 0 {
+		sugar.Warnf("%s: invalid value %d for knob %s, skipping run", taskName, value, knob)
+		return 0, false
+	}
+	return value, true
+}
+
+// scanCursor owns one task's persisted scan position: the cache client, the
+// per-operator key, and the warning text. Tasks call load and persist and never
+// touch the client, so the "cursor loss is not an error" policy lives in one place
+// instead of being re-implemented per task.
+type scanCursor struct {
+	taskName string
+	key      string
+	mc       *memcache.Client
+	sugar    *zap.SugaredLogger
+}
+
+// newScanCursor derives the cache key from the task name, so renaming a task
+// orphans its cursor and the next run restarts at the oldest row. That is the same
+// non-event as any other cursor loss, though for a table the size of
+// signing_keyshare_secrets it does cost a full re-scan to recover.
+func newScanCursor(ctx context.Context, taskName string, config *so.Config) *scanCursor {
+	sugar := logging.GetLoggerFromContext(ctx).Sugar()
+
+	mc, err := newScanCursorMemcacheClient(config.CacheURI)
+	if err != nil {
+		// Not fatal: a nil client means every run restarts at the oldest row, which
+		// costs coverage rather than correctness.
+		sugar.Warnf("%s: cursor cache unavailable, each run will restart from the oldest row: %v", taskName, err)
+	}
+
+	return &scanCursor{
+		taskName: taskName,
+		key:      fmt.Sprintf("%s_cursor:%d", taskName, config.Index),
+		mc:       mc,
+		sugar:    sugar,
+	}
+}
+
+func (c *scanCursor) load() *uuid.UUID {
+	return loadScanCursor(c.mc, c.key)
+}
+
+// persist stores next, or clears the cursor when next is nil because the scan
+// reached the end of its data and should wrap to the oldest row.
+func (c *scanCursor) persist(next *uuid.UUID) {
+	if next != nil {
+		if err := saveScanCursor(c.mc, c.key, *next); err != nil {
+			c.sugar.Warnf("%s: failed to persist cursor (will resume from previous cursor or start over on next run): %v", c.taskName, err)
+		}
+		return
+	}
+	if err := deleteScanCursor(c.mc, c.key); err != nil {
+		c.sugar.Warnf("%s: failed to clear cursor at end of pass (next run may rescan from stale cursor): %v", c.taskName, err)
+	}
 }
 
 // newScanCursorMemcacheClient returns a nil client when no usable server is
