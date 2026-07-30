@@ -3,7 +3,13 @@ package task
 import (
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // A cursor that silently fails to persist degrades a scan to "head of the table
@@ -36,6 +42,99 @@ func TestParseScanCursorMemcacheAddrs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, test.expectedAddrs, parseScanCursorMemcacheAddrs(test.cacheURI))
+		})
+	}
+}
+
+func TestPositiveIntKnob(t *testing.T) {
+	t.Parallel()
+
+	const knob = "spark.so.test_positive_int_knob"
+	tests := []struct {
+		name          string
+		knobValue     *float64
+		expectedValue int
+		expectedOK    bool
+	}{
+		{name: "unset falls back to the default", expectedValue: 1000, expectedOK: true},
+		{name: "positive override", knobValue: new(float64(25)), expectedValue: 25, expectedOK: true},
+		{name: "zero skips the run", knobValue: new(float64(0)), expectedOK: false},
+		{name: "negative skips the run", knobValue: new(float64(-1)), expectedOK: false},
+		// Truncation toward zero means a fractional value below 1 is not a small
+		// batch, it is no batch at all, so it has to be rejected rather than floored.
+		{name: "fraction below one skips the run", knobValue: new(float64(0.5)), expectedOK: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			values := map[string]float64{}
+			if test.knobValue != nil {
+				values[knob] = *test.knobValue
+			}
+
+			value, ok := positiveIntKnob(zap.NewNop().Sugar(), knobs.NewFixedKnobs(values), "test_task", knob, 1000)
+			require.Equal(t, test.expectedOK, ok)
+			require.Equal(t, test.expectedValue, value)
+		})
+	}
+}
+
+// persist owns the save-or-delete policy for every scan task, so its branches are
+// worth pinning directly. The warn-only error handling is only observable through
+// the logger, which is why the cursor is built by hand here rather than through
+// newScanCursor.
+func TestScanCursorPersist(t *testing.T) {
+	t.Parallel()
+
+	next := uuid.New()
+
+	t.Run("no cache configured is silent", func(t *testing.T) {
+		t.Parallel()
+		core, logs := observer.New(zapcore.WarnLevel)
+		cursor := &scanCursor{taskName: "test_task", key: "test_key", mc: nil, sugar: zap.New(core).Sugar()}
+
+		cursor.persist(&next)
+		cursor.persist(nil)
+		require.Zero(t, logs.Len(), "a task with no cursor cache must not warn every run")
+	})
+
+	t.Run("unreachable cache warns per branch", func(t *testing.T) {
+		t.Parallel()
+		// Port 1 resolves but refuses, so Set and Delete fail without needing a server.
+		mc, err := newScanCursorMemcacheClient("127.0.0.1:1")
+		require.NoError(t, err)
+
+		core, logs := observer.New(zapcore.WarnLevel)
+		cursor := &scanCursor{taskName: "test_task", key: "test_key", mc: mc, sugar: zap.New(core).Sugar()}
+
+		cursor.persist(&next)
+		require.Equal(t, 1, logs.FilterMessageSnippet("failed to persist cursor").Len())
+
+		cursor.persist(nil)
+		require.Equal(t, 1, logs.FilterMessageSnippet("failed to clear cursor").Len())
+	})
+}
+
+// The cursor key is derived from the task name, so a rename silently orphans the
+// persisted cursor and the next run restarts at the oldest row. These are the keys
+// in use before the derivation replaced explicit per-task prefix constants; they
+// must not drift.
+func TestScanCursorKeyIsStable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		taskName    string
+		expectedKey string
+	}{
+		{taskName: "purge_dangling_signing_keyshare_secrets", expectedKey: "purge_dangling_signing_keyshare_secrets_cursor:0"},
+		{taskName: "reconcile_signing_keyshare_secret_pointers", expectedKey: "reconcile_signing_keyshare_secret_pointers_cursor:0"},
+	}
+	for _, test := range tests {
+		t.Run(test.taskName, func(t *testing.T) {
+			t.Parallel()
+			cursor := newScanCursor(t.Context(), test.taskName, &so.Config{})
+			require.Equal(t, test.expectedKey, cursor.key)
 		})
 	}
 }

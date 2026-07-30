@@ -70,8 +70,14 @@ var signingKeysharePointerReconciliationOutcomeCounter = sync.OnceValue(func() m
 	return c
 })
 
+// recordSigningKeysharePointerReconciliationOutcome deliberately records zeros.
+// The healthy state for the dangling buckets is zero, and a counter that is only
+// touched on a non-zero result has no series at all until the first hit — so a
+// dashboard or alert cannot distinguish "no dangling keyshares" from "the task
+// never ran". Adding 0 each run creates the series and makes flat-at-zero the
+// observable healthy signal.
 func recordSigningKeysharePointerReconciliationOutcome(ctx context.Context, outcome string, count int) {
-	if count <= 0 {
+	if count < 0 {
 		return
 	}
 	signingKeysharePointerReconciliationOutcomeCounter().Add(ctx, int64(count), metric.WithAttributes(attribute.String("outcome", outcome)))

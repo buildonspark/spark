@@ -2,8 +2,6 @@ package task
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/entephemeral"
-	entephemeraltest "github.com/lightsparkdev/spark/so/entephemeral/enttest"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3"
@@ -34,11 +31,8 @@ import (
 // Tests assert on deltas, and the metric-asserting ones do not run in parallel
 // because they share the counter's attribute values.
 //
-// Deliberately never restored or shut down. Restoring the previous provider would
-// be hygiene theatre: the package's counters are sync.OnceValue, so they are
-// already bound to this one and would keep writing to it. Shutting the reader down
-// would be worse than a no-op — it is pull-based, with no exporter goroutine or
-// connection to leak, and a shut-down reader rejects the later Collect calls the
+// Never restored or shut down: the counters are sync.OnceValue and already bound to
+// this provider, and a shut-down ManualReader would reject the Collect calls the
 // remaining tests depend on.
 var reconcileSigningKeyshareSecretPointersMetricReader = msdk.NewManualReader()
 
@@ -149,6 +143,23 @@ func TestReconcileSigningKeyshareSecretPointers_DetectsAcrossMultiplePages(t *te
 	require.Equal(t, int64(1), outcomes["pass_complete"])
 }
 
+// A healthy zero has to be observable, or a dashboard cannot tell "no dangling
+// keyshares" from "the task never ran".
+//
+// The delta assertions in the tests above cannot prove that: a missing Go map key
+// reads as zero, so comparing against zero passes whether or not the series exists.
+// This uses an outcome value no other test emits, which makes key presence decisive
+// and independent of the order tests run in.
+func TestRecordSigningKeysharePointerReconciliationOutcome_ZeroCreatesSeries(t *testing.T) {
+	const outcome = "zero_series_probe"
+
+	recordSigningKeysharePointerReconciliationOutcome(t.Context(), outcome, 0)
+
+	counts := collectSigningKeysharePointerReconciliationOutcomes(t)
+	require.Contains(t, counts, outcome, "recording zero must create the series")
+	require.Equal(t, int64(0), counts[outcome])
+}
+
 func TestReconcileSigningKeyshareSecretPointers_NoOpWithoutEphemeralSession(t *testing.T) {
 	t.Parallel()
 	mainClient := db.NewTestSQLiteClient(t)
@@ -218,20 +229,7 @@ type reconcileSigningKeyshareSecretPointersEnv struct {
 func newReconcileSigningKeyshareSecretPointersEnv(t *testing.T) *reconcileSigningKeyshareSecretPointersEnv {
 	t.Helper()
 
-	mainClient := db.NewTestSQLiteClient(t)
-	ephemeralClient := entephemeraltest.Open(t, "sqlite3", fmt.Sprintf(
-		"file:%s?mode=memory&_fk=1",
-		strings.ReplaceAll(t.Name(), "/", "_"),
-	))
-
-	t.Cleanup(func() {
-		require.NoError(t, ephemeralClient.Close())
-		require.NoError(t, mainClient.Close())
-	})
-
-	ctx := ent.Inject(t.Context(), db.NewReadOnlySession(t.Context(), mainClient))
-	ctx = entephemeral.Inject(ctx, db.NewReadOnlyEphemeralSession(t.Context(), ephemeralClient))
-
+	ctx, mainClient, ephemeralClient := newSigningKeyshareSecretTaskContext(t)
 	return &reconcileSigningKeyshareSecretPointersEnv{
 		ctx:             ctx,
 		config:          sparktesting.TestConfig(t),

@@ -31,7 +31,8 @@ const (
 	purgeDanglingSigningKeyshareSecretsGracePeriod         = 10 * time.Minute
 	purgeDanglingSigningKeyshareSecretsDefaultBatchSize    = 1000
 	purgeDanglingSigningKeyshareSecretsDefaultMaxScanCount = 100_000
-	purgeDanglingSigningKeyshareSecretsCursorKeyPrefix     = "purge_dangling_signing_keyshare_secrets_cursor"
+	// Also the scheduler's name for this task, and the prefix of its cursor key.
+	purgeDanglingSigningKeyshareSecretsTaskName = "purge_dangling_signing_keyshare_secrets"
 )
 
 type purgeDanglingSigningKeyshareSecretsBatchResult struct {
@@ -64,42 +65,23 @@ func runPurgeDanglingSigningKeyshareSecrets(ctx context.Context, config *so.Conf
 	}
 	defer purgeDanglingSigningKeyshareSecretsMu.Unlock()
 
-	batchSize := int(knobsService.GetValue(knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize, purgeDanglingSigningKeyshareSecretsDefaultBatchSize))
-	if batchSize <= 0 {
-		sugar.Warnf("purge_dangling_signing_keyshare_secrets: invalid batchSize %d (knob %s), skipping run", batchSize, knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize)
+	batchSize, ok := positiveIntKnob(sugar, knobsService, purgeDanglingSigningKeyshareSecretsTaskName, knobs.KnobPurgeDanglingSigningKeyshareSecretsBatchSize, purgeDanglingSigningKeyshareSecretsDefaultBatchSize)
+	if !ok {
 		return nil
 	}
-	maxScanCount := int(knobsService.GetValue(knobs.KnobPurgeDanglingSigningKeyshareSecretsMaxScanCount, purgeDanglingSigningKeyshareSecretsDefaultMaxScanCount))
-	if maxScanCount <= 0 {
-		sugar.Warnf("purge_dangling_signing_keyshare_secrets: invalid maxScanCount %d (knob %s), skipping run", maxScanCount, knobs.KnobPurgeDanglingSigningKeyshareSecretsMaxScanCount)
+	maxScanCount, ok := positiveIntKnob(sugar, knobsService, purgeDanglingSigningKeyshareSecretsTaskName, knobs.KnobPurgeDanglingSigningKeyshareSecretsMaxScanCount, purgeDanglingSigningKeyshareSecretsDefaultMaxScanCount)
+	if !ok {
 		return nil
 	}
 
-	mc, cacheErr := newScanCursorMemcacheClient(config.CacheURI)
-	if cacheErr != nil {
-		// Not fatal: a nil client just means every run restarts at the oldest row.
-		// Worth a warning because at ~94.6M rows and a bounded per-run budget, the
-		// cursor is the only reason a full pass is reachable at all.
-		sugar.Warnf("purge_dangling_signing_keyshare_secrets: cursor cache unavailable, each run will restart from the oldest row: %v", cacheErr)
-	}
-	cursorKey := scanCursorKey(purgeDanglingSigningKeyshareSecretsCursorKeyPrefix, config.Index)
-	startCursor := loadScanCursor(mc, cursorKey)
+	cursor := newScanCursor(ctx, purgeDanglingSigningKeyshareSecretsTaskName, config)
 
 	cutoffID := uuids.UUIDv7FromTime(time.Now().Add(-purgeDanglingSigningKeyshareSecretsGracePeriod))
-	result, err := purgeDanglingSigningKeyshareSecretsBatch(ctx, cutoffID, batchSize, maxScanCount, startCursor)
+	result, err := purgeDanglingSigningKeyshareSecretsBatch(ctx, cutoffID, batchSize, maxScanCount, cursor.load())
 	if err != nil {
 		return err
 	}
-
-	if result.NextCursor != nil {
-		if cacheErr := saveScanCursor(mc, cursorKey, *result.NextCursor); cacheErr != nil {
-			sugar.Warnf("purge_dangling_signing_keyshare_secrets: failed to persist cursor (will resume from previous cursor or start over on next run): %v", cacheErr)
-		}
-	} else {
-		if cacheErr := deleteScanCursor(mc, cursorKey); cacheErr != nil {
-			sugar.Warnf("purge_dangling_signing_keyshare_secrets: failed to clear cursor at end of pass (next run may rescan from stale cursor): %v", cacheErr)
-		}
-	}
+	cursor.persist(result.NextCursor)
 
 	switch {
 	case result.FoundFullDeleteBatch && result.NextCursor != nil:
