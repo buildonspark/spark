@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, hexToBytes } from "@noble/curves/utils";
+import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
 import type {
   AggregateFrostParams,
@@ -26,6 +28,7 @@ import {
   type QueryTransfersResponse,
   type SigningResult as ProtoSigningResult,
 } from "../proto/spark.js";
+import { type Signature, SignatureScheme } from "../proto/common.js";
 import { SparkValidationError } from "../errors/index.js";
 import { getSigHashFromTx, getTxFromRawTxHex } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
@@ -643,5 +646,86 @@ describe("isReceiverLegComplete", () => {
       },
     ]);
     expect(isReceiverLegComplete(t, strangerPk)).toBe(false);
+  });
+});
+
+describe("verifyPendingTransfer", () => {
+  const senderPriv = hexToBytes(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  );
+  const senderIdentityPublicKey = secp256k1.getPublicKey(senderPriv, true);
+  const transferId = "test-transfer-id";
+  const leafId = "test-leaf-id";
+  const secretCipher = new Uint8Array([9, 8, 7]);
+  const decryptedSecret = new Uint8Array([4, 2]);
+
+  const encoder = new TextEncoder();
+  const payloadHash = sha256(
+    new Uint8Array([
+      ...encoder.encode(leafId),
+      ...encoder.encode(transferId),
+      ...secretCipher,
+    ]),
+  );
+
+  function makeService() {
+    const decryptEcies = jest.fn<() => Promise<Uint8Array>>(() =>
+      Promise.resolve(decryptedSecret),
+    );
+    return new TransferService(
+      { signer: { decryptEcies } } as unknown as WalletConfigService,
+      {} as unknown as ConnectionManager,
+      {} as unknown as SigningService,
+    );
+  }
+
+  function makePendingTransfer(typedSignature: Signature): Transfer {
+    return {
+      id: transferId,
+      senderIdentityPublicKey,
+      leaves: [
+        {
+          leaf: { id: leafId },
+          secretCipher,
+          sig: { $case: "typedSignature", typedSignature },
+        },
+      ],
+    } as unknown as Transfer;
+  }
+
+  it("accepts a leaf carrying the typedSignature oneof arm", async () => {
+    const transfer = makePendingTransfer({
+      scheme: SignatureScheme.SIGNATURE_SCHEME_SCHNORR,
+      signature: schnorr.sign(payloadHash, senderPriv),
+    });
+
+    const leafPubKeyMap = await makeService().verifyPendingTransfer(transfer);
+
+    expect(leafPubKeyMap.get(leafId)).toEqual(decryptedSecret);
+  });
+
+  it("rejects a typed signature from the wrong key", async () => {
+    const otherPriv = hexToBytes(
+      "0000000000000000000000000000000000000000000000000000000000000007",
+    );
+    const transfer = makePendingTransfer({
+      scheme: SignatureScheme.SIGNATURE_SCHEME_SCHNORR,
+      signature: schnorr.sign(payloadHash, otherPriv),
+    });
+
+    await expect(makeService().verifyPendingTransfer(transfer)).rejects.toThrow(
+      "Signature verification failed",
+    );
+  });
+
+  it("rejects a typed signature with an unspecified scheme", async () => {
+    const transfer = makePendingTransfer({
+      scheme: SignatureScheme.SIGNATURE_SCHEME_UNSPECIFIED,
+      signature: schnorr.sign(payloadHash, senderPriv),
+    });
+
+    await expect(makeService().verifyPendingTransfer(transfer)).rejects.toThrow(
+      "Signature verification failed",
+    );
   });
 });

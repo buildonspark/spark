@@ -59,6 +59,7 @@ import {
 import { NetworkToProto } from "../utils/network.js";
 import { type RetryContext, withRetry } from "../utils/retry.js";
 import { type VerifiableSecretShare } from "../utils/secret-sharing.js";
+import { verifyTypedSignature } from "../utils/signature.js";
 import {
   createCurrentTimelockRefundTxs,
   createDecrementedTimelockNodeTx,
@@ -1330,16 +1331,17 @@ export class TransferService extends BaseTransferService {
 
         const payloadHash = sha256(payload);
 
-        const leafSignature =
-          leaf.sig?.$case === "signature"
-            ? leaf.sig.signature
-            : new Uint8Array();
         if (
-          !secp256k1.verify(
-            leafSignature,
-            payloadHash,
-            transfer.senderIdentityPublicKey,
-          )
+          !verifyTypedSignature({
+            digest: payloadHash,
+            compressedPubkey: transfer.senderIdentityPublicKey,
+            legacy:
+              leaf.sig?.$case === "signature" ? leaf.sig.signature : undefined,
+            typed:
+              leaf.sig?.$case === "typedSignature"
+                ? leaf.sig.typedSignature
+                : undefined,
+          })
         ) {
           throw new Error("Signature verification failed");
         }
