@@ -125,6 +125,7 @@ func (i *Interceptor) PartnerJWTInterceptor(ctx context.Context, req any, info *
 	pInfo, err := i.verifyPartnerJWT(ctx, vals[0])
 	if err != nil {
 		// Per design: invalid JWT → request proceeds normally, unattributed.
+		RecordAttributionFailure(ctx, AttributionFailureJWTInvalid)
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf("partner JWT verification failed, request will proceed unattributed: %v", err)
 		return handler(ctx, req)
 	}
@@ -198,6 +199,7 @@ func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*P
 				Label:       label,
 			}, nil
 		}
+		RecordAttributionFailure(ctx, AttributionFailurePartnerCreateFailed)
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf(
 			"partner JWT verified but auto-create failed for %s/%s: %v", partnerID, label, err)
 		// JWT valid but no attribution — return with label but empty PartnerDBID.

@@ -29,6 +29,7 @@ func SaveTransferPartner(ctx context.Context, transferID uuid.UUID, transferPart
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
+		RecordAttributionFailure(ctx, AttributionFailureDBContextMissing)
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf("failed to get db context for transfer partner: %w", err)
 		return
 	}
@@ -41,6 +42,7 @@ func SaveTransferPartner(ctx context.Context, transferID uuid.UUID, transferPart
 		Ignore().
 		Exec(ctx)
 	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
+		RecordAttributionFailure(ctx, AttributionFailureWriteFailed)
 		logging.GetLoggerFromContext(ctx).Sugar().Warnf("failed to save transfer partner for transfer %s: %w", transferID, err)
 		return
 	}
