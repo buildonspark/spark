@@ -2196,6 +2196,11 @@ export interface InitiatePreimageSwapV4Request {
    * invoice owner on REASON_RECEIVE. Keys the preimage request.
    */
   counterpartyIdentityPublicKey: Uint8Array;
+  /**
+   * The counterparty's signature over the manifest hash, made with the key above:
+   * attests that the invoice owner agreed to this edge set.
+   */
+  counterpartyManifestSignature: Uint8Array;
   transferV3Request: StartTransferV3Request | undefined;
 }
 
@@ -15317,6 +15322,7 @@ function createBaseInitiatePreimageSwapV4Request(): InitiatePreimageSwapV4Reques
     invoiceAmount: undefined,
     reason: 0,
     counterpartyIdentityPublicKey: new Uint8Array(0),
+    counterpartyManifestSignature: new Uint8Array(0),
     transferV3Request: undefined,
   };
 }
@@ -15335,8 +15341,11 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
     if (message.counterpartyIdentityPublicKey.length !== 0) {
       writer.uint32(34).bytes(message.counterpartyIdentityPublicKey);
     }
+    if (message.counterpartyManifestSignature.length !== 0) {
+      writer.uint32(42).bytes(message.counterpartyManifestSignature);
+    }
     if (message.transferV3Request !== undefined) {
-      StartTransferV3Request.encode(message.transferV3Request, writer.uint32(42).fork()).join();
+      StartTransferV3Request.encode(message.transferV3Request, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -15385,6 +15394,14 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
             break;
           }
 
+          message.counterpartyManifestSignature = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
           message.transferV3Request = StartTransferV3Request.decode(reader, reader.uint32());
           continue;
         }
@@ -15404,6 +15421,9 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
       reason: isSet(object.reason) ? initiatePreimageSwapRequest_ReasonFromJSON(object.reason) : 0,
       counterpartyIdentityPublicKey: isSet(object.counterpartyIdentityPublicKey)
         ? bytesFromBase64(object.counterpartyIdentityPublicKey)
+        : new Uint8Array(0),
+      counterpartyManifestSignature: isSet(object.counterpartyManifestSignature)
+        ? bytesFromBase64(object.counterpartyManifestSignature)
         : new Uint8Array(0),
       transferV3Request: isSet(object.transferV3Request)
         ? StartTransferV3Request.fromJSON(object.transferV3Request)
@@ -15425,6 +15445,9 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
     if (message.counterpartyIdentityPublicKey.length !== 0) {
       obj.counterpartyIdentityPublicKey = base64FromBytes(message.counterpartyIdentityPublicKey);
     }
+    if (message.counterpartyManifestSignature.length !== 0) {
+      obj.counterpartyManifestSignature = base64FromBytes(message.counterpartyManifestSignature);
+    }
     if (message.transferV3Request !== undefined) {
       obj.transferV3Request = StartTransferV3Request.toJSON(message.transferV3Request);
     }
@@ -15442,6 +15465,7 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
       : undefined;
     message.reason = object.reason ?? 0;
     message.counterpartyIdentityPublicKey = object.counterpartyIdentityPublicKey ?? new Uint8Array(0);
+    message.counterpartyManifestSignature = object.counterpartyManifestSignature ?? new Uint8Array(0);
     message.transferV3Request = (object.transferV3Request !== undefined && object.transferV3Request !== null)
       ? StartTransferV3Request.fromPartial(object.transferV3Request)
       : undefined;
