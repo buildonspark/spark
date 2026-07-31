@@ -9,12 +9,16 @@ import (
 // SparkSspInternalService is the Lightspark-only SSP coordination surface.
 // Every method is IP-protected; subsets either accept anonymous callers (legacy "ops" RPCs) or require a session token
 // (newer flows that go through the same sspcore client used by external partners).
+//
+// Despite the "internal" name these aren't AuthOperatorBrontide: the SSP isn't a signing operator, so it can't complete
+// the Noise_XK handshake against the operator set, and this service is only registered on the public listener. The IP
+// allowlist really is the only caller gate for the anonymous subset.
 func init() {
 	register(sparkSspInternalServicePolicies())
 }
 
 func sparkSspInternalServicePolicies() map[string]Policy {
-	unauthInternal := Policy{AuthMode: AuthUnauthenticated, InternalOnly: true}
+	unauthInternal := Policy{AuthMode: AuthAnonymous, InternalOnly: true}
 	sessionInternal := Policy{AuthMode: AuthSession, InternalOnly: true}
 	return map[string]Policy{
 		// Anonymous, IP-restricted ops RPCs.

@@ -131,7 +131,8 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 
 	// A brontide-authenticated caller has cryptographically proven possession of a known operator's identity private
 	// key via the Noise_XK handshake. That's strictly stronger than the IP allowlist, so we let the call through
-	// regardless of source IP. The IP allowlist is still the gate for non-brontide traffic.
+	// regardless of source IP. The IP allowlist is still the gate for non-brontide traffic — including calls to the
+	// rpcpolicy.AuthOperatorBrontide methods that arrive on the public listener.
 	if peerOp := brontide.PeerOperator(ctx); peerOp != nil {
 		i.recordAuthDecision(ctx, authPathBrontide)
 		logger.Sugar().Debugf("internal API call authenticated via brontide as operator %s", peerOp.Identifier)

@@ -30,18 +30,25 @@ type AuthMode int
 const (
 	// AuthSession requires a valid session token.
 	AuthSession AuthMode = iota
-	// AuthUnauthenticated skips session-token verification. Use only for public discovery RPCs or for internal RPCs
-	// that rely on IP allowlisting instead of session auth.
-	AuthUnauthenticated
+	// AuthAnonymous performs no caller authentication at all. Use only for public discovery RPCs, or for reads that
+	// either return public data or apply wallet-privacy filtering inside the handler.
+	AuthAnonymous
 	// AuthPartnerBasic means the method is authenticated, but via HTTP Basic Auth rather than a session token. The
 	// authn interceptor does not require a session token (so the "Basic …" credential passes through); the credential
 	// itself is verified downstream by partner.BasicAuthInterceptor against partner_keys.basic_auth_secret_hash.
 	//
 	// IMPORTANT: BasicAuthInterceptor is on the UNARY chain only. A *streaming* AuthPartnerBasic method would skip
-	// session auth (StreamAuthnInterceptor also consults IsAuthenticated) yet never have its Basic credential verified
-	// — i.e. effectively unauthenticated. Keep AuthPartnerBasic methods unary-only; TestSparkPartnerServiceIsUnaryOnly
-	// enforces this.
+	// session auth yet never have its Basic credential verified.
 	AuthPartnerBasic
+	// AuthOperatorBrontide means the caller is another SO, authenticated at the transport layer: the Noise_XK handshake
+	// proves possession of an identity private key belonging to the operator set. No session token is involved, and the
+	// authz interceptor admits the call on the strength of the resolved brontide.PeerOperator.
+	//
+	// IMPORTANT: for now this only holds for calls that arrive on the internal listener. The same services are still
+	// registered on the public listener, where InternalOnly's IP gate is the only check. Once every peer client dials
+	// brontide and these services come off the public listener, the IP fallback (and InternalOnly on these methods) can
+	// go. The readiness signal is internal_authz_decisions_total{path="vpc-ip"} dropping to zero for these methods.
+	AuthOperatorBrontide
 )
 
 // Policy is the per-method declarative policy.
@@ -71,19 +78,21 @@ func LookUp(fullMethod string) (Policy, bool) {
 	return p, ok
 }
 
-// IsAuthenticated reports whether the authn interceptor should require session-token enforcement for the method.
-// AuthUnauthenticated and AuthPartnerBasic are the only modes that don't use a session token (the latter is
-// authenticated downstream by its own interceptor); every other mode — including any future AuthMode and any
-// unregistered method — fails closed and requires a session.
-func IsAuthenticated(fullMethod string) bool {
+// RequiresSessionToken reports whether the authn interceptor should require session-token enforcement for the method.
+// Only AuthSession uses session tokens; the other modes are either anonymous or authenticated by a different mechanism
+// (Basic Auth downstream, or the brontide handshake at the transport layer). Stated as an allowlist so unregistered
+// methods and any future AuthMode fail closed and require a session.
+func RequiresSessionToken(fullMethod string) bool {
 	p, ok := LookUp(fullMethod)
-	// Fail closed for unregistered methods; explicitly exclude the two modes that don't use session
-	// tokens so any future AuthMode defaults to requiring a session.
-	return !ok || (p.AuthMode != AuthUnauthenticated && p.AuthMode != AuthPartnerBasic)
+	if !ok {
+		return true
+	}
+	return p.AuthMode == AuthSession
 }
 
-// IsInternalOnly reports whether the authz interceptor should require a VPC-internal or allowlisted peer IP for the
-// method. Unknown methods default to false; the startup guard rejects them anyway so this default isn't possible in prod.
+// IsInternalOnly reports whether the authz interceptor should gate the method on caller provenance. The interceptor
+// admits either a brontide-authenticated operator or a VPC-internal / allowlisted peer IP, so for AuthOperatorBrontide
+// methods this is the fallback gate rather than the primary one.
 func IsInternalOnly(fullMethod string) bool {
 	p, ok := LookUp(fullMethod)
 	return ok && p.InternalOnly
@@ -109,8 +118,8 @@ func init() {
 
 func sparkAuthnPolicies() map[string]Policy {
 	return map[string]Policy{
-		pbauthn.SparkAuthnService_GetChallenge_FullMethodName:    {AuthMode: AuthUnauthenticated},
-		pbauthn.SparkAuthnService_VerifyChallenge_FullMethodName: {AuthMode: AuthUnauthenticated},
+		pbauthn.SparkAuthnService_GetChallenge_FullMethodName:    {AuthMode: AuthAnonymous},
+		pbauthn.SparkAuthnService_VerifyChallenge_FullMethodName: {AuthMode: AuthAnonymous},
 	}
 }
 
@@ -134,9 +143,9 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_StartDepositTreeCreation_FullMethodName:            {AuthMode: AuthSession},
 		pbspark.SparkService_FinalizeDepositTreeCreation_FullMethodName:         {AuthMode: AuthSession},
 		pbspark.SparkService_FinalizeTransferWithTransferPackage_FullMethodName: {AuthMode: AuthSession},
-		pbspark.SparkService_QueryPendingTransfers_FullMethodName:               {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryAllTransfers_FullMethodName:                   {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryTransfersById_FullMethodName:                  {AuthMode: AuthUnauthenticated},
+		pbspark.SparkService_QueryPendingTransfers_FullMethodName:               {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QueryAllTransfers_FullMethodName:                   {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QueryTransfersById_FullMethodName:                  {AuthMode: AuthAnonymous},
 		pbspark.SparkService_ClaimTransferTweakKeys_FullMethodName:              {AuthMode: AuthSession},
 		pbspark.SparkService_StorePreimageShare_FullMethodName:                  {AuthMode: AuthSession},
 		pbspark.SparkService_StorePreimageShareV2_FullMethodName:                {AuthMode: AuthSession},
@@ -145,11 +154,11 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_QueryPreimage_FullMethodName:                       {AuthMode: AuthSession},
 		pbspark.SparkService_QueryHtlc_FullMethodName:                           {AuthMode: AuthSession},
 		pbspark.SparkService_RenewLeaf_FullMethodName:                           {AuthMode: AuthSession},
-		pbspark.SparkService_GetSigningOperatorList_FullMethodName:              {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryNodes_FullMethodName:                          {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryBalance_FullMethodName:                        {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryUnusedDepositAddresses_FullMethodName:         {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QueryStaticDepositAddresses_FullMethodName:         {AuthMode: AuthUnauthenticated},
+		pbspark.SparkService_GetSigningOperatorList_FullMethodName:              {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QueryNodes_FullMethodName:                          {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QueryBalance_FullMethodName:                        {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QueryUnusedDepositAddresses_FullMethodName:         {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QueryStaticDepositAddresses_FullMethodName:         {AuthMode: AuthAnonymous},
 		pbspark.SparkService_SubscribeToEvents_FullMethodName:                   {AuthMode: AuthSession},
 		pbspark.SparkService_InitiateStaticDepositUtxoRefund_FullMethodName:     {AuthMode: AuthSession},
 		pbspark.SparkService_ExitSingleNodeTrees_FullMethodName:                 {AuthMode: AuthSession},
@@ -163,61 +172,60 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_StartTransferV3_FullMethodName:                     {AuthMode: AuthSession},
 		pbspark.SparkService_StartTransferMpc_FullMethodName:                    {AuthMode: AuthSession},
 		pbspark.SparkService_ClaimTransfer_FullMethodName:                       {AuthMode: AuthSession},
-		pbspark.SparkService_GetUtxosForAddress_FullMethodName:                  {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_GetUtxosForIdentity_FullMethodName:                 {AuthMode: AuthUnauthenticated},
-		pbspark.SparkService_QuerySparkInvoices_FullMethodName:                  {AuthMode: AuthUnauthenticated},
+		pbspark.SparkService_GetUtxosForAddress_FullMethodName:                  {AuthMode: AuthAnonymous},
+		pbspark.SparkService_GetUtxosForIdentity_FullMethodName:                 {AuthMode: AuthAnonymous},
+		pbspark.SparkService_QuerySparkInvoices_FullMethodName:                  {AuthMode: AuthAnonymous},
 		pbspark.SparkService_InitiateSwapPrimaryTransfer_FullMethodName:         {AuthMode: AuthSession},
 		pbspark.SparkService_UpdateWalletSetting_FullMethodName:                 {AuthMode: AuthSession},
 		pbspark.SparkService_QueryWalletSetting_FullMethodName:                  {AuthMode: AuthSession},
 	}
 }
 
-// sparkInternalServicePolicies handle SO-to-SO coordination. Every method is unauthenticated at the session layer and
-// protected by VPC IP allowlisting.
+// sparkInternalServicePolicies handle SO-to-SO coordination.
 func sparkInternalServicePolicies() map[string]Policy {
-	unauthInternal := Policy{AuthMode: AuthUnauthenticated, InternalOnly: true}
+	operatorInternal := Policy{AuthMode: AuthOperatorBrontide, InternalOnly: true}
 	return map[string]Policy{
-		pbinternal.SparkInternalService_MarkKeysharesAsUsed_FullMethodName:                unauthInternal,
-		pbinternal.SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName:      unauthInternal,
-		pbinternal.SparkInternalService_ReserveEntityDkgKey_FullMethodName:                unauthInternal,
-		pbinternal.SparkInternalService_FinalizeTreeCreation_FullMethodName:               unauthInternal,
-		pbinternal.SparkInternalService_FrostRound1_FullMethodName:                        unauthInternal,
-		pbinternal.SparkInternalService_FrostRound2_FullMethodName:                        unauthInternal,
-		pbinternal.SparkInternalService_FinalizeTransfer_FullMethodName:                   unauthInternal,
-		pbinternal.SparkInternalService_FinalizeRefreshTimelock_FullMethodName:            unauthInternal,
-		pbinternal.SparkInternalService_FinalizeExtendLeaf_FullMethodName:                 unauthInternal,
-		pbinternal.SparkInternalService_FinalizeRenewRefundTimelock_FullMethodName:        unauthInternal,
-		pbinternal.SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName:          unauthInternal,
-		pbinternal.SparkInternalService_NodeAvailableForRenew_FullMethodName:              unauthInternal,
-		pbinternal.SparkInternalService_InitiatePreimageSwap_FullMethodName:               unauthInternal,
-		pbinternal.SparkInternalService_InitiatePreimageSwapV2_FullMethodName:             unauthInternal,
-		pbinternal.SparkInternalService_UpdatePreimageRequest_FullMethodName:              unauthInternal,
-		pbinternal.SparkInternalService_StorePreimageShare_FullMethodName:                 unauthInternal,
-		pbinternal.SparkInternalService_PrepareTreeAddress_FullMethodName:                 unauthInternal,
-		pbinternal.SparkInternalService_InitiateTransfer_FullMethodName:                   unauthInternal,
-		pbinternal.SparkInternalService_InitiateTransferV2_FullMethodName:                 unauthInternal,
-		pbinternal.SparkInternalService_DeliverSenderKeyTweak_FullMethodName:              unauthInternal,
-		pbinternal.SparkInternalService_InitiateCooperativeExit_FullMethodName:            unauthInternal,
-		pbinternal.SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName:     unauthInternal,
-		pbinternal.SparkInternalService_SettleReceiverKeyTweak_FullMethodName:             unauthInternal,
-		pbinternal.SparkInternalService_SettleSenderKeyTweak_FullMethodName:               unauthInternal,
-		pbinternal.SparkInternalService_CreateStaticDepositUtxoSwap_FullMethodName:        unauthInternal,
-		pbinternal.SparkInternalService_CreateStaticDepositUtxoRefund_FullMethodName:      unauthInternal,
-		pbinternal.SparkInternalService_CreateInstantStaticDepositUtxoSwap_FullMethodName: unauthInternal,
-		pbinternal.SparkInternalService_SaveUtxoForInstantStaticDeposit_FullMethodName:    unauthInternal,
-		pbinternal.SparkInternalService_LinkUtxoSwapTransfer_FullMethodName:               unauthInternal,
-		pbinternal.SparkInternalService_RollbackUtxoSwap_FullMethodName:                   unauthInternal,
-		pbinternal.SparkInternalService_RollbackInstantUtxoSwap_FullMethodName:            unauthInternal,
-		pbinternal.SparkInternalService_UtxoSwapCompleted_FullMethodName:                  unauthInternal,
-		pbinternal.SparkInternalService_FixKeyshare_FullMethodName:                        unauthInternal,
-		pbinternal.SparkInternalService_FixKeyshareRound1_FullMethodName:                  unauthInternal,
-		pbinternal.SparkInternalService_FixKeyshareRound2_FullMethodName:                  unauthInternal,
-		pbinternal.SparkInternalService_GetTransfers_FullMethodName:                       unauthInternal,
-		pbinternal.SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName: unauthInternal,
-		pbinternal.SparkInternalService_SyncNode_FullMethodName:                           unauthInternal,
-		pbinternal.SparkInternalService_QueryNodes_FullMethodName:                         unauthInternal,
-		pbinternal.SparkInternalService_ConsensusPrepare_FullMethodName:                   unauthInternal,
-		pbinternal.SparkInternalService_ConsensusQueryOutcome_FullMethodName:              unauthInternal,
+		pbinternal.SparkInternalService_MarkKeysharesAsUsed_FullMethodName:                operatorInternal,
+		pbinternal.SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName:      operatorInternal,
+		pbinternal.SparkInternalService_ReserveEntityDkgKey_FullMethodName:                operatorInternal,
+		pbinternal.SparkInternalService_FinalizeTreeCreation_FullMethodName:               operatorInternal,
+		pbinternal.SparkInternalService_FrostRound1_FullMethodName:                        operatorInternal,
+		pbinternal.SparkInternalService_FrostRound2_FullMethodName:                        operatorInternal,
+		pbinternal.SparkInternalService_FinalizeTransfer_FullMethodName:                   operatorInternal,
+		pbinternal.SparkInternalService_FinalizeRefreshTimelock_FullMethodName:            operatorInternal,
+		pbinternal.SparkInternalService_FinalizeExtendLeaf_FullMethodName:                 operatorInternal,
+		pbinternal.SparkInternalService_FinalizeRenewRefundTimelock_FullMethodName:        operatorInternal,
+		pbinternal.SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName:          operatorInternal,
+		pbinternal.SparkInternalService_NodeAvailableForRenew_FullMethodName:              operatorInternal,
+		pbinternal.SparkInternalService_InitiatePreimageSwap_FullMethodName:               operatorInternal,
+		pbinternal.SparkInternalService_InitiatePreimageSwapV2_FullMethodName:             operatorInternal,
+		pbinternal.SparkInternalService_UpdatePreimageRequest_FullMethodName:              operatorInternal,
+		pbinternal.SparkInternalService_StorePreimageShare_FullMethodName:                 operatorInternal,
+		pbinternal.SparkInternalService_PrepareTreeAddress_FullMethodName:                 operatorInternal,
+		pbinternal.SparkInternalService_InitiateTransfer_FullMethodName:                   operatorInternal,
+		pbinternal.SparkInternalService_InitiateTransferV2_FullMethodName:                 operatorInternal,
+		pbinternal.SparkInternalService_DeliverSenderKeyTweak_FullMethodName:              operatorInternal,
+		pbinternal.SparkInternalService_InitiateCooperativeExit_FullMethodName:            operatorInternal,
+		pbinternal.SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName:     operatorInternal,
+		pbinternal.SparkInternalService_SettleReceiverKeyTweak_FullMethodName:             operatorInternal,
+		pbinternal.SparkInternalService_SettleSenderKeyTweak_FullMethodName:               operatorInternal,
+		pbinternal.SparkInternalService_CreateStaticDepositUtxoSwap_FullMethodName:        operatorInternal,
+		pbinternal.SparkInternalService_CreateStaticDepositUtxoRefund_FullMethodName:      operatorInternal,
+		pbinternal.SparkInternalService_CreateInstantStaticDepositUtxoSwap_FullMethodName: operatorInternal,
+		pbinternal.SparkInternalService_SaveUtxoForInstantStaticDeposit_FullMethodName:    operatorInternal,
+		pbinternal.SparkInternalService_LinkUtxoSwapTransfer_FullMethodName:               operatorInternal,
+		pbinternal.SparkInternalService_RollbackUtxoSwap_FullMethodName:                   operatorInternal,
+		pbinternal.SparkInternalService_RollbackInstantUtxoSwap_FullMethodName:            operatorInternal,
+		pbinternal.SparkInternalService_UtxoSwapCompleted_FullMethodName:                  operatorInternal,
+		pbinternal.SparkInternalService_FixKeyshare_FullMethodName:                        operatorInternal,
+		pbinternal.SparkInternalService_FixKeyshareRound1_FullMethodName:                  operatorInternal,
+		pbinternal.SparkInternalService_FixKeyshareRound2_FullMethodName:                  operatorInternal,
+		pbinternal.SparkInternalService_GetTransfers_FullMethodName:                       operatorInternal,
+		pbinternal.SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName: operatorInternal,
+		pbinternal.SparkInternalService_SyncNode_FullMethodName:                           operatorInternal,
+		pbinternal.SparkInternalService_QueryNodes_FullMethodName:                         operatorInternal,
+		pbinternal.SparkInternalService_ConsensusPrepare_FullMethodName:                   operatorInternal,
+		pbinternal.SparkInternalService_ConsensusQueryOutcome_FullMethodName:              operatorInternal,
 	}
 }
 
@@ -225,40 +233,40 @@ func sparkTokenServicePolicies() map[string]Policy {
 	return map[string]Policy{
 		pbtoken.SparkTokenService_StartTransaction_FullMethodName:       {AuthMode: AuthSession},
 		pbtoken.SparkTokenService_CommitTransaction_FullMethodName:      {AuthMode: AuthSession},
-		pbtoken.SparkTokenService_QueryTokenMetadata_FullMethodName:     {AuthMode: AuthUnauthenticated},
-		pbtoken.SparkTokenService_QueryTokenTransactions_FullMethodName: {AuthMode: AuthUnauthenticated},
-		pbtoken.SparkTokenService_QueryTokenOutputs_FullMethodName:      {AuthMode: AuthUnauthenticated},
+		pbtoken.SparkTokenService_QueryTokenMetadata_FullMethodName:     {AuthMode: AuthAnonymous},
+		pbtoken.SparkTokenService_QueryTokenTransactions_FullMethodName: {AuthMode: AuthAnonymous},
+		pbtoken.SparkTokenService_QueryTokenOutputs_FullMethodName:      {AuthMode: AuthAnonymous},
 		pbtoken.SparkTokenService_FreezeTokens_FullMethodName:           {AuthMode: AuthSession},
 		pbtoken.SparkTokenService_BroadcastTransaction_FullMethodName:   {AuthMode: AuthSession},
 	}
 }
 
 func sparkTokenInternalServicePolicies() map[string]Policy {
-	unauthInternal := Policy{AuthMode: AuthUnauthenticated, InternalOnly: true}
+	operatorInternal := Policy{AuthMode: AuthOperatorBrontide, InternalOnly: true}
 	return map[string]Policy{
-		pbtokeninternal.SparkTokenInternalService_PrepareTransaction_FullMethodName:                   unauthInternal,
-		pbtokeninternal.SparkTokenInternalService_SignTokenTransactionFromCoordination_FullMethodName: unauthInternal,
-		pbtokeninternal.SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName:      unauthInternal,
-		pbtokeninternal.SparkTokenInternalService_SignTokenTransaction_FullMethodName:                 unauthInternal,
-		pbtokeninternal.SparkTokenInternalService_InternalFreezeTokens_FullMethodName:                 unauthInternal,
+		pbtokeninternal.SparkTokenInternalService_PrepareTransaction_FullMethodName:                   operatorInternal,
+		pbtokeninternal.SparkTokenInternalService_SignTokenTransactionFromCoordination_FullMethodName: operatorInternal,
+		pbtokeninternal.SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName:      operatorInternal,
+		pbtokeninternal.SparkTokenInternalService_SignTokenTransaction_FullMethodName:                 operatorInternal,
+		pbtokeninternal.SparkTokenInternalService_InternalFreezeTokens_FullMethodName:                 operatorInternal,
 	}
 }
 
 func dkgServicePolicies() map[string]Policy {
-	unauthInternal := Policy{AuthMode: AuthUnauthenticated, InternalOnly: true}
+	operatorInternal := Policy{AuthMode: AuthOperatorBrontide, InternalOnly: true}
 	return map[string]Policy{
-		pbdkg.DKGService_StartDkg_FullMethodName:          unauthInternal,
-		pbdkg.DKGService_InitiateDkg_FullMethodName:       unauthInternal,
-		pbdkg.DKGService_Round1Packages_FullMethodName:    unauthInternal,
-		pbdkg.DKGService_Round1Signature_FullMethodName:   unauthInternal,
-		pbdkg.DKGService_Round2Packages_FullMethodName:    unauthInternal,
-		pbdkg.DKGService_RoundConfirmation_FullMethodName: unauthInternal,
+		pbdkg.DKGService_StartDkg_FullMethodName:          operatorInternal,
+		pbdkg.DKGService_InitiateDkg_FullMethodName:       operatorInternal,
+		pbdkg.DKGService_Round1Packages_FullMethodName:    operatorInternal,
+		pbdkg.DKGService_Round1Signature_FullMethodName:   operatorInternal,
+		pbdkg.DKGService_Round2Packages_FullMethodName:    operatorInternal,
+		pbdkg.DKGService_RoundConfirmation_FullMethodName: operatorInternal,
 	}
 }
 
 func gossipServicePolicies() map[string]Policy {
 	return map[string]Policy{
-		pbgossip.GossipService_Gossip_FullMethodName: {AuthMode: AuthUnauthenticated, InternalOnly: true},
+		pbgossip.GossipService_Gossip_FullMethodName: {AuthMode: AuthOperatorBrontide, InternalOnly: true},
 	}
 }
 
@@ -266,11 +274,11 @@ func gossipServicePolicies() map[string]Policy {
 // NOT IP-protected (so they're reachable from a developer's loopback). Prod binaries don't register these methods at all.
 func mockServicePolicies() map[string]Policy {
 	return map[string]Policy{
-		pbmock.MockService_CleanUpPreimageShare_FullMethodName: {AuthMode: AuthUnauthenticated},
-		pbmock.MockService_UpdateNodesStatus_FullMethodName:    {AuthMode: AuthUnauthenticated},
-		pbmock.MockService_TriggerTask_FullMethodName:          {AuthMode: AuthUnauthenticated},
-		pbmock.MockService_QueryPreimageShare_FullMethodName:   {AuthMode: AuthUnauthenticated},
-		pbmock.MockService_ModifyNodeTimelock_FullMethodName:   {AuthMode: AuthUnauthenticated},
+		pbmock.MockService_CleanUpPreimageShare_FullMethodName: {AuthMode: AuthAnonymous},
+		pbmock.MockService_UpdateNodesStatus_FullMethodName:    {AuthMode: AuthAnonymous},
+		pbmock.MockService_TriggerTask_FullMethodName:          {AuthMode: AuthAnonymous},
+		pbmock.MockService_QueryPreimageShare_FullMethodName:   {AuthMode: AuthAnonymous},
+		pbmock.MockService_ModifyNodeTimelock_FullMethodName:   {AuthMode: AuthAnonymous},
 	}
 }
 
@@ -278,8 +286,8 @@ func mockServicePolicies() map[string]Policy {
 // are stable parts of the gRPC health protocol, so referencing them as string literals is safe.
 func healthServicePolicies() map[string]Policy {
 	return map[string]Policy{
-		"/grpc.health.v1.Health/Check": {AuthMode: AuthUnauthenticated},
-		"/grpc.health.v1.Health/List":  {AuthMode: AuthUnauthenticated},
-		"/grpc.health.v1.Health/Watch": {AuthMode: AuthUnauthenticated},
+		"/grpc.health.v1.Health/Check": {AuthMode: AuthAnonymous},
+		"/grpc.health.v1.Health/List":  {AuthMode: AuthAnonymous},
+		"/grpc.health.v1.Health/Watch": {AuthMode: AuthAnonymous},
 	}
 }

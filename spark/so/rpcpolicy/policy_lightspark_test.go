@@ -25,7 +25,7 @@ func TestLightsparkSparkSspInternalPoliciesPresent(t *testing.T) {
 		{
 			name:             "anonymous ops query",
 			method:           pbssp.SparkSspInternalService_QueryLostNodes_FullMethodName,
-			expectedAuthMode: AuthUnauthenticated,
+			expectedAuthMode: AuthAnonymous,
 		},
 		{
 			name:             "session-required SSP flow",
