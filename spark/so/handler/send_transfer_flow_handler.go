@@ -178,7 +178,7 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, fmt.Errorf("failed to create transfer rows for %s: %w", parsed.transferID, err)
 	}
 
-	if err := bindManifestIfPresent(orig, transferEnt.Network, leafMap); err != nil {
+	if err := bindManifestIfPresent(ctx, manifestBindEndpointForTransferType(h.transferType), orig, transferEnt.Network, leafMap); err != nil {
 		return nil, err
 	}
 
@@ -629,9 +629,9 @@ func parseSendTransferEnvelope(req *pb.StartTransferV3Request) (*pb.SenderTransf
 // because the cover check needs the locked rows' owners and amounts — which is also what keeps
 // those two facts out of the requester's hands. The coordinator entry additionally runs the
 // signature half up front, where it can reject before any of that work is done.
-func bindManifestIfPresent(req *pb.StartTransferV3Request, network btcnetwork.Network, leafMap map[string]*ent.TreeNode) error {
+func bindManifestIfPresent(ctx context.Context, endpoint manifestBindEndpoint, req *pb.StartTransferV3Request, network btcnetwork.Network, leafMap map[string]*ent.TreeNode) error {
 	if req.GetTransferManifest() == nil {
-		return rejectStrayManifestSignature(req)
+		return rejectStrayManifestSignature(ctx, endpoint, req)
 	}
 
 	leaves := make(map[string]transferpkg.ExecutedLeaf, len(leafMap))
@@ -640,6 +640,8 @@ func bindManifestIfPresent(req *pb.StartTransferV3Request, network btcnetwork.Ne
 	}
 
 	if err := transferpkg.BindManifest(req, network, leaves); err != nil {
+		kind, _ := classifyManifestRefusal(err)
+		recordManifestRefusal(ctx, endpoint, kind)
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer manifest does not bind this transfer: %w", err))
 	}
 	return nil
@@ -648,11 +650,13 @@ func bindManifestIfPresent(req *pb.StartTransferV3Request, network btcnetwork.Ne
 // requireAndBindManifest is bindManifestIfPresent for the flows whose contract includes a manifest:
 // a missing one is refused rather than skipped. Two named entry points rather than a boolean
 // parameter, because a bare true at a call site says nothing about which precondition is in force.
-func requireAndBindManifest(req *pb.StartTransferV3Request, network btcnetwork.Network, leafMap map[string]*ent.TreeNode) error {
+func requireAndBindManifest(ctx context.Context, endpoint manifestBindEndpoint, req *pb.StartTransferV3Request, network btcnetwork.Network, leafMap map[string]*ent.TreeNode) error {
 	if req.GetTransferManifest() == nil {
+		// Counted here rather than around the delegated call, which counts its own refusals.
+		recordManifestRefusal(ctx, endpoint, manifestRefusalMissingManifest)
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_manifest is required"))
 	}
-	return bindManifestIfPresent(req, network, leafMap)
+	return bindManifestIfPresent(ctx, endpoint, req, network, leafMap)
 }
 
 // parseSendTransferReceivers parses the sender package's leaf→receiver map and

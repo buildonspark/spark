@@ -31,7 +31,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 	}
 
 	t.Run("the counterparty's own leaf satisfies it", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 1000}},
 			routing(t, map[string]keys.Public{leafA.String(): counterparty}),
 			pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
@@ -40,7 +40,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 	})
 
 	t.Run("sharing the transfer with fee receivers is fine", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 900}, leafB.String(): {Value: 100}},
 			routing(t, map[string]keys.Public{leafA.String(): counterparty, leafB.String(): other}),
 			pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
@@ -49,7 +49,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 	})
 
 	t.Run("a non-canonical spelling of a moved leaf still counts", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 1000}},
 			routing(t, map[string]keys.Public{strings.ToUpper(leafA.String()): counterparty}),
 			pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
@@ -59,7 +59,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 
 	// The case the check exists for: a caller names a counterparty and routes the money elsewhere.
 	t.Run("a counterparty that receives nothing is refused", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 900}, leafB.String(): {Value: 100}},
 			routing(t, map[string]keys.Public{leafA.String(): other, leafB.String(): other}),
 			pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
@@ -71,7 +71,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 
 	// A leaf count reads this as paid; the value it carries is what says otherwise.
 	t.Run("a counterparty routed only a valueless leaf is refused", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 0}, leafB.String(): {Value: 100_000}},
 			routing(t, map[string]keys.Public{leafA.String(): counterparty, leafB.String(): other}),
 			pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
@@ -83,7 +83,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 
 	// A routing entry for a leaf outside the transfer is free to write, so it cannot stand in for payment.
 	t.Run("a phantom leaf naming the counterparty does not satisfy it", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 1000}},
 			routing(t, map[string]keys.Public{
 				leafA.String():      other,
@@ -98,7 +98,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 	})
 
 	t.Run("an empty transfer is refused", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty, map[string]*ent.TreeNode{},
+		err := assertCounterpartyIsPaid(t.Context(), counterparty, map[string]*ent.TreeNode{},
 			routing(t, map[string]keys.Public{}), pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
 
 		require.Error(t, err)
@@ -107,7 +107,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 
 	// An unrouted leaf has no destination to attribute, so it cannot be assumed to pay anyone.
 	t.Run("a moved leaf no routing entry names is refused", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 1000}, leafB.String(): {Value: 1000}},
 			routing(t, map[string]keys.Public{leafA.String(): counterparty}),
 			pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE)
@@ -117,7 +117,7 @@ func TestAssertCounterpartyIsPaid(t *testing.T) {
 	})
 
 	t.Run("it holds on send as well as receive", func(t *testing.T) {
-		err := assertCounterpartyIsPaid(counterparty,
+		err := assertCounterpartyIsPaid(t.Context(), counterparty,
 			map[string]*ent.TreeNode{leafA.String(): {Value: 1000}},
 			routing(t, map[string]keys.Public{leafA.String(): other}),
 			pbspark.InitiatePreimageSwapRequest_REASON_SEND)

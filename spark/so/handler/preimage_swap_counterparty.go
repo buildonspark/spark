@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
@@ -12,9 +13,18 @@ import (
 
 // A manifest is signed only by its senders, and on a receive the sender is the SSP — so nothing in
 // it attests that the counterparty agreed to its own edge, however small that edge is.
-func verifyCounterpartyManifestSignature(req *pbspark.InitiatePreimageSwapV4Request, counterparty keys.Public) error {
+func verifyCounterpartyManifestSignature(ctx context.Context, req *pbspark.InitiatePreimageSwapV4Request, counterparty keys.Public) (retErr error) {
 	signature := req.GetCounterpartyManifestSignature()
 	manifest := req.GetTransferV3Request().GetTransferManifest()
+
+	// Set once up front so no refusal path can forget to count, and reassigned by the branch whose
+	// class differs from the gate's own.
+	kind := counterpartySignatureRefusalKind(req.GetTransferV3Request(), signature)
+	defer func() {
+		if retErr != nil {
+			recordManifestRefusal(ctx, manifestEndpointInitiatePreimageSwapV4, kind)
+		}
+	}()
 
 	if len(signature) == 0 {
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
@@ -29,6 +39,7 @@ func verifyCounterpartyManifestSignature(req *pbspark.InitiatePreimageSwapV4Requ
 
 	manifestHash, err := common.HashTransferManifest(manifest)
 	if err != nil {
+		kind = manifestRefusalSignature
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer manifest is not hashable: %w", err))
 	}
 	if err := common.VerifyECDSASignature(counterparty, signature, manifestHash); err != nil {
@@ -38,6 +49,17 @@ func verifyCounterpartyManifestSignature(req *pbspark.InitiatePreimageSwapV4Requ
 	return nil
 }
 
+// v4LeafDestinations keeps a v4-specific label out of the generic perLeafDestinations. Its kind is
+// asserted, not classified: that helper's only refusal is a duplicated leaf id.
+func v4LeafDestinations(ctx context.Context, receiverByLeafID map[string]keys.Public) (leafDestinations, error) {
+	destinations, err := perLeafDestinations(receiverByLeafID)
+	if err != nil {
+		recordManifestRefusal(ctx, manifestEndpointInitiatePreimageSwapV4, manifestRefusalDuplicate)
+		return leafDestinations{}, err
+	}
+	return destinations, nil
+}
+
 // assertCounterpartyIsPaid guarantees the transfer routes strictly positive sats, summed from the
 // locked rows, to the counterparty the swap names. Being named or routed a leaf is not being paid.
 //
@@ -45,6 +67,7 @@ func verifyCounterpartyManifestSignature(req *pbspark.InitiatePreimageSwapV4Requ
 // and only the sender ever states the difference — so there is no reference value to check an amount
 // against. The counterparty's signature over the manifest is what closes that gap.
 func assertCounterpartyIsPaid(
+	ctx context.Context,
 	counterparty keys.Public,
 	leafMap map[string]*ent.TreeNode,
 	destinations leafDestinations,
@@ -54,6 +77,7 @@ func assertCounterpartyIsPaid(
 	for leafID, leaf := range leafMap {
 		destination, err := destinations.forLeaf(leafID)
 		if err != nil {
+			recordManifestRefusal(ctx, manifestEndpointInitiatePreimageSwapV4, manifestRefusalLeafDestination)
 			return err
 		}
 		if destination.Equals(counterparty) {
@@ -61,6 +85,7 @@ func assertCounterpartyIsPaid(
 		}
 	}
 	if counterpartySats == 0 {
+		recordManifestRefusal(ctx, manifestEndpointInitiatePreimageSwapV4, manifestRefusalCounterpartyUnpaid)
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 			"counterparty %x receives no value from this transfer (reason %s)", counterparty.Serialize(), reason))
 	}

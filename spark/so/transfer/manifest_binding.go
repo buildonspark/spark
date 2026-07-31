@@ -49,6 +49,34 @@ var (
 	ErrManifestUnlistedTransfer   = fmt.Errorf("executed leaves have no matching manifest edge")
 )
 
+// AllManifestRefusals enumerates BindManifest's refusals for callers that bucket them. A new
+// ErrManifest sentinel in this file must be appended here; a test in this package fails when not.
+var AllManifestRefusals = []error{
+	ErrManifestAmountMismatch,
+	ErrManifestDuplicateEdge,
+	ErrManifestDuplicateSender,
+	ErrManifestEdgeNotRealized,
+	ErrManifestExpiryMismatch,
+	ErrManifestExpiryUnsigned,
+	ErrManifestInvalidReceiver,
+	ErrManifestInvalidSender,
+	ErrManifestInvalidSignature,
+	ErrManifestLeafNotRouted,
+	ErrManifestLeafOwnerMismatch,
+	ErrManifestMissing,
+	ErrManifestMissingSignature,
+	ErrManifestNetworkMismatch,
+	ErrManifestUnknownNetwork,
+	ErrManifestNonSatsEdge,
+	ErrManifestNotHashable,
+	ErrManifestTotalOverflow,
+	ErrManifestTooLarge,
+	ErrManifestTransferIDMismatch,
+	ErrManifestUnknownLeaf,
+	ErrManifestUnlistedTransfer,
+	ErrDuplicateLeafID,
+}
+
 // ExecutedLeaf is the operator's own record of a leaf. Both fields must come from the locked
 // rows: sourcing either from the request would make the binding restate the caller's own claim.
 // Keys are leaf IDs in the operator's canonical spelling, which is what the routed IDs are
