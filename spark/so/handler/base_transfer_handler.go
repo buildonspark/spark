@@ -710,6 +710,13 @@ func (h *BaseTransferHandler) createTransferV3(
 			}
 			continue
 		}
+		// Preimage-swap refunds are validated against each leaf's own destination on the lightning
+		// path before Prepare, and validateTransferLeaves still requires the cpfp refund to
+		// decrement its timelock. The direct and direct-from-cpfp sequences stay unvalidated, as
+		// they are on v3: their destinations are checked, but nothing enforces the exit ladder.
+		if transferType == st.TransferTypePreimageSwap {
+			continue
+		}
 		if err := h.validateAndConstructBitcoinTransactions(ctx, pkgLeafIDs, transferType, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, nil); err != nil {
 			return nil, nil, fmt.Errorf("unable to validate bitcoin transactions for receiver %s: %w", g.receiverPubKey, err)
 		}

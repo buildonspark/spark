@@ -80,6 +80,20 @@ func (h *InitiatePreimageSwapFlowHandler) ValidateDecisionAgainstPrepare(prepare
 	// transfer_request; the legacy transfer/V2 field is disabled). Using the same
 	// resolver keeps the bind consistent with how the id was persisted.
 	preparedTransferID := preimageSwapTransferIDFromRequest(prepare.GetOriginalRequest())
+	if echo, isEcho := decisionOp.(*pbinternal.InitiatePreimageSwapPrepareRequest); isEcho {
+		// The reconciler's presumed-abort path echoes the prepare op itself.
+		echoedTransferID := preimageSwapTransferIDFromRequest(echo.GetOriginalRequest())
+		if !sameTransferID(echoedTransferID, preparedTransferID) {
+			return fmt.Errorf("presumed-abort rollback transfer id %s does not match the prepared transfer id %s", echoedTransferID, preparedTransferID)
+		}
+		return nil
+	}
+	return validatePreimageSwapDecisionAgainstPrepare(preparedTransferID, isSendPackagePreimageSwap(prepare.GetOriginalRequest()), decisionOp)
+}
+
+// validatePreimageSwapDecisionAgainstPrepare holds a commit/rollback decision to the transfer its
+// prepare persisted. Callers must handle their own version-typed presumed-abort echo first.
+func validatePreimageSwapDecisionAgainstPrepare(preparedTransferID string, preparedIsSendPackage bool, decisionOp proto.Message) error {
 	switch d := decisionOp.(type) {
 	case *pbinternal.InitiatePreimageSwapCommitRequest:
 		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
@@ -94,7 +108,7 @@ func (h *InitiatePreimageSwapFlowHandler) ValidateDecisionAgainstPrepare(prepare
 		// with its refund signatures never applied (stuck funds). Fail loud here,
 		// mirroring the receiver-key bind on claim and applySendTransferCommit's
 		// empty-signature error.
-		if isSendPackagePreimageSwap(prepare.GetOriginalRequest()) && len(d.GetLeafSignatures()) == 0 {
+		if preparedIsSendPackage && len(d.GetLeafSignatures()) == 0 {
 			return fmt.Errorf("commit for SEND+package preimage swap %s carries no leaf signatures", preparedTransferID)
 		}
 		// NOTE: RECEIVE commit-payload completeness (a non-HODL receive must settle
@@ -108,11 +122,6 @@ func (h *InitiatePreimageSwapFlowHandler) ValidateDecisionAgainstPrepare(prepare
 	case *pbinternal.InitiatePreimageSwapRollbackRequest:
 		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
 			return fmt.Errorf("rollback transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)
-		}
-	case *pbinternal.InitiatePreimageSwapPrepareRequest:
-		// The reconciler's presumed-abort path echoes the prepare op itself.
-		if !sameTransferID(preimageSwapTransferIDFromRequest(d.GetOriginalRequest()), preparedTransferID) {
-			return fmt.Errorf("presumed-abort rollback transfer id %s does not match the prepared transfer id %s", preimageSwapTransferIDFromRequest(d.GetOriginalRequest()), preparedTransferID)
 		}
 	default:
 		return fmt.Errorf("unexpected decision op type %T for initiate preimage swap", decisionOp)
@@ -555,27 +564,12 @@ func (h *InitiatePreimageSwapFlowHandler) persistPreimage(ctx context.Context, t
 	return nil
 }
 
-// Rollback cancels the transfer this SO wrote in Prepare — transfer → RETURNED,
-// leaves unlocked — via executeCancelTransfer, the same mechanism the legacy
-// CancelTransfer / RollbackTransferGossip path uses. Idempotent: a never-created
-// transfer (NotFound) or an already-terminal one is a no-op.
-//
-// The preimage is NOT un-revealed on rollback. For the non-HODL receive path the
-// preimage is only persisted in Commit (after the commit decision), so a rollback
-// — which fires before any commit gossip — means no SO ever persisted it. For
-// REASON_SEND there is no preimage at this stage. This is consistent with the
-// engine's roll-back-only recovery model (see ProvidePreimageFlowHandler.Rollback
-// and SP-3195): a crash before the engine's atomic decision commit rolls every SO
-// back; a crash after leaves a COMMITTED row the reconciler drives forward.
-//
-// Accepts both InitiatePreimageSwapRollbackRequest (the canonical payload) and
-// InitiatePreimageSwapPrepareRequest (the prepare op echoed by the participant
-// reconciler when the coordinator's row is missing).
 func (h *InitiatePreimageSwapFlowHandler) Rollback(ctx context.Context, op proto.Message) error {
 	var transferIDStr string
 	switch r := op.(type) {
 	case *pbinternal.InitiatePreimageSwapRollbackRequest:
 		transferIDStr = r.GetTransferId()
+	// The participant reconciler echoes the prepare op when the coordinator's row is missing.
 	case *pbinternal.InitiatePreimageSwapPrepareRequest:
 		if req := r.GetOriginalRequest(); req != nil {
 			transferIDStr = preimageSwapTransferIDFromRequest(req)
@@ -583,6 +577,15 @@ func (h *InitiatePreimageSwapFlowHandler) Rollback(ctx context.Context, op proto
 	default:
 		return fmt.Errorf("unexpected operation type %T for initiate preimage swap rollback", op)
 	}
+	return h.rollbackPreimageSwapTransfer(ctx, transferIDStr)
+}
+
+// rollbackPreimageSwapTransfer cancels the transfer this SO wrote in Prepare — idempotent, and
+// shared across preimage-swap versions since cancelling by transfer id carries no version.
+// The preimage is NOT un-revealed on rollback: it is persisted only in Commit, so a rollback
+// — which fires before any commit gossip — means no SO ever persisted it, and REASON_SEND has
+// no preimage at that stage.
+func (h *InitiatePreimageSwapFlowHandler) rollbackPreimageSwapTransfer(ctx context.Context, transferIDStr string) error {
 	if transferIDStr == "" {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_id is required for rollback"))
 	}
@@ -679,13 +682,13 @@ func (f *initiatePreimageSwapCoordinatorFlow) BuildCommitPayload(ctx context.Con
 	}
 
 	if f.isNonHodlReceive {
-		preimage, err := f.recoverPreimage(results)
+		preimage, err := f.recoverPreimage(f.req.GetPaymentHash(), results)
 		if err != nil {
 			return nil, err
 		}
 		commitReq.Preimage = preimage
 		if f.req.GetTransferRequest() != nil {
-			proofs, err := f.deriveKeyTweakProofs(ctx)
+			proofs, err := f.deriveKeyTweakProofs(ctx, f.transferID)
 			if err != nil {
 				return nil, err
 			}
@@ -746,7 +749,7 @@ func (f *initiatePreimageSwapCoordinatorFlow) aggregateRefundSignatures(ctx cont
 // returned in the SOs' prepare results and verifies it against the payment hash.
 // The share index for each SO is its operator identifier parsed as hex, matching
 // the legacy initiatePreimageSwap recovery.
-func (f *initiatePreimageSwapCoordinatorFlow) recoverPreimage(results map[string]*anypb.Any) ([]byte, error) {
+func (h *InitiatePreimageSwapFlowHandler) recoverPreimage(paymentHash []byte, results map[string]*anypb.Any) ([]byte, error) {
 	var shares []*secretsharing.SecretShare
 	for identifier, anyResult := range results {
 		if anyResult == nil {
@@ -765,7 +768,7 @@ func (f *initiatePreimageSwapCoordinatorFlow) recoverPreimage(results map[string
 		}
 		shares = append(shares, &secretsharing.SecretShare{
 			FieldModulus: secp256k1.S256().N,
-			Threshold:    int(f.config.Threshold),
+			Threshold:    int(h.config.Threshold),
 			Index:        index,
 			Share:        new(big.Int).SetBytes(resp.GetPreimageShare()),
 		})
@@ -776,22 +779,22 @@ func (f *initiatePreimageSwapCoordinatorFlow) recoverPreimage(results map[string
 	// interpolation would still "recover" a wrong secret and only the hash check
 	// below would catch it — with a misleading "preimage did not match" error.
 	// Surface the real cause here instead.
-	if len(shares) < int(f.config.Threshold) {
+	if len(shares) < int(h.config.Threshold) {
 		return nil, fmt.Errorf("insufficient preimage shares for payment hash %x: got %d, need threshold %d",
-			f.req.GetPaymentHash(), len(shares), f.config.Threshold)
+			paymentHash, len(shares), h.config.Threshold)
 	}
 
 	secret, err := secretsharing.RecoverSecret(shares)
 	if err != nil {
-		return nil, fmt.Errorf("unable to recover preimage for payment hash %x: %w", f.req.GetPaymentHash(), err)
+		return nil, fmt.Errorf("unable to recover preimage for payment hash %x: %w", paymentHash, err)
 	}
 	secretBytes := secret.Bytes()
 	if len(secretBytes) < 32 {
 		secretBytes = append(make([]byte, 32-len(secretBytes)), secretBytes...)
 	}
 	hash := sha256.Sum256(secretBytes)
-	if !bytes.Equal(hash[:], f.req.GetPaymentHash()) {
-		return nil, fmt.Errorf("recovered preimage did not match payment hash %x", f.req.GetPaymentHash())
+	if !bytes.Equal(hash[:], paymentHash) {
+		return nil, fmt.Errorf("recovered preimage did not match payment hash %x", paymentHash)
 	}
 	return secretBytes, nil
 }
@@ -801,14 +804,14 @@ func (f *initiatePreimageSwapCoordinatorFlow) recoverPreimage(results map[string
 // buildProvidePreimageCoordinatorFlow. The proofs are public polynomial
 // commitments identical across SOs; every participant re-validates them against
 // its own stored tweaks inside CommitSenderKeyTweaks.
-func (f *initiatePreimageSwapCoordinatorFlow) deriveKeyTweakProofs(ctx context.Context) (map[string]*pbspark.SecretProof, error) {
-	transferEnt, err := f.transfer.loadTransferForUpdate(ctx, f.transferID)
+func (h *InitiatePreimageSwapFlowHandler) deriveKeyTweakProofs(ctx context.Context, transferID uuid.UUID) (map[string]*pbspark.SecretProof, error) {
+	transferEnt, err := h.transfer.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load transfer %s for key tweak proofs: %w", f.transferID, err)
+		return nil, fmt.Errorf("unable to load transfer %s for key tweak proofs: %w", transferID, err)
 	}
 	transferLeaves, err := transferEnt.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load transfer leaves for transfer %s: %w", f.transferID, err)
+		return nil, fmt.Errorf("unable to load transfer leaves for transfer %s: %w", transferID, err)
 	}
 	proofs := make(map[string]*pbspark.SecretProof, len(transferLeaves))
 	for _, leaf := range transferLeaves {

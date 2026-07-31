@@ -187,10 +187,12 @@ func (s *SparkServer) InitiatePreimageSwapV3(ctx context.Context, req *pb.Initia
 	return lightningHandler.InitiatePreimageSwapV3(ctx, req)
 }
 
-// InitiatePreimageSwapV4 is registered ahead of its implementation so clients have a stable target to
-// generate against. FEATURE_NOT_IMPLEMENTED, not the earlier versions' METHOD_DISABLED: this one is coming.
+// InitiatePreimageSwapV4 initiates a preimage swap whose transfer routes each leaf to its own
+// receiver and whose sender-signed manifest the SO binds. Still answers Unimplemented until its
+// knob is enabled — the handler owns that gate.
 func (s *SparkServer) InitiatePreimageSwapV4(ctx context.Context, req *pb.InitiatePreimageSwapV4Request) (*pb.InitiatePreimageSwapResponse, error) {
-	return nil, errors.UnimplementedFeatureIncomplete(fmt.Errorf("initiate preimage swap v4 is not yet implemented"))
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return lightningHandler.InitiatePreimageSwapV4(ctx, req)
 }
 
 // CooperativeExit asks for signatures for refund transactions spending leaves

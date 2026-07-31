@@ -1903,3 +1903,117 @@ func TestCreateTransferEdgeRows_DenormalizeTransferTypeFromParent(t *testing.T) 
 		})
 	}
 }
+
+// createPreimageSwapLeafFixture builds one available leaf owned by senderPub plus the cpfp
+// refund tx a lightning receive submits for it.
+func createPreimageSwapLeafFixture(t *testing.T, ctx context.Context, senderPub keys.Public, receiverPub keys.Public, oldTimeLock uint32, newTimeLock uint32) (*ent.TreeNode, []byte) {
+	t.Helper()
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := client.Tree.Create().
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Regtest).
+		SetOwnerIdentityPubkey(senderPub).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	receiverP2tr, err := common.P2TRScriptFromPubKey(receiverPub)
+	require.NoError(t, err)
+
+	nodeTx := &wire.MsgTx{Version: 3}
+	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
+	nodeTx.AddTxOut(common.EphemeralAnchorOutput())
+	nodeHash := nodeTx.TxHash()
+
+	oldRefund := &wire.MsgTx{Version: 3}
+	oldRefund.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0}, Sequence: oldTimeLock})
+	oldRefund.AddTxOut(common.EphemeralAnchorOutput())
+
+	newRefund := &wire.MsgTx{Version: 3}
+	newRefund.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0}, Sequence: newTimeLock})
+	newRefund.AddTxOut(&wire.TxOut{Value: nodeTx.TxOut[0].Value, PkScript: receiverP2tr})
+	newRefund.AddTxOut(common.EphemeralAnchorOutput())
+
+	secret := keys.GeneratePrivateKey()
+	keyshare, err := client.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secret).
+		SetPublicShares(map[string]keys.Public{"key": secret.Public()}).
+		SetPublicKey(secret.Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := client.TreeNode.Create().
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetValue(1000).
+		SetVerifyingPubkey(keys.GeneratePrivateKey().Public()).
+		SetOwnerIdentityPubkey(senderPub).
+		SetOwnerSigningPubkey(senderPub).
+		SetSigningKeyshare(keyshare).
+		SetRawTx(mustSerializeTx(t, nodeTx)).
+		SetRawRefundTx(mustSerializeTx(t, oldRefund)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return leaf, mustSerializeTx(t, newRefund)
+}
+
+func TestCreateTransferV3_PreimageSwap(t *testing.T) {
+	const oldTimeLock uint32 = 600
+
+	tests := []struct {
+		name          string
+		newTimeLock   uint32
+		expectedError string
+	}{
+		{
+			name:        "accepts a decremented refund timelock",
+			newTimeLock: oldTimeLock - spark.TimeLockInterval,
+		},
+		{
+			// The lightning path's own refund validator does not check the timelock ladder,
+			// so this is the only place a receive's missing decrement is caught.
+			name:          "rejects an undecremented refund timelock",
+			newTimeLock:   oldTimeLock,
+			expectedError: "must be less than the old one",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := sparktesting.TestConfig(t)
+			ctx, _ := db.ConnectToTestPostgres(t)
+
+			senderPub := keys.GeneratePrivateKey().Public()
+			receiverPub := keys.GeneratePrivateKey().Public()
+			leaf, newRefundBytes := createPreimageSwapLeafFixture(t, ctx, senderPub, receiverPub, oldTimeLock, test.newTimeLock)
+
+			spec := &transferSpec{
+				transferID:      uuid.New(),
+				senderIDPK:      senderPub,
+				receivers:       []keys.Public{receiverPub},
+				leafReceiverMap: map[string]keys.Public{leaf.ID.String(): receiverPub},
+				expiryTime:      time.Now().Add(10 * time.Minute),
+				cpfpRefunds:     map[string][]byte{leaf.ID.String(): newRefundBytes},
+			}
+
+			h := NewBaseTransferHandler(config)
+			transfer, leafMap, err := h.createTransferV3(ctx, spec, st.TransferTypePreimageSwap, TransferRoleParticipant, true)
+			if test.expectedError != "" {
+				require.ErrorContains(t, err, test.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, st.TransferTypePreimageSwap, transfer.Type)
+			require.Contains(t, leafMap, leaf.ID.String())
+		})
+	}
+}
