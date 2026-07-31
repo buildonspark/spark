@@ -51,25 +51,26 @@ func (s *Session) ExpirationTimestamp() int64 {
 // Interceptor validates session tokens and adds session info to the context.
 type Interceptor struct {
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier
-	// isAuthenticated returns true for methods that require a session token. In production this is wired to
-	// rpcpolicy.IsAuthenticated; tests can override via NewInterceptorWithAuthenticatedFunc.
-	isAuthenticated func(fullMethod string) bool
+	// requiresSessionToken returns true for methods that require a session token. In production this is wired to
+	// rpcpolicy.RequiresSessionToken; tests can override via NewInterceptorWithSessionTokenFunc.
+	requiresSessionToken func(fullMethod string) bool
 }
 
 // NewInterceptor creates a new Interceptor backed by the declarative rpcpolicy table.
 func NewInterceptor(sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier) *Interceptor {
 	return &Interceptor{
 		sessionTokenCreatorVerifier: sessionTokenCreatorVerifier,
-		isAuthenticated:             rpcpolicy.IsAuthenticated,
+		requiresSessionToken:        rpcpolicy.RequiresSessionToken,
 	}
 }
 
-// NewInterceptorWithAuthenticatedFunc creates an interceptor with a custom "is this method authenticated" predicate.
+// NewInterceptorWithSessionTokenFunc creates an interceptor with a custom "does this method require a session token"
+// predicate.
 // Intended for tests that want to isolate the interceptor from the global policy table.
-func NewInterceptorWithAuthenticatedFunc(sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier, isAuthenticated func(fullMethod string) bool) *Interceptor {
+func NewInterceptorWithSessionTokenFunc(sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier, requiresSessionToken func(fullMethod string) bool) *Interceptor {
 	return &Interceptor{
 		sessionTokenCreatorVerifier: sessionTokenCreatorVerifier,
-		isAuthenticated:             isAuthenticated,
+		requiresSessionToken:        requiresSessionToken,
 	}
 }
 
@@ -86,7 +87,7 @@ func (w *wrappedServerStream) Context() context.Context {
 // Unauthenticated requests are rejected unless the method is explicitly marked as unauthenticated.
 // For unauthenticated methods, we still attempt to extract the session if a token is present.
 func (i *Interceptor) AuthnInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	requireAuth := i.isAuthenticated(info.FullMethod)
+	requireAuth := i.requiresSessionToken(info.FullMethod)
 	ctx, err := i.authenticateContext(ctx, requireAuth)
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func (i *Interceptor) AuthnInterceptor(ctx context.Context, req any, info *grpc.
 // Unauthenticated requests are rejected unless the method is explicitly marked as unauthenticated.
 // For unauthenticated methods, we still attempt to extract the session if a token is present.
 func (i *Interceptor) StreamAuthnInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	requireAuth := i.isAuthenticated(info.FullMethod)
+	requireAuth := i.requiresSessionToken(info.FullMethod)
 	ctx, err := i.authenticateContext(ss.Context(), requireAuth)
 	if err != nil {
 		return err

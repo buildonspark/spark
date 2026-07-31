@@ -17,12 +17,12 @@ import (
 	"github.com/lightsparkdev/spark/so/authninternal"
 )
 
-func testIsAuthenticated(fullMethod string) bool {
+func testRequiresSessionToken(fullMethod string) bool {
 	return fullMethod != "/test.Service/Unauthenticated" && !strings.HasPrefix(fullMethod, "/internal.Service/")
 }
 
 func TestAuthnInterceptor_SkipsUnauthenticatedMethod(t *testing.T) {
-	interceptor := NewInterceptorWithAuthenticatedFunc(nil, testIsAuthenticated)
+	interceptor := NewInterceptorWithSessionTokenFunc(nil, testRequiresSessionToken)
 
 	handlerCalled := false
 	handler := func(ctx context.Context, req any) (any, error) {
@@ -39,7 +39,7 @@ func TestAuthnInterceptor_SkipsUnauthenticatedMethod(t *testing.T) {
 }
 
 func TestAuthnInterceptor_RejectsWithoutToken(t *testing.T) {
-	interceptor := NewInterceptorWithAuthenticatedFunc(&authninternal.SessionTokenCreatorVerifier{}, testIsAuthenticated)
+	interceptor := NewInterceptorWithSessionTokenFunc(&authninternal.SessionTokenCreatorVerifier{}, testRequiresSessionToken)
 
 	handlerCalled := false
 	handler := func(ctx context.Context, req any) (any, error) {
@@ -67,7 +67,7 @@ func TestAuthnInterceptor_AcceptsValidToken(t *testing.T) {
 	tokenResult, err := tokenVerifier.CreateToken(userKey.Public(), time.Hour)
 	require.NoError(t, err)
 
-	interceptor := NewInterceptorWithAuthenticatedFunc(tokenVerifier, testIsAuthenticated)
+	interceptor := NewInterceptorWithSessionTokenFunc(tokenVerifier, testRequiresSessionToken)
 
 	handlerCalled := false
 	var capturedCtx context.Context
@@ -95,7 +95,7 @@ func TestAuthnInterceptor_RejectsInvalidToken(t *testing.T) {
 	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(identityKey, authninternal.RealClock{})
 	require.NoError(t, err)
 
-	interceptor := NewInterceptorWithAuthenticatedFunc(tokenVerifier, testIsAuthenticated)
+	interceptor := NewInterceptorWithSessionTokenFunc(tokenVerifier, testRequiresSessionToken)
 
 	handlerCalled := false
 	handler := func(ctx context.Context, req any) (any, error) {
@@ -116,7 +116,7 @@ func TestAuthnInterceptor_RejectsInvalidToken(t *testing.T) {
 }
 
 func TestStreamAuthnInterceptor_SkipsUnauthenticatedMethod(t *testing.T) {
-	interceptor := NewInterceptorWithAuthenticatedFunc(nil, testIsAuthenticated)
+	interceptor := NewInterceptorWithSessionTokenFunc(nil, testRequiresSessionToken)
 
 	handlerCalled := false
 	handler := func(srv any, ss grpc.ServerStream) error {
@@ -132,7 +132,7 @@ func TestStreamAuthnInterceptor_SkipsUnauthenticatedMethod(t *testing.T) {
 }
 
 func TestStreamAuthnInterceptor_RejectsWithoutToken(t *testing.T) {
-	interceptor := NewInterceptorWithAuthenticatedFunc(&authninternal.SessionTokenCreatorVerifier{}, testIsAuthenticated)
+	interceptor := NewInterceptorWithSessionTokenFunc(&authninternal.SessionTokenCreatorVerifier{}, testRequiresSessionToken)
 
 	handlerCalled := false
 	handler := func(srv any, ss grpc.ServerStream) error {

@@ -40,14 +40,10 @@ var extraRegisteredMethods = []string{
 	"/grpc.health.v1.Health/List",
 }
 
-func registeredServiceDescs() []*grpc.ServiceDesc {
-	return append([]*grpc.ServiceDesc{}, baseRegisteredServiceDescs...)
-}
-
 func registeredFullMethods(t *testing.T) []string {
 	t.Helper()
-	out := append([]string{}, extraRegisteredMethods...)
-	for _, sd := range registeredServiceDescs() {
+	out := slices.Clone(extraRegisteredMethods)
+	for _, sd := range baseRegisteredServiceDescs {
 		out = append(out, fullMethodsFromServiceDesc(sd)...)
 	}
 	slices.Sort(out)
@@ -103,7 +99,7 @@ func TestLookupBehavior(t *testing.T) {
 		{
 			name:             "public unauthenticated query",
 			method:           pbspark.SparkService_QueryNodes_FullMethodName,
-			expectedAuthMode: AuthUnauthenticated,
+			expectedAuthMode: AuthAnonymous,
 		},
 		{
 			name:             "session-required transfer",
@@ -118,18 +114,18 @@ func TestLookupBehavior(t *testing.T) {
 		{
 			name:                 "internal-only SO-to-SO",
 			method:               pbinternal.SparkInternalService_FinalizeTransfer_FullMethodName,
-			expectedAuthMode:     AuthUnauthenticated,
+			expectedAuthMode:     AuthOperatorBrontide,
 			expectedInternalOnly: true,
 		},
 		{
 			name:             "auth challenge",
 			method:           pbauthn.SparkAuthnService_GetChallenge_FullMethodName,
-			expectedAuthMode: AuthUnauthenticated,
+			expectedAuthMode: AuthAnonymous,
 		},
 		{
 			name:             "health probe",
 			method:           "/grpc.health.v1.Health/Check",
-			expectedAuthMode: AuthUnauthenticated,
+			expectedAuthMode: AuthAnonymous,
 		},
 		{
 			name:             "partner basic-auth query",
@@ -143,8 +139,7 @@ func TestLookupBehavior(t *testing.T) {
 			require.True(t, ok, "policy must exist for %s", tc.method)
 			assert.Equal(t, tc.expectedAuthMode, p.AuthMode)
 			assert.Equal(t, tc.expectedInternalOnly, p.InternalOnly)
-			// Only AuthSession requires a session token; AuthPartnerBasic is authenticated downstream.
-			assert.Equal(t, tc.expectedAuthMode == AuthSession, IsAuthenticated(tc.method))
+			assert.Equal(t, tc.expectedAuthMode == AuthSession, RequiresSessionToken(tc.method))
 			assert.Equal(t, tc.expectedInternalOnly, IsInternalOnly(tc.method))
 		})
 	}
@@ -156,13 +151,67 @@ func TestLookupBehavior(t *testing.T) {
 // is extended to cover it.
 func TestSparkPartnerServiceIsUnaryOnly(t *testing.T) {
 	require.Empty(t, pbpartner.SparkPartnerService_ServiceDesc.Streams,
-		"SparkPartnerService must stay unary-only: AuthPartnerBasic is enforced only on the unary chain "+
-			"(BasicAuthInterceptor), so a streaming method would skip Basic Auth verification")
+		"SparkPartnerService must stay unary-only: AuthPartnerBasic is only enforced on the unary chain, so a streaming method would skip Basic Auth verification")
+}
+
+// soToSoServiceDescs mirrors the services registered by RegisterInternalGrpcServers in bin/operator — the ones hosted on
+// the brontide-authenticated internal listener. It's a literal because bin/operator is package main and can't be
+// imported, so nothing in this package can see the real registration: drift between this list and
+// RegisterInternalGrpcServers is caught by TestInternalListenerServicesAreOperatorBrontide in
+// bin/operator/internal_services_policy_test.go, which registers into a real grpc.Server and reads the registration back.
+var soToSoServiceDescs = []*grpc.ServiceDesc{
+	&pbinternal.SparkInternalService_ServiceDesc,
+	&pbtokeninternal.SparkTokenInternalService_ServiceDesc,
+	&pbgossip.GossipService_ServiceDesc,
+	&pbdkg.DKGService_ServiceDesc,
+}
+
+// TestOperatorBrontideMatchesSoToSoServices keeps the AuthOperatorBrontide label consistent with soToSoServiceDescs in
+// both directions: every method on one of those services must claim it, and no method outside them may. A new RPC added
+// to SparkInternalService without an AuthOperatorBrontide entry, or an AuthOperatorBrontide entry on a service not in the
+// list, both fail here. That the list itself still matches what bin/operator registers is the operator-side test's job.
+func TestOperatorBrontideMatchesSoToSoServices(t *testing.T) {
+	soToSo := map[string]struct{}{}
+	for _, sd := range soToSoServiceDescs {
+		for _, m := range fullMethodsFromServiceDesc(sd) {
+			soToSo[m] = struct{}{}
+		}
+	}
+
+	var missingLabel, unexpectedLabel []string
+	for _, m := range RegisteredMethods() {
+		p, ok := LookUp(m)
+		require.True(t, ok)
+		_, isSOToSO := soToSo[m]
+		switch {
+		case isSOToSO && p.AuthMode != AuthOperatorBrontide:
+			missingLabel = append(missingLabel, m)
+		case !isSOToSO && p.AuthMode == AuthOperatorBrontide:
+			unexpectedLabel = append(unexpectedLabel, m)
+		}
+	}
+	slices.Sort(missingLabel)
+	slices.Sort(unexpectedLabel)
+
+	require.Empty(t, missingLabel, "methods on SO-to-SO services must be AuthOperatorBrontide: %v", missingLabel)
+	require.Empty(t, unexpectedLabel,
+		"AuthOperatorBrontide is only valid for services hosted on the internal brontide listener; these aren't: %v", unexpectedLabel)
+}
+
+// TestOperatorBrontideMethodsAreInternalOnly pins the IP allowlist fallback in place. The SO-to-SO services are still
+// registered on the public listener, where the IP gate is the only caller check, so brontide methods must stay
+// InternalOnly until that registration is removed.
+func TestOperatorBrontideMethodsAreInternalOnly(t *testing.T) {
+	for _, m := range RegisteredMethods() {
+		if p, _ := LookUp(m); p.AuthMode == AuthOperatorBrontide {
+			assert.True(t, p.InternalOnly, "%s is AuthOperatorBrontide but not InternalOnly", m)
+		}
+	}
 }
 
 func TestUnknownMethodFailsClosed(t *testing.T) {
 	_, ok := LookUp("/never.Registered/Method")
 	assert.False(t, ok)
-	assert.True(t, IsAuthenticated("/never.Registered/Method"), "unknown methods must require authn (fail closed)")
+	assert.True(t, RequiresSessionToken("/never.Registered/Method"), "unknown methods must require authn")
 	assert.False(t, IsInternalOnly("/never.Registered/Method"))
 }
