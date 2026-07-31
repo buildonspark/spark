@@ -645,6 +645,16 @@ func bindManifestIfPresent(req *pb.StartTransferV3Request, network btcnetwork.Ne
 	return nil
 }
 
+// requireAndBindManifest is bindManifestIfPresent for the flows whose contract includes a manifest:
+// a missing one is refused rather than skipped. Two named entry points rather than a boolean
+// parameter, because a bare true at a call site says nothing about which precondition is in force.
+func requireAndBindManifest(req *pb.StartTransferV3Request, network btcnetwork.Network, leafMap map[string]*ent.TreeNode) error {
+	if req.GetTransferManifest() == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_manifest is required"))
+	}
+	return bindManifestIfPresent(req, network, leafMap)
+}
+
 // parseSendTransferReceivers parses the sender package's leaf→receiver map and
 // returns it along with the distinct receivers in canonical (sorted) order.
 func parseSendTransferReceivers(senderPkg *pb.SenderTransferPackage) (map[string]keys.Public, []keys.Public, error) {

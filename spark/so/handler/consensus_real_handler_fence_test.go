@@ -101,6 +101,18 @@ func TestConsensusDecisionFence_RealHandlersFenceForeignPayload(t *testing.T) {
 			foreignCommit: &pbinternal.InitiatePreimageSwapCommitRequest{TransferId: foreignID},
 			foreignRoll:   &pbinternal.InitiatePreimageSwapRollbackRequest{TransferId: foreignID},
 		},
+		{
+			name:    "initiate_preimage_swap_v4",
+			opType:  pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4,
+			handler: NewInitiatePreimageSwapV4FlowHandler(cfg),
+			prepare: &pbinternal.InitiatePreimageSwapV4PrepareRequest{OriginalRequest: &pb.InitiatePreimageSwapV4Request{
+				Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+				TransferV3Request: &pb.StartTransferV3Request{TransferId: preparedID},
+			}},
+			// v4 shares the version-free decision payloads with v3; only its prepare carrier differs.
+			foreignCommit: &pbinternal.InitiatePreimageSwapCommitRequest{TransferId: foreignID},
+			foreignRoll:   &pbinternal.InitiatePreimageSwapRollbackRequest{TransferId: foreignID},
+		},
 	}
 
 	for _, tc := range cases {

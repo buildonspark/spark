@@ -436,3 +436,67 @@ func TestBindManifestIfPresentBindsAgainstTheLockedRows(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
 }
+
+// The gate for flows whose contract includes a manifest. Its whole difference from
+// bindManifestIfPresent is what happens when none is supplied, so that is what these pin — plus
+// that it still delegates the binding rather than merely checking presence.
+func TestRequireAndBindManifest(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{64})
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiver := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	transferID := uuid.New().String()
+	const leafID = "leaf-a"
+	const leafSats = 1000
+
+	signedRequest := func(t *testing.T) *pb.StartTransferV3Request {
+		t.Helper()
+		manifest := &pb.TransferManifest{
+			Version:    1,
+			TransferId: transferID,
+			Network:    pb.Network_REGTEST,
+			Edges: []*pb.ManifestEdge{{
+				SenderIdentityPublicKey:   senderKey.Public().Serialize(),
+				ReceiverIdentityPublicKey: receiver.Serialize(),
+				Amount:                    &pb.ManifestAmount{Amount: &pb.ManifestAmount_Sats{Sats: leafSats}},
+			}},
+		}
+		hash, err := common.HashTransferManifest(manifest)
+		require.NoError(t, err)
+
+		return &pb.StartTransferV3Request{
+			TransferId: transferID,
+			SenderPackages: []*pb.SenderTransferPackage{{
+				OwnerIdentityPublicKey:     senderKey.Public().Serialize(),
+				ReceiverIdentityPublicKeys: map[string][]byte{leafID: receiver.Serialize()},
+				ManifestHashSignature:      ecdsa.Sign(senderKey.ToBTCEC(), hash).Serialize(),
+			}},
+			TransferManifest: manifest,
+		}
+	}
+	lockedLeaves := func(owner keys.Public, valueSats uint64) map[string]*ent.TreeNode {
+		return map[string]*ent.TreeNode{leafID: {OwnerIdentityPubkey: owner, Value: valueSats}}
+	}
+
+	// The one case that differs from bindManifestIfPresent, which treats this as a no-op.
+	t.Run("a missing manifest is refused", func(t *testing.T) {
+		err := requireAndBindManifest(&pb.StartTransferV3Request{TransferId: transferID}, btcnetwork.Regtest, nil)
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.Contains(t, err.Error(), "transfer_manifest is required")
+	})
+
+	t.Run("a manifest covering the locked rows binds", func(t *testing.T) {
+		err := requireAndBindManifest(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats))
+
+		require.NoError(t, err)
+	})
+
+	// Presence alone must not satisfy it: the binding still has to run.
+	t.Run("a manifest that does not cover the locked rows is refused", func(t *testing.T) {
+		err := requireAndBindManifest(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats-1))
+
+		require.Error(t, err)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+}
