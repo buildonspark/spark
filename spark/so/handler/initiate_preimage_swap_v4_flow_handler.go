@@ -115,73 +115,110 @@ func (h *LightningHandler) InitiatePreimageSwapV4(ctx context.Context, req *pbsp
 		return nil, sparkerrors.UnimplementedFeatureIncomplete(fmt.Errorf("initiate_preimage_swap_v4 currently supports REASON_RECEIVE only"))
 	}
 
-	v3req := req.GetTransferV3Request()
-	if v3req == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_v3_request is required"))
-	}
-	parsed, err := parseSendTransferRequest(v3req)
-	if err != nil {
-		return nil, err
-	}
-	// Size cap before the ownership load and the flow builder's preload; Prepare re-checks it.
-	if err := validatePreimageSwapPackageSize(ctx, parsed.senderPkg.GetTransferPackage()); err != nil {
-		return nil, err
-	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, parsed.senderIDPK); err != nil {
-		return nil, err
-	}
-	if err := authz.EnforceWalletNotKillSwitched(ctx, parsed.senderIDPK); err != nil {
-		return nil, err
-	}
-	cpfpJobs := parsed.senderPkg.GetTransferPackage().GetLeavesToSend()
-	if len(cpfpJobs) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
-	}
+	// The flow metrics carry no version label, so a v4-specific flow value would orphan this
+	// path from every query already written against initiate_preimage_swap.
+	flowStart := time.Now()
+	flowPath := lightningFlowPathUnknown
+	spanOpt := lightningPaymentHashSpanOption(req.GetPaymentHash())
+	ctx, span := tracer.Start(ctx, "LightningHandler.InitiatePreimageSwapV4", spanOpt)
+	defer func() {
+		endSpanWithError(span, retErr)
+		observeLightningFlow(ctx, lightningFlowInitiatePreimage, flowPath, flowStart, retErr)
+	}()
 
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get db context: %w", err)
-	}
-	preimageShare, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.GetPaymentHash())).First(ctx)
-	if err != nil {
-		if !ent.IsNotFound(err) {
-			return nil, fmt.Errorf("unable to get preimage share for payment hash %x: %w", req.GetPaymentHash(), err)
+	var (
+		preimageShare    *ent.PreimageShare
+		isNonHodlReceive bool
+	)
+	phaseStart := time.Now()
+	validateCtx, validateSpan := tracer.Start(ctx, "LightningHandler.InitiatePreimageSwapV4.validate", spanOpt)
+	validateErr := func() error {
+		v3req := req.GetTransferV3Request()
+		if v3req == nil {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_v3_request is required"))
 		}
-		preimageShare = nil
-		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobShutdownHodlInvoices, 0) > 0 {
-			return nil, sparkerrors.UnavailableMethodDisabled(fmt.Errorf("hodl invoices are currently disabled"))
+		parsed, err := parseSendTransferRequest(v3req)
+		if err != nil {
+			return err
 		}
-	}
-	isNonHodlReceive := req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil
-	if isNonHodlReceive {
-		// Strip before the fanout so every SO prepares the same transfer: a non-HODL receive must
-		// not be reaped by cancel_expired_transfers. The manifest must then omit its expiry too,
-		// which the binding exempts only for a sole sender — and a receive has exactly one, the SSP.
-		v3req.ExpiryTime = nil
-	} else if expiry := v3req.GetExpiryTime().AsTime(); expiry.Unix() != 0 && expiry.Before(time.Now()) {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
-	}
+		// Size cap before the ownership load and the flow builder's preload; Prepare re-checks it.
+		if err := validatePreimageSwapPackageSize(validateCtx, parsed.senderPkg.GetTransferPackage()); err != nil {
+			return err
+		}
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(validateCtx, h.config, parsed.senderIDPK); err != nil {
+			return err
+		}
+		if err := authz.EnforceWalletNotKillSwitched(validateCtx, parsed.senderIDPK); err != nil {
+			return err
+		}
+		cpfpJobs := parsed.senderPkg.GetTransferPackage().GetLeavesToSend()
+		if len(cpfpJobs) == 0 {
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("at least one cpfp leaf tx must be provided"))
+		}
 
-	// Coordinator-only ownership check, session-based; participants run
-	// validateNodeOwnership=false in Prepare. Non-locking — Prepare re-loads FOR UPDATE.
-	if err := h.validateLeafOwnershipForPreimageSwap(ctx, cpfpJobs); err != nil {
-		return nil, err
+		db, err := ent.GetDbFromContext(validateCtx)
+		if err != nil {
+			return fmt.Errorf("unable to get db context: %w", err)
+		}
+		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.GetPaymentHash())).First(validateCtx)
+		if err != nil {
+			if !ent.IsNotFound(err) {
+				return fmt.Errorf("unable to get preimage share for payment hash %x: %w", req.GetPaymentHash(), err)
+			}
+			preimageShare = nil
+			flowPath = lightningFlowPathReceiveHodl
+			if knobs.GetKnobsService(validateCtx).GetValue(knobs.KnobShutdownHodlInvoices, 0) > 0 {
+				return sparkerrors.UnavailableMethodDisabled(fmt.Errorf("hodl invoices are currently disabled"))
+			}
+		} else {
+			flowPath = lightningFlowPathReceiveNonHodl
+		}
+		isNonHodlReceive = req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil
+		if isNonHodlReceive {
+			// Strip before the fanout so every SO prepares the same transfer: a non-HODL receive must
+			// not be reaped by cancel_expired_transfers. The manifest must then omit its expiry too,
+			// which the binding exempts only for a sole sender — and a receive has exactly one, the SSP.
+			v3req.ExpiryTime = nil
+		} else if expiry := v3req.GetExpiryTime().AsTime(); expiry.Unix() != 0 && expiry.Before(time.Now()) {
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
+		}
+
+		// Coordinator-only ownership check, session-based; participants run
+		// validateNodeOwnership=false in Prepare. Non-locking — Prepare re-loads FOR UPDATE.
+		return h.validateLeafOwnershipForPreimageSwap(validateCtx, cpfpJobs)
+	}()
+	endSpanWithError(validateSpan, validateErr)
+	observeLightningPhase(ctx, lightningFlowInitiatePreimage, lightningPhaseValidate, phaseStart, validateErr)
+	if validateErr != nil {
+		return nil, validateErr
 	}
 
 	flow, err := buildInitiatePreimageSwapV4CoordinatorFlow(h.config, req, isNonHodlReceive)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build coordinator flow: %w", err)
 	}
-	engine, err := consensus.GetEngine(ctx)
-	if err != nil {
-		return nil, err
+
+	phaseStart = time.Now()
+	consensusCtx, consensusSpan := tracer.Start(ctx, "LightningHandler.InitiatePreimageSwapV4.execute", spanOpt)
+	execErr := func() error {
+		engine, err := consensus.GetEngine(consensusCtx)
+		if err != nil {
+			return err
+		}
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+		if _, err := engine.Execute(consensusCtx,
+			pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4,
+			&selection, flow); err != nil {
+			return fmt.Errorf("consensus initiate preimage swap v4 failed: %w", err)
+		}
+		return nil
+	}()
+	endSpanWithError(consensusSpan, execErr)
+	observeLightningPhase(ctx, lightningFlowInitiatePreimage, lightningPhaseConsensusExecute, phaseStart, execErr)
+	if execErr != nil {
+		return nil, execErr
 	}
-	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	if _, err := engine.Execute(ctx,
-		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP_V4,
-		&selection, flow); err != nil {
-		return nil, fmt.Errorf("consensus initiate preimage swap v4 failed: %w", err)
-	}
+
 	if flow.response == nil {
 		return nil, fmt.Errorf("initiate preimage swap v4 consensus completed without building a response for transfer %s", flow.transferID)
 	}
