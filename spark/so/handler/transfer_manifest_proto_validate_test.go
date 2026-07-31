@@ -321,19 +321,19 @@ func TestRejectStrayManifestSignature(t *testing.T) {
 	}
 
 	t.Run("a manifest alone is admitted", func(t *testing.T) {
-		require.NoError(t, rejectStrayManifestSignature(&pb.StartTransferV3Request{
+		require.NoError(t, rejectStrayManifestSignature(t.Context(), manifestEndpointStartTransferV3, &pb.StartTransferV3Request{
 			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg(nil)}, TransferManifest: manifest,
 		}))
 	})
 
 	t.Run("a manifest with its signature is admitted", func(t *testing.T) {
-		require.NoError(t, rejectStrayManifestSignature(&pb.StartTransferV3Request{
+		require.NoError(t, rejectStrayManifestSignature(t.Context(), manifestEndpointStartTransferV3, &pb.StartTransferV3Request{
 			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg([]byte{0x30, 0x44})}, TransferManifest: manifest,
 		}))
 	})
 
 	t.Run("a signature with no manifest is refused", func(t *testing.T) {
-		err := rejectStrayManifestSignature(&pb.StartTransferV3Request{
+		err := rejectStrayManifestSignature(t.Context(), manifestEndpointStartTransferV3, &pb.StartTransferV3Request{
 			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg([]byte{0x30, 0x44})},
 		})
 		require.Error(t, err)
@@ -341,7 +341,7 @@ func TestRejectStrayManifestSignature(t *testing.T) {
 	})
 
 	t.Run("no manifest material at all is admitted", func(t *testing.T) {
-		require.NoError(t, rejectStrayManifestSignature(&pb.StartTransferV3Request{
+		require.NoError(t, rejectStrayManifestSignature(t.Context(), manifestEndpointStartTransferV3, &pb.StartTransferV3Request{
 			TransferId: transferID, SenderPackages: []*pb.SenderTransferPackage{pkg(nil)},
 		}))
 	})
@@ -356,7 +356,7 @@ func TestBindManifestIfPresentWithoutAManifest(t *testing.T) {
 	t.Run("no manifest material at all is a no-op", func(t *testing.T) {
 		req := &pb.StartTransferV3Request{TransferId: uuid.New().String()}
 
-		require.NoError(t, bindManifestIfPresent(req, btcnetwork.Regtest, nil))
+		require.NoError(t, bindManifestIfPresent(t.Context(), manifestEndpointStartTransferV3, req, btcnetwork.Regtest, nil))
 	})
 
 	t.Run("a stray signature is still refused", func(t *testing.T) {
@@ -368,7 +368,7 @@ func TestBindManifestIfPresentWithoutAManifest(t *testing.T) {
 			}},
 		}
 
-		err := bindManifestIfPresent(req, btcnetwork.Regtest, nil)
+		err := bindManifestIfPresent(t.Context(), manifestEndpointStartTransferV3, req, btcnetwork.Regtest, nil)
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -415,13 +415,13 @@ func TestBindManifestIfPresentBindsAgainstTheLockedRows(t *testing.T) {
 	}
 
 	t.Run("a manifest covering the locked rows binds", func(t *testing.T) {
-		err := bindManifestIfPresent(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats))
+		err := bindManifestIfPresent(t.Context(), manifestEndpointStartTransferV3, signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats))
 
 		require.NoError(t, err)
 	})
 
 	t.Run("a manifest disagreeing with the locked value is refused", func(t *testing.T) {
-		err := bindManifestIfPresent(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats-1))
+		err := bindManifestIfPresent(t.Context(), manifestEndpointStartTransferV3, signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats-1))
 
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -430,7 +430,7 @@ func TestBindManifestIfPresentBindsAgainstTheLockedRows(t *testing.T) {
 	t.Run("a manifest disagreeing with the locked owner is refused", func(t *testing.T) {
 		otherOwner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-		err := bindManifestIfPresent(signedRequest(t), btcnetwork.Regtest, lockedLeaves(otherOwner, leafSats))
+		err := bindManifestIfPresent(t.Context(), manifestEndpointStartTransferV3, signedRequest(t), btcnetwork.Regtest, lockedLeaves(otherOwner, leafSats))
 
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -479,7 +479,7 @@ func TestRequireAndBindManifest(t *testing.T) {
 
 	// The one case that differs from bindManifestIfPresent, which treats this as a no-op.
 	t.Run("a missing manifest is refused", func(t *testing.T) {
-		err := requireAndBindManifest(&pb.StartTransferV3Request{TransferId: transferID}, btcnetwork.Regtest, nil)
+		err := requireAndBindManifest(t.Context(), manifestEndpointInitiatePreimageSwapV4, &pb.StartTransferV3Request{TransferId: transferID}, btcnetwork.Regtest, nil)
 
 		require.Error(t, err)
 		require.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -487,14 +487,14 @@ func TestRequireAndBindManifest(t *testing.T) {
 	})
 
 	t.Run("a manifest covering the locked rows binds", func(t *testing.T) {
-		err := requireAndBindManifest(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats))
+		err := requireAndBindManifest(t.Context(), manifestEndpointInitiatePreimageSwapV4, signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats))
 
 		require.NoError(t, err)
 	})
 
 	// Presence alone must not satisfy it: the binding still has to run.
 	t.Run("a manifest that does not cover the locked rows is refused", func(t *testing.T) {
-		err := requireAndBindManifest(signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats-1))
+		err := requireAndBindManifest(t.Context(), manifestEndpointInitiatePreimageSwapV4, signedRequest(t), btcnetwork.Regtest, lockedLeaves(senderKey.Public(), leafSats-1))
 
 		require.Error(t, err)
 		require.Equal(t, codes.InvalidArgument, status.Code(err))

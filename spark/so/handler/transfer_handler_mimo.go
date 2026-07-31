@@ -65,12 +65,13 @@ func convertV2ToV3SendTransferRequest(req *pb.StartTransferRequest) *pb.StartTra
 // sender that sent one believes something was bound. Presence of the manifest itself is not
 // required here: start_transfer_v3 is the generic path, and each fee flow requires the manifest on
 // its own endpoint.
-func rejectStrayManifestSignature(req *pb.StartTransferV3Request) error {
+func rejectStrayManifestSignature(ctx context.Context, endpoint manifestBindEndpoint, req *pb.StartTransferV3Request) error {
 	if req.GetTransferManifest() != nil {
 		return nil
 	}
 	for _, senderPkg := range req.GetSenderPackages() {
 		if len(senderPkg.GetManifestHashSignature()) > 0 {
+			recordManifestRefusal(ctx, endpoint, manifestRefusalStraySignature)
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("manifest_hash_signature set without a transfer_manifest"))
 		}
 	}
@@ -121,7 +122,7 @@ func (h *TransferHandler) startTransferV3Consensus(
 		return nil, err
 	}
 
-	if err := rejectStrayManifestSignature(req); err != nil {
+	if err := rejectStrayManifestSignature(ctx, manifestEndpointStartTransferV3, req); err != nil {
 		return nil, err
 	}
 

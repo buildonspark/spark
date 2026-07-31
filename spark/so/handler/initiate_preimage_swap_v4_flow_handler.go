@@ -366,7 +366,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse counterparty identity public key: %w", err))
 	}
-	if err := verifyCounterpartyManifestSignature(req, counterparty); err != nil {
+	if err := verifyCounterpartyManifestSignature(ctx, req, counterparty); err != nil {
 		return nil, err
 	}
 
@@ -412,7 +412,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 		return nil, err
 	}
 
-	destinations, err := perLeafDestinations(parsed.leafReceiverMap)
+	destinations, err := v4LeafDestinations(ctx, parsed.leafReceiverMap)
 	if err != nil {
 		return nil, err
 	}
@@ -458,10 +458,10 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 
 	// Both read the locked rows: the cover check needs their owners and amounts, and what the
 	// counterparty is paid has to be summed from those amounts rather than the request's.
-	if err := requireAndBindManifest(v3req, transfer.Network, leafMap); err != nil {
+	if err := requireAndBindManifest(ctx, manifestEndpointInitiatePreimageSwapV4, v3req, transfer.Network, leafMap); err != nil {
 		return nil, err
 	}
-	if err := assertCounterpartyIsPaid(counterparty, leafMap, destinations, req.GetReason()); err != nil {
+	if err := assertCounterpartyIsPaid(ctx, counterparty, leafMap, destinations, req.GetReason()); err != nil {
 		return nil, err
 	}
 
