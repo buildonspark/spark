@@ -1,33 +1,93 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// These tests target the unexported digest-unanimity helpers directly rather
-// than the BuildCommitPayload boundary: the check is security-sensitive
-// (divergent VSS polynomials silently corrupt a leaf's signing keyshare across
-// SOs) and the enclosing boundary needs a live FROST signer plus a full
-// multi-SO claim, which only the minikube integration suite can drive
-// (TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL). The pre-apply /
-// adopt-fresh behavior is covered at the FlowHandler boundary in
-// claim_transfer_status_test.go.
+func writeExpectedClaimDigestField(h interface{ Write([]byte) (int, error) }, value []byte) {
+	var length [4]byte
+	binary.BigEndian.PutUint32(length[:], uint32(len(value)))
+	_, _ = h.Write(length[:])
+	_, _ = h.Write(value)
+}
+
+func TestClaimPostTweakKeyshareDigest(t *testing.T) {
+	basePublicKey := keys.GeneratePrivateKey().Public()
+	publicKeyTweak := keys.GeneratePrivateKey().Public()
+	baseShares := map[string]keys.Public{
+		"operator-b": keys.GeneratePrivateKey().Public(),
+		"operator-a": keys.GeneratePrivateKey().Public(),
+	}
+	shareTweaks := map[string]keys.Public{
+		"operator-a": keys.GeneratePrivateKey().Public(),
+		"operator-b": keys.GeneratePrivateKey().Public(),
+	}
+	keyshare := &ent.SigningKeyshare{PublicKey: basePublicKey, PublicShares: baseShares}
+	tweak := &pb.ClaimLeafKeyTweak{
+		SecretShareTweak: &pb.SecretShare{Proofs: [][]byte{publicKeyTweak.Serialize()}},
+		PubkeySharesTweak: map[string][]byte{
+			"operator-a": shareTweaks["operator-a"].Serialize(),
+			"operator-b": shareTweaks["operator-b"].Serialize(),
+		},
+	}
+
+	digest, err := claimPostTweakKeyshareDigest(keyshare, tweak)
+	require.NoError(t, err)
+
+	h := sha256.New()
+	writeExpectedClaimDigestField(h, []byte("spark.claim.post-tweak-keyshare.v1"))
+	writeExpectedClaimDigestField(h, basePublicKey.Add(publicKeyTweak).Serialize())
+	operatorIDs := []string{"operator-a", "operator-b"}
+	slices.Sort(operatorIDs)
+	var count [4]byte
+	binary.BigEndian.PutUint32(count[:], uint32(len(operatorIDs)))
+	_, _ = h.Write(count[:])
+	for _, operatorID := range operatorIDs {
+		writeExpectedClaimDigestField(h, []byte(operatorID))
+		writeExpectedClaimDigestField(h, baseShares[operatorID].Add(shareTweaks[operatorID]).Serialize())
+	}
+	require.Equal(t, h.Sum(nil), digest)
+}
+
+// These tests exercise digest unanimity directly because its enclosing
+// boundary requires a live multi-operator FROST round. The check prevents
+// divergent VSS polynomials from corrupting threshold signing keyshares.
 
 var digestTestTransferID = uuid.MustParse("019ebba9-2a03-77e7-9fa6-05a7d3be388c")
 
 func digestReport(applied bool, digests map[string][]byte) *pbinternal.ClaimTransferPrepareResponse {
+	return digestReportWithState(applied, digests, digests)
+}
+
+func digestReportWithState(applied bool, proofDigests, keyshareDigests map[string][]byte) *pbinternal.ClaimTransferPrepareResponse {
 	resp := &pbinternal.ClaimTransferPrepareResponse{TweaksAlreadyApplied: applied}
-	for leafID, hash := range digests {
+	leafIDs := make(map[string]struct{}, len(proofDigests)+len(keyshareDigests))
+	for leafID := range proofDigests {
+		leafIDs[leafID] = struct{}{}
+	}
+	for leafID := range keyshareDigests {
+		leafIDs[leafID] = struct{}{}
+	}
+	for leafID := range leafIDs {
 		resp.LeafTweakDigests = append(resp.LeafTweakDigests, &pbinternal.ClaimLeafTweakDigest{
-			LeafId:     leafID,
-			ProofsHash: hash,
+			LeafId:                leafID,
+			ProofsHash:            proofDigests[leafID],
+			PostTweakKeyshareHash: keyshareDigests[leafID],
 		})
 	}
 	return resp
@@ -52,6 +112,22 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 			},
 		},
 		{
+			name: "all staged matching proofs and divergent post-tweak keyshares fail",
+			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
+				"0001": digestReportWithState(false, map[string][]byte{leafA: hashX}, map[string][]byte{leafA: hashX}),
+				"0002": digestReportWithState(false, map[string][]byte{leafA: hashX}, map[string][]byte{leafA: hashY}),
+			},
+			expectedErr: "post-tweak keyshare digest mismatch",
+		},
+		{
+			name: "all staged without post-tweak keyshare evidence fails",
+			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
+				"0001": digestReportWithState(false, map[string][]byte{leafA: hashX}, nil),
+				"0002": digestReportWithState(false, map[string][]byte{leafA: hashX}, nil),
+			},
+			expectedErr: "no post-tweak keyshare digest",
+		},
+		{
 			name: "divergent digest for one leaf fails",
 			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
 				"0001": digestReport(false, map[string][]byte{leafA: hashX}),
@@ -68,19 +144,50 @@ func TestValidateClaimTweakDigestUnanimity(t *testing.T) {
 			expectedErr: "tweak digest",
 		},
 		{
-			name: "all applied pass",
+			name: "all applied X passes",
+			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
+				"0001": digestReportWithState(true, nil, map[string][]byte{leafA: hashX}),
+				"0002": digestReportWithState(true, nil, map[string][]byte{leafA: hashX}),
+			},
+		},
+		{
+			name: "all applied X and Y fails",
+			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
+				"0001": digestReportWithState(true, nil, map[string][]byte{leafA: hashX}),
+				"0002": digestReportWithState(true, nil, map[string][]byte{leafA: hashY}),
+			},
+			expectedErr: "post-tweak keyshare digest mismatch",
+		},
+		{
+			name: "all applied without post-tweak keyshare evidence fails",
 			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
 				"0001": digestReport(true, nil),
 				"0002": digestReport(true, nil),
 			},
+			expectedErr: "no post-tweak keyshare digests",
 		},
 		{
-			name: "applied mixed with pre-apply fails",
+			name: "applied X mixed with staged X passes",
+			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
+				"0001": digestReportWithState(true, nil, map[string][]byte{leafA: hashX}),
+				"0002": digestReportWithState(false, map[string][]byte{leafA: hashX}, map[string][]byte{leafA: hashX}),
+			},
+		},
+		{
+			name: "applied X mixed with staged Y fails",
+			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
+				"0001": digestReportWithState(true, nil, map[string][]byte{leafA: hashX}),
+				"0002": digestReportWithState(false, map[string][]byte{leafA: hashY}, map[string][]byte{leafA: hashY}),
+			},
+			expectedErr: "post-tweak keyshare digest mismatch",
+		},
+		{
+			name: "mixed applied and staged without post-tweak keyshare evidence fails",
 			reports: map[string]*pbinternal.ClaimTransferPrepareResponse{
 				"0001": digestReport(true, nil),
 				"0002": digestReport(false, map[string][]byte{leafA: hashX}),
 			},
-			expectedErr: "already applied",
+			expectedErr: "no post-tweak keyshare digest",
 		},
 		{
 			name:    "no reporters (all old binaries) passes",
@@ -158,6 +265,84 @@ func TestValidateClaimTweakDigestReporters(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "0002")
 	assert.Contains(t, err.Error(), "did not report")
+}
+
+func TestClaimTransferBuildCommitRejectsMissingTweakDigestReporter(t *testing.T) {
+	report, err := anypb.New(digestReport(false, map[string][]byte{
+		"11111111-1111-1111-1111-111111111111": {0x01},
+	}))
+	require.NoError(t, err)
+
+	flow := &claimTransferCoordinatorFlow{
+		ClaimTransferFlowHandler: NewClaimTransferFlowHandler(&so.Config{
+			SigningOperatorMap: map[string]*so.SigningOperator{
+				"0001": nil,
+				"0002": nil,
+			},
+		}),
+		parsed: parsedClaimTransferRequest{transferID: digestTestTransferID},
+	}
+
+	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobClaimTransferRequireTweakDigests: 1,
+	}))
+	_, err = flow.BuildCommitPayload(ctx, map[string]*anypb.Any{
+		"0001": report,
+		"0002": nil,
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "SO 0002 did not report tweak digests")
+}
+
+func TestClaimTransferBuildCommitSkipsMissingReporterValidationByDefault(t *testing.T) {
+	report, err := anypb.New(digestReport(false, map[string][]byte{
+		"11111111-1111-1111-1111-111111111111": {0x01},
+	}))
+	require.NoError(t, err)
+
+	flow := &claimTransferCoordinatorFlow{
+		ClaimTransferFlowHandler: NewClaimTransferFlowHandler(&so.Config{
+			SigningOperatorMap: map[string]*so.SigningOperator{
+				"0001": nil,
+				"0002": nil,
+			},
+		}),
+		parsed: parsedClaimTransferRequest{transferID: digestTestTransferID},
+	}
+
+	_, err = flow.BuildCommitPayload(t.Context(), map[string]*anypb.Any{
+		"0001": report,
+		"0002": nil,
+	})
+	// Reaching the commit step proves the default-off rollout gate tolerated
+	// the legacy participant; this unit flow intentionally has no database.
+	require.ErrorContains(t, err, "unable to apply receiver key tweaks during coordinator commit")
+}
+
+func TestClaimTransferBuildCommitSkipsUnanimityValidationByDefault(t *testing.T) {
+	leafID := "11111111-1111-1111-1111-111111111111"
+	reportX, err := anypb.New(digestReport(false, map[string][]byte{leafID: {0x01}}))
+	require.NoError(t, err)
+	reportY, err := anypb.New(digestReport(false, map[string][]byte{leafID: {0x02}}))
+	require.NoError(t, err)
+
+	flow := &claimTransferCoordinatorFlow{
+		ClaimTransferFlowHandler: NewClaimTransferFlowHandler(&so.Config{
+			SigningOperatorMap: map[string]*so.SigningOperator{
+				"0001": nil,
+				"0002": nil,
+			},
+		}),
+		parsed: parsedClaimTransferRequest{transferID: digestTestTransferID},
+	}
+
+	_, err = flow.BuildCommitPayload(t.Context(), map[string]*anypb.Any{
+		"0001": reportX,
+		"0002": reportY,
+	})
+	// Commit binding must also remain off during rollout; otherwise upgraded
+	// participants could reject after a legacy participant already committed.
+	require.ErrorContains(t, err, "unable to apply receiver key tweaks during coordinator commit")
 }
 
 func TestParseClaimPrepareResults(t *testing.T) {

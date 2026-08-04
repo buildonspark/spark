@@ -13049,6 +13049,8 @@ func (m *ClaimLeafTweakDigest) validate(all bool) error {
 
 	// no validation rules for ProofsHash
 
+	// no validation rules for PostTweakKeyshareHash
+
 	if len(errors) > 0 {
 		return ClaimLeafTweakDigestMultiError(errors)
 	}

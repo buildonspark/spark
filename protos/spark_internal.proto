@@ -1044,14 +1044,17 @@ message ClaimTransferPrepareRequest {
     bool report_tweak_digests = 2;
 }
 
-// ClaimLeafTweakDigest identifies the receiver key tweak polynomial an SO has
-// staged (or been asked to apply) for one leaf: a SHA-256 over the ordered VSS
-// proofs. The proofs are the polynomial's public commitments and identical
-// across SOs' slices, so equal digests mean equal polynomials.
+// ClaimLeafTweakDigest identifies both the staged tweak polynomial and the
+// resulting signing keyshare state for one leaf.
 message ClaimLeafTweakDigest {
     // Tree node id of the leaf.
     string leaf_id = 1;
+    // SHA-256 over the ordered VSS proofs. Equal hashes mean staged SOs will
+    // apply the same polynomial.
     bytes proofs_hash = 2;
+    // SHA-256 over the post-tweak public key and ordered public shares. Applied
+    // SOs hash their durable state; staged SOs hash their predicted state.
+    bytes post_tweak_keyshare_hash = 3;
 }
 
 // ClaimTransferPrepareResponse is returned from claim-transfer Prepare when the
@@ -1065,9 +1068,9 @@ message ClaimTransferPrepareResponse {
     FrostRound2Response round2 = 1;
     repeated ClaimLeafTweakDigest leaf_tweak_digests = 2;
     // True when this SO already applied the receiver key tweak durably (a
-    // resumed RKA/RRS claim). Such an SO stages nothing and reports no
-    // digests; mixing applied and pre-apply SOs in one claim is not safely
-    // committable and must abort.
+    // resumed RKA/RRS claim). Such an SO reports post-tweak keyshare hashes but
+    // no proofs hashes. A mixed applied/staged claim may commit only when the
+    // post-tweak keyshare hashes match.
     bool tweaks_already_applied = 3;
 }
 
@@ -1086,11 +1089,10 @@ message ClaimTransferCommitRequest {
     string transfer_id = 1;
     repeated ClaimTransferLeafSignatures leaf_signatures = 2;
     bytes receiver_identity_public_key = 3;
-    // Per-leaf digest of the tweak polynomial the cluster reached unanimity on
-    // during Prepare. Participants must refuse to apply a stored tweak whose
-    // proofs digest differs (see SettleReceiverKeyTweakRequest.leaf_tweak_digests).
-    // Empty when sent by a pre-digest coordinator; participants then apply
-    // without the digest check.
+    // Per-leaf proof and post-tweak keyshare digests the cluster reached
+    // unanimity on during Prepare. Participants must refuse to apply a stored
+    // tweak that does not match. Empty when sent by a pre-digest coordinator;
+    // participants then apply without the digest check.
     repeated ClaimLeafTweakDigest leaf_tweak_digests = 4;
 }
 
