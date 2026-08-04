@@ -268,18 +268,7 @@ func TestClaimTransferPrepare_PoisonedNodeRefundTx_HealsViaTransferLeafAnchor(t 
 	assert.Nil(t, resp, "non-signing SO returns nil shares after validation")
 }
 
-// TestClaimTransferPrepare_PreApplyStatusesDecryptFreshPackage pins the
-// tweak-source routing at the Prepare boundary: at EVERY pre-apply status —
-// SENDER_KEY_TWEAKED, and the locked statuses a prior attempt can leave
-// behind (ReceiverKeyTweaked from the retired pre-consensus path,
-// ReceiverKeyTweakLocked from a partial Phase-1) — Prepare decrypts the fresh
-// claim package, observable as the package-decrypt error since the fixture
-// package carries no ciphertext for this SO. A stale stored tweak must never
-// be silently reused: per-SO reuse is how a retry used to commit divergent
-// polynomials across SOs (see
-// TestClaimTransferPrepare_AdoptsFreshPackageOverDivergentStoredTweak and the
-// minikube suite's TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL).
-func TestClaimTransferPrepare_PreApplyStatusesDecryptFreshPackage(t *testing.T) {
+func TestClaimTransferPrepare_PreApplyTweakSource(t *testing.T) {
 	cases := []struct {
 		status      st.TransferStatus
 		expectedErr string

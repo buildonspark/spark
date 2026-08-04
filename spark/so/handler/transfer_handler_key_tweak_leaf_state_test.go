@@ -178,6 +178,12 @@ func createReceiverKeyTweakSettlementFixture(
 	t.Helper()
 
 	keyshare := createTestSigningKeyshare(t, ctx, rng, client)
+	publicShares := make(map[string]keys.Public, len(cfg.SigningOperatorMap))
+	for identifier := range cfg.SigningOperatorMap {
+		publicShares[identifier] = keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	}
+	keyshare, err := keyshare.Update().SetPublicShares(publicShares).Save(ctx)
+	require.NoError(t, err)
 	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	tree := createTestTreeForClaim(t, ctx, ownerIdentityPrivKey.Public(), client)
 	leaf := createTestTreeNode(t, ctx, rng, client, tree, keyshare)
@@ -185,7 +191,7 @@ func createReceiverKeyTweakSettlementFixture(
 	transferLeaf := createTestTransferLeaf(t, ctx, client, transfer, leaf)
 
 	keyTweakBytes := createReceiverClaimKeyTweakBytes(t, cfg, rng, leaf.ID)
-	transferLeaf, err := transferLeaf.Update().SetKeyTweak(keyTweakBytes).Save(ctx)
+	transferLeaf, err = transferLeaf.Update().SetKeyTweak(keyTweakBytes).Save(ctx)
 	require.NoError(t, err)
 	createTestTransferReceiver(t, ctx, client, transfer)
 

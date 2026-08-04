@@ -13,12 +13,14 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
+	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
@@ -196,26 +198,9 @@ func readKeyshareFromAllOperators(
 	return result
 }
 
-// TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL pins what a claim
-// retry must do when a prior attempt stranded ONE peer at
-// RECEIVER_KEY_TWEAK_LOCKED with polynomial proofs_X while the other SOs
-// never locked (a partial Phase-1 whose rollback missed the peer — the
-// durable mid-2PC state reachable in production, and the trigger of the
-// 2026-07 prod incident where a retry silently committed proofs_X on the
-// stranded SO and fresh proofs_Y everywhere else, permanently diverging the
-// leaf's keyshare).
-//
-// Under the digest-unanimity fix, the stranded peer's Prepare OVERWRITES its
-// stale proofs_X with the freshly validated package's proofs_Y (the stale
-// tweak is not applied anywhere, so the fresh package is authoritative),
-// every SO reports the proofs_Y digest, the coordinator verifies unanimity,
-// and Commit binds the digest so no SO can apply anything else. The claim
-// must therefore SUCCEED and leave every operator's keyshare view identical.
-//
-// Setup: stage a non-coordinator peer at RECEIVER_KEY_TWEAK_LOCKED with
-// proofs_X. ClaimTransferV2 then dispatches with fresh proofs_Y. Assert the
-// claim completes and all operators' keyshares agree.
-func TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL(t *testing.T) {
+// TestClaimTransferV2_DivergentStoredPolynomialRollsPeerBackToSKT verifies that
+// a divergent stored polynomial aborts and rolls the staged peer back to SKT.
+func TestClaimTransferV2_DivergentStoredPolynomialRollsPeerBackToSKT(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -271,17 +256,148 @@ func TestClaimTransferV2_FreshPolynomialHealsPeerLockedAtRKL(t *testing.T) {
 		stagedTweaks[stagedPeer.Identifier],
 	)
 
-	// Drive the unified claim — wallet.ClaimTransferV2 generates fresh
-	// polynomial P_Y. The RKL peer must overwrite its stale proofs_X with
-	// P_Y during Prepare, the digest-unanimity check must pass, and the
-	// claim must complete with every SO on P_Y.
 	claimed, err := wallet.ClaimTransferV2(receiverCtx, receiverTransfer, receiverConfig, []wallet.LeafKeyTweak{claimLeaf})
-	require.NoError(t, err, "a fresh-polynomial retry must heal a peer stranded at RKL with a stale polynomial, not wedge or diverge")
-	require.NotNil(t, claimed)
+	require.Error(t, err)
+	require.Nil(t, claimed)
+
+	stagedClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, int(stagedPeer.ID)))
+	t.Cleanup(func() { _ = stagedClient.Close() })
+	transferID, err := uuid.Parse(senderTransfer.GetId())
+	require.NoError(t, err)
+	stagedTransfer, err := stagedClient.Transfer.Get(t.Context(), transferID)
+	require.NoError(t, err)
+	assert.Equal(t, st.TransferStatusSenderKeyTweaked, stagedTransfer.Status)
+	stagedLeaf, err := stagedClient.TransferLeaf.Query().
+		Where(
+			enttransferleaf.HasTransferWith(enttransfer.IDEQ(transferID)),
+			enttransferleaf.HasLeafWith(enttreenode.IDEQ(uuid.MustParse(claimLeaf.Leaf.GetId()))),
+		).
+		Only(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, stagedLeaf.KeyTweak)
 
 	leafID, err := uuid.Parse(claimLeaf.Leaf.GetId())
 	require.NoError(t, err)
 	assertKeysharesConsistentAcrossOperators(t, receiverConfig, leafID)
+}
+
+func TestClaimTransferV2_MatchingAppliedAndStagedPolynomialCompletes(t *testing.T) {
+	senderConfig := wallet.NewTestWalletConfig(t)
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+	receiverPrivKey := keys.GeneratePrivateKey()
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		t.Context(), senderConfig,
+		[]wallet.LeafKeyTweak{{Leaf: rootNode, SigningPrivKey: leafPrivKey, NewSigningPrivKey: newLeafPrivKey}},
+		receiverPrivKey.Public(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send transfer")
+
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	pending, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Len(t, pending.GetTransfers(), 1)
+	receiverTransfer := pending.GetTransfers()[0]
+
+	finalLeafPrivKey := keys.GeneratePrivateKey()
+	claimLeaf := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.GetLeaves()[0].GetLeaf(),
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}
+	matchingTweaks := buildClaimLeafTweaksAcrossOperators(t, receiverConfig, claimLeaf)
+
+	var appliedPeer *so.SigningOperator
+	for identifier, op := range receiverConfig.SigningOperators {
+		if identifier == receiverConfig.CoordinatorIdentifier {
+			continue
+		}
+		appliedPeer = op
+		break
+	}
+	require.NotNil(t, appliedPeer, "test cluster must have at least one non-coordinator peer")
+	stagePeerLockedAtRKL(
+		t, appliedPeer,
+		senderTransfer.GetId(), claimLeaf.Leaf.GetId(),
+		matchingTweaks[appliedPeer.Identifier],
+	)
+	applyPeerClaimTweak(t, appliedPeer, senderTransfer.GetId(), receiverPrivKey.Public())
+
+	tweaksByOperator := make(map[string][]*sparkpb.ClaimLeafKeyTweak, len(matchingTweaks))
+	for identifier, tweak := range matchingTweaks {
+		tweaksByOperator[identifier] = []*sparkpb.ClaimLeafKeyTweak{tweak}
+	}
+	transferID := uuid.MustParse(senderTransfer.GetId())
+	claimPackage, err := wallet.PrepareClaimPackage(
+		receiverCtx,
+		receiverConfig,
+		transferID,
+		tweaksByOperator,
+		[]wallet.LeafKeyTweak{{Leaf: claimLeaf.Leaf, SigningPrivKey: finalLeafPrivKey}},
+	)
+	require.NoError(t, err, "failed to prepare claim package")
+	conn, err := receiverConfig.NewCoordinatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+	resp, err := sparkpb.NewSparkServiceClient(conn).ClaimTransfer(receiverCtx, &sparkpb.ClaimTransferRequest{
+		TransferId:             senderTransfer.GetId(),
+		OwnerIdentityPublicKey: receiverPrivKey.Public().Serialize(),
+		ClaimPackage:           claimPackage,
+	})
+	require.NoError(t, err, "matching applied/staged post-tweak keyshares must complete the claim")
+	require.Equal(t, sparkpb.TransferStatus_TRANSFER_STATUS_COMPLETED, resp.GetTransfer().GetStatus())
+
+	assertKeysharesConsistentAcrossOperators(t, receiverConfig, uuid.MustParse(claimLeaf.Leaf.GetId()))
+}
+
+func applyPeerClaimTweak(
+	t *testing.T,
+	operator *so.SigningOperator,
+	transferID string,
+	receiverIdentityPublicKey keys.Public,
+) {
+	t.Helper()
+	conn, err := operator.NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = pbinternal.NewSparkInternalServiceClient(conn).SettleReceiverKeyTweak(
+		t.Context(),
+		&pbinternal.SettleReceiverKeyTweakRequest{
+			TransferId:                transferID,
+			Action:                    pbinternal.SettleKeyTweakAction_COMMIT,
+			ReceiverIdentityPublicKey: receiverIdentityPublicKey.Serialize(),
+		},
+	)
+	require.NoError(t, err, "failed to pre-apply matching claim tweak on operator %d", operator.ID)
+
+	client := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, int(operator.ID)))
+	t.Cleanup(func() { _ = client.Close() })
+	transferUUID := uuid.MustParse(transferID)
+	receiver, err := client.TransferReceiver.Query().
+		Where(
+			enttransferreceiver.TransferIDEQ(transferUUID),
+			enttransferreceiver.IdentityPubkeyEQ(receiverIdentityPublicKey),
+		).
+		Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, st.TransferReceiverStatusKeyTweakApplied, receiver.Status,
+		"operator %d must be in the applied half of the mixed-state fixture", operator.ID)
+	transferLeaves, err := client.TransferLeaf.Query().
+		Where(enttransferleaf.HasTransferWith(enttransfer.IDEQ(transferUUID))).
+		All(t.Context())
+	require.NoError(t, err)
+	require.NotEmpty(t, transferLeaves)
+	for _, transferLeaf := range transferLeaves {
+		require.Empty(t, transferLeaf.KeyTweak,
+			"operator %d must have consumed its stored tweak before the retry", operator.ID)
+	}
 }
 
 // buildClaimLeafTweaksAcrossOperators returns a polynomial-derived
@@ -342,13 +458,8 @@ func buildClaimLeafTweaksAcrossOperators(
 	return result
 }
 
-// stagePeerLockedAtRKL writes the given ClaimLeafKeyTweak to the peer's
-// transfer_leafs.key_tweak row and transitions the transfer status to
-// RECEIVER_KEY_TWEAK_LOCKED — the durable post-Phase-1 state a peer
-// arrives at when its middleware commits InitiateSettleReceiverKeyTweak
-// successfully while the coordinator's outer 2PC fails or aborts before
-// rollback can run. Used to simulate the partial-Phase-1-success state
-// that the anti-replay invariant must defend against on a retry.
+// stagePeerLockedAtRKL simulates a peer whose Phase 1 committed before the
+// coordinator aborted.
 func stagePeerLockedAtRKL(
 	t *testing.T,
 	operator *so.SigningOperator,

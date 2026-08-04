@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"bytes"
 	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"maps"
@@ -30,7 +31,6 @@ import (
 	"github.com/lightsparkdev/spark/so/consensus"
 	sparkdb "github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
@@ -360,28 +360,17 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 			predictedOwnerByLeaf[job.GetLeafId()] = leaf.OwnerSigningPubkey
 		}
 	} else {
-		// The freshly validated claim package is always authoritative at
-		// pre-apply statuses. A tweak stored by a prior attempt (RKT from the
-		// retired pre-consensus path, RKL from a partial Phase-1 whose
-		// rollback never reached this SO) is not applied anywhere yet, and
-		// the settle helper below OVERWRITES it when its polynomial differs —
-		// every SO must stage the same polynomial or the commit would
-		// permanently diverge the leaf's keyshare across operators.
-		tweaksByLeaf, err = decryptClaimKeyTweaks(h.config, parsed.claimPackage)
+		var encryptedPackage map[string][]byte
+		var claimSignature []byte
+		var usesFreshPackage bool
+		tweaksByLeaf, usesFreshPackage, err = resolveClaimKeyTweaks(h.config, parsed.claimPackage, transferLeavesPre)
 		if err != nil {
 			return nil, err
 		}
-		// A staged tweak is write-once while the flow that staged it is still
-		// IN_FLIGHT: that flow's delayed commit applies whatever is stored, so
-		// replacing the polynomial here would make a committed flow permanently
-		// unable to apply. Reject the retry until the reconciler resolves the
-		// prior flow (commit → applied-resume; rollback → the anchor is cleared
-		// and the next retry adopts the fresh package below).
-		if err := h.fenceStaleTweakReplacement(ctx, parsed, transferLeavesPre, tweaksByLeaf); err != nil {
-			return nil, err
+		if usesFreshPackage {
+			encryptedPackage = parsed.claimPackage.GetKeyTweakPackage()
+			claimSignature = parsed.claimPackage.GetUserSignature()
 		}
-		encryptedPackage := parsed.claimPackage.GetKeyTweakPackage()
-		claimSignature := parsed.claimPackage.GetUserSignature()
 		keyTweakProofs := make(map[string]*pb.SecretProof, len(tweaksByLeaf))
 		for leafID, leafTweak := range tweaksByLeaf {
 			keyTweakProofs[leafID] = &pb.SecretProof{Proofs: leafTweak.GetSecretShareTweak().GetProofs()}
@@ -392,13 +381,8 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 			userPublicKeys[job.GetLeafId()] = job.GetSigningPublicKey()
 		}
 
-		// Phase-1 lock only: persist the encrypted tweak package + per-leaf
-		// proofs, validate against the claim signature, advance status to
-		// KeyTweakLocked. We deliberately do NOT call the Phase-2 apply
-		// (SettleReceiverKeyTweak with COMMIT) here — that mutates the
-		// signing keyshare and tree node ownership, which under the consensus
-		// engine must wait until Commit. The engine's ent.Tx is rolled back on
-		// any Prepare failure, undoing this Phase-1 lock cleanly.
+		// Applying here would mutate keyshares before the consensus engine reaches
+		// Commit. A Prepare failure rolls back this transaction and its staged lock.
 		settleReq := &pbinternal.InitiateSettleReceiverKeyTweakRequest{
 			TransferId:                    parsed.transferID.String(),
 			KeyTweakProofs:                keyTweakProofs,
@@ -428,6 +412,20 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 				return nil, fmt.Errorf("unable to parse public key tweak for leaf %s: %w", leafID, err)
 			}
 			predictedOwnerByLeaf[leafID] = leaf.OwnerSigningPubkey.Sub(pubKeyTweak)
+		}
+	}
+	var postTweakKeyshareDigests map[string][]byte
+	if req.GetReportTweakDigests() {
+		postTweakKeyshareDigests = make(map[string][]byte, len(leavesByID))
+		for leafID, leaf := range leavesByID {
+			if leaf.Edges.SigningKeyshare == nil {
+				return nil, fmt.Errorf("leaf %s missing signing keyshare", leafID)
+			}
+			digest, err := claimPostTweakKeyshareDigest(leaf.Edges.SigningKeyshare, tweaksByLeaf[leafID])
+			if err != nil {
+				return nil, fmt.Errorf("compute post-tweak keyshare digest for leaf %s: %w", leafID, err)
+			}
+			postTweakKeyshareDigests[leafID] = digest
 		}
 	}
 
@@ -474,7 +472,7 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 		// tweak on a non-signer diverges keyshares without ever touching a
 		// signature the coordinator could reject.
 		logging.GetLoggerFromContext(ctx).Sugar().Debugf("claim transfer 2pc prepare: SO %s not in signing set for transfer %s, returning nil shares", h.config.Identifier, parsed.transferID)
-		return claimPrepareResponse(req.GetReportTweakDigests(), nil, tweaksByLeaf, applied)
+		return claimPrepareResponse(req.GetReportTweakDigests(), nil, tweaksByLeaf, postTweakKeyshareDigests, applied)
 	}
 
 	frostHandler := signing_handler.NewFrostSigningHandler(h.config)
@@ -498,26 +496,33 @@ func (h *ClaimTransferFlowHandler) Prepare(ctx context.Context, op proto.Message
 	if err != nil {
 		return nil, fmt.Errorf("local frost round 2 failed during prepare: %w", err)
 	}
-	return claimPrepareResponse(req.GetReportTweakDigests(), frostResp, tweaksByLeaf, applied)
+	return claimPrepareResponse(req.GetReportTweakDigests(), frostResp, tweaksByLeaf, postTweakKeyshareDigests, applied)
 }
 
 // claimPrepareResponse shapes Prepare's return value. Digest-reporting
-// coordinators get a ClaimTransferPrepareResponse carrying the per-leaf
-// digests of the tweaks this SO staged (and will apply at Commit) alongside
-// any round-2 shares; legacy coordinators get the bare FrostRound2Response
-// (or nil for a non-signer) they know how to unmarshal.
-func claimPrepareResponse(reportDigests bool, round2 *pbinternal.FrostRound2Response, tweaksByLeaf map[string]*pb.ClaimLeafKeyTweak, applied bool) (proto.Message, error) {
+// coordinators get a ClaimTransferPrepareResponse carrying the staged proof
+// digests and resulting public keyshare digests alongside any round-2 shares;
+// legacy coordinators get the bare FrostRound2Response (or nil for a
+// non-signer) they know how to unmarshal.
+func claimPrepareResponse(
+	reportDigests bool,
+	round2 *pbinternal.FrostRound2Response,
+	tweaksByLeaf map[string]*pb.ClaimLeafKeyTweak,
+	postTweakKeyshareDigests map[string][]byte,
+	applied bool,
+) (proto.Message, error) {
 	if !reportDigests {
 		if round2 == nil {
 			return nil, nil
 		}
 		return round2, nil
 	}
-	digests := make([]*pbinternal.ClaimLeafTweakDigest, 0, len(tweaksByLeaf))
-	for leafID, tweak := range tweaksByLeaf {
+	digests := make([]*pbinternal.ClaimLeafTweakDigest, 0, len(postTweakKeyshareDigests))
+	for leafID, postTweakKeyshareDigest := range postTweakKeyshareDigests {
 		digests = append(digests, &pbinternal.ClaimLeafTweakDigest{
-			LeafId:     leafID,
-			ProofsHash: claimLeafKeyTweakProofsDigest(tweak),
+			LeafId:                leafID,
+			ProofsHash:            claimLeafKeyTweakProofsDigest(tweaksByLeaf[leafID]),
+			PostTweakKeyshareHash: postTweakKeyshareDigest,
 		})
 	}
 	slices.SortFunc(digests, func(a, b *pbinternal.ClaimLeafTweakDigest) int { return cmp.Compare(a.GetLeafId(), b.GetLeafId()) })
@@ -528,92 +533,55 @@ func claimPrepareResponse(reportDigests bool, round2 *pbinternal.FrostRound2Resp
 	}, nil
 }
 
-// fenceStaleTweakReplacement rejects a claim whose fresh package would REPLACE
-// a staged tweak polynomial while a prior claim flow for the same transfer +
-// receiver is still IN_FLIGHT on this SO. An identical polynomial (an
-// idempotent retry of the same package) passes — only a replacement is fenced,
-// because the unresolved flow's commit, if it lands, applies the stored bytes
-// and must find the polynomial it was built against. Aborted is retryable:
-// the reconciler drives the prior row terminal, after which the retry either
-// resumes (committed) or adopts the fresh package (rolled back — revert
-// cleared the anchor).
-func (h *ClaimTransferFlowHandler) fenceStaleTweakReplacement(
-	ctx context.Context,
-	parsed parsedClaimTransferRequest,
-	transferLeaves []*ent.TransferLeaf,
-	tweaksByLeaf map[string]*pb.ClaimLeafKeyTweak,
-) error {
-	replacing := false
-	for _, transferLeaf := range transferLeaves {
-		if len(transferLeaf.KeyTweak) == 0 || transferLeaf.Edges.Leaf == nil {
-			continue
-		}
-		fresh, ok := tweaksByLeaf[transferLeaf.Edges.Leaf.ID.String()]
-		if !ok {
-			continue
-		}
-		stored := &pb.ClaimLeafKeyTweak{}
-		if err := proto.Unmarshal(transferLeaf.KeyTweak, stored); err != nil {
-			// Unreadable stored bytes: digest equality can't be proven, so
-			// treat as a replacement and let the fence decide.
-			replacing = true
-			break
-		}
-		if !bytes.Equal(claimLeafKeyTweakProofsDigest(stored), claimLeafKeyTweakProofsDigest(fresh)) {
-			replacing = true
-			break
-		}
+func claimPostTweakKeyshareDigest(keyshare *ent.SigningKeyshare, tweak *pb.ClaimLeafKeyTweak) ([]byte, error) {
+	if keyshare == nil {
+		return nil, fmt.Errorf("missing signing keyshare")
 	}
-	if !replacing {
-		return nil
+	publicKey := keyshare.PublicKey
+	publicShares := maps.Clone(keyshare.PublicShares)
+	if tweak != nil {
+		if tweak.GetSecretShareTweak() == nil || len(tweak.GetSecretShareTweak().GetProofs()) == 0 {
+			return nil, fmt.Errorf("missing public key tweak proof for leaf %s", tweak.GetLeafId())
+		}
+		publicKeyTweak, err := keys.ParsePublicKey(tweak.GetSecretShareTweak().GetProofs()[0])
+		if err != nil {
+			return nil, fmt.Errorf("parse public key tweak for leaf %s: %w", tweak.GetLeafId(), err)
+		}
+		publicKey = publicKey.Add(publicKeyTweak)
+		publicShareTweaks, err := keys.ParsePublicKeyMap(tweak.GetPubkeySharesTweak())
+		if err != nil {
+			return nil, fmt.Errorf("parse public share tweaks for leaf %s: %w", tweak.GetLeafId(), err)
+		}
+		if len(publicShareTweaks) != len(publicShares) {
+			return nil, fmt.Errorf("public share tweak count for leaf %s is %d, expected %d", tweak.GetLeafId(), len(publicShareTweaks), len(publicShares))
+		}
+		for operatorID, share := range publicShares {
+			shareTweak, ok := publicShareTweaks[operatorID]
+			if !ok {
+				return nil, fmt.Errorf("public share tweak for leaf %s missing operator %s", tweak.GetLeafId(), operatorID)
+			}
+			publicShares[operatorID] = share.Add(shareTweak)
+		}
 	}
 
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return err
+	h := sha256.New()
+	writeField := func(value []byte) {
+		var length [4]byte
+		binary.BigEndian.PutUint32(length[:], uint32(len(value)))
+		_, _ = h.Write(length[:])
+		_, _ = h.Write(value)
 	}
-	// In-flight participant claim rows are few (the reconciler sweeps them),
-	// so matching the bound transfer by unmarshalling each prepare payload is
-	// cheap. This SO's row for the CURRENT prepare doesn't exist yet —
-	// DispatchPrepare writes it only after Prepare succeeds.
-	rows, err := db.FlowExecution.Query().
-		Where(
-			flowexecution.RoleEQ(st.FlowExecutionRoleParticipant),
-			flowexecution.StatusEQ(st.FlowExecutionStatusInFlight),
-			flowexecution.OpTypeEQ(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER)),
-		).
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to query in-flight claim flows for transfer %s: %w", parsed.transferID, err)
+	writeField([]byte("spark.claim.post-tweak-keyshare.v1"))
+	writeField(publicKey.Serialize())
+	operatorIDs := slices.Sorted(maps.Keys(publicShares))
+	var count [4]byte
+	binary.BigEndian.PutUint32(count[:], uint32(len(operatorIDs)))
+	_, _ = h.Write(count[:])
+	for _, operatorID := range operatorIDs {
+		writeField([]byte(operatorID))
+		writeField(publicShares[operatorID].Serialize())
 	}
-	for _, row := range rows {
-		if row.PreparePayload == nil || len(*row.PreparePayload) == 0 {
-			continue
-		}
-		var prepAny anypb.Any
-		if err := proto.Unmarshal(*row.PreparePayload, &prepAny); err != nil {
-			continue
-		}
-		msg, err := prepAny.UnmarshalNew()
-		if err != nil {
-			continue
-		}
-		prep, ok := msg.(*pbinternal.ClaimTransferPrepareRequest)
-		if !ok {
-			continue
-		}
-		orig := prep.GetOriginalRequest()
-		if !sameTransferID(orig.GetTransferId(), parsed.transferID.String()) {
-			continue
-		}
-		if !samePublicKey(orig.GetOwnerIdentityPublicKey(), parsed.ownerIDPK.Serialize()) {
-			continue
-		}
-		return sparkerrors.AbortedConcurrentClaimConflict(fmt.Errorf(
-			"transfer %s has an unresolved prior claim flow %s whose staged key tweak this claim would replace; retry after the flow resolves",
-			parsed.transferID, row.ID))
-	}
-	return nil
+	return h.Sum(nil), nil
 }
 
 // tweakedKeyPackagesForFrost loads the KeyPackage for every job's keyshare
@@ -1059,19 +1027,14 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect signature shares: %w", err)
 	}
-	// Abort unless every reporting SO staged the SAME tweak polynomial per
-	// leaf. The engine's rollback then clears the staged tweaks on every SO
-	// (revertClaimTransfer), so the receiver's next retry stages the fresh
-	// package everywhere and converges — whereas committing here would apply
-	// divergent polynomials and permanently corrupt the leaf keyshares.
-	if err := validateClaimTweakDigestUnanimity(f.parsed.transferID, digestReports); err != nil {
-		return nil, err
-	}
-	// A non-reporting SO is a legacy binary: its staged tweak is invisible to
-	// the unanimity check above and it ignores the commit digest binding, so a
-	// stale tweak stranded there would still be applied at commit. Once the
-	// fleet reports digests, flip the knob to close that window.
+	var commitDigests []*pbinternal.ClaimLeafTweakDigest
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobClaimTransferRequireTweakDigests, 0) > 0 {
+		// Abort unless every SO proves the same post-tweak state. The rollout
+		// gate must cover both validation and commit binding: older SOs neither
+		// report the new digest nor enforce it during Commit.
+		if err := validateClaimTweakDigestUnanimity(f.parsed.transferID, digestReports); err != nil {
+			return nil, err
+		}
 		participants := make([]string, 0, len(f.config.SigningOperatorMap))
 		for opID := range f.config.SigningOperatorMap {
 			participants = append(participants, opID)
@@ -1079,8 +1042,8 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 		if err := validateClaimTweakDigestReporters(f.parsed.transferID, participants, digestReports); err != nil {
 			return nil, err
 		}
+		commitDigests = unanimousClaimTweakDigests(digestReports)
 	}
-	commitDigests := unanimousClaimTweakDigests(digestReports)
 
 	// Phase-2 apply must run before FROST aggregation: the aggregation jobs
 	// read leaf.OwnerSigningPubkey as the user's signing pubkey, and the user
@@ -1209,17 +1172,9 @@ func parseClaimPrepareResults(results map[string]*anypb.Any) (map[string]map[str
 	return allShares, reports, nil
 }
 
-// validateClaimTweakDigestUnanimity enforces that every SO that reported a
-// digest staged the SAME key tweak polynomial per leaf, and that
-// already-applied SOs are not mixed with pre-apply SOs. Committing without
-// this check applies whatever tweak each SO happens to have stored — when a
-// prior attempt stranded a stale tweak on a subset of SOs, that silently
-// diverges the leaf's signing keyshare across operators (same aggregate
-// pubkey, different VSS polynomials), after which any signing set spanning
-// both polynomials produces invalid signatures.
-//
-// Old binaries don't report; unanimity is enforced among reporters only, so a
-// rolling deploy degrades to the pre-check behavior rather than failing.
+// validateClaimTweakDigestUnanimity requires every SO to report the same
+// resulting public keyshare state and compares the proofs staged by SOs that
+// still need to apply the tweak.
 func validateClaimTweakDigestUnanimity(transferID uuid.UUID, reports map[string]*pbinternal.ClaimTransferPrepareResponse) error {
 	appliedOps := make([]string, 0, len(reports))
 	stagingOps := make([]string, 0, len(reports))
@@ -1232,11 +1187,6 @@ func validateClaimTweakDigestUnanimity(transferID uuid.UUID, reports map[string]
 	}
 	slices.Sort(appliedOps)
 	slices.Sort(stagingOps)
-	if len(appliedOps) > 0 && len(stagingOps) > 0 {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
-			"claim transfer %s: key tweak already applied on SOs %v but still pre-apply on SOs %v; committing would tweak keyshares with divergent polynomials",
-			transferID, appliedOps, stagingOps))
-	}
 
 	var refOp string
 	refDigests := make(map[string]string)
@@ -1276,13 +1226,58 @@ func validateClaimTweakDigestUnanimity(transferID uuid.UUID, reports map[string]
 			}
 		}
 	}
+	return validateClaimPostTweakKeyshareUnanimity(transferID, reports, append(appliedOps, stagingOps...))
+}
+
+func validateClaimPostTweakKeyshareUnanimity(
+	transferID uuid.UUID,
+	reports map[string]*pbinternal.ClaimTransferPrepareResponse,
+	opIDs []string,
+) error {
+	var refOp string
+	refDigests := make(map[string]string)
+	for _, opID := range opIDs {
+		digests := make(map[string]string, len(reports[opID].GetLeafTweakDigests()))
+		for _, d := range reports[opID].GetLeafTweakDigests() {
+			if len(d.GetPostTweakKeyshareHash()) == 0 {
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+					"claim transfer %s: SO %s reported no post-tweak keyshare digest for leaf %s; the claim's resulting keyshare state cannot be validated", transferID, opID, d.GetLeafId()))
+			}
+			digests[d.GetLeafId()] = hex.EncodeToString(d.GetPostTweakKeyshareHash())
+		}
+		if len(digests) == 0 {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+				"claim transfer %s: SO %s reported no post-tweak keyshare digests; the claim's resulting keyshare state cannot be validated", transferID, opID))
+		}
+		if refOp == "" {
+			refOp, refDigests = opID, digests
+			continue
+		}
+		if len(digests) != len(refDigests) {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+				"claim transfer %s: SO %s reported post-tweak keyshare digests for %d leaves but SO %s for %d; divergent post-tweak keyshares require manual repair",
+				transferID, refOp, len(refDigests), opID, len(digests)))
+		}
+		for leafID, refHash := range refDigests {
+			hash, ok := digests[leafID]
+			if !ok {
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+					"claim transfer %s: SO %s reported no post-tweak keyshare digest for leaf %s while SO %s did; divergent post-tweak keyshares require manual repair",
+					transferID, opID, leafID, refOp))
+			}
+			if hash != refHash {
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+					"claim transfer %s: post-tweak keyshare digest mismatch for leaf %s: SO %s reported %s but SO %s reported %s; divergent post-tweak keyshares require manual repair",
+					transferID, leafID, refOp, refHash, opID, hash))
+			}
+		}
+	}
 	return nil
 }
 
 // validateClaimTweakDigestReporters requires a digest report from every
-// participant. Enforced behind KnobClaimTransferRequireTweakDigests: with it
-// on, a legacy binary (or a dropped report) aborts the claim instead of
-// silently bypassing the unanimity check and the commit digest binding.
+// participant. A legacy binary (or a dropped report) aborts the claim instead
+// of silently bypassing the unanimity check and commit digest binding.
 func validateClaimTweakDigestReporters(transferID uuid.UUID, participants []string, reports map[string]*pbinternal.ClaimTransferPrepareResponse) error {
 	sorted := append([]string(nil), participants...)
 	slices.Sort(sorted)
@@ -1573,6 +1568,64 @@ func decryptClaimKeyTweaks(config *so.Config, pkg *pb.ClaimPackage) (map[string]
 		out[leafTweak.GetLeafId()] = leafTweak
 	}
 	return out, nil
+}
+
+// resolveClaimKeyTweaks preserves each durable leaf tweak and fills only
+// missing leaves from the receiver-signed package. The boolean tells the caller
+// to process that package so missing tweaks are persisted without replacement.
+func resolveClaimKeyTweaks(
+	config *so.Config,
+	pkg *pb.ClaimPackage,
+	transferLeaves []*ent.TransferLeaf,
+) (map[string]*pb.ClaimLeafKeyTweak, bool, error) {
+	if config.Threshold < 1 {
+		return nil, false, fmt.Errorf("invalid SO config: threshold must be >= 1, got %d", config.Threshold)
+	}
+	out := make(map[string]*pb.ClaimLeafKeyTweak, len(transferLeaves))
+	missingLeafIDs := make([]string, 0, len(transferLeaves))
+	for _, transferLeaf := range transferLeaves {
+		if transferLeaf.Edges.Leaf == nil {
+			return nil, false, fmt.Errorf("transfer leaf %s missing tree node edge", transferLeaf.ID)
+		}
+		leafID := transferLeaf.Edges.Leaf.ID.String()
+		if len(transferLeaf.KeyTweak) == 0 {
+			missingLeafIDs = append(missingLeafIDs, leafID)
+			continue
+		}
+		leafTweak := &pb.ClaimLeafKeyTweak{}
+		if err := proto.Unmarshal(transferLeaf.KeyTweak, leafTweak); err != nil {
+			return nil, false, sparkerrors.InternalDataInconsistency(fmt.Errorf(
+				"stored key tweak for transfer leaf %s is unreadable: %w", transferLeaf.ID, err))
+		}
+		if leafTweak.GetLeafId() == "" {
+			leafTweak.LeafId = leafID
+		} else if leafTweak.GetLeafId() != leafID {
+			return nil, false, sparkerrors.InternalDataInconsistency(fmt.Errorf(
+				"stored key tweak for transfer leaf %s references tree node %s instead of %s",
+				transferLeaf.ID, leafTweak.GetLeafId(), leafID))
+		}
+		if err := validateClaimLeafKeyTweak(config, leafTweak); err != nil {
+			return nil, false, sparkerrors.InternalDataInconsistency(fmt.Errorf(
+				"stored key tweak for transfer leaf %s is malformed: %w", transferLeaf.ID, err))
+		}
+		out[leafID] = leafTweak
+	}
+	if len(missingLeafIDs) == 0 {
+		return out, false, nil
+	}
+
+	freshTweaks, err := decryptClaimKeyTweaks(config, pkg)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, leafID := range missingLeafIDs {
+		leafTweak, ok := freshTweaks[leafID]
+		if !ok {
+			return nil, false, fmt.Errorf("signed claim key tweak package has no tweak for transfer leaf %s", leafID)
+		}
+		out[leafID] = leafTweak
+	}
+	return out, true, nil
 }
 
 // loadClaimReceiverLeaves loads the receiver's TransferLeaf rows along with

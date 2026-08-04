@@ -5939,17 +5939,20 @@ func (x *ClaimTransferPrepareRequest) GetReportTweakDigests() bool {
 	return false
 }
 
-// ClaimLeafTweakDigest identifies the receiver key tweak polynomial an SO has
-// staged (or been asked to apply) for one leaf: a SHA-256 over the ordered VSS
-// proofs. The proofs are the polynomial's public commitments and identical
-// across SOs' slices, so equal digests mean equal polynomials.
+// ClaimLeafTweakDigest identifies both the staged tweak polynomial and the
+// resulting signing keyshare state for one leaf.
 type ClaimLeafTweakDigest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Tree node id of the leaf.
-	LeafId        string `protobuf:"bytes,1,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
-	ProofsHash    []byte `protobuf:"bytes,2,opt,name=proofs_hash,json=proofsHash,proto3" json:"proofs_hash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LeafId string `protobuf:"bytes,1,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
+	// SHA-256 over the ordered VSS proofs. Equal hashes mean staged SOs will
+	// apply the same polynomial.
+	ProofsHash []byte `protobuf:"bytes,2,opt,name=proofs_hash,json=proofsHash,proto3" json:"proofs_hash,omitempty"`
+	// SHA-256 over the post-tweak public key and ordered public shares. Applied
+	// SOs hash their durable state; staged SOs hash their predicted state.
+	PostTweakKeyshareHash []byte `protobuf:"bytes,3,opt,name=post_tweak_keyshare_hash,json=postTweakKeyshareHash,proto3" json:"post_tweak_keyshare_hash,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *ClaimLeafTweakDigest) Reset() {
@@ -5996,6 +5999,13 @@ func (x *ClaimLeafTweakDigest) GetProofsHash() []byte {
 	return nil
 }
 
+func (x *ClaimLeafTweakDigest) GetPostTweakKeyshareHash() []byte {
+	if x != nil {
+		return x.PostTweakKeyshareHash
+	}
+	return nil
+}
+
 // ClaimTransferPrepareResponse is returned from claim-transfer Prepare when the
 // coordinator requested a tweak-digest report. It carries the FROST round-2
 // shares (absent for SOs outside the signing set) plus the per-leaf digest of
@@ -6008,9 +6018,9 @@ type ClaimTransferPrepareResponse struct {
 	Round2           *FrostRound2Response    `protobuf:"bytes,1,opt,name=round2,proto3" json:"round2,omitempty"`
 	LeafTweakDigests []*ClaimLeafTweakDigest `protobuf:"bytes,2,rep,name=leaf_tweak_digests,json=leafTweakDigests,proto3" json:"leaf_tweak_digests,omitempty"`
 	// True when this SO already applied the receiver key tweak durably (a
-	// resumed RKA/RRS claim). Such an SO stages nothing and reports no
-	// digests; mixing applied and pre-apply SOs in one claim is not safely
-	// committable and must abort.
+	// resumed RKA/RRS claim). Such an SO reports post-tweak keyshare hashes but
+	// no proofs hashes. A mixed applied/staged claim may commit only when the
+	// post-tweak keyshare hashes match.
 	TweaksAlreadyApplied bool `protobuf:"varint,3,opt,name=tweaks_already_applied,json=tweaksAlreadyApplied,proto3" json:"tweaks_already_applied,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -6083,11 +6093,10 @@ type ClaimTransferCommitRequest struct {
 	TransferId                string                         `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
 	LeafSignatures            []*ClaimTransferLeafSignatures `protobuf:"bytes,2,rep,name=leaf_signatures,json=leafSignatures,proto3" json:"leaf_signatures,omitempty"`
 	ReceiverIdentityPublicKey []byte                         `protobuf:"bytes,3,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
-	// Per-leaf digest of the tweak polynomial the cluster reached unanimity on
-	// during Prepare. Participants must refuse to apply a stored tweak whose
-	// proofs digest differs (see SettleReceiverKeyTweakRequest.leaf_tweak_digests).
-	// Empty when sent by a pre-digest coordinator; participants then apply
-	// without the digest check.
+	// Per-leaf proof and post-tweak keyshare digests the cluster reached
+	// unanimity on during Prepare. Participants must refuse to apply a stored
+	// tweak that does not match. Empty when sent by a pre-digest coordinator;
+	// participants then apply without the digest check.
 	LeafTweakDigests []*ClaimLeafTweakDigest `protobuf:"bytes,4,rep,name=leaf_tweak_digests,json=leafTweakDigests,proto3" json:"leaf_tweak_digests,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -7412,11 +7421,12 @@ const file_spark_internal_proto_rawDesc = "" +
 	"transferId\"\x97\x01\n" +
 	"\x1bClaimTransferPrepareRequest\x12F\n" +
 	"\x10original_request\x18\x01 \x01(\v2\x1b.spark.ClaimTransferRequestR\x0foriginalRequest\x120\n" +
-	"\x14report_tweak_digests\x18\x02 \x01(\bR\x12reportTweakDigests\"P\n" +
+	"\x14report_tweak_digests\x18\x02 \x01(\bR\x12reportTweakDigests\"\x89\x01\n" +
 	"\x14ClaimLeafTweakDigest\x12\x17\n" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12\x1f\n" +
 	"\vproofs_hash\x18\x02 \x01(\fR\n" +
-	"proofsHash\"\xe5\x01\n" +
+	"proofsHash\x127\n" +
+	"\x18post_tweak_keyshare_hash\x18\x03 \x01(\fR\x15postTweakKeyshareHash\"\xe5\x01\n" +
 	"\x1cClaimTransferPrepareResponse\x12;\n" +
 	"\x06round2\x18\x01 \x01(\v2#.spark_internal.FrostRound2ResponseR\x06round2\x12R\n" +
 	"\x12leaf_tweak_digests\x18\x02 \x03(\v2$.spark_internal.ClaimLeafTweakDigestR\x10leafTweakDigests\x124\n" +

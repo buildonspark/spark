@@ -3,6 +3,7 @@
 package handler
 
 import (
+	"bytes"
 	"math/rand/v2"
 	"testing"
 
@@ -70,6 +71,48 @@ func TestSettleReceiverKeyTweakCommitRejectsDigestMismatch(t *testing.T) {
 	require.Equal(t, st.TransferStatusReceiverKeyTweakLocked, updatedTransfer.Status)
 }
 
+func TestSettleReceiverKeyTweakCommitRejectsPostTweakKeyshareDigestMismatch(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{84})
+	cfg := sparktesting.TestConfig(t)
+	handler := NewTransferHandler(cfg)
+
+	leaf, transfer, transferLeaf := createReceiverKeyTweakSettlementFixture(t, ctx, sessionCtx.Client, cfg, rng)
+	stored := &pb.ClaimLeafKeyTweak{}
+	require.NoError(t, proto.Unmarshal(transferLeaf.KeyTweak, stored))
+	originalOwnerSigningPubkey := leaf.OwnerSigningPubkey.Serialize()
+	keyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+	actualDigest, err := claimPostTweakKeyshareDigest(keyshare, stored)
+	require.NoError(t, err, "the fixture must reach the post-tweak digest comparison")
+	bogusDigest := bytes.Repeat([]byte{0xEE}, 32)
+	require.NotEqual(t, actualDigest, bogusDigest)
+
+	err = handler.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
+		TransferId: transfer.ID.String(),
+		Action:     pbinternal.SettleKeyTweakAction_COMMIT,
+		LeafTweakDigests: []*pbinternal.ClaimLeafTweakDigest{
+			{
+				LeafId:                leaf.ID.String(),
+				ProofsHash:            claimTweakProofsDigest(stored.GetSecretShareTweak().GetProofs()),
+				PostTweakKeyshareHash: bogusDigest,
+			},
+		},
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "post-tweak keyshare digest")
+
+	entTx, err := ent.GetTxFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, entTx.Commit())
+	updatedLeaf, err := sessionCtx.Client.TreeNode.Get(ctx, leaf.ID)
+	require.NoError(t, err)
+	require.Equal(t, originalOwnerSigningPubkey, updatedLeaf.OwnerSigningPubkey.Serialize())
+	updatedTransferLeaf, err := sessionCtx.Client.TransferLeaf.Get(ctx, transferLeaf.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, updatedTransferLeaf.KeyTweak)
+}
+
 func TestSettleReceiverKeyTweakCommitAppliesWithMatchingDigest(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	rng := rand.NewChaCha8([32]byte{82})
@@ -79,15 +122,23 @@ func TestSettleReceiverKeyTweakCommitAppliesWithMatchingDigest(t *testing.T) {
 	leaf, transfer, transferLeaf := createReceiverKeyTweakSettlementFixture(t, ctx, sessionCtx.Client, cfg, rng)
 	stored := &pb.ClaimLeafKeyTweak{}
 	require.NoError(t, proto.Unmarshal(transferLeaf.KeyTweak, stored))
+	keyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+	postTweakKeyshareDigest, err := claimPostTweakKeyshareDigest(keyshare, stored)
+	require.NoError(t, err)
 
-	err := handler.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
+	err = handler.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
 		TransferId: transfer.ID.String(),
 		Action:     pbinternal.SettleKeyTweakAction_COMMIT,
 		LeafTweakDigests: []*pbinternal.ClaimLeafTweakDigest{
-			{LeafId: leaf.ID.String(), ProofsHash: claimTweakProofsDigest(stored.GetSecretShareTweak().GetProofs())},
+			{
+				LeafId:                leaf.ID.String(),
+				ProofsHash:            claimTweakProofsDigest(stored.GetSecretShareTweak().GetProofs()),
+				PostTweakKeyshareHash: postTweakKeyshareDigest,
+			},
 		},
 	})
-	require.NoError(t, err, "a matching digest must apply exactly like a digest-free commit")
+	require.NoError(t, err, "matching proof and post-tweak keyshare digests must apply")
 
 	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
