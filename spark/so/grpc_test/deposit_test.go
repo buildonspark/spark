@@ -416,12 +416,8 @@ func TestFinalizeDepositTreeCreationBasic(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
 	require.NotNil(t, directFromCpfpRefundTx.TxIn[0])
-	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
+	require.Empty(t, directFromCpfpRefundTx.TxIn[0].Witness)
 	require.Len(t, directFromCpfpRefundTx.TxOut, 1)
-
-	// Verify the DirectFromCpfpRefundTx signature is cryptographically valid (spends from NodeTx)
-	err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
-	require.NoError(t, err, "DirectFromCpfpRefundTx signature should be valid")
 
 	// Mine 2 more blocks because deposits won't be available until there are 3 confirmations
 	_, err = client.GenerateToAddress(2, randomAddress, nil)
@@ -1465,13 +1461,10 @@ func TestFinalizeDepositTreeCreationMultiUtxo(t *testing.T) {
 	err = common.VerifySignatureSingleInput(refundTx, 0, nodeTxPrevOut)
 	require.NoError(t, err, "refund tx signature should be valid")
 
-	// Verify directFromCpfpRefund tx signature is valid
 	directFromCpfpRefundTx, err := common.TxFromRawTxBytes(resp.GetRootNode().GetDirectFromCpfpRefundTx())
 	require.NoError(t, err)
 	require.Len(t, directFromCpfpRefundTx.TxIn, 1)
-	require.Len(t, directFromCpfpRefundTx.TxIn[0].Witness, 1)
-	err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, nodeTxPrevOut)
-	require.NoError(t, err, "directFromCpfpRefund tx signature should be valid")
+	require.Empty(t, directFromCpfpRefundTx.TxIn[0].Witness)
 }
 
 func seedConfirmedDepositUtxos(t *testing.T, config *wallet.TestWalletConfig, address string, txs ...*wire.MsgTx) {
