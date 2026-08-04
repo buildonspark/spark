@@ -86,6 +86,105 @@ func (s TreeNodeStatus) IsExitedToL1() bool {
 	return s == TreeNodeStatusOnChain || s == TreeNodeStatusExited || s == TreeNodeStatusParentExited
 }
 
+// ShouldMarkParentExited reports whether a child in this status should be swept
+// to PARENT_EXITED when one of its parent's transactions confirms
+// (tree.MarkExitingNodes).
+//
+// PARENT_EXITED exists to mark a node unusable for transfer or renewal while an
+// ancestor exits to L1, so it is only worth writing over a status that could
+// otherwise still reach AVAILABLE. Anywhere else it destroys information the
+// exit itself depends on. The default is to sweep: a status added without
+// classification blocks transfers rather than silently leaving a node
+// spendable under a dead parent.
+//
+// aggregateLeavesPriorLeafStatus (so/handler/aggregate_leaves_flow_handler.go)
+// derives the same judgment by hand for a single leaf and is not wired to this
+// predicate; keep the two in step.
+func (s TreeNodeStatus) ShouldMarkParentExited() bool {
+	switch s {
+	case TreeNodeStatusSplitted:
+		// A branch, whose children spend its output — a parent confirming
+		// advances this node's exit rather than invalidating it. SPLITTED is
+		// also terminal to the watchtower while PARENT_EXITED is not, so
+		// sweeping a branch hands back a tx whose sequence has the relative
+		// timelock disabled; checkAndBroadcastNodeTx rejects it on every scan
+		// tick forever.
+		return false
+	case TreeNodeStatusOnChain, TreeNodeStatusExited, TreeNodeStatusParentExited:
+		// Already at least as strong a claim as PARENT_EXITED. Overwriting
+		// would downgrade confirmed chain state — the sweep otherwise
+		// clobbers a branch marked ON_CHAIN earlier in the same call — or, for
+		// an already-swept node, churn update_time on every later block that
+		// confirms another of the parent's transactions.
+		return false
+
+	// Leaf-aggregation statuses are already unusable for transfer and
+	// renewal, so overwriting one only destroys the marker it carries:
+	case TreeNodeStatusConsolidated:
+		// Overwriting it destroys the one marker the watchtower uses to find
+		// that node's exit package, and a confirming parent is precisely when
+		// that package becomes broadcastable, so the owner would lose
+		// protection at the moment they need it.
+		return false
+	case TreeNodeStatusAggregated:
+		// Retired nodes keep their transaction bytes, and AGGREGATED is what
+		// keeps the watchtower from broadcasting them. PARENT_EXITED is not
+		// terminal, so the sweep would hand those superseded transactions back
+		// to the watchtower to retry forever against an outpoint the
+		// consolidated package already spent.
+		return false
+	case TreeNodeStatusAggregateLock:
+		// A leaf mid-aggregation, whose stored package is about to be
+		// replaced. AGGREGATE_LOCK is the only thing stopping the watchtower
+		// from broadcasting that soon-to-be-stale package, so replacing it
+		// with PARENT_EXITED would publish an old state right as the exit
+		// package is being installed — irreversible, unlike the cost of not
+		// sweeping (a rolled-back leaf briefly sits AVAILABLE under an exited
+		// parent until the next pass).
+		return false
+
+	case TreeNodeStatusReimbursed:
+		// Already settled: the operator has paid this node out. PARENT_EXITED is
+		// the weaker claim and the write is one-way — nothing un-sets it, and
+		// there is no reorg-rollback path — so sweeping would lose the marker
+		// for good. It would also re-admit the node to work it is finished
+		// with: PARENT_EXITED satisfies IsExitedToL1(), which is what
+		// validateFinalizeTransferLeafCanComplete gates on, and REIMBURSED is
+		// in the watchtower's terminal set while PARENT_EXITED is not.
+		return false
+
+	case TreeNodeStatusCreating,
+		TreeNodeStatusAvailable,
+		TreeNodeStatusFrozenByIssuer,
+		TreeNodeStatusTransferLocked,
+		TreeNodeStatusSplitLocked,
+		TreeNodeStatusRenewLocked,
+		TreeNodeStatusInvestigation,
+		TreeNodeStatusLost:
+		// SPLIT_LOCKED covers renew-created split nodes: sweeping them is what
+		// keeps them non-terminal and inside the watchtower's work set, which
+		// is the defensive sweep that parks funds beyond a previous holder's
+		// reach. TRANSFER_LOCKED and RENEW_LOCKED are transient and drain back
+		// to AVAILABLE, so skipping them would reopen the hole a moment later.
+		return true
+	}
+	// See the doc comment: an unclassified status blocks rather than allows.
+	return true
+}
+
+// ParentExitSweepExcludedStatuses returns the statuses MarkExitingNodes must
+// not overwrite with PARENT_EXITED, derived from ShouldMarkParentExited so the
+// query predicate cannot drift from the policy.
+func ParentExitSweepExcludedStatuses() []TreeNodeStatus {
+	var out []TreeNodeStatus
+	for _, v := range (TreeNodeStatus("")).Values() {
+		if s := TreeNodeStatus(v); !s.ShouldMarkParentExited() {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // Values returns the values of the tree node status.
 func (TreeNodeStatus) Values() []string {
 	return []string{

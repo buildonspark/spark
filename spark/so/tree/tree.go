@@ -74,37 +74,15 @@ func MarkExitingNodes(ctx context.Context, dbClient *ent.Client, confirmedTxHash
 		for _, treeNode := range exitedTreeNodes {
 			exitedTreeNodesIds = append(exitedTreeNodesIds, treeNode.ID)
 		}
-		// Leaf-aggregation statuses are deliberately left alone. PARENT_EXITED
-		// exists to mark a child unusable for transfer or renewal, which both
-		// of these already are, so the sweep would only do harm:
-		//
-		//   CONSOLIDATED — overwriting it destroys the one marker the
-		//   watchtower uses to find that node's exit package, and a confirming
-		//   parent is precisely when that package becomes broadcastable, so the
-		//   owner would lose protection at the moment they need it.
-		//
-		//   AGGREGATED — retired nodes keep their transaction bytes, and
-		//   AGGREGATED is what keeps the watchtower from broadcasting them.
-		//   PARENT_EXITED is not terminal, so the sweep would hand those
-		//   superseded transactions back to the watchtower to retry forever
-		//   against an outpoint the consolidated package already spent.
-		//
-		//   AGGREGATE_LOCK — a leaf mid-aggregation, whose stored package is
-		//   about to be replaced. AGGREGATE_LOCK is the only thing stopping the
-		//   watchtower from broadcasting that soon-to-be-stale package, so
-		//   replacing it with PARENT_EXITED would publish an old state right as
-		//   the exit package is being installed. A broadcast cannot be undone,
-		//   whereas the cost of not sweeping is only that a rolled-back leaf
-		//   can sit AVAILABLE with an exited parent until the next sweep — so
-		//   the irreversible side loses.
+		// Only children that could otherwise still reach AVAILABLE are swept;
+		// see ShouldMarkParentExited for the per-status reasoning. Branches in
+		// particular must keep SPLITTED: a parent confirming advances their
+		// exit rather than invalidating it, and PARENT_EXITED would return them
+		// to the watchtower to retry a timelock-disabled tx forever.
 		countParentExited, err := dbClient.TreeNode.Update().
 			Where(
 				treenode.HasParentWith(treenode.IDIn(exitedTreeNodesIds...)),
-				treenode.StatusNotIn(
-					st.TreeNodeStatusConsolidated,
-					st.TreeNodeStatusAggregated,
-					st.TreeNodeStatusAggregateLock,
-				),
+				treenode.StatusNotIn(st.ParentExitSweepExcludedStatuses()...),
 			).
 			SetStatus(st.TreeNodeStatusParentExited).
 			Save(ctx)
