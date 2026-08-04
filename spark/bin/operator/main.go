@@ -876,6 +876,9 @@ func main() {
 			// Idempotency must be after the DB session so it can store keys,
 			// and after authz/validation so cached responses cannot bypass
 			// internal-service allowlist checks or request-shape validation.
+			// Response sanitization wraps idempotency so cached responses are
+			// sanitized on every delivery, including entries created before deployment.
+			sparkgrpc.DirectTransactionResponseInterceptor(),
 			sparkgrpc.IdempotencyInterceptor(),
 		)),
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
@@ -906,6 +909,7 @@ func main() {
 				authz.WithXffClientIpPosition(config.XffClientIpPosition),
 			)).StreamServerInterceptor,
 			sparkgrpc.StreamValidationInterceptor(),
+			sparkgrpc.DirectTransactionResponseStreamInterceptor(),
 		)),
 	)
 
