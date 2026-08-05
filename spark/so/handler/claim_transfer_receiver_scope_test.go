@@ -122,6 +122,8 @@ func TestSettleReceiverKeyTweakScopesToRequestedReceiver(t *testing.T) {
 	assert.Equal(t, armA.receiver.IdentityPubkey.Serialize(), settledA.OwnerIdentityPubkey.Serialize(),
 		"receiver A's leaf should have moved to receiver A")
 	assert.NotEqual(t, armA.leaf.OwnerSigningPubkey.Serialize(), settledA.OwnerSigningPubkey.Serialize())
+	assert.True(t, settledA.UpdateTime.After(armA.leaf.UpdateTime),
+		"settled leaf's update_time must advance so incremental consumers cursoring on it see the owner-key change")
 
 	settledATransferLeaf, err := sessionCtx.Client.TransferLeaf.Get(ctx, armA.transferLeaf.ID)
 	require.NoError(t, err)
