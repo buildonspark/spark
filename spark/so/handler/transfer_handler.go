@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"maps"
 	"math/big"
@@ -4816,6 +4815,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		}
 		pending := make([]pendingClaimLeaf, 0, len(leaves))
 		tweaks := make([]*ent.SigningKeyshareTweak, 0, len(leaves))
+		leafIDByKeyshareID := make(map[uuid.UUID]uuid.UUID, len(leaves))
 		for _, leaf := range leaves {
 			// Leaf and keyshare edges were validated non-nil by
 			// lockAndHydrateLeafKeyshares over this same slice.
@@ -4876,27 +4876,17 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 				keyTweak:     keyTweakProto,
 				keyshareID:   keyshare.ID,
 			})
+			leafIDByKeyshareID[keyshare.ID] = treeNode.ID
 		}
 
-		rotatedKeyshares, err := ent.TweakSigningKeyshares(ctx, tweaks)
+		rotatedKeyshares, err := rotateLeafKeyshares(ctx, transferID, tweaks, leafIDByKeyshareID)
 		if err != nil {
-			// Restore per-leaf attribution: the batch error names the failing
-			// keyshare; map it back to the leaf an operator would look up.
-			var rotationErr *ent.KeyshareRotationError
-			if errors.As(err, &rotationErr) {
-				for _, p := range pending {
-					if p.keyshareID == rotationErr.KeyshareID {
-						return fmt.Errorf("unable to tweak keyshare %s for leaf %s in transfer %s: %w",
-							rotationErr.KeyshareID, p.treeNode.ID, transferID, err)
-					}
-				}
-			}
-			return fmt.Errorf("unable to tweak keyshares for transfer %s: %w", transferID, err)
+			return err
 		}
 
 		// Track successful leaf IDs to clear key_tweak in a single batch.
 		clearedIDs := make([]uuid.UUID, 0, len(leaves))
-		builders := make([]*ent.TreeNodeCreate, 0, len(leaves))
+		updates := make([]treeNodeOwnerKeyUpdate, 0, len(leaves))
 		appliedLogs := make([]struct {
 			leafID     uuid.UUID
 			numProofs  int
@@ -4910,53 +4900,22 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 				return sparkerrors.InternalDataInconsistency(fmt.Errorf(
 					"rotated signing keyshare %s for leaf %s missing from batch result", p.keyshareID, treeNode.ID))
 			}
-			ownerSigningPubkey := treeNode.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
 			appliedLogs = append(appliedLogs, struct {
 				leafID     uuid.UUID
 				numProofs  int
 				proofsHash string
 			}{leaf.ID, len(p.keyTweak.GetSecretShareTweak().GetProofs()), hashClaimLeafKeyTweakProofs(p.keyTweak)})
 
-			// Build upsert for batch update. Since records always exist (queried above),
-			// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
-			builders = append(builders,
-				db.TreeNode.Create().
-					SetID(treeNode.ID).
-					SetTree(treeNode.Edges.Tree).
-					SetNetwork(treeNode.Edges.Tree.Network).
-					SetSigningKeyshare(treeNode.Edges.SigningKeyshare).
-					SetValue(treeNode.Value).
-					SetVerifyingPubkey(treeNode.VerifyingPubkey).
-					SetOwnerIdentityPubkey(*receiverIdentityPublicKey).
-					SetOwnerSigningPubkey(ownerSigningPubkey).
-					SetRawTx(treeNode.RawTx).
-					SetVout(treeNode.Vout).
-					SetStatus(treeNode.Status),
-			)
+			updates = append(updates, treeNodeOwnerKeyUpdate{
+				node:                treeNode,
+				ownerSigningPubkey:  treeNode.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey),
+				ownerIdentityPubkey: *receiverIdentityPublicKey,
+			})
 			clearedIDs = append(clearedIDs, leaf.ID)
 		}
 
-		// Execute all TreeNode updates in batch to avoid N+1 queries.
-		// We use CreateBulk with OnConflict as a workaround since Ent doesn't have native bulk UPDATE support.
-		// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
-		// Batch in chunks to avoid PostgreSQL parameter limit (65535).
-		const maxBatchSize = 1000
-		for chunk := range slices.Chunk(builders, maxBatchSize) {
-			err = db.TreeNode.CreateBulk(chunk...).
-				OnConflictColumns(enttreenode.FieldID).
-				Update(func(u *ent.TreeNodeUpsert) {
-					// Status is intentionally excluded from the update set:
-					// claiming must never rewrite a leaf's status here — in
-					// particular an exited-to-L1 leaf keeps its on-chain
-					// status (see validateClaimLeafTweak), and adding
-					// UpdateStatus() would let a stale read revive it.
-					u.UpdateOwnerIdentityPubkey()
-					u.UpdateOwnerSigningPubkey()
-				}).
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("unable to batch update tree node keys: %w", err)
-			}
+		if err := applyTreeNodeOwnerKeyUpdates(ctx, db, transferID, updates, true); err != nil {
+			return err
 		}
 		for _, l := range appliedLogs {
 			logging.GetLoggerFromContext(ctx).Sugar().Infof(

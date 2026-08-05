@@ -2651,6 +2651,7 @@ func (h *BaseTransferHandler) applySenderKeyTweaks(ctx context.Context, db *ent.
 	}
 	pending := make([]pendingSendLeaf, 0, len(transferLeaves))
 	tweaks := make([]*ent.SigningKeyshareTweak, 0, len(transferLeaves))
+	leafIDByKeyshareID := make(map[uuid.UUID]uuid.UUID, len(transferLeaves))
 	for _, leaf := range transferLeaves {
 		// Leaf and keyshare edges were validated non-nil by
 		// lockAndHydrateLeafKeyshares over this same slice.
@@ -2683,25 +2684,15 @@ func (h *BaseTransferHandler) applySenderKeyTweaks(ctx context.Context, db *ent.
 			keyTweak:     keyTweak,
 			keyshareID:   keyshare.ID,
 		})
+		leafIDByKeyshareID[keyshare.ID] = treeNode.ID
 	}
 
-	rotatedKeyshares, err := ent.TweakSigningKeyshares(ctx, tweaks)
+	rotatedKeyshares, err := rotateLeafKeyshares(ctx, transfer.ID, tweaks, leafIDByKeyshareID)
 	if err != nil {
-		// Restore per-leaf attribution: the batch error names the failing
-		// keyshare; map it back to the leaf an operator would look up.
-		var rotationErr *ent.KeyshareRotationError
-		if errors.As(err, &rotationErr) {
-			for _, p := range pending {
-				if p.keyshareID == rotationErr.KeyshareID {
-					return fmt.Errorf("unable to tweak keyshare %s for leaf %s in transfer %s: %w",
-						rotationErr.KeyshareID, p.treeNode.ID, transfer.ID, err)
-				}
-			}
-		}
-		return fmt.Errorf("unable to tweak keyshares for transfer %s: %w", transfer.ID, err)
+		return err
 	}
 
-	treeNodeBuilders := make([]*ent.TreeNodeCreate, 0, len(pending))
+	updates := make([]treeNodeOwnerKeyUpdate, 0, len(pending))
 	leafBuilders := make([]*ent.TransferLeafCreate, 0, len(pending))
 	for _, p := range pending {
 		rotated, ok := rotatedKeyshares[p.keyshareID]
@@ -2709,26 +2700,14 @@ func (h *BaseTransferHandler) applySenderKeyTweaks(ctx context.Context, db *ent.
 			return sparkerrors.InternalDataInconsistency(fmt.Errorf(
 				"rotated signing keyshare %s for leaf %s missing from batch result", p.keyshareID, p.treeNode.ID))
 		}
-		ownerSigningPubkey := p.treeNode.VerifyingPubkey.Sub(rotated.PublicKey)
+		updates = append(updates, treeNodeOwnerKeyUpdate{
+			node:               p.treeNode,
+			ownerSigningPubkey: p.treeNode.VerifyingPubkey.Sub(rotated.PublicKey),
+		})
 
-		// Build upserts for batch update. Since every row exists (queried
-		// above), OnConflict always UPDATEs, never INSERTs. Builders set ID
-		// (for matching), all required fields, and the fields being updated.
-		treeNodeBuilders = append(treeNodeBuilders,
-			db.TreeNode.Create().
-				SetID(p.treeNode.ID).
-				SetTree(p.treeNode.Edges.Tree).
-				SetNetwork(p.treeNode.Edges.Tree.Network).
-				SetSigningKeyshare(p.treeNode.Edges.SigningKeyshare).
-				SetValue(p.treeNode.Value).
-				SetVerifyingPubkey(p.treeNode.VerifyingPubkey).
-				SetOwnerIdentityPubkey(p.treeNode.OwnerIdentityPubkey).
-				SetOwnerSigningPubkey(ownerSigningPubkey).
-				SetRawTx(p.treeNode.RawTx).
-				SetVout(p.treeNode.Vout).
-				SetStatus(p.treeNode.Status),
-		)
-
+		// Builders set ID (for conflict matching), all required fields, and
+		// the fields being updated; every row exists, so the upsert always
+		// takes the UPDATE branch.
 		leafBuilder := db.TransferLeaf.Create().
 			SetID(p.transferLeaf.ID).
 			SetLeaf(p.treeNode).
@@ -2748,25 +2727,13 @@ func (h *BaseTransferHandler) applySenderKeyTweaks(ctx context.Context, db *ent.
 		leafBuilders = append(leafBuilders, leafBuilder)
 	}
 
+	if err := applyTreeNodeOwnerKeyUpdates(ctx, db, transfer.ID, updates, false); err != nil {
+		return err
+	}
+
 	// CreateBulk with OnConflict is the bulk-UPDATE workaround (ent has no
 	// native one). Chunk to respect PostgreSQL's 65535-parameter limit.
 	const maxBatchSize = 1000
-	for chunk := range slices.Chunk(treeNodeBuilders, maxBatchSize) {
-		if err := db.TreeNode.CreateBulk(chunk...).
-			OnConflictColumns(treenode.FieldID).
-			Update(func(u *ent.TreeNodeUpsert) {
-				// Only the owner signing key changes on a sender tweak. Status
-				// is excluded so an exited-to-L1 leaf keeps its on-chain
-				// status, and owner identity stays with the sender until the
-				// receiver claims. update_time must be carried explicitly:
-				// custom upsert resolvers bypass ent's UpdateDefault.
-				u.UpdateOwnerSigningPubkey()
-				u.UpdateUpdateTime()
-			}).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("unable to batch update tree node keys for transfer %s: %w", transfer.ID, err)
-		}
-	}
 	for chunk := range slices.Chunk(leafBuilders, maxBatchSize) {
 		if err := db.TransferLeaf.CreateBulk(chunk...).
 			OnConflictColumns(enttransferleaf.FieldID).
