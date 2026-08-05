@@ -1339,6 +1339,45 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 	return slices.Collect(maps.Values(resultsByLeafID)), nil
 }
 
+// signingKeyshareIDsForLeaves resolves each leaf's signing keyshare ID, keyed
+// by leaf ID, with at most one query: leaves whose SigningKeyshare edge is
+// already loaded are read from the edge, the rest are fetched in one batch.
+func signingKeyshareIDsForLeaves(ctx context.Context, leafMap map[string]*ent.TreeNode) (map[string]uuid.UUID, error) {
+	keyshareIDs := make(map[string]uuid.UUID, len(leafMap))
+	missing := make([]uuid.UUID, 0)
+	for _, leaf := range leafMap {
+		if keyshare := leaf.Edges.SigningKeyshare; keyshare != nil {
+			keyshareIDs[leaf.ID.String()] = keyshare.ID
+		} else {
+			missing = append(missing, leaf.ID)
+		}
+	}
+	if len(missing) == 0 {
+		return keyshareIDs, nil
+	}
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db: %w", err)
+	}
+	nodes, err := db.TreeNode.Query().
+		Where(enttreenode.IDIn(missing...)).
+		WithSigningKeyshare().
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load signing keyshares for leaves: %w", err)
+	}
+	if len(nodes) != len(missing) {
+		return nil, fmt.Errorf("expected %d leaves for keyshare lookup but found %d", len(missing), len(nodes))
+	}
+	for _, node := range nodes {
+		if node.Edges.SigningKeyshare == nil {
+			return nil, fmt.Errorf("signing keyshare not found for leaf %s", node.ID)
+		}
+		keyshareIDs[node.ID.String()] = node.Edges.SigningKeyshare.ID
+	}
+	return keyshareIDs, nil
+}
+
 func SignRefundsWithPregeneratedNonce(
 	ctx context.Context,
 	config *so.Config,
@@ -1418,11 +1457,6 @@ func SignRefundsWithPregeneratedNonce(
 		jobIsDirectRefund[cpfpJobID] = false
 		jobIsDirectFromCpfpRefund[cpfpJobID] = false
 
-		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
-		}
-
 		round1Packages := make(map[string]frost.SigningCommitment)
 
 		signingCommitments := req.GetSigningCommitments()
@@ -1444,12 +1478,11 @@ func SignRefundsWithPregeneratedNonce(
 			signingJobs,
 			&helper.SigningJobWithPregeneratedNonce{
 				SigningJob: helper.SigningJob{
-					JobID:             cpfpJobID,
-					SigningKeyshareID: signingKeyshare.ID,
-					Message:           refundTxSigHash,
-					VerifyingKey:      &leaf.VerifyingPubkey,
-					UserCommitment:    &userNonceCommitment,
-					AdaptorPublicKey:  &cpfpAdaptorPubKey,
+					JobID:            cpfpJobID,
+					Message:          refundTxSigHash,
+					VerifyingKey:     &leaf.VerifyingPubkey,
+					UserCommitment:   &userNonceCommitment,
+					AdaptorPublicKey: &cpfpAdaptorPubKey,
 				},
 				Round1Packages: round1Packages,
 			},
@@ -1506,10 +1539,6 @@ func SignRefundsWithPregeneratedNonce(
 
 		directJobID := uuid.New()
 		jobIsDirectRefund[directJobID] = true
-		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
-		}
 
 		round1Packages := make(map[string]frost.SigningCommitment)
 
@@ -1527,12 +1556,11 @@ func SignRefundsWithPregeneratedNonce(
 		}
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
 			SigningJob: helper.SigningJob{
-				JobID:             directJobID,
-				SigningKeyshareID: signingKeyshare.ID,
-				Message:           directRefundTxSigHash,
-				VerifyingKey:      &leaf.VerifyingPubkey,
-				UserCommitment:    &userNonceCommitment,
-				AdaptorPublicKey:  &directAdaptorPubKey,
+				JobID:            directJobID,
+				Message:          directRefundTxSigHash,
+				VerifyingKey:     &leaf.VerifyingPubkey,
+				UserCommitment:   &userNonceCommitment,
+				AdaptorPublicKey: &directAdaptorPubKey,
 			},
 			Round1Packages: round1Packages,
 		})
@@ -1587,10 +1615,6 @@ func SignRefundsWithPregeneratedNonce(
 
 		directFromCpfpJobID := uuid.New()
 		jobIsDirectFromCpfpRefund[directFromCpfpJobID] = true
-		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
-		}
 
 		round1Packages := make(map[string]frost.SigningCommitment)
 
@@ -1608,12 +1632,11 @@ func SignRefundsWithPregeneratedNonce(
 		}
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
 			SigningJob: helper.SigningJob{
-				JobID:             directFromCpfpJobID,
-				SigningKeyshareID: signingKeyshare.ID,
-				Message:           directFromCpfpRefundTxSigHash,
-				VerifyingKey:      &leaf.VerifyingPubkey,
-				UserCommitment:    &userNonceCommitment,
-				AdaptorPublicKey:  &directFromCpfpAdaptorPubKey,
+				JobID:            directFromCpfpJobID,
+				Message:          directFromCpfpRefundTxSigHash,
+				VerifyingKey:     &leaf.VerifyingPubkey,
+				UserCommitment:   &userNonceCommitment,
+				AdaptorPublicKey: &directFromCpfpAdaptorPubKey,
 			},
 			Round1Packages: round1Packages,
 		})
@@ -1630,6 +1653,21 @@ func SignRefundsWithPregeneratedNonce(
 				return nil, nil, nil, fmt.Errorf("signing job %s has invalid commitment for key %s: hiding or binding is empty (message: %x)", job.JobID, key, job.Message)
 			}
 		}
+	}
+
+	// Resolved after the loops so validation failures surface without a
+	// database read, and only for leaves that carry a signing job — leafMap
+	// may be a superset of the package.
+	jobLeaves := make(map[string]*ent.TreeNode, len(leafJobMap))
+	for _, leaf := range leafJobMap {
+		jobLeaves[leaf.ID.String()] = leaf
+	}
+	keyshareIDs, err := signingKeyshareIDsForLeaves(ctx, jobLeaves)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	for _, job := range signingJobs {
+		job.SigningKeyshareID = keyshareIDs[leafJobMap[job.JobID].ID.String()]
 	}
 
 	signingResults, err := helper.SignFrostWithPregeneratedNonce(ctx, config, signingJobs)
@@ -4620,6 +4658,14 @@ func leafKeyshareIDsForClaim(leaves []*ent.TransferLeaf, transferID uuid.UUID) (
 // is never reassigned after creation (an application convention — the ent
 // edge is not schema-immutable; see the matching note on
 // leafKeyshareIDsForClaim).
+//
+// Lock-ordering note: the claim commit acquires keyshares (here) before its
+// tree-node upsert row locks, while the send commit (applySenderKeyTweaks)
+// locks tree nodes before calling here — an AB-BA shape that is unreachable
+// today only because every rotation path takes the transfer row lock first
+// and a leaf's keyshare belongs to exactly one non-terminal transfer. A new
+// rotation path that skips the transfer lock (or shares keyshares across
+// transfers) would make this a real deadlock.
 //
 // Deadlock safety does not depend on lock-acquisition order: same-transfer
 // claims are serialized by the transfer row lock the caller already holds,

@@ -73,23 +73,25 @@ func ValidatePubkeySharesTweak(config *so.Config, proofs [][]byte, pubKeySharesT
 	return nil
 }
 
-// TweakLeafKeyUpdate applies the sender-side key tweak from `req` to the
-// leaf's underlying signing keyshare and returns the resulting tree-node
-// owner-signing-pubkey update.
+// SendLeafKeyTweakParts holds the parsed and validated components of a
+// sender-side key tweak, ready to apply to the leaf's signing keyshare
+// (individually via SigningKeyshare.TweakKeyShare or batched via
+// ent.TweakSigningKeyshares).
+type SendLeafKeyTweakParts struct {
+	SecretShare       keys.Private
+	PubKeyTweak       keys.Public
+	PubKeySharesTweak map[string]keys.Public
+}
+
+// ValidateSendLeafKeyTweak parses and validates the sender-side key tweak
+// from `req` without touching the database.
 //
 // `config` is required to validate that `req.PubkeySharesTweak` is consistent
 // with `req.SecretShareTweak.Proofs` across every operator in the cluster.
 // Without that cross-field check, the wire map can be crafted per-SO so that
 // every SO accepts the request but their `signing_keyshares.public_shares`
 // rows diverge — see ValidatePubkeySharesTweak.
-func TweakLeafKeyUpdate(ctx context.Context, config *so.Config, leaf *ent.TreeNode, req *pb.SendLeafKeyTweak) (*ent.TreeNodeUpdateOne, error) {
-	// Tweak keyshare
-	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
-	if err != nil || keyshare == nil {
-		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %w", req.GetLeafId(), err)
-	}
-	keyshareID := keyshare.ID.String()
-
+func ValidateSendLeafKeyTweak(config *so.Config, req *pb.SendLeafKeyTweak) (*SendLeafKeyTweakParts, error) {
 	if req.GetSecretShareTweak() == nil {
 		return nil, fmt.Errorf("secret share tweak is not provided for leaf %s", req.GetLeafId())
 	}
@@ -112,9 +114,39 @@ func TweakLeafKeyUpdate(ctx context.Context, config *so.Config, leaf *ent.TreeNo
 	if err := ValidatePubkeySharesTweak(config, req.GetSecretShareTweak().GetProofs(), pubKeySharesTweak); err != nil {
 		return nil, fmt.Errorf("invalid pubkey_shares_tweak for leaf %s: %w", req.GetLeafId(), err)
 	}
-	keyshare, err = keyshare.TweakKeyShare(ctx, secretShare, pubKeyTweak, pubKeySharesTweak)
-	if err != nil || keyshare == nil {
+	return &SendLeafKeyTweakParts{
+		SecretShare:       secretShare,
+		PubKeyTweak:       pubKeyTweak,
+		PubKeySharesTweak: pubKeySharesTweak,
+	}, nil
+}
+
+// TweakLeafKeyUpdate applies the sender-side key tweak from `req` to the
+// leaf's underlying signing keyshare and returns the resulting tree-node
+// owner-signing-pubkey update.
+//
+// Rotates one keyshare per call; batch callers should validate with
+// ValidateSendLeafKeyTweak and rotate via ent.TweakSigningKeyshares instead.
+func TweakLeafKeyUpdate(ctx context.Context, config *so.Config, leaf *ent.TreeNode, req *pb.SendLeafKeyTweak) (*ent.TreeNodeUpdateOne, error) {
+	parts, err := ValidateSendLeafKeyTweak(config, req)
+	if err != nil {
+		return nil, err
+	}
+	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %w", req.GetLeafId(), err)
+	}
+	if keyshare == nil {
+		return nil, fmt.Errorf("no keyshare found for leaf %s", req.GetLeafId())
+	}
+	keyshareID := keyshare.ID.String()
+
+	keyshare, err = keyshare.TweakKeyShare(ctx, parts.SecretShare, parts.PubKeyTweak, parts.PubKeySharesTweak)
+	if err != nil {
 		return nil, fmt.Errorf("unable to tweak keyshare %s for leaf %s: %w", keyshareID, req.GetLeafId(), err)
+	}
+	if keyshare == nil {
+		return nil, fmt.Errorf("tweak of keyshare %s for leaf %s returned no keyshare", keyshareID, req.GetLeafId())
 	}
 
 	signingPubkey := leaf.VerifyingPubkey.Sub(keyshare.PublicKey)
