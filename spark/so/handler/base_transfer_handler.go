@@ -36,6 +36,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
+	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -1220,8 +1221,11 @@ func lockLeaves(ctx context.Context, db *ent.Client, leaves []*ent.TreeNode) ([]
 		return nil, fmt.Errorf("unable to update leaf statuses: %w", err)
 	}
 
+	// SigningKeyshare is eager-loaded for the downstream signing-job
+	// builders, which need each leaf's keyshare ID.
 	updatedLeaves, err := db.TreeNode.Query().
 		Where(treenode.IDIn(ids...)).
+		WithSigningKeyshare().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch updated leaves: %w", err)
@@ -2562,60 +2566,224 @@ func (h *BaseTransferHandler) commitSenderKeyTweaksWithMode(ctx context.Context,
 	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator && transfer.Status != st.TransferStatusApplyingSenderKeyTweak {
 		return transfer, nil
 	}
-	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	transferLeaves, err := transfer.QueryTransferLeaves().
+		WithLeaf(func(tnq *ent.TreeNodeQuery) {
+			tnq.WithTree().WithSigningKeyshare()
+		}).
+		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
-	logger.Sugar().Infof("Beginning to tweak keys for transfer %s", transfer.ID)
-	for _, leaf := range transferLeaves {
-		if len(leaf.KeyTweak) == 0 {
-			treeNode, _ := leaf.QueryLeaf().Only(ctx)
-			leafID := leaf.ID.String()
-			if treeNode != nil {
-				leafID = treeNode.ID.String()
-			}
-			return nil, fmt.Errorf("transfer leaf has no key tweak stored for leaf %s in transfer %s", leafID, transfer.ID)
-		}
-		keyTweak := &pbspark.SendLeafKeyTweak{}
-		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
-		}
-		treeNode, err := leaf.QueryLeaf().ForUpdate().Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node: %w", err)
-		}
-		logger.Sugar().Infof("Tweaking leaf %s for transfer %s", treeNode.ID, transfer.ID)
-		treeNodeUpdate, err := helper.TweakLeafKeyUpdate(ctx, h.config, treeNode, keyTweak)
-		if err != nil {
-			return nil, fmt.Errorf("unable to tweak leaf key: %w", err)
-		}
-		err = treeNodeUpdate.Exec(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update tree node: %w", err)
-		}
-		_, err = applyLeafSignature(leaf.Update(), keyTweak.GetSignature(), keyTweak.GetTypedSignature()).
-			SetKeyTweak(nil).
-			SetSecretCipher(keyTweak.GetSecretCipher()).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update leaf key tweak: %w", err)
+	logger.Sugar().Infof("Beginning to tweak keys for %d leaves of transfer %s", len(transferLeaves), transfer.ID)
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db: %w", err)
+	}
+
+	if len(transferLeaves) > 0 {
+		if err := h.applySenderKeyTweaks(ctx, db, transfer, transferLeaves); err != nil {
+			return nil, err
 		}
 	}
 	transfer, err = transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status: %w", err)
 	}
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get db: %w", err)
-	}
 	if err := transferpkg.MarkReceiversClaimPending(ctx, db, transfer.ID); err != nil {
 		return nil, fmt.Errorf("unable to mark receivers claim pending for transfer %s: %w", transfer.ID, err)
 	}
 
 	return transfer, nil
+}
+
+// applySenderKeyTweaks applies every leaf's stored sender key tweak in one
+// batched pass with O(1) database round trips. Per-leaf work here runs on the
+// coordinator and again on every participant applying the settle gossip
+// inline, so it scales the sender's synchronous gossip wait with leaf count.
+//
+// Every transferLeaves entry must carry the Leaf edge with Tree and
+// SigningKeyshare loaded.
+func (h *BaseTransferHandler) applySenderKeyTweaks(ctx context.Context, db *ent.Client, transfer *ent.Transfer, transferLeaves []*ent.TransferLeaf) error {
+	nodeIDs := make([]uuid.UUID, 0, len(transferLeaves))
+	for _, leaf := range transferLeaves {
+		if leaf.Edges.Leaf == nil {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("tree node edge not loaded for transfer leaf %s", leaf.ID))
+		}
+		nodeIDs = append(nodeIDs, leaf.Edges.Leaf.ID)
+	}
+
+	// Pin the tree-node rows until the transaction commits so a concurrent
+	// claim or exit can't mutate them mid-rotation; deterministic order to
+	// avoid lock-order deadlocks between concurrent batch lockers.
+	lockedNodes, err := db.TreeNode.Query().
+		Where(treenode.IDIn(nodeIDs...)).
+		Order(ent.Asc(treenode.FieldID)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to lock tree nodes for transfer %s: %w", transfer.ID, err)
+	}
+	if len(lockedNodes) != len(nodeIDs) {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf(
+			"expected %d tree nodes for transfer %s but locked %d", len(nodeIDs), transfer.ID, len(lockedNodes)))
+	}
+	// Re-check the exit guard on the now-locked rows: the earlier
+	// validateTransferLeavesNotExitedToL1 read was unlocked, so a chain
+	// watcher marking a leaf exited to L1 could have committed in between.
+	for _, node := range lockedNodes {
+		if node.Status.IsExitedToL1() {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+				"cannot commit sender key tweaks: leaf %s has been exited to L1 (status: %s)", node.ID, node.Status))
+		}
+	}
+
+	keysharesByID, err := lockAndHydrateLeafKeyshares(ctx, db, transferLeaves, transfer.ID)
+	if err != nil {
+		return err
+	}
+
+	type pendingSendLeaf struct {
+		transferLeaf *ent.TransferLeaf
+		treeNode     *ent.TreeNode
+		keyTweak     *pbspark.SendLeafKeyTweak
+		keyshareID   uuid.UUID
+	}
+	pending := make([]pendingSendLeaf, 0, len(transferLeaves))
+	tweaks := make([]*ent.SigningKeyshareTweak, 0, len(transferLeaves))
+	for _, leaf := range transferLeaves {
+		// Leaf and keyshare edges were validated non-nil by
+		// lockAndHydrateLeafKeyshares over this same slice.
+		treeNode := leaf.Edges.Leaf
+		if len(leaf.KeyTweak) == 0 {
+			return fmt.Errorf("transfer leaf has no key tweak stored for leaf %s in transfer %s", treeNode.ID, transfer.ID)
+		}
+		keyTweak := &pbspark.SendLeafKeyTweak{}
+		if err := proto.Unmarshal(leaf.KeyTweak, keyTweak); err != nil {
+			return fmt.Errorf("unable to unmarshal key tweak: %w", err)
+		}
+		keyshare, ok := keysharesByID[treeNode.Edges.SigningKeyshare.ID]
+		if !ok {
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf(
+				"signing keyshare %s for leaf %s not found during sender key tweak commit", treeNode.Edges.SigningKeyshare.ID, treeNode.ID))
+		}
+		parts, err := helper.ValidateSendLeafKeyTweak(h.config, keyTweak)
+		if err != nil {
+			return fmt.Errorf("unable to tweak leaf key: %w", err)
+		}
+		tweaks = append(tweaks, &ent.SigningKeyshareTweak{
+			Keyshare:       keyshare,
+			SecretTweak:    parts.SecretShare,
+			PubKeyTweak:    parts.PubKeyTweak,
+			PubSharesTweak: parts.PubKeySharesTweak,
+		})
+		pending = append(pending, pendingSendLeaf{
+			transferLeaf: leaf,
+			treeNode:     treeNode,
+			keyTweak:     keyTweak,
+			keyshareID:   keyshare.ID,
+		})
+	}
+
+	rotatedKeyshares, err := ent.TweakSigningKeyshares(ctx, tweaks)
+	if err != nil {
+		// Restore per-leaf attribution: the batch error names the failing
+		// keyshare; map it back to the leaf an operator would look up.
+		var rotationErr *ent.KeyshareRotationError
+		if errors.As(err, &rotationErr) {
+			for _, p := range pending {
+				if p.keyshareID == rotationErr.KeyshareID {
+					return fmt.Errorf("unable to tweak keyshare %s for leaf %s in transfer %s: %w",
+						rotationErr.KeyshareID, p.treeNode.ID, transfer.ID, err)
+				}
+			}
+		}
+		return fmt.Errorf("unable to tweak keyshares for transfer %s: %w", transfer.ID, err)
+	}
+
+	treeNodeBuilders := make([]*ent.TreeNodeCreate, 0, len(pending))
+	leafBuilders := make([]*ent.TransferLeafCreate, 0, len(pending))
+	for _, p := range pending {
+		rotated, ok := rotatedKeyshares[p.keyshareID]
+		if !ok {
+			return sparkerrors.InternalDataInconsistency(fmt.Errorf(
+				"rotated signing keyshare %s for leaf %s missing from batch result", p.keyshareID, p.treeNode.ID))
+		}
+		ownerSigningPubkey := p.treeNode.VerifyingPubkey.Sub(rotated.PublicKey)
+
+		// Build upserts for batch update. Since every row exists (queried
+		// above), OnConflict always UPDATEs, never INSERTs. Builders set ID
+		// (for matching), all required fields, and the fields being updated.
+		treeNodeBuilders = append(treeNodeBuilders,
+			db.TreeNode.Create().
+				SetID(p.treeNode.ID).
+				SetTree(p.treeNode.Edges.Tree).
+				SetNetwork(p.treeNode.Edges.Tree.Network).
+				SetSigningKeyshare(p.treeNode.Edges.SigningKeyshare).
+				SetValue(p.treeNode.Value).
+				SetVerifyingPubkey(p.treeNode.VerifyingPubkey).
+				SetOwnerIdentityPubkey(p.treeNode.OwnerIdentityPubkey).
+				SetOwnerSigningPubkey(ownerSigningPubkey).
+				SetRawTx(p.treeNode.RawTx).
+				SetVout(p.treeNode.Vout).
+				SetStatus(p.treeNode.Status),
+		)
+
+		leafBuilder := db.TransferLeaf.Create().
+			SetID(p.transferLeaf.ID).
+			SetLeaf(p.treeNode).
+			SetTransferID(transfer.ID).
+			SetPreviousRefundTx(p.transferLeaf.PreviousRefundTx).
+			SetIntermediateRefundTx(p.transferLeaf.IntermediateRefundTx).
+			SetSecretCipher(p.keyTweak.GetSecretCipher())
+		// A typed signature persists its scheme; a legacy one leaves the
+		// scheme unset so the conflict update writes NULL over any stored
+		// value. key_tweak is deliberately never set: the same mechanism
+		// clears it.
+		if typed := p.keyTweak.GetTypedSignature(); typed != nil {
+			leafBuilder.SetSignature(typed.GetSignature()).SetSignatureScheme(int32(typed.GetScheme()))
+		} else {
+			leafBuilder.SetSignature(p.keyTweak.GetSignature())
+		}
+		leafBuilders = append(leafBuilders, leafBuilder)
+	}
+
+	// CreateBulk with OnConflict is the bulk-UPDATE workaround (ent has no
+	// native one). Chunk to respect PostgreSQL's 65535-parameter limit.
+	const maxBatchSize = 1000
+	for chunk := range slices.Chunk(treeNodeBuilders, maxBatchSize) {
+		if err := db.TreeNode.CreateBulk(chunk...).
+			OnConflictColumns(treenode.FieldID).
+			Update(func(u *ent.TreeNodeUpsert) {
+				// Only the owner signing key changes on a sender tweak. Status
+				// is excluded so an exited-to-L1 leaf keeps its on-chain
+				// status, and owner identity stays with the sender until the
+				// receiver claims. update_time must be carried explicitly:
+				// custom upsert resolvers bypass ent's UpdateDefault.
+				u.UpdateOwnerSigningPubkey()
+				u.UpdateUpdateTime()
+			}).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("unable to batch update tree node keys for transfer %s: %w", transfer.ID, err)
+		}
+	}
+	for chunk := range slices.Chunk(leafBuilders, maxBatchSize) {
+		if err := db.TransferLeaf.CreateBulk(chunk...).
+			OnConflictColumns(enttransferleaf.FieldID).
+			Update(func(u *ent.TransferLeafUpsert) {
+				u.UpdateSignature()
+				u.UpdateSignatureScheme()
+				u.UpdateSecretCipher()
+				u.UpdateKeyTweak()
+				// Carried explicitly: custom upsert resolvers bypass ent's
+				// UpdateDefault, and incremental consumers cursor on it.
+				u.UpdateUpdateTime()
+			}).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("unable to batch update transfer leaf key tweaks for transfer %s: %w", transfer.ID, err)
+		}
+	}
+	return nil
 }
 
 func (h *BaseTransferHandler) validateSenderKeyTweakCommitPreconditions(ctx context.Context, transfer *ent.Transfer, allowSwapV3 bool) error {
