@@ -229,25 +229,29 @@ func TestBindManifestAttributesValueToTheOwningSender(t *testing.T) {
 	})
 }
 
-// Real manifests always carry these, and they legitimately hold bps amounts and recipients that
+// Real manifests always carry these, and they legitimately hold bps amounts and receivers that
 // appear in no edge — so the exact-cover check must not reach into them.
 func TestBindManifestIgnoresPricedFields(t *testing.T) {
 	f := newBindingFixture(t)
 	f.manifest.QuoteExpiryTime = timestamppb.New(time.Unix(1900000000, 0))
 	f.manifest.Fees = []*spark.FeeComponent{
-		{Source: spark.FeeSource_FEE_SOURCE_BASE, Amount: satsOf(7)},
 		{
-			Source:                     spark.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
-			Role:                       spark.FeeRole_FEE_ROLE_AFFILIATE,
-			Amount:                     &spark.ManifestAmount{Amount: &spark.ManifestAmount_Bps{Bps: 150}},
-			RecipientIdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
+			Source:                    spark.FeeSource_FEE_SOURCE_BASE,
+			Amount:                    satsOf(7),
+			ReceiverIdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
+		},
+		{
+			Source:                    spark.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
+			Role:                      spark.FeeRole_FEE_ROLE_AFFILIATE,
+			Amount:                    &spark.ManifestAmount{Amount: &spark.ManifestAmount_Bps{Bps: 150}},
+			ReceiverIdentityPublicKey: keys.GeneratePrivateKey().Public().Serialize(),
 		},
 	}
 
 	require.NoError(t, f.bind())
 }
 
-// A dual-role key — destination and fee recipient — gets one edge for its total, not one per
+// A dual-role key — destination and fee receiver — gets one edge for its total, not one per
 // role. Accepting the split form would give a single movement two signable representations.
 func TestBindManifestRejectsRepeatedEdgesForOnePair(t *testing.T) {
 	f := newBindingFixture(t)

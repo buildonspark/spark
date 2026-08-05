@@ -12606,7 +12606,16 @@ func (m *FeeComponent) validate(all bool) error {
 		}
 	}
 
-	// no validation rules for RecipientIdentityPublicKey
+	if len(m.GetReceiverIdentityPublicKey()) != 33 {
+		err := FeeComponentValidationError{
+			field:  "ReceiverIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return FeeComponentMultiError(errors)

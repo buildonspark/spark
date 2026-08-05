@@ -1,5 +1,5 @@
 {
-  "description": "Cross-language TransferManifest hash cases in canonical Protobuf JSON. Expected hash = tagged_hash([\"spark\",\"transfer\",\"manifest\"], protohash(canonicalized manifest)) as computed by common.HashTransferManifest. THIS FILE IS THE SOURCE OF TRUTH: downstream implementations keep byte-identical mirrors and assert these same vectors \u2014 any change here must be propagated to every mirror.",
+  "description": "Cross-language TransferManifest hash cases in canonical Protobuf JSON. Expected hash = tagged_hash([\"spark\",\"transfer\",\"manifest\"], protohash(canonicalized manifest)) as computed by common.HashTransferManifest. THIS FILE IS THE SOURCE OF TRUTH: downstream implementations keep byte-identical mirrors and assert these same vectors — any change here must be propagated to every mirror.",
   "testCases": [
     {
       "name": "minimal_single_edge",
@@ -55,8 +55,8 @@
     },
     {
       "name": "fees_shuffled",
-      "description": "Fees deliberately out of canonical (source, role, recipient, amount) order; includes an SSP-retained fee (empty recipient) and an explicit partner payout",
-      "expectedHash": "f6f3a8f5c62a519cd417f68536f0a9e0cae38b3676ded5062446373008124bf4",
+      "description": "Fees deliberately out of canonical (source, role, receiver, amount) order; two cuts paid to the edge receiver plus a partner payout to a key holding no edge",
+      "expectedHash": "e1428f64b6c98788d4452212d4a8c8b7682620e74dc70f0060f3e220b89c1d76",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -75,14 +75,16 @@
             "source": "FEE_SOURCE_BASE",
             "amount": {
               "sats": "10"
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           },
           {
             "source": "FEE_SOURCE_PARTNER_MARKUP",
             "amount": {
               "sats": "15"
             },
-            "role": "FEE_ROLE_LS"
+            "role": "FEE_ROLE_LS",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           },
           {
             "source": "FEE_SOURCE_PARTNER_MARKUP",
@@ -90,7 +92,7 @@
               "sats": "25"
             },
             "role": "FEE_ROLE_PARTNER",
-            "recipientIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+            "receiverIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
           }
         ]
       }
@@ -98,7 +100,7 @@
     {
       "name": "bps_amounts",
       "description": "Basis-point amounts on an edge and a fee; bps and sats hash distinctly by oneof field number",
-      "expectedHash": "81d73d595b54689fd27765f42e5e266600e27bf1783652516c88da31ec9d3836",
+      "expectedHash": "27613404f9b330b40100d5edc81385b71cfc5daf4c13e4f06d1b8c7cc2d0d3c8",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -124,7 +126,8 @@
             "source": "FEE_SOURCE_NETWORK",
             "amount": {
               "bps": 50
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
@@ -192,7 +195,7 @@
     },
     {
       "name": "whole_second_timestamp",
-      "description": "Whole-second timestamp (nanos exactly 0) \u2014 pins that protohash hashes Timestamp seconds/nanos unconditionally, even at zero",
+      "description": "Whole-second timestamp (nanos exactly 0) — pins that protohash hashes Timestamp seconds/nanos unconditionally, even at zero",
       "expectedHash": "a3a7190e7c1cfffb9acacfb3bc91d07c565ed08706988ac501d006cf62fe5878",
       "transferManifest": {
         "version": 1,
@@ -212,7 +215,7 @@
     },
     {
       "name": "duplicate_edges",
-      "description": "Two byte-identical edges \u2014 pins that objecthash list hashing preserves multiplicity (duplicates must not collapse)",
+      "description": "Two byte-identical edges — pins that objecthash list hashing preserves multiplicity (duplicates must not collapse)",
       "expectedHash": "b9d87e643a19b85011cfc237b733868da9e3ea527743637c01359bb1fdb40696",
       "transferManifest": {
         "version": 1,
@@ -239,7 +242,7 @@
     {
       "name": "kitchen_sink",
       "description": "Shuffled multi-edge + all three fee sources + both timestamps, combined",
-      "expectedHash": "3b87caf3aee855878a5c1f52b0e2dffb5bd8beecc1d2cc72759877f585b2ceb8",
+      "expectedHash": "7a32efa5d426b5631e2d7712802b4f4ffe3e1cb82829463da2ac85fadca7fed5",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -272,13 +275,15 @@
             "source": "FEE_SOURCE_NETWORK",
             "amount": {
               "bps": 50
-            }
+            },
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
           },
           {
             "source": "FEE_SOURCE_BASE",
             "amount": {
               "sats": "10"
-            }
+            },
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
           },
           {
             "source": "FEE_SOURCE_PARTNER_MARKUP",
@@ -286,14 +291,15 @@
               "sats": "25"
             },
             "role": "FEE_ROLE_PARTNER",
-            "recipientIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+            "receiverIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
           },
           {
             "source": "FEE_SOURCE_PARTNER_MARKUP",
             "amount": {
               "sats": "15"
             },
-            "role": "FEE_ROLE_LS"
+            "role": "FEE_ROLE_LS",
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
           }
         ],
         "transferExpiryTime": "2026-07-15T12:30:45.123Z",
@@ -302,7 +308,7 @@
     },
     {
       "name": "max_timestamp",
-      "description": "Last representable instant after millisecond flooring (9999-12-31T23:59:59.999Z) \u2014 pins the shared upper bound of the timestamp accept domain",
+      "description": "Last representable instant after millisecond flooring (9999-12-31T23:59:59.999Z) — pins the shared upper bound of the timestamp accept domain",
       "expectedHash": "ad49857d915ad7be8c54677a51a98cf714ee3f3ada277586ea6ed7a28dec4561",
       "transferManifest": {
         "version": 1,
@@ -322,7 +328,7 @@
     },
     {
       "name": "sats_above_uint32",
-      "description": "Sats above uint32 range (~50 BTC) \u2014 pins the uint64 encoding path at realistic mainnet magnitudes",
+      "description": "Sats above uint32 range (~50 BTC) — pins the uint64 encoding path at realistic mainnet magnitudes",
       "expectedHash": "bccaaf2ede845da714bef8fa60a56674d925f9d266d68df3e46d85bc81d3650b",
       "transferManifest": {
         "version": 1,
@@ -341,7 +347,7 @@
     },
     {
       "name": "sats_at_max_supply",
-      "description": "Sats at the enforced cap (total bitcoin supply, 21M BTC) \u2014 pins the largest amount any language may hash",
+      "description": "Sats at the enforced cap (total bitcoin supply, 21M BTC) — pins the largest amount any language may hash",
       "expectedHash": "4925b71709381873d8d1b05d1eac382d59128250b7246b728b7f3e5f057b5a90",
       "transferManifest": {
         "version": 1,
@@ -398,7 +404,7 @@
             "amount": {
               "sats": "1020"
             },
-            "recipientIdentityPublicKey": "Ax8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8f"
+            "receiverIdentityPublicKey": "Ax8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8f"
           },
           {
             "source": "FEE_SOURCE_PARTNER_MARKUP",
@@ -406,7 +412,81 @@
             "amount": {
               "sats": "1020"
             },
-            "recipientIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh"
+            "receiverIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fees_tied_by_receiver",
+      "description": "Two fees identical in source, role and amount, listed with the higher receiver first so only the receiver tiebreak can produce canonical order",
+      "expectedHash": "6eb75be6f01949ec607650eb95d8f693e3bb178d41296efc749aa20c0fa35443",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "15"
+            },
+            "receiverIdentityPublicKey": "A3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "15"
+            },
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fees_tied_by_amount",
+      "description": "Two fees identical in source, role and receiver, listed with the larger amount first so only the amount tiebreak can produce canonical order",
+      "expectedHash": "0ca640671720a0f82a63b16a2daf8cdde3e921e7c4234899a45dda69df761229",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "25"
+            },
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
+          },
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "15"
+            },
+            "receiverIdentityPublicKey": "AsDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
           }
         ]
       }
@@ -415,7 +495,7 @@
   "invalidCases": [
     {
       "name": "unsupported_version_0",
-      "description": "version absent/zero \u2014 objecthash would omit it entirely",
+      "description": "version absent/zero — objecthash would omit it entirely",
       "transferManifest": {
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
         "network": "REGTEST",
@@ -432,7 +512,7 @@
     },
     {
       "name": "unsupported_version_2",
-      "description": "future format version \u2014 implementations must not vouch for fields they cannot see",
+      "description": "future format version — implementations must not vouch for fields they cannot see",
       "transferManifest": {
         "version": 2,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -493,7 +573,7 @@
     },
     {
       "name": "empty_sender_key",
-      "description": "edge sender pubkey absent \u2014 would silently vanish from the digest",
+      "description": "edge sender pubkey absent — would silently vanish from the digest",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -510,7 +590,7 @@
     },
     {
       "name": "empty_receiver_key",
-      "description": "edge receiver pubkey absent \u2014 would silently vanish from the digest",
+      "description": "edge receiver pubkey absent — would silently vanish from the digest",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -542,7 +622,7 @@
     },
     {
       "name": "zero_edge_amount",
-      "description": "explicit zero amount \u2014 indistinguishable from absent under objecthash",
+      "description": "explicit zero amount — indistinguishable from absent under objecthash",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -578,14 +658,15 @@
           {
             "amount": {
               "sats": "10"
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
     },
     {
       "name": "missing_fee_amount",
-      "description": "fee amount oneof unset \u2014 the fee-side twin of missing_edge_amount",
+      "description": "fee amount oneof unset — the fee-side twin of missing_edge_amount",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -601,7 +682,8 @@
         ],
         "fees": [
           {
-            "source": "FEE_SOURCE_BASE"
+            "source": "FEE_SOURCE_BASE",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
@@ -627,7 +709,8 @@
             "source": "FEE_SOURCE_PARTNER_MARKUP",
             "amount": {
               "sats": "10"
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
@@ -653,14 +736,15 @@
             "source": "FEE_SOURCE_BASE",
             "amount": {
               "sats": "0"
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
     },
     {
       "name": "pre_epoch_timestamp",
-      "description": "negative-epoch timestamp \u2014 JS remainder would derive negative nanos, diverging from Go",
+      "description": "negative-epoch timestamp — JS remainder would derive negative nanos, diverging from Go",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -679,7 +763,7 @@
     },
     {
       "name": "unknown_network_value",
-      "description": "numeric enum value this build's descriptor cannot name \u2014 same hazard as an unknown manifest version",
+      "description": "numeric enum value this build's descriptor cannot name — same hazard as an unknown manifest version",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -716,7 +800,8 @@
             "source": 999,
             "amount": {
               "sats": "10"
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
@@ -743,14 +828,15 @@
             "role": 999,
             "amount": {
               "sats": "10"
-            }
+            },
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
           }
         ]
       }
     },
     {
       "name": "sats_beyond_max_supply",
-      "description": "One sat above total bitcoin supply \u2014 no real transfer can move it, and rejecting keeps amounts inside JS Number precision",
+      "description": "One sat above total bitcoin supply — no real transfer can move it, and rejecting keeps amounts inside JS Number precision",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -768,7 +854,7 @@
     },
     {
       "name": "epoch_transfer_expiry",
-      "description": "present transfer_expiry_time at the epoch \u2014 implementations disagree on hashing present-but-zero message fields (presence-gated hashers emit list[0,0]; default-skipping hashers omit), so every language rejects it",
+      "description": "present transfer_expiry_time at the epoch — implementations disagree on hashing present-but-zero message fields (presence-gated hashers emit list[0,0]; default-skipping hashers omit), so every language rejects it",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -787,7 +873,7 @@
     },
     {
       "name": "sub_millisecond_epoch_quote_expiry",
-      "description": "present quote_expiry_time within 1ms of the epoch floors to the all-zero timestamp, which implementations hash inconsistently \u2014 rejected everywhere",
+      "description": "present quote_expiry_time within 1ms of the epoch floors to the all-zero timestamp, which implementations hash inconsistently — rejected everywhere",
       "transferManifest": {
         "version": 1,
         "transferId": "0197f9a0-1111-7000-8000-000000000001",
@@ -802,6 +888,89 @@
           }
         ],
         "quoteExpiryTime": "1970-01-01T00:00:00.000500Z"
+      }
+    },
+    {
+      "name": "fee_empty_receiver",
+      "description": "Fee with a valid source, role and amount but no receiver",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "25"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "fee_wrong_length_receiver",
+      "description": "Fee receiver that is 32 bytes rather than a 33-byte compressed key",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "25"
+            },
+            "receiverIdentityPublicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+          }
+        ]
+      }
+    },
+    {
+      "name": "fee_overlong_receiver",
+      "description": "Fee receiver that is 34 bytes rather than a 33-byte compressed key",
+      "transferManifest": {
+        "version": 1,
+        "transferId": "0197f9a0-1111-7000-8000-000000000001",
+        "network": "REGTEST",
+        "edges": [
+          {
+            "senderIdentityPublicKey": "AqGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh",
+            "receiverIdentityPublicKey": "AlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "amount": {
+              "sats": "1000"
+            }
+          }
+        ],
+        "fees": [
+          {
+            "source": "FEE_SOURCE_PARTNER_MARKUP",
+            "role": "FEE_ROLE_LS",
+            "amount": {
+              "sats": "25"
+            },
+            "receiverIdentityPublicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+          }
+        ]
       }
     }
   ]

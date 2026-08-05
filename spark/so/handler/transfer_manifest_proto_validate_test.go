@@ -93,6 +93,15 @@ func TestStartTransferV3Request_RejectsMalformedManifest(t *testing.T) {
 		}
 	}
 
+	validFee := func(receiver keys.Public) *pb.FeeComponent {
+		return &pb.FeeComponent{
+			Source:                    pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
+			Role:                      pb.FeeRole_FEE_ROLE_LS,
+			ReceiverIdentityPublicKey: receiver.Serialize(),
+			Amount:                    &pb.ManifestAmount{Amount: &pb.ManifestAmount_Sats{Sats: 25}},
+		}
+	}
+
 	tests := []struct {
 		name        string
 		mutate      func(*pb.TransferManifest)
@@ -105,6 +114,19 @@ func TestStartTransferV3Request_RejectsMalformedManifest(t *testing.T) {
 		{"no edges", func(m *pb.TransferManifest) { m.Edges = nil }, true},
 		{"uncompressed edge sender key", func(m *pb.TransferManifest) {
 			m.Edges[0].SenderIdentityPublicKey = make([]byte, 32)
+		}, true},
+		{"well-formed fee", func(m *pb.TransferManifest) {
+			m.Fees = []*pb.FeeComponent{validFee(receiver)}
+		}, false},
+		{"uncompressed fee receiver key", func(m *pb.TransferManifest) {
+			fee := validFee(receiver)
+			fee.ReceiverIdentityPublicKey = make([]byte, 32)
+			m.Fees = []*pb.FeeComponent{fee}
+		}, true},
+		{"fee with no receiver", func(m *pb.TransferManifest) {
+			fee := validFee(receiver)
+			fee.ReceiverIdentityPublicKey = nil
+			m.Fees = []*pb.FeeComponent{fee}
 		}, true},
 	}
 	for _, tc := range tests {

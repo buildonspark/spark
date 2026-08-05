@@ -62,14 +62,15 @@ func TestHashTransferManifestOrderIndependent(t *testing.T) {
 		Amount:                    satsAmount(2000),
 	}
 	feeA := &pb.FeeComponent{
-		Source: pb.FeeSource_FEE_SOURCE_BASE,
-		Amount: satsAmount(10),
+		Source:                    pb.FeeSource_FEE_SOURCE_BASE,
+		ReceiverIdentityPublicKey: testPubKey(0x04),
+		Amount:                    satsAmount(10),
 	}
 	feeB := &pb.FeeComponent{
-		Source:                     pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
-		Role:                       pb.FeeRole_FEE_ROLE_PARTNER,
-		RecipientIdentityPublicKey: testPubKey(0x05),
-		Amount:                     satsAmount(25),
+		Source:                    pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
+		Role:                      pb.FeeRole_FEE_ROLE_PARTNER,
+		ReceiverIdentityPublicKey: testPubKey(0x05),
+		Amount:                    satsAmount(25),
 	}
 
 	sorted := validManifest()
@@ -134,7 +135,11 @@ func TestHashTransferManifestDistinguishes(t *testing.T) {
 		"sats vs equal bps": func(m *pb.TransferManifest) { m.Edges[0].Amount = bpsAmount(1000) },
 		"transfer expiry":   func(m *pb.TransferManifest) { m.TransferExpiryTime = &timestamppb.Timestamp{Seconds: 1700000000} },
 		"added fee": func(m *pb.TransferManifest) {
-			m.Fees = []*pb.FeeComponent{{Source: pb.FeeSource_FEE_SOURCE_BASE, Amount: satsAmount(10)}}
+			m.Fees = []*pb.FeeComponent{{
+				Source:                    pb.FeeSource_FEE_SOURCE_BASE,
+				ReceiverIdentityPublicKey: testPubKey(0x04),
+				Amount:                    satsAmount(10),
+			}}
 		},
 		"swapped sender and receiver": func(m *pb.TransferManifest) {
 			edge := m.GetEdges()[0]
@@ -204,8 +209,13 @@ func TestHashTransferManifestValidation(t *testing.T) {
 		"markup fee without role": func(m *pb.TransferManifest) {
 			m.Fees = []*pb.FeeComponent{{Source: pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP, Amount: satsAmount(10)}}
 		},
+		// Carries a receiver because the receiver check runs first and would mask the amount.
 		"zero fee amount": func(m *pb.TransferManifest) {
-			m.Fees = []*pb.FeeComponent{{Source: pb.FeeSource_FEE_SOURCE_BASE, Amount: satsAmount(0)}}
+			m.Fees = []*pb.FeeComponent{{
+				Source:                    pb.FeeSource_FEE_SOURCE_BASE,
+				ReceiverIdentityPublicKey: testPubKey(0x04),
+				Amount:                    satsAmount(0),
+			}}
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -223,7 +233,11 @@ func TestHashTransferManifestValidation(t *testing.T) {
 
 	t.Run("base fee without role is valid", func(t *testing.T) {
 		manifest := validManifest()
-		manifest.Fees = []*pb.FeeComponent{{Source: pb.FeeSource_FEE_SOURCE_BASE, Amount: satsAmount(10)}}
+		manifest.Fees = []*pb.FeeComponent{{
+			Source:                    pb.FeeSource_FEE_SOURCE_BASE,
+			ReceiverIdentityPublicKey: testPubKey(0x04),
+			Amount:                    satsAmount(10),
+		}}
 		_, err := HashTransferManifest(manifest)
 		require.NoError(t, err)
 	})
@@ -242,14 +256,21 @@ func TestHashTransferManifestValidation(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("retained fee with empty recipient is valid", func(t *testing.T) {
-		manifest := validManifest()
-		manifest.Fees = []*pb.FeeComponent{{
-			Source: pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
-			Role:   pb.FeeRole_FEE_ROLE_LS,
-			Amount: satsAmount(10),
-		}}
-		_, err := HashTransferManifest(manifest)
-		require.NoError(t, err)
-	})
+	for name, receiver := range map[string][]byte{
+		"empty":        nil,
+		"uncompressed": make([]byte, 32),
+		"overlong":     make([]byte, 34),
+	} {
+		t.Run("fee receiver "+name+" is rejected", func(t *testing.T) {
+			manifest := validManifest()
+			manifest.Fees = []*pb.FeeComponent{{
+				Source:                    pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP,
+				Role:                      pb.FeeRole_FEE_ROLE_LS,
+				ReceiverIdentityPublicKey: receiver,
+				Amount:                    satsAmount(10),
+			}}
+			_, err := HashTransferManifest(manifest)
+			require.ErrorContains(t, err, "fees[0]: receiver_identity_public_key must be 33 bytes")
+		})
+	}
 }

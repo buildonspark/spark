@@ -10,7 +10,7 @@
 //!
 //! Canonicalization (applied to a copy; the input is never mutated):
 //!   - edges are sorted by (sender, receiver, amount kind, amount value)
-//!   - fees are sorted by (source, role, recipient, amount kind, amount value)
+//!   - fees are sorted by (source, role, receiver, amount kind, amount value)
 //!   - timestamps are floored to whole milliseconds, the precision every
 //!     supported language can represent losslessly
 //!
@@ -19,10 +19,10 @@
 //! simply vanish from the digest instead of failing, so we reject them before
 //! they can weaken what the signature covers.
 //!
-//! Validation here covers only what affects the digest's cross-language
-//! meaning. Structural validity (UUID format, 33-byte keys) is owned by the
-//! proto's validate.rules at the RPC boundary — duplicating those rules in
-//! hand-written validators would drift.
+//! Validation here covers what affects the digest's cross-language meaning,
+//! plus the fee receiver's length: nothing downstream ever parses a fee key,
+//! so an ill-formed one would otherwise reach a signature unchecked. Edge keys
+//! are parsed where they are spent, and UUID format stays with the proto.
 
 use std::cmp::Ordering;
 
@@ -38,6 +38,8 @@ use crate::protohash::hash_proto;
 use crate::SparkTokenPrimitivesError;
 
 const TRANSFER_MANIFEST_HASH_TAG: [&str; 3] = ["spark", "transfer", "manifest"];
+
+const COMPRESSED_PUBLIC_KEY_LEN: usize = 33;
 
 // The only manifest format version this implementation can vouch for.
 // protohash silently ignores unknown proto fields, so hashing a
@@ -136,6 +138,11 @@ fn validate_for_hashing(manifest: &TransferManifest) -> Result<(), String> {
                 "fees[{i}]: role must be set for partner markup fees"
             ));
         }
+        if fee.receiver_identity_public_key.len() != COMPRESSED_PUBLIC_KEY_LEN {
+            return Err(format!(
+                "fees[{i}]: receiver_identity_public_key must be {COMPRESSED_PUBLIC_KEY_LEN} bytes"
+            ));
+        }
         validate_amount(fee.amount.as_ref()).map_err(|msg| format!("fees[{i}]: {msg}"))?;
     }
     Ok(())
@@ -207,8 +214,8 @@ fn compare_fees(a: &FeeComponent, b: &FeeComponent) -> Ordering {
         .cmp(&b.source)
         .then_with(|| a.role.cmp(&b.role))
         .then_with(|| {
-            a.recipient_identity_public_key
-                .cmp(&b.recipient_identity_public_key)
+            a.receiver_identity_public_key
+                .cmp(&b.receiver_identity_public_key)
         })
         .then_with(|| compare_amounts(a.amount.as_ref(), b.amount.as_ref()))
 }
