@@ -28,6 +28,8 @@ const SupportedTransferManifestVersion = 1
 // nanos from a pre-1970 Date, silently diverging from Go's digest.
 const maxTimestampSeconds = 253402300799
 
+const compressedPublicKeyLen = 33
+
 // HashTransferManifest returns the signed digest for a TransferManifest:
 //
 //	tagged_hash(["spark", "transfer", "manifest"], protohash(canonicalize(manifest)))
@@ -42,7 +44,7 @@ const maxTimestampSeconds = 253402300799
 //
 // Canonicalization (applied to a copy; the input is never mutated):
 //   - edges are sorted by (sender, receiver, amount kind, amount value)
-//   - fees are sorted by (source, role, recipient, amount kind, amount value)
+//   - fees are sorted by (source, role, receiver, amount kind, amount value)
 //   - timestamps are floored to whole milliseconds, the precision every
 //     supported language can represent losslessly
 //
@@ -51,10 +53,10 @@ const maxTimestampSeconds = 253402300799
 // simply vanish from the digest instead of failing, so we reject them before
 // they can weaken what the signature covers.
 //
-// Validation here covers only what affects the digest's cross-language
-// meaning. Structural validity (UUID format, 33-byte keys) is owned by the
-// proto's validate.rules at the RPC boundary — duplicating those rules in
-// three hand-written validators would drift.
+// Validation here covers what affects the digest's cross-language meaning,
+// plus the fee receiver's length: nothing downstream ever parses a fee key, so
+// an ill-formed one would otherwise reach a signature unchecked. Edge keys are
+// parsed where they are spent, and UUID format stays with the proto.
 func HashTransferManifest(manifest *pb.TransferManifest) ([]byte, error) {
 	if err := validateTransferManifestForHashing(manifest); err != nil {
 		return nil, fmt.Errorf("transfer manifest not hashable: %w", err)
@@ -111,6 +113,9 @@ func validateTransferManifestForHashing(manifest *pb.TransferManifest) error {
 		}
 		if fee.GetSource() == pb.FeeSource_FEE_SOURCE_PARTNER_MARKUP && fee.GetRole() == pb.FeeRole_FEE_ROLE_UNSPECIFIED {
 			return fmt.Errorf("fees[%d]: role must be set for partner markup fees", i)
+		}
+		if len(fee.GetReceiverIdentityPublicKey()) != compressedPublicKeyLen {
+			return fmt.Errorf("fees[%d]: receiver_identity_public_key must be %d bytes", i, compressedPublicKeyLen)
 		}
 		if err := validateManifestAmount(fee.GetAmount()); err != nil {
 			return fmt.Errorf("fees[%d]: %w", i, err)
@@ -207,7 +212,7 @@ func compareFeeComponents(a, b *pb.FeeComponent) int {
 	if c := cmp.Compare(a.GetRole(), b.GetRole()); c != 0 {
 		return c
 	}
-	if c := bytes.Compare(a.GetRecipientIdentityPublicKey(), b.GetRecipientIdentityPublicKey()); c != 0 {
+	if c := bytes.Compare(a.GetReceiverIdentityPublicKey(), b.GetReceiverIdentityPublicKey()); c != 0 {
 		return c
 	}
 	return compareManifestAmounts(a.GetAmount(), b.GetAmount())

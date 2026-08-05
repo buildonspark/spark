@@ -69,7 +69,7 @@ struct FeeJson {
     source: Option<EnumJson>,
     role: Option<EnumJson>,
     #[serde(default)]
-    recipient_identity_public_key: String,
+    receiver_identity_public_key: String,
     amount: Option<AmountJson>,
 }
 
@@ -194,7 +194,7 @@ fn build_manifest(json: &ManifestJson) -> TransferManifest {
                 source: parse_fee_source(fee.source.as_ref()),
                 role: parse_fee_role(fee.role.as_ref()),
                 amount: parse_amount(fee.amount.as_ref()),
-                recipient_identity_public_key: decode_base64(&fee.recipient_identity_public_key),
+                receiver_identity_public_key: decode_base64(&fee.receiver_identity_public_key),
             })
             .collect(),
     }

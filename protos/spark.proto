@@ -1113,12 +1113,12 @@ message ManifestEdge {
     ManifestAmount amount = 3;
 }
 
-// One fee: category, amount, and recipient.
+// One fee: category, amount, and receiver.
 message FeeComponent {
     FeeSource source = 1;
     FeeRole role = 2;  // markup split role
     ManifestAmount amount = 3;
-    bytes recipient_identity_public_key = 4;  // empty if SSP-retained
+    bytes receiver_identity_public_key = 4 [(validate.rules).bytes.len = 33];
 }
 
 // The kind of fee.

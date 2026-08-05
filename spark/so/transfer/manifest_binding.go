@@ -290,7 +290,7 @@ func bindManifestEdges(
 }
 
 // edges[] carries at most one entry per (sender, receiver): a key that is both a destination and
-// a fee recipient gets a single edge for its total, with fees[] annotating the slice. Summing
+// a fee receiver gets a single edge for its total, with fees[] annotating the slice. Summing
 // duplicates instead would let one movement have several valid signed forms, since the digest
 // covers the list as written.
 func declaredEdgeTotals(edges []*spark.ManifestEdge) (map[manifestEdgeKey]uint64, error) {

@@ -1965,16 +1965,13 @@ export interface ManifestEdge {
   amount: ManifestAmount | undefined;
 }
 
-/** One fee: category, amount, and recipient. */
+/** One fee: category, amount, and receiver. */
 export interface FeeComponent {
   source: FeeSource;
   /** markup split role */
   role: FeeRole;
-  amount:
-    | ManifestAmount
-    | undefined;
-  /** empty if SSP-retained */
-  recipientIdentityPublicKey: Uint8Array;
+  amount: ManifestAmount | undefined;
+  receiverIdentityPublicKey: Uint8Array;
 }
 
 export interface TransferFilter {
@@ -12638,7 +12635,7 @@ export const ManifestEdge: MessageFns<ManifestEdge> = {
 };
 
 function createBaseFeeComponent(): FeeComponent {
-  return { source: 0, role: 0, amount: undefined, recipientIdentityPublicKey: new Uint8Array(0) };
+  return { source: 0, role: 0, amount: undefined, receiverIdentityPublicKey: new Uint8Array(0) };
 }
 
 export const FeeComponent: MessageFns<FeeComponent> = {
@@ -12652,8 +12649,8 @@ export const FeeComponent: MessageFns<FeeComponent> = {
     if (message.amount !== undefined) {
       ManifestAmount.encode(message.amount, writer.uint32(26).fork()).join();
     }
-    if (message.recipientIdentityPublicKey.length !== 0) {
-      writer.uint32(34).bytes(message.recipientIdentityPublicKey);
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      writer.uint32(34).bytes(message.receiverIdentityPublicKey);
     }
     return writer;
   },
@@ -12694,7 +12691,7 @@ export const FeeComponent: MessageFns<FeeComponent> = {
             break;
           }
 
-          message.recipientIdentityPublicKey = reader.bytes();
+          message.receiverIdentityPublicKey = reader.bytes();
           continue;
         }
       }
@@ -12711,8 +12708,8 @@ export const FeeComponent: MessageFns<FeeComponent> = {
       source: isSet(object.source) ? feeSourceFromJSON(object.source) : 0,
       role: isSet(object.role) ? feeRoleFromJSON(object.role) : 0,
       amount: isSet(object.amount) ? ManifestAmount.fromJSON(object.amount) : undefined,
-      recipientIdentityPublicKey: isSet(object.recipientIdentityPublicKey)
-        ? bytesFromBase64(object.recipientIdentityPublicKey)
+      receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
+        ? bytesFromBase64(object.receiverIdentityPublicKey)
         : new Uint8Array(0),
     };
   },
@@ -12728,8 +12725,8 @@ export const FeeComponent: MessageFns<FeeComponent> = {
     if (message.amount !== undefined) {
       obj.amount = ManifestAmount.toJSON(message.amount);
     }
-    if (message.recipientIdentityPublicKey.length !== 0) {
-      obj.recipientIdentityPublicKey = base64FromBytes(message.recipientIdentityPublicKey);
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
     }
     return obj;
   },
@@ -12744,7 +12741,7 @@ export const FeeComponent: MessageFns<FeeComponent> = {
     message.amount = (object.amount !== undefined && object.amount !== null)
       ? ManifestAmount.fromPartial(object.amount)
       : undefined;
-    message.recipientIdentityPublicKey = object.recipientIdentityPublicKey ?? new Uint8Array(0);
+    message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };

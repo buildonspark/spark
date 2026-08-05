@@ -6642,15 +6642,15 @@ func (x *ManifestEdge) GetAmount() *ManifestAmount {
 	return nil
 }
 
-// One fee: category, amount, and recipient.
+// One fee: category, amount, and receiver.
 type FeeComponent struct {
-	state                      protoimpl.MessageState `protogen:"open.v1"`
-	Source                     FeeSource              `protobuf:"varint,1,opt,name=source,proto3,enum=spark.FeeSource" json:"source,omitempty"`
-	Role                       FeeRole                `protobuf:"varint,2,opt,name=role,proto3,enum=spark.FeeRole" json:"role,omitempty"` // markup split role
-	Amount                     *ManifestAmount        `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
-	RecipientIdentityPublicKey []byte                 `protobuf:"bytes,4,opt,name=recipient_identity_public_key,json=recipientIdentityPublicKey,proto3" json:"recipient_identity_public_key,omitempty"` // empty if SSP-retained
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	Source                    FeeSource              `protobuf:"varint,1,opt,name=source,proto3,enum=spark.FeeSource" json:"source,omitempty"`
+	Role                      FeeRole                `protobuf:"varint,2,opt,name=role,proto3,enum=spark.FeeRole" json:"role,omitempty"` // markup split role
+	Amount                    *ManifestAmount        `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	ReceiverIdentityPublicKey []byte                 `protobuf:"bytes,4,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *FeeComponent) Reset() {
@@ -6704,9 +6704,9 @@ func (x *FeeComponent) GetAmount() *ManifestAmount {
 	return nil
 }
 
-func (x *FeeComponent) GetRecipientIdentityPublicKey() []byte {
+func (x *FeeComponent) GetReceiverIdentityPublicKey() []byte {
 	if x != nil {
-		return x.RecipientIdentityPublicKey
+		return x.ReceiverIdentityPublicKey
 	}
 	return nil
 }
@@ -13269,12 +13269,12 @@ const file_spark_proto_rawDesc = "" +
 	"\fManifestEdge\x12D\n" +
 	"\x1asender_identity_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x17senderIdentityPublicKey\x12H\n" +
 	"\x1creceiver_identity_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x19receiverIdentityPublicKey\x12-\n" +
-	"\x06amount\x18\x03 \x01(\v2\x15.spark.ManifestAmountR\x06amount\"\xce\x01\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.spark.ManifestAmountR\x06amount\"\xd5\x01\n" +
 	"\fFeeComponent\x12(\n" +
 	"\x06source\x18\x01 \x01(\x0e2\x10.spark.FeeSourceR\x06source\x12\"\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x0e.spark.FeeRoleR\x04role\x12-\n" +
-	"\x06amount\x18\x03 \x01(\v2\x15.spark.ManifestAmountR\x06amount\x12A\n" +
-	"\x1drecipient_identity_public_key\x18\x04 \x01(\fR\x1arecipientIdentityPublicKey\"\x8a\x05\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.spark.ManifestAmountR\x06amount\x12H\n" +
+	"\x1creceiver_identity_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x19receiverIdentityPublicKey\"\x8a\x05\n" +
 	"\x0eTransferFilter\x12A\n" +
 	"\x1creceiver_identity_public_key\x18\x01 \x01(\fH\x00R\x19receiverIdentityPublicKey\x12=\n" +
 	"\x1asender_identity_public_key\x18\x02 \x01(\fH\x00R\x17senderIdentityPublicKey\x12S\n" +
