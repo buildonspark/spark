@@ -376,6 +376,14 @@ func GetTimelockFromSequence(sequence uint32) uint32 {
 	return sequence & wire.SequenceLockTimeMask
 }
 
+// HasBlockRelativeTimelock reports whether a sequence encodes a block-denominated
+// relative timelock: bit 31 clear so BIP68 applies, bit 22 clear so the units are
+// blocks. Callers needing to report *which* bit is wrong should test them directly.
+func HasBlockRelativeTimelock(sequence uint32) bool {
+	return sequence&wire.SequenceLockTimeDisabled == 0 &&
+		sequence&wire.SequenceLockTimeIsSeconds == 0
+}
+
 // roundDownToTimelockInterval handles leaves that have non-aligned timelocks (e.g., 740 instead of 700)
 func RoundDownToTimelockInterval(timelock uint32) uint32 {
 	return timelock - (timelock % spark.TimeLockInterval)

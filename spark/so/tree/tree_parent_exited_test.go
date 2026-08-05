@@ -62,36 +62,15 @@ func newExitingTree(t *testing.T) *exitingTree {
 // spend builds a transaction spending the given outpoint. Every node needs its
 // own: one sharing its parent's raw tx would match the confirmed txid itself
 // and be re-statused before the child sweep runs.
+// See spendSeq for the variant that sets an explicit input sequence.
 func (f *exitingTree) spend(t *testing.T, prev chainhash.Hash, index uint32) ([]byte, *wire.MsgTx) {
-	tx := wire.NewMsgTx(3)
-	tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Hash: prev, Index: index}})
-	tx.AddTxOut(wire.NewTxOut(50_000, f.script))
-	raw, err := common.SerializeTx(tx)
-	require.NoError(t, err)
-	return raw, tx
+	return f.spendSeq(t, prev, index, 0)
 }
 
+// newNode creates a node with only a raw (CPFP) tx. See newNodeTxs for the
+// variant that also attaches a direct tx.
 func (f *exitingTree) newNode(t *testing.T, parent *ent.TreeNode, status st.TreeNodeStatus, rawTx []byte) *ent.TreeNode {
-	dbClient, err := ent.GetDbFromContext(f.ctx)
-	require.NoError(t, err)
-
-	create := dbClient.TreeNode.Create().
-		SetTree(f.tree).
-		SetNetwork(btcnetwork.Regtest).
-		SetSigningKeyshare(f.keyshare).
-		SetValue(100_000).
-		SetVerifyingPubkey(f.ownerKey).
-		SetOwnerIdentityPubkey(f.ownerKey).
-		SetOwnerSigningPubkey(f.ownerKey).
-		SetRawTx(rawTx).
-		SetVout(0).
-		SetStatus(status)
-	if parent != nil {
-		create.SetParent(parent)
-	}
-	node, err := create.Save(f.ctx)
-	require.NoError(t, err)
-	return node
+	return f.newNodeTxs(t, parent, status, rawTx, nil)
 }
 
 // confirm runs MarkExitingNodes as if the given transaction confirmed in a block.
