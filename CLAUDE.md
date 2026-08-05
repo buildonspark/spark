@@ -48,7 +48,7 @@ verifyOperatorSignatures(sigs)
 - Comments must be self-contained - never reference "the old implementation" since future readers won't have that context
 - Only add non-obvious information - `// Save to database` before `db.Save()` wastes space
 - Don't comment out code - delete it; git remembers
-- Link to issues/specs for complex business logic
+- A Jira ticket belongs in a comment as `TODO(SP-XXXX)`, or appended as a citation to a comment that already reads on its own - never as a bare "See SP-1234" standing in for the reason
 
 ### Logging (Go)
 
