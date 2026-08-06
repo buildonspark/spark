@@ -8,10 +8,11 @@ import (
 
 func TestTreeNodeStatusIsTerminal(t *testing.T) {
 	terminal := map[TreeNodeStatus]bool{
-		TreeNodeStatusSplitted:   true,
-		TreeNodeStatusAggregated: true,
-		TreeNodeStatusExited:     true,
-		TreeNodeStatusReimbursed: true,
+		TreeNodeStatusSplitted:         true,
+		TreeNodeStatusAggregated:       true,
+		TreeNodeStatusExited:           true,
+		TreeNodeStatusReimbursed:       true,
+		TreeNodeStatusWatchtowerExited: true,
 	}
 	for _, v := range (TreeNodeStatus("")).Values() {
 		s := TreeNodeStatus(v)
@@ -113,9 +114,55 @@ func TestParentExitSweepExcludedStatuses(t *testing.T) {
 	assert.NotContains(t, excluded, TreeNodeStatusAvailable)
 }
 
+func TestTreeNodeStatusShouldMarkWatchtowerExited(t *testing.T) {
+	// The only difference from the PARENT_EXITED policy, and the reason the
+	// watchtower pass runs after the raw cascade rather than before it.
+	assert.True(t, TreeNodeStatusParentExited.ShouldMarkWatchtowerExited())
+	assert.False(t, TreeNodeStatusParentExited.ShouldMarkParentExited())
+	for _, v := range (TreeNodeStatus("")).Values() {
+		s := TreeNodeStatus(v)
+		if s == TreeNodeStatusParentExited {
+			continue
+		}
+		assert.Equal(t, s.ShouldMarkParentExited(), s.ShouldMarkWatchtowerExited(),
+			"ShouldMarkWatchtowerExited(%s) must match the PARENT_EXITED policy", s)
+	}
+	// Being terminal makes this status safe for the watchtower to ignore, not
+	// safe to write over confirmed chain state or an aggregation marker.
+	assert.False(t, TreeNodeStatusOnChain.ShouldMarkWatchtowerExited())
+	assert.False(t, TreeNodeStatusExited.ShouldMarkWatchtowerExited())
+	assert.False(t, TreeNodeStatusSplitted.ShouldMarkWatchtowerExited())
+	assert.False(t, TreeNodeStatusConsolidated.ShouldMarkWatchtowerExited())
+	// Re-confirmation in a later block must not churn update_time.
+	assert.False(t, TreeNodeStatusWatchtowerExited.ShouldMarkWatchtowerExited())
+}
+
+func TestWatchtowerExitSweepExcludedStatuses(t *testing.T) {
+	excluded := WatchtowerExitSweepExcludedStatuses()
+	for _, s := range excluded {
+		assert.False(t, s.ShouldMarkWatchtowerExited(), "%s is excluded but marked as sweepable", s)
+	}
+	for _, v := range (TreeNodeStatus("")).Values() {
+		if s := TreeNodeStatus(v); !s.ShouldMarkWatchtowerExited() {
+			assert.Contains(t, excluded, s)
+		}
+	}
+	// The upgrade this pass exists to perform.
+	assert.NotContains(t, excluded, TreeNodeStatusParentExited)
+	assert.Contains(t, ParentExitSweepExcludedStatuses(), TreeNodeStatusParentExited)
+}
+
+func TestTreeNodeStatusWatchtowerExitedIsExitedToL1(t *testing.T) {
+	// setAvailableUnlessExitedToL1 reads this to decide whether a completing
+	// transfer may return a leaf to AVAILABLE. False here would let the next
+	// finalize revive a leaf whose exit path is gone.
+	assert.True(t, TreeNodeStatusWatchtowerExited.IsExitedToL1())
+	assert.False(t, TreeNodeStatusWatchtowerExited.CanBecomeAvailable())
+}
+
 func TestOccupancyTreeNodeStatuses_ExcludesTerminalAndAvailable(t *testing.T) {
 	occupancy := OccupancyTreeNodeStatuses()
-	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-7)
+	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-8)
 	for _, s := range occupancy {
 		assert.True(t, s.CountsForOccupancy())
 		assert.False(t, s.IsTerminal())

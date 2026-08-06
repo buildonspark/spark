@@ -40,6 +40,10 @@ const (
 	// not transferable, renewable, or splittable. It may be aggregated
 	// further up the tree.
 	TreeNodeStatusConsolidated TreeNodeStatus = "CONSOLIDATED"
+	// TreeNodeStatusWatchtowerExited is the status of a node below one whose direct
+	// tx confirmed, which conflict-spends the outpoint its own raw tx names: the
+	// exit path is gone rather than pending, and recovery moves to L1. Terminal.
+	TreeNodeStatusWatchtowerExited TreeNodeStatus = "WATCHTOWER_EXITED"
 )
 
 // CanBecomeAvailable reports whether a tree node currently in this status is
@@ -54,7 +58,8 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 		TreeNodeStatusExited,
 		TreeNodeStatusParentExited,
 		TreeNodeStatusReimbursed,
-		TreeNodeStatusConsolidated:
+		TreeNodeStatusConsolidated,
+		TreeNodeStatusWatchtowerExited:
 		return false
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,
@@ -77,13 +82,20 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 
 // IsExitedToL1 reports whether the node has exited (or is exiting) to Bitcoin
 // L1: its own node tx confirmed (ON_CHAIN), its refund tx confirmed (EXITED),
-// or an ancestor's exit confirmed (PARENT_EXITED). These are the only
-// non-claimable-by-default statuses a receiver may still claim through (the
-// claim preserves them). Distinct from CanBecomeAvailable above, whose false
-// set additionally includes SPLITTED and REIMBURSED — statuses that must
+// or an ancestor's exit confirmed (PARENT_EXITED, WATCHTOWER_EXITED). These are
+// the only non-claimable-by-default statuses a receiver may still claim through
+// (the claim preserves them). Distinct from CanBecomeAvailable above, whose
+// false set additionally includes SPLITTED and REIMBURSED — statuses that must
 // remain neither claimable nor revivable.
+//
+// WATCHTOWER_EXITED is here for the preservation half: setAvailableUnlessExitedToL1
+// reads this to decide whether a completing transfer may return a leaf to
+// AVAILABLE, so excluding it would revive a leaf whose exit path is gone.
 func (s TreeNodeStatus) IsExitedToL1() bool {
-	return s == TreeNodeStatusOnChain || s == TreeNodeStatusExited || s == TreeNodeStatusParentExited
+	return s == TreeNodeStatusOnChain ||
+		s == TreeNodeStatusExited ||
+		s == TreeNodeStatusParentExited ||
+		s == TreeNodeStatusWatchtowerExited
 }
 
 // ShouldMarkParentExited reports whether a child in this status should be swept
@@ -110,7 +122,7 @@ func (s TreeNodeStatus) ShouldMarkParentExited() bool {
 		// timelock disabled; checkAndBroadcastNodeTx rejects it on every scan
 		// tick forever.
 		return false
-	case TreeNodeStatusOnChain, TreeNodeStatusExited, TreeNodeStatusParentExited:
+	case TreeNodeStatusOnChain, TreeNodeStatusExited, TreeNodeStatusParentExited, TreeNodeStatusWatchtowerExited:
 		// Already at least as strong a claim as PARENT_EXITED. Overwriting
 		// would downgrade confirmed chain state — the sweep otherwise
 		// clobbers a branch marked ON_CHAIN earlier in the same call — or, for
@@ -185,6 +197,27 @@ func ParentExitSweepExcludedStatuses() []TreeNodeStatus {
 	return out
 }
 
+// ShouldMarkWatchtowerExited reports whether a descendant in this status should be
+// marked WATCHTOWER_EXITED when an ancestor's direct tx confirms. The
+// ShouldMarkParentExited policy plus one upgrade: a confirmed direct tx is the
+// event PARENT_EXITED was anticipating, so replacing it loses nothing.
+func (s TreeNodeStatus) ShouldMarkWatchtowerExited() bool {
+	return s == TreeNodeStatusParentExited || s.ShouldMarkParentExited()
+}
+
+// WatchtowerExitSweepExcludedStatuses returns the statuses MarkExitingNodes must
+// not overwrite with WATCHTOWER_EXITED, derived from ShouldMarkWatchtowerExited
+// so the query predicate cannot drift from the policy.
+func WatchtowerExitSweepExcludedStatuses() []TreeNodeStatus {
+	var out []TreeNodeStatus
+	for _, v := range (TreeNodeStatus("")).Values() {
+		if s := TreeNodeStatus(v); !s.ShouldMarkWatchtowerExited() {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // Values returns the values of the tree node status.
 func (TreeNodeStatus) Values() []string {
 	return []string{
@@ -204,6 +237,7 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusParentExited),
 		string(TreeNodeStatusRenewLocked),
 		string(TreeNodeStatusConsolidated),
+		string(TreeNodeStatusWatchtowerExited),
 	}
 }
 
@@ -219,7 +253,8 @@ func (s TreeNodeStatus) IsTerminal() bool {
 	case TreeNodeStatusSplitted,
 		TreeNodeStatusAggregated,
 		TreeNodeStatusExited,
-		TreeNodeStatusReimbursed:
+		TreeNodeStatusReimbursed,
+		TreeNodeStatusWatchtowerExited:
 		return true
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,

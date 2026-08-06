@@ -596,6 +596,8 @@ func nodeStatusToProto(s st.TreeNodeStatus) pb.TreeVizNodeStatus {
 		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_RENEW_LOCKED
 	case st.TreeNodeStatusConsolidated:
 		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_CONSOLIDATED
+	case st.TreeNodeStatusWatchtowerExited:
+		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_WATCHTOWER_EXITED
 	default:
 		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_UNSPECIFIED
 	}

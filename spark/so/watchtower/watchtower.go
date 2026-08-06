@@ -41,6 +41,7 @@ var (
 		st.TreeNodeStatusExited,
 		st.TreeNodeStatusSplitted,
 		st.TreeNodeStatusReimbursed,
+		st.TreeNodeStatusWatchtowerExited,
 	}
 )
 

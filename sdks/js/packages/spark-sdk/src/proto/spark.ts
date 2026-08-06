@@ -770,6 +770,11 @@ export enum TreeNodeStatus {
    * aggregated further up the tree.
    */
   TREE_NODE_STATUS_CONSOLIDATED = 13,
+  /**
+   * TREE_NODE_STATUS_WATCHTOWER_EXITED - A node below one whose watchtower transaction confirmed, which spends the
+   * output this node's own transaction claims. Terminal; recovery moves to L1.
+   */
+  TREE_NODE_STATUS_WATCHTOWER_EXITED = 14,
   UNRECOGNIZED = -1,
 }
 
@@ -817,6 +822,9 @@ export function treeNodeStatusFromJSON(object: any): TreeNodeStatus {
     case 13:
     case "TREE_NODE_STATUS_CONSOLIDATED":
       return TreeNodeStatus.TREE_NODE_STATUS_CONSOLIDATED;
+    case 14:
+    case "TREE_NODE_STATUS_WATCHTOWER_EXITED":
+      return TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXITED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -854,6 +862,8 @@ export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
       return "TREE_NODE_STATUS_PARENT_EXITED";
     case TreeNodeStatus.TREE_NODE_STATUS_CONSOLIDATED:
       return "TREE_NODE_STATUS_CONSOLIDATED";
+    case TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXITED:
+      return "TREE_NODE_STATUS_WATCHTOWER_EXITED";
     case TreeNodeStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
