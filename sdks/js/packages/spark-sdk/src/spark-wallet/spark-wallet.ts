@@ -161,6 +161,7 @@ import {
   encodeBech32mTokenIdentifier,
 } from "../utils/token-identifier.js";
 import { sumTokenOutputs } from "../utils/token-transactions.js";
+import { generateTransferId, UUID } from "../utils/transfer-id.js";
 import type {
   CreateHTLCParams,
   CreateLightningHodlInvoiceParams,
@@ -192,6 +193,22 @@ import {
 } from "./types.js";
 
 const MAX_FALLBACK_CLAIM_BATCHES = 100;
+
+type TransferWithInvoiceInternalParams = TransferWithInvoiceParams & {
+  transferId?: string;
+};
+
+function resolveLightningPaymentTransferId(transferId?: UUID): string {
+  const resolved = transferId ?? generateTransferId();
+  if (!(resolved instanceof UUID)) {
+    throw new SparkValidationError("Transfer ID must be a UUID", {
+      field: "transferId",
+      value: resolved,
+      expected: "UUID",
+    });
+  }
+  return resolved.toString();
+}
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -3019,10 +3036,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {number} params.amountSats - Amount to send in satoshis
    * @returns {Promise<WalletTransfer>} The completed transfer details
    */
-  public async transfer({
-    amountSats,
-    receiverSparkAddress,
-  }: TransferParams): Promise<WalletTransfer> {
+  public async transfer(params: TransferParams): Promise<WalletTransfer> {
+    return this.transferInternal(params);
+  }
+
+  private async transferInternal(
+    { amountSats, receiverSparkAddress }: TransferParams,
+    transferId?: string,
+  ): Promise<WalletTransfer> {
     if (!receiverSparkAddress) {
       throw new SparkValidationError("Receiver Spark address cannot be empty", {
         field: "receiverSparkAddress",
@@ -3044,10 +3065,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       );
     }
 
-    const [outcome] = await this.transferWithInvoice([
+    const [outcome] = await this.transferWithInvoiceInternal([
       {
         amountSats,
         receiverIdentityPubkey: hexToBytes(receiverAddress.identityPublicKey),
+        transferId,
       },
     ]);
     if (!outcome) throw new Error("no transfer created");
@@ -3180,6 +3202,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected async transferWithInvoice(
     params: TransferWithInvoiceParams[],
   ): Promise<TransferWithInvoiceOutcome[]> {
+    return this.transferWithInvoiceInternal(params);
+  }
+
+  private async transferWithInvoiceInternal(
+    params: TransferWithInvoiceInternalParams[],
+  ): Promise<TransferWithInvoiceOutcome[]> {
     const amountSatsArray: number[] = [];
     for (const param of params) {
       const { amountSats } = param;
@@ -3203,7 +3231,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amountSatsArray,
       async (selected) => {
         const jobs = params.map((param, i) => {
-          const { receiverIdentityPubkey, sparkInvoice } = param;
+          const { receiverIdentityPubkey, sparkInvoice, transferId } = param;
           const leaves = selected[i] as TreeNode[];
           const leafKeyTweaks: LeafKeyTweak[] = leaves.map((leaf) =>
             this.toSendTweak(leaf, receiverIdentityPubkey),
@@ -3212,6 +3240,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             leafKeyTweaks,
             receiverIdentityPubkey,
             sparkInvoice,
+            transferId,
             param,
           };
         });
@@ -3226,6 +3255,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 await this.transferService.sendTransferWithKeyTweaks(
                   job.leafKeyTweaks,
                   job.sparkInvoice,
+                  job.transferId,
                 );
 
               const isSelfTransfer = equalBytes(
@@ -3909,6 +3939,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     decodedInvoice: DecodedInvoice,
     amountSats: number,
     network: Network,
+    transferId: string,
   ): Promise<WalletTransfer | undefined> {
     const fallbackAddress = decodedInvoice.fallbackAddress;
     if (!fallbackAddress) {
@@ -3948,13 +3979,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       return this.fulfillSparkInvoiceInternal(
         fallbackAddress as SparkAddressFormat,
         amountSats,
+        transferId,
       );
     }
     if (decoded) {
-      return this.transfer({
-        amountSats,
-        receiverSparkAddress: fallbackAddress,
-      });
+      return this.transferInternal(
+        {
+          amountSats,
+          receiverSparkAddress: fallbackAddress,
+        },
+        transferId,
+      );
     }
 
     if (!isValidSparkAddressFallback(fallbackAddress)) {
@@ -3966,7 +4001,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       identityPublicKey: fallbackAddress,
       network: Network[network] as NetworkType,
     });
-    return this.transfer({ amountSats, receiverSparkAddress: sparkAddress });
+    return this.transferInternal(
+      { amountSats, receiverSparkAddress: sparkAddress },
+      transferId,
+    );
   }
 
   private tryDecodeSparkAddress(
@@ -4046,10 +4084,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private async fulfillSparkInvoiceInternal(
     invoice: SparkAddressFormat,
     amountSats: number,
+    transferId: string,
   ): Promise<WalletTransfer> {
-    const result = await this.fulfillSparkInvoice([
-      { invoice, amount: BigInt(amountSats) },
-    ]);
+    const result = await this.fulfillSparkInvoices(
+      [{ invoice, amount: BigInt(amountSats) }],
+      transferId,
+    );
     const firstError = result.satsTransactionErrors[0];
     if (firstError) {
       throw firstError.error;
@@ -4068,6 +4108,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {string} params.invoice - The BOLT11-encoded Lightning invoice to pay
    * @param {boolean} [params.preferSpark] - Whether to prefer a spark transfer over lightning for the payment
    * @param {number} [params.amountSatsToSend] - The amount in sats to send. This is only valid for 0 amount lightning invoices.
+   * @param {UUID} [params.transferId] - UUID to reuse to prevent duplicate transfers when retrying the same payment
    * @returns {Promise<LightningSendRequest | WalletTransfer>} The Lightning payment request details or the transfer details if the payment is over Spark
    */
   public async payLightningInvoice({
@@ -4075,10 +4116,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     maxFeeSats,
     preferSpark = false,
     amountSatsToSend,
-    idempotencyKey,
+    transferId: requestedTransferId,
   }: PayLightningInvoiceParams): Promise<
     LightningSendRequest | WalletTransfer
   > {
+    const transferId = resolveLightningPaymentTransferId(requestedTransferId);
     invoice = invoice.toLowerCase();
 
     const invoiceNetwork = getNetworkFromInvoice(invoice);
@@ -4149,6 +4191,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         decodedInvoice,
         amountSats,
         invoiceNetwork,
+        transferId,
       );
       if (sparkPayment) {
         return sparkPayment;
@@ -4203,14 +4246,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             receiverIdentityPublicKey: sspIdentityPubkey,
           }));
 
-          const transferID = uuidv7();
-
           const startTransferRequest =
             await this.transferService.prepareTransferForLightning(
               leavesToSend,
               hexToBytes(paymentHash),
               expiryTime,
-              transferID,
+              transferId,
             );
 
           const swapResponse = await this.lightningService.swapNodesForPreimage(
@@ -4224,7 +4265,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               feeSats: feeEstimate,
               amountSatsToSend: amountSatsToSend,
               startTransferRequest,
-              idempotencyKey,
+              idempotencyKey: transferId,
             },
           );
 
@@ -4234,6 +4275,26 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
           // Advance local state — leaves are now locked on the SO
           await this.leafManager.handleTransferEvent(swapResponse.transfer);
+
+          // On a retry the SO returns the transfer it already holds for this
+          // transfer ID, which covers the leaves from the first attempt rather
+          // than the ones just selected. Release the selection the SO never
+          // took, otherwise the executor marks it OUTGOING while those leaves
+          // are still spendable server-side.
+          const transferredLeafIds = new Set(
+            swapResponse.transfer.leaves.flatMap((transferLeaf) =>
+              transferLeaf.leaf ? [transferLeaf.leaf.id] : [],
+            ),
+          );
+          const untakenLeafIds = leavesToSend
+            .map(({ leaf }) => leaf.id)
+            .filter((id) => !transferredLeafIds.has(id));
+          if (untakenLeafIds.length > 0) {
+            this.logger.warn(
+              `Preimage swap returned transfer ${swapResponse.transfer.id} covering different leaves than selected; releasing ${untakenLeafIds.length} leaf(es)`,
+            );
+            this.leafManager.restoreLocalLockedToAvailable(untakenLeafIds);
+          }
 
           const sspResponse = await sspClient.requestLightningSend({
             encodedInvoice: invoice,
@@ -4567,6 +4628,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amount?: bigint;
     }[],
   ): Promise<FulfillSparkInvoiceResponse> {
+    return this.fulfillSparkInvoices(sparkInvoices);
+  }
+
+  private async fulfillSparkInvoices(
+    sparkInvoices: {
+      invoice: SparkAddressFormat;
+      amount?: bigint;
+    }[],
+    transferId?: string,
+  ): Promise<FulfillSparkInvoiceResponse> {
     if (!Array.isArray(sparkInvoices) || sparkInvoices.length === 0) {
       throw new SparkValidationError("No Spark invoices provided", {
         field: "sparkInvoices",
@@ -4695,7 +4766,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     }
     if (satsInvoices.length > 0) {
-      const transfers = await this.transferWithInvoice(satsInvoices);
+      const transferParams: TransferWithInvoiceInternalParams[] =
+        transferId && satsInvoices.length === 1
+          ? [{ ...satsInvoices[0]!, transferId }]
+          : satsInvoices;
+      const transfers = await this.transferWithInvoiceInternal(transferParams);
       for (const transfer of transfers) {
         if (transfer.ok) {
           satsTransactionSuccess.push({

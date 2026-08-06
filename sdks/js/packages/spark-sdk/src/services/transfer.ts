@@ -314,12 +314,13 @@ export class BaseTransferService {
   async sendTransferWithKeyTweaks(
     leaves: LeafKeyTweak[],
     sparkInvoice?: SparkAddressFormat,
+    transferId?: string,
   ): Promise<Transfer> {
     if (leaves.length === 0) {
       throw new SparkValidationError("leaves must not be empty");
     }
 
-    const transferID = uuidv7();
+    const transferID = transferId ?? uuidv7();
 
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transferID,

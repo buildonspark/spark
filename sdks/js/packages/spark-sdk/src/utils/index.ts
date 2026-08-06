@@ -18,6 +18,7 @@ export * from "./token-identifier.js";
 export * from "./token-transactions.js";
 export * from "./manifest-signing.js";
 export * from "./transfer_package.js";
+export * from "./transfer-id.js";
 export * from "./transaction.js";
 export * from "./unilateral-exit.js";
 export * from "./xchain-address.js";
