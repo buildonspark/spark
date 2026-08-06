@@ -12,8 +12,8 @@ import {
   type WalletTransfer,
 } from "../types/index.js";
 import { type SparkAddressFormat } from "../utils/address.js";
-import { type IdempotencyOptions } from "../utils/idempotency.js";
 import { type Bech32mTokenIdentifier } from "../utils/token-identifier.js";
+import type { UUID } from "../utils/transfer-id.js";
 import type { SparkWallet } from "./spark-wallet.js";
 
 export type WithdrawParams = {
@@ -55,7 +55,8 @@ export type PayLightningInvoiceParams = {
   maxFeeSats: number;
   preferSpark?: boolean;
   amountSatsToSend?: number;
-} & IdempotencyOptions;
+  transferId?: UUID;
+};
 
 export type TransferParams = {
   amountSats: number;
