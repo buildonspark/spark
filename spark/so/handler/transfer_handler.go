@@ -3388,6 +3388,7 @@ func restoreLeafNodeRefundTxs(ctx context.Context, transferLeaf *ent.TransferLea
 			st.TreeNodeStatusOnChain,
 			st.TreeNodeStatusExited,
 			st.TreeNodeStatusParentExited,
+			st.TreeNodeStatusWatchtowerExited,
 		),
 		enttreenode.RawRefundTxEQ(node.RawRefundTx),
 	}

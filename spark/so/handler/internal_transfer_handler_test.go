@@ -235,6 +235,7 @@ func TestFinalizeTransferCompletesExitedToL1LeafPreservingStatus(t *testing.T) {
 		st.TreeNodeStatusOnChain,
 		st.TreeNodeStatusExited,
 		st.TreeNodeStatusParentExited,
+		st.TreeNodeStatusWatchtowerExited,
 	}
 
 	for _, status := range statuses {
@@ -286,6 +287,7 @@ func TestFinalizeTransferAlreadyCompletedRetryPreservesExitedLeafStatus(t *testi
 		st.TreeNodeStatusOnChain,
 		st.TreeNodeStatusExited,
 		st.TreeNodeStatusParentExited,
+		st.TreeNodeStatusWatchtowerExited,
 	}
 
 	for _, status := range statuses {
@@ -330,6 +332,7 @@ func TestFinalizeTransferReceiverCompletesExitedToL1LeafPreservingStatus(t *test
 		st.TreeNodeStatusOnChain,
 		st.TreeNodeStatusExited,
 		st.TreeNodeStatusParentExited,
+		st.TreeNodeStatusWatchtowerExited,
 	}
 
 	for _, status := range statuses {

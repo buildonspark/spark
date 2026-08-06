@@ -1878,6 +1878,9 @@ enum TreeNodeStatus {
     // is exit-only — not transferable, renewable, or splittable. It may be
     // aggregated further up the tree.
     TREE_NODE_STATUS_CONSOLIDATED = 13;
+    // A node below one whose watchtower transaction confirmed, which spends the
+    // output this node's own transaction claims. Terminal; recovery moves to L1.
+    TREE_NODE_STATUS_WATCHTOWER_EXITED = 14;
 }
 
 message WalletSetting {
