@@ -1,12 +1,15 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"math"
 	"math/rand/v2"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -59,6 +62,166 @@ func createTestInstantReserveSwap(t *testing.T, ctx context.Context, transferSta
 	require.NoError(t, err)
 	require.NoError(t, addUtxoSwapToDepositAddress(ctx, client, depositAddress.ID, utxoSwap))
 	return utxoSwap, transfer, coordinatorPubKey
+}
+
+// createTestInstantSwapWithSignature persists an INSTANT swap at depositAddress
+// carrying sspSignature, optionally bound to a utxo (required by the schema hook
+// for COMPLETED). It returns the create error rather than asserting on it so
+// callers can pin the uniqueness failure.
+func createTestInstantSwapWithSignature(
+	t *testing.T,
+	ctx context.Context,
+	client *ent.Client,
+	depositAddress *ent.DepositAddress,
+	utxo *ent.Utxo,
+	sspSignature []byte,
+	status st.UtxoSwapStatus,
+) error {
+	t.Helper()
+	create := client.UtxoSwap.Create().
+		SetStatus(status).
+		SetRequestType(st.UtxoSwapRequestTypeInstant).
+		SetUtxoValueSats(10_000).
+		SetCreditAmountSats(9_000).
+		SetSspSignature(sspSignature).
+		SetSspIdentityPublicKey(keys.GeneratePrivateKey().Public()).
+		SetUserSignature([]byte("test_user_signature")).
+		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
+		SetCoordinatorIdentityPublicKey(keys.GeneratePrivateKey().Public()).
+		SetRequestedTransferID(uuid.New()).
+		SetConsensusManaged(true)
+	if utxo != nil {
+		create = create.SetUtxo(utxo)
+	}
+	swap, err := create.Save(ctx)
+	if err != nil {
+		return err
+	}
+	return addUtxoSwapToDepositAddress(ctx, client, depositAddress.ID, swap)
+}
+
+// createTestInstantUtxo mirrors createTestUtxo but takes an explicit txid, so a
+// single static deposit address can hold several same-value UTXOs — the state
+// the replay depends on.
+func createTestInstantUtxo(t *testing.T, ctx context.Context, client *ent.Client, depositAddress *ent.DepositAddress, txid []byte) *ent.Utxo {
+	t.Helper()
+	utxo, err := client.Utxo.Create().
+		SetNetwork(btcnetwork.Regtest).
+		SetTxid(txid).
+		SetVout(0).
+		SetBlockHeight(100).
+		SetAmount(10_000).
+		SetPkScript([]byte("test_pk_script")).
+		SetDepositAddress(depositAddress).
+		Save(ctx)
+	require.NoError(t, err)
+	return utxo
+}
+
+func setUpInstantSignatureUniquenessTest(t *testing.T) (context.Context, *ent.Client, *ent.DepositAddress) {
+	t.Helper()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{13})
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(
+		t, ctx, sessionCtx.Client, keyshare,
+		keys.MustGeneratePrivateKeyFromRand(rng).Public(),
+		keys.MustGeneratePrivateKeyFromRand(rng).Public(),
+	)
+	return ctx, sessionCtx.Client, depositAddress
+}
+
+// TestInstantSspSignatureUnique_ReplayAfterCompletedRejected is the SP-3750
+// regression. The instant user statement commits to no txid, so before the
+// uniqueness constraint the same authorization bytes drove a second claim
+// against any other same-value UTXO at the address as soon as the first swap
+// COMPLETEd and freed the (deposit_address, utxo_value_sats) index.
+func TestInstantSspSignatureUnique_ReplayAfterCompletedRejected(t *testing.T) {
+	t.Parallel()
+	ctx, client, depositAddress := setUpInstantSignatureUniquenessTest(t)
+
+	firstUtxo := createTestInstantUtxo(t, ctx, client, depositAddress, bytes.Repeat([]byte{0xa1}, 32))
+	sspSignature := []byte("test_ssp_quote_signature_for_first_deposit")
+	require.NoError(t, createTestInstantSwapWithSignature(
+		t, ctx, client, depositAddress, firstUtxo, sspSignature, st.UtxoSwapStatusCompleted,
+	))
+
+	// The replay reserves against a second same-value UTXO at the address, which
+	// like any real reservation carries no Utxo edge yet.
+	err := createTestInstantSwapWithSignature(
+		t, ctx, client, depositAddress, nil, sspSignature, st.UtxoSwapStatusCreated,
+	)
+	require.ErrorContains(t, err, "utxoswap_ssp_signature")
+}
+
+// TestInstantSspSignatureUnique_CancelledAllowsRetry pins the CANCELLED
+// exclusion: a rolled-back reservation is legitimately retried with the same
+// quote, so those rows must stay outside the constraint.
+func TestInstantSspSignatureUnique_CancelledAllowsRetry(t *testing.T) {
+	t.Parallel()
+	ctx, client, depositAddress := setUpInstantSignatureUniquenessTest(t)
+
+	sspSignature := []byte("test_ssp_quote_signature_retried_after_rollback")
+	require.NoError(t, createTestInstantSwapWithSignature(
+		t, ctx, client, depositAddress, nil, sspSignature, st.UtxoSwapStatusCancelled,
+	))
+	require.NoError(t, createTestInstantSwapWithSignature(
+		t, ctx, client, depositAddress, nil, sspSignature, st.UtxoSwapStatusCreated,
+	))
+}
+
+// TestInstantSspSignatureUnique_ScopedToInstant pins the request_type scope: the
+// fixed and refund paths store a spend tx sighash in ssp_signature, which two
+// different UTXOs of the same spend can legitimately share.
+func TestInstantSspSignatureUnique_ScopedToInstant(t *testing.T) {
+	t.Parallel()
+	ctx, client, depositAddress := setUpInstantSignatureUniquenessTest(t)
+
+	sighash := []byte("test_spend_tx_sighash")
+	for i, requestType := range []st.UtxoSwapRequestType{
+		st.UtxoSwapRequestTypeRefund,
+		st.UtxoSwapRequestTypeFixedAmount,
+	} {
+		// Two UTXOs of the same spend, both carrying that spend's sighash.
+		for j := range 2 {
+			utxo := createTestInstantUtxo(t, ctx, client, depositAddress, bytes.Repeat([]byte{byte(0xc0 + i*2 + j)}, 32))
+			_, err := client.UtxoSwap.Create().
+				SetStatus(st.UtxoSwapStatusCompleted).
+				SetRequestType(requestType).
+				SetUtxo(utxo).
+				SetUtxoValueSats(10_000).
+				SetCreditAmountSats(9_000).
+				SetSspSignature(sighash).
+				SetSspIdentityPublicKey(keys.GeneratePrivateKey().Public()).
+				SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
+				SetCoordinatorIdentityPublicKey(keys.GeneratePrivateKey().Public()).
+				Save(ctx)
+			require.NoError(t, err)
+		}
+	}
+}
+
+// TestValidateInstantUserSignature_RequiresSignatures keeps an empty
+// ssp_signature out of the column: Postgres treats NULLs as distinct, so a NULL
+// row would sit outside the uniqueness constraint entirely.
+func TestValidateInstantUserSignature_RequiresSignatures(t *testing.T) {
+	t.Parallel()
+	userPrivKey := keys.GeneratePrivateKey()
+	sspSignature := []byte("test_ssp_quote_signature")
+	messageHash := CreateInstantUserStatement(btcnetwork.Regtest, 9_000, 0, "bc1ptest_address", 10_000, sspSignature)
+	userSignature := ecdsa.Sign(userPrivKey.ToBTCEC(), messageHash).Serialize()
+
+	validate := func(userSig, sspSig []byte) error {
+		return validateInstantUserSignature(
+			userPrivKey.Public(), userSig, sspSig,
+			btcnetwork.Regtest, 9_000, 0, "bc1ptest_address", 10_000,
+		)
+	}
+
+	require.NoError(t, validate(userSignature, sspSignature))
+	require.ErrorContains(t, validate(nil, sspSignature), "user signature is required")
+	require.ErrorContains(t, validate(userSignature, nil), "ssp signature is required")
+	require.ErrorContains(t, validate(userSignature, []byte{}), "ssp signature is required")
 }
 
 func instantRollbackOpFor(transfer *ent.Transfer) *pbinternal.ReserveInstantStaticDepositUtxoSwapRollbackRequest {

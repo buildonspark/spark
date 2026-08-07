@@ -290,12 +290,14 @@ func TestSaveUtxoForInstantStaticDeposit_UsesTransferIDOverLegacySwapID(t *testi
 	_, err = sessionCtx.Client.DepositAddress.UpdateOneID(depositAddress.ID).AddUtxoswaps(utxoSwap).Save(ctx)
 	require.NoError(t, err)
 
+	// A distinct quote signature, as a second reservation always has in production:
+	// ssp_signature is unique across live INSTANT swaps (SP-3750).
 	otherSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetRequestType(st.UtxoSwapRequestTypeInstant).
 		SetUtxoValueSats(utxo.Amount).
 		SetCreditAmountSats(9000).
-		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspSignature([]byte("other_test_ssp_signature")).
 		SetSspIdentityPublicKey(sspIdentityPubKey).
 		SetUserIdentityPublicKey(userIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
@@ -764,7 +766,7 @@ func TestLinkUtxoSwapTransferRejectsTransferUsedByCompletedSwap(t *testing.T) {
 		SetRequestType(st.UtxoSwapRequestTypeInstant).
 		SetUtxoValueSats(10000).
 		SetCreditAmountSats(9000).
-		SetSspSignature([]byte("test_ssp_signature")).
+		SetSspSignature([]byte("new_test_ssp_signature")).
 		SetSspIdentityPublicKey(sspIdentityPubKey).
 		SetUserIdentityPublicKey(userIdentityPubKey).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
@@ -1003,7 +1005,7 @@ func TestGetTransferFromUtxoSwapRejectsTransferUsedByOtherNonCancelledSwap(t *te
 				SetRequestType(st.UtxoSwapRequestTypeInstant).
 				SetUtxoValueSats(10000).
 				SetCreditAmountSats(9000).
-				SetSspSignature([]byte("test_ssp_signature")).
+				SetSspSignature([]byte("other_test_ssp_signature")).
 				SetSspIdentityPublicKey(sspIdentityPubKey).
 				SetUserIdentityPublicKey(userIdentityPubKey).
 				SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public())
