@@ -1671,6 +1671,274 @@ var _ interface {
 	ErrorName() string
 } = FrostNonceResponseValidationError{}
 
+// Validate checks the field values on SubUserCommitment with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *SubUserCommitment) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SubUserCommitment with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SubUserCommitmentMultiError, or nil if none found.
+func (m *SubUserCommitment) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SubUserCommitment) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Position
+
+	if all {
+		switch v := interface{}(m.GetCommitment()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubUserCommitmentValidationError{
+					field:  "Commitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubUserCommitmentValidationError{
+					field:  "Commitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCommitment()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubUserCommitmentValidationError{
+				field:  "Commitment",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return SubUserCommitmentMultiError(errors)
+	}
+
+	return nil
+}
+
+// SubUserCommitmentMultiError is an error wrapping multiple validation errors
+// returned by SubUserCommitment.ValidateAll() if the designated constraints
+// aren't met.
+type SubUserCommitmentMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SubUserCommitmentMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SubUserCommitmentMultiError) AllErrors() []error { return m }
+
+// SubUserCommitmentValidationError is the validation error returned by
+// SubUserCommitment.Validate if the designated constraints aren't met.
+type SubUserCommitmentValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SubUserCommitmentValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SubUserCommitmentValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SubUserCommitmentValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SubUserCommitmentValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SubUserCommitmentValidationError) ErrorName() string {
+	return "SubUserCommitmentValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SubUserCommitmentValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSubUserCommitment.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SubUserCommitmentValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SubUserCommitmentValidationError{}
+
+// Validate checks the field values on SubUserSignatureShare with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SubUserSignatureShare) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SubUserSignatureShare with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SubUserSignatureShareMultiError, or nil if none found.
+func (m *SubUserSignatureShare) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SubUserSignatureShare) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Position
+
+	if all {
+		switch v := interface{}(m.GetCommitment()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubUserSignatureShareValidationError{
+					field:  "Commitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubUserSignatureShareValidationError{
+					field:  "Commitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCommitment()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubUserSignatureShareValidationError{
+				field:  "Commitment",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for SignatureShare
+
+	if len(errors) > 0 {
+		return SubUserSignatureShareMultiError(errors)
+	}
+
+	return nil
+}
+
+// SubUserSignatureShareMultiError is an error wrapping multiple validation
+// errors returned by SubUserSignatureShare.ValidateAll() if the designated
+// constraints aren't met.
+type SubUserSignatureShareMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SubUserSignatureShareMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SubUserSignatureShareMultiError) AllErrors() []error { return m }
+
+// SubUserSignatureShareValidationError is the validation error returned by
+// SubUserSignatureShare.Validate if the designated constraints aren't met.
+type SubUserSignatureShareValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SubUserSignatureShareValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SubUserSignatureShareValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SubUserSignatureShareValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SubUserSignatureShareValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SubUserSignatureShareValidationError) ErrorName() string {
+	return "SubUserSignatureShareValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SubUserSignatureShareValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSubUserSignatureShare.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SubUserSignatureShareValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SubUserSignatureShareValidationError{}
+
 // Validate checks the field values on FrostSigningJob with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -1833,6 +2101,42 @@ func (m *FrostSigningJob) validate(all bool) error {
 	}
 
 	// no validation rules for AdaptorPublicKey
+
+	// no validation rules for SigningScheme
+
+	for idx, item := range m.GetSubuserCommitments() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FrostSigningJobValidationError{
+						field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FrostSigningJobValidationError{
+						field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FrostSigningJobValidationError{
+					field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return FrostSigningJobMultiError(errors)
@@ -2306,6 +2610,42 @@ func (m *AggregateFrostRequest) validate(all bool) error {
 	// no validation rules for UserSignatureShare
 
 	// no validation rules for AdaptorPublicKey
+
+	// no validation rules for SigningScheme
+
+	for idx, item := range m.GetSubuserShares() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, AggregateFrostRequestValidationError{
+						field:  fmt.Sprintf("SubuserShares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, AggregateFrostRequestValidationError{
+						field:  fmt.Sprintf("SubuserShares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return AggregateFrostRequestValidationError{
+					field:  fmt.Sprintf("SubuserShares[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return AggregateFrostRequestMultiError(errors)

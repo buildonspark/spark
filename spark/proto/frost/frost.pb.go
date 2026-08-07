@@ -70,6 +70,70 @@ func (SigningRole) EnumDescriptor() ([]byte, []int) {
 	return file_frost_proto_rawDescGZIP(), []int{0}
 }
 
+// How the user side of a signing job or aggregation is composed.
+//
+// An explicit discriminant: the signer branches on this value and never
+// infers the scheme from which fields happen to be populated. A request
+// whose populated fields do not match its scheme is rejected.
+type SigningScheme int32
+
+const (
+	// Deployed senders predate this field and send 0; identical semantics to
+	// SIGNING_SCHEME_SINGLE_USER.
+	SigningScheme_SIGNING_SCHEME_UNSPECIFIED SigningScheme = 0
+	// The user side is a single signer: `user_commitments` (and, for
+	// aggregation, `user_public_key` + `user_signature_share`) carry it.
+	// Sub-user fields are absent. Byte behavior is exactly the deployed one.
+	SigningScheme_SIGNING_SCHEME_SINGLE_USER SigningScheme = 1
+	// The user side is a t-of-n FROST group of sub-users: the repeated
+	// sub-user fields carry it, and single-user fields are absent. Binding
+	// factors are computed over both groups' commitments with a one-byte
+	// group tag (0x00 = statechain, 0x01 = user group), so sub-user positions
+	// and statechain identifiers stay independent index spaces.
+	SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP SigningScheme = 2
+)
+
+// Enum value maps for SigningScheme.
+var (
+	SigningScheme_name = map[int32]string{
+		0: "SIGNING_SCHEME_UNSPECIFIED",
+		1: "SIGNING_SCHEME_SINGLE_USER",
+		2: "SIGNING_SCHEME_MPC_USER_GROUP",
+	}
+	SigningScheme_value = map[string]int32{
+		"SIGNING_SCHEME_UNSPECIFIED":    0,
+		"SIGNING_SCHEME_SINGLE_USER":    1,
+		"SIGNING_SCHEME_MPC_USER_GROUP": 2,
+	}
+)
+
+func (x SigningScheme) Enum() *SigningScheme {
+	p := new(SigningScheme)
+	*p = x
+	return p
+}
+
+func (x SigningScheme) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SigningScheme) Descriptor() protoreflect.EnumDescriptor {
+	return file_frost_proto_enumTypes[1].Descriptor()
+}
+
+func (SigningScheme) Type() protoreflect.EnumType {
+	return &file_frost_proto_enumTypes[1]
+}
+
+func (x SigningScheme) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SigningScheme.Descriptor instead.
+func (SigningScheme) EnumDescriptor() ([]byte, []int) {
+	return file_frost_proto_rawDescGZIP(), []int{1}
+}
+
 type EchoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -798,6 +862,130 @@ func (x *FrostNonceResponse) GetResults() []*SigningNonceResult {
 	return nil
 }
 
+// One sub-user's round-1 nonce commitment, for SIGNING_SCHEME_MPC_USER_GROUP.
+type SubUserCommitment struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The sub-user's position in its signing group; its FROST identifier is
+	// the 32-byte big-endian scalar equal to this value. Nonzero.
+	Position uint32 `protobuf:"varint,1,opt,name=position,proto3" json:"position,omitempty"`
+	// The sub-user's round-1 nonce commitment.
+	Commitment    *common.SigningCommitment `protobuf:"bytes,2,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubUserCommitment) Reset() {
+	*x = SubUserCommitment{}
+	mi := &file_frost_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubUserCommitment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubUserCommitment) ProtoMessage() {}
+
+func (x *SubUserCommitment) ProtoReflect() protoreflect.Message {
+	mi := &file_frost_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubUserCommitment.ProtoReflect.Descriptor instead.
+func (*SubUserCommitment) Descriptor() ([]byte, []int) {
+	return file_frost_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SubUserCommitment) GetPosition() uint32 {
+	if x != nil {
+		return x.Position
+	}
+	return 0
+}
+
+func (x *SubUserCommitment) GetCommitment() *common.SigningCommitment {
+	if x != nil {
+		return x.Commitment
+	}
+	return nil
+}
+
+// One sub-user's round-1 nonce commitment and round-2 signature share, for
+// SIGNING_SCHEME_MPC_USER_GROUP aggregation.
+type SubUserSignatureShare struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The sub-user's position in its signing group; its FROST identifier is
+	// the 32-byte big-endian scalar equal to this value. Nonzero.
+	Position uint32 `protobuf:"varint,1,opt,name=position,proto3" json:"position,omitempty"`
+	// The sub-user's round-1 nonce commitment.
+	Commitment *common.SigningCommitment `protobuf:"bytes,2,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	// The complete FROST round-2 share z_i as a 32-byte scalar, with the
+	// within-group Lagrange coefficient already applied by the sub-user;
+	// aggregation only sums shares.
+	SignatureShare []byte `protobuf:"bytes,3,opt,name=signature_share,json=signatureShare,proto3" json:"signature_share,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SubUserSignatureShare) Reset() {
+	*x = SubUserSignatureShare{}
+	mi := &file_frost_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubUserSignatureShare) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubUserSignatureShare) ProtoMessage() {}
+
+func (x *SubUserSignatureShare) ProtoReflect() protoreflect.Message {
+	mi := &file_frost_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubUserSignatureShare.ProtoReflect.Descriptor instead.
+func (*SubUserSignatureShare) Descriptor() ([]byte, []int) {
+	return file_frost_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SubUserSignatureShare) GetPosition() uint32 {
+	if x != nil {
+		return x.Position
+	}
+	return 0
+}
+
+func (x *SubUserSignatureShare) GetCommitment() *common.SigningCommitment {
+	if x != nil {
+		return x.Commitment
+	}
+	return nil
+}
+
+func (x *SubUserSignatureShare) GetSignatureShare() []byte {
+	if x != nil {
+		return x.SignatureShare
+	}
+	return nil
+}
+
 type FrostSigningJob struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The unique identifier for the signing job.
@@ -812,17 +1000,27 @@ type FrostSigningJob struct {
 	Nonce *SigningNonce `protobuf:"bytes,5,opt,name=nonce,proto3" json:"nonce,omitempty"`
 	// The commitments for all participants of the statechain.
 	Commitments map[string]*common.SigningCommitment `protobuf:"bytes,6,rep,name=commitments,proto3" json:"commitments,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// The commitments for all participants of the user.
+	// The commitments for all participants of the user. Absent with
+	// SIGNING_SCHEME_MPC_USER_GROUP; optional under the single-user schemes,
+	// where a job without it is signed by the statechain participants alone.
 	UserCommitments *common.SigningCommitment `protobuf:"bytes,7,opt,name=user_commitments,json=userCommitments,proto3" json:"user_commitments,omitempty"`
 	// Adaptor public key for adaptor signature
 	AdaptorPublicKey []byte `protobuf:"bytes,8,opt,name=adaptor_public_key,json=adaptorPublicKey,proto3" json:"adaptor_public_key,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The signing scheme discriminant; see SigningScheme.
+	SigningScheme SigningScheme `protobuf:"varint,9,opt,name=signing_scheme,json=signingScheme,proto3,enum=frost.SigningScheme" json:"signing_scheme,omitempty"`
+	// The user group's round-1 commitments, one entry per participating
+	// sub-user, positions ascending and unique. Present exactly when the
+	// scheme is SIGNING_SCHEME_MPC_USER_GROUP: this participant's own round-2
+	// share then binds both groups' commitments. Adaptor signatures are not
+	// supported in this scheme.
+	SubuserCommitments []*SubUserCommitment `protobuf:"bytes,10,rep,name=subuser_commitments,json=subuserCommitments,proto3" json:"subuser_commitments,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *FrostSigningJob) Reset() {
 	*x = FrostSigningJob{}
-	mi := &file_frost_proto_msgTypes[13]
+	mi := &file_frost_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +1032,7 @@ func (x *FrostSigningJob) String() string {
 func (*FrostSigningJob) ProtoMessage() {}
 
 func (x *FrostSigningJob) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[13]
+	mi := &file_frost_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +1045,7 @@ func (x *FrostSigningJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrostSigningJob.ProtoReflect.Descriptor instead.
 func (*FrostSigningJob) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{13}
+	return file_frost_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FrostSigningJob) GetJobId() string {
@@ -906,6 +1104,20 @@ func (x *FrostSigningJob) GetAdaptorPublicKey() []byte {
 	return nil
 }
 
+func (x *FrostSigningJob) GetSigningScheme() SigningScheme {
+	if x != nil {
+		return x.SigningScheme
+	}
+	return SigningScheme_SIGNING_SCHEME_UNSPECIFIED
+}
+
+func (x *FrostSigningJob) GetSubuserCommitments() []*SubUserCommitment {
+	if x != nil {
+		return x.SubuserCommitments
+	}
+	return nil
+}
+
 // Signing request
 //
 // This request is sent to the server for the signing.
@@ -921,7 +1133,7 @@ type SignFrostRequest struct {
 
 func (x *SignFrostRequest) Reset() {
 	*x = SignFrostRequest{}
-	mi := &file_frost_proto_msgTypes[14]
+	mi := &file_frost_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -933,7 +1145,7 @@ func (x *SignFrostRequest) String() string {
 func (*SignFrostRequest) ProtoMessage() {}
 
 func (x *SignFrostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[14]
+	mi := &file_frost_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -946,7 +1158,7 @@ func (x *SignFrostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignFrostRequest.ProtoReflect.Descriptor instead.
 func (*SignFrostRequest) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{14}
+	return file_frost_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SignFrostRequest) GetSigningJobs() []*FrostSigningJob {
@@ -976,7 +1188,7 @@ type SignFrostResponse struct {
 
 func (x *SignFrostResponse) Reset() {
 	*x = SignFrostResponse{}
-	mi := &file_frost_proto_msgTypes[15]
+	mi := &file_frost_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -988,7 +1200,7 @@ func (x *SignFrostResponse) String() string {
 func (*SignFrostResponse) ProtoMessage() {}
 
 func (x *SignFrostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[15]
+	mi := &file_frost_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1001,7 +1213,7 @@ func (x *SignFrostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignFrostResponse.ProtoReflect.Descriptor instead.
 func (*SignFrostResponse) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{15}
+	return file_frost_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SignFrostResponse) GetResults() map[string]*common.SigningResult {
@@ -1034,13 +1246,23 @@ type AggregateFrostRequest struct {
 	UserSignatureShare []byte `protobuf:"bytes,8,opt,name=user_signature_share,json=userSignatureShare,proto3" json:"user_signature_share,omitempty"`
 	// Adaptor public key for adaptor signature
 	AdaptorPublicKey []byte `protobuf:"bytes,9,opt,name=adaptor_public_key,json=adaptorPublicKey,proto3" json:"adaptor_public_key,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The signing scheme discriminant; see SigningScheme.
+	SigningScheme SigningScheme `protobuf:"varint,10,opt,name=signing_scheme,json=signingScheme,proto3,enum=frost.SigningScheme" json:"signing_scheme,omitempty"`
+	// The user group's contributions, one entry per participating sub-user,
+	// positions ascending and unique. Present exactly when the scheme is
+	// SIGNING_SCHEME_MPC_USER_GROUP; `user_commitments`, `user_public_key`,
+	// and `user_signature_share` are then absent. Sub-user verifying shares
+	// are not on the wire: a bad sub-user share is detected by the aggregate
+	// verification, without per-position blame. Adaptor signatures are not
+	// supported in this scheme.
+	SubuserShares []*SubUserSignatureShare `protobuf:"bytes,11,rep,name=subuser_shares,json=subuserShares,proto3" json:"subuser_shares,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AggregateFrostRequest) Reset() {
 	*x = AggregateFrostRequest{}
-	mi := &file_frost_proto_msgTypes[16]
+	mi := &file_frost_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1052,7 +1274,7 @@ func (x *AggregateFrostRequest) String() string {
 func (*AggregateFrostRequest) ProtoMessage() {}
 
 func (x *AggregateFrostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[16]
+	mi := &file_frost_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1065,7 +1287,7 @@ func (x *AggregateFrostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateFrostRequest.ProtoReflect.Descriptor instead.
 func (*AggregateFrostRequest) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{16}
+	return file_frost_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AggregateFrostRequest) GetMessage() []byte {
@@ -1131,6 +1353,20 @@ func (x *AggregateFrostRequest) GetAdaptorPublicKey() []byte {
 	return nil
 }
 
+func (x *AggregateFrostRequest) GetSigningScheme() SigningScheme {
+	if x != nil {
+		return x.SigningScheme
+	}
+	return SigningScheme_SIGNING_SCHEME_UNSPECIFIED
+}
+
+func (x *AggregateFrostRequest) GetSubuserShares() []*SubUserSignatureShare {
+	if x != nil {
+		return x.SubuserShares
+	}
+	return nil
+}
+
 // Aggregate frost response
 //
 // This response is sent from the server to the client after the aggregate signing has been completed.
@@ -1144,7 +1380,7 @@ type AggregateFrostResponse struct {
 
 func (x *AggregateFrostResponse) Reset() {
 	*x = AggregateFrostResponse{}
-	mi := &file_frost_proto_msgTypes[17]
+	mi := &file_frost_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1156,7 +1392,7 @@ func (x *AggregateFrostResponse) String() string {
 func (*AggregateFrostResponse) ProtoMessage() {}
 
 func (x *AggregateFrostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[17]
+	mi := &file_frost_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1169,7 +1405,7 @@ func (x *AggregateFrostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateFrostResponse.ProtoReflect.Descriptor instead.
 func (*AggregateFrostResponse) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{17}
+	return file_frost_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AggregateFrostResponse) GetSignature() []byte {
@@ -1192,7 +1428,7 @@ type AggregateFrostJob struct {
 
 func (x *AggregateFrostJob) Reset() {
 	*x = AggregateFrostJob{}
-	mi := &file_frost_proto_msgTypes[18]
+	mi := &file_frost_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1204,7 +1440,7 @@ func (x *AggregateFrostJob) String() string {
 func (*AggregateFrostJob) ProtoMessage() {}
 
 func (x *AggregateFrostJob) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[18]
+	mi := &file_frost_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,7 +1453,7 @@ func (x *AggregateFrostJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateFrostJob.ProtoReflect.Descriptor instead.
 func (*AggregateFrostJob) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{18}
+	return file_frost_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *AggregateFrostJob) GetJobId() string {
@@ -1248,7 +1484,7 @@ type AggregateFrostBatchRequest struct {
 
 func (x *AggregateFrostBatchRequest) Reset() {
 	*x = AggregateFrostBatchRequest{}
-	mi := &file_frost_proto_msgTypes[19]
+	mi := &file_frost_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1260,7 +1496,7 @@ func (x *AggregateFrostBatchRequest) String() string {
 func (*AggregateFrostBatchRequest) ProtoMessage() {}
 
 func (x *AggregateFrostBatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[19]
+	mi := &file_frost_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1273,7 +1509,7 @@ func (x *AggregateFrostBatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateFrostBatchRequest.ProtoReflect.Descriptor instead.
 func (*AggregateFrostBatchRequest) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{19}
+	return file_frost_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AggregateFrostBatchRequest) GetJobs() []*AggregateFrostJob {
@@ -1294,7 +1530,7 @@ type AggregateFrostBatchResponse struct {
 
 func (x *AggregateFrostBatchResponse) Reset() {
 	*x = AggregateFrostBatchResponse{}
-	mi := &file_frost_proto_msgTypes[20]
+	mi := &file_frost_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1306,7 +1542,7 @@ func (x *AggregateFrostBatchResponse) String() string {
 func (*AggregateFrostBatchResponse) ProtoMessage() {}
 
 func (x *AggregateFrostBatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[20]
+	mi := &file_frost_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1319,7 +1555,7 @@ func (x *AggregateFrostBatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateFrostBatchResponse.ProtoReflect.Descriptor instead.
 func (*AggregateFrostBatchResponse) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{20}
+	return file_frost_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AggregateFrostBatchResponse) GetResults() map[string]*AggregateFrostResponse {
@@ -1353,7 +1589,7 @@ type ValidateSignatureShareRequest struct {
 
 func (x *ValidateSignatureShareRequest) Reset() {
 	*x = ValidateSignatureShareRequest{}
-	mi := &file_frost_proto_msgTypes[21]
+	mi := &file_frost_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1365,7 +1601,7 @@ func (x *ValidateSignatureShareRequest) String() string {
 func (*ValidateSignatureShareRequest) ProtoMessage() {}
 
 func (x *ValidateSignatureShareRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_frost_proto_msgTypes[21]
+	mi := &file_frost_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1378,7 +1614,7 @@ func (x *ValidateSignatureShareRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateSignatureShareRequest.ProtoReflect.Descriptor instead.
 func (*ValidateSignatureShareRequest) Descriptor() ([]byte, []int) {
-	return file_frost_proto_rawDescGZIP(), []int{21}
+	return file_frost_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ValidateSignatureShareRequest) GetIdentifier() string {
@@ -1495,7 +1731,18 @@ const file_frost_proto_rawDesc = "" +
 	"\x06nonces\x18\x01 \x01(\v2\x13.frost.SigningNonceR\x06nonces\x12;\n" +
 	"\vcommitments\x18\x02 \x01(\v2\x19.common.SigningCommitmentR\vcommitments\"I\n" +
 	"\x12FrostNonceResponse\x123\n" +
-	"\aresults\x18\x01 \x03(\v2\x19.frost.SigningNonceResultR\aresults\"\xe0\x03\n" +
+	"\aresults\x18\x01 \x03(\v2\x19.frost.SigningNonceResultR\aresults\"j\n" +
+	"\x11SubUserCommitment\x12\x1a\n" +
+	"\bposition\x18\x01 \x01(\rR\bposition\x129\n" +
+	"\n" +
+	"commitment\x18\x02 \x01(\v2\x19.common.SigningCommitmentR\n" +
+	"commitment\"\x97\x01\n" +
+	"\x15SubUserSignatureShare\x12\x1a\n" +
+	"\bposition\x18\x01 \x01(\rR\bposition\x129\n" +
+	"\n" +
+	"commitment\x18\x02 \x01(\v2\x19.common.SigningCommitmentR\n" +
+	"commitment\x12'\n" +
+	"\x0fsignature_share\x18\x03 \x01(\fR\x0esignatureShare\"\xe8\x04\n" +
 	"\x0fFrostSigningJob\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\fR\amessage\x122\n" +
@@ -1505,7 +1752,10 @@ const file_frost_proto_rawDesc = "" +
 	"\x05nonce\x18\x05 \x01(\v2\x13.frost.SigningNonceR\x05nonce\x12I\n" +
 	"\vcommitments\x18\x06 \x03(\v2'.frost.FrostSigningJob.CommitmentsEntryR\vcommitments\x12D\n" +
 	"\x10user_commitments\x18\a \x01(\v2\x19.common.SigningCommitmentR\x0fuserCommitments\x12,\n" +
-	"\x12adaptor_public_key\x18\b \x01(\fR\x10adaptorPublicKey\x1aY\n" +
+	"\x12adaptor_public_key\x18\b \x01(\fR\x10adaptorPublicKey\x12;\n" +
+	"\x0esigning_scheme\x18\t \x01(\x0e2\x14.frost.SigningSchemeR\rsigningScheme\x12I\n" +
+	"\x13subuser_commitments\x18\n" +
+	" \x03(\v2\x18.frost.SubUserCommitmentR\x12subuserCommitments\x1aY\n" +
 	"\x10CommitmentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12/\n" +
 	"\x05value\x18\x02 \x01(\v2\x19.common.SigningCommitmentR\x05value:\x028\x01\"u\n" +
@@ -1516,7 +1766,7 @@ const file_frost_proto_rawDesc = "" +
 	"\aresults\x18\x01 \x03(\v2%.frost.SignFrostResponse.ResultsEntryR\aresults\x1aQ\n" +
 	"\fResultsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
-	"\x05value\x18\x02 \x01(\v2\x15.common.SigningResultR\x05value:\x028\x01\"\x88\x06\n" +
+	"\x05value\x18\x02 \x01(\v2\x15.common.SigningResultR\x05value:\x028\x01\"\x8a\a\n" +
 	"\x15AggregateFrostRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\fR\amessage\x12\\\n" +
 	"\x10signature_shares\x18\x02 \x03(\v21.frost.AggregateFrostRequest.SignatureSharesEntryR\x0fsignatureShares\x12S\n" +
@@ -1526,7 +1776,10 @@ const file_frost_proto_rawDesc = "" +
 	"\x10user_commitments\x18\x06 \x01(\v2\x19.common.SigningCommitmentR\x0fuserCommitments\x12&\n" +
 	"\x0fuser_public_key\x18\a \x01(\fR\ruserPublicKey\x120\n" +
 	"\x14user_signature_share\x18\b \x01(\fR\x12userSignatureShare\x12,\n" +
-	"\x12adaptor_public_key\x18\t \x01(\fR\x10adaptorPublicKey\x1aB\n" +
+	"\x12adaptor_public_key\x18\t \x01(\fR\x10adaptorPublicKey\x12;\n" +
+	"\x0esigning_scheme\x18\n" +
+	" \x01(\x0e2\x14.frost.SigningSchemeR\rsigningScheme\x12C\n" +
+	"\x0esubuser_shares\x18\v \x03(\v2\x1c.frost.SubUserSignatureShareR\rsubuserShares\x1aB\n" +
 	"\x14SignatureSharesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\x1a?\n" +
@@ -1565,7 +1818,11 @@ const file_frost_proto_rawDesc = "" +
 	"\vSigningRole\x12\x0e\n" +
 	"\n" +
 	"STATECHAIN\x10\x00\x12\b\n" +
-	"\x04USER\x10\x012\xa3\x05\n" +
+	"\x04USER\x10\x01*r\n" +
+	"\rSigningScheme\x12\x1e\n" +
+	"\x1aSIGNING_SCHEME_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aSIGNING_SCHEME_SINGLE_USER\x10\x01\x12!\n" +
+	"\x1dSIGNING_SCHEME_MPC_USER_GROUP\x10\x022\xa3\x05\n" +
 	"\fFrostService\x121\n" +
 	"\x04echo\x12\x12.frost.EchoRequest\x1a\x13.frost.EchoResponse\"\x00\x12A\n" +
 	"\n" +
@@ -1593,101 +1850,110 @@ func file_frost_proto_rawDescGZIP() []byte {
 	return file_frost_proto_rawDescData
 }
 
-var file_frost_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_frost_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_frost_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_frost_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_frost_proto_goTypes = []any{
 	(SigningRole)(0),                      // 0: frost.SigningRole
-	(*EchoRequest)(nil),                   // 1: frost.EchoRequest
-	(*EchoResponse)(nil),                  // 2: frost.EchoResponse
-	(*DkgRound1Request)(nil),              // 3: frost.DkgRound1Request
-	(*DkgRound1Response)(nil),             // 4: frost.DkgRound1Response
-	(*DkgRound2Request)(nil),              // 5: frost.DkgRound2Request
-	(*DkgRound2Response)(nil),             // 6: frost.DkgRound2Response
-	(*DkgRound3Request)(nil),              // 7: frost.DkgRound3Request
-	(*KeyPackage)(nil),                    // 8: frost.KeyPackage
-	(*DkgRound3Response)(nil),             // 9: frost.DkgRound3Response
-	(*SigningNonce)(nil),                  // 10: frost.SigningNonce
-	(*FrostNonceRequest)(nil),             // 11: frost.FrostNonceRequest
-	(*SigningNonceResult)(nil),            // 12: frost.SigningNonceResult
-	(*FrostNonceResponse)(nil),            // 13: frost.FrostNonceResponse
-	(*FrostSigningJob)(nil),               // 14: frost.FrostSigningJob
-	(*SignFrostRequest)(nil),              // 15: frost.SignFrostRequest
-	(*SignFrostResponse)(nil),             // 16: frost.SignFrostResponse
-	(*AggregateFrostRequest)(nil),         // 17: frost.AggregateFrostRequest
-	(*AggregateFrostResponse)(nil),        // 18: frost.AggregateFrostResponse
-	(*AggregateFrostJob)(nil),             // 19: frost.AggregateFrostJob
-	(*AggregateFrostBatchRequest)(nil),    // 20: frost.AggregateFrostBatchRequest
-	(*AggregateFrostBatchResponse)(nil),   // 21: frost.AggregateFrostBatchResponse
-	(*ValidateSignatureShareRequest)(nil), // 22: frost.ValidateSignatureShareRequest
-	nil,                                   // 23: frost.KeyPackage.PublicSharesEntry
-	nil,                                   // 24: frost.FrostSigningJob.CommitmentsEntry
-	nil,                                   // 25: frost.SignFrostResponse.ResultsEntry
-	nil,                                   // 26: frost.AggregateFrostRequest.SignatureSharesEntry
-	nil,                                   // 27: frost.AggregateFrostRequest.PublicSharesEntry
-	nil,                                   // 28: frost.AggregateFrostRequest.CommitmentsEntry
-	nil,                                   // 29: frost.AggregateFrostBatchResponse.ResultsEntry
-	nil,                                   // 30: frost.ValidateSignatureShareRequest.CommitmentsEntry
-	(*common.PackageMap)(nil),             // 31: common.PackageMap
-	(*common.SigningCommitment)(nil),      // 32: common.SigningCommitment
-	(*common.SigningResult)(nil),          // 33: common.SigningResult
-	(*emptypb.Empty)(nil),                 // 34: google.protobuf.Empty
+	(SigningScheme)(0),                    // 1: frost.SigningScheme
+	(*EchoRequest)(nil),                   // 2: frost.EchoRequest
+	(*EchoResponse)(nil),                  // 3: frost.EchoResponse
+	(*DkgRound1Request)(nil),              // 4: frost.DkgRound1Request
+	(*DkgRound1Response)(nil),             // 5: frost.DkgRound1Response
+	(*DkgRound2Request)(nil),              // 6: frost.DkgRound2Request
+	(*DkgRound2Response)(nil),             // 7: frost.DkgRound2Response
+	(*DkgRound3Request)(nil),              // 8: frost.DkgRound3Request
+	(*KeyPackage)(nil),                    // 9: frost.KeyPackage
+	(*DkgRound3Response)(nil),             // 10: frost.DkgRound3Response
+	(*SigningNonce)(nil),                  // 11: frost.SigningNonce
+	(*FrostNonceRequest)(nil),             // 12: frost.FrostNonceRequest
+	(*SigningNonceResult)(nil),            // 13: frost.SigningNonceResult
+	(*FrostNonceResponse)(nil),            // 14: frost.FrostNonceResponse
+	(*SubUserCommitment)(nil),             // 15: frost.SubUserCommitment
+	(*SubUserSignatureShare)(nil),         // 16: frost.SubUserSignatureShare
+	(*FrostSigningJob)(nil),               // 17: frost.FrostSigningJob
+	(*SignFrostRequest)(nil),              // 18: frost.SignFrostRequest
+	(*SignFrostResponse)(nil),             // 19: frost.SignFrostResponse
+	(*AggregateFrostRequest)(nil),         // 20: frost.AggregateFrostRequest
+	(*AggregateFrostResponse)(nil),        // 21: frost.AggregateFrostResponse
+	(*AggregateFrostJob)(nil),             // 22: frost.AggregateFrostJob
+	(*AggregateFrostBatchRequest)(nil),    // 23: frost.AggregateFrostBatchRequest
+	(*AggregateFrostBatchResponse)(nil),   // 24: frost.AggregateFrostBatchResponse
+	(*ValidateSignatureShareRequest)(nil), // 25: frost.ValidateSignatureShareRequest
+	nil,                                   // 26: frost.KeyPackage.PublicSharesEntry
+	nil,                                   // 27: frost.FrostSigningJob.CommitmentsEntry
+	nil,                                   // 28: frost.SignFrostResponse.ResultsEntry
+	nil,                                   // 29: frost.AggregateFrostRequest.SignatureSharesEntry
+	nil,                                   // 30: frost.AggregateFrostRequest.PublicSharesEntry
+	nil,                                   // 31: frost.AggregateFrostRequest.CommitmentsEntry
+	nil,                                   // 32: frost.AggregateFrostBatchResponse.ResultsEntry
+	nil,                                   // 33: frost.ValidateSignatureShareRequest.CommitmentsEntry
+	(*common.PackageMap)(nil),             // 34: common.PackageMap
+	(*common.SigningCommitment)(nil),      // 35: common.SigningCommitment
+	(*common.SigningResult)(nil),          // 36: common.SigningResult
+	(*emptypb.Empty)(nil),                 // 37: google.protobuf.Empty
 }
 var file_frost_proto_depIdxs = []int32{
-	31, // 0: frost.DkgRound2Request.round1_packages_maps:type_name -> common.PackageMap
-	31, // 1: frost.DkgRound2Response.round2_packages:type_name -> common.PackageMap
-	31, // 2: frost.DkgRound3Request.round1_packages_maps:type_name -> common.PackageMap
-	31, // 3: frost.DkgRound3Request.round2_packages_maps:type_name -> common.PackageMap
-	23, // 4: frost.KeyPackage.public_shares:type_name -> frost.KeyPackage.PublicSharesEntry
-	8,  // 5: frost.DkgRound3Response.key_packages:type_name -> frost.KeyPackage
-	8,  // 6: frost.FrostNonceRequest.key_packages:type_name -> frost.KeyPackage
-	10, // 7: frost.SigningNonceResult.nonces:type_name -> frost.SigningNonce
-	32, // 8: frost.SigningNonceResult.commitments:type_name -> common.SigningCommitment
-	12, // 9: frost.FrostNonceResponse.results:type_name -> frost.SigningNonceResult
-	8,  // 10: frost.FrostSigningJob.key_package:type_name -> frost.KeyPackage
-	10, // 11: frost.FrostSigningJob.nonce:type_name -> frost.SigningNonce
-	24, // 12: frost.FrostSigningJob.commitments:type_name -> frost.FrostSigningJob.CommitmentsEntry
-	32, // 13: frost.FrostSigningJob.user_commitments:type_name -> common.SigningCommitment
-	14, // 14: frost.SignFrostRequest.signing_jobs:type_name -> frost.FrostSigningJob
-	0,  // 15: frost.SignFrostRequest.role:type_name -> frost.SigningRole
-	25, // 16: frost.SignFrostResponse.results:type_name -> frost.SignFrostResponse.ResultsEntry
-	26, // 17: frost.AggregateFrostRequest.signature_shares:type_name -> frost.AggregateFrostRequest.SignatureSharesEntry
-	27, // 18: frost.AggregateFrostRequest.public_shares:type_name -> frost.AggregateFrostRequest.PublicSharesEntry
-	28, // 19: frost.AggregateFrostRequest.commitments:type_name -> frost.AggregateFrostRequest.CommitmentsEntry
-	32, // 20: frost.AggregateFrostRequest.user_commitments:type_name -> common.SigningCommitment
-	17, // 21: frost.AggregateFrostJob.request:type_name -> frost.AggregateFrostRequest
-	19, // 22: frost.AggregateFrostBatchRequest.jobs:type_name -> frost.AggregateFrostJob
-	29, // 23: frost.AggregateFrostBatchResponse.results:type_name -> frost.AggregateFrostBatchResponse.ResultsEntry
-	0,  // 24: frost.ValidateSignatureShareRequest.role:type_name -> frost.SigningRole
-	30, // 25: frost.ValidateSignatureShareRequest.commitments:type_name -> frost.ValidateSignatureShareRequest.CommitmentsEntry
-	32, // 26: frost.ValidateSignatureShareRequest.user_commitments:type_name -> common.SigningCommitment
-	32, // 27: frost.FrostSigningJob.CommitmentsEntry.value:type_name -> common.SigningCommitment
-	33, // 28: frost.SignFrostResponse.ResultsEntry.value:type_name -> common.SigningResult
-	32, // 29: frost.AggregateFrostRequest.CommitmentsEntry.value:type_name -> common.SigningCommitment
-	18, // 30: frost.AggregateFrostBatchResponse.ResultsEntry.value:type_name -> frost.AggregateFrostResponse
-	32, // 31: frost.ValidateSignatureShareRequest.CommitmentsEntry.value:type_name -> common.SigningCommitment
-	1,  // 32: frost.FrostService.echo:input_type -> frost.EchoRequest
-	3,  // 33: frost.FrostService.dkg_round1:input_type -> frost.DkgRound1Request
-	5,  // 34: frost.FrostService.dkg_round2:input_type -> frost.DkgRound2Request
-	7,  // 35: frost.FrostService.dkg_round3:input_type -> frost.DkgRound3Request
-	11, // 36: frost.FrostService.frost_nonce:input_type -> frost.FrostNonceRequest
-	15, // 37: frost.FrostService.sign_frost:input_type -> frost.SignFrostRequest
-	17, // 38: frost.FrostService.aggregate_frost:input_type -> frost.AggregateFrostRequest
-	20, // 39: frost.FrostService.aggregate_frost_batch:input_type -> frost.AggregateFrostBatchRequest
-	22, // 40: frost.FrostService.validate_signature_share:input_type -> frost.ValidateSignatureShareRequest
-	2,  // 41: frost.FrostService.echo:output_type -> frost.EchoResponse
-	4,  // 42: frost.FrostService.dkg_round1:output_type -> frost.DkgRound1Response
-	6,  // 43: frost.FrostService.dkg_round2:output_type -> frost.DkgRound2Response
-	9,  // 44: frost.FrostService.dkg_round3:output_type -> frost.DkgRound3Response
-	13, // 45: frost.FrostService.frost_nonce:output_type -> frost.FrostNonceResponse
-	16, // 46: frost.FrostService.sign_frost:output_type -> frost.SignFrostResponse
-	18, // 47: frost.FrostService.aggregate_frost:output_type -> frost.AggregateFrostResponse
-	21, // 48: frost.FrostService.aggregate_frost_batch:output_type -> frost.AggregateFrostBatchResponse
-	34, // 49: frost.FrostService.validate_signature_share:output_type -> google.protobuf.Empty
-	41, // [41:50] is the sub-list for method output_type
-	32, // [32:41] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	34, // 0: frost.DkgRound2Request.round1_packages_maps:type_name -> common.PackageMap
+	34, // 1: frost.DkgRound2Response.round2_packages:type_name -> common.PackageMap
+	34, // 2: frost.DkgRound3Request.round1_packages_maps:type_name -> common.PackageMap
+	34, // 3: frost.DkgRound3Request.round2_packages_maps:type_name -> common.PackageMap
+	26, // 4: frost.KeyPackage.public_shares:type_name -> frost.KeyPackage.PublicSharesEntry
+	9,  // 5: frost.DkgRound3Response.key_packages:type_name -> frost.KeyPackage
+	9,  // 6: frost.FrostNonceRequest.key_packages:type_name -> frost.KeyPackage
+	11, // 7: frost.SigningNonceResult.nonces:type_name -> frost.SigningNonce
+	35, // 8: frost.SigningNonceResult.commitments:type_name -> common.SigningCommitment
+	13, // 9: frost.FrostNonceResponse.results:type_name -> frost.SigningNonceResult
+	35, // 10: frost.SubUserCommitment.commitment:type_name -> common.SigningCommitment
+	35, // 11: frost.SubUserSignatureShare.commitment:type_name -> common.SigningCommitment
+	9,  // 12: frost.FrostSigningJob.key_package:type_name -> frost.KeyPackage
+	11, // 13: frost.FrostSigningJob.nonce:type_name -> frost.SigningNonce
+	27, // 14: frost.FrostSigningJob.commitments:type_name -> frost.FrostSigningJob.CommitmentsEntry
+	35, // 15: frost.FrostSigningJob.user_commitments:type_name -> common.SigningCommitment
+	1,  // 16: frost.FrostSigningJob.signing_scheme:type_name -> frost.SigningScheme
+	15, // 17: frost.FrostSigningJob.subuser_commitments:type_name -> frost.SubUserCommitment
+	17, // 18: frost.SignFrostRequest.signing_jobs:type_name -> frost.FrostSigningJob
+	0,  // 19: frost.SignFrostRequest.role:type_name -> frost.SigningRole
+	28, // 20: frost.SignFrostResponse.results:type_name -> frost.SignFrostResponse.ResultsEntry
+	29, // 21: frost.AggregateFrostRequest.signature_shares:type_name -> frost.AggregateFrostRequest.SignatureSharesEntry
+	30, // 22: frost.AggregateFrostRequest.public_shares:type_name -> frost.AggregateFrostRequest.PublicSharesEntry
+	31, // 23: frost.AggregateFrostRequest.commitments:type_name -> frost.AggregateFrostRequest.CommitmentsEntry
+	35, // 24: frost.AggregateFrostRequest.user_commitments:type_name -> common.SigningCommitment
+	1,  // 25: frost.AggregateFrostRequest.signing_scheme:type_name -> frost.SigningScheme
+	16, // 26: frost.AggregateFrostRequest.subuser_shares:type_name -> frost.SubUserSignatureShare
+	20, // 27: frost.AggregateFrostJob.request:type_name -> frost.AggregateFrostRequest
+	22, // 28: frost.AggregateFrostBatchRequest.jobs:type_name -> frost.AggregateFrostJob
+	32, // 29: frost.AggregateFrostBatchResponse.results:type_name -> frost.AggregateFrostBatchResponse.ResultsEntry
+	0,  // 30: frost.ValidateSignatureShareRequest.role:type_name -> frost.SigningRole
+	33, // 31: frost.ValidateSignatureShareRequest.commitments:type_name -> frost.ValidateSignatureShareRequest.CommitmentsEntry
+	35, // 32: frost.ValidateSignatureShareRequest.user_commitments:type_name -> common.SigningCommitment
+	35, // 33: frost.FrostSigningJob.CommitmentsEntry.value:type_name -> common.SigningCommitment
+	36, // 34: frost.SignFrostResponse.ResultsEntry.value:type_name -> common.SigningResult
+	35, // 35: frost.AggregateFrostRequest.CommitmentsEntry.value:type_name -> common.SigningCommitment
+	21, // 36: frost.AggregateFrostBatchResponse.ResultsEntry.value:type_name -> frost.AggregateFrostResponse
+	35, // 37: frost.ValidateSignatureShareRequest.CommitmentsEntry.value:type_name -> common.SigningCommitment
+	2,  // 38: frost.FrostService.echo:input_type -> frost.EchoRequest
+	4,  // 39: frost.FrostService.dkg_round1:input_type -> frost.DkgRound1Request
+	6,  // 40: frost.FrostService.dkg_round2:input_type -> frost.DkgRound2Request
+	8,  // 41: frost.FrostService.dkg_round3:input_type -> frost.DkgRound3Request
+	12, // 42: frost.FrostService.frost_nonce:input_type -> frost.FrostNonceRequest
+	18, // 43: frost.FrostService.sign_frost:input_type -> frost.SignFrostRequest
+	20, // 44: frost.FrostService.aggregate_frost:input_type -> frost.AggregateFrostRequest
+	23, // 45: frost.FrostService.aggregate_frost_batch:input_type -> frost.AggregateFrostBatchRequest
+	25, // 46: frost.FrostService.validate_signature_share:input_type -> frost.ValidateSignatureShareRequest
+	3,  // 47: frost.FrostService.echo:output_type -> frost.EchoResponse
+	5,  // 48: frost.FrostService.dkg_round1:output_type -> frost.DkgRound1Response
+	7,  // 49: frost.FrostService.dkg_round2:output_type -> frost.DkgRound2Response
+	10, // 50: frost.FrostService.dkg_round3:output_type -> frost.DkgRound3Response
+	14, // 51: frost.FrostService.frost_nonce:output_type -> frost.FrostNonceResponse
+	19, // 52: frost.FrostService.sign_frost:output_type -> frost.SignFrostResponse
+	21, // 53: frost.FrostService.aggregate_frost:output_type -> frost.AggregateFrostResponse
+	24, // 54: frost.FrostService.aggregate_frost_batch:output_type -> frost.AggregateFrostBatchResponse
+	37, // 55: frost.FrostService.validate_signature_share:output_type -> google.protobuf.Empty
+	47, // [47:56] is the sub-list for method output_type
+	38, // [38:47] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_frost_proto_init() }
@@ -1700,8 +1966,8 @@ func file_frost_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_frost_proto_rawDesc), len(file_frost_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   30,
+			NumEnums:      2,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

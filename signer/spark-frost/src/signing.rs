@@ -216,6 +216,16 @@ pub fn frost_nonce(req: &FrostNonceRequest) -> Result<FrostNonceResponse, String
 }
 
 fn sign_frost_job(job: &FrostSigningJob, req: &SignFrostRequest) -> Result<SignatureShare, String> {
+    if job.signing_scheme() == SigningScheme::MpcUserGroup {
+        return Err("MPC user-group signing is not implemented yet".to_string());
+    }
+    if !job.subuser_commitments.is_empty() {
+        return Err(format!(
+            "sub-user commitments require SIGNING_SCHEME_MPC_USER_GROUP, got {:?}",
+            job.signing_scheme()
+        ));
+    }
+
     let mut commitments = frost_signing_commiement_map_from_proto(&job.commitments)
         .map_err(|e| format!("Failed to parse signing commitments: {e:?}"))?;
 
@@ -320,6 +330,16 @@ pub fn sign_frost_serial(req: &SignFrostRequest) -> Result<SignFrostResponse, St
 }
 
 pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResponse, String> {
+    if req.signing_scheme() == SigningScheme::MpcUserGroup {
+        return Err("MPC user-group aggregation is not implemented yet".to_string());
+    }
+    if !req.subuser_shares.is_empty() {
+        return Err(format!(
+            "sub-user shares require SIGNING_SCHEME_MPC_USER_GROUP, got {:?}",
+            req.signing_scheme()
+        ));
+    }
+
     let mut commitments = frost_signing_commiement_map_from_proto(&req.commitments)
         .map_err(|e| format!("Failed to parse signing commitments: {e:?}"))?;
 
@@ -656,6 +676,8 @@ mod tests {
                 commitments: se_proto_commitments.clone(),
                 user_commitments: Some(user_proto_commitment.clone()),
                 adaptor_public_key: vec![],
+                signing_scheme: SigningScheme::Unspecified.into(),
+                subuser_commitments: vec![],
             };
             let resp = sign_frost(&SignFrostRequest {
                 signing_jobs: vec![job],
@@ -691,6 +713,8 @@ mod tests {
             commitments: se_proto_commitments.clone(),
             user_commitments: Some(user_proto_commitment.clone()),
             adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::Unspecified.into(),
+            subuser_commitments: vec![],
         };
         let user_resp = sign_frost(&SignFrostRequest {
             signing_jobs: vec![user_job],
@@ -714,6 +738,8 @@ mod tests {
             user_public_key: keys.user_vk.serialize().unwrap().to_vec(),
             user_signature_share,
             adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::Unspecified.into(),
+            subuser_shares: vec![],
         }
     }
 
