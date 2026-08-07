@@ -135,7 +135,16 @@ func (i *Interceptor) PartnerJWTInterceptor(ctx context.Context, req any, info *
 
 // ContextWithPartnerInfo returns a copy of ctx carrying the verified partner info.
 // Set by the partner interceptors after authentication; read via GetPartnerInfoFromContext.
+//
+// The identity is also recorded on the end-of-request summary, and only for credentials that
+// actually verified: grpc.client.partner.id always, grpc.client.partner.label only when the
+// credential carries one. Basic Auth identifies a partner without a label, so it contributes
+// no label field. Neither repeats on the lines logged while the request runs.
 func ContextWithPartnerInfo(ctx context.Context, info *PartnerInfo) context.Context {
+	logging.AddRequestFields(ctx, zap.String("grpc.client.partner.id", info.PartnerID))
+	if info.Label != "" {
+		logging.AddRequestFields(ctx, zap.String("grpc.client.partner.label", info.Label))
+	}
 	return context.WithValue(ctx, partnerContextKey, info)
 }
 

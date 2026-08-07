@@ -36,7 +36,11 @@ func InitRequestFields(ctx context.Context) context.Context {
 	})
 }
 
-func addRequestFields(ctx context.Context, fields ...zap.Field) {
+// AddRequestFields accumulates fields for the end-of-request summary — the spark-requests table
+// entry, plus the terminal error line if the request fails — without attaching them to the request
+// logger, so they don't repeat on every line logged while the request runs. Use WithRequestAttrs
+// instead when the value should appear on every log line for the request.
+func AddRequestFields(ctx context.Context, fields ...zap.Field) {
 	fieldsContainer, ok := ctx.Value(requestFieldsKey).(*requestFields)
 	if !ok {
 		return
@@ -92,7 +96,7 @@ func WithAttrs(ctx context.Context, fields ...zap.Field) (context.Context, *zap.
 // fields container. These fields will be included in table logging at the end of the request.
 // Use this for important request-level fields like identity_public_key.
 func WithRequestAttrs(ctx context.Context, fields ...zap.Field) (context.Context, *zap.Logger) {
-	addRequestFields(ctx, fields...)
+	AddRequestFields(ctx, fields...)
 	return WithAttrs(ctx, fields...)
 }
 
