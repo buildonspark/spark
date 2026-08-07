@@ -15,10 +15,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	jwtkeys "github.com/lightsparkdev/spark/common/keys/jwt"
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -259,6 +263,53 @@ func TestPartnerJWTInterceptor_ValidES256JWT(t *testing.T) {
 	assert.Equal(t, partnerID, partnerInfo.PartnerID)
 	assert.Equal(t, testLabel, partnerInfo.Label)
 	assert.Equal(t, dbID, partnerInfo.PartnerDBID)
+}
+
+// TestPartnerJWTInterceptor_RecordsAttributionForRequestSummary drives the real interceptor, so
+// the attribution fields are proven to reach the request summary through the production path
+// rather than through a direct ContextWithPartnerInfo call. The empty-label case is the shape
+// Basic Auth produces, which identifies a partner without a label.
+func TestPartnerJWTInterceptor_RecordsAttributionForRequestSummary(t *testing.T) {
+	priv, pub := makeP256Key(t)
+	partnerID := "partner-a"
+	pkID := uuid.New()
+	dbID := uuid.New()
+	i := makeTestInterceptor(
+		map[string]*testPartnerKeyEntry{partnerID: {pubKey: pub, partnerKeyID: pkID}},
+		map[string]uuid.UUID{pkID.String() + "/" + testLabel: dbID},
+	)
+
+	tests := []struct {
+		name           string
+		label          string
+		logsLabelField bool
+	}{
+		{"label present", testLabel, true},
+		{"no label, as Basic Auth produces", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.InfoLevel)
+			token := makeES256JWT(t, priv, partnerID, tt.label, time.Now().Add(time.Hour).Unix())
+			ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
+			ctx = logging.Inject(ctx, zap.New(core))
+			ctx = logging.InitRequestFields(ctx)
+
+			_, err := i.PartnerJWTInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+			require.NoError(t, err)
+
+			logging.GetLoggerWithAccumulatedRequestFields(ctx).Info("request summary")
+			require.Len(t, logs.All(), 1)
+			fields := logs.All()[0].ContextMap()
+
+			assert.Equal(t, partnerID, fields["grpc.client.partner.id"])
+			if tt.logsLabelField {
+				assert.Equal(t, tt.label, fields["grpc.client.partner.label"])
+			} else {
+				assert.NotContains(t, fields, "grpc.client.partner.label")
+			}
+		})
+	}
 }
 
 func TestPartnerJWTInterceptor_ExpiredES256JWT(t *testing.T) {
