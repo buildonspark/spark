@@ -80,6 +80,8 @@ pub fn sign_frost(
         verifying_key: key_package.public_key.clone(),
         commitments: statechain_commitments,
         adaptor_public_key: adaptor_public_key.unwrap_or_default(),
+        signing_scheme: proto::frost::SigningScheme::SingleUser.into(),
+        subuser_commitments: vec![],
     };
 
     let request = proto::frost::SignFrostRequest {
@@ -121,6 +123,8 @@ pub fn aggregate_frost(
         verifying_key,
         user_signature_share: self_signature,
         adaptor_public_key: adaptor_public_key.unwrap_or_default(),
+        signing_scheme: proto::frost::SigningScheme::SingleUser.into(),
+        subuser_shares: vec![],
     };
 
     let response = signing::aggregate_frost(&request).map_err(|e| e.to_string())?;

@@ -175,6 +175,61 @@ message FrostNonceResponse {
     repeated SigningNonceResult results = 1;
 }
 
+/*
+ * How the user side of a signing job or aggregation is composed.
+ *
+ * An explicit discriminant: the signer branches on this value and never
+ * infers the scheme from which fields happen to be populated. A request
+ * whose populated fields do not match its scheme is rejected.
+ */
+enum SigningScheme {
+    // Deployed senders predate this field and send 0; identical semantics to
+    // SIGNING_SCHEME_SINGLE_USER.
+    SIGNING_SCHEME_UNSPECIFIED = 0;
+
+    // The user side is a single signer: `user_commitments` (and, for
+    // aggregation, `user_public_key` + `user_signature_share`) carry it.
+    // Sub-user fields are absent. Byte behavior is exactly the deployed one.
+    SIGNING_SCHEME_SINGLE_USER = 1;
+
+    // The user side is a t-of-n FROST group of sub-users: the repeated
+    // sub-user fields carry it, and single-user fields are absent. Binding
+    // factors are computed over both groups' commitments with a one-byte
+    // group tag (0x00 = statechain, 0x01 = user group), so sub-user positions
+    // and statechain identifiers stay independent index spaces.
+    SIGNING_SCHEME_MPC_USER_GROUP = 2;
+}
+
+/*
+ * One sub-user's round-1 nonce commitment, for SIGNING_SCHEME_MPC_USER_GROUP.
+ */
+message SubUserCommitment {
+    // The sub-user's position in its signing group; its FROST identifier is
+    // the 32-byte big-endian scalar equal to this value. Nonzero.
+    uint32 position = 1;
+
+    // The sub-user's round-1 nonce commitment.
+    common.SigningCommitment commitment = 2;
+}
+
+/*
+ * One sub-user's round-1 nonce commitment and round-2 signature share, for
+ * SIGNING_SCHEME_MPC_USER_GROUP aggregation.
+ */
+message SubUserSignatureShare {
+    // The sub-user's position in its signing group; its FROST identifier is
+    // the 32-byte big-endian scalar equal to this value. Nonzero.
+    uint32 position = 1;
+
+    // The sub-user's round-1 nonce commitment.
+    common.SigningCommitment commitment = 2;
+
+    // The complete FROST round-2 share z_i as a 32-byte scalar, with the
+    // within-group Lagrange coefficient already applied by the sub-user;
+    // aggregation only sums shares.
+    bytes signature_share = 3;
+}
+
 message FrostSigningJob {
     // The unique identifier for the signing job.
     string job_id = 1;
@@ -194,11 +249,23 @@ message FrostSigningJob {
     // The commitments for all participants of the statechain.
     map<string, common.SigningCommitment> commitments = 6;
 
-    // The commitments for all participants of the user.
+    // The commitments for all participants of the user. Absent with
+    // SIGNING_SCHEME_MPC_USER_GROUP; optional under the single-user schemes,
+    // where a job without it is signed by the statechain participants alone.
     common.SigningCommitment user_commitments = 7;
 
     // Adaptor public key for adaptor signature
     bytes adaptor_public_key = 8;
+
+    // The signing scheme discriminant; see SigningScheme.
+    SigningScheme signing_scheme = 9;
+
+    // The user group's round-1 commitments, one entry per participating
+    // sub-user, positions ascending and unique. Present exactly when the
+    // scheme is SIGNING_SCHEME_MPC_USER_GROUP: this participant's own round-2
+    // share then binds both groups' commitments. Adaptor signatures are not
+    // supported in this scheme.
+    repeated SubUserCommitment subuser_commitments = 10;
 }
 
 /*
@@ -256,6 +323,18 @@ message AggregateFrostRequest {
 
     // Adaptor public key for adaptor signature
     bytes adaptor_public_key = 9;
+
+    // The signing scheme discriminant; see SigningScheme.
+    SigningScheme signing_scheme = 10;
+
+    // The user group's contributions, one entry per participating sub-user,
+    // positions ascending and unique. Present exactly when the scheme is
+    // SIGNING_SCHEME_MPC_USER_GROUP; `user_commitments`, `user_public_key`,
+    // and `user_signature_share` are then absent. Sub-user verifying shares
+    // are not on the wire: a bad sub-user share is detected by the aggregate
+    // verification, without per-position blame. Adaptor signatures are not
+    // supported in this scheme.
+    repeated SubUserSignatureShare subuser_shares = 11;
 }
 
 /*
