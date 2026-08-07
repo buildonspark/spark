@@ -74,9 +74,14 @@ func (f *exitingTree) newNode(t *testing.T, parent *ent.TreeNode, status st.Tree
 }
 
 // confirm runs MarkExitingNodes as if the given transaction confirmed in a block.
-func (f *exitingTree) confirm(t *testing.T, blockHeight int64, tx *wire.MsgTx) {
-	require.NoError(t, MarkExitingNodes(t.Context(), f.tc.Client,
-		map[[32]byte]bool{tx.TxHash(): true}, blockHeight))
+// confirm runs MarkExitingNodes as if every given transaction confirmed in the
+// same block, which is how the two cascades come to overlap.
+func (f *exitingTree) confirm(t *testing.T, blockHeight int64, txs ...*wire.MsgTx) {
+	confirmed := make(map[[32]byte]bool, len(txs))
+	for _, tx := range txs {
+		confirmed[tx.TxHash()] = true
+	}
+	require.NoError(t, MarkExitingNodes(t.Context(), f.tc.Client, confirmed, blockHeight))
 }
 
 func (f *exitingTree) reload(t *testing.T, node *ent.TreeNode) *ent.TreeNode {

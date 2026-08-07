@@ -69,6 +69,14 @@ func (f *exitingTree) newNodeTxs(t *testing.T, parent *ent.TreeNode, status st.T
 	return node
 }
 
+// newRenewalRoot creates a parentless SPLIT_LOCKED renewal node off the tree's
+// base txid, returning its raw and direct txs.
+func (f *exitingTree) newRenewalRoot(t *testing.T) (*ent.TreeNode, *wire.MsgTx, *wire.MsgTx) {
+	raw, rawTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalRawSequence)
+	direct, directTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalDirectSequence)
+	return f.newNodeTxs(t, nil, st.TreeNodeStatusSplitLocked, raw, direct), rawTx, directTx
+}
+
 // renewalChain builds the shape a repeatedly-renewed leaf actually has:
 // branch -> S1 -> S2 -> S3 -> leaf, where each Sn is a SPLIT_LOCKED renewal
 // split node whose direct tx the watchtower can broadcast.
@@ -119,12 +127,13 @@ func TestMarkExitingNodesCascadesBelowRenewalNode(t *testing.T) {
 	assert.Equal(t, st.TreeNodeStatusParentExited, f.reload(t, c.leaf).Status,
 		"the stranded leaf must be blocked from further transfers")
 
-	// S1's direct tx then actually confirms: nothing new to mark, but S1 records it.
+	// S1's direct tx then actually confirms, which is what the sweep above only
+	// anticipated: the same nodes are upgraded to the terminal status.
 	f.confirm(t, 1_052, c.s1DirectTx)
 
 	assert.Equal(t, st.TreeNodeStatusOnChain, f.reload(t, c.s1).Status,
 		"the swept renewal node itself records the confirmation")
-	assert.Equal(t, st.TreeNodeStatusParentExited, f.reload(t, c.leaf).Status)
+	assert.Equal(t, st.TreeNodeStatusWatchtowerExited, f.reload(t, c.leaf).Status)
 }
 
 // TestMarkExitingNodesDoesNotCascadeBelowBranch pins what the gate buys: a branch
@@ -158,9 +167,7 @@ func TestMarkExitingNodesDoesNotCascadeBelowBranch(t *testing.T) {
 func TestMarkExitingNodesCascadeTraversesSplitted(t *testing.T) {
 	f := newExitingTree(t)
 
-	s1Raw, s1RawTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalRawSequence)
-	s1Direct, s1DirectTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalDirectSequence)
-	s1 := f.newNodeTxs(t, nil, st.TreeNodeStatusSplitLocked, s1Raw, s1Direct)
+	s1, s1RawTx, _ := f.newRenewalRoot(t)
 
 	// The SPLITTED node must sit below the cascade root (S2) for the walk to have
 	// anything to traverse.
@@ -175,7 +182,7 @@ func TestMarkExitingNodesCascadeTraversesSplitted(t *testing.T) {
 	leaf := f.newNodeTxs(t, mid, st.TreeNodeStatusAvailable, leafRaw, nil)
 	require.NoError(t, ent.DbCommit(f.ctx))
 
-	f.confirm(t, 1_000, s1DirectTx)
+	f.confirm(t, 1_000, s1RawTx)
 
 	assert.Equal(t, st.TreeNodeStatusSplitted, f.reload(t, mid).Status,
 		"the walk must pass through a SPLITTED node without downgrading it")
@@ -183,39 +190,14 @@ func TestMarkExitingNodesCascadeTraversesSplitted(t *testing.T) {
 		"the leaf below that SPLITTED node must still be reached")
 }
 
-// TestMarkExitingNodesDoesNotCascadeThroughBranchChild pins the gap SP-3713
-// closes: a direct confirmation kills the parent's raw_tx, so a branch child's
-// raw_tx is dead too, but the branch fails the gate and nothing cascades.
-func TestMarkExitingNodesDoesNotCascadeThroughBranchChild(t *testing.T) {
-	f := newExitingTree(t)
-
-	s1Raw, s1RawTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalRawSequence)
-	s1Direct, s1DirectTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalDirectSequence)
-	s1 := f.newNodeTxs(t, nil, st.TreeNodeStatusSplitLocked, s1Raw, s1Direct)
-
-	branchRaw, branchTx := f.spendSeq(t, s1RawTx.TxHash(), 0, branchSequence)
-	branch := f.newNodeTxs(t, s1, st.TreeNodeStatusSplitted, branchRaw, nil)
-
-	leafRaw, _ := f.spendSeq(t, branchTx.TxHash(), 0, renewalRawSequence)
-	leaf := f.newNodeTxs(t, branch, st.TreeNodeStatusAvailable, leafRaw, nil)
-	require.NoError(t, ent.DbCommit(f.ctx))
-
-	f.confirm(t, 1_000, s1DirectTx)
-
-	assert.Equal(t, st.TreeNodeStatusSplitted, f.reload(t, branch).Status,
-		"the branch child keeps SPLITTED")
-	assert.Equal(t, st.TreeNodeStatusAvailable, f.reload(t, leaf).Status,
-		"known gap: the leaf is stranded but stays spendable until SP-3713")
-}
-
 // newLinearRenewalChain builds a root with depth renewal nodes strung below it,
 // each carrying the raw/direct pair a real renewal node has, so descendants[i]
-// sits at level i+1. The cascade roots on descendants[0], so the walk spends its
-// cap over descendants[1:] — which is why maxExitSweepDepth+1 sweeps in full.
-func newLinearRenewalChain(t *testing.T, f *exitingTree, depth int) (*wire.MsgTx, []*ent.TreeNode) {
-	rootRaw, rootRawTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalRawSequence)
-	rootDirect, rootDirectTx := f.spendSeq(t, f.tree.BaseTxid.Hash(), 0, renewalDirectSequence)
-	root := f.newNodeTxs(t, nil, st.TreeNodeStatusSplitLocked, rootRaw, rootDirect)
+// sits at level i+1. Returns the root's raw and direct txs: confirming the raw one
+// roots the cascade on descendants[0] and spends the cap over descendants[1:],
+// which is why maxExitSweepDepth+1 sweeps in full; confirming the direct one roots
+// on the node itself and so reaches one level less far.
+func newLinearRenewalChain(t *testing.T, f *exitingTree, depth int) (*wire.MsgTx, *wire.MsgTx, []*ent.TreeNode) {
+	root, rootRawTx, rootDirectTx := f.newRenewalRoot(t)
 
 	descendants := make([]*ent.TreeNode, 0, depth)
 	parent, parentRawTx := root, rootRawTx
@@ -231,15 +213,15 @@ func newLinearRenewalChain(t *testing.T, f *exitingTree, depth int) (*wire.MsgTx
 		parent, parentRawTx = node, rawTx
 	}
 	require.NoError(t, ent.DbCommit(f.ctx))
-	return rootDirectTx, descendants
+	return rootRawTx, rootDirectTx, descendants
 }
 
 // unmarkedDescendants counts nodes the sweep left behind. The confirmed root
-// itself becomes ON_CHAIN, so anything else outside those two statuses is a
+// itself becomes ON_CHAIN, so anything outside that and the swept status is a
 // descendant the walk never reached.
-func (f *exitingTree) unmarkedDescendants(t *testing.T) int {
+func (f *exitingTree) unmarkedDescendants(t *testing.T, swept st.TreeNodeStatus) int {
 	count, err := f.tc.Client.TreeNode.Query().
-		Where(treenode.StatusNotIn(st.TreeNodeStatusParentExited, st.TreeNodeStatusOnChain)).
+		Where(treenode.StatusNotIn(swept, st.TreeNodeStatusOnChain)).
 		Count(t.Context())
 	require.NoError(t, err)
 	return count
@@ -250,14 +232,14 @@ func (f *exitingTree) unmarkedDescendants(t *testing.T) int {
 // nothing behind for the cap check to report.
 func TestMarkExitingNodesCascadeReachesTheDepthCap(t *testing.T) {
 	f := newExitingTree(t)
-	rootDirectTx, descendants := newLinearRenewalChain(t, f, maxExitSweepDepth+1)
+	rootRawTx, _, descendants := newLinearRenewalChain(t, f, maxExitSweepDepth+1)
 
-	f.confirm(t, 1_000, rootDirectTx)
+	f.confirm(t, 1_000, rootRawTx)
 
 	assert.Equal(t, st.TreeNodeStatusParentExited,
 		f.reload(t, descendants[maxExitSweepDepth]).Status,
 		"the node on the last permitted level must be marked")
-	assert.Zero(t, f.unmarkedDescendants(t),
+	assert.Zero(t, f.unmarkedDescendants(t, st.TreeNodeStatusParentExited),
 		"a chain ending exactly at the cap must sweep completely")
 }
 
@@ -267,9 +249,9 @@ func TestMarkExitingNodesCascadeReachesTheDepthCap(t *testing.T) {
 // spark_tree_exit_sweep_depth_cap_hit_total alerts on.
 func TestMarkExitingNodesCascadeStopsPastTheDepthCap(t *testing.T) {
 	f := newExitingTree(t)
-	rootDirectTx, descendants := newLinearRenewalChain(t, f, maxExitSweepDepth+2)
+	rootRawTx, _, descendants := newLinearRenewalChain(t, f, maxExitSweepDepth+2)
 
-	f.confirm(t, 1_000, rootDirectTx)
+	f.confirm(t, 1_000, rootRawTx)
 
 	assert.Equal(t, st.TreeNodeStatusParentExited,
 		f.reload(t, descendants[maxExitSweepDepth]).Status,
@@ -277,7 +259,7 @@ func TestMarkExitingNodesCascadeStopsPastTheDepthCap(t *testing.T) {
 	assert.Equal(t, st.TreeNodeStatusAvailable,
 		f.reload(t, descendants[maxExitSweepDepth+1]).Status,
 		"the level past the cap is left transferable with no exit path")
-	assert.Equal(t, 1, f.unmarkedDescendants(t),
+	assert.Equal(t, 1, f.unmarkedDescendants(t, st.TreeNodeStatusParentExited),
 		"exactly the levels past the cap are left behind")
 }
 

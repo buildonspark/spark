@@ -9,7 +9,6 @@ import (
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -31,21 +30,12 @@ func init() {
 	var err error
 	exitSweepDepthCapCounter, err = meter.Int64Counter(
 		"spark_tree_exit_sweep_depth_cap_hit_total",
-		metric.WithDescription("Times the PARENT_EXITED descendant walk stopped at maxExitSweepDepth, leaving descendants unmarked"),
+		metric.WithDescription("Times an exit-sweep descendant walk stopped at maxExitSweepDepth, leaving descendants unmarked"),
 	)
 	if err != nil {
 		otel.Handle(err)
 		exitSweepDepthCapCounter = noop.Int64Counter{}
 	}
-}
-
-// nodeTxConfirmedPredicate matches nodes whose own node tx confirmed, by either
-// spend path. Shared so the cascade cannot drift from what sets node_confirmation_height.
-func nodeTxConfirmedPredicate(confirmedTxids []st.TxID) predicate.TreeNode {
-	return treenode.Or(
-		treenode.RawTxidIn(confirmedTxids...),
-		treenode.DirectTxidIn(confirmedTxids...),
-	)
 }
 
 // Marks exiting nodes and their children with a proper status and confirmation height in batch update query to the DB.
@@ -62,12 +52,15 @@ func MarkExitingNodes(ctx context.Context, dbClient *ent.Client, confirmedTxHash
 		confirmedTxids = append(confirmedTxids, txidObj)
 	}
 
-	nodeTxConfirmedPred := nodeTxConfirmedPredicate(confirmedTxids)
-
 	// The state goes from OnChain to Exited, so we need to mark the nodes as OnChain first.
+	// Either spend path confirming puts the node itself on chain; which one it was
+	// only decides how far below the node the marking reaches.
 	countOnChain, err := dbClient.TreeNode.Update().SetStatus(st.TreeNodeStatusOnChain).
 		SetNodeConfirmationHeight(uint64(blockHeight)).
-		Where(nodeTxConfirmedPred).
+		Where(treenode.Or(
+			treenode.RawTxidIn(confirmedTxids...),
+			treenode.DirectTxidIn(confirmedTxids...),
+		)).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to mark exiting nodes as on chain: %w", err)
@@ -92,47 +85,16 @@ func MarkExitingNodes(ctx context.Context, dbClient *ent.Client, confirmedTxHash
 	// optimize this by marking the children only when the parent is marked as OnChain,
 	// but it is safer to do it for each status.
 	if countOnChain > 0 || countExited > 0 {
-		exitedTreeNodes, err := dbClient.TreeNode.Query().Where(treenode.Or(
-			treenode.RawTxidIn(confirmedTxids...),
-			treenode.DirectTxidIn(confirmedTxids...),
-			treenode.RawRefundTxidIn(confirmedTxids...),
-			treenode.DirectRefundTxidIn(confirmedTxids...),
-			treenode.DirectFromCpfpRefundTxidIn(confirmedTxids...),
-		)).
-			Select(treenode.FieldID).
-			All(ctx)
-		if err != nil {
+		if err := cascadeExitingRenewalNodes(ctx, dbClient, confirmedTxids, blockHeight); err != nil {
 			return err
 		}
 
-		var exitedTreeNodesIds []uuid.UUID
-		for _, treeNode := range exitedTreeNodes {
-			exitedTreeNodesIds = append(exitedTreeNodesIds, treeNode.ID)
-		}
-		// Only children that could otherwise still reach AVAILABLE are swept;
-		// see ShouldMarkParentExited for the per-status reasoning. Branches in
-		// particular must keep SPLITTED: a parent confirming advances their
-		// exit rather than invalidating it, and PARENT_EXITED would return them
-		// to the watchtower to retry a timelock-disabled tx forever.
-		countParentExited, err := dbClient.TreeNode.Update().
-			Where(
-				treenode.HasParentWith(treenode.IDIn(exitedTreeNodesIds...)),
-				treenode.StatusNotIn(st.ParentExitSweepExcludedStatuses()...),
-			).
-			SetStatus(st.TreeNodeStatusParentExited).
-			Save(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to update child nodes status: %w", err)
-		}
-		logger.Sugar().Infof("Child tree nodes %+q marked as unusable because %d parent nodes are exiting at block height %d",
-			exitedTreeNodesIds,
-			countParentExited,
-			blockHeight,
-		)
-
-		// The sweep above stops at level 1, and a child the watchtower can sweep
-		// strands everything beneath it; see cascadeExitingRenewalNodes.
-		if err := cascadeExitingRenewalNodes(ctx, dbClient, confirmedTxids, blockHeight); err != nil {
+		// A raw tx and a descendant's direct tx can confirm in the same block, so the
+		// two passes overlap. Order is not load bearing, though not by symmetry: the
+		// pass above will not overwrite WATCHTOWER_EXITED, while this one upgrades
+		// PARENT_EXITED (see ShouldMarkWatchtowerExited). Preserved one way and
+		// replaced the other, the terminal status lands either way.
+		if err := cascadeWatchtowerExitedNodes(ctx, dbClient, confirmedTxids, blockHeight); err != nil {
 			return err
 		}
 	}
@@ -188,26 +150,51 @@ func willWatchtowerBroadcastDirectTx(node *ent.TreeNode) bool {
 	return bitcointransaction.HasBlockRelativeTimelock(directTx.TxIn[0].Sequence)
 }
 
-// cascadeExitingRenewalNodes marks everything below each child whose direct_tx
-// the watchtower can now broadcast (watchtower.go:409). That broadcast
-// conflict-spends the outpoint the child's raw_tx names, and every descendant
-// names that raw_txid, so the whole chain below loses its exit path at once.
+// cascadeExitingRenewalNodes marks the children of every node that is exiting to
+// L1, then everything below each of those children whose direct_tx the watchtower
+// can now broadcast (watchtower.go:409). That broadcast conflict-spends the
+// outpoint the child's raw_tx names, and every descendant names that raw_txid, so
+// the whole chain below loses its exit path at once.
 //
-// Branch children are skipped: the watchtower rejects their timelock-disabled
-// direct_tx, leaving raw_tx the live path beneath them. SP-3713 closes the gap
-// where the parent's direct_tx confirmed, which kills a branch child's raw_tx too.
+// direct_txid is deliberately not one of the columns matched. A confirmed
+// direct_tx kills its children's raw_tx outright, a stronger claim than this pass
+// makes, and it reaches branch children the broadcast gate here rejects;
+// cascadeWatchtowerExitedNodes owns that case. Matching them here too would write
+// a status that pass immediately replaces, for no change in the final result.
 func cascadeExitingRenewalNodes(ctx context.Context, dbClient *ent.Client, confirmedTxids []st.TxID, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
+	hasExitingParent := treenode.HasParentWith(treenode.Or(
+		treenode.RawTxidIn(confirmedTxids...),
+		treenode.RawRefundTxidIn(confirmedTxids...),
+		treenode.DirectRefundTxidIn(confirmedTxids...),
+		treenode.DirectFromCpfpRefundTxidIn(confirmedTxids...),
+	))
+
+	// Only children that could otherwise still reach AVAILABLE are marked; see
+	// ShouldMarkParentExited for the per-status reasoning. Branches in particular
+	// must keep SPLITTED: a parent confirming advances their exit rather than
+	// invalidating it, and PARENT_EXITED would return them to the watchtower to
+	// retry a timelock-disabled tx forever.
+	countChildren, err := dbClient.TreeNode.Update().
+		Where(hasExitingParent, treenode.StatusNotIn(st.ParentExitSweepExcludedStatuses()...)).
+		SetStatus(st.TreeNodeStatusParentExited).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to mark children of exiting nodes: %w", err)
+	}
+	logger.Sugar().Infof("Marked %d children of exiting nodes as %v at block height %d",
+		countChildren, st.TreeNodeStatusParentExited, blockHeight)
+
 	children, err := dbClient.TreeNode.Query().
-		Where(treenode.HasParentWith(nodeTxConfirmedPredicate(confirmedTxids))).
+		Where(hasExitingParent).
 		Select(treenode.FieldID, treenode.FieldDirectTx).
 		All(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to query children of nodes with confirmed node txs: %w", err)
+		return fmt.Errorf("failed to query children of exiting nodes: %w", err)
 	}
 
-	var roots []uuid.UUID
+	roots := make([]uuid.UUID, 0, len(children))
 	for _, child := range children {
 		if willWatchtowerBroadcastDirectTx(child) {
 			roots = append(roots, child.ID)
@@ -217,7 +204,7 @@ func cascadeExitingRenewalNodes(ctx context.Context, dbClient *ent.Client, confi
 		return nil
 	}
 
-	count, err := markDescendantsParentExited(ctx, dbClient, roots)
+	count, err := markDescendants(ctx, dbClient, roots, st.TreeNodeStatusParentExited, st.ParentExitSweepExcludedStatuses())
 	if err != nil {
 		return fmt.Errorf("failed to mark descendants of sweepable nodes: %w", err)
 	}
@@ -226,14 +213,48 @@ func cascadeExitingRenewalNodes(ctx context.Context, dbClient *ent.Client, confi
 	return nil
 }
 
-// markDescendantsParentExited marks every descendant of roots that the sweep is
-// allowed to overwrite. Traversal is structural rather than status-driven: it
-// descends *through* nodes it must not rewrite, because the marking no longer
-// cascades one hop per block and a skipped node would otherwise cut the walk
-// short. Returns the number of rows updated.
-func markDescendantsParentExited(ctx context.Context, dbClient *ent.Client, roots []uuid.UUID) (int, error) {
+// cascadeWatchtowerExitedNodes marks every descendant of a node whose direct_tx
+// just confirmed. That confirmation spends the outpoint the node's raw_tx names,
+// and both of a child's spend paths hang off that one output, so nothing about a
+// child's own transactions can rescue it. Hence no gate, and rooted at the
+// confirmed node so the walk covers its children too.
+func cascadeWatchtowerExitedNodes(ctx context.Context, dbClient *ent.Client, confirmedTxids []st.TxID, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	excluded := st.ParentExitSweepExcludedStatuses()
+
+	// The raw_txid arms are load bearing rather than defensive: the column is
+	// nullable, so a bare NOT IN evaluates to NULL and drops the rows it should keep.
+	roots, err := dbClient.TreeNode.Query().
+		Where(
+			treenode.DirectTxidIn(confirmedTxids...),
+			treenode.Or(
+				treenode.RawTxidIsNil(),
+				treenode.RawTxidNotIn(confirmedTxids...),
+			),
+		).
+		IDs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query nodes with confirmed direct txs: %w", err)
+	}
+	if len(roots) == 0 {
+		return nil
+	}
+
+	count, err := markDescendants(ctx, dbClient, roots, st.TreeNodeStatusWatchtowerExited, st.WatchtowerExitSweepExcludedStatuses())
+	if err != nil {
+		return fmt.Errorf("failed to mark descendants of watchtower-exited nodes: %w", err)
+	}
+	logger.Sugar().Infof("Marked %d descendants of %d watchtower-exited nodes %+q as %v at block height %d",
+		count, len(roots), roots, st.TreeNodeStatusWatchtowerExited, blockHeight)
+	return nil
+}
+
+// markDescendants marks every descendant of roots, excluding the given statuses,
+// and returns the number of rows updated. The roots themselves are left alone.
+// Traversal is structural rather than status-driven: it descends *through* nodes
+// it must not rewrite, because the marking no longer cascades one hop per block
+// and a skipped node would otherwise cut the walk short.
+func markDescendants(ctx context.Context, dbClient *ent.Client, roots []uuid.UUID, status st.TreeNodeStatus, excluded []st.TreeNodeStatus) (int, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 
 	childIDsOf := func(parents []uuid.UUID) ([]uuid.UUID, error) {
 		return dbClient.TreeNode.Query().
@@ -247,8 +268,7 @@ func markDescendantsParentExited(ctx context.Context, dbClient *ent.Client, root
 	}
 
 	// currentLevelIDs is always the level not yet marked, so the post-loop check
-	// reflects what was left behind. Roots are already-swept children, so this
-	// starts at the first level the one-hop sweep does not reach.
+	// reflects what was left behind.
 	total := 0
 	for depth := 0; len(currentLevelIDs) > 0 && depth < maxExitSweepDepth; depth++ {
 		count, err := dbClient.TreeNode.Update().
@@ -256,7 +276,7 @@ func markDescendantsParentExited(ctx context.Context, dbClient *ent.Client, root
 				treenode.IDIn(currentLevelIDs...),
 				treenode.StatusNotIn(excluded...),
 			).
-			SetStatus(st.TreeNodeStatusParentExited).
+			SetStatus(status).
 			Save(ctx)
 		if err != nil {
 			return total, fmt.Errorf("failed to mark descendants at depth %d: %w", depth, err)
@@ -271,8 +291,8 @@ func markDescendantsParentExited(ctx context.Context, dbClient *ent.Client, root
 		// The counter is what alerts; returning rather than erroring keeps every
 		// unrelated tree in the same block from failing with it.
 		exitSweepDepthCapCounter.Add(ctx, 1)
-		logger.Sugar().Errorf("Exit sweep hit the %d-depth cap with %d nodes still unvisited below %+q; descendants beyond that depth remain transferable with no exit path",
-			maxExitSweepDepth, len(currentLevelIDs), roots)
+		logger.Sugar().Errorf("Exit sweep for %v hit the %d-depth cap with %d nodes still unvisited below %+q; descendants beyond that depth remain transferable with no exit path",
+			status, maxExitSweepDepth, len(currentLevelIDs), roots)
 	}
 	return total, nil
 }
