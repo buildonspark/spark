@@ -115,28 +115,24 @@ func (b *frostAggregationBatch) keyPackage(ctx context.Context, keyshareID uuid.
 	return keyPackage, nil
 }
 
-// addJob builds the AggregateFrostRequest for one signing job and queues it
-// under jobKey. It also records a SigningResult mirroring
-// helper.GetSignaturesWithPregeneratedNonce's output shape for callers that
-// need it (the send-transfer flow publishes it in its response protos).
-func (b *frostAggregationBatch) addJob(
+// prepareJob runs the per-job work shared by addJob and addMpcJob: the
+// duplicate-key check, the key package read, and the share collection.
+func (b *frostAggregationBatch) prepareJob(
 	ctx context.Context,
 	jobKey string,
 	job *helper.SigningJobWithPregeneratedNonce,
 	allShares map[string]map[string][]byte,
-	leaf *ent.TreeNode,
-	userSignatureShare []byte,
-) error {
+) (*pbfrost.KeyPackage, map[string][]byte, map[string][]byte, error) {
 	if _, ok := b.requests[jobKey]; ok {
-		return sparkerrors.InternalDataInconsistency(fmt.Errorf("duplicate aggregation job key %s", jobKey))
+		return nil, nil, nil, sparkerrors.InternalDataInconsistency(fmt.Errorf("duplicate aggregation job key %s", jobKey))
 	}
 	keyPackage, err := b.keyPackage(ctx, job.SigningKeyshareID)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	shares, ok := allShares[job.JobID.String()]
 	if !ok {
-		return sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("missing signature shares for job %s", job.JobID))
+		return nil, nil, nil, sparkerrors.InternalInvalidOperatorResponse(fmt.Errorf("missing signature shares for job %s", job.JobID))
 	}
 	// Public shares filtered to the t-of-n that actually contributed shares
 	// for this job (different leaves can carry different round1 commitment
@@ -152,9 +148,55 @@ func (b *frostAggregationBatch) addJob(
 	for id := range shares {
 		share, ok := keyPackage.GetPublicShares()[id]
 		if !ok {
-			return sparkerrors.InternalKeyshareError(fmt.Errorf("missing public share for operator %s", id))
+			return nil, nil, nil, sparkerrors.InternalKeyshareError(fmt.Errorf("missing public share for operator %s", id))
 		}
 		publicShares[id] = share
+	}
+	return keyPackage, shares, publicShares, nil
+}
+
+// recordSigningResult records a SigningResult mirroring
+// helper.GetSignaturesWithPregeneratedNonce's output shape for callers that
+// need it (the send-transfer flow publishes it in its response protos).
+func (b *frostAggregationBatch) recordSigningResult(
+	jobKey string,
+	job *helper.SigningJobWithPregeneratedNonce,
+	keyPackage *pbfrost.KeyPackage,
+	shares map[string][]byte,
+	publicShares map[string][]byte,
+) {
+	if !b.recordSigningResults {
+		return
+	}
+	// KeyshareOwnerIdentifiers lists every owner of the keyshare (not
+	// just this job's t-of-n contributors) — matches
+	// signing_coordinator.go. Sorted for deterministic response bytes.
+	keyshareOwnerIdentifiers := slices.Collect(maps.Keys(keyPackage.GetPublicShares()))
+	slices.Sort(keyshareOwnerIdentifiers)
+	b.signingResults[jobKey] = &helper.SigningResult{
+		JobID:                    job.JobID,
+		Message:                  job.Message,
+		SignatureShares:          shares,
+		SigningCommitments:       job.Round1Packages,
+		PublicKeys:               publicShares,
+		KeyshareOwnerIdentifiers: keyshareOwnerIdentifiers,
+		KeyshareThreshold:        keyPackage.GetMinSigners(),
+	}
+}
+
+// addJob builds the AggregateFrostRequest for one signing job and queues it
+// under jobKey.
+func (b *frostAggregationBatch) addJob(
+	ctx context.Context,
+	jobKey string,
+	job *helper.SigningJobWithPregeneratedNonce,
+	allShares map[string]map[string][]byte,
+	leaf *ent.TreeNode,
+	userSignatureShare []byte,
+) error {
+	keyPackage, shares, publicShares, err := b.prepareJob(ctx, jobKey, job, allShares)
+	if err != nil {
+		return err
 	}
 
 	// A job carrying an adaptor point (set by buildSigningJobForRefund) makes
@@ -178,22 +220,46 @@ func (b *frostAggregationBatch) addJob(
 		AdaptorPublicKey:   adaptorPublicKeyBytes,
 	}
 
-	if b.recordSigningResults {
-		// KeyshareOwnerIdentifiers lists every owner of the keyshare (not
-		// just this job's t-of-n contributors) — matches
-		// signing_coordinator.go. Sorted for deterministic response bytes.
-		keyshareOwnerIdentifiers := slices.Collect(maps.Keys(keyPackage.GetPublicShares()))
-		slices.Sort(keyshareOwnerIdentifiers)
-		b.signingResults[jobKey] = &helper.SigningResult{
-			JobID:                    job.JobID,
-			Message:                  job.Message,
-			SignatureShares:          shares,
-			SigningCommitments:       job.Round1Packages,
-			PublicKeys:               publicShares,
-			KeyshareOwnerIdentifiers: keyshareOwnerIdentifiers,
-			KeyshareThreshold:        keyPackage.GetMinSigners(),
-		}
+	b.recordSigningResult(jobKey, job, keyPackage, shares, publicShares)
+	return nil
+}
+
+// addMpcJob is addJob's multi-sub-user form (SIGNING_SCHEME_MPC_USER_GROUP):
+// the user side is the sub-user contribution list, the single-user fields
+// stay absent, and adaptor signatures are not supported. Sub-user verifying
+// shares are not on the wire, so the signer detects a bad sub-user
+// contribution only when the aggregate fails to verify, without per-position
+// blame.
+func (b *frostAggregationBatch) addMpcJob(
+	ctx context.Context,
+	jobKey string,
+	job *helper.SigningJobWithPregeneratedNonce,
+	allShares map[string]map[string][]byte,
+	verifyingKey keys.Public,
+	subuserShares []*pbfrost.SubUserSignatureShare,
+) error {
+	if job.SigningScheme != pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("job %s is not an MPC signing job", jobKey))
 	}
+	if job.AdaptorPublicKey != nil && !job.AdaptorPublicKey.IsZero() {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("adaptor signatures are not supported for MPC job %s", jobKey))
+	}
+	keyPackage, shares, publicShares, err := b.prepareJob(ctx, jobKey, job, allShares)
+	if err != nil {
+		return err
+	}
+
+	b.requests[jobKey] = &pbfrost.AggregateFrostRequest{
+		Message:         job.Message.Serialize(),
+		SignatureShares: shares,
+		PublicShares:    publicShares,
+		VerifyingKey:    verifyingKey.Serialize(),
+		Commitments:     collections.ConvertObjectMapToProtoMap(job.Round1Packages),
+		SigningScheme:   pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
+		SubuserShares:   subuserShares,
+	}
+
+	b.recordSigningResult(jobKey, job, keyPackage, shares, publicShares)
 	return nil
 }
 

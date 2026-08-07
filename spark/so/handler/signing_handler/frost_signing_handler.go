@@ -216,14 +216,16 @@ func (h *FrostSigningHandler) FrostRound2WithKeyPackages(ctx context.Context, re
 		nonceObject := nonceEnt.Nonce
 		keyPackage := keyPackages[keyshareID]
 		signingJobProto := &pbfrost.FrostSigningJob{
-			JobId:            job.GetJobId(),
-			Message:          job.GetMessage(),
-			KeyPackage:       keyPackage,
-			VerifyingKey:     job.GetVerifyingKey(),
-			Nonce:            nonceObject.MarshalProto(),
-			Commitments:      job.GetCommitments(),
-			UserCommitments:  job.GetUserCommitments(),
-			AdaptorPublicKey: job.GetAdaptorPublicKey(),
+			JobId:              job.GetJobId(),
+			Message:            job.GetMessage(),
+			KeyPackage:         keyPackage,
+			VerifyingKey:       job.GetVerifyingKey(),
+			Nonce:              nonceObject.MarshalProto(),
+			Commitments:        job.GetCommitments(),
+			UserCommitments:    job.GetUserCommitments(),
+			AdaptorPublicKey:   job.GetAdaptorPublicKey(),
+			SigningScheme:      job.GetSigningScheme(),
+			SubuserCommitments: job.GetSubuserCommitments(),
 		}
 		signingJobProtos = append(signingJobProtos, signingJobProto)
 	}
@@ -272,6 +274,21 @@ func retryFingerprint(job *pb.SigningJob) []byte {
 		if com != nil {
 			writeBytesCollisionResistant(hashState, com.GetHiding())
 			writeBytesCollisionResistant(hashState, com.GetBinding())
+		}
+	}
+
+	// The MPC fields enter the binding factor (and hence what this nonce
+	// signs), so they must be part of the fingerprint. Appended only when
+	// set, so fingerprints of deployed single-user jobs — including ones
+	// already recorded on in-flight nonces — keep their exact bytes.
+	if job.GetSigningScheme() != pbfrost.SigningScheme_SIGNING_SCHEME_UNSPECIFIED ||
+		len(job.GetSubuserCommitments()) > 0 {
+		hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(job.GetSigningScheme())))
+		hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(len(job.GetSubuserCommitments()))))
+		for _, subuser := range job.GetSubuserCommitments() {
+			hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(subuser.GetPosition())))
+			writeBytesCollisionResistant(hashState, subuser.GetCommitment().GetHiding())
+			writeBytesCollisionResistant(hashState, subuser.GetCommitment().GetBinding())
 		}
 	}
 
