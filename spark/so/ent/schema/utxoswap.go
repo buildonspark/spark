@@ -40,6 +40,16 @@ func (UtxoSwap) Indexes() []ent.Index {
 		// Also gates the refund path intentionally.
 		index.Edges("deposit_address").Fields("utxo_value_sats").Unique().
 			Annotations(entsql.IndexWhere("status NOT IN ('CANCELLED', 'COMPLETED')")),
+		// Makes an instant authorization single-use (SP-3750). The instant user statement
+		// commits to no txid — it cannot, the UTXO is 0-conf at reserve time — so the same
+		// signature otherwise drives a second claim against any same-value UTXO at the
+		// address once the index above frees on COMPLETED. ssp_signature is the quote
+		// signature, which does commit to txid:vout upstream.
+		// Unlike the index above, this must NOT exclude COMPLETED. It must exclude
+		// CANCELLED: a rolled-back reservation is legitimately retried with the same quote.
+		// INSTANT-scoped because the fixed and refund paths store a spend tx sighash here.
+		index.Fields("ssp_signature").Unique().
+			Annotations(entsql.IndexWhere("request_type = 'INSTANT' AND status <> 'CANCELLED'")),
 	}
 }
 

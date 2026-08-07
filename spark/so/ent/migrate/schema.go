@@ -2028,6 +2028,14 @@ var (
 					Where: "status NOT IN ('CANCELLED', 'COMPLETED')",
 				},
 			},
+			{
+				Name:    "utxoswap_ssp_signature",
+				Unique:  true,
+				Columns: []*schema.Column{UtxoSwapsColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "request_type = 'INSTANT' AND status <> 'CANCELLED'",
+				},
+			},
 		},
 	}
 	// WalletSettingsColumns holds the columns for the "wallet_settings" table.

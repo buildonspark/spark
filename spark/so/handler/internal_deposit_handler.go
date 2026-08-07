@@ -464,6 +464,11 @@ func validateInstantUserSignature(
 	if len(userSignature) == 0 {
 		return fmt.Errorf("user signature is required")
 	}
+	// Postgres treats NULLs as distinct, so a row with no ssp_signature would sit outside
+	// the partial unique index that makes an instant authorization single-use (SP-3750).
+	if len(sspSignature) == 0 {
+		return fmt.Errorf("ssp signature is required")
+	}
 	messageHash := CreateInstantUserStatement(network, creditAmountSats, secondaryCreditAmountSats, destinationAddress, satsValue, sspSignature)
 	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
