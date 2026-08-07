@@ -39,7 +39,6 @@ import (
 	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -1027,23 +1026,19 @@ func (f *claimTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect signature shares: %w", err)
 	}
-	var commitDigests []*pbinternal.ClaimLeafTweakDigest
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobClaimTransferRequireTweakDigests, 0) > 0 {
-		// Abort unless every SO proves the same post-tweak state. The rollout
-		// gate must cover both validation and commit binding: older SOs neither
-		// report the new digest nor enforce it during Commit.
-		if err := validateClaimTweakDigestUnanimity(f.parsed.transferID, digestReports); err != nil {
-			return nil, err
-		}
-		participants := make([]string, 0, len(f.config.SigningOperatorMap))
-		for opID := range f.config.SigningOperatorMap {
-			participants = append(participants, opID)
-		}
-		if err := validateClaimTweakDigestReporters(f.parsed.transferID, participants, digestReports); err != nil {
-			return nil, err
-		}
-		commitDigests = unanimousClaimTweakDigests(digestReports)
+	// A non-reporting SO cannot prove its post-tweak keyshare state or enforce
+	// the commit binding, so accepting it could permanently diverge keyshares.
+	if err := validateClaimTweakDigestUnanimity(f.parsed.transferID, digestReports); err != nil {
+		return nil, err
 	}
+	participants := make([]string, 0, len(f.config.SigningOperatorMap))
+	for opID := range f.config.SigningOperatorMap {
+		participants = append(participants, opID)
+	}
+	if err := validateClaimTweakDigestReporters(f.parsed.transferID, participants, digestReports); err != nil {
+		return nil, err
+	}
+	commitDigests := unanimousClaimTweakDigests(digestReports)
 
 	// Phase-2 apply must run before FROST aggregation: the aggregation jobs
 	// read leaf.OwnerSigningPubkey as the user's signing pubkey, and the user
@@ -1275,9 +1270,6 @@ func validateClaimPostTweakKeyshareUnanimity(
 	return nil
 }
 
-// validateClaimTweakDigestReporters requires a digest report from every
-// participant. A legacy binary (or a dropped report) aborts the claim instead
-// of silently bypassing the unanimity check and commit digest binding.
 func validateClaimTweakDigestReporters(transferID uuid.UUID, participants []string, reports map[string]*pbinternal.ClaimTransferPrepareResponse) error {
 	sorted := append([]string(nil), participants...)
 	slices.Sort(sorted)

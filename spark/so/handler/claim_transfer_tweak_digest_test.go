@@ -13,7 +13,6 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -267,10 +266,11 @@ func TestValidateClaimTweakDigestReporters(t *testing.T) {
 	assert.Contains(t, err.Error(), "did not report")
 }
 
-func TestClaimTransferBuildCommitRejectsMissingTweakDigestReporter(t *testing.T) {
-	report, err := anypb.New(digestReport(false, map[string][]byte{
-		"11111111-1111-1111-1111-111111111111": {0x01},
-	}))
+func TestClaimTransferBuildCommitAcceptsUnanimousTweakDigestReports(t *testing.T) {
+	leafID := "11111111-1111-1111-1111-111111111111"
+	report1, err := anypb.New(digestReport(false, map[string][]byte{leafID: {0x01}}))
+	require.NoError(t, err)
+	report2, err := anypb.New(digestReport(false, map[string][]byte{leafID: {0x01}}))
 	require.NoError(t, err)
 
 	flow := &claimTransferCoordinatorFlow{
@@ -283,18 +283,14 @@ func TestClaimTransferBuildCommitRejectsMissingTweakDigestReporter(t *testing.T)
 		parsed: parsedClaimTransferRequest{transferID: digestTestTransferID},
 	}
 
-	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobClaimTransferRequireTweakDigests: 1,
-	}))
-	_, err = flow.BuildCommitPayload(ctx, map[string]*anypb.Any{
-		"0001": report,
-		"0002": nil,
+	_, err = flow.BuildCommitPayload(t.Context(), map[string]*anypb.Any{
+		"0001": report1,
+		"0002": report2,
 	})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "SO 0002 did not report tweak digests")
+	require.ErrorContains(t, err, "unable to apply receiver key tweaks during coordinator commit")
 }
 
-func TestClaimTransferBuildCommitSkipsMissingReporterValidationByDefault(t *testing.T) {
+func TestClaimTransferBuildCommitRejectsMissingTweakDigestReporter(t *testing.T) {
 	report, err := anypb.New(digestReport(false, map[string][]byte{
 		"11111111-1111-1111-1111-111111111111": {0x01},
 	}))
@@ -314,12 +310,11 @@ func TestClaimTransferBuildCommitSkipsMissingReporterValidationByDefault(t *test
 		"0001": report,
 		"0002": nil,
 	})
-	// Reaching the commit step proves the default-off rollout gate tolerated
-	// the legacy participant; this unit flow intentionally has no database.
-	require.ErrorContains(t, err, "unable to apply receiver key tweaks during coordinator commit")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "SO 0002 did not report tweak digests")
 }
 
-func TestClaimTransferBuildCommitSkipsUnanimityValidationByDefault(t *testing.T) {
+func TestClaimTransferBuildCommitRejectsDivergentTweakDigests(t *testing.T) {
 	leafID := "11111111-1111-1111-1111-111111111111"
 	reportX, err := anypb.New(digestReport(false, map[string][]byte{leafID: {0x01}}))
 	require.NoError(t, err)
@@ -340,9 +335,7 @@ func TestClaimTransferBuildCommitSkipsUnanimityValidationByDefault(t *testing.T)
 		"0001": reportX,
 		"0002": reportY,
 	})
-	// Commit binding must also remain off during rollout; otherwise upgraded
-	// participants could reject after a legacy participant already committed.
-	require.ErrorContains(t, err, "unable to apply receiver key tweaks during coordinator commit")
+	require.ErrorContains(t, err, "tweak digest mismatch")
 }
 
 func TestParseClaimPrepareResults(t *testing.T) {
