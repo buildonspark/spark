@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use frost_core::round1::Nonce;
 use frost_core::round1::NonceCommitment;
+use frost_core::two_group::{self, SignerGroup, TwoGroupSigningPackage};
 use frost_secp256k1_tr::keys::EvenY;
 use frost_secp256k1_tr::keys::KeyPackage as FrostKeyPackage;
 use frost_secp256k1_tr::keys::PublicKeyPackage;
@@ -77,6 +78,77 @@ pub fn frost_build_signin_package(
         message,
         adaptor_public_key,
     )
+}
+
+/// A sub-user's FROST identifier is the scalar equal to its position; the
+/// group-tagged binding factors keep these independent from the statechain
+/// identifiers, which also start at 1.
+fn subuser_identifier(position: u32) -> Result<Identifier, String> {
+    let position = u16::try_from(position)
+        .map_err(|_| format!("Sub-user position {position} is out of range"))?;
+    Identifier::try_from(position)
+        .map_err(|e| format!("Invalid sub-user position {position}: {e:?}"))
+}
+
+fn subuser_commitments_from_proto(
+    entries: &[SubUserCommitment],
+) -> Result<BTreeMap<Identifier, FrostSigningCommitments>, String> {
+    if entries.is_empty() {
+        return Err(
+            "SIGNING_SCHEME_MPC_USER_GROUP requires at least one sub-user entry".to_string(),
+        );
+    }
+    let mut map = BTreeMap::new();
+    let mut previous: Option<u32> = None;
+    for entry in entries {
+        if previous.is_some_and(|p| entry.position <= p) {
+            return Err("Sub-user positions must be strictly ascending".to_string());
+        }
+        previous = Some(entry.position);
+        let commitment = entry
+            .commitment
+            .as_ref()
+            .ok_or("Sub-user entry is missing its nonce commitment")?;
+        map.insert(
+            subuser_identifier(entry.position)?,
+            frost_commitments_from_proto(commitment)?,
+        );
+    }
+    Ok(map)
+}
+
+type SubUserRound2 = (
+    BTreeMap<Identifier, FrostSigningCommitments>,
+    BTreeMap<Identifier, SignatureShare>,
+);
+
+fn subuser_shares_from_proto(entries: &[SubUserSignatureShare]) -> Result<SubUserRound2, String> {
+    if entries.is_empty() {
+        return Err(
+            "SIGNING_SCHEME_MPC_USER_GROUP requires at least one sub-user entry".to_string(),
+        );
+    }
+    let mut commitments = BTreeMap::new();
+    let mut shares = BTreeMap::new();
+    let mut previous: Option<u32> = None;
+    for entry in entries {
+        if previous.is_some_and(|p| entry.position <= p) {
+            return Err("Sub-user positions must be strictly ascending".to_string());
+        }
+        previous = Some(entry.position);
+        let identifier = subuser_identifier(entry.position)?;
+        let commitment = entry
+            .commitment
+            .as_ref()
+            .ok_or("Sub-user entry is missing its nonce commitment")?;
+        commitments.insert(identifier, frost_commitments_from_proto(commitment)?);
+        shares.insert(
+            identifier,
+            SignatureShare::deserialize(&entry.signature_share)
+                .map_err(|e| format!("Failed to parse sub-user signature share: {e:?}"))?,
+        );
+    }
+    Ok((commitments, shares))
 }
 
 pub fn frost_signature_shares_from_proto(
@@ -216,8 +288,10 @@ pub fn frost_nonce(req: &FrostNonceRequest) -> Result<FrostNonceResponse, String
 }
 
 fn sign_frost_job(job: &FrostSigningJob, req: &SignFrostRequest) -> Result<SignatureShare, String> {
-    if job.signing_scheme() == SigningScheme::MpcUserGroup {
-        return Err("MPC user-group signing is not implemented yet".to_string());
+    match SigningScheme::try_from(job.signing_scheme) {
+        Ok(SigningScheme::MpcUserGroup) => return sign_frost_job_mpc(job, req),
+        Ok(SigningScheme::Unspecified | SigningScheme::SingleUser) => {}
+        Err(_) => return Err(format!("Unknown signing scheme {}", job.signing_scheme)),
     }
     if !job.subuser_commitments.is_empty() {
         return Err(format!(
@@ -294,6 +368,62 @@ fn sign_frost_job(job: &FrostSigningJob, req: &SignFrostRequest) -> Result<Signa
     Ok(signature_share)
 }
 
+/// The statechain side of an MPC (multi-sub-user) signing job. This
+/// operator's own round-2 share binds both groups' round-1 commitments
+/// through group-tagged binding factors, so the sub-user commitment set is
+/// required already at signing time. Sub-users produce their shares
+/// client-side; a signing job never carries user key material in this scheme.
+fn sign_frost_job_mpc(
+    job: &FrostSigningJob,
+    req: &SignFrostRequest,
+) -> Result<SignatureShare, String> {
+    if req.role != SigningRole::Statechain as i32 {
+        return Err("MPC user-group signing jobs are statechain-side only".to_string());
+    }
+    if job.user_commitments.is_some() {
+        return Err(
+            "user_commitments must be absent with SIGNING_SCHEME_MPC_USER_GROUP".to_string(),
+        );
+    }
+    if !job.adaptor_public_key.is_empty() {
+        return Err(
+            "adaptor signatures are not supported with SIGNING_SCHEME_MPC_USER_GROUP".to_string(),
+        );
+    }
+
+    let statechain_commitments = frost_signing_commiement_map_from_proto(&job.commitments)
+        .map_err(|e| format!("Failed to parse signing commitments: {e:?}"))?;
+    let subuser_commitments = subuser_commitments_from_proto(&job.subuser_commitments)?;
+
+    let nonce = match &job.nonce {
+        Some(nonce) => {
+            frost_nonce_from_proto(nonce).map_err(|e| format!("Failed to parse nonce: {e:?}"))?
+        }
+        None => return Err("Nonce is required".to_string()),
+    };
+    let verifying_key = verifying_key_from_bytes(job.verifying_key.clone())
+        .map_err(|e| format!("Failed to parse verifying key: {e:?}"))?;
+    let key_package = match &job.key_package {
+        Some(key_package) => {
+            frost_key_package_from_proto(key_package, None, verifying_key, req.role)
+                .map_err(|e| format!("Failed to parse key package: {e:?}"))?
+        }
+        None => return Err("Key package is required".to_string()),
+    };
+
+    let signing_package =
+        TwoGroupSigningPackage::new(statechain_commitments, subuser_commitments, &job.message)
+            .map_err(|e| format!("Failed to build two-group signing package: {e:?}"))?;
+
+    // As on the single-user statechain path (sign_with_tweak with an empty
+    // merkle root): the taproot tweak term rides with the statechain group;
+    // sub-users sign without it.
+    let tweak = vec![];
+    let key_package = key_package.tweak(Some(tweak.as_slice()));
+    two_group::sign(&signing_package, &nonce, &key_package, SignerGroup::Primary)
+        .map_err(|e| format!("Failed to sign MPC frost: {e:?}"))
+}
+
 pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
     let results: HashMap<String, SigningResult> = req
         .signing_jobs
@@ -330,8 +460,10 @@ pub fn sign_frost_serial(req: &SignFrostRequest) -> Result<SignFrostResponse, St
 }
 
 pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResponse, String> {
-    if req.signing_scheme() == SigningScheme::MpcUserGroup {
-        return Err("MPC user-group aggregation is not implemented yet".to_string());
+    match SigningScheme::try_from(req.signing_scheme) {
+        Ok(SigningScheme::MpcUserGroup) => return aggregate_frost_mpc(req),
+        Ok(SigningScheme::Unspecified | SigningScheme::SingleUser) => {}
+        Err(_) => return Err(format!("Unknown signing scheme {}", req.signing_scheme)),
     }
     if !req.subuser_shares.is_empty() {
         return Err(format!(
@@ -395,6 +527,78 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
         Some(&tweak),
     )
     .map_err(|e| format!("Failed to aggregate frost: {e:?}"))?;
+
+    Ok(AggregateFrostResponse {
+        signature: signature
+            .serialize()
+            .map_err(|e| format!("Failed to serialize signature: {e:?}"))?,
+    })
+}
+
+/// MPC (multi-sub-user) aggregation: sums the statechain shares and the
+/// sub-user shares (each already carrying its within-group Lagrange
+/// coefficient) under group-tagged binding factors, and verifies the result
+/// against the tweaked verifying key. Sub-user verifying shares are not on
+/// the wire, so a failing aggregate blames statechain shares individually
+/// but reports a sub-user-side failure without per-position blame.
+fn aggregate_frost_mpc(req: &AggregateFrostRequest) -> Result<AggregateFrostResponse, String> {
+    if req.user_commitments.is_some()
+        || !req.user_public_key.is_empty()
+        || !req.user_signature_share.is_empty()
+    {
+        return Err(
+            "single-user fields must be absent with SIGNING_SCHEME_MPC_USER_GROUP".to_string(),
+        );
+    }
+    if !req.adaptor_public_key.is_empty() {
+        return Err(
+            "adaptor signatures are not supported with SIGNING_SCHEME_MPC_USER_GROUP".to_string(),
+        );
+    }
+
+    let statechain_commitments = frost_signing_commiement_map_from_proto(&req.commitments)
+        .map_err(|e| format!("Failed to parse signing commitments: {e:?}"))?;
+    let (subuser_commitments, subuser_shares) = subuser_shares_from_proto(&req.subuser_shares)?;
+
+    let statechain_shares = req
+        .signature_shares
+        .iter()
+        .map(|(k, v)| -> Result<(Identifier, SignatureShare), String> {
+            let identifier = hex_string_to_identifier(k)
+                .map_err(|e| format!("Failed to parse identifier: {e}"))?;
+            let share = SignatureShare::deserialize(v).map_err(|e| e.to_string())?;
+            Ok((identifier, share))
+        })
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
+
+    let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
+        .map_err(|e| format!("Failed to parse verifying key: {e:?}"))?;
+    let statechain_verifying_shares = req
+        .public_shares
+        .iter()
+        .map(|(k, v)| -> Result<(Identifier, VerifyingShare), String> {
+            let identifier = hex_string_to_identifier(k)?;
+            let share = VerifyingShare::deserialize(v).map_err(|e| e.to_string())?;
+            Ok((identifier, share))
+        })
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
+    let public_package = PublicKeyPackage::new(statechain_verifying_shares, verifying_key, None);
+    // As on the single-user path (aggregate_with_tweak with an empty merkle
+    // root), which mirrors how the statechain signers tweaked at signing time.
+    let tweak = vec![];
+    let public_package = public_package.tweak(Some(tweak.as_slice()));
+
+    let signing_package =
+        TwoGroupSigningPackage::new(statechain_commitments, subuser_commitments, &req.message)
+            .map_err(|e| format!("Failed to build two-group signing package: {e:?}"))?;
+
+    let signature = two_group::aggregate(
+        &signing_package,
+        &statechain_shares,
+        &subuser_shares,
+        &public_package,
+    )
+    .map_err(|e| format!("Failed to aggregate MPC frost: {e:?}"))?;
 
     Ok(AggregateFrostResponse {
         signature: signature
@@ -552,7 +756,7 @@ mod tests {
     use super::*;
     use frost_secp256k1_tr::{
         self as frost,
-        keys::{KeyPackage as FrostKP, PublicKeyPackage, Tweak},
+        keys::{EvenY, KeyPackage as FrostKP, PublicKeyPackage, Tweak},
         Identifier, VerifyingKey,
     };
     use rand::thread_rng;
@@ -766,6 +970,456 @@ mod tests {
         let req = build_legacy_aggregate_request(&keys, message);
         let resp = aggregate_frost(&req).unwrap();
         verify_legacy_signature(&keys, message, &resp.signature);
+    }
+
+    /// The SE group of a [`LegacyKeys`] plus the SAME user key split t-of-n
+    /// across sub-users, so the combined key is identical to the legacy
+    /// single-user setup and both schemes can be verified against one key.
+    struct MpcKeys {
+        legacy: LegacyKeys,
+        /// Sub-user key packages by position (identifier scalar == position).
+        subuser_key_packages: BTreeMap<u16, FrostKP>,
+        user_min: u16,
+        tweaked_combined_vk: VerifyingKey,
+    }
+
+    fn generate_mpc_keys(se_max: u16, se_min: u16, user_max: u16, user_min: u16) -> MpcKeys {
+        let mut rng = thread_rng();
+        let legacy = generate_legacy_keys(se_max, se_min);
+
+        // Positions 1..=n numerically collide with the SE identifiers (also
+        // 1..=n); the group-tagged binding factors keep them apart.
+        let subuser_ids: Vec<Identifier> = (1..=user_max)
+            .map(|i| Identifier::try_from(i).unwrap())
+            .collect();
+        let (subuser_shares, _) = frost::keys::split(
+            &legacy.user_key,
+            user_max,
+            user_min,
+            frost::keys::IdentifierList::Custom(&subuser_ids),
+            &mut rng,
+        )
+        .unwrap();
+        let subuser_key_packages: BTreeMap<u16, FrostKP> = (1..=user_max)
+            .zip(subuser_shares.into_values())
+            .map(|(position, share)| (position, FrostKP::try_from(share).unwrap()))
+            .collect();
+
+        let merkle_root = vec![];
+        let tweaked_combined_vk = *PublicKeyPackage::new(BTreeMap::new(), legacy.combined_vk, None)
+            .tweak(Some(&merkle_root))
+            .verifying_key();
+
+        MpcKeys {
+            legacy,
+            subuser_key_packages,
+            user_min,
+            tweaked_combined_vk,
+        }
+    }
+
+    /// Runs one full MPC round-1 + round-2 pass: the SE signers through the
+    /// proto surface (sign_frost, SIGNING_SCHEME_MPC_USER_GROUP), the
+    /// sub-users client-side (two_group::sign, simulating the SDK: even-Y
+    /// normalized by the untweaked combined key's parity, no taptweak term,
+    /// under the tweaked combined key), and returns the aggregate request.
+    fn build_mpc_aggregate_request(keys: &MpcKeys, message: &[u8]) -> AggregateFrostRequest {
+        let mut rng = thread_rng();
+        let se_signers: Vec<Identifier> = keys
+            .legacy
+            .se_key_packages
+            .keys()
+            .take(keys.legacy.se_min as usize)
+            .cloned()
+            .collect();
+
+        // Round 1: SE signers.
+        let mut se_nonces = BTreeMap::new();
+        let mut se_proto_commitments: HashMap<String, SigningCommitment> = HashMap::new();
+        let mut se_frost_commitments = BTreeMap::new();
+        for id in &se_signers {
+            let kp = &keys.legacy.se_key_packages[id];
+            let (nonce, commitment) = frost::round1::commit(kp.signing_share(), &mut rng);
+            se_nonces.insert(*id, nonce);
+            se_proto_commitments.insert(id_to_hex(id), commitment_to_proto(&commitment));
+            se_frost_commitments.insert(*id, commitment);
+        }
+
+        // Round 1: the participating sub-users.
+        let mut subuser_nonces = BTreeMap::new();
+        let mut subuser_frost_commitments = BTreeMap::new();
+        let mut subuser_proto_commitments = Vec::new();
+        for (&position, kp) in keys
+            .subuser_key_packages
+            .iter()
+            .take(keys.user_min as usize)
+        {
+            let (nonce, commitment) = frost::round1::commit(kp.signing_share(), &mut rng);
+            subuser_nonces.insert(position, nonce);
+            subuser_frost_commitments.insert(Identifier::try_from(position).unwrap(), commitment);
+            subuser_proto_commitments.push(SubUserCommitment {
+                position: position as u32,
+                commitment: Some(commitment_to_proto(&commitment)),
+            });
+        }
+
+        let se_public_shares: HashMap<String, Vec<u8>> = se_signers
+            .iter()
+            .map(|id| {
+                let kp = &keys.legacy.se_key_packages[id];
+                (
+                    id_to_hex(id),
+                    kp.verifying_share().serialize().unwrap().to_vec(),
+                )
+            })
+            .collect();
+
+        // Round 2 for the SE signers, through the proto surface.
+        let mut se_signature_shares: HashMap<String, Vec<u8>> = HashMap::new();
+        for id in &se_signers {
+            let kp = &keys.legacy.se_key_packages[id];
+            let nonce = &se_nonces[id];
+            let proto_kp = KeyPackage {
+                identifier: id_to_hex(id),
+                secret_share: kp.signing_share().serialize().to_vec(),
+                public_shares: se_public_shares.clone(),
+                public_key: keys.legacy.combined_vk.serialize().unwrap().to_vec(),
+                min_signers: keys.legacy.se_min as u32,
+            };
+            let job = FrostSigningJob {
+                job_id: id_to_hex(id),
+                message: message.to_vec(),
+                key_package: Some(proto_kp),
+                verifying_key: keys.legacy.combined_vk.serialize().unwrap().to_vec(),
+                nonce: Some(SigningNonce {
+                    hiding: nonce.hiding().serialize().to_vec(),
+                    binding: nonce.binding().serialize().to_vec(),
+                }),
+                commitments: se_proto_commitments.clone(),
+                user_commitments: None,
+                adaptor_public_key: vec![],
+                signing_scheme: SigningScheme::MpcUserGroup.into(),
+                subuser_commitments: subuser_proto_commitments.clone(),
+            };
+            let resp = sign_frost(&SignFrostRequest {
+                signing_jobs: vec![job],
+                role: 0,
+            })
+            .unwrap();
+            let share = resp.results.get(&id_to_hex(id)).unwrap();
+            se_signature_shares.insert(id_to_hex(id), share.signature_share.clone());
+        }
+
+        // Round 2 for the sub-users, client-side.
+        let signing_package =
+            TwoGroupSigningPackage::new(se_frost_commitments, subuser_frost_commitments, message)
+                .unwrap();
+        let mut subuser_share_protos = Vec::new();
+        for (&position, kp) in keys
+            .subuser_key_packages
+            .iter()
+            .take(keys.user_min as usize)
+        {
+            let even = kp
+                .clone()
+                .into_even_y(Some(keys.legacy.combined_vk.has_even_y()));
+            let signer_kp = FrostKP::new(
+                *even.identifier(),
+                *even.signing_share(),
+                *even.verifying_share(),
+                keys.tweaked_combined_vk,
+                keys.user_min,
+            );
+            let share = two_group::sign(
+                &signing_package,
+                &subuser_nonces[&position],
+                &signer_kp,
+                SignerGroup::Secondary,
+            )
+            .unwrap();
+            let commitment = subuser_proto_commitments
+                .iter()
+                .find(|c| c.position == position as u32)
+                .unwrap()
+                .commitment
+                .clone();
+            subuser_share_protos.push(SubUserSignatureShare {
+                position: position as u32,
+                commitment,
+                signature_share: share.serialize(),
+            });
+        }
+
+        AggregateFrostRequest {
+            message: message.to_vec(),
+            signature_shares: se_signature_shares,
+            public_shares: se_public_shares,
+            verifying_key: keys.legacy.combined_vk.serialize().unwrap().to_vec(),
+            commitments: se_proto_commitments,
+            user_commitments: None,
+            user_public_key: vec![],
+            user_signature_share: vec![],
+            adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::MpcUserGroup.into(),
+            subuser_shares: subuser_share_protos,
+        }
+    }
+
+    #[test]
+    fn test_mpc_user_group_verifies_against_same_key_as_single_user() {
+        let keys = generate_mpc_keys(5, 3, 3, 2);
+        let message = b"same key, either scheme";
+
+        // Sub-user positions {1, 2} numerically collide with SE identifiers.
+        assert!(keys
+            .legacy
+            .se_key_packages
+            .contains_key(&Identifier::try_from(1u16).unwrap()));
+
+        // Single-party signature over the deployed scheme.
+        let legacy_request = build_legacy_aggregate_request(&keys.legacy, message);
+        let legacy_signature = aggregate_frost(&legacy_request).unwrap().signature;
+
+        // Multi-member user-group signature over the MPC scheme, same user key.
+        let mpc_request = build_mpc_aggregate_request(&keys, message);
+        let mpc_signature = aggregate_frost(&mpc_request).unwrap().signature;
+
+        for signature in [&legacy_signature, &mpc_signature] {
+            let signature = frost_secp256k1_tr::Signature::deserialize(signature).unwrap();
+            keys.tweaked_combined_vk
+                .verify(message, &signature)
+                .expect("signature should verify against the tweaked combined key");
+        }
+    }
+
+    #[test]
+    fn test_mpc_bad_subuser_share_fails_aggregate_without_blame() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"bad sub-user share";
+        let mut request = build_mpc_aggregate_request(&keys, message);
+
+        let share = &mut request.subuser_shares[0].signature_share;
+        let last = share.last_mut().unwrap();
+        *last = last.wrapping_add(1);
+
+        let err = aggregate_frost(&request).unwrap_err();
+        assert!(
+            err.contains("Failed to aggregate MPC frost"),
+            "unexpected error: {err}"
+        );
+        // Sub-user verifying shares are not on the wire, so there is no
+        // per-position blame — the SE shares all verify, and the failure is
+        // reported as an invalid signature.
+        assert!(err.contains("InvalidSignature"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn test_mpc_sign_rejects_user_commitments() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"mixed forms";
+        let request = build_mpc_aggregate_request(&keys, message);
+
+        let job = FrostSigningJob {
+            job_id: "job".to_string(),
+            message: message.to_vec(),
+            key_package: None,
+            verifying_key: vec![],
+            nonce: None,
+            commitments: HashMap::new(),
+            user_commitments: request.commitments.values().next().cloned(),
+            adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::MpcUserGroup.into(),
+            subuser_commitments: vec![],
+        };
+        let err = sign_frost(&SignFrostRequest {
+            signing_jobs: vec![job],
+            role: 0,
+        })
+        .unwrap_err();
+        assert!(
+            err.contains("user_commitments must be absent"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_mpc_sign_rejects_user_role() {
+        let job = FrostSigningJob {
+            job_id: "job".to_string(),
+            message: vec![],
+            key_package: None,
+            verifying_key: vec![],
+            nonce: None,
+            commitments: HashMap::new(),
+            user_commitments: None,
+            adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::MpcUserGroup.into(),
+            subuser_commitments: vec![],
+        };
+        let err = sign_frost(&SignFrostRequest {
+            signing_jobs: vec![job],
+            role: 1,
+        })
+        .unwrap_err();
+        assert!(
+            err.contains("statechain-side only"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_mpc_rejects_unsorted_positions() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"unsorted positions";
+        let mut request = build_mpc_aggregate_request(&keys, message);
+        request.subuser_shares.reverse();
+
+        let err = aggregate_frost(&request).unwrap_err();
+        assert!(
+            err.contains("strictly ascending"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_mpc_sign_rejects_unsorted_positions() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"unsorted signing positions";
+        let request = build_mpc_aggregate_request(&keys, message);
+        let mut subuser_commitments: Vec<SubUserCommitment> = request
+            .subuser_shares
+            .iter()
+            .map(|share| SubUserCommitment {
+                position: share.position,
+                commitment: share.commitment.clone(),
+            })
+            .collect();
+        subuser_commitments.reverse();
+
+        let job = FrostSigningJob {
+            job_id: "job".to_string(),
+            message: message.to_vec(),
+            key_package: None,
+            verifying_key: vec![],
+            nonce: None,
+            commitments: HashMap::new(),
+            user_commitments: None,
+            adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::MpcUserGroup.into(),
+            subuser_commitments,
+        };
+        let err = sign_frost(&SignFrostRequest {
+            signing_jobs: vec![job],
+            role: 0,
+        })
+        .unwrap_err();
+        assert!(
+            err.contains("strictly ascending"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_mpc_sign_rejects_adaptor() {
+        let job = FrostSigningJob {
+            job_id: "job".to_string(),
+            message: vec![],
+            key_package: None,
+            verifying_key: vec![],
+            nonce: None,
+            commitments: HashMap::new(),
+            user_commitments: None,
+            adaptor_public_key: vec![2; 33],
+            signing_scheme: SigningScheme::MpcUserGroup.into(),
+            subuser_commitments: vec![],
+        };
+        let err = sign_frost(&SignFrostRequest {
+            signing_jobs: vec![job],
+            role: 0,
+        })
+        .unwrap_err();
+        assert!(
+            err.contains("adaptor signatures are not supported"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_mpc_aggregate_rejects_adaptor() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"adaptor with mpc";
+        let mut request = build_mpc_aggregate_request(&keys, message);
+        request.adaptor_public_key = vec![2; 33];
+
+        let err = aggregate_frost(&request).unwrap_err();
+        assert!(
+            err.contains("adaptor signatures are not supported"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_unknown_signing_scheme_is_rejected() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"unknown scheme";
+        let mut request = build_mpc_aggregate_request(&keys, message);
+        request.signing_scheme = 99;
+
+        let err = aggregate_frost(&request).unwrap_err();
+        assert!(
+            err.contains("Unknown signing scheme 99"),
+            "unexpected error: {err}"
+        );
+
+        let job = FrostSigningJob {
+            job_id: "job".to_string(),
+            message: message.to_vec(),
+            key_package: None,
+            verifying_key: vec![],
+            nonce: None,
+            commitments: HashMap::new(),
+            user_commitments: None,
+            adaptor_public_key: vec![],
+            signing_scheme: 99,
+            subuser_commitments: vec![],
+        };
+        let err = sign_frost(&SignFrostRequest {
+            signing_jobs: vec![job],
+            role: 0,
+        })
+        .unwrap_err();
+        assert!(
+            err.contains("Unknown signing scheme 99"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_mpc_aggregate_rejects_single_user_fields() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"mixed aggregate forms";
+        let mut request = build_mpc_aggregate_request(&keys, message);
+        request.user_signature_share = vec![1; 32];
+
+        let err = aggregate_frost(&request).unwrap_err();
+        assert!(
+            err.contains("single-user fields must be absent"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_single_user_scheme_rejects_subuser_fields() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"sub-user fields without the scheme";
+        let mut request = build_mpc_aggregate_request(&keys, message);
+        request.signing_scheme = SigningScheme::Unspecified.into();
+
+        let err = aggregate_frost(&request).unwrap_err();
+        assert!(
+            err.contains("sub-user shares require SIGNING_SCHEME_MPC_USER_GROUP"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
