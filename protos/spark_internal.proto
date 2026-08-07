@@ -3,6 +3,7 @@ syntax = "proto3";
 package spark_internal;
 
 import "common.proto";
+import "frost.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
@@ -158,10 +159,19 @@ message SigningJob {
     map<string, common.SigningCommitment> commitments = 5;
 
     // The commitments for all participants of the user.
+    // Present exactly when the scheme is single-user.
     common.SigningCommitment user_commitments = 6;
 
     // The adaptor for the message.
     bytes adaptor_public_key = 7;
+
+    // The signing scheme discriminant; see frost.SigningScheme. Deployed
+    // senders predate the field and send 0 (≡ single-user).
+    frost.SigningScheme signing_scheme = 8;
+
+    // The user group's round-1 commitments, positions ascending and unique.
+    // Present exactly when the scheme is SIGNING_SCHEME_MPC_USER_GROUP.
+    repeated frost.SubUserCommitment subuser_commitments = 9;
 }
 
 message FrostRound2Request {

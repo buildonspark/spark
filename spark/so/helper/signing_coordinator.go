@@ -244,10 +244,19 @@ type SigningJob struct {
 	Message sighash.Hash
 	// VerifyingKey is the verifying key for the message.
 	VerifyingKey *keys.Public
-	// UserCommitment is the user commitment for the message.
+	// UserCommitment is the user commitment for the message. Present exactly
+	// when the scheme is single-user.
 	UserCommitment *frost.SigningCommitment
 	// AdaptorPublicKey is the adaptor public key for the message.
 	AdaptorPublicKey *keys.Public
+	// SigningScheme is the explicit user-side scheme discriminant on the
+	// frost-signer wire; the zero value is the deployed single-user form.
+	// The signer branches on this value, never on which fields are populated.
+	SigningScheme pbfrost.SigningScheme
+	// SubUserCommitments is the user group's round-1 commitments, positions
+	// ascending and unique. Present exactly when the scheme is
+	// SIGNING_SCHEME_MPC_USER_GROUP.
+	SubUserCommitments []*pbfrost.SubUserCommitment
 }
 
 type SigningJobWithPregeneratedNonce struct {

@@ -278,13 +278,15 @@ func marshalSigningJobHelper(job *helper.SigningJobWithPregeneratedNonce) (*pbin
 		adaptorPublicKey = job.AdaptorPublicKey.Serialize()
 	}
 	return &pbinternal.SigningJob{
-		JobId:            job.JobID.String(),
-		Message:          job.Message.Serialize(),
-		KeyshareId:       job.SigningKeyshareID.String(),
-		VerifyingKey:     job.VerifyingKey.Serialize(),
-		Commitments:      commitments,
-		UserCommitments:  userCommitments,
-		AdaptorPublicKey: adaptorPublicKey,
+		JobId:              job.JobID.String(),
+		Message:            job.Message.Serialize(),
+		KeyshareId:         job.SigningKeyshareID.String(),
+		VerifyingKey:       job.VerifyingKey.Serialize(),
+		Commitments:        commitments,
+		UserCommitments:    userCommitments,
+		AdaptorPublicKey:   adaptorPublicKey,
+		SigningScheme:      job.SigningScheme,
+		SubuserCommitments: job.SubUserCommitments,
 	}, nil
 }
 

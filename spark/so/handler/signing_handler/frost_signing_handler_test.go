@@ -11,6 +11,7 @@ import (
 	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
@@ -588,5 +589,80 @@ func TestRetryFingerprintBindsSigningJobInputs(t *testing.T) {
 			tc.mutate(job)
 			assert.NotEqual(t, baseFingerprint, retryFingerprint(job))
 		})
+	}
+}
+
+func TestRetryFingerprint_MpcFields(t *testing.T) {
+	commitment := &pbcommon.SigningCommitment{
+		Hiding:  keys.GeneratePrivateKey().Public().Serialize(),
+		Binding: keys.GeneratePrivateKey().Public().Serialize(),
+	}
+	base := &pb.SigningJob{
+		KeyshareId:   uuid.NewString(),
+		Message:      []byte("message"),
+		VerifyingKey: keys.GeneratePrivateKey().Public().Serialize(),
+		Commitments:  map[string]*pbcommon.SigningCommitment{"op1": commitment},
+	}
+	legacy := retryFingerprint(base)
+
+	// The explicit zero values of the new fields keep the deployed
+	// fingerprint bytes, so fingerprints recorded on in-flight nonces
+	// survive a deploy.
+	explicitZero := &pb.SigningJob{
+		KeyshareId:         base.GetKeyshareId(),
+		Message:            base.GetMessage(),
+		VerifyingKey:       base.GetVerifyingKey(),
+		Commitments:        base.GetCommitments(),
+		SigningScheme:      pbfrost.SigningScheme_SIGNING_SCHEME_UNSPECIFIED,
+		SubuserCommitments: nil,
+	}
+	assert.Equal(t, legacy, retryFingerprint(explicitZero))
+
+	// The MPC fields enter the binding factor, so each must change the
+	// fingerprint: the scheme alone, the sub-user set, and any individual
+	// sub-user commitment.
+	subuser := &pbfrost.SubUserCommitment{
+		Position: 1,
+		Commitment: &pbcommon.SigningCommitment{
+			Hiding:  keys.GeneratePrivateKey().Public().Serialize(),
+			Binding: keys.GeneratePrivateKey().Public().Serialize(),
+		},
+	}
+	schemeOnly := &pb.SigningJob{
+		KeyshareId:    base.GetKeyshareId(),
+		Message:       base.GetMessage(),
+		VerifyingKey:  base.GetVerifyingKey(),
+		Commitments:   base.GetCommitments(),
+		SigningScheme: pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
+	}
+	mpc := &pb.SigningJob{
+		KeyshareId:         base.GetKeyshareId(),
+		Message:            base.GetMessage(),
+		VerifyingKey:       base.GetVerifyingKey(),
+		Commitments:        base.GetCommitments(),
+		SigningScheme:      pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
+		SubuserCommitments: []*pbfrost.SubUserCommitment{subuser},
+	}
+	otherSubuser := &pbfrost.SubUserCommitment{
+		Position: 1,
+		Commitment: &pbcommon.SigningCommitment{
+			Hiding:  keys.GeneratePrivateKey().Public().Serialize(),
+			Binding: keys.GeneratePrivateKey().Public().Serialize(),
+		},
+	}
+	otherMpc := &pb.SigningJob{
+		KeyshareId:         base.GetKeyshareId(),
+		Message:            base.GetMessage(),
+		VerifyingKey:       base.GetVerifyingKey(),
+		Commitments:        base.GetCommitments(),
+		SigningScheme:      pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
+		SubuserCommitments: []*pbfrost.SubUserCommitment{otherSubuser},
+	}
+
+	fingerprints := [][]byte{legacy, retryFingerprint(schemeOnly), retryFingerprint(mpc), retryFingerprint(otherMpc)}
+	for i := range fingerprints {
+		for j := i + 1; j < len(fingerprints); j++ {
+			assert.NotEqual(t, fingerprints[i], fingerprints[j], "fingerprints %d and %d must differ", i, j)
+		}
 	}
 }

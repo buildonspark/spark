@@ -18,6 +18,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
+	frost "github.com/lightsparkdev/spark/proto/frost"
+
 	spark "github.com/lightsparkdev/spark/proto/spark"
 )
 
@@ -35,6 +37,8 @@ var (
 	_ = (*mail.Address)(nil)
 	_ = anypb.Any{}
 	_ = sort.Sort
+
+	_ = frost.SigningScheme(0)
 
 	_ = spark.Network(0)
 )
@@ -728,6 +732,42 @@ func (m *SigningJob) validate(all bool) error {
 	}
 
 	// no validation rules for AdaptorPublicKey
+
+	// no validation rules for SigningScheme
+
+	for idx, item := range m.GetSubuserCommitments() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SigningJobValidationError{
+						field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SigningJobValidationError{
+						field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SigningJobValidationError{
+					field:  fmt.Sprintf("SubuserCommitments[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return SigningJobMultiError(errors)
