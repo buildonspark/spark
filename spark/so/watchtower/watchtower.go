@@ -229,13 +229,8 @@ func CheckExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, bitcoinCli
 	// A node locked for aggregation is mid-flow: its stored refund package is
 	// about to be replaced, and broadcasting it would publish an old state, so
 	// leave it alone until the flow commits or rolls back.
-	//
-	// Two limits worth knowing. This only binds operators running this code:
-	// an older binary sharing the database has no such guard, which is why
-	// spark.so.enable_leaf_aggregation must stay off until the whole fleet is
-	// upgraded (nothing can reach AGGREGATE_LOCK before then). And the status
-	// is read, not held — a Prepare committing between the read above and the
-	// broadcast below is still possible; see refreshNodeStatus.
+	// The status is read, not held, so a Prepare may commit between this read and
+	// the broadcast below.
 	if node.Status == st.TreeNodeStatusAggregateLock {
 		return nil
 	}
