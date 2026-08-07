@@ -64,8 +64,6 @@ knobs:
     # Instant static deposit
     spark.so.enable_instant_static_deposit@REGTEST: 100
     spark.so.max_pending_instant_static_deposit_amount: 1000000
-    # Leaf aggregation
-    spark.so.enable_leaf_aggregation: 1
     # Lightning
     spark.so.shutdown_hodl_invoices: 0
     # Multiparty (user-side MPC) transfer send — fail-closed endpoint; off until the flow lands.

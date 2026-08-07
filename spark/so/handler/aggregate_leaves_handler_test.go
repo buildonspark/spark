@@ -14,15 +14,11 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
-
-// These cover the entrypoint's own gates — the rollout knob, the session
-// binding, and the ownership check that guards the idempotent short-circuit.
-// The consensus round itself needs a cluster and is covered by the
-// grpc_test_internal suite; everything here fails before Execute is reached.
 
 func aggregateLeavesRequest(f *aggregateLeavesFixture) *pbssp.AggregateLeavesRequest {
 	return &pbssp.AggregateLeavesRequest{
@@ -32,36 +28,18 @@ func aggregateLeavesRequest(f *aggregateLeavesFixture) *pbssp.AggregateLeavesReq
 	}
 }
 
-func TestSspAggregateLeavesRequiresKnob(t *testing.T) {
-	ctx, _ := db.ConnectToTestPostgres(t)
-	rng := rand.NewChaCha8([32]byte{51})
-	f := createAggregateLeavesFixture(t, ctx, rng)
-
-	// Knob absent means disabled: aggregation is irreversible per subtree, so
-	// it must stay unreachable until every SO can dispatch and defend it.
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{}))
-	ctx = authn.InjectSessionForTests(ctx, f.ownerIdentity.Public(), time.Now().Add(time.Hour).Unix())
-
-	handler := NewSspRequestHandler(&so.Config{Identifier: "operator1"})
-	_, err := handler.AggregateLeaves(ctx, aggregateLeavesRequest(f))
-	require.ErrorContains(t, err, "not enabled")
-}
-
 func TestSspAggregateLeavesEnforcesSessionIdentity(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	rng := rand.NewChaCha8([32]byte{52})
 	f := createAggregateLeavesFixture(t, ctx, rng)
 
 	// A session for someone else must not be able to name this owner's key.
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobEnableLeafAggregation: 1,
-	}))
 	ctx = authn.InjectSessionForTests(ctx, keys.MustGeneratePrivateKeyFromRand(rng).Public(), time.Now().Add(time.Hour).Unix())
 
-	handler := NewSspRequestHandler(&so.Config{Identifier: "operator1"})
+	handler := NewSspRequestHandler(&so.Config{Identifier: "operator1", AuthzEnforced: true})
 	_, err := handler.AggregateLeaves(ctx, aggregateLeavesRequest(f))
-	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "not enabled", "the knob gate must not be what rejected this")
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.ErrorContains(t, err, "session identity does not match request identity")
 }
 
 // TestSspAggregateLeavesConsolidatedShortCircuitChecksOwnership is the
@@ -85,15 +63,12 @@ func TestSspAggregateLeavesConsolidatedShortCircuitChecksOwnership(t *testing.T)
 	require.NoError(t, err)
 
 	attacker := keys.MustGeneratePrivateKeyFromRand(rng)
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobEnableLeafAggregation: 1,
-	}))
 	ctx = authn.InjectSessionForTests(ctx, attacker.Public(), time.Now().Add(time.Hour).Unix())
 
 	req := aggregateLeavesRequest(f)
 	req.OwnerIdentityPublicKey = attacker.Public().Serialize()
 
-	handler := NewSspRequestHandler(&so.Config{Identifier: "operator1"})
+	handler := NewSspRequestHandler(&so.Config{Identifier: "operator1", AuthzEnforced: true})
 	resp, err := handler.AggregateLeaves(ctx, req)
 	require.Error(t, err)
 	assert.Nil(t, resp)

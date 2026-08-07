@@ -18,7 +18,6 @@ import (
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/knobs"
 )
 
 // AggregateLeaves is the SSP-facing coordinator entrypoint for the
@@ -26,9 +25,6 @@ import (
 // into Prepare, short-circuits idempotent retries, and drives the flow
 // through the consensus engine.
 func (h *SspRequestHandler) AggregateLeaves(ctx context.Context, req *pbssp.AggregateLeavesRequest) (*pbssp.AggregateLeavesResponse, error) {
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnableLeafAggregation, 0) == 0 {
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf aggregation is not enabled"))
-	}
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
