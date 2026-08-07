@@ -176,18 +176,6 @@ func (m *mockFrostServiceClient) ValidateSignatureShare(context.Context, *pbfros
 	return &emptypb.Empty{}, nil
 }
 
-func (m *mockFrostServiceClient) SignFrostV2(context.Context, *pbfrost.SignFrostRequestV2, ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
-	return &pbfrost.SignFrostResponse{}, nil
-}
-
-func (m *mockFrostServiceClient) AggregateFrostV2(context.Context, *pbfrost.AggregateFrostRequestV2, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
-	return &pbfrost.AggregateFrostResponse{}, nil
-}
-
-func (m *mockFrostServiceClient) ValidateSignatureShareV2(context.Context, *pbfrost.ValidateSignatureShareRequestV2, ...grpc.CallOption) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
-}
-
 func TestLightningHandlersRejectNilRequests(t *testing.T) {
 	ctx := t.Context()
 	handler := NewLightningHandler(&so.Config{})
@@ -615,18 +603,6 @@ func (m *trackingFrostServiceClient) ValidateSignatureShare(ctx context.Context,
 		m.inFlight.Add(-1)
 		return nil, ctx.Err()
 	}
-}
-
-func (m *trackingFrostServiceClient) SignFrostV2(context.Context, *pbfrost.SignFrostRequestV2, ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
-	return &pbfrost.SignFrostResponse{}, nil
-}
-
-func (m *trackingFrostServiceClient) AggregateFrostV2(context.Context, *pbfrost.AggregateFrostRequestV2, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
-	return &pbfrost.AggregateFrostResponse{}, nil
-}
-
-func (m *trackingFrostServiceClient) ValidateSignatureShareV2(context.Context, *pbfrost.ValidateSignatureShareRequestV2, ...grpc.CallOption) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
 }
 
 func createSigningJob(leafID string) *pb.UserSignedTxSigningJob {

@@ -20,18 +20,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FrostService_Echo_FullMethodName                     = "/frost.FrostService/echo"
-	FrostService_DkgRound1_FullMethodName                = "/frost.FrostService/dkg_round1"
-	FrostService_DkgRound2_FullMethodName                = "/frost.FrostService/dkg_round2"
-	FrostService_DkgRound3_FullMethodName                = "/frost.FrostService/dkg_round3"
-	FrostService_FrostNonce_FullMethodName               = "/frost.FrostService/frost_nonce"
-	FrostService_SignFrost_FullMethodName                = "/frost.FrostService/sign_frost"
-	FrostService_AggregateFrost_FullMethodName           = "/frost.FrostService/aggregate_frost"
-	FrostService_AggregateFrostBatch_FullMethodName      = "/frost.FrostService/aggregate_frost_batch"
-	FrostService_ValidateSignatureShare_FullMethodName   = "/frost.FrostService/validate_signature_share"
-	FrostService_SignFrostV2_FullMethodName              = "/frost.FrostService/sign_frost_v2"
-	FrostService_AggregateFrostV2_FullMethodName         = "/frost.FrostService/aggregate_frost_v2"
-	FrostService_ValidateSignatureShareV2_FullMethodName = "/frost.FrostService/validate_signature_share_v2"
+	FrostService_Echo_FullMethodName                   = "/frost.FrostService/echo"
+	FrostService_DkgRound1_FullMethodName              = "/frost.FrostService/dkg_round1"
+	FrostService_DkgRound2_FullMethodName              = "/frost.FrostService/dkg_round2"
+	FrostService_DkgRound3_FullMethodName              = "/frost.FrostService/dkg_round3"
+	FrostService_FrostNonce_FullMethodName             = "/frost.FrostService/frost_nonce"
+	FrostService_SignFrost_FullMethodName              = "/frost.FrostService/sign_frost"
+	FrostService_AggregateFrost_FullMethodName         = "/frost.FrostService/aggregate_frost"
+	FrostService_AggregateFrostBatch_FullMethodName    = "/frost.FrostService/aggregate_frost_batch"
+	FrostService_ValidateSignatureShare_FullMethodName = "/frost.FrostService/validate_signature_share"
 )
 
 // FrostServiceClient is the client API for FrostService service.
@@ -47,9 +44,6 @@ type FrostServiceClient interface {
 	AggregateFrost(ctx context.Context, in *AggregateFrostRequest, opts ...grpc.CallOption) (*AggregateFrostResponse, error)
 	AggregateFrostBatch(ctx context.Context, in *AggregateFrostBatchRequest, opts ...grpc.CallOption) (*AggregateFrostBatchResponse, error)
 	ValidateSignatureShare(ctx context.Context, in *ValidateSignatureShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	SignFrostV2(ctx context.Context, in *SignFrostRequestV2, opts ...grpc.CallOption) (*SignFrostResponse, error)
-	AggregateFrostV2(ctx context.Context, in *AggregateFrostRequestV2, opts ...grpc.CallOption) (*AggregateFrostResponse, error)
-	ValidateSignatureShareV2(ctx context.Context, in *ValidateSignatureShareRequestV2, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type frostServiceClient struct {
@@ -150,36 +144,6 @@ func (c *frostServiceClient) ValidateSignatureShare(ctx context.Context, in *Val
 	return out, nil
 }
 
-func (c *frostServiceClient) SignFrostV2(ctx context.Context, in *SignFrostRequestV2, opts ...grpc.CallOption) (*SignFrostResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SignFrostResponse)
-	err := c.cc.Invoke(ctx, FrostService_SignFrostV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *frostServiceClient) AggregateFrostV2(ctx context.Context, in *AggregateFrostRequestV2, opts ...grpc.CallOption) (*AggregateFrostResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AggregateFrostResponse)
-	err := c.cc.Invoke(ctx, FrostService_AggregateFrostV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *frostServiceClient) ValidateSignatureShareV2(ctx context.Context, in *ValidateSignatureShareRequestV2, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, FrostService_ValidateSignatureShareV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // FrostServiceServer is the server API for FrostService service.
 // All implementations must embed UnimplementedFrostServiceServer
 // for forward compatibility.
@@ -193,9 +157,6 @@ type FrostServiceServer interface {
 	AggregateFrost(context.Context, *AggregateFrostRequest) (*AggregateFrostResponse, error)
 	AggregateFrostBatch(context.Context, *AggregateFrostBatchRequest) (*AggregateFrostBatchResponse, error)
 	ValidateSignatureShare(context.Context, *ValidateSignatureShareRequest) (*emptypb.Empty, error)
-	SignFrostV2(context.Context, *SignFrostRequestV2) (*SignFrostResponse, error)
-	AggregateFrostV2(context.Context, *AggregateFrostRequestV2) (*AggregateFrostResponse, error)
-	ValidateSignatureShareV2(context.Context, *ValidateSignatureShareRequestV2) (*emptypb.Empty, error)
 	mustEmbedUnimplementedFrostServiceServer()
 }
 
@@ -232,15 +193,6 @@ func (UnimplementedFrostServiceServer) AggregateFrostBatch(context.Context, *Agg
 }
 func (UnimplementedFrostServiceServer) ValidateSignatureShare(context.Context, *ValidateSignatureShareRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateSignatureShare not implemented")
-}
-func (UnimplementedFrostServiceServer) SignFrostV2(context.Context, *SignFrostRequestV2) (*SignFrostResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SignFrostV2 not implemented")
-}
-func (UnimplementedFrostServiceServer) AggregateFrostV2(context.Context, *AggregateFrostRequestV2) (*AggregateFrostResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method AggregateFrostV2 not implemented")
-}
-func (UnimplementedFrostServiceServer) ValidateSignatureShareV2(context.Context, *ValidateSignatureShareRequestV2) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method ValidateSignatureShareV2 not implemented")
 }
 func (UnimplementedFrostServiceServer) mustEmbedUnimplementedFrostServiceServer() {}
 func (UnimplementedFrostServiceServer) testEmbeddedByValue()                      {}
@@ -425,60 +377,6 @@ func _FrostService_ValidateSignatureShare_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _FrostService_SignFrostV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SignFrostRequestV2)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(FrostServiceServer).SignFrostV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: FrostService_SignFrostV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FrostServiceServer).SignFrostV2(ctx, req.(*SignFrostRequestV2))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _FrostService_AggregateFrostV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AggregateFrostRequestV2)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(FrostServiceServer).AggregateFrostV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: FrostService_AggregateFrostV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FrostServiceServer).AggregateFrostV2(ctx, req.(*AggregateFrostRequestV2))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _FrostService_ValidateSignatureShareV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ValidateSignatureShareRequestV2)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(FrostServiceServer).ValidateSignatureShareV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: FrostService_ValidateSignatureShareV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FrostServiceServer).ValidateSignatureShareV2(ctx, req.(*ValidateSignatureShareRequestV2))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // FrostService_ServiceDesc is the grpc.ServiceDesc for FrostService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -521,18 +419,6 @@ var FrostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "validate_signature_share",
 			Handler:    _FrostService_ValidateSignatureShare_Handler,
-		},
-		{
-			MethodName: "sign_frost_v2",
-			Handler:    _FrostService_SignFrostV2_Handler,
-		},
-		{
-			MethodName: "aggregate_frost_v2",
-			Handler:    _FrostService_AggregateFrostV2_Handler,
-		},
-		{
-			MethodName: "validate_signature_share_v2",
-			Handler:    _FrostService_ValidateSignatureShareV2_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
