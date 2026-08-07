@@ -202,7 +202,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("failed to parse transfer receiver public key: %w", err)
 	}
 	if !depositAddress.OwnerIdentityPubkey.Equals(reqTransferReceiverIdentityPubKey) {
-		return nil, fmt.Errorf("transfer is not to the recepient of the deposit")
+		return nil, fmt.Errorf("transfer is not to the recipient of the deposit")
 	}
 
 	// Validate that the deposit key provided by the user matches what's in the DB.
