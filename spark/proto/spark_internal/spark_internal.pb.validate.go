@@ -12097,8 +12097,47 @@ func (m *DepositTreePrepareRequest) validate(all bool) error {
 		}
 	}
 
+	if m.GetSigningKeyshareId() != "" {
+
+		if err := m._validateUuid(m.GetSigningKeyshareId()); err != nil {
+			err = DepositTreePrepareRequestValidationError{
+				field:  "SigningKeyshareId",
+				reason: "value must be a valid UUID",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(m.GetVerifyingPubkey()) > 0 {
+
+		if len(m.GetVerifyingPubkey()) != 33 {
+			err := DepositTreePrepareRequestValidationError{
+				field:  "VerifyingPubkey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return DepositTreePrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *DepositTreePrepareRequest) _validateUuid(uuid string) error {
+	if matched := _spark_internal_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
 	}
 
 	return nil

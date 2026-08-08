@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -19,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -27,7 +30,10 @@ import (
 // DepositTreeFlowHandler — participant side (Prepare / Commit / Rollback)
 // ---------------------------------------------------------------------------
 
-var _ consensus.FlowHandler = (*DepositTreeFlowHandler)(nil)
+var (
+	_ consensus.FlowHandler                    = (*DepositTreeFlowHandler)(nil)
+	_ consensus.ContextPrepareBoundFlowHandler = (*DepositTreeFlowHandler)(nil)
+)
 
 // DepositTreeFlowHandler implements consensus.FlowHandler for the deposit tree
 // finalization flow. Each SO independently validates the deposit address,
@@ -38,6 +44,178 @@ type DepositTreeFlowHandler struct {
 
 func NewDepositTreeFlowHandler(config *so.Config) *DepositTreeFlowHandler {
 	return &DepositTreeFlowHandler{config: config}
+}
+
+// ValidateDecisionAgainstPrepare prevents the finalize payload from replacing
+// the deposit tree state each participant validated before producing signature
+// shares. Rollback is a no-op, so its prepare-shaped payload carries no state
+// that needs binding.
+func (h *DepositTreeFlowHandler) ValidateDecisionAgainstPrepare(ctx context.Context, prepareOp proto.Message, decisionOp proto.Message) error {
+	prepare, ok := prepareOp.(*pbinternal.DepositTreePrepareRequest)
+	if !ok {
+		return fmt.Errorf("unexpected prepare operation type %T for deposit tree", prepareOp)
+	}
+	orig := prepare.GetOriginalRequest()
+	if orig == nil {
+		return fmt.Errorf("prepared deposit tree request has no original request")
+	}
+
+	switch decision := decisionOp.(type) {
+	case *pbinternal.DepositTreePrepareRequest:
+		return nil
+	case *pbinternal.FinalizeTreeCreationRequest:
+		if len(decision.GetNodes()) != 1 || decision.GetNodes()[0] == nil || decision.GetNodes()[0].ParentNodeId != nil {
+			return fmt.Errorf("deposit tree commit must contain exactly one root node")
+		}
+		node := decision.GetNodes()[0]
+		validateBinding, err := shouldValidateDepositPrepareBinding(ctx, prepare)
+		if err != nil {
+			return err
+		}
+		if validateBinding {
+			preparedKeyshareID, err := uuid.Parse(prepare.GetSigningKeyshareId())
+			if err != nil {
+				return fmt.Errorf("invalid prepared signing keyshare id: %w", err)
+			}
+			commitKeyshareID, err := uuid.Parse(node.GetSigningKeyshareId())
+			if err != nil {
+				return fmt.Errorf("invalid commit signing keyshare id: %w", err)
+			}
+			if commitKeyshareID != preparedKeyshareID {
+				return fmt.Errorf("commit signing keyshare does not match prepared signing keyshare")
+			}
+			preparedVerifyingKey, err := keys.ParsePublicKey(prepare.GetVerifyingPubkey())
+			if err != nil {
+				return fmt.Errorf("invalid prepared verifying public key: %w", err)
+			}
+			commitVerifyingKey, err := keys.ParsePublicKey(node.GetVerifyingPubkey())
+			if err != nil {
+				return fmt.Errorf("invalid commit verifying public key: %w", err)
+			}
+			if !commitVerifyingKey.Equals(preparedVerifyingKey) {
+				return fmt.Errorf("commit verifying key does not match prepared verifying key")
+			}
+		}
+		if !samePublicKey(node.GetOwnerIdentityPubkey(), orig.GetIdentityPublicKey()) {
+			return fmt.Errorf("commit root identity owner does not match prepared identity owner")
+		}
+		if !samePublicKey(node.GetOwnerSigningPubkey(), orig.GetRootTxSigningJob().GetSigningPublicKey()) {
+			return fmt.Errorf("commit root signing owner does not match prepared signing owner")
+		}
+		primaryTx, primaryOutput, additionalUtxos, err := preparedDepositRootInputs(orig)
+		if err != nil {
+			return err
+		}
+		expectedValue, err := checkedDepositRootTotalValue(primaryOutput, additionalUtxos)
+		if err != nil {
+			return err
+		}
+		if node.GetValue() != expectedValue {
+			return fmt.Errorf("commit root value %d does not match prepared deposit value %d", node.GetValue(), expectedValue)
+		}
+		if decision.GetNetwork() != orig.GetOnChainUtxo().GetNetwork() {
+			return fmt.Errorf("commit network %s does not match prepared network %s", decision.GetNetwork(), orig.GetOnChainUtxo().GetNetwork())
+		}
+		if node.GetVout() != orig.GetOnChainUtxo().GetVout() {
+			return fmt.Errorf("commit root vout %d does not match prepared primary utxo vout %d", node.GetVout(), orig.GetOnChainUtxo().GetVout())
+		}
+		if len(node.GetDirectTx()) != 0 {
+			return fmt.Errorf("commit root direct transaction must be empty")
+		}
+		if len(node.GetDirectRefundTx()) != 0 {
+			return fmt.Errorf("commit root direct refund transaction must be empty")
+		}
+		if node.GetRefundTimelock() != 0 {
+			return fmt.Errorf("commit root refund timelock must be zero")
+		}
+		if err := decisionTxMatchesPrepared(node.GetRawTx(), orig.GetRootTxSigningJob().GetRawTx(), "root"); err != nil {
+			return err
+		}
+		if err := decisionTxMatchesPrepared(node.GetRawRefundTx(), orig.GetRefundTxSigningJob().GetRawTx(), "refund"); err != nil {
+			return err
+		}
+		if err := decisionTxMatchesPrepared(node.GetDirectFromCpfpRefundTx(), orig.GetDirectFromCpfpRefundTxSigningJob().GetRawTx(), "direct-from-cpfp refund"); err != nil {
+			return err
+		}
+		if err := verifySignedTransactions(node.GetRawTx(), node.GetRawRefundTx(), node.GetDirectFromCpfpRefundTx(), primaryTx, primaryOutput, additionalUtxos); err != nil {
+			return fmt.Errorf("commit signed transaction verification failed: %w", err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unexpected decision operation type %T for deposit tree", decisionOp)
+	}
+}
+
+func preparedDepositRootInputs(req *pb.FinalizeDepositTreeCreationRequest) (*wire.MsgTx, *wire.TxOut, []additionalUtxoData, error) {
+	primaryUtxo := req.GetOnChainUtxo()
+	if primaryUtxo == nil {
+		return nil, nil, nil, fmt.Errorf("prepared primary utxo is required")
+	}
+	primaryTx, err := common.TxFromRawTxBytes(primaryUtxo.GetRawTx())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("invalid prepared primary utxo transaction: %w", err)
+	}
+	if uint64(primaryUtxo.GetVout()) >= uint64(len(primaryTx.TxOut)) {
+		return nil, nil, nil, fmt.Errorf("prepared primary utxo vout %d is out of bounds", primaryUtxo.GetVout())
+	}
+
+	additionalUtxos := make([]additionalUtxoData, 0, len(req.GetAdditionalOnChainUtxos()))
+	for i, additionalUtxo := range req.GetAdditionalOnChainUtxos() {
+		if additionalUtxo == nil {
+			return nil, nil, nil, fmt.Errorf("prepared additional utxo %d is required", i)
+		}
+		additionalTx, err := common.TxFromRawTxBytes(additionalUtxo.GetRawTx())
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("invalid prepared additional utxo %d transaction: %w", i, err)
+		}
+		if uint64(additionalUtxo.GetVout()) >= uint64(len(additionalTx.TxOut)) {
+			return nil, nil, nil, fmt.Errorf("prepared additional utxo %d vout %d is out of bounds", i, additionalUtxo.GetVout())
+		}
+		additionalUtxos = append(additionalUtxos, additionalUtxoData{
+			onChainTx:     additionalTx,
+			onChainOutput: additionalTx.TxOut[additionalUtxo.GetVout()],
+			vout:          additionalUtxo.GetVout(),
+		})
+	}
+
+	return primaryTx, primaryTx.TxOut[primaryUtxo.GetVout()], additionalUtxos, nil
+}
+
+func shouldValidateDepositPrepareBinding(ctx context.Context, req *pbinternal.DepositTreePrepareRequest) (bool, error) {
+	hasKeyshareID := req.GetSigningKeyshareId() != ""
+	hasVerifyingKey := len(req.GetVerifyingPubkey()) != 0
+	if hasKeyshareID != hasVerifyingKey {
+		return false, fmt.Errorf("signing keyshare id and verifying public key must be provided together")
+	}
+	if !hasKeyshareID {
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDepositTreePrepareBinding, 0) > 0 {
+			return false, fmt.Errorf("deposit prepare binding is required")
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+func validateDepositPrepareBinding(ctx context.Context, req *pbinternal.DepositTreePrepareRequest, expectedKeyshareID uuid.UUID, expectedVerifyingKey keys.Public) error {
+	validateBinding, err := shouldValidateDepositPrepareBinding(ctx, req)
+	if err != nil || !validateBinding {
+		return err
+	}
+	keyshareID, err := uuid.Parse(req.GetSigningKeyshareId())
+	if err != nil {
+		return fmt.Errorf("invalid signing keyshare id: %w", err)
+	}
+	if keyshareID != expectedKeyshareID {
+		return fmt.Errorf("signing keyshare id does not match deposit address")
+	}
+	verifyingKey, err := keys.ParsePublicKey(req.GetVerifyingPubkey())
+	if err != nil {
+		return fmt.Errorf("invalid verifying public key: %w", err)
+	}
+	if !verifyingKey.Equals(expectedVerifyingKey) {
+		return fmt.Errorf("verifying public key does not match deposit address")
+	}
+	return nil
 }
 
 // Prepare validates the deposit, checks it hasn't been finalized, and performs
@@ -82,6 +260,10 @@ func (h *DepositTreeFlowHandler) Prepare(ctx context.Context, op proto.Message) 
 	// UTXOs yet.
 	depositAddress, onChainTx, onChainOutput, additionalUtxos, err := loadAndValidateDepositAddress(ctx, network, origReq, reqIDPubKey, false)
 	if err != nil {
+		return nil, err
+	}
+	expectedVerifyingKey := depositAddress.Edges.SigningKeyshare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
+	if err := validateDepositPrepareBinding(ctx, req, depositAddress.Edges.SigningKeyshare.ID, expectedVerifyingKey); err != nil {
 		return nil, err
 	}
 
@@ -331,7 +513,9 @@ func buildDepositCoordinatorFlow(
 		DepositTreeFlowHandler: NewDepositTreeFlowHandler(config),
 		origReq:                req,
 		prepareReq: &pbinternal.DepositTreePrepareRequest{
-			OriginalRequest: req,
+			OriginalRequest:   req,
+			SigningKeyshareId: depositAddress.Edges.SigningKeyshare.ID.String(),
+			VerifyingPubkey:   verifyingKey.Serialize(),
 		},
 		signingJobs:       signingJobs,
 		verifyingKey:      verifyingKey,

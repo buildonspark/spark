@@ -110,3 +110,10 @@ type GossipSender interface {
 type PrepareBoundFlowHandler interface {
 	ValidateDecisionAgainstPrepare(prepareOp proto.Message, decisionOp proto.Message) error
 }
+
+// ContextPrepareBoundFlowHandler is the context-aware form of
+// PrepareBoundFlowHandler for validators whose rollout policy is request
+// scoped.
+type ContextPrepareBoundFlowHandler interface {
+	ValidateDecisionAgainstPrepare(ctx context.Context, prepareOp proto.Message, decisionOp proto.Message) error
+}

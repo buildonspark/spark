@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -137,6 +138,56 @@ func TestConsensusDecisionFence_RealHandlersFenceForeignPayload(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestConsensusDecisionFence_DepositInflatedValueFenced(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	opType := pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE
+	prepare, commit := depositTreeDecisionFixture(t, 1_000)
+	commit.Nodes[0].Value = 1_000_000
+
+	flowID := seedRealFencePrepareRow(t, ctx, opType, prepare)
+	require.NoError(t, runConsensusCommit(
+		ctx,
+		NewDepositTreeFlowHandler(cfg),
+		opType,
+		flowID.String(),
+		commit,
+	), "an inflated deposit commit must be fenced without triggering gossip redelivery")
+	assertFenceRowStatus(t, ctx, flowID, st.FlowExecutionStatusInFlight)
+}
+
+func TestConsensusDecisionFence_DepositLegacyPrepareBindingKnob(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	cfg := sparktesting.TestConfig(t)
+	opType := pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_FINALIZE_DEPOSIT_TREE
+	prepare, commit := depositTreeDecisionFixture(t, 1_000)
+	prepare.SigningKeyshareId = ""
+	prepare.VerifyingPubkey = nil
+
+	flowID := seedRealFencePrepareRow(t, ctx, opType, prepare)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := dbClient.FlowExecution.Get(ctx, flowID)
+	require.NoError(t, err)
+	handler := NewDepositTreeFlowHandler(cfg)
+
+	require.True(t, validateDecisionAgainstPreparedOp(ctx, handler, row, commit, "commit"),
+		"legacy prepares must pass the decision fence while the rollout knob is off")
+
+	strictCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobRequireDepositTreePrepareBinding: 1,
+	}))
+	require.False(t, validateDecisionAgainstPreparedOp(strictCtx, handler, row, commit, "commit"),
+		"legacy prepares must be fenced after the rollout knob is enabled")
+
+	prepare.SigningKeyshareId = uuid.NewString()
+	partialFlowID := seedRealFencePrepareRow(t, ctx, opType, prepare)
+	partialRow, err := dbClient.FlowExecution.Get(ctx, partialFlowID)
+	require.NoError(t, err)
+	require.False(t, validateDecisionAgainstPreparedOp(ctx, handler, partialRow, commit, "commit"),
+		"partially populated bindings must be fenced even while the rollout knob is off")
 }
 
 // TestConsensusDecisionFence_ClaimForeignReceiverFenced drives claim's

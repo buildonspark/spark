@@ -5527,6 +5527,10 @@ func (x *SyncNodeRequest) GetOperatorId() string {
 type DepositTreePrepareRequest struct {
 	state           protoimpl.MessageState                    `protogen:"open.v1"`
 	OriginalRequest *spark.FinalizeDepositTreeCreationRequest `protobuf:"bytes,1,opt,name=original_request,json=originalRequest,proto3" json:"original_request,omitempty"`
+	// The deposit address keyshare every participant must validate before signing.
+	SigningKeyshareId string `protobuf:"bytes,2,opt,name=signing_keyshare_id,json=signingKeyshareId,proto3" json:"signing_keyshare_id,omitempty"`
+	// The combined operator and owner key every participant must validate before signing.
+	VerifyingPubkey []byte `protobuf:"bytes,3,opt,name=verifying_pubkey,json=verifyingPubkey,proto3" json:"verifying_pubkey,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -5564,6 +5568,20 @@ func (*DepositTreePrepareRequest) Descriptor() ([]byte, []int) {
 func (x *DepositTreePrepareRequest) GetOriginalRequest() *spark.FinalizeDepositTreeCreationRequest {
 	if x != nil {
 		return x.OriginalRequest
+	}
+	return nil
+}
+
+func (x *DepositTreePrepareRequest) GetSigningKeyshareId() string {
+	if x != nil {
+		return x.SigningKeyshareId
+	}
+	return ""
+}
+
+func (x *DepositTreePrepareRequest) GetVerifyingPubkey() []byte {
+	if x != nil {
+		return x.VerifyingPubkey
 	}
 	return nil
 }
@@ -7421,9 +7439,11 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x0fSyncNodeRequest\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12\x1f\n" +
 	"\voperator_id\x18\x02 \x01(\tR\n" +
-	"operatorId\"q\n" +
+	"operatorId\"\xe4\x01\n" +
 	"\x19DepositTreePrepareRequest\x12T\n" +
-	"\x10original_request\x18\x01 \x01(\v2).spark.FinalizeDepositTreeCreationRequestR\x0foriginalRequest\"q\n" +
+	"\x10original_request\x18\x01 \x01(\v2).spark.FinalizeDepositTreeCreationRequestR\x0foriginalRequest\x12;\n" +
+	"\x13signing_keyshare_id\x18\x02 \x01(\tB\v\xfaB\br\x06\xd0\x01\x01\xb0\x01\x01R\x11signingKeyshareId\x124\n" +
+	"\x10verifying_pubkey\x18\x03 \x01(\fB\t\xfaB\x06z\x04h!p\x01R\x0fverifyingPubkey\"q\n" +
 	" StorePreimageSharePrepareRequest\x12M\n" +
 	"\x10original_request\x18\x01 \x01(\v2\".spark.StorePreimageShareV2RequestR\x0foriginalRequest\"\x8b\x01\n" +
 	"\x1aSendTransferPrepareRequest\x12H\n" +

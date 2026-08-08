@@ -133,7 +133,9 @@ func (h *ConsensusHandler) DispatchPrepare(
 	// ConsensusPrepare RPC error drives the coordinator's rollback path, whereas a
 	// (nil, nil) return reads as a successful prepare and could let the coordinator
 	// record and broadcast COMMITTED for the other participants.
-	if _, bound := handler.(consensus.PrepareBoundFlowHandler); bound && flowExecutionID == "" {
+	_, prepareBound := handler.(consensus.PrepareBoundFlowHandler)
+	_, contextPrepareBound := handler.(consensus.ContextPrepareBoundFlowHandler)
+	if (prepareBound || contextPrepareBound) && flowExecutionID == "" {
 		return nil, fmt.Errorf("consensus prepare for bound op type %d requires a flow_execution_id; refusing to prepare a bound flow with no row to commit/rollback/reconcile against", opType)
 	}
 
