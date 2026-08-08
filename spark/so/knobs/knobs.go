@@ -151,6 +151,10 @@ const (
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
+	// When enabled (> 0), deposit tree prepare payloads must include the
+	// signing-keyshare and verifying-key binding fields. Default 0 permits both
+	// fields to be absent during mixed-version rollouts.
+	KnobRequireDepositTreePrepareBinding = "spark.so.deposit_tree.require_prepare_binding"
 	// KnobStaticDepositAddressPrivacyEnabled gates the per-wallet privacy filter on the
 	// public query_static_deposit_addresses endpoint. Default off so the endpoint behaves
 	// as before until the SSP has switched to the internal query_static_deposit_addresses

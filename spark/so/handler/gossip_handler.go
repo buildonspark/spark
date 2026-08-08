@@ -934,8 +934,15 @@ func classifyConsensusOp(ctx context.Context, flowExecutionID string, opType pbg
 // redelivery on a message that can never become valid (same rationale as the
 // op-type fence in classifyConsensusOp).
 func validateDecisionAgainstPreparedOp(ctx context.Context, handler consensus.FlowHandler, row *ent.FlowExecution, op proto.Message, phase string) bool {
-	bound, ok := handler.(consensus.PrepareBoundFlowHandler)
-	if !ok {
+	var validate func(proto.Message, proto.Message) error
+	switch bound := handler.(type) {
+	case consensus.ContextPrepareBoundFlowHandler:
+		validate = func(prepareOp, decisionOp proto.Message) error {
+			return bound.ValidateDecisionAgainstPrepare(ctx, prepareOp, decisionOp)
+		}
+	case consensus.PrepareBoundFlowHandler:
+		validate = bound.ValidateDecisionAgainstPrepare
+	default:
 		// The flow does not opt into payload binding — dispatch unchanged.
 		return true
 	}
@@ -990,7 +997,7 @@ func validateDecisionAgainstPreparedOp(ctx context.Context, handler consensus.Fl
 		consensusOpFencedTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("phase", phase), attribute.String("disposition", "corrupt_prepare_payload")))
 		return false
 	}
-	if err := bound.ValidateDecisionAgainstPrepare(prepareOp, op); err != nil {
+	if err := validate(prepareOp, op); err != nil {
 		// A mismatch means the decision payload names resources this SO did not
 		// prepare under this flow_execution_id. This is reachable only from a
 		// forged or misrouted gossip decision — never the authoritative one: the

@@ -981,6 +981,16 @@ message SyncNodeRequest {
 // and produces FROST signature shares.
 message DepositTreePrepareRequest {
     spark.FinalizeDepositTreeCreationRequest original_request = 1;
+    // The deposit address keyshare every participant must validate before signing.
+    string signing_keyshare_id = 2 [
+        (validate.rules).string.uuid = true,
+        (validate.rules).string.ignore_empty = true
+    ];
+    // The combined operator and owner key every participant must validate before signing.
+    bytes verifying_pubkey = 3 [
+        (validate.rules).bytes.len = 33,
+        (validate.rules).bytes.ignore_empty = true
+    ];
 }
 
 // StorePreimageSharePrepareRequest is the 2PC prepare payload for consensus
