@@ -775,6 +775,13 @@ export enum TreeNodeStatus {
    * output this node's own transaction claims. Terminal; recovery moves to L1.
    */
   TREE_NODE_STATUS_WATCHTOWER_EXITED = 14,
+  /**
+   * TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED - A watchtower-exited node whose owner has co-signed a transaction spending
+   * the swept output with the SE. Written when that signature is issued, not
+   * when it confirms — the SE never observes the broadcast. Terminal: the leaf
+   * can no longer be used off-chain, and recovery is on L1.
+   */
+  TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED = 15,
   UNRECOGNIZED = -1,
 }
 
@@ -825,6 +832,9 @@ export function treeNodeStatusFromJSON(object: any): TreeNodeStatus {
     case 14:
     case "TREE_NODE_STATUS_WATCHTOWER_EXITED":
       return TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXITED;
+    case 15:
+    case "TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED":
+      return TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -864,6 +874,8 @@ export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
       return "TREE_NODE_STATUS_CONSOLIDATED";
     case TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXITED:
       return "TREE_NODE_STATUS_WATCHTOWER_EXITED";
+    case TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED:
+      return "TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED";
     case TreeNodeStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

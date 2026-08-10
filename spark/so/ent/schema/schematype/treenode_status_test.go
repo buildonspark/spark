@@ -8,11 +8,12 @@ import (
 
 func TestTreeNodeStatusIsTerminal(t *testing.T) {
 	terminal := map[TreeNodeStatus]bool{
-		TreeNodeStatusSplitted:         true,
-		TreeNodeStatusAggregated:       true,
-		TreeNodeStatusExited:           true,
-		TreeNodeStatusReimbursed:       true,
-		TreeNodeStatusWatchtowerExited: true,
+		TreeNodeStatusSplitted:                true,
+		TreeNodeStatusAggregated:              true,
+		TreeNodeStatusExited:                  true,
+		TreeNodeStatusReimbursed:              true,
+		TreeNodeStatusWatchtowerExited:        true,
+		TreeNodeStatusWatchtowerExitRecovered: true,
 	}
 	for _, v := range (TreeNodeStatus("")).Values() {
 		s := TreeNodeStatus(v)
@@ -135,6 +136,9 @@ func TestTreeNodeStatusShouldMarkWatchtowerExited(t *testing.T) {
 	assert.False(t, TreeNodeStatusConsolidated.ShouldMarkWatchtowerExited())
 	// Re-confirmation in a later block must not churn update_time.
 	assert.False(t, TreeNodeStatusWatchtowerExited.ShouldMarkWatchtowerExited())
+	// A later ancestor confirmation must not walk back a recovery the SE has
+	// already co-signed.
+	assert.False(t, TreeNodeStatusWatchtowerExitRecovered.ShouldMarkWatchtowerExited())
 }
 
 func TestWatchtowerExitSweepExcludedStatuses(t *testing.T) {
@@ -160,9 +164,24 @@ func TestTreeNodeStatusWatchtowerExitedIsExitedToL1(t *testing.T) {
 	assert.False(t, TreeNodeStatusWatchtowerExited.CanBecomeAvailable())
 }
 
+func TestTreeNodeStatusWatchtowerExitRecovered(t *testing.T) {
+	// The whole point of the status: the SE never observes the broadcast, so the
+	// signature — not a confirmation — is what keeps the leaf out of the
+	// transferable pool.
+	assert.True(t, TreeNodeStatusWatchtowerExitRecovered.IsTerminal())
+	assert.True(t, TreeNodeStatusWatchtowerExitRecovered.IsExitedToL1())
+	assert.False(t, TreeNodeStatusWatchtowerExitRecovered.CanBecomeAvailable())
+	// Terminal, so the watchtower has no path left to work and the node drops
+	// out of the occupancy metrics rather than reading as stuck.
+	assert.False(t, TreeNodeStatusWatchtowerExitRecovered.CountsForOccupancy())
+	// Neither exit sweep may overwrite it: both write a weaker claim.
+	assert.Contains(t, ParentExitSweepExcludedStatuses(), TreeNodeStatusWatchtowerExitRecovered)
+	assert.Contains(t, WatchtowerExitSweepExcludedStatuses(), TreeNodeStatusWatchtowerExitRecovered)
+}
+
 func TestOccupancyTreeNodeStatuses_ExcludesTerminalAndAvailable(t *testing.T) {
 	occupancy := OccupancyTreeNodeStatuses()
-	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-8)
+	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-9)
 	for _, s := range occupancy {
 		assert.True(t, s.CountsForOccupancy())
 		assert.False(t, s.IsTerminal())

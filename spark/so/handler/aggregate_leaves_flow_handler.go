@@ -828,13 +828,15 @@ func applyAggregateLeavesCommit(ctx context.Context, config *so.Config, req *pbi
 	return nil
 }
 
-// aggregateLeavesOnChainStatuses are the statuses the chain watcher sets from
-// observed chain state.
+// aggregateLeavesOnChainStatuses are the statuses recording that the subtree's
+// outpoint is already claimed on L1 — set by the chain watcher from observed
+// chain state, or by a recovery the SE co-signed.
 var aggregateLeavesOnChainStatuses = map[st.TreeNodeStatus]bool{
-	st.TreeNodeStatusOnChain:          true,
-	st.TreeNodeStatusExited:           true,
-	st.TreeNodeStatusParentExited:     true,
-	st.TreeNodeStatusWatchtowerExited: true,
+	st.TreeNodeStatusOnChain:                 true,
+	st.TreeNodeStatusExited:                  true,
+	st.TreeNodeStatusParentExited:            true,
+	st.TreeNodeStatusWatchtowerExited:        true,
+	st.TreeNodeStatusWatchtowerExitRecovered: true,
 }
 
 // firstAggregateLeavesOnChainNode returns any node in the subtree whose status

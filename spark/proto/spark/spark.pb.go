@@ -832,6 +832,11 @@ const (
 	// A node below one whose watchtower transaction confirmed, which spends the
 	// output this node's own transaction claims. Terminal; recovery moves to L1.
 	TreeNodeStatus_TREE_NODE_STATUS_WATCHTOWER_EXITED TreeNodeStatus = 14
+	// A watchtower-exited node whose owner has co-signed a transaction spending
+	// the swept output with the SE. Written when that signature is issued, not
+	// when it confirms — the SE never observes the broadcast. Terminal: the leaf
+	// can no longer be used off-chain, and recovery is on L1.
+	TreeNodeStatus_TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED TreeNodeStatus = 15
 )
 
 // Enum value maps for TreeNodeStatus.
@@ -852,23 +857,25 @@ var (
 		12: "TREE_NODE_STATUS_PARENT_EXITED",
 		13: "TREE_NODE_STATUS_CONSOLIDATED",
 		14: "TREE_NODE_STATUS_WATCHTOWER_EXITED",
+		15: "TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED",
 	}
 	TreeNodeStatus_value = map[string]int32{
-		"TREE_NODE_STATUS_CREATING":          0,
-		"TREE_NODE_STATUS_AVAILABLE":         1,
-		"TREE_NODE_STATUS_FROZEN_BY_ISSUER":  2,
-		"TREE_NODE_STATUS_TRANSFER_LOCKED":   3,
-		"TREE_NODE_STATUS_SPLIT_LOCKED":      4,
-		"TREE_NODE_STATUS_SPLITTED":          5,
-		"TREE_NODE_STATUS_AGGREGATED":        6,
-		"TREE_NODE_STATUS_ON_CHAIN":          7,
-		"TREE_NODE_STATUS_AGGREGATE_LOCK":    8,
-		"TREE_NODE_STATUS_EXITED":            9,
-		"TREE_NODE_STATUS_RENEW_LOCKED":      10,
-		"TREE_NODE_STATUS_UNAVAILABLE":       11,
-		"TREE_NODE_STATUS_PARENT_EXITED":     12,
-		"TREE_NODE_STATUS_CONSOLIDATED":      13,
-		"TREE_NODE_STATUS_WATCHTOWER_EXITED": 14,
+		"TREE_NODE_STATUS_CREATING":                  0,
+		"TREE_NODE_STATUS_AVAILABLE":                 1,
+		"TREE_NODE_STATUS_FROZEN_BY_ISSUER":          2,
+		"TREE_NODE_STATUS_TRANSFER_LOCKED":           3,
+		"TREE_NODE_STATUS_SPLIT_LOCKED":              4,
+		"TREE_NODE_STATUS_SPLITTED":                  5,
+		"TREE_NODE_STATUS_AGGREGATED":                6,
+		"TREE_NODE_STATUS_ON_CHAIN":                  7,
+		"TREE_NODE_STATUS_AGGREGATE_LOCK":            8,
+		"TREE_NODE_STATUS_EXITED":                    9,
+		"TREE_NODE_STATUS_RENEW_LOCKED":              10,
+		"TREE_NODE_STATUS_UNAVAILABLE":               11,
+		"TREE_NODE_STATUS_PARENT_EXITED":             12,
+		"TREE_NODE_STATUS_CONSOLIDATED":              13,
+		"TREE_NODE_STATUS_WATCHTOWER_EXITED":         14,
+		"TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED": 15,
 	}
 )
 
@@ -13824,7 +13831,7 @@ const file_spark_proto_rawDesc = "" +
 	"\bRETURNED\x10\x04\x12 \n" +
 	"\x1cMISMATCHED_INVOICE_FINALIZED\x10\x05\x12\x1e\n" +
 	"\x1aMISMATCHED_INVOICE_PENDING\x10\x06\x12\x1f\n" +
-	"\x1bMISMATCHED_INVOICE_RETURNED\x10\a\"\x04\b\x03\x10\x03*\x94\x04\n" +
+	"\x1bMISMATCHED_INVOICE_RETURNED\x10\a\"\x04\b\x03\x10\x03*\xc4\x04\n" +
 	"\x0eTreeNodeStatus\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_CREATING\x10\x00\x12\x1e\n" +
 	"\x1aTREE_NODE_STATUS_AVAILABLE\x10\x01\x12%\n" +
@@ -13841,7 +13848,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x1cTREE_NODE_STATUS_UNAVAILABLE\x10\v\x12\"\n" +
 	"\x1eTREE_NODE_STATUS_PARENT_EXITED\x10\f\x12!\n" +
 	"\x1dTREE_NODE_STATUS_CONSOLIDATED\x10\r\x12&\n" +
-	"\"TREE_NODE_STATUS_WATCHTOWER_EXITED\x10\x0e2\xc5\x1f\n" +
+	"\"TREE_NODE_STATUS_WATCHTOWER_EXITED\x10\x0e\x12.\n" +
+	"*TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED\x10\x0f2\xc5\x1f\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12v\n" +
