@@ -20,10 +20,38 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
+// This is the magic date we've decided to consider 'old' transfers / leaves we are
+// counting out of our metrics from the 'current' cohort. Transfers prior to this state
+// have been stuck for a very long time, and we have the `SP-365x` tracking their cleanup,
+// but we want clean alerting in the meantime for 'current' trasnfers.
+var occupancyCohortCutoff = time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+
+type occupancyCohort string
+
+const (
+	occupancyCohortLegacy  occupancyCohort = "legacy"
+	occupancyCohortCurrent occupancyCohort = "current"
+)
+
+func occupancyCohortValues() []occupancyCohort {
+	return []occupancyCohort{occupancyCohortLegacy, occupancyCohortCurrent}
+}
+
+func occupancyCohortExpr(column string) string {
+	return fmt.Sprintf(
+		"CASE WHEN %s < '%s' THEN '%s' ELSE '%s' END",
+		column,
+		occupancyCohortCutoff.Format(time.RFC3339),
+		occupancyCohortLegacy,
+		occupancyCohortCurrent,
+	)
+}
+
 type transferCellKey struct {
 	network      btcnetwork.Network
 	status       st.TransferStatus
 	transferType st.TransferType
+	cohort       occupancyCohort
 }
 
 type occupancyCell struct {
@@ -31,14 +59,13 @@ type occupancyCell struct {
 	oldestAge time.Duration
 }
 
-// transferOccupancyRow's JSON tags must match Ent's column aliases: grouped
-// fields keep their column names; "count"/"min" are the default aliases for
-// ent.Count() and ent.Min(...) (same contract as inFlightAggregateRow in
-// flow_execution_reconcile.go).
+// transferOccupancyRow's JSON tags must match the aliases set explicitly in the
+// Modify select below.
 type transferOccupancyRow struct {
 	Network btcnetwork.Network `json:"network"`
 	Status  st.TransferStatus  `json:"status"`
 	Type    st.TransferType    `json:"type"`
+	Cohort  occupancyCohort    `json:"cohort"`
 	Count   int64              `json:"count"`
 	Min     time.Time          `json:"min"`
 }
@@ -47,6 +74,7 @@ type transferReceiverCellKey struct {
 	network      btcnetwork.Network
 	status       st.TransferReceiverStatus
 	transferType st.TransferType
+	cohort       occupancyCohort
 }
 
 // transferReceiverOccupancyRow's aliases are set explicitly in the Modify
@@ -55,6 +83,7 @@ type transferReceiverOccupancyRow struct {
 	Network btcnetwork.Network        `json:"network"`
 	Status  st.TransferReceiverStatus `json:"status"`
 	Type    st.TransferType           `json:"transfer_type"`
+	Cohort  occupancyCohort           `json:"cohort"`
 	Count   int64                     `json:"count"`
 	Min     time.Time                 `json:"min"`
 }
@@ -62,11 +91,13 @@ type transferReceiverOccupancyRow struct {
 type treeNodeCellKey struct {
 	network btcnetwork.Network
 	status  st.TreeNodeStatus
+	cohort  occupancyCohort
 }
 
 type treeNodeOccupancyRow struct {
 	Network btcnetwork.Network `json:"network"`
 	Status  st.TreeNodeStatus  `json:"status"`
+	Cohort  occupancyCohort    `json:"cohort"`
 	Count   int64              `json:"count"`
 	Min     time.Time          `json:"min"`
 }
@@ -87,7 +118,7 @@ func init() {
 	var err error
 	transferOccupancyGauge, err = occupancyMeter.Int64Gauge(
 		"spark_transfer_occupancy",
-		metric.WithDescription("Transfers currently in each non-terminal status, by status/network/type. Zero-filled: a drained status reports 0."),
+		metric.WithDescription("Transfers currently in each non-terminal status, by status/network/type/cohort. Cohort splits rows on create_time at 2026-07-01 UTC: legacy is older, current is newer. Zero-filled: a drained status reports 0."),
 		metric.WithUnit("{row}"),
 	)
 	if err != nil {
@@ -97,7 +128,7 @@ func init() {
 
 	transferOldestAgeGauge, err = occupancyMeter.Float64Gauge(
 		"spark_transfer_oldest_age_seconds",
-		metric.WithDescription("Age in seconds of the oldest transfer (now - MIN(update_time)) per non-terminal status; 0 when the status is empty."),
+		metric.WithDescription("Age in seconds of the oldest transfer (now - MIN(update_time)) per non-terminal status; 0 when the status is empty. Split by cohort on create_time at 2026-07-01 UTC."),
 	)
 	if err != nil {
 		otel.Handle(err)
@@ -106,7 +137,7 @@ func init() {
 
 	transferReceiverOccupancyGauge, err = occupancyMeter.Int64Gauge(
 		"spark_transfer_receiver_occupancy",
-		metric.WithDescription("Transfer receivers currently in each non-terminal claim status, by status/network/type."),
+		metric.WithDescription("Transfer receivers currently in each non-terminal claim status, by status/network/type/cohort. Cohort splits rows on create_time at 2026-07-01 UTC: legacy is older, current is newer."),
 		metric.WithUnit("{row}"),
 	)
 	if err != nil {
@@ -116,7 +147,7 @@ func init() {
 
 	transferReceiverOldestAgeGauge, err = occupancyMeter.Float64Gauge(
 		"spark_transfer_receiver_oldest_age_seconds",
-		metric.WithDescription("Age in seconds of the oldest transfer receiver (now - MIN(update_time)) per non-terminal claim status; 0 when the status is empty."),
+		metric.WithDescription("Age in seconds of the oldest transfer receiver (now - MIN(update_time)) per non-terminal claim status; 0 when the status is empty. Split by cohort on create_time at 2026-07-01 UTC."),
 	)
 	if err != nil {
 		otel.Handle(err)
@@ -125,7 +156,7 @@ func init() {
 
 	treeNodeOccupancyGauge, err = occupancyMeter.Int64Gauge(
 		"spark_tree_node_occupancy",
-		metric.WithDescription("Tree nodes currently in each occupancy-tracked status, by status/network. Zero-filled: a drained status reports 0."),
+		metric.WithDescription("Tree nodes currently in each occupancy-tracked status, by status/network/cohort. Cohort splits rows on create_time at 2026-07-01 UTC: legacy is older, current is newer. Zero-filled: a drained status reports 0."),
 		metric.WithUnit("{row}"),
 	)
 	if err != nil {
@@ -135,7 +166,7 @@ func init() {
 
 	treeNodeOldestAgeGauge, err = occupancyMeter.Float64Gauge(
 		"spark_tree_node_oldest_age_seconds",
-		metric.WithDescription("Age in seconds of the oldest tree node (now - MIN(update_time)) per occupancy-tracked status; 0 when the status is empty."),
+		metric.WithDescription("Age in seconds of the oldest tree node (now - MIN(update_time)) per occupancy-tracked status; 0 when the status is empty. Split by cohort on create_time at 2026-07-01 UTC."),
 	)
 	if err != nil {
 		otel.Handle(err)
@@ -159,6 +190,7 @@ func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
 			attribute.String("status", string(k.status)),
 			attribute.String("network", k.network.String()),
 			attribute.String("type", string(k.transferType)),
+			attribute.String("cohort", string(k.cohort)),
 		)
 		transferOccupancyGauge.Record(ctx, c.count, attrs)
 		transferOldestAgeGauge.Record(ctx, c.oldestAge.Seconds(), attrs)
@@ -173,6 +205,7 @@ func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
 			attribute.String("status", string(k.status)),
 			attribute.String("network", k.network.String()),
 			attribute.String("type", string(k.transferType)),
+			attribute.String("cohort", string(k.cohort)),
 		)
 		transferReceiverOccupancyGauge.Record(ctx, c.count, attrs)
 		transferReceiverOldestAgeGauge.Record(ctx, c.oldestAge.Seconds(), attrs)
@@ -186,6 +219,7 @@ func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
 		attrs := metric.WithAttributes(
 			attribute.String("status", string(k.status)),
 			attribute.String("network", k.network.String()),
+			attribute.String("cohort", string(k.cohort)),
 		)
 		treeNodeOccupancyGauge.Record(ctx, c.count, attrs)
 		treeNodeOldestAgeGauge.Record(ctx, c.oldestAge.Seconds(), attrs)
@@ -194,14 +228,16 @@ func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
 }
 
 // transferOccupancyCells returns one cell per (network × non-terminal status
-// × type), zero-filled so a drained status reads as a real 0 rather than a
-// missing series. Rows on networks outside the passed set still emit.
+// × type × cohort), zero-filled so a drained status reads as a real 0 rather
+// than a missing series. Rows on networks outside the passed set still emit.
 func transferOccupancyCells(ctx context.Context, db *ent.Client, networks []btcnetwork.Network, now time.Time) (map[transferCellKey]occupancyCell, error) {
 	cells := make(map[transferCellKey]occupancyCell)
 	for _, network := range networks {
 		for _, status := range st.NonTerminalTransferStatuses() {
 			for _, transferType := range (st.TransferType("")).Values() {
-				cells[transferCellKey{network, status, st.TransferType(transferType)}] = occupancyCell{}
+				for _, cohort := range occupancyCohortValues() {
+					cells[transferCellKey{network, status, st.TransferType(transferType), cohort}] = occupancyCell{}
+				}
 			}
 		}
 	}
@@ -209,13 +245,28 @@ func transferOccupancyCells(ctx context.Context, db *ent.Client, networks []btcn
 	var rows []transferOccupancyRow
 	if err := db.Transfer.Query().
 		Where(transfer.StatusIn(st.NonTerminalTransferStatuses()...)).
-		GroupBy(transfer.FieldNetwork, transfer.FieldStatus, transfer.FieldType).
-		Aggregate(ent.Count(), ent.Min(transfer.FieldUpdateTime)).
+		Modify(func(s *sql.Selector) {
+			cohort := occupancyCohortExpr(s.C(transfer.FieldCreateTime))
+			s.Select(
+				sql.As(s.C(transfer.FieldNetwork), "network"),
+				sql.As(s.C(transfer.FieldStatus), "status"),
+				sql.As(s.C(transfer.FieldType), "type"),
+				sql.As(cohort, "cohort"),
+				sql.As(sql.Count("*"), "count"),
+				sql.As(sql.Min(s.C(transfer.FieldUpdateTime)), "min"),
+			)
+			s.GroupBy(
+				s.C(transfer.FieldNetwork),
+				s.C(transfer.FieldStatus),
+				s.C(transfer.FieldType),
+				cohort,
+			)
+		}).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("aggregate transfer occupancy: %w", err)
 	}
 	for _, r := range rows {
-		cells[transferCellKey{r.Network, r.Status, r.Type}] = occupancyCell{
+		cells[transferCellKey{r.Network, r.Status, r.Type, r.Cohort}] = occupancyCell{
 			count:     r.Count,
 			oldestAge: clampAge(now.Sub(r.Min)),
 		}
@@ -231,7 +282,9 @@ func transferReceiverOccupancyCells(ctx context.Context, db *ent.Client, network
 	for _, network := range networks {
 		for _, status := range st.NonTerminalTransferReceiverStatuses() {
 			for _, transferType := range (st.TransferType("")).Values() {
-				cells[transferReceiverCellKey{network, status, st.TransferType(transferType)}] = occupancyCell{}
+				for _, cohort := range occupancyCohortValues() {
+					cells[transferReceiverCellKey{network, status, st.TransferType(transferType), cohort}] = occupancyCell{}
+				}
 			}
 		}
 	}
@@ -242,10 +295,12 @@ func transferReceiverOccupancyCells(ctx context.Context, db *ent.Client, network
 		Modify(func(s *sql.Selector) {
 			t := sql.Table(transfer.Table)
 			s.Join(t).On(s.C(transferreceiver.FieldTransferID), t.C(transfer.FieldID))
+			cohort := occupancyCohortExpr(s.C(transferreceiver.FieldCreateTime))
 			s.Select(
 				sql.As(t.C(transfer.FieldNetwork), "network"),
 				sql.As(s.C(transferreceiver.FieldStatus), "status"),
 				sql.As(s.C(transferreceiver.FieldTransferType), "transfer_type"),
+				sql.As(cohort, "cohort"),
 				sql.As(sql.Count("*"), "count"),
 				sql.As(sql.Min(s.C(transferreceiver.FieldUpdateTime)), "min"),
 			)
@@ -253,13 +308,14 @@ func transferReceiverOccupancyCells(ctx context.Context, db *ent.Client, network
 				t.C(transfer.FieldNetwork),
 				s.C(transferreceiver.FieldStatus),
 				s.C(transferreceiver.FieldTransferType),
+				cohort,
 			)
 		}).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("aggregate transfer_receiver occupancy: %w", err)
 	}
 	for _, r := range rows {
-		cells[transferReceiverCellKey{r.Network, r.Status, r.Type}] = occupancyCell{
+		cells[transferReceiverCellKey{r.Network, r.Status, r.Type, r.Cohort}] = occupancyCell{
 			count:     r.Count,
 			oldestAge: clampAge(now.Sub(r.Min)),
 		}
@@ -273,20 +329,35 @@ func treeNodeOccupancyCells(ctx context.Context, db *ent.Client, networks []btcn
 	cells := make(map[treeNodeCellKey]occupancyCell)
 	for _, network := range networks {
 		for _, status := range st.OccupancyTreeNodeStatuses() {
-			cells[treeNodeCellKey{network, status}] = occupancyCell{}
+			for _, cohort := range occupancyCohortValues() {
+				cells[treeNodeCellKey{network, status, cohort}] = occupancyCell{}
+			}
 		}
 	}
 
 	var rows []treeNodeOccupancyRow
 	if err := db.TreeNode.Query().
 		Where(treenode.StatusIn(st.OccupancyTreeNodeStatuses()...)).
-		GroupBy(treenode.FieldNetwork, treenode.FieldStatus).
-		Aggregate(ent.Count(), ent.Min(treenode.FieldUpdateTime)).
+		Modify(func(s *sql.Selector) {
+			cohort := occupancyCohortExpr(s.C(treenode.FieldCreateTime))
+			s.Select(
+				sql.As(s.C(treenode.FieldNetwork), "network"),
+				sql.As(s.C(treenode.FieldStatus), "status"),
+				sql.As(cohort, "cohort"),
+				sql.As(sql.Count("*"), "count"),
+				sql.As(sql.Min(s.C(treenode.FieldUpdateTime)), "min"),
+			)
+			s.GroupBy(
+				s.C(treenode.FieldNetwork),
+				s.C(treenode.FieldStatus),
+				cohort,
+			)
+		}).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("aggregate tree_node occupancy: %w", err)
 	}
 	for _, r := range rows {
-		cells[treeNodeCellKey{r.Network, r.Status}] = occupancyCell{
+		cells[treeNodeCellKey{r.Network, r.Status, r.Cohort}] = occupancyCell{
 			count:     r.Count,
 			oldestAge: clampAge(now.Sub(r.Min)),
 		}
