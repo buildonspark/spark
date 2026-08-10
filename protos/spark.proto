@@ -1881,6 +1881,11 @@ enum TreeNodeStatus {
     // A node below one whose watchtower transaction confirmed, which spends the
     // output this node's own transaction claims. Terminal; recovery moves to L1.
     TREE_NODE_STATUS_WATCHTOWER_EXITED = 14;
+    // A watchtower-exited node whose owner has co-signed a transaction spending
+    // the swept output with the SE. Written when that signature is issued, not
+    // when it confirms — the SE never observes the broadcast. Terminal: the leaf
+    // can no longer be used off-chain, and recovery is on L1.
+    TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED = 15;
 }
 
 message WalletSetting {

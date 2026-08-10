@@ -44,6 +44,16 @@ const (
 	// tx confirmed, which conflict-spends the outpoint its own raw tx names: the
 	// exit path is gone rather than pending, and recovery moves to L1. Terminal.
 	TreeNodeStatusWatchtowerExited TreeNodeStatus = "WATCHTOWER_EXITED"
+	// TreeNodeStatusWatchtowerExitRecovered is the status of a WATCHTOWER_EXITED node
+	// whose owner has since co-signed a transaction spending the swept output with
+	// the SE. Written when the signature is issued rather than when it confirms:
+	// holding a valid spend is already enough to double-claim the value against an
+	// off-chain transfer, and the SE never sees the broadcast. Terminal.
+	//
+	// Anything gating a co-signed spend of the swept output must name this status
+	// and WATCHTOWER_EXITED explicitly, never IsExitedToL1 — three of that
+	// predicate's five statuses have no such output to spend.
+	TreeNodeStatusWatchtowerExitRecovered TreeNodeStatus = "WATCHTOWER_EXIT_RECOVERED"
 )
 
 // CanBecomeAvailable reports whether a tree node currently in this status is
@@ -59,7 +69,8 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 		TreeNodeStatusParentExited,
 		TreeNodeStatusReimbursed,
 		TreeNodeStatusConsolidated,
-		TreeNodeStatusWatchtowerExited:
+		TreeNodeStatusWatchtowerExited,
+		TreeNodeStatusWatchtowerExitRecovered:
 		return false
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,
@@ -82,20 +93,26 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 
 // IsExitedToL1 reports whether the node has exited (or is exiting) to Bitcoin
 // L1: its own node tx confirmed (ON_CHAIN), its refund tx confirmed (EXITED),
-// or an ancestor's exit confirmed (PARENT_EXITED, WATCHTOWER_EXITED). These are
-// the only non-claimable-by-default statuses a receiver may still claim through
-// (the claim preserves them). Distinct from CanBecomeAvailable above, whose
-// false set additionally includes SPLITTED and REIMBURSED — statuses that must
-// remain neither claimable nor revivable.
+// or an ancestor's exit confirmed (PARENT_EXITED, WATCHTOWER_EXITED), or its
+// owner holds a co-signed spend of the swept output (WATCHTOWER_EXIT_RECOVERED).
+// These are the only non-claimable-by-default statuses a receiver may still
+// claim through (the claim preserves them). Distinct from CanBecomeAvailable
+// above, whose false set additionally includes SPLITTED and REIMBURSED —
+// statuses that must remain neither claimable nor revivable.
 //
-// WATCHTOWER_EXITED is here for the preservation half: setAvailableUnlessExitedToL1
+// The last two are here for the preservation half: setAvailableUnlessExitedToL1
 // reads this to decide whether a completing transfer may return a leaf to
-// AVAILABLE, so excluding it would revive a leaf whose exit path is gone.
+// AVAILABLE, so excluding them would revive a leaf whose exit path is gone or
+// whose value has already been claimed on L1.
+//
+// Claimability is all this answers, not recoverability: only WATCHTOWER_EXITED
+// and WATCHTOWER_EXIT_RECOVERED leave an output under the leaf key to spend.
 func (s TreeNodeStatus) IsExitedToL1() bool {
 	return s == TreeNodeStatusOnChain ||
 		s == TreeNodeStatusExited ||
 		s == TreeNodeStatusParentExited ||
-		s == TreeNodeStatusWatchtowerExited
+		s == TreeNodeStatusWatchtowerExited ||
+		s == TreeNodeStatusWatchtowerExitRecovered
 }
 
 // ShouldMarkParentExited reports whether a child in this status should be swept
@@ -122,12 +139,14 @@ func (s TreeNodeStatus) ShouldMarkParentExited() bool {
 		// timelock disabled; checkAndBroadcastNodeTx rejects it on every scan
 		// tick forever.
 		return false
-	case TreeNodeStatusOnChain, TreeNodeStatusExited, TreeNodeStatusParentExited, TreeNodeStatusWatchtowerExited:
+	case TreeNodeStatusOnChain, TreeNodeStatusExited, TreeNodeStatusParentExited, TreeNodeStatusWatchtowerExited, TreeNodeStatusWatchtowerExitRecovered:
 		// Already at least as strong a claim as PARENT_EXITED. Overwriting
 		// would downgrade confirmed chain state — the sweep otherwise
 		// clobbers a branch marked ON_CHAIN earlier in the same call — or, for
 		// an already-swept node, churn update_time on every later block that
-		// confirms another of the parent's transactions.
+		// confirms another of the parent's transactions. WATCHTOWER_EXIT_RECOVERED
+		// additionally records a spend the SE co-signed, which no chain
+		// observation supersedes.
 		return false
 
 	// Leaf-aggregation statuses are already unusable for transfer and
@@ -238,6 +257,7 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusRenewLocked),
 		string(TreeNodeStatusConsolidated),
 		string(TreeNodeStatusWatchtowerExited),
+		string(TreeNodeStatusWatchtowerExitRecovered),
 	}
 }
 
@@ -254,7 +274,8 @@ func (s TreeNodeStatus) IsTerminal() bool {
 		TreeNodeStatusAggregated,
 		TreeNodeStatusExited,
 		TreeNodeStatusReimbursed,
-		TreeNodeStatusWatchtowerExited:
+		TreeNodeStatusWatchtowerExited,
+		TreeNodeStatusWatchtowerExitRecovered:
 		return true
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,
