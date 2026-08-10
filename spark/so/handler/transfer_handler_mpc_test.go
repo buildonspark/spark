@@ -328,9 +328,10 @@ func TestStartTransferMpc_MultiReceiverRejected(t *testing.T) {
 	assert.Contains(t, err.Error(), "exactly one distinct receiver")
 }
 
-// A structurally valid, single-receiver submission passes every gate and then fails closed: the endpoint cannot
-// commit a transfer until the verification and consensus flows land behind the same knob.
-func TestStartTransferMpc_ValidSubmissionFailsClosed(t *testing.T) {
+// A structurally valid submission whose authorization signature does not verify is rejected before any state is
+// read — the fixture's placeholder signature parses but proves nothing. The authorized-submission path (which
+// reaches the fail-closed tail) lives in transfer_handler_mpc_validation_test.go.
+func TestStartTransferMpc_PlaceholderSignatureRejected(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewTransferHandler(cfg)
 	ctx := mpcEnabledContext(t)
@@ -339,9 +340,6 @@ func TestStartTransferMpc_ValidSubmissionFailsClosed(t *testing.T) {
 
 	_, err := handler.StartTransferMpc(ctx, req)
 	require.Error(t, err)
-	assert.Equal(t, codes.Unimplemented, status.Code(err))
-	assert.Contains(t, err.Error(), "not yet implemented")
-	// Same code as the knob-off gate, but a distinct machine-readable reason: this is the only signal a client gets
-	// that its submission passed every implemented check.
-	assert.Equal(t, sparkerrors.ReasonUnimplementedFeatureIncomplete, grpcErrorReason(t, err))
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, sparkerrors.ReasonInvalidArgumentMpcAuthorizationSignatureInvalid, grpcErrorReason(t, err))
 }

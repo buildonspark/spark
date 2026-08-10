@@ -48,6 +48,8 @@ const (
 	ReasonInvalidArgumentLeafRenewalRequired = "LEAF_RENEWAL_REQUIRED"
 	ReasonInvalidArgumentTimelockMismatch    = "TIMELOCK_MISMATCH"
 
+	ReasonInvalidArgumentMpcAuthorizationSignatureInvalid = "MPC_AUTHORIZATION_SIGNATURE_INVALID"
+
 	ReasonFailedPreconditionBadSignature              = "BAD_SIGNATURE"
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
 	ReasonFailedPreconditionInsufficientConfirmations = "INSUFFICIENT_CONFIRMATIONS"
@@ -56,6 +58,7 @@ const (
 	ReasonFailedPreconditionExpired                   = "EXPIRED"
 	ReasonFailedPreconditionReplay                    = "REPLAY"
 	ReasonFailedPreconditionHashMismatch              = "HASH_MISMATCH"
+	ReasonFailedPreconditionMpcAuthorizationMismatch  = "MPC_AUTHORIZATION_MISMATCH"
 
 	ReasonAbortedTransactionPreempted       = "TRANSACTION_PREEMPTED"
 	ReasonAbortedConcurrentClaimConflict    = "CONCURRENT_CLAIM_CONFLICT"
@@ -253,6 +256,18 @@ func FailedPreconditionInvalidState(err error) error {
 
 func FailedPreconditionLeafUnavailable(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionLeafUnavailable)
+}
+
+// Use when a multiparty transfer authorization's signature does not verify over the recomputed submission payload —
+// the submission can never succeed as signed, distinguishing it from a fact that merely disagrees with current state.
+func InvalidArgumentMpcAuthorizationSignatureInvalid(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMpcAuthorizationSignatureInvalid)
+}
+
+// Use when a validly-signed multiparty transfer authorization names a fact that disagrees with this operator's own
+// state (leaf ownership, value, owner signing key, receiver-bound outputs, refund sighashes, expiry).
+func FailedPreconditionMpcAuthorizationMismatch(err error) error {
+	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionMpcAuthorizationMismatch)
 }
 
 func FailedPreconditionExpired(err error) error {
