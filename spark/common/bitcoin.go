@@ -13,6 +13,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 )
 
 func EphemeralAnchorOutput() *wire.TxOut {
@@ -407,6 +408,29 @@ func VerifyECDSASignature(pubKey keys.Public, signatureBytes []byte, messageHash
 	}
 
 	return nil
+}
+
+// VerifySignatureWithScheme verifies a signature over a message hash per its tagged scheme: strict-DER ECDSA or
+// 64-byte BIP-340 Schnorr.
+func VerifySignatureWithScheme(pubKey keys.Public, scheme pbcommon.SignatureScheme, signatureBytes, messageHash []byte) error {
+	switch scheme {
+	case pbcommon.SignatureScheme_SIGNATURE_SCHEME_ECDSA:
+		return VerifyECDSASignature(pubKey, signatureBytes, messageHash)
+	case pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR:
+		if len(messageHash) == 0 {
+			return fmt.Errorf("message hash cannot be empty")
+		}
+		sig, err := schnorr.ParseSignature(signatureBytes)
+		if err != nil {
+			return fmt.Errorf("invalid signature format: malformed schnorr signature: %w", err)
+		}
+		if !pubKey.Verify(sig, messageHash) {
+			return fmt.Errorf("invalid signature")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported signature scheme %s", scheme)
+	}
 }
 
 // CompareTransactions compares two Bitcoin transactions for structural equality.
