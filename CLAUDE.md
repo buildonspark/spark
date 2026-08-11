@@ -101,6 +101,39 @@ Keep functions focused and reasonably short. If a function is doing too many thi
 - Focus on corner cases and error conditions, not just happy paths
 - Write tests that would catch real bugs
 
+## Knobs
+
+A knob declared in `spark/so/knobs/knobs.go` must be given a value in all three config
+sources, at the same value in each:
+
+- `tilt/spark/Tiltfile` — minikube/Tilt, and the CI hermetic suite
+- `so.template.config.yaml` — `run-everything.sh`
+- `docker/operator.config.yaml` — `docker-compose`
+
+No deployed environment reads these; deployed values come from the knobs service. Run
+`./scripts/lint-knobs.sh` after touching a knob — CI runs it too.
+
+**Define the knob, don't add it to the ignore list.** `ALLOWED_MISSING` in
+`scripts/lint-knobs.sh` exempts a knob from all three sources at once, leaving its gated path
+unexercised everywhere. Reach for it only when setting a value is genuinely wrong (a targeted
+per-pubkey knob, say), never as the quick way past a lint failure.
+
+**Prefer enabling a new knob here.** These are the local and CI surfaces, so enabling a knob
+is what puts the new path under the integration suite; leaving it at `0` means the suite keeps
+running the old branch and the new one ships untested. Match the value to how the knob is
+read: `1` for a boolean knob (`GetValue(...) > 0`), `100` for a percentage knob
+(`RolloutRandom` / `RolloutRandomTarget`). `1` on a percentage knob means 1% of calls, which
+makes the suite flaky rather than covered. Shipping a knob defined-but-disabled is a
+legitimate call for the implementer to make — just make it deliberately, and note why. Keep
+that separate from the fallback each call site passes as its default argument, and from the
+deployed value; those generally stay off so a feature can roll out and back without a deploy.
+
+**Tests and knob state.** A test that depends on knob-on behavior should force the knob on
+itself rather than relying on the config default. If enabling a knob breaks pre-existing
+tests *because* of the knob, having those tests pin it to `0` is a reasonable fix. If they
+break for any other reason, that is the regression test doing its job — fix the code, don't
+pin the knob.
+
 ## Pull Request Descriptions
 
 PRs are synced to a public mirror. Follow the format in `.github/PULL_REQUEST_TEMPLATE.md`. The `## Public` section is required and CI will fail without it. When using tools that create PRs without a body (e.g., `gt submit` in non-interactive mode), follow up with `gh pr edit <number> --body "..."` to add the description.
