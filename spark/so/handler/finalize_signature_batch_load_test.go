@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -24,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,26 +93,24 @@ func (t *queryCountingTx) Query(ctx context.Context, query string, args, v any) 
 	return t.Tx.Query(ctx, query, args, v)
 }
 
-// newQueryCountingSQLiteContext builds the same test context as
-// db.NewTestSQLiteContext, but with a driver wrapper that records every
-// SELECT so tests can assert on query counts.
-func newQueryCountingSQLiteContext(t *testing.T) (context.Context, *queryCountingDriver) {
+// newQueryCountingPostgresContext provisions a migrated test Postgres
+// database (Postgres, not SQLite: the flush paths under test take FOR UPDATE
+// row locks) and returns a context whose ent client records every SQL
+// statement so tests can assert on query counts.
+func newQueryCountingPostgresContext(t *testing.T) (context.Context, *queryCountingDriver) {
 	t.Helper()
-	drv, err := entsql.Open(dialect.SQLite, fmt.Sprintf("file:%s?mode=memory&_fk=1", strings.ReplaceAll(t.Name(), "/", "_")))
+	_, tc := db.ConnectToTestPostgres(t)
+	rawDB, err := tc.Client.RawDB()
 	require.NoError(t, err)
-	// A single connection keeps the in-memory database visible to both the
-	// schema migration and the session transaction.
-	drv.DB().SetMaxOpenConns(1)
-	counting := &queryCountingDriver{Driver: drv}
+	counting := &queryCountingDriver{Driver: entsql.OpenDB(dialect.Postgres, rawDB)}
 	client := ent.NewClient(ent.Driver(counting))
-	require.NoError(t, client.Schema.Create(t.Context()))
 
 	session := db.NewDefaultSessionFactory(client).NewSession(t.Context())
+	// The underlying *sql.DB belongs to tc; its cleanup closes it.
 	t.Cleanup(func() {
 		if tx := session.GetTxIfExists(); tx != nil {
 			_ = tx.Rollback()
 		}
-		_ = client.Close()
 	})
 	return ent.Inject(t.Context(), session), counting
 }
@@ -165,7 +165,7 @@ func nodeSignaturesForLeaves(leaves []*ent.TreeNode) []*pb.NodeSignatures {
 }
 
 func TestUpdateNodesFromSignaturesDoesNotScaleSelectsWithNodeCount(t *testing.T) {
-	ctx, counter := newQueryCountingSQLiteContext(t)
+	ctx, counter := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 	leaves := createFinalizeFixture(t, ctx, 3)
 	sigs := nodeSignaturesForLeaves(leaves)
@@ -177,13 +177,15 @@ func TestUpdateNodesFromSignaturesDoesNotScaleSelectsWithNodeCount(t *testing.T)
 	require.Len(t, internalNodes, 3)
 
 	// Budget: one batched node load plus one query per eager-loaded edge type
-	// (children, parent, tree, signing keyshare), plus two per node that are
-	// inherent to the UpdateOne mutation itself: ent's internal post-UPDATE
-	// refetch in Save, and the AVAILABLE-transition guard hook on TreeNode.
-	// Anything above this means per-node loads crept back in.
+	// (children, parent, tree, signing keyshare), the row lock, and the
+	// grouped status update's two queries (the mutation's ID resolution and
+	// the AVAILABLE-transition guard's batched status check) — plus exactly
+	// one query per node: the TreeNode create hook re-validating network
+	// against the tree on each upsert row. Anything above that means more
+	// per-node loads crept in.
 	selects := counter.Selects()
-	assert.LessOrEqual(t, len(selects), 5+2*len(sigs),
-		"finalize must not issue per-node SELECTs beyond the UpdateOne refetch; got %d selects:\n%s",
+	assert.LessOrEqual(t, len(selects), 8+len(sigs),
+		"finalize must not issue per-node SELECTs beyond the network hook's; got %d selects:\n%s",
 		len(selects), strings.Join(selects, "\n"))
 
 	parentID := ""
@@ -203,7 +205,7 @@ func TestUpdateNodesFromSignaturesDoesNotScaleSelectsWithNodeCount(t *testing.T)
 
 func measureFinalizeSelects(t *testing.T, n int) int {
 	t.Helper()
-	ctx, counter := newQueryCountingSQLiteContext(t)
+	ctx, counter := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 	leaves := createFinalizeFixture(t, ctx, n)
 	sigs := nodeSignaturesForLeaves(leaves)
@@ -216,23 +218,141 @@ func measureFinalizeSelects(t *testing.T, n int) int {
 }
 
 // The production incident this guards against: applying a large claim issued
-// ~9 SELECTs per leaf. The marginal cost of one extra node must be exactly
-// the two selects inherent to its UpdateOne mutation (ent's post-UPDATE
-// refetch and the AVAILABLE-transition guard hook) — everything else has to
-// come from the batched load. If this fails after adding or removing a
-// TreeNode mutation hook that queries, that's expected: update the constant
-// here and confirm the budget test above still holds.
-func TestUpdateNodesFromSignaturesMarginalCostIsTwoSelectsPerNode(t *testing.T) {
+// ~9 SELECTs per leaf. With the batched flush (one upsert for the byte
+// fields, grouped status updates for the AVAILABLE-transition guard), an
+// extra node costs exactly one additional SELECT: the TreeNode create hook's
+// network re-validation on its upsert row. If this fails after adding a
+// TreeNode mutation hook that queries per row, batch that hook instead of
+// raising the constant.
+func TestUpdateNodesFromSignaturesMarginalCostIsOneSelect(t *testing.T) {
 	var small, large int
 	t.Run("n=1", func(t *testing.T) { small = measureFinalizeSelects(t, 1) })
 	t.Run("n=50", func(t *testing.T) { large = measureFinalizeSelects(t, 50) })
 
-	assert.Equal(t, 2*49, large-small,
-		"each additional node must add exactly 2 SELECTs (UpdateOne refetch + AVAILABLE guard); got %d for 49 extra nodes", large-small)
+	assert.Equal(t, 49, large-small,
+		"an additional node must add exactly the network hook's SELECT; got %d for 49 extra nodes", large-small)
+}
+
+// A second raw connection proves the flush's row lock is actually held: its
+// FOR UPDATE NOWAIT on the same row must fail with lock_not_available while
+// the request transaction is open.
+func TestPersistFinalizedNodesLocksRowsOnPostgres(t *testing.T) {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	leaf := createDbLeaf(t, ctx, true)
+
+	tree, err := leaf.node.QueryTree().Only(ctx)
+	require.NoError(t, err)
+	keyshare, err := leaf.node.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+	node := leaf.node
+	node.Edges.Tree = tree
+	node.Edges.SigningKeyshare = keyshare
+	node.UpdateTime = time.Now().UTC()
+
+	// Commit the fixture so the row is visible to the second connection; the
+	// flush below then runs (and holds its locks) in a fresh transaction.
+	require.NoError(t, ent.DbCommit(ctx))
+
+	require.NoError(t, persistFinalizedNodes(ctx, []*ent.TreeNode{node}, nil, node.UpdateTime))
+
+	rawDB, err := sessionCtx.Client.RawDB()
+	require.NoError(t, err)
+	conn, err := rawDB.Conn(t.Context())
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	_, err = conn.ExecContext(t.Context(), "BEGIN")
+	require.NoError(t, err)
+	defer func() { _, _ = conn.ExecContext(t.Context(), "ROLLBACK") }()
+	var lockedID string
+	err = conn.QueryRowContext(t.Context(),
+		"SELECT id FROM tree_nodes WHERE id = $1::uuid FOR UPDATE NOWAIT", node.ID.String()).Scan(&lockedID)
+	require.ErrorContains(t, err, "could not obtain lock")
+
+	ghost := &ent.TreeNode{ID: uuid.New()}
+	err = persistFinalizedNodes(ctx, []*ent.TreeNode{ghost}, nil, node.UpdateTime)
+	require.ErrorContains(t, err, "expected 1 tree nodes to finalize but locked 0")
+}
+
+// A terminal transition committed between finalize's unlocked read and its
+// flush — e.g. the chain watcher exiting a leaf to L1 — must fail the whole
+// request for any stale target status, not only AVAILABLE (the schema
+// guard's fence), or a stale SPLITTED would overwrite the exit.
+func TestPersistFinalizedNodesRejectsStaleTransitionsOverTerminalStatus(t *testing.T) {
+	for _, target := range []st.TreeNodeStatus{st.TreeNodeStatusAvailable, st.TreeNodeStatusSplitted} {
+		t.Run(string(target), func(t *testing.T) {
+			ctx, _ := newQueryCountingPostgresContext(t)
+			leaves := createFinalizeFixture(t, ctx, 1)
+
+			dbTx, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+			_, err = dbTx.TreeNode.UpdateOneID(leaves[0].ID).SetStatus(st.TreeNodeStatusExited).Save(ctx)
+			require.NoError(t, err)
+
+			err = persistFinalizedNodes(ctx, nil, map[st.TreeNodeStatus][]uuid.UUID{
+				target: {leaves[0].ID},
+			}, time.Now().UTC())
+			require.ErrorContains(t, err, "in terminal status EXITED cannot transition to")
+		})
+	}
+}
+
+func measureOwnerKeyUpdateSelects(t *testing.T, n int) int {
+	t.Helper()
+	ctx, counter := newQueryCountingPostgresContext(t)
+	leaves := createFinalizeFixture(t, ctx, n)
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	updates := make([]treeNodeOwnerKeyUpdate, 0, n)
+	for _, leaf := range leaves {
+		node, err := dbTx.TreeNode.Query().
+			Where(enttreenode.IDEQ(leaf.ID)).
+			WithTree().
+			WithSigningKeyshare().
+			Only(ctx)
+		require.NoError(t, err)
+		updates = append(updates, treeNodeOwnerKeyUpdate{
+			node:                node,
+			ownerSigningPubkey:  node.OwnerSigningPubkey,
+			ownerIdentityPubkey: node.OwnerIdentityPubkey,
+		})
+	}
+
+	counter.Reset()
+	require.NoError(t, applyTreeNodeOwnerKeyUpdates(ctx, dbTx, uuid.New(), updates, true))
+	return len(counter.Selects())
+}
+
+// An additional node costs the owner-key flush exactly one SELECT: the
+// TreeNode create hook's network re-validation on its upsert row. Everything
+// else (lock, rotation, upserts) is flat.
+func TestApplyTreeNodeOwnerKeyUpdatesMarginalCostIsOneSelect(t *testing.T) {
+	var small, large int
+	t.Run("n=1", func(t *testing.T) { small = measureOwnerKeyUpdateSelects(t, 1) })
+	t.Run("n=50", func(t *testing.T) { large = measureOwnerKeyUpdateSelects(t, 50) })
+
+	assert.Equal(t, 49, large-small,
+		"an additional node must add exactly the network hook's SELECT; got %d for 49 extra nodes", large-small)
+}
+
+// Redelivered finalizes rewrite the same status; the terminal re-check must
+// not break that idempotency.
+func TestPersistFinalizedNodesAllowsSameStatusRewrite(t *testing.T) {
+	ctx, _ := newQueryCountingPostgresContext(t)
+	leaves := createFinalizeFixture(t, ctx, 1)
+
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	_, err = dbTx.TreeNode.UpdateOneID(leaves[0].ID).SetStatus(st.TreeNodeStatusSplitted).Save(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, persistFinalizedNodes(ctx, nil, map[st.TreeNodeStatus][]uuid.UUID{
+		st.TreeNodeStatusSplitted: {leaves[0].ID},
+	}, time.Now().UTC()))
 }
 
 func TestUpdateNodesFromSignaturesRejectsInvalidAndMissingNodes(t *testing.T) {
-	ctx, _ := newQueryCountingSQLiteContext(t)
+	ctx, _ := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 
 	_, _, err := handler.updateNodesFromSignatures(ctx, []*pb.NodeSignatures{{NodeId: "not-a-uuid"}}, pbcommon.SignatureIntent_TRANSFER, false)
@@ -318,7 +438,7 @@ func createClaimStyleLeaf(t *testing.T, ctx context.Context, tree *ent.Tree, par
 // variants — across multiple leaves, and verifies the signatures are applied
 // and persisted.
 func TestUpdateNodesFromSignaturesAppliesAllRefundVariantsWithDirectTxRequired(t *testing.T) {
-	ctx, _ := newQueryCountingSQLiteContext(t)
+	ctx, _ := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 	tree, parentNode := createTestTree(t, ctx, btcnetwork.Regtest, st.TreeStatusAvailable)
 	keyshare, err := parentNode.QuerySigningKeyshare().Only(ctx)
@@ -367,7 +487,7 @@ func TestUpdateNodesFromSignaturesAppliesAllRefundVariantsWithDirectTxRequired(t
 // edge), so exercise the defense-in-depth branches directly with a bare node
 // and confirm they reproduce the preloaded behavior.
 func TestUpdateLoadedNodeFallsBackToQueriesWhenEdgesNotLoaded(t *testing.T) {
-	ctx, _ := newQueryCountingSQLiteContext(t)
+	ctx, _ := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 	leaves := createFinalizeFixture(t, ctx, 1)
 
@@ -376,10 +496,18 @@ func TestUpdateLoadedNodeFallsBackToQueriesWhenEdgesNotLoaded(t *testing.T) {
 	bare, err := dbTx.TreeNode.Get(ctx, leaves[0].ID)
 	require.NoError(t, err)
 
-	sparkNode, internalNode, err := handler.updateLoadedNode(ctx, &pb.NodeSignatures{NodeId: bare.ID.String()}, bare, pbcommon.SignatureIntent_TRANSFER, false)
+	newStatus, err := handler.updateLoadedNode(ctx, &pb.NodeSignatures{NodeId: bare.ID.String()}, bare, pbcommon.SignatureIntent_TRANSFER, false, time.Now().UTC())
 	require.NoError(t, err)
-	require.NotNil(t, sparkNode)
-	require.NotNil(t, internalNode)
+	require.NotNil(t, newStatus)
+	assert.Equal(t, st.TreeNodeStatusAvailable, *newStatus)
+	assert.Equal(t, st.TreeNodeStatusAvailable, bare.Status)
+
+	// The fallback queries populate the edges, so marshaling reproduces the
+	// preloaded behavior.
+	sparkNode, err := bare.MarshalSparkProto(ctx)
+	require.NoError(t, err)
+	internalNode, err := bare.MarshalInternalProto(ctx)
+	require.NoError(t, err)
 
 	parent, err := leaves[0].QueryParent().Only(ctx)
 	require.NoError(t, err)
@@ -394,7 +522,7 @@ func TestUpdateLoadedNodeFallsBackToQueriesWhenEdgesNotLoaded(t *testing.T) {
 // instead of the fresh read the old per-node code did. All production callers
 // already reject duplicates upstream; this pins the defense in depth.
 func TestUpdateNodesFromSignaturesRejectsDuplicateNodeIDs(t *testing.T) {
-	ctx, _ := newQueryCountingSQLiteContext(t)
+	ctx, _ := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 	leaves := createFinalizeFixture(t, ctx, 1)
 	sigs := nodeSignaturesForLeaves([]*ent.TreeNode{leaves[0], leaves[0]})
@@ -404,7 +532,7 @@ func TestUpdateNodesFromSignaturesRejectsDuplicateNodeIDs(t *testing.T) {
 }
 
 func TestUpdateNodesFromSignaturesWrapsErrorsWithNodeID(t *testing.T) {
-	ctx, _ := newQueryCountingSQLiteContext(t)
+	ctx, _ := newQueryCountingPostgresContext(t)
 	handler := NewFinalizeSignatureHandler(&so.Config{})
 	leaves := createFinalizeFixture(t, ctx, 2)
 	sigs := nodeSignaturesForLeaves(leaves)
