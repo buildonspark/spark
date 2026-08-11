@@ -3,6 +3,7 @@ package partner
 import (
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -38,6 +39,10 @@ const partnerJWTHeader = "x-partner-jwt"
 // expectedAudience is the audience value that partner JWTs must contain.
 const expectedAudience = "spark-so"
 
+// errMissingSubject is a sentinel so the interceptor can attribute the rejection to no_subject
+// rather than the generic invalid-JWT reason, keeping one request on one metric series.
+var errMissingSubject = errors.New("JWT missing sub claim")
+
 type contextKey string
 
 const partnerContextKey = contextKey("partner_info")
@@ -50,8 +55,8 @@ const partnerContextKey = contextKey("partner_info")
 // unattributed (see PartnerJWTInterceptor).
 type PartnerInfo struct {
 	// PartnerDBID is the UUID primary key of the partners row, used for transfer
-	// attribution. Set by the partner JWT interceptor; empty for Basic Auth, which
-	// identifies only the partner_id and not a specific label/partners row.
+	// attribution. A verified JWT always resolves one, so this is empty only for Basic Auth,
+	// which identifies a partner but no label, or when the row could not be created.
 	PartnerDBID uuid.UUID
 	// PartnerID is the partner identifier (JWT "iss" claim, or the Basic Auth username).
 	PartnerID string
@@ -124,9 +129,13 @@ func (i *Interceptor) PartnerJWTInterceptor(ctx context.Context, req any, info *
 
 	pInfo, err := i.verifyPartnerJWT(ctx, vals[0])
 	if err != nil {
-		// Per design: invalid JWT → request proceeds normally, unattributed.
-		RecordAttributionFailure(ctx, AttributionFailureJWTInvalid)
-		logging.GetLoggerFromContext(ctx).Sugar().Warnf("partner JWT verification failed, request will proceed unattributed: %v", err)
+		reason := AttributionFailureJWTInvalid
+		if errors.Is(err, errMissingSubject) {
+			reason = AttributionFailureNoSubject
+		}
+		// Per design: a rejected credential → request proceeds normally, unattributed.
+		RecordAttributionFailure(ctx, reason)
+		logging.GetLoggerFromContext(ctx).Sugar().Warnf("partner JWT rejected, request will proceed unattributed: %v", err)
 		return handler(ctx, req)
 	}
 
@@ -158,10 +167,9 @@ func GetPartnerInfoFromContext(ctx context.Context) (*PartnerInfo, bool) {
 	return info, ok
 }
 
-// verifyPartnerJWT parses and verifies a partner JWT (ES256 or ES256K).
-// Always looks up the public key by partner_id (from partner_keys table).
-// When "sub" is present, also resolves the partners row for attribution tracking.
-// When "sub" is absent, returns read-only access with empty PartnerDBID.
+// verifyPartnerJWT parses and verifies a partner JWT (ES256 or ES256K), resolving the partners
+// row named by "sub". A JWT with no "sub" is rejected — a labelless partner has no row shape.
+// The check runs after signature verification so an unsigned forgery cannot drive no_subject.
 func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*PartnerInfo, error) {
 	// Parse without verification first to extract iss/sub for key lookup.
 	unverified, _, err := jwt.NewParser().ParseUnverified(tokenStr, &jwt.RegisteredClaims{})
@@ -218,10 +226,7 @@ func (i *Interceptor) verifyPartnerJWT(ctx context.Context, tokenStr string) (*P
 		}, nil
 	}
 
-	// No label — read-only access, no attribution.
-	return &PartnerInfo{
-		PartnerID: partnerID,
-	}, nil
+	return nil, errMissingSubject
 }
 
 // verifySignature verifies the JWT signature against the given public key.

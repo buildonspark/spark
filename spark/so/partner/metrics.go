@@ -3,11 +3,13 @@ package partner
 import (
 	"context"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
 )
 
 var transferPartnerMeter = otel.Meter("so.partner")
@@ -21,6 +23,7 @@ type AttributionFailure string
 
 const (
 	AttributionFailureJWTInvalid          AttributionFailure = "jwt_invalid"
+	AttributionFailureNoSubject           AttributionFailure = "no_subject"
 	AttributionFailurePartnerCreateFailed AttributionFailure = "partner_create_failed"
 	AttributionFailureDBContextMissing    AttributionFailure = "db_context_missing"
 	AttributionFailureWriteFailed         AttributionFailure = "write_failed"
@@ -33,7 +36,7 @@ func init() {
 	)
 	transferPartnerAttributionFailure = counterOrNoop(
 		"spark_transfer_partner_attribution_failures",
-		"Requests that lost their partner attribution without failing, by reason",
+		"Requests whose partner attribution was available and then lost, by reason",
 	)
 }
 
@@ -54,6 +57,9 @@ func RecordTransferPartnerWrite(ctx context.Context, t schematype.TransferPartne
 	transferPartnerWrites.Add(ctx, 1, metric.WithAttributes(attribute.String("transfer_type", string(t))))
 }
 
+// RecordAttributionFailure feeds both sinks so a new failure mode cannot appear in the metric but
+// not the log.
 func RecordAttributionFailure(ctx context.Context, reason AttributionFailure) {
 	transferPartnerAttributionFailure.Add(ctx, 1, metric.WithAttributes(attribute.String("reason", string(reason))))
+	logging.AddRequestFields(ctx, zap.String("grpc.client.partner.attribution_failure", string(reason)))
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/argon2"
 	"google.golang.org/grpc"
@@ -92,6 +93,28 @@ func TestBasicAuthInterceptor_ValidCredentials(t *testing.T) {
 	require.True(t, h.called)
 	require.NotNil(t, h.seen)
 	require.Equal(t, "breez", h.seen.PartnerID)
+}
+
+// Basic Auth is the only credential that stamps a partner id with no label, since a verified JWT
+// always resolves one — so an absent label field is an unambiguous marker for Basic Auth.
+func TestBasicAuthInterceptor_StampsPartnerIDWithoutLabel(t *testing.T) {
+	i := newBasicAuthInterceptorWithLookup(func(context.Context, string) (string, error) {
+		return makeArgon2idHash("s3cret"), nil
+	})
+	ctx, logs := requestFieldsCtx(t)
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs(authorizationHeader, basicAuthHeader("breez", "s3cret")))
+
+	var h recordingHandler
+	_, err := i.UnaryServerInterceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: partnerMethod}, h.handle)
+	require.NoError(t, err)
+	require.True(t, h.called)
+
+	logging.GetLoggerWithAccumulatedRequestFields(ctx).Info("request summary")
+	entries := logs.FilterMessage("request summary").All()
+	require.Len(t, entries, 1)
+	fields := entries[0].ContextMap()
+	require.Equal(t, "breez", fields["grpc.client.partner.id"])
+	require.NotContains(t, fields, "grpc.client.partner.label")
 }
 
 // A secret containing colons is preserved (only the first colon splits id:secret).

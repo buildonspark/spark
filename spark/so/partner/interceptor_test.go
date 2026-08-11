@@ -203,11 +203,13 @@ func TestKnobGatedInterceptor_Gating(t *testing.T) {
 		name               string
 		knobEnabled        bool
 		isCoordinator      bool
+		fullMethod         string
 		expectedAttributed bool
 	}{
-		{"coordinator with knob on runs attribution", true, true, true},
-		{"non-coordinator passes through", true, false, false},
-		{"knob off passes through", false, true, false},
+		{"coordinator with knob on runs attribution", true, true, "", true},
+		{"non-coordinator passes through", true, false, "", false},
+		{"knob off passes through", false, true, "", false},
+		{"partner service bypasses the gate", true, true, SparkPartnerServiceMethodPrefix + "QuerySparkTransactionVolumes", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,7 +221,7 @@ func TestKnobGatedInterceptor_Gating(t *testing.T) {
 			gated := i.KnobGatedInterceptor(k, tt.isCoordinator)
 
 			ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
-			resp, err := gated(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+			resp, err := gated(ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.fullMethod}, noopHandler)
 			require.NoError(t, err)
 
 			_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
@@ -267,8 +269,7 @@ func TestPartnerJWTInterceptor_ValidES256JWT(t *testing.T) {
 
 // TestPartnerJWTInterceptor_RecordsAttributionForRequestSummary drives the real interceptor, so
 // the attribution fields are proven to reach the request summary through the production path
-// rather than through a direct ContextWithPartnerInfo call. The empty-label case is the shape
-// Basic Auth produces, which identifies a partner without a label.
+// rather than through a direct ContextWithPartnerInfo call.
 func TestPartnerJWTInterceptor_RecordsAttributionForRequestSummary(t *testing.T) {
 	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
@@ -279,37 +280,21 @@ func TestPartnerJWTInterceptor_RecordsAttributionForRequestSummary(t *testing.T)
 		map[string]uuid.UUID{pkID.String() + "/" + testLabel: dbID},
 	)
 
-	tests := []struct {
-		name           string
-		label          string
-		logsLabelField bool
-	}{
-		{"label present", testLabel, true},
-		{"no label, as Basic Auth produces", "", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			core, logs := observer.New(zapcore.InfoLevel)
-			token := makeES256JWT(t, priv, partnerID, tt.label, time.Now().Add(time.Hour).Unix())
-			ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
-			ctx = logging.Inject(ctx, zap.New(core))
-			ctx = logging.InitRequestFields(ctx)
+	core, logs := observer.New(zapcore.InfoLevel)
+	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(time.Hour).Unix())
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
+	ctx = logging.Inject(ctx, zap.New(core))
+	ctx = logging.InitRequestFields(ctx)
 
-			_, err := i.PartnerJWTInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
-			require.NoError(t, err)
+	_, err := i.PartnerJWTInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+	require.NoError(t, err)
 
-			logging.GetLoggerWithAccumulatedRequestFields(ctx).Info("request summary")
-			require.Len(t, logs.All(), 1)
-			fields := logs.All()[0].ContextMap()
+	logging.GetLoggerWithAccumulatedRequestFields(ctx).Info("request summary")
+	require.Len(t, logs.All(), 1)
+	fields := logs.All()[0].ContextMap()
 
-			assert.Equal(t, partnerID, fields["grpc.client.partner.id"])
-			if tt.logsLabelField {
-				assert.Equal(t, tt.label, fields["grpc.client.partner.label"])
-			} else {
-				assert.NotContains(t, fields, "grpc.client.partner.label")
-			}
-		})
-	}
+	assert.Equal(t, partnerID, fields["grpc.client.partner.id"])
+	assert.Equal(t, testLabel, fields["grpc.client.partner.label"])
 }
 
 func TestPartnerJWTInterceptor_ExpiredES256JWT(t *testing.T) {
@@ -652,8 +637,7 @@ func TestPartnerJWTInterceptor_WrongLabel(t *testing.T) {
 	assert.Equal(t, "wrong-label", partnerInfo.Label)
 }
 
-// Iss-only JWT (no sub) succeeds with read-only access (empty label).
-func TestPartnerJWTInterceptor_MissingSubClaim_ReadOnly(t *testing.T) {
+func TestPartnerJWTInterceptor_MissingSubClaimIsRejected(t *testing.T) {
 	priv, pub := makeP256Key(t)
 	partnerID := "partner-a"
 	pkID := uuid.New()
@@ -672,12 +656,10 @@ func TestPartnerJWTInterceptor_MissingSubClaim_ReadOnly(t *testing.T) {
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(partnerJWTHeader, token))
 	info := &grpc.UnaryServerInfo{}
 	resp, err := i.PartnerJWTInterceptor(ctx, nil, info, noopHandler)
-	require.NoError(t, err)
+	require.NoError(t, err, "a rejected credential must not fail the request")
 
-	partnerInfo, ok := GetPartnerInfoFromContext(respCtx(t, resp))
-	require.True(t, ok, "iss-only JWT should succeed with read-only access")
-	assert.Equal(t, partnerID, partnerInfo.PartnerID)
-	assert.Empty(t, partnerInfo.Label)
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	assert.False(t, ok)
 }
 
 // Iss-only JWT fails when none of the registered keys match the signature.
@@ -829,4 +811,86 @@ func TestPartnerJWTInterceptor_Secp256k1KeyViaJWTPublicSumType(t *testing.T) {
 	assert.Equal(t, partnerID, partnerInfo.PartnerID)
 	assert.Equal(t, testLabel, partnerInfo.Label)
 	assert.Equal(t, dbID, partnerInfo.PartnerDBID)
+}
+
+func requestFieldsCtx(t *testing.T) (context.Context, *observer.ObservedLogs) {
+	t.Helper()
+	core, logs := observer.New(zap.InfoLevel)
+	return logging.Inject(logging.InitRequestFields(t.Context()), zap.New(core)), logs
+}
+
+// attributionFailure returns the reason stamped on the end-of-request summary, or "" if none was.
+func attributionFailure(t *testing.T, ctx context.Context, logs *observer.ObservedLogs) string {
+	t.Helper()
+	logging.GetLoggerWithAccumulatedRequestFields(ctx).Info("request summary")
+	entries := logs.FilterMessage("request summary").All()
+	require.Len(t, entries, 1)
+	reason, ok := entries[0].ContextMap()["grpc.client.partner.attribution_failure"]
+	if !ok {
+		return ""
+	}
+	return reason.(string)
+}
+
+// A missing header is not a failure: the request proceeds unattributed and stamps no reason, so the
+// absence of both a partner id and a reason is what identifies it.
+func TestPartnerJWTInterceptor_MissingHeaderProceedsUnattributed(t *testing.T) {
+	i := makeTestInterceptor(map[string]*testPartnerKeyEntry{}, map[string]uuid.UUID{})
+	ctx, logs := requestFieldsCtx(t)
+	ctx = metadata.NewIncomingContext(ctx, metadata.MD{})
+
+	resp, err := i.PartnerJWTInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+	require.NoError(t, err)
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	assert.False(t, ok)
+	assert.Empty(t, attributionFailure(t, ctx, logs))
+}
+
+func TestPartnerJWTInterceptor_RejectedJWTIsStamped(t *testing.T) {
+	priv, pub := makeP256Key(t)
+	partnerID := "partner-a"
+	pkID := uuid.New()
+	i := makeTestInterceptor(
+		map[string]*testPartnerKeyEntry{partnerID: {pubKey: pub, partnerKeyID: pkID}},
+		map[string]uuid.UUID{pkID.String() + "/" + testLabel: uuid.New()},
+	)
+	token := makeES256JWT(t, priv, partnerID, testLabel, time.Now().Add(-time.Hour).Unix())
+
+	ctx, logs := requestFieldsCtx(t)
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs(partnerJWTHeader, token))
+
+	_, err := i.PartnerJWTInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+	require.NoError(t, err)
+	assert.Equal(t, string(AttributionFailureJWTInvalid), attributionFailure(t, ctx, logs))
+}
+
+func TestPartnerJWTInterceptor_SubjectlessJWTIsRecordedAndStamped(t *testing.T) {
+	priv, pub := makeP256Key(t)
+	partnerID := "partner-a"
+	pkID := uuid.New()
+	i := makeTestInterceptor(
+		map[string]*testPartnerKeyEntry{partnerID: {pubKey: pub, partnerKeyID: pkID}},
+		map[string]uuid.UUID{},
+	)
+	token := makeES256JWT(t, priv, partnerID, "", time.Now().Add(time.Hour).Unix())
+
+	ctx, logs := requestFieldsCtx(t)
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs(partnerJWTHeader, token))
+
+	before := collectFailureCountsByReason(t, metricTestReader)
+	resp, err := i.PartnerJWTInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, noopHandler)
+	require.NoError(t, err, "a rejected credential must not fail the request")
+	after := collectFailureCountsByReason(t, metricTestReader)
+
+	_, ok := GetPartnerInfoFromContext(respCtx(t, resp))
+	assert.False(t, ok)
+
+	noSubject := string(AttributionFailureNoSubject)
+	jwtInvalid := string(AttributionFailureJWTInvalid)
+	assert.Equal(t, int64(1), after[noSubject]-before[noSubject])
+	// The sentinel must reach the interceptor as its own reason, not fall through to the generic
+	// invalid-JWT branch, or one request would land on two series.
+	assert.Zero(t, after[jwtInvalid]-before[jwtInvalid])
+	assert.Equal(t, noSubject, attributionFailure(t, ctx, logs))
 }
