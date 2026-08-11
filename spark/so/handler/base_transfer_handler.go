@@ -481,6 +481,7 @@ func (h *BaseTransferHandler) createTransfer(
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
 	}
+	logging.AddRequestFieldsOnce(ctx, zap.Stringer("network", network))
 
 	for _, leaf := range leaves {
 		if err := leafAvailableStatus(leaf); err != nil {
@@ -652,6 +653,7 @@ func (h *BaseTransferHandler) createTransferV3(
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
 	}
+	logging.AddRequestFieldsOnce(ctx, zap.Stringer("network", network))
 
 	for _, leaf := range leaves {
 		if err := leafAvailableStatus(leaf); err != nil {
@@ -1606,6 +1608,7 @@ func (h *BaseTransferHandler) loadTransferForUpdate(ctx context.Context, transfe
 	if transfer == nil {
 		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("unable to find transfer %s", transferID))
 	}
+	logging.AddRequestFieldsOnce(ctx, zap.Stringer("network", transfer.Network))
 	return transfer, nil
 }
 
@@ -1629,6 +1632,7 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 	if transfer == nil {
 		return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("unable to find transfer %s", transferID))
 	}
+	logging.AddRequestFieldsOnce(ctx, zap.Stringer("network", transfer.Network))
 	return transfer, nil
 }
 

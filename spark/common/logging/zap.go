@@ -20,6 +20,7 @@ const requestFieldsKey = requestFieldsContextKey("requestFields")
 
 type requestFields struct {
 	fields []zap.Field
+	seen   map[string]struct{}
 	mu     sync.Mutex
 }
 
@@ -32,6 +33,7 @@ func Inject(ctx context.Context, logger *zap.Logger) context.Context {
 func InitRequestFields(ctx context.Context) context.Context {
 	return context.WithValue(ctx, requestFieldsKey, &requestFields{
 		fields: make([]zap.Field, 0),
+		seen:   make(map[string]struct{}),
 		mu:     sync.Mutex{},
 	})
 }
@@ -47,7 +49,28 @@ func AddRequestFields(ctx context.Context, fields ...zap.Field) {
 	}
 	fieldsContainer.mu.Lock()
 	defer fieldsContainer.mu.Unlock()
+	for _, field := range fields {
+		fieldsContainer.seen[field.Key] = struct{}{}
+	}
 	fieldsContainer.fields = append(fieldsContainer.fields, fields...)
+}
+
+// AddRequestFieldsOnce accumulates each field only if its key is new, so a value stamped from a
+// path that runs several times in one request appears once. Zap's With does not dedupe keys.
+func AddRequestFieldsOnce(ctx context.Context, fields ...zap.Field) {
+	fieldsContainer, ok := ctx.Value(requestFieldsKey).(*requestFields)
+	if !ok {
+		return
+	}
+	fieldsContainer.mu.Lock()
+	defer fieldsContainer.mu.Unlock()
+	for _, field := range fields {
+		if _, duplicate := fieldsContainer.seen[field.Key]; duplicate {
+			continue
+		}
+		fieldsContainer.seen[field.Key] = struct{}{}
+		fieldsContainer.fields = append(fieldsContainer.fields, field)
+	}
 }
 
 // Get an instance of zap.SugaredLogger from the current context. If no logger is found, returns a

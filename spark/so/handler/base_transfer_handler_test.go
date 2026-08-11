@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -21,6 +22,8 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -453,7 +456,8 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 	transferID := uuid.New()
 	expiry := time.Now().Add(10 * time.Minute)
 
-	_, _, err = h.createTransfer(
+	ctx, stamped := stampRequestFields(t, ctx)
+	createdTransfer, _, err := h.createTransfer(
 		ctx,
 		transferID,
 		nil,
@@ -474,6 +478,7 @@ func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *tes
 	if err != nil {
 		t.Fatalf("expected success when using nodeTx as expected outpoint, got error: %v", err)
 	}
+	require.Equal(t, createdTransfer.Network.String(), stamped("network"))
 }
 
 func TestCreateTransfer_FailsWithWrongPrevOutpoint(t *testing.T) {
@@ -2006,6 +2011,7 @@ func TestCreateTransferV3_PreimageSwap(t *testing.T) {
 			}
 
 			h := NewBaseTransferHandler(config)
+			ctx, stamped := stampRequestFields(t, ctx)
 			transfer, leafMap, err := h.createTransferV3(ctx, spec, st.TransferTypePreimageSwap, TransferRoleParticipant, true)
 			if test.expectedError != "" {
 				require.ErrorContains(t, err, test.expectedError)
@@ -2014,6 +2020,57 @@ func TestCreateTransferV3_PreimageSwap(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, st.TransferTypePreimageSwap, transfer.Type)
 			require.Contains(t, leafMap, leaf.ID.String())
+			require.Equal(t, transfer.Network.String(), stamped("network"))
 		})
+	}
+}
+
+func TestLoadTransfer_StampsNetworkOnceOnTheRequestLog(t *testing.T) {
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	client, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	transfer, err := client.Transfer.Create().
+		SetSenderIdentityPubkey(keys.GeneratePrivateKey().Public()).
+		SetReceiverIdentityPubkey(keys.GeneratePrivateKey().Public()).
+		SetStatus(st.TransferStatusSenderInitiated).
+		SetType(st.TransferTypeTransfer).
+		SetNetwork(btcnetwork.Regtest).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	ctx, stamped := stampRequestFields(t, ctx)
+
+	h := NewBaseTransferHandler(config)
+	_, err = h.loadTransferNoUpdate(ctx, transfer.ID)
+	require.NoError(t, err)
+	_, err = h.loadTransferNoUpdate(ctx, transfer.ID)
+	require.NoError(t, err)
+
+	require.Equal(t, transfer.Network.String(), stamped("network"))
+}
+
+func stampRequestFields(t *testing.T, ctx context.Context) (context.Context, func(key string) string) {
+	t.Helper()
+	core, logs := observer.New(zap.InfoLevel)
+	ctx = logging.Inject(logging.InitRequestFields(ctx), zap.New(core))
+	return ctx, func(key string) string {
+		t.Helper()
+		logging.GetLoggerWithAccumulatedRequestFields(ctx).Info("request field summary")
+		entries := logs.FilterMessage("request field summary").All()
+		require.Len(t, entries, 1)
+		// Count the fields rather than read the map: ContextMap collapses duplicate keys, so it
+		// would pass even if a repeating path appended the field twice.
+		stamped := 0
+		for _, field := range entries[0].Context {
+			if field.Key == key {
+				stamped++
+			}
+		}
+		require.Equal(t, 1, stamped)
+		return entries[0].ContextMap()[key].(string)
 	}
 }
