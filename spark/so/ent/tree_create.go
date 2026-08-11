@@ -475,18 +475,6 @@ func (u *TreeUpsert) UpdateStatus() *TreeUpsert {
 	return u
 }
 
-// SetNetwork sets the "network" field.
-func (u *TreeUpsert) SetNetwork(v btcnetwork.Network) *TreeUpsert {
-	u.Set(tree.FieldNetwork, v)
-	return u
-}
-
-// UpdateNetwork sets the "network" field to the value that was provided on create.
-func (u *TreeUpsert) UpdateNetwork() *TreeUpsert {
-	u.SetExcluded(tree.FieldNetwork)
-	return u
-}
-
 // SetBaseTxid sets the "base_txid" field.
 func (u *TreeUpsert) SetBaseTxid(v schematype.TxID) *TreeUpsert {
 	u.Set(tree.FieldBaseTxid, v)
@@ -536,6 +524,9 @@ func (u *TreeUpsertOne) UpdateNewValues() *TreeUpsertOne {
 		}
 		if _, exists := u.create.mutation.CreateTime(); exists {
 			s.SetIgnore(tree.FieldCreateTime)
+		}
+		if _, exists := u.create.mutation.Network(); exists {
+			s.SetIgnore(tree.FieldNetwork)
 		}
 	}))
 	return u
@@ -607,20 +598,6 @@ func (u *TreeUpsertOne) SetStatus(v schematype.TreeStatus) *TreeUpsertOne {
 func (u *TreeUpsertOne) UpdateStatus() *TreeUpsertOne {
 	return u.Update(func(s *TreeUpsert) {
 		s.UpdateStatus()
-	})
-}
-
-// SetNetwork sets the "network" field.
-func (u *TreeUpsertOne) SetNetwork(v btcnetwork.Network) *TreeUpsertOne {
-	return u.Update(func(s *TreeUpsert) {
-		s.SetNetwork(v)
-	})
-}
-
-// UpdateNetwork sets the "network" field to the value that was provided on create.
-func (u *TreeUpsertOne) UpdateNetwork() *TreeUpsertOne {
-	return u.Update(func(s *TreeUpsert) {
-		s.UpdateNetwork()
 	})
 }
 
@@ -845,6 +822,9 @@ func (u *TreeUpsertBulk) UpdateNewValues() *TreeUpsertBulk {
 			if _, exists := b.mutation.CreateTime(); exists {
 				s.SetIgnore(tree.FieldCreateTime)
 			}
+			if _, exists := b.mutation.Network(); exists {
+				s.SetIgnore(tree.FieldNetwork)
+			}
 		}
 	}))
 	return u
@@ -916,20 +896,6 @@ func (u *TreeUpsertBulk) SetStatus(v schematype.TreeStatus) *TreeUpsertBulk {
 func (u *TreeUpsertBulk) UpdateStatus() *TreeUpsertBulk {
 	return u.Update(func(s *TreeUpsert) {
 		s.UpdateStatus()
-	})
-}
-
-// SetNetwork sets the "network" field.
-func (u *TreeUpsertBulk) SetNetwork(v btcnetwork.Network) *TreeUpsertBulk {
-	return u.Update(func(s *TreeUpsert) {
-		s.SetNetwork(v)
-	})
-}
-
-// UpdateNetwork sets the "network" field to the value that was provided on create.
-func (u *TreeUpsertBulk) UpdateNetwork() *TreeUpsertBulk {
-	return u.Update(func(s *TreeUpsert) {
-		s.UpdateNetwork()
 	})
 }
 
