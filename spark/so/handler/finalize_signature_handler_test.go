@@ -559,7 +559,7 @@ func TestFinalizeNodeSignaturesAllowsMultiInputDepositRootSignatureValidation(t 
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testing.T) {
 	t.Parallel()
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
@@ -593,7 +593,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testin
 }
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyOperatorsMap(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{},
@@ -649,7 +649,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *te
 // Test that nodes with children are not set to Available status even with refund tx
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8094
 func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	config := &so.Config{}
@@ -730,7 +730,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 
 // Test that nodes without refund tx are set to Splitted regardless of children
 func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
@@ -764,7 +764,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8094
 func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
 
@@ -852,7 +852,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 
 // Test edge case: Tree not in Available status should not trigger status logic
 func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
@@ -1120,7 +1120,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 	t.Parallel()
 	rng := rand.NewChaCha8([32]byte{})
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
@@ -1333,7 +1333,7 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T) {
 	for _, nodeStatus := range []st.TreeNodeStatus{st.TreeNodeStatusOnChain, st.TreeNodeStatusExited, st.TreeNodeStatusParentExited} {
 		t.Run(string(nodeStatus), func(t *testing.T) {
-			ctx, _ := db.NewTestSQLiteContext(t)
+			ctx, _ := db.ConnectToTestPostgres(t)
 
 			config := &so.Config{}
 			handler := NewFinalizeSignatureHandler(config)

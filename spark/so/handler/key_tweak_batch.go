@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
 // rotateLeafKeyshares rotates every keyshare in tweaks via one batched
@@ -51,8 +52,35 @@ type treeNodeOwnerKeyUpdate struct {
 
 // applyTreeNodeOwnerKeyUpdates persists post-rotation owner keys for all
 // nodes with chunked CreateBulk+OnConflict upserts — ent's bulk-UPDATE
-// workaround. Chunking respects PostgreSQL's 65535-parameter limit.
+// workaround. Chunking respects PostgreSQL's 65535-parameter limit. The rows
+// are row-locked and counted first so the conflict path always takes the
+// UPDATE branch — without that, a node deleted by a concurrent transaction
+// would be resurrected through the INSERT branch. The send path's caller
+// already holds these locks (re-locking rows held by the same transaction is
+// a no-op); the claim settle path locks only the transfer, receiver, and
+// keyshares, so this is its tree-node existence fence.
 func applyTreeNodeOwnerKeyUpdates(ctx context.Context, db *ent.Client, transferID uuid.UUID, updates []treeNodeOwnerKeyUpdate, updateOwnerIdentity bool) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	nodeIDs := make([]uuid.UUID, 0, len(updates))
+	for _, update := range updates {
+		nodeIDs = append(nodeIDs, update.node.ID)
+	}
+	// Deterministic order to avoid lock-order deadlocks between concurrent
+	// batch lockers.
+	lockedIDs, err := db.TreeNode.Query().
+		Where(enttreenode.IDIn(nodeIDs...)).
+		Order(ent.Asc(enttreenode.FieldID)).
+		ForUpdate().
+		IDs(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to lock tree nodes for transfer %s: %w", transferID, err)
+	}
+	if len(lockedIDs) != len(nodeIDs) {
+		return sparkerrors.NotFoundMissingEntity(fmt.Errorf(
+			"expected %d tree nodes for transfer %s key update but locked %d", len(nodeIDs), transferID, len(lockedIDs)))
+	}
 	builders := make([]*ent.TreeNodeCreate, 0, len(updates))
 	for _, update := range updates {
 		ownerIdentity := update.node.OwnerIdentityPubkey

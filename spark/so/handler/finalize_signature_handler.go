@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -33,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tree"
+	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -561,36 +563,189 @@ func loadNodesForFinalize(ctx context.Context, nodeSignatures []*pb.NodeSignatur
 }
 
 // updateNodesFromSignatures applies each NodeSignatures entry to its tree
-// node, with all node data batch-loaded once up front.
+// node, with all node data batch-loaded once up front and all writes flushed
+// in one batch at the end.
 func (o *FinalizeSignatureHandler) updateNodesFromSignatures(ctx context.Context, nodeSignatures []*pb.NodeSignatures, intent pbcommon.SignatureIntent, requireDirectTx bool) ([]*pb.TreeNode, []*pbinternal.TreeNode, error) {
 	loadedNodes, err := loadNodesForFinalize(ctx, nodeSignatures)
 	if err != nil {
 		return nil, nil, err
 	}
-	nodes := make([]*pb.TreeNode, 0, len(nodeSignatures))
-	internalNodes := make([]*pbinternal.TreeNode, 0, len(nodeSignatures))
+	// Microsecond precision so the marshaled timestamps equal what Postgres
+	// stores.
+	updateTime := utils.ToMicrosecondPrecision(time.Now().UTC())
+	statusGroups := make(map[st.TreeNodeStatus][]uuid.UUID)
 	for i, sig := range nodeSignatures {
-		node, internalNode, err := o.updateLoadedNode(ctx, sig, loadedNodes[i], intent, requireDirectTx)
+		newStatus, err := o.updateLoadedNode(ctx, sig, loadedNodes[i], intent, requireDirectTx, updateTime)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to update node %s: %w", sig.GetNodeId(), err)
 		}
-		nodes = append(nodes, node)
+		if newStatus != nil {
+			statusGroups[*newStatus] = append(statusGroups[*newStatus], loadedNodes[i].ID)
+		}
+	}
+	if err := persistFinalizedNodes(ctx, loadedNodes, statusGroups, updateTime); err != nil {
+		return nil, nil, err
+	}
+
+	nodes := make([]*pb.TreeNode, 0, len(nodeSignatures))
+	internalNodes := make([]*pbinternal.TreeNode, 0, len(nodeSignatures))
+	for _, node := range loadedNodes {
+		nodeSparkProto, err := node.MarshalSparkProto(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %w", node.ID, err)
+		}
+		internalNode, err := node.MarshalInternalProto(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %w", node.ID, err)
+		}
+		nodes = append(nodes, nodeSparkProto)
 		internalNodes = append(internalNodes, internalNode)
 	}
 	return nodes, internalNodes, nil
 }
 
-// updateLoadedNode applies one NodeSignatures entry to a tree node preloaded
-// by loadNodesForFinalize. It must not re-query data available on the node's
+// persistFinalizedNodes flushes the in-memory finalize mutations with chunked
+// CreateBulk+OnConflict upserts (ent's bulk-UPDATE workaround). The rows are
+// row-locked and counted first so the conflict path always takes the UPDATE
+// branch — without that, a node deleted by a concurrent transaction would be
+// resurrected through the INSERT branch with its status applied guard-free.
+// Status is deliberately excluded from the upsert and applied through grouped
+// Update statements instead: the AVAILABLE-transition guard only fires on
+// update mutations, and it must keep vetting every transition (SP-3049).
+func persistFinalizedNodes(ctx context.Context, nodes []*ent.TreeNode, statusGroups map[st.TreeNodeStatus][]uuid.UUID, updateTime time.Time) error {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get db: %w", err)
+	}
+	idSet := make(map[uuid.UUID]struct{}, len(nodes))
+	for _, node := range nodes {
+		idSet[node.ID] = struct{}{}
+	}
+	for _, ids := range statusGroups {
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+	lockedStatus := make(map[uuid.UUID]st.TreeNodeStatus, len(idSet))
+	if len(idSet) > 0 {
+		nodeIDs := make([]uuid.UUID, 0, len(idSet))
+		for id := range idSet {
+			nodeIDs = append(nodeIDs, id)
+		}
+		// Deterministic order to avoid lock-order deadlocks between
+		// concurrent batch lockers.
+		lockedRows, err := db.TreeNode.Query().
+			Where(treenode.IDIn(nodeIDs...)).
+			Order(ent.Asc(treenode.FieldID)).
+			ForUpdate().
+			Select(treenode.FieldID, treenode.FieldStatus).
+			All(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to lock tree nodes for finalize: %w", err)
+		}
+		if len(lockedRows) != len(nodeIDs) {
+			return sparkerrors.NotFoundMissingEntity(fmt.Errorf(
+				"expected %d tree nodes to finalize but locked %d", len(nodeIDs), len(lockedRows)))
+		}
+		for _, row := range lockedRows {
+			lockedStatus[row.ID] = row.Status
+		}
+	}
+	// Re-check the planned transitions against the now-locked statuses: the
+	// groups were computed from an unlocked read, and the schema guard only
+	// vets transitions to AVAILABLE — without this, a terminal transition
+	// committed since the read (e.g. the chain watcher exiting a leaf to L1)
+	// would be overwritten with a stale SPLITTED. Same-status writes stay
+	// permitted so redelivered finalizes remain idempotent.
+	for status, ids := range statusGroups {
+		for _, id := range ids {
+			current := lockedStatus[id]
+			if current != status && !current.CanBecomeAvailable() {
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+					"tree node %s in terminal status %s cannot transition to %s", id, current, status))
+			}
+		}
+	}
+	builders := make([]*ent.TreeNodeCreate, 0, len(nodes))
+	for _, node := range nodes {
+		builders = append(builders, db.TreeNode.Create().
+			SetID(node.ID).
+			SetTree(node.Edges.Tree).
+			// The tree's network, matching applyTreeNodeOwnerKeyUpdates: the
+			// column is not in the conflict update set, and the create hook's
+			// network check must not start rejecting stored rows the old
+			// update path accepted.
+			SetNetwork(node.Edges.Tree.Network).
+			SetSigningKeyshare(node.Edges.SigningKeyshare).
+			SetValue(node.Value).
+			SetVerifyingPubkey(node.VerifyingPubkey).
+			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
+			SetOwnerSigningPubkey(node.OwnerSigningPubkey).
+			SetVout(node.Vout).
+			SetStatus(node.Status).
+			SetUpdateTime(node.UpdateTime).
+			SetRawTx(node.RawTx).
+			SetRawRefundTx(node.RawRefundTx).
+			SetDirectTx(node.DirectTx).
+			SetDirectRefundTx(node.DirectRefundTx).
+			SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx))
+	}
+	const maxBatchSize = 1000
+	for chunk := range slices.Chunk(builders, maxBatchSize) {
+		if err := db.TreeNode.CreateBulk(chunk...).
+			OnConflictColumns(treenode.FieldID).
+			Update(func(u *ent.TreeNodeUpsert) {
+				u.UpdateRawTx()
+				u.UpdateRawRefundTx()
+				u.UpdateDirectTx()
+				u.UpdateDirectRefundTx()
+				u.UpdateDirectFromCpfpRefundTx()
+				// The create hooks computed txids from this batch's tx bytes;
+				// carry them so the indexed columns track the new txs.
+				u.UpdateRawTxid()
+				u.UpdateRawRefundTxid()
+				u.UpdateDirectTxid()
+				u.UpdateDirectRefundTxid()
+				u.UpdateDirectFromCpfpRefundTxid()
+				// Carried explicitly: custom upsert resolvers bypass ent's
+				// UpdateDefault.
+				u.UpdateUpdateTime()
+			}).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("unable to batch update finalized tree nodes: %w", err)
+		}
+	}
+	for status, ids := range statusGroups {
+		for chunk := range slices.Chunk(ids, maxBatchSize) {
+			if err := db.TreeNode.Update().
+				Where(treenode.IDIn(chunk...)).
+				SetStatus(status).
+				// Pinned to the batch timestamp (instead of UpdateDefault's
+				// fresh now) so the rows match the marshaled protos.
+				SetUpdateTime(updateTime).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("unable to batch update tree node status to %s: %w", status, err)
+			}
+		}
+	}
+	return nil
+}
+
+// updateLoadedNode validates one NodeSignatures entry and applies the
+// resulting fields to the preloaded tree node in memory; the caller persists
+// all nodes in one batch and marshals them afterwards. The returned status is
+// the transition finalize decided for the node (nil for none), which the
+// caller must apply through an update mutation so the AVAILABLE-transition
+// guard vets it. It must not re-query data available on the node's
 // eager-loaded edges (see loadNodesForFinalize); the query fallbacks below
 // exist only for defense in depth if an edge is missing.
-func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, node *ent.TreeNode, intent pbcommon.SignatureIntent, requireDirectTx bool) (*pb.TreeNode, *pbinternal.TreeNode, error) {
+func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, node *ent.TreeNode, intent pbcommon.SignatureIntent, requireDirectTx bool, updateTime time.Time) (*st.TreeNodeStatus, error) {
 	signingKeyshare := node.Edges.SigningKeyshare
 	if signingKeyshare == nil {
 		var err error
 		signingKeyshare, err = node.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get signing keyshare for node %s: %w", node.ID, err)
+			return nil, fmt.Errorf("failed to get signing keyshare for node %s: %w", node.ID, err)
 		}
 	}
 	treeEnt := node.Edges.Tree
@@ -598,7 +753,7 @@ func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSig
 		var err error
 		treeEnt, err = node.QueryTree().Only(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get tree for node %s: %w", node.ID, err)
+			return nil, fmt.Errorf("failed to get tree for node %s: %w", node.ID, err)
 		}
 	}
 	// A nil parent with a loaded edge means the node is a root; only fall
@@ -608,7 +763,7 @@ func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSig
 		if _, edgeErr := node.Edges.ParentOrErr(); ent.IsNotLoaded(edgeErr) {
 			p, qErr := node.QueryParent().Only(ctx)
 			if qErr != nil && !ent.IsNotFound(qErr) {
-				return nil, nil, fmt.Errorf("failed to get parent for node %s: %w", node.ID, qErr)
+				return nil, fmt.Errorf("failed to get parent for node %s: %w", node.ID, qErr)
 			}
 			nodeParent = p
 		}
@@ -619,7 +774,7 @@ func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSig
 	if children, childrenErr := node.Edges.ChildrenOrErr(); childrenErr == nil {
 		hasChildren = len(children) > 0
 	} else if hasChildren, err = node.QueryChildren().Exist(ctx); err != nil {
-		return nil, nil, fmt.Errorf("failed to check node children in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+		return nil, fmt.Errorf("failed to check node children in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 	nodeCanBecomeAvailable := treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) && !hasChildren
 
@@ -629,50 +784,50 @@ func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSig
 	if intent == pbcommon.SignatureIntent_CREATION {
 		cpfpNodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.GetNodeTxSignature())
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update cpfp tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update cpfp tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 		}
 		if len(node.DirectTx) > 0 && len(nodeSignatures.GetDirectNodeTxSignature()) > 0 {
 			directNodeTxBytes, err = common.UpdateTxWithSignature(node.DirectTx, 0, nodeSignatures.GetDirectNodeTxSignature())
 			if err != nil {
-				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update direct tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update direct tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
 		} else if len(nodeSignatures.GetDirectNodeTxSignature()) == 0 && requireDirectTx && len(node.DirectTx) > 0 {
-			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version"))
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version"))
 		}
 		// Node may not have a parent if it is the root node.
 		if nodeParent != nil {
 			cpfpTreeNodeTx, err := common.TxFromRawTxBytes(cpfpNodeTxBytes)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize node tx: %w", err)
+				return nil, fmt.Errorf("unable to deserialize node tx: %w", err)
 			}
 			treeNodeParentTx, err := common.TxFromRawTxBytes(nodeParent.RawTx)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize parent tx: %w", err)
+				return nil, fmt.Errorf("unable to deserialize parent tx: %w", err)
 			}
 			if len(treeNodeParentTx.TxOut) <= int(node.Vout) {
-				return nil, nil, fmt.Errorf("vout out of bounds")
+				return nil, fmt.Errorf("vout out of bounds")
 			}
 			err = common.VerifySignatureSingleInput(cpfpTreeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 			if err != nil {
-				return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
+				return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
 			}
 			if len(directNodeTxBytes) > 0 {
 				directTreeNodeTx, err := common.TxFromRawTxBytes(directNodeTxBytes)
 				if err != nil {
-					return nil, nil, fmt.Errorf("unable to deserialize node tx: %w", err)
+					return nil, fmt.Errorf("unable to deserialize node tx: %w", err)
 				}
 				err = common.VerifySignatureSingleInput(directTreeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 				if err != nil {
-					return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
+					return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify node tx signature: %w", err))
 				}
 			}
 		} else {
 			if err := o.verifyDepositBackedRootNodeSignature(ctx, node, treeEnt, cpfpNodeTxBytes); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			if len(directNodeTxBytes) > 0 {
 				if err := o.verifyDepositBackedRootNodeSignature(ctx, node, treeEnt, directNodeTxBytes); err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 			}
 		}
@@ -686,121 +841,115 @@ func (o *FinalizeSignatureHandler) updateLoadedNode(ctx context.Context, nodeSig
 	if len(nodeSignatures.GetRefundTxSignature()) > 0 {
 		cpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.GetRefundTxSignature())
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 		}
 
 		cpfpRefundTx, err := common.TxFromRawTxBytes(cpfpRefundTxBytes)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+			return nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 		}
 		cpfpTreeNodeTx, err := common.TxFromRawTxBytes(cpfpNodeTxBytes)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to deserialize cpfp leaf tx: %w", err)
+			return nil, fmt.Errorf("unable to deserialize cpfp leaf tx: %w", err)
 		}
 		if len(cpfpTreeNodeTx.TxOut) == 0 {
-			return nil, nil, fmt.Errorf("cpfp vout out of bounds")
+			return nil, fmt.Errorf("cpfp vout out of bounds")
 		}
 		err = common.VerifySignatureSingleInput(cpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
 		if err != nil {
-			return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify cpfprefund tx signature: %w", err))
+			return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify cpfprefund tx signature: %w", err))
 		}
 		if len(nodeSignatures.GetDirectRefundTxSignature()) > 0 {
 			directRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectRefundTx, 0, nodeSignatures.GetDirectRefundTxSignature())
 			if err != nil {
-				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
 			directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+				return nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 			}
 			directTreeNodeTx, err := common.TxFromRawTxBytes(directNodeTxBytes)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize direct leaf tx: %w", err)
+				return nil, fmt.Errorf("unable to deserialize direct leaf tx: %w", err)
 			}
 			if len(directTreeNodeTx.TxOut) == 0 {
-				return nil, nil, fmt.Errorf("direct vout out of bounds")
+				return nil, fmt.Errorf("direct vout out of bounds")
 			}
 			err = common.VerifySignatureSingleInput(directRefundTx, 0, directTreeNodeTx.TxOut[0])
 			if err != nil {
-				return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify direct refund tx signature: %w", err))
+				return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify direct refund tx signature: %w", err))
 			}
 		} else if requireDirectTx && len(node.DirectTx) > 0 {
 			isZeroNode, err := bitcointransaction.IsZeroNode(node)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
+				return nil, fmt.Errorf("failed to determine if node is zero node: %w", err)
 			}
 
 			if !isZeroNode {
-				return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version"))
+				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectRefundTxSignature is required. Please upgrade to the latest SDK version"))
 			}
 		}
 		if len(nodeSignatures.GetDirectFromCpfpRefundTxSignature()) > 0 {
 			directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(node.DirectFromCpfpRefundTx, 0, nodeSignatures.GetDirectFromCpfpRefundTxSignature())
 			if err != nil {
-				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err))
 			}
 			directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
+				return nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 			}
 			err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpTreeNodeTx.TxOut[0])
 			if err != nil {
-				return nil, nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err))
+				return nil, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err))
 			}
 		} else if requireDirectTx {
 			if len(node.DirectTx) > 0 {
-				return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version"))
+				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("DirectFromCpfpRefundTxSignature is required. Please upgrade to the latest SDK version"))
 			}
 		}
 	} else {
 		requiresSignature, err := requiresFinalizeRefundSignature(node, intent)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if nodeCanBecomeAvailable && requiresSignature {
-			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("RefundTxSignature is required for unsigned refund transaction on node %s", node.ID))
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("RefundTxSignature is required for unsigned refund transaction on node %s", node.ID))
 		}
 		cpfpRefundTxBytes = node.RawRefundTx
 		directRefundTxBytes = node.DirectRefundTx
 		directFromCpfpRefundTxBytes = node.DirectFromCpfpRefundTx
 	}
 
-	// Update the tree node
-	nodeMutator := node.Update().
-		SetRawTx(cpfpNodeTxBytes).
-		SetRawRefundTx(cpfpRefundTxBytes).
-		SetDirectTx(directNodeTxBytes).
-		SetDirectRefundTx(directRefundTxBytes).
-		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes)
+	// Decide the status transition against the pre-update field values (the
+	// refund-tx check below must see the stored bytes, not this entry's),
+	// then apply everything in memory.
+	var newStatus *st.TreeNodeStatus
 	if treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) {
 		if len(node.RawRefundTx) == 0 || hasChildren {
-			nodeMutator.SetStatus(st.TreeNodeStatusSplitted)
+			s := st.TreeNodeStatusSplitted
+			newStatus = &s
 		} else if (intent == pbcommon.SignatureIntent_CREATION && node.Status == st.TreeNodeStatusCreating) || intent == pbcommon.SignatureIntent_TRANSFER {
-			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
+			s := st.TreeNodeStatusAvailable
+			newStatus = &s
 		}
 	}
-	node, err = nodeMutator.Save(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update node: %w", err)
+	node.RawTx = cpfpNodeTxBytes
+	node.RawRefundTx = cpfpRefundTxBytes
+	node.DirectTx = directNodeTxBytes
+	node.DirectRefundTx = directRefundTxBytes
+	node.DirectFromCpfpRefundTx = directFromCpfpRefundTxBytes
+	node.UpdateTime = updateTime
+	if newStatus != nil {
+		node.Status = *newStatus
 	}
-	// Preserve eagerly-loaded edges for downstream marshaling logic. For root
-	// nodes (nil parent) the marshal falls back to a parent lookup that finds
-	// nothing, matching prior behavior.
+	// Ensure the edges are set for downstream marshaling even when a fallback
+	// query loaded them.
 	node.Edges.SigningKeyshare = signingKeyshare
 	node.Edges.Tree = treeEnt
 	if nodeParent != nil {
 		node.Edges.Parent = nodeParent
 	}
-
-	nodeSparkProto, err := node.MarshalSparkProto(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %w", node.ID, err)
-	}
-	internalNode, err := node.MarshalInternalProto(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %w", node.ID, err)
-	}
-	return nodeSparkProto, internalNode, nil
+	return newStatus, nil
 }
 
 func txHasWitness(rawTx []byte) (bool, error) {
