@@ -2501,6 +2501,7 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pbspark.Pr
 	if err != nil {
 		return nil, nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("unable to get transfer: %w", err))
 	}
+	logging.AddRequestFieldsOnce(ctx, zap.Stringer("network", transfer.Network))
 
 	if transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now()) {
 		return nil, nil, sparkerrors.FailedPreconditionExpired(fmt.Errorf("transfer %s has expired", transfer.ID))
