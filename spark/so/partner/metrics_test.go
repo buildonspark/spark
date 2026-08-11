@@ -134,6 +134,29 @@ func collectFailureCountsByReason(t *testing.T, reader *msdk.ManualReader) map[s
 	return collectCounter(t, reader, "spark_transfer_partner_attribution_failures", "reason")
 }
 
+// Every reason on the attribution-failure counter is also stamped on the request log, so a new
+// reason cannot reach the metric while staying invisible in the log.
+func TestRecordAttributionFailure_StampsEveryReason(t *testing.T) {
+	for _, reason := range []AttributionFailure{
+		AttributionFailureJWTInvalid,
+		AttributionFailureNoSubject,
+		AttributionFailurePartnerCreateFailed,
+		AttributionFailureDBContextMissing,
+		AttributionFailureWriteFailed,
+	} {
+		t.Run(string(reason), func(t *testing.T) {
+			ctx, logs := requestFieldsCtx(t)
+
+			before := collectFailureCountsByReason(t, metricTestReader)
+			RecordAttributionFailure(ctx, reason)
+			after := collectFailureCountsByReason(t, metricTestReader)
+
+			assert.Equal(t, int64(1), after[string(reason)]-before[string(reason)])
+			assert.Equal(t, string(reason), attributionFailure(t, ctx, logs))
+		})
+	}
+}
+
 func collectCounter(t *testing.T, reader *msdk.ManualReader, name, attr string) map[string]int64 {
 	t.Helper()
 	var rm md.ResourceMetrics
