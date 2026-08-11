@@ -12,7 +12,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -66,20 +65,6 @@ func (tu *TreeUpdate) SetStatus(ss schematype.TreeStatus) *TreeUpdate {
 func (tu *TreeUpdate) SetNillableStatus(ss *schematype.TreeStatus) *TreeUpdate {
 	if ss != nil {
 		tu.SetStatus(*ss)
-	}
-	return tu
-}
-
-// SetNetwork sets the "network" field.
-func (tu *TreeUpdate) SetNetwork(b btcnetwork.Network) *TreeUpdate {
-	tu.mutation.SetNetwork(b)
-	return tu
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tu *TreeUpdate) SetNillableNetwork(b *btcnetwork.Network) *TreeUpdate {
-	if b != nil {
-		tu.SetNetwork(*b)
 	}
 	return tu
 }
@@ -289,11 +274,6 @@ func (tu *TreeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
 		}
 	}
-	if v, ok := tu.mutation.Network(); ok {
-		if err := tree.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
-		}
-	}
 	if v, ok := tu.mutation.Vout(); ok {
 		if err := tree.VoutValidator(v); err != nil {
 			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
@@ -328,9 +308,6 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.Status(); ok {
 		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
-	}
-	if value, ok := tu.mutation.Network(); ok {
-		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
 	}
 	if value, ok := tu.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
@@ -541,20 +518,6 @@ func (tuo *TreeUpdateOne) SetStatus(ss schematype.TreeStatus) *TreeUpdateOne {
 func (tuo *TreeUpdateOne) SetNillableStatus(ss *schematype.TreeStatus) *TreeUpdateOne {
 	if ss != nil {
 		tuo.SetStatus(*ss)
-	}
-	return tuo
-}
-
-// SetNetwork sets the "network" field.
-func (tuo *TreeUpdateOne) SetNetwork(b btcnetwork.Network) *TreeUpdateOne {
-	tuo.mutation.SetNetwork(b)
-	return tuo
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tuo *TreeUpdateOne) SetNillableNetwork(b *btcnetwork.Network) *TreeUpdateOne {
-	if b != nil {
-		tuo.SetNetwork(*b)
 	}
 	return tuo
 }
@@ -777,11 +740,6 @@ func (tuo *TreeUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
 		}
 	}
-	if v, ok := tuo.mutation.Network(); ok {
-		if err := tree.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
-		}
-	}
 	if v, ok := tuo.mutation.Vout(); ok {
 		if err := tree.VoutValidator(v); err != nil {
 			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
@@ -833,9 +791,6 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.Status(); ok {
 		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
-	}
-	if value, ok := tuo.mutation.Network(); ok {
-		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
 	}
 	if value, ok := tuo.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)

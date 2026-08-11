@@ -547,6 +547,7 @@ func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, re
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.IDIn(leafUUIDs...)).
 		WithTree().
+		WithSigningKeyshare().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to preload leaves for coordinator flow: %w", err)
@@ -852,8 +853,12 @@ func buildSigningJobForRefund(
 		}
 	}
 
-	signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
-	if err != nil {
+	// This runs three times per leaf, so callers batch-load the
+	// SigningKeyshare edge; the query is only a fallback.
+	var signingKeyshareID uuid.UUID
+	if ks := leaf.Edges.SigningKeyshare; ks != nil {
+		signingKeyshareID = ks.ID
+	} else if signingKeyshareID, err = leaf.QuerySigningKeyshare().OnlyID(ctx); err != nil {
 		return nil, fmt.Errorf("unable to load signing keyshare for leaf %s: %w", leaf.ID, err)
 	}
 	var adaptorPubKeyRef *keys.Public
@@ -863,7 +868,7 @@ func buildSigningJobForRefund(
 	return &helper.SigningJobWithPregeneratedNonce{
 		SigningJob: helper.SigningJob{
 			JobID:             jobID,
-			SigningKeyshareID: signingKeyshare.ID,
+			SigningKeyshareID: signingKeyshareID,
 			Message:           sigHash,
 			VerifyingKey:      new(leaf.VerifyingPubkey),
 			UserCommitment:    &userCommitment,

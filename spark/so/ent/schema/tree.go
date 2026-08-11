@@ -36,6 +36,7 @@ func (Tree) Fields() []ent.Field {
 			Annotations(entexample.Default(st.TreeStatusAvailable)),
 		field.Enum("network").
 			GoType(btcnetwork.Unspecified).
+			Immutable().
 			Comment("The Bitcoin network this tree is anchored on.").
 			Annotations(entexample.Default(btcnetwork.Regtest)),
 		field.Bytes("base_txid").
