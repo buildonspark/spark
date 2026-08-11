@@ -50,14 +50,13 @@ tracing:
 knobs:
   static_values:
     spark.database.pool.min_conns: 4
-    spark.so.enable_deposit_flow_validation@REGTEST: 100
-    spark.so.enhanced_transfer_receive_validation@REGTEST: 100
-    spark.so.direct_refund_tx_validation@REGTEST: 100
     spark.so.max_unused_deposit_addresses: 64
-    spark.so.enforce_no_direct_transactions_from_deposit_tx@REGTEST: 100
-    spark.so.disable_v2_txs@REGTEST: 100
     spark.so.enable_instant_static_deposit@REGTEST: 100
     spark.so.max_pending_instant_static_deposit_amount: 1000000
+    spark.so.deposit_tree.require_prepare_binding: 0
+    spark.so.grpc.server.stream_heartbeat.enabled: 100
+    spark.so.log_transfer_query_invocations: 0
+    spark.so.log_transfer_query_invocations_slow_ms: 0
     spark.so.shutdown_hodl_invoices: 0
     spark.so.mpc_transfer.enabled: 0
     spark.so.initiate_preimage_swap_v4.enabled: 1
@@ -68,6 +67,14 @@ knobs:
     spark.so.use_consensus_reserve_instant_static_deposit_utxo_swap: 1
     spark.so.use_consensus_static_deposit_utxo_refund: 1
     spark.so.use_consensus_static_deposit_utxo_swap: 1
+    spark.so.enable_partner_jwt: 1
+    spark.so.signing_keyshare.backfill_secrets_enabled: 0
+    spark.so.signing_keyshare.clear_secret_shares_enabled: 0
+    spark.so.signing_keyshare.dual_write_secret_share: 100
+    spark.so.purge_dangling_signing_keyshare_secrets_batch_size: 1000
+    spark.so.purge_dangling_signing_keyshare_secrets_max_scan_count: 100000
+    spark.so.reconcile_signing_keyshare_secret_pointers_batch_size: 1000
+    spark.so.reconcile_signing_keyshare_secret_pointers_max_scan_count: 100000
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
     spark.so.tokens.coordinated_freeze_enabled: 0
@@ -78,6 +85,15 @@ knobs:
     spark.so.tokens.token_transaction_v3_enabled: 100
     spark.so.tokens.token_transaction_v3_phase2_enabled: 100
     spark.so.tokens.token_transaction_v3_phase2_retry_enabled: 100
+    spark.so.tokens.tx_events_enabled: 1
+    spark.so.finalize_revealed_token_transactions.batch_limit: 50
+    spark.so.finalize_revealed_token_transactions.max_runtime_seconds: 180
+    spark.so.flow_execution.stuck_threshold_seconds: 300
+    spark.so.flow_execution.coordinator_stall_threshold_seconds: 600
+    spark.so.flow_execution.sweep_batch_limit: 50
+    spark.so.flow_execution.metrics_enabled: 0
+    spark.so.flow_execution.metrics_min_age_seconds: 600
+    spark.so.internal_rpc.brontide_enabled: 0
     spark.so.ro_session@/spark.SparkService/query_nodes: 100
     spark.so.ro_session@/spark.SparkService/query_pending_transfers: 100
     spark.so.ro_session@/spark.SparkService/query_transfers_by_id: 100
