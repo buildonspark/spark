@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
@@ -18,6 +19,13 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	defer stop()
+
+	m.Run()
+}
 
 const (
 	testOpType        = pbgossip.ConsensusOperationType(999)
@@ -62,6 +70,19 @@ func testConfig() *so.Config {
 func newTestEngine(t *testing.T) (context.Context, *TwoPCEngine, *mockGossipSender, *ent.Client, *so.Config) {
 	t.Helper()
 	ctx, tc := db.NewTestSQLiteContext(t)
+	return engineForTestContext(ctx, tc)
+}
+
+// newTestPostgresEngine is newTestEngine on a real Postgres database, for
+// tests that exercise row-locking semantics (readBackDecisionStatusFromDB's
+// FOR UPDATE) which SQLite cannot express.
+func newTestPostgresEngine(t *testing.T) (context.Context, *TwoPCEngine, *mockGossipSender, *ent.Client, *so.Config) {
+	t.Helper()
+	ctx, tc := db.ConnectToTestPostgres(t)
+	return engineForTestContext(ctx, tc)
+}
+
+func engineForTestContext(ctx context.Context, tc *db.TestContext) (context.Context, *TwoPCEngine, *mockGossipSender, *ent.Client, *so.Config) {
 	gs := &mockGossipSender{}
 	config := testConfig()
 	// Engine takes a SessionFactory (mirroring production) so its
@@ -582,7 +603,9 @@ func parentlessCtx() context.Context { return context.Background() }
 // gossip — never rollback — so participants converge with the committed
 // coordinator instead of terminally rolling back a committed transfer.
 func TestExecute_AmbiguousCommit_TxDurablyCommitted_HonorsCommit(t *testing.T) {
-	ctx, engine, gs, client, config := newTestEngine(t)
+	// Postgres: the real read-back locks the row FOR UPDATE, which SQLite
+	// cannot express.
+	ctx, engine, gs, client, config := newTestPostgresEngine(t)
 	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
 	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
 
@@ -620,7 +643,9 @@ func TestExecute_AmbiguousCommit_TxDurablyCommitted_HonorsCommit(t *testing.T) {
 // creation), the read-back sees IN_FLIGHT and the engine rolls back — the
 // correct behavior, preserved.
 func TestExecute_AmbiguousCommit_TxDidNotCommit_RollsBack(t *testing.T) {
-	ctx, engine, gs, client, config := newTestEngine(t)
+	// Postgres: the real read-back locks the row FOR UPDATE, which SQLite
+	// cannot express.
+	ctx, engine, gs, client, config := newTestPostgresEngine(t)
 	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
 	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
 
@@ -676,6 +701,145 @@ func TestExecute_AmbiguousCommit_ReadBackFails_SendsNoGossip(t *testing.T) {
 
 	assert.Empty(t, gs.calls,
 		"when the commit outcome is unresolvable the engine must send neither COMMIT nor ROLLBACK gossip")
+}
+
+// TestExecute_AmbiguousCommit_StaleInFlightReadBack_HonorsCommittedDecision:
+// the request tx durably COMMITTED (e.g. the client cancelled mid-commit and
+// the COMMIT still landed), but the ambiguity read-back raced the still-landing
+// COMMIT and observed the stale IN_FLIGHT row version, sending the engine down
+// the rollback path. Once that path's CAS proves the decision is durably
+// COMMITTED, the engine must honor it — dispatch COMMIT gossip and return
+// success, exactly as if the read-back had seen COMMITTED directly — rather
+// than withhold all gossip and strand participants IN_FLIGHT until the
+// reconciler pulls the outcome.
+func TestExecute_AmbiguousCommit_StaleInFlightReadBack_HonorsCommittedDecision(t *testing.T) {
+	ctx, engine, gs, client, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+
+	// The tx durably commits but reports an error (lost ack).
+	engine.commitCoordinatorTx = func(commitCtx context.Context) error {
+		if err := ent.DbCommit(commitCtx); err != nil {
+			return err
+		}
+		return fmt.Errorf("simulated lost commit acknowledgement")
+	}
+	// The read-back returns the stale pre-commit snapshot: IN_FLIGHT. In prod
+	// this happens when the read races a COMMIT that is still landing — MVCC
+	// serves the old row version without blocking on the committing tx.
+	engine.readBackDecisionStatus = func(context.Context, uuid.UUID) (st.FlowExecutionStatus, error) {
+		return st.FlowExecutionStatusInFlight, nil
+	}
+
+	result, err := engine.Execute(ctx, testOpType, selfSelection(t, config),
+		&aggregatingFlow{rollbackOp: rollbackOp, commitResult: commitOp})
+	require.NoError(t, err,
+		"a durably-COMMITTED decision discovered via the rollback CAS must be honored, not surfaced as an error")
+	assert.True(t, proto.Equal(commitOp, result))
+
+	// COMMIT gossip dispatched so participants converge without waiting for
+	// the reconciler; never a rollback.
+	require.Len(t, gs.calls, 1)
+	assert.NotNil(t, gs.calls[0].msg.GetConsensusCommit(),
+		"engine must dispatch COMMIT gossip after discovering the committed decision")
+	assert.Nil(t, gs.calls[0].msg.GetConsensusRollback(),
+		"a durably-committed decision must NEVER dispatch ROLLBACK gossip")
+
+	rows, err := client.FlowExecution.Query().All(parentlessCtx())
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, rows[0].Status)
+}
+
+// TestExecute_AmbiguousCommit_RollbackSafetyUnconfirmable_SendsNoGossip covers
+// the remaining ambiguous-commit branch: the read-back reports IN_FLIGHT but the
+// rollback attempt can neither transition the row nor confirm its terminal
+// status (here, the row is gone by the time markRolledBack runs). The engine
+// must send NO gossip — it cannot justify a rollback and cannot prove a commit —
+// and must report the commit outcome as unknown, not as a definite failure.
+func TestExecute_AmbiguousCommit_RollbackSafetyUnconfirmable_SendsNoGossip(t *testing.T) {
+	ctx, engine, gs, client, config := newTestEngine(t)
+	commitOp := &pbgossip.GossipMessage{MessageId: "commit-payload"}
+	rollbackOp := &pbgossip.GossipMessage{MessageId: "rollback-payload"}
+
+	// The tx durably commits but reports an error, and the coordinator row
+	// vanishes out-of-band so the rollback attempt's CAS matches nothing and
+	// its re-read fails — the unconfirmable case.
+	engine.commitCoordinatorTx = func(commitCtx context.Context) error {
+		if err := ent.DbCommit(commitCtx); err != nil {
+			return err
+		}
+		if _, err := client.FlowExecution.Delete().Exec(parentlessCtx()); err != nil {
+			return err
+		}
+		return fmt.Errorf("simulated lost commit acknowledgement")
+	}
+	engine.readBackDecisionStatus = func(context.Context, uuid.UUID) (st.FlowExecutionStatus, error) {
+		return st.FlowExecutionStatusInFlight, nil
+	}
+
+	result, err := engine.Execute(ctx, testOpType, selfSelection(t, config),
+		&aggregatingFlow{rollbackOp: rollbackOp, commitResult: commitOp})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "commit outcome unknown",
+		"an unconfirmable rollback must be reported as an unknown outcome, not a definite commit failure")
+	assert.Nil(t, result)
+
+	assert.Empty(t, gs.calls,
+		"when rollback safety cannot be confirmed the engine must send neither COMMIT nor ROLLBACK gossip")
+}
+
+// TestReadBackDecisionStatus_WaitsOutInFlightCommit pins the transaction-level
+// contract underneath resolveAmbiguousCommit: the read-back must not serve a
+// stale MVCC snapshot while the request tx's COMMIT is still landing — it must
+// block on the row lock until the in-flight tx resolves and then report the
+// post-resolution status. This is tested below the Execute boundary because the
+// contract is a row-locking semantic (FOR UPDATE vs. plain read) that is
+// invisible at the API level except as a rare timing race; it requires real
+// Postgres, since SQLite has neither row locks nor concurrent transactions.
+func TestReadBackDecisionStatus_WaitsOutInFlightCommit(t *testing.T) {
+	ctx, engine, _, client, _ := newTestPostgresEngine(t)
+
+	// Committed baseline: an IN_FLIGHT coordinator row (as written at row creation).
+	row, err := client.FlowExecution.Create().
+		SetRole(st.FlowExecutionRoleCoordinator).
+		SetOpType(int32(testOpType)).
+		SetCoordinatorIndex(uint(testCoordinatorID)).
+		SetStatus(st.FlowExecutionStatusInFlight).
+		Save(parentlessCtx())
+	require.NoError(t, err)
+
+	// A separate tx plays the part of the request tx mid-commit: it has
+	// written the COMMITTED decision (holding the row lock) but not yet
+	// committed.
+	lockTx, err := client.Tx(parentlessCtx())
+	require.NoError(t, err)
+	_, err = lockTx.FlowExecution.UpdateOneID(row.ID).
+		SetStatus(st.FlowExecutionStatusCommitted).
+		Save(parentlessCtx())
+	require.NoError(t, err)
+
+	// Resolve the in-flight tx shortly after the read-back has started; the
+	// goroutine touches only lockTx, never the engine's session state.
+	const commitDelay = 250 * time.Millisecond
+	committed := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		time.Sleep(commitDelay)
+		committed <- lockTx.Commit()
+	}()
+
+	status, err := engine.readBackDecisionStatusFromDB(ctx, row.ID)
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	assert.Equal(t, st.FlowExecutionStatusCommitted, status,
+		"read-back must wait out the in-flight COMMIT and report the resolved status, not the stale IN_FLIGHT snapshot")
+	// Guard against a vacuous pass: a read that doesn't take the row lock
+	// returns in milliseconds (with the stale IN_FLIGHT snapshot); only a
+	// lock-waiting read can span the full commit delay.
+	assert.GreaterOrEqual(t, elapsed, commitDelay,
+		"read-back must have blocked on the in-flight tx's row lock, not returned early from a snapshot")
+	require.NoError(t, <-committed)
 }
 
 // TestAttemptRollback_DurablyCommittedRow_RefusesGossip exercises the
