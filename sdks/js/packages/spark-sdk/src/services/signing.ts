@@ -332,7 +332,7 @@ export class SigningService {
 
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
       const currentSequence = currRefundTx.getInput(0).sequence;
-      if (!currentSequence) {
+      if (currentSequence == null) {
         throw new SparkValidationError("Invalid refund transaction", {
           field: "sequence",
           value: currRefundTx.getInput(0),
