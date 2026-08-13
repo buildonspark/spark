@@ -929,7 +929,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 
 	var keyTweakMap map[string]validatedKeyTweak
 	if transferReq.GetTransferPackage() != nil {
-		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.GetTransferPackage(), senderIDPubKey, true, asParticipantDuringRollout(transferReq.GetSenderKeyTweakProofs()))
+		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.GetTransferPackage(), senderIDPubKey, true, asParticipant(transferReq.GetSenderKeyTweakProofs()))
 		if err != nil {
 			return err
 		}

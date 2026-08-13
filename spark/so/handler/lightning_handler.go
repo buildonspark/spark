@@ -1396,7 +1396,7 @@ func (h *LightningHandler) GetPreimageShare(
 		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.buildHTLCRefunds", spanOpt)
 		buildErr := func() error {
 			var err error
-			keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asParticipantDuringRollout(senderKeyTweakProofs))
+			keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asParticipant(senderKeyTweakProofs))
 			if err != nil {
 				return fmt.Errorf("unable to validate transfer package: %w", err)
 			}

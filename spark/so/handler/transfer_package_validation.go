@@ -26,9 +26,8 @@ import (
 // proofs across operators catches the divergence. Making the source a required
 // parameter means no caller can skip that comparison by omission.
 type senderTweakProofSource struct {
-	isCoordinator     bool
-	allowAbsentProofs bool
-	proofs            map[string]*pbspark.SecretProof
+	isCoordinator bool
+	proofs        map[string]*pbspark.SecretProof
 }
 
 // asCoordinator marks the caller as the operator that fans the package out: its
@@ -42,14 +41,6 @@ func asCoordinator() senderTweakProofSource {
 // present and match the proofs this SO decrypts from its own slice.
 func asParticipant(proofs map[string]*pbspark.SecretProof) senderTweakProofSource {
 	return senderTweakProofSource{proofs: proofs}
-}
-
-// asParticipantDuringRollout is asParticipant for flows whose coordinators only
-// started fanning proofs out in this release: absent proofs pass, so a
-// not-yet-upgraded coordinator doesn't fail every transfer mid-deploy.
-// TODO(SP-3772): fold into asParticipant once every operator sends proofs.
-func asParticipantDuringRollout(proofs map[string]*pbspark.SecretProof) senderTweakProofSource {
-	return senderTweakProofSource{proofs: proofs, allowAbsentProofs: true}
 }
 
 // ValidateTransferPackage checks a sender-supplied TransferPackage and returns
@@ -100,7 +91,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		return nil, err
 	}
 
-	if !proofSource.isCoordinator && !(proofSource.allowAbsentProofs && len(proofSource.proofs) == 0) {
+	if !proofSource.isCoordinator {
 		if err := verifySenderKeyTweakProofsMatch(validated, proofSource.proofs); err != nil {
 			return nil, err
 		}
@@ -365,10 +356,9 @@ func verifyTransferPackageSignature(
 
 // validatedKeyTweak is a sender key tweak that has passed this SO's share
 // validation (Feldman check plus per-operator pubkey-share consistency) and,
-// on participants, ValidateTransferPackage's cross-operator proof comparison —
-// except through asParticipantDuringRollout with an absent proofs map, which
-// skips the comparison. The zero value is meaningless; the only construction
-// site is validateKeyTweakShares, so holding one is evidence of validation.
+// on participants, ValidateTransferPackage's cross-operator proof comparison.
+// The zero value is meaningless; the only construction site is
+// validateKeyTweakShares, so holding one is evidence of validation.
 type validatedKeyTweak struct{ pb *pbspark.SendLeafKeyTweak }
 
 // Proto returns the tweak's wire encoding, which is also its persistence

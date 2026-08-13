@@ -449,7 +449,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 		return nil, fmt.Errorf("unable to validate request for payment hash %x: %w", req.GetPaymentHash(), err)
 	}
 
-	keyTweakMap, err := h.transfer.ValidateTransferPackage(ctx, parsed.transferID, pkg, parsed.senderIDPK, false, asParticipantDuringRollout(senderKeyTweakProofs))
+	keyTweakMap, err := h.transfer.ValidateTransferPackage(ctx, parsed.transferID, pkg, parsed.senderIDPK, false, asParticipant(senderKeyTweakProofs))
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 	}
