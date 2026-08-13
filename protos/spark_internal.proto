@@ -237,6 +237,9 @@ message InitiatePreimageSwapRequest {
     map<string, bytes> cpfp_refund_signatures = 2;
     map<string, bytes> direct_refund_signatures = 3;
     map<string, bytes> direct_from_cpfp_refund_signatures = 4;
+    // The coordinator's own decrypted proofs, per leaf (as on
+    // SendTransferPrepareRequest); empty when there is no transfer package.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 5;
 }
 
 message InitiatePreimageSwapResponse {
@@ -405,6 +408,9 @@ message CreateInstantStaticDepositUtxoSwapRequest {
     ReserveInstantStaticDepositUtxoSwapRequest request = 1;
     bytes signature = 2;
     bytes coordinator_public_key = 3;
+    // The coordinator's own decrypted proofs for the swap transfer, per leaf
+    // (as on SendTransferPrepareRequest).
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 4;
 }
 
 message CreateInstantStaticDepositUtxoSwapResponse {
@@ -443,6 +449,9 @@ message CreateStaticDepositUtxoSwapRequest {
     InitiateStaticDepositUtxoSwapRequest request = 1;
     bytes signature = 2;
     bytes coordinator_public_key = 3;
+    // The coordinator's own decrypted proofs for the swap transfer, per leaf
+    // (as on SendTransferPrepareRequest).
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 4;
 }
 
 message CreateStaticDepositUtxoSwapResponse {
@@ -553,6 +562,8 @@ message ProvidePreimageRollbackRequest {
 // (SendTransferPrepareRequest, ProvidePreimagePrepareRequest, CoopExitPrepareRequest).
 message InitiatePreimageSwapPrepareRequest {
     spark.InitiatePreimageSwapRequest original_request = 1;
+    // As on SendTransferPrepareRequest; empty when there is no transfer package.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
 }
 
 // InitiatePreimageSwapV4PrepareRequest is the Prepare payload for the
@@ -569,6 +580,8 @@ message InitiatePreimageSwapPrepareRequest {
 // prepared by the v3 handler on every SO but the coordinator.
 message InitiatePreimageSwapV4PrepareRequest {
     spark.InitiatePreimageSwapV4Request original_request = 1;
+    // As on SendTransferPrepareRequest.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
 }
 
 // InitiatePreimageSwapPrepareResponse is each SO's Prepare result. The two
@@ -674,6 +687,8 @@ message StaticDepositUtxoRefundRollbackRequest {
 message StaticDepositUtxoSwapPrepareRequest {
     InitiateStaticDepositUtxoSwapRequest original_request = 1;
     map<string, common.SigningCommitment> spend_tx_signing_commitments = 2;
+    // As on SendTransferPrepareRequest, for the nested send transfer.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 3;
 }
 
 // StaticDepositUtxoSwapCommitRequest is the 2PC commit payload: the embedded
@@ -737,6 +752,8 @@ message StaticDepositUtxoSwapRollbackRequest {
 // edge.
 message ReserveInstantStaticDepositUtxoSwapPrepareRequest {
     ReserveInstantStaticDepositUtxoSwapRequest original_request = 1;
+    // As on SendTransferPrepareRequest, for the nested send transfer.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
 }
 
 // ReserveInstantStaticDepositUtxoSwapCommitRequest is the 2PC commit payload:
@@ -803,6 +820,9 @@ message ClaimInstantStaticDepositUtxoSwapRequest {
 message ClaimInstantStaticDepositUtxoSwapPrepareRequest {
     ClaimInstantStaticDepositUtxoSwapRequest original_request = 1;
     map<string, common.SigningCommitment> spend_tx_signing_commitments = 2;
+    // As on SendTransferPrepareRequest, for the nested secondary transfer;
+    // empty when the claim carries no secondary transfer.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 3;
 }
 
 // ClaimInstantStaticDepositUtxoSwapCommitRequest is the 2PC commit payload:
@@ -845,6 +865,8 @@ message ClaimInstantStaticDepositUtxoSwapRollbackRequest {
 // the legacy coordinator-side override produced.
 message InitiateSwapPrimaryTransferPrepareRequest {
     spark.InitiateSwapPrimaryTransferRequest original_request = 1;
+    // As on SendTransferPrepareRequest.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
 }
 
 // InitiateSwapPrimaryTransferCommitRequest is the 2PC commit payload for the
@@ -893,6 +915,8 @@ message InitiateCounterTransferRequest {
 // refund tx sighashes computed with the request's adaptor public key.
 message InitiateCounterTransferPrepareRequest {
     InitiateCounterTransferRequest original_request = 1;
+    // As on SendTransferPrepareRequest.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
 }
 
 // InitiateCounterTransferCommitRequest is the 2PC commit payload for the swap
@@ -1013,6 +1037,9 @@ message SendTransferPrepareRequest {
     // through the consensus engine carried a spark_invoice. Every SO
     // validates it in Prepare and persists it on the transfer.
     string spark_invoice = 2;
+    // The coordinator's own decrypted proofs, per leaf. Each SO can decrypt only
+    // its own slice, so this is what forces all slices onto one polynomial.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 3;
 }
 
 // MpcSendTransferPrepareRequest is the 2PC prepare payload for consensus
@@ -1149,6 +1176,8 @@ message ClaimTransferRollbackRequest {
 // connector-spending refund transactions.
 message CoopExitPrepareRequest {
     spark.CooperativeExitRequest original_request = 1;
+    // As on SendTransferPrepareRequest.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
 }
 
 // CoopExitCommitRequest is the 2PC commit payload built by the coordinator in
