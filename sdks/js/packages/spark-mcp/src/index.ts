@@ -38,6 +38,12 @@ async function main(): Promise<void> {
           "- Fund deposit addresses through an external Bitcoin wallet or faucet.",
         ]),
     "",
+    "Fee-quoted Lightning receives:",
+    "- spark_create_quoted_invoice quotes, signs and invoices in one step. spark_lightning_receive_quote + spark_create_invoice_from_quote is the same flow split, for inspecting a quote or testing that reusing one is refused.",
+    "- Pass serializedManifest and issuerSignature back verbatim, exactly as the quote tool returned them. The quote is stateless: the SSP re-verifies its own signature over those exact bytes rather than looking anything up, so a re-encoded manifest is refused.",
+    "- Without a partnerJwt a quote is feeless; attributionStatus reports why.",
+    "- Settling an invoice is the counterparty's job, not this server's — see spark_create_quoted_invoice's description for how to pay one on a local stack.",
+    "",
     "Output modes:",
     '- All tools accept an optional `output` parameter: "normal" (default, concise), "verbose" (all fields, human-readable), or "raw" (full JSON from SDK).',
   ].join("\n");

@@ -9,13 +9,14 @@ import {
   Requester,
 } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
+import { Mutex, withTimeout } from "async-mutex";
 import {
   SparkAuthenticationError,
   SparkRequestError,
 } from "../errors/index.js";
 import { type SparkSigner } from "../signer/signer.js";
 import { type UserRequestType } from "../types/sdk-types.js";
-import { getFetch } from "../utils/fetch.js";
+import { getFetch, type SparkHeadersConstructor } from "../utils/fetch.js";
 import { NoopLogger } from "../utils/logging.js";
 import type { LoggingService } from "../utils/logging-service.js";
 import { ClaimInstantStaticDeposit } from "./mutations/ClaimInstantStaticDeposit.js";
@@ -110,6 +111,19 @@ import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js"
 import { GetTransfers } from "./queries/Transfers.js";
 import { UserRequest } from "./queries/UserRequest.js";
 
+// The requester accepts a protocol-less baseUrl and prepends https:// before
+// sending, so an origin comparison has to normalize the same way or it silently
+// stops matching — and the partner token silently stops being sent.
+const withProtocol = (baseUrl: string) =>
+  /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
+
+// Generous enough that only a degraded SSP trips it — a single request can
+// spend tens of seconds in retry backoff before giving up.
+const PARTNER_JWT_LOCK_TIMEOUT_MS = 60_000;
+
+const PARTNER_JWT_HEADER = "x-partner-jwt";
+const PARTNER_ATTRIBUTED_OPERATION = "LightningReceiveQuote";
+
 export interface SspClientOptions {
   baseUrl: string;
   identityPublicKey: string;
@@ -160,6 +174,21 @@ export default class SspClient {
   private authPromise?: Promise<void>;
   private readonly logger?: Logger;
   private readonly logging?: LoggingService;
+  private readonly headersImpl: SparkHeadersConstructor;
+  // The token has no per-request channel through the shared Requester, so it
+  // is held here for the duration of one quote call. EVERY quote call takes the
+  // lock, not just attributed ones: the leak this prevents is an unattributed
+  // quote overlapping an attributed one and inheriting its token.
+  private readonly partnerJwtMutex = new Mutex();
+  private readonly partnerJwtLock = withTimeout(
+    this.partnerJwtMutex,
+    PARTNER_JWT_LOCK_TIMEOUT_MS,
+    new SparkRequestError("Timed out waiting to issue a receive quote", {
+      method: "POST",
+    }),
+  );
+  private partnerJwt: string | undefined;
+  private readonly sspBaseUrl: string;
 
   constructor(
     config: HasSspClientOptions & {
@@ -175,7 +204,8 @@ export default class SspClient {
     this.authProvider = new SparkAuthProvider(this.logging);
     this.logger = options?.logging?.logger("SspClient") ?? options?.logger;
 
-    const { fetch } = getFetch({ logger: this.logger, retry: true });
+    const { fetch, Headers } = getFetch({ logger: this.logger, retry: true });
+    this.headersImpl = Headers;
     const sspOptions = config.sspClientOptions;
     const schemaEndpoint =
       sspOptions.schemaEndpoint || `graphql/spark/2025-03-19`;
@@ -185,12 +215,17 @@ export default class SspClient {
       init?: RequestInit,
     ) => {
       const sparkFetch = fetch as unknown as typeof globalThis.fetch;
-      const response = await sparkFetch(input, init);
+      const response = await sparkFetch(
+        input,
+        this.withPartnerJwt(input, init),
+      );
       if (response.status === 401) {
         throw new Error("Request unauthorized");
       }
       return response;
     };
+
+    this.sspBaseUrl = sspOptions.baseUrl;
 
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
@@ -204,6 +239,67 @@ export default class SspClient {
     );
 
     this.logging?.wrapPrototypeMethods("SspClient", this);
+  }
+
+  /**
+   * Attach the partner token to the quote request only.
+   *
+   * Done at the fetch boundary rather than in the auth provider so the token is
+   * absent from the header object the requester assembles and traces before
+   * calling fetch. The retry wrapper it then passes through logs only method,
+   * url, status and timing, never headers.
+   */
+  private withPartnerJwt(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): RequestInit | undefined {
+    if (!this.partnerJwt || !init) {
+      return init;
+    }
+    // The runtime's own constructor, not the global: bare installs its Headers
+    // through setFetch and never assigns globalThis.Headers. Everything on this
+    // path carries a plain record — the auth provider's own signature is
+    // Record<string, string> — which is what that constructor accepts.
+    const headers = new this.headersImpl(
+      init.headers as Record<string, string> | undefined,
+    );
+    if (headers.get("X-GraphQL-Operation") !== PARTNER_ATTRIBUTED_OPERATION) {
+      return init;
+    }
+    // Gated on origin as well as operation. A custom header, unlike
+    // Authorization, is not stripped when a redirect crosses origins, so the
+    // token must never be attached to a request that is not already the SSP's.
+    if (!this.isSspOrigin(input)) {
+      return init;
+    }
+    headers.set(PARTNER_JWT_HEADER, this.partnerJwt);
+    // A redirect would replay the credential onto whatever it names, so it is
+    // refused with no scheme carve-out: the only config that breaks is a
+    // plaintext remote endpoint, which is already sending a bearer token in
+    // cleartext. Runtimes that follow redirects themselves (bare-fetch, React
+    // Native's XHR fetch) ignore this, hence the origin gate above.
+    return {
+      ...init,
+      headers: headers as unknown as HeadersInit,
+      redirect: "error",
+    };
+  }
+
+  /** True when `input` is addressed to the configured SSP origin. */
+  private isSspOrigin(input: RequestInfo | URL): boolean {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    try {
+      return (
+        new URL(url).origin === new URL(withProtocol(this.sspBaseUrl)).origin
+      );
+    } catch {
+      return false;
+    }
   }
 
   async executeRawQuery<T>(
@@ -347,29 +443,44 @@ export default class SspClient {
     amountSats,
     network,
     amountBasis,
+    partnerJwt,
   }: {
     amountSats: number;
     network: BitcoinNetwork;
     amountBasis?: ReceiveQuoteAmountBasis;
+    partnerJwt?: string;
   }): Promise<LightningReceiveQuoteOutput | null> {
     // NET is the server-side default, so omitting the field keeps the request
     // valid against schemas that predate amount_basis.
     const sendsBasis =
       amountBasis !== undefined && amountBasis !== ReceiveQuoteAmountBasis.NET;
-    return await this.executeRawQuery({
-      queryPayload: lightningReceiveQuoteDocument(sendsBasis),
-      variables: {
-        network: network,
-        amount_sats: amountSats,
-        ...(sendsBasis ? { amount_basis: amountBasis } : {}),
-      },
-      constructObject: (response: {
-        lightning_receive_quote: LightningReceiveQuoteOutputWire;
-      }) => {
-        return LightningReceiveQuoteOutputFromJson(
-          response.lightning_receive_quote,
-        );
-      },
+    const run = () =>
+      this.executeRawQuery({
+        queryPayload: lightningReceiveQuoteDocument(sendsBasis),
+        variables: {
+          network: network,
+          amount_sats: amountSats,
+          ...(sendsBasis ? { amount_basis: amountBasis } : {}),
+        },
+        constructObject: (response: {
+          lightning_receive_quote: LightningReceiveQuoteOutputWire;
+        }) => {
+          return LightningReceiveQuoteOutputFromJson(
+            response.lightning_receive_quote,
+          );
+        },
+      });
+
+    // Bounded: the lock spans the whole round trip including the retry budget, so
+    // without a cap one degraded quote would stall every later quote on this
+    // client indefinitely rather than failing them quickly.
+    return await this.partnerJwtLock.runExclusive(async () => {
+      this.partnerJwt = partnerJwt;
+      try {
+        return await run();
+      } finally {
+        this.partnerJwt = undefined;
+      }
     });
   }
 

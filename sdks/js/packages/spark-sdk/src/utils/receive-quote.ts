@@ -2,6 +2,9 @@ import { bytesToHex } from "@noble/curves/utils";
 import { SparkValidationError } from "../errors/index.js";
 import type { ManifestAmount, TransferManifest } from "../proto/spark.js";
 
+/** The one `attribution_status` the SSP defines as "a markup was applied". */
+export const ATTRIBUTED_STATUS = "ATTRIBUTED";
+
 /**
  * Which quantity the caller's `amountSats` names. Chosen when the quote is
  * requested and never recorded in the manifest, so it cannot be read back —

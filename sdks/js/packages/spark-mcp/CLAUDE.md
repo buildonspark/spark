@@ -37,6 +37,7 @@ src/
     ├── funding.ts    # spark_fund_address (LOCAL only, Bitcoin RPC)
     ├── transfers.ts  # spark_send_transfer, spark_send_multi_transfer, spark_get_transfer, spark_list_transfers
     ├── lightning.ts  # spark_create_invoice, spark_pay_invoice, spark_get_lightning_fee_estimate
+    ├── receive-quote.ts # spark_lightning_receive_quote, spark_create_invoice_from_quote, spark_create_quoted_invoice
     └── withdrawals.ts # spark_get_withdrawal_fee_quote, spark_withdraw
 ```
 

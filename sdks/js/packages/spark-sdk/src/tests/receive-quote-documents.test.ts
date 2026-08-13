@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { Mutex } from "async-mutex";
 import SspClient from "../graphql/client.js";
 import { lightningReceiveQuoteDocument } from "../graphql/mutations/LightningReceiveQuote.js";
 import { requestLightningReceiveDocument } from "../graphql/mutations/RequestLightningReceive.js";
@@ -55,10 +56,14 @@ describe("conditionally built receive documents", () => {
 
 describe("variables sent alongside the built documents", () => {
   const clientCapturing = (calls: Record<string, unknown>[]) => {
-    const client = Object.create(SspClient.prototype) as SspClient & {
+    const client = Object.create(SspClient.prototype) as SspClient;
+    const internals = client as unknown as {
       executeRawQuery: (q: { variables?: Record<string, unknown> }) => unknown;
+      partnerJwtLock: Mutex;
     };
-    client.executeRawQuery = jest.fn(
+    // Object.create skips field initializers, and the quote path takes this lock.
+    internals.partnerJwtLock = new Mutex();
+    internals.executeRawQuery = jest.fn(
       (q: { variables?: Record<string, unknown> }) => {
         calls.push(q.variables ?? {});
         return Promise.resolve(null);
