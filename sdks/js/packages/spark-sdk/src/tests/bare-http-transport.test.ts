@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import http from "http";
 import type { ClientRequest, IncomingMessage } from "http";
 import { PassThrough } from "stream";
-import { ClientError, Metadata } from "nice-grpc-common";
+import { ClientError, Metadata, Status } from "nice-grpc-common";
 import type { TransportParams } from "nice-grpc-web/lib/client/Transport.js";
 import {
   attachPrematureSocketCloseGuard,
@@ -129,6 +129,17 @@ async function getRejection(promise: Promise<unknown>) {
   throw new Error("Expected promise to reject");
 }
 
+async function waitForRequestEnd(req: MockClientRequest) {
+  for (
+    let attempt = 0;
+    attempt < 10 && req.end.mock.calls.length === 0;
+    attempt++
+  ) {
+    await Promise.resolve();
+  }
+  expect(req.end).toHaveBeenCalledTimes(1);
+}
+
 afterEach(() => {
   jest.restoreAllMocks();
   jest.useRealTimers();
@@ -188,6 +199,144 @@ describe("attachPrematureSocketCloseGuard", () => {
 });
 
 describe("BareHttpTransport", () => {
+  it.each([
+    ["unary", queryPendingTransfersMethod],
+    ["response stream", subscribeToEventsMethod],
+  ])(
+    "rejects a %s request immediately when it closes before response headers",
+    async (_, method) => {
+      jest.useFakeTimers();
+
+      const req = createMockClientRequest();
+      jest.spyOn(http, "request").mockImplementation(() => req);
+
+      const transport = BareHttpTransport();
+      const iterator = transport({
+        body: createUnaryBody(),
+        metadata: new Metadata(),
+        method,
+        signal: new AbortController().signal,
+        url: "http://example.com/test",
+      });
+
+      const errorPromise = getRejection(
+        iterator[Symbol.asyncIterator]().next(),
+      );
+      await waitForRequestEnd(req);
+
+      let rejection: Error | undefined;
+      void errorPromise.then((error) => {
+        rejection = error;
+      });
+      req.emit("close");
+      for (let attempt = 0; attempt < 10 && rejection == null; attempt++) {
+        await Promise.resolve();
+      }
+      const rejectedBeforeTimeout = rejection != null;
+
+      await jest.advanceTimersByTimeAsync(15_000);
+      const eventualError = await errorPromise;
+
+      expect(rejectedBeforeTimeout).toBe(true);
+      expect(eventualError).toBeInstanceOf(ClientError);
+      expect(eventualError).toMatchObject({ code: Status.UNAVAILABLE });
+      expect(eventualError.message).toContain("request closed before response");
+      expect(req.destroy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["unary", queryPendingTransfersMethod],
+    ["response stream", subscribeToEventsMethod],
+  ])(
+    "ignores %s request close after response headers arrive",
+    async (_, method) => {
+      const req = createMockClientRequest();
+      let onResponse: ((res: IncomingMessage) => void) | undefined;
+      jest
+        .spyOn(http, "request")
+        .mockImplementation((...args: Parameters<typeof http.request>) => {
+          onResponse = args[2];
+          return req;
+        });
+
+      const { res } = createMockStreamingIncomingMessage();
+      const transport = BareHttpTransport();
+      const iterator = transport({
+        body: createUnaryBody(),
+        metadata: new Metadata(),
+        method,
+        signal: new AbortController().signal,
+        url: "http://example.com/test",
+      })[Symbol.asyncIterator]();
+
+      const headerPromise = iterator.next();
+      for (let attempt = 0; attempt < 10 && onResponse == null; attempt++) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      expect(onResponse).toBeDefined();
+      onResponse?.(res);
+      req.emit("close");
+      await expect(headerPromise).resolves.toMatchObject({
+        done: false,
+        value: { type: "header" },
+      });
+
+      const completionPromise = iterator.next();
+      res.end();
+
+      await expect(completionPromise).resolves.toMatchObject({ done: true });
+    },
+  );
+
+  it("preserves a request error when close follows", async () => {
+    const req = createMockClientRequest();
+    jest.spyOn(http, "request").mockImplementation(() => req);
+
+    const iterator = BareHttpTransport()({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: queryPendingTransfersMethod,
+      signal: new AbortController().signal,
+      url: "http://example.com/test",
+    });
+
+    const errorPromise = getRejection(iterator[Symbol.asyncIterator]().next());
+    await waitForRequestEnd(req);
+
+    req.emit("error", new Error("socket reset"));
+    req.emit("close");
+
+    const error = await errorPromise;
+    expect(error).toBeInstanceOf(ClientError);
+    expect(error.message).toContain("socket reset");
+    expect(error.message).not.toContain("request closed before response");
+  });
+
+  it("preserves an abort when close follows", async () => {
+    const req = createMockClientRequest();
+    jest.spyOn(http, "request").mockImplementation(() => req);
+    const abortController = new AbortController();
+
+    const iterator = BareHttpTransport()({
+      body: createUnaryBody(),
+      metadata: new Metadata(),
+      method: queryPendingTransfersMethod,
+      signal: abortController.signal,
+      url: "http://example.com/test",
+    });
+
+    const errorPromise = getRejection(iterator[Symbol.asyncIterator]().next());
+    await waitForRequestEnd(req);
+
+    abortController.abort();
+    req.emit("close");
+
+    const error = await errorPromise;
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(error.message).not.toContain("request closed before response");
+  });
+
   it("rejects a unary request when the wall-clock timeout fires before headers arrive", async () => {
     jest.useFakeTimers();
 

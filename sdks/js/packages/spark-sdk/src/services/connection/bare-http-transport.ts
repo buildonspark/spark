@@ -407,6 +407,9 @@ export function BareHttpTransport({
       });
       req.on("close", () => {
         log("request close event");
+        if (!requestSetupSettled) {
+          failRequestSetup(new Error("request closed before response"));
+        }
       });
       req.on("finish", () => {
         log("request finish event");
