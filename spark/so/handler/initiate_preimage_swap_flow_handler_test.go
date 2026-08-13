@@ -13,9 +13,21 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestPersistPreimageRejectsNon32BytePreimage verifies the 2PC-commit persistence
+// path rejects a preimage whose length is not 32 bytes before writing it, matching
+// the guard on the user-facing ValidatePreimage path.
+func TestPersistPreimageRejectsNon32BytePreimage(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	h := NewInitiatePreimageSwapFlowHandler(sparktesting.TestConfig(t))
+	err := h.persistPreimage(ctx, uuid.New(), []byte("too_short"))
+	require.ErrorContains(t, err, "preimage must be")
+}
 
 // TestIsPreimageSwapSettleableStatus pins the pre-commit status set in which the
 // Commit handler applies refund signatures / settles sender key tweaks. It
