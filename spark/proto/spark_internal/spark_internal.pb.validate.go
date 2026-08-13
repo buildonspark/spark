@@ -2302,6 +2302,52 @@ func (m *InitiatePreimageSwapRequest) validate(all bool) error {
 
 	// no validation rules for DirectFromCpfpRefundSignatures
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiatePreimageSwapRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiatePreimageSwapRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiatePreimageSwapRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return InitiatePreimageSwapRequestMultiError(errors)
 	}
@@ -4725,6 +4771,52 @@ func (m *CreateInstantStaticDepositUtxoSwapRequest) validate(all bool) error {
 
 	// no validation rules for CoordinatorPublicKey
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, CreateInstantStaticDepositUtxoSwapRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, CreateInstantStaticDepositUtxoSwapRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return CreateInstantStaticDepositUtxoSwapRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return CreateInstantStaticDepositUtxoSwapRequestMultiError(errors)
 	}
@@ -5421,6 +5513,52 @@ func (m *CreateStaticDepositUtxoSwapRequest) validate(all bool) error {
 	// no validation rules for Signature
 
 	// no validation rules for CoordinatorPublicKey
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, CreateStaticDepositUtxoSwapRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, CreateStaticDepositUtxoSwapRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return CreateStaticDepositUtxoSwapRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
 
 	if len(errors) > 0 {
 		return CreateStaticDepositUtxoSwapRequestMultiError(errors)
@@ -7313,6 +7451,52 @@ func (m *InitiatePreimageSwapPrepareRequest) validate(all bool) error {
 		}
 	}
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiatePreimageSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiatePreimageSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiatePreimageSwapPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return InitiatePreimageSwapPrepareRequestMultiError(errors)
 	}
@@ -7444,6 +7628,52 @@ func (m *InitiatePreimageSwapV4PrepareRequest) validate(all bool) error {
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiatePreimageSwapV4PrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiatePreimageSwapV4PrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiatePreimageSwapV4PrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
 		}
 	}
 
@@ -8508,6 +8738,52 @@ func (m *StaticDepositUtxoSwapPrepareRequest) validate(all bool) error {
 		}
 	}
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, StaticDepositUtxoSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, StaticDepositUtxoSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return StaticDepositUtxoSwapPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return StaticDepositUtxoSwapPrepareRequestMultiError(errors)
 	}
@@ -8937,6 +9213,52 @@ func (m *ReserveInstantStaticDepositUtxoSwapPrepareRequest) validate(all bool) e
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, ReserveInstantStaticDepositUtxoSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, ReserveInstantStaticDepositUtxoSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return ReserveInstantStaticDepositUtxoSwapPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
 		}
 	}
 
@@ -9581,6 +9903,52 @@ func (m *ClaimInstantStaticDepositUtxoSwapPrepareRequest) validate(all bool) err
 		}
 	}
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, ClaimInstantStaticDepositUtxoSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, ClaimInstantStaticDepositUtxoSwapPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return ClaimInstantStaticDepositUtxoSwapPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return ClaimInstantStaticDepositUtxoSwapPrepareRequestMultiError(errors)
 	}
@@ -9973,6 +10341,52 @@ func (m *InitiateSwapPrimaryTransferPrepareRequest) validate(all bool) error {
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiateSwapPrimaryTransferPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiateSwapPrimaryTransferPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiateSwapPrimaryTransferPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
 		}
 	}
 
@@ -10522,6 +10936,52 @@ func (m *InitiateCounterTransferPrepareRequest) validate(all bool) error {
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiateCounterTransferPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiateCounterTransferPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiateCounterTransferPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
 		}
 	}
 
@@ -12403,6 +12863,52 @@ func (m *SendTransferPrepareRequest) validate(all bool) error {
 
 	// no validation rules for SparkInvoice
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, SendTransferPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, SendTransferPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return SendTransferPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return SendTransferPrepareRequestMultiError(errors)
 	}
@@ -13818,6 +14324,52 @@ func (m *CoopExitPrepareRequest) validate(all bool) error {
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, CoopExitPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, CoopExitPrepareRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return CoopExitPrepareRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
 		}
 	}
 
