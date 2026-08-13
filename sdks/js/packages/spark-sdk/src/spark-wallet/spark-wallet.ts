@@ -20,6 +20,7 @@ import {
   SparkRequestError,
   SparkValidationError,
 } from "../errors/index.js";
+import { type CommittedQuoteInput } from "../graphql/receive-quote.js";
 import SspClient, {
   type GetUserRequestsParams,
   type TransferWithUserRequest,
@@ -62,6 +63,7 @@ import {
   type SubscribeToEventsResponse,
   type TokenTransactionEvent,
   type Transfer,
+  TransferManifest,
   TransferStatus,
   TransferType,
   type TreeNode,
@@ -144,6 +146,13 @@ import {
 } from "../utils/htlc-transactions.js";
 import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { parseCompressedPublicKeyHex } from "../utils/keys.js";
+import { signSerializedTransferManifest } from "../utils/manifest-signing.js";
+import {
+  manifestFeeSats,
+  manifestGrossSats,
+  ReceiveQuoteAmountBasis,
+  validateQuotedManifestAmounts,
+} from "../utils/receive-quote.js";
 import {
   LoggingService,
   type ServiceMethodDecorator,
@@ -167,6 +176,8 @@ import type {
   CreateLightningHodlInvoiceParams,
   CreateLightningInvoiceParams,
   DepositParams,
+  GetLightningReceiveQuoteParams,
+  LightningReceiveQuote,
   FulfillSparkInvoiceResponse,
   GroupSparkInvoicesResult,
   HandlePublicMethodErrorParams,
@@ -3616,6 +3627,187 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   // ***** Lightning Flow *****
 
   /**
+   * Requests a fee quote for a Lightning receive. The quote is short-lived, so
+   * request it immediately before signing it.
+   *
+   * @param {Object} params - Parameters for the quote
+   * @param {number} params.amountSats - Amount in satoshis, interpreted per amountBasis
+   * @param {ReceiveQuoteAmountBasis} [params.amountBasis] - Whether amountSats is the receiver's net (default) or the invoice total
+   * @returns {Promise<LightningReceiveQuote>} The quote, to be echoed back verbatim
+   */
+  public async getLightningReceiveQuote({
+    amountSats,
+    amountBasis = ReceiveQuoteAmountBasis.NET,
+  }: GetLightningReceiveQuoteParams): Promise<LightningReceiveQuote> {
+    const sspClient = this.getSspClient();
+
+    if (!Number.isSafeInteger(amountSats) || amountSats <= 0) {
+      throw new SparkValidationError("Invalid amount", {
+        field: "amountSats",
+        value: amountSats,
+        expected: "positive integer below 2^53",
+      });
+    }
+
+    const quote = await sspClient.lightningReceiveQuote({
+      amountSats,
+      network: this.toBitcoinNetwork(),
+      amountBasis,
+    });
+
+    if (!quote) {
+      throw new SparkRequestError("Failed to get a lightning receive quote", {
+        method: "POST",
+      });
+    }
+
+    return {
+      serializedManifest: quote.issuedQuote.serializedManifest,
+      issuerSignature: quote.issuedQuote.issuerSignature,
+      attributionStatus: quote.attributionStatus,
+      manifest: TransferManifest.decode(
+        hexToBytes(quote.issuedQuote.serializedManifest),
+      ),
+      amountSats,
+      amountBasis,
+    };
+  }
+
+  private toBitcoinNetwork(): BitcoinNetwork {
+    return this.config.getNetwork() === Network.MAINNET
+      ? BitcoinNetwork.MAINNET
+      : BitcoinNetwork.REGTEST;
+  }
+
+  /**
+   * Every refusal here has to precede the signature: it attests that these
+   * exact bytes describe the agreed transfer, so a mismatch caught afterwards
+   * is a mismatch already signed.
+   */
+  private async signReceiveQuote({
+    quote,
+    amountSats,
+    receiverIdentityPubkey,
+    includeSparkAddress,
+    includeSparkInvoice,
+  }: {
+    quote: LightningReceiveQuote;
+    amountSats: number;
+    receiverIdentityPubkey?: string;
+    includeSparkAddress: boolean;
+    includeSparkInvoice: boolean;
+  }): Promise<{ committedQuote: CommittedQuoteInput; invoicedSats: number }> {
+    if (quote.amountSats !== amountSats) {
+      throw new SparkValidationError(
+        "Quote was issued for a different amount than the invoice requests",
+        {
+          field: "amountSats",
+          value: amountSats,
+          expected: quote.amountSats,
+        },
+      );
+    }
+
+    // Snapshotted before the first await, and the signature is taken over these
+    // bytes: the quote is a caller-owned object, so re-reading any of its fields
+    // later could attest to something other than what was checked.
+    const { serializedManifest, issuerSignature, amountBasis } = quote;
+    const manifestBytes = hexToBytes(serializedManifest);
+    const manifest = TransferManifest.decode(manifestBytes);
+
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    if (
+      receiverIdentityPubkey &&
+      receiverIdentityPubkey.toLowerCase() !==
+        bytesToHex(identityPublicKey).toLowerCase()
+    ) {
+      // The SSP quotes for the authenticated caller, so only that wallet holds
+      // the key the counterparty attestation is verified against.
+      throw new SparkValidationError(
+        "A quote cannot be signed for a receiver other than this wallet",
+        {
+          field: "receiverIdentityPubkey",
+          value: receiverIdentityPubkey,
+          expected: bytesToHex(identityPublicKey),
+        },
+      );
+    }
+
+    if (
+      manifestFeeSats(manifest) > 0 &&
+      (includeSparkAddress || includeSparkInvoice)
+    ) {
+      throw new SparkValidationError(
+        "A fee-bearing quote cannot be combined with a Spark fallback address or invoice",
+        {
+          field: includeSparkAddress
+            ? "includeSparkAddress"
+            : "includeSparkInvoice",
+          value: true,
+          expected: false,
+        },
+      );
+    }
+
+    // From the same mapping the request used, not the wallet's network: that
+    // mapping collapses every non-mainnet network onto regtest, so comparing
+    // against the wallet's own value refuses the quote it just asked for.
+    const quotedNetwork =
+      NetworkToProto[
+        this.toBitcoinNetwork() === BitcoinNetwork.MAINNET
+          ? Network.MAINNET
+          : Network.REGTEST
+      ];
+    if (manifest.network !== quotedNetwork) {
+      throw new SparkValidationError(
+        "Quote was issued for a different network than this wallet",
+        {
+          field: "network",
+          value: manifest.network,
+          expected: quotedNetwork,
+        },
+      );
+    }
+
+    // An absent or unrepresentable expiry is refused rather than skipped: the
+    // SSP always stamps one, so a manifest without it is not a quote this can
+    // sign.
+    const quoteExpiryTime = manifest.quoteExpiryTime;
+    if (
+      !quoteExpiryTime ||
+      !Number.isFinite(quoteExpiryTime.getTime()) ||
+      quoteExpiryTime.getTime() <= Date.now()
+    ) {
+      throw new SparkValidationError("Quote has expired", {
+        field: "quoteExpiryTime",
+        value: quoteExpiryTime?.toJSON() ?? "unset",
+        expected: "a future expiry",
+      });
+    }
+
+    validateQuotedManifestAmounts({
+      manifest,
+      amountSats,
+      basis: amountBasis,
+      receiverIdentityPublicKey: identityPublicKey,
+    });
+
+    const signature = await signSerializedTransferManifest(
+      manifestBytes,
+      this.config.signer,
+    );
+
+    return {
+      committedQuote: {
+        serializedManifest,
+        issuerSignature,
+        manifestSignature: bytesToHex(signature),
+      },
+      invoicedSats: manifestGrossSats(manifest),
+    };
+  }
+
+  /**
    * Creates a Lightning invoice for receiving payments.
    *
    * @param {Object} params - Parameters for the lightning invoice
@@ -3626,6 +3818,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {boolean} [params.includeSparkInvoice] - Optional boolean signalling whether to include a spark invoice in the invoice routing hints. Mutually exclusive with includeSparkAddress.
    * @param {string} [params.receiverIdentityPubkey] - Optional public key of the wallet receiving the lightning invoice. If not present, the receiver will be the creator of this request.
    * @param {string} [params.descriptionHash] - Optional h tag of the invoice. This is the hash of a longer description to include in the lightning invoice. It is used in LNURL and UMA as the hash of the metadata. This field is mutually exclusive with the memo field. Only one or the other should be provided.
+   * @param {LightningReceiveQuote} [params.quote] - Optional quote to sign and send with this invoice. The invoice is issued for the quote's gross: above amountSats on a NET quote carrying markup, equal to it on a GROSS one.
    * @returns {Promise<LightningReceiveRequest>} BOLT11 encoded invoice
    */
   public async createLightningInvoice({
@@ -3636,6 +3829,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     includeSparkInvoice = false,
     receiverIdentityPubkey,
     descriptionHash,
+    quote,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
     const requestLightningInvoice = async (
       amountSats: number,
@@ -3653,6 +3847,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         includeSparkInvoice,
         receiverIdentityPubkey,
         descriptionHash,
+        quote,
       });
     };
 
@@ -3676,6 +3871,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     includeSparkInvoice,
     receiverIdentityPubkey,
     descriptionHash,
+    quote,
   }: {
     amountSats: number;
     paymentHashHex: string;
@@ -3685,6 +3881,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     includeSparkInvoice: boolean;
     receiverIdentityPubkey?: string;
     descriptionHash?: string;
+    quote?: LightningReceiveQuote;
   }): Promise<LightningReceiveRequest> {
     const sspClient = this.getSspClient();
 
@@ -3750,6 +3947,19 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       );
     }
 
+    // Ahead of the Spark invoice, which is itself identity-signed: one of this
+    // step's refusals exists to reject a quote combined with a Spark fallback,
+    // and running it second would mint the artifact it forbids.
+    const signedQuote = quote
+      ? await this.signReceiveQuote({
+          quote,
+          amountSats,
+          receiverIdentityPubkey,
+          includeSparkAddress,
+          includeSparkInvoice,
+        })
+      : undefined;
+
     let sparkInvoice: string | undefined;
     if (includeSparkInvoice) {
       const sparkAmount = amountSats > 0 ? amountSats : undefined;
@@ -3761,17 +3971,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    const network = this.config.getNetwork();
-    let bitcoinNetwork: BitcoinNetwork = BitcoinNetwork.REGTEST;
-    if (network === Network.MAINNET) {
-      bitcoinNetwork = BitcoinNetwork.MAINNET;
-    } else if (network === Network.REGTEST) {
-      bitcoinNetwork = BitcoinNetwork.REGTEST;
-    }
+    // The SSP invoices the manifest's edge sum and refuses a request naming
+    // anything else, so a quote's gross replaces the requested amount here —
+    // they differ whenever a markup applies.
+    const invoicedSats = signedQuote?.invoicedSats ?? amountSats;
 
     const invoice = await sspClient.requestLightningReceive({
-      amountSats,
-      network: bitcoinNetwork,
+      amountSats: invoicedSats,
+      network: this.toBitcoinNetwork(),
       paymentHash: paymentHashHex,
       expirySecs: expirySeconds,
       memo,
@@ -3779,6 +3986,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       receiverIdentityPubkey,
       descriptionHash,
       sparkInvoice,
+      committedQuote: signedQuote?.committedQuote,
     });
 
     if (!invoice) {
@@ -3798,22 +4006,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    if (decodedInvoice.amountMSats === null && amountSats !== 0) {
+    if (decodedInvoice.amountMSats === null && invoicedSats !== 0) {
       throw new SparkValidationError("Amount mismatch", {
         field: "amountMSats",
         value: "null",
-        expected: amountSats * 1000,
+        expected: invoicedSats * 1000,
       });
     }
 
     if (
       decodedInvoice.amountMSats !== null &&
-      decodedInvoice.amountMSats !== BigInt(amountSats * 1000)
+      decodedInvoice.amountMSats !== BigInt(invoicedSats) * 1000n
     ) {
       throw new SparkValidationError("Amount mismatch", {
         field: "amountMSats",
         value: decodedInvoice.amountMSats.toString(),
-        expected: amountSats * 1000,
+        expected: invoicedSats * 1000,
       });
     }
 
@@ -6541,6 +6749,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "experimental_GetInstantStaticDepositQuote",
   "getIdentityPublicKey",
   "getLeaves",
+  "getLightningReceiveQuote",
   "getLightningReceiveRequest",
   "getLightningSendFeeEstimate",
   "getLightningSendRequest",

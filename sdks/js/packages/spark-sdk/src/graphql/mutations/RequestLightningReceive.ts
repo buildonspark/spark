@@ -1,6 +1,14 @@
 import { FRAGMENT as RequestLightningReceiveOutputFragment } from "../objects/LightningReceiveRequest.js";
 
-export const RequestLightningReceive = `
+/**
+ * Built rather than fixed so an unquoted invoice never names
+ * `CommittedQuoteInput`. Declaring the variable unconditionally would put the
+ * whole receive path at the mercy of a schema that has not gained the type yet,
+ * for a value it does not send.
+ */
+export const requestLightningReceiveDocument = (
+  withCommittedQuote: boolean,
+) => `
   mutation RequestLightningReceive(
     $network: BitcoinNetwork!
     $amount_sats: Long!
@@ -10,7 +18,9 @@ export const RequestLightningReceive = `
     $include_spark_address: Boolean
     $receiver_identity_pubkey: PublicKey
     $description_hash: Hash32
-    $spark_invoice: String
+    $spark_invoice: String${
+      withCommittedQuote ? "\n    $committed_quote: CommittedQuoteInput" : ""
+    }
   ) {
     request_lightning_receive(
       input: {
@@ -22,7 +32,11 @@ export const RequestLightningReceive = `
         include_spark_address: $include_spark_address
         receiver_identity_pubkey: $receiver_identity_pubkey
         description_hash: $description_hash
-        spark_invoice: $spark_invoice
+        spark_invoice: $spark_invoice${
+          withCommittedQuote
+            ? "\n        committed_quote: $committed_quote"
+            : ""
+        }
       }
     ) {
       request {
