@@ -150,14 +150,6 @@ func TestCrossSOProofCheckRejectsDivergentPolynomials(t *testing.T) {
 		}
 		require.Errorf(t, err, "operator %d accepted a slice from a different polynomial", i)
 		assert.Contains(t, err.Error(), "sender key tweak proof mismatch")
-
-		// The rollout source tolerates only ABSENT proofs; present-but-divergent
-		// proofs must still be rejected, or every rollout-classified flow would
-		// silently lose the protection.
-		_, err = h.ValidateTransferPackage(
-			t.Context(), transferID, pkg, senderPrivKey.Public(), false, asParticipantDuringRollout(coordinatorProofs))
-		require.Errorf(t, err, "operator %d accepted divergent proofs through the rollout source", i)
-		assert.Contains(t, err.Error(), "sender key tweak proof mismatch")
 	}
 }
 
@@ -188,10 +180,8 @@ func TestCrossSOProofCheckAcceptsOnePolynomial(t *testing.T) {
 	}
 }
 
-// A not-yet-upgraded coordinator sends no proofs: the rollout source tolerates
-// that (rejecting would fail every transfer for the length of the deploy),
-// while the strict source refuses to validate without them.
-func TestCrossSOProofCheckAbsentProofs(t *testing.T) {
+// Absent proofs must fail closed: a skipped comparison is the original gap.
+func TestCrossSOProofCheckRejectsAbsentProofs(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	rng := rand.NewChaCha8([32]byte{13})
 	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -208,13 +198,6 @@ func TestCrossSOProofCheckAbsentProofs(t *testing.T) {
 
 	h := NewBaseTransferHandler(cfg)
 	_, err := h.ValidateTransferPackage(
-		t.Context(), transferID, pkg, senderPrivKey.Public(), false, asParticipantDuringRollout(nil))
-	require.NoError(t, err)
-	_, err = h.ValidateTransferPackage(
-		t.Context(), transferID, pkg, senderPrivKey.Public(), false, asParticipantDuringRollout(map[string]*pb.SecretProof{}))
-	require.NoError(t, err)
-
-	_, err = h.ValidateTransferPackage(
 		t.Context(), transferID, pkg, senderPrivKey.Public(), false, asParticipant(nil))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must not be nil")

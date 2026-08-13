@@ -103,7 +103,7 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, err
 	}
 
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), parsed.senderIDPK, h.requireDirectRefunds, asParticipantDuringRollout(req.GetSenderKeyTweakProofs()))
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), parsed.senderIDPK, h.requireDirectRefunds, asParticipant(req.GetSenderKeyTweakProofs()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package: %w", err)
 	}

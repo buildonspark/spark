@@ -296,7 +296,7 @@ func (h *SendTransferFlowHandler) prepareSwapTransfer(
 	primaryTransferID uuid.UUID,
 	senderKeyTweakProofs map[string]*pb.SecretProof,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.transferReq.GetTransferPackage(), parsed.senderIDPK, false, asParticipantDuringRollout(senderKeyTweakProofs))
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.transferReq.GetTransferPackage(), parsed.senderIDPK, false, asParticipant(senderKeyTweakProofs))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", parsed.transferID, err)
 	}

@@ -334,7 +334,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 
 	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferRequest() != nil {
-		keyTweakMap, err = h.transfer.ValidateTransferPackage(ctx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asParticipantDuringRollout(senderKeyTweakProofs))
+		keyTweakMap, err = h.transfer.ValidateTransferPackage(ctx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asParticipant(senderKeyTweakProofs))
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}
