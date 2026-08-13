@@ -396,6 +396,8 @@ type swapCounterTransferCoordinatorFlow struct {
 	parsed            parsedSwapTransferRequest
 	signingJobsByLeaf map[string]*sendTransferLeafSigningJobs
 
+	senderKeyTweakProofs map[string]*pb.SecretProof
+
 	// response is populated during BuildCommitPayload so the SSP-facing
 	// handler can return it after engine.Execute completes.
 	response *pb.StartTransferResponse
@@ -404,7 +406,10 @@ type swapCounterTransferCoordinatorFlow struct {
 var _ consensus.CoordinatorFlow = (*swapCounterTransferCoordinatorFlow)(nil)
 
 func (f *swapCounterTransferCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.InitiateCounterTransferPrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.InitiateCounterTransferPrepareRequest{
+		OriginalRequest:      f.req,
+		SenderKeyTweakProofs: f.senderKeyTweakProofs,
+	}
 }
 
 func (f *swapCounterTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, results map[string]*anypb.Any) (proto.Message, error) {
@@ -473,11 +478,17 @@ func initiateCounterTransferConsensus(ctx context.Context, config *so.Config, re
 	if err != nil {
 		return nil, err
 	}
+	handler := NewSwapCounterTransferFlowHandler(config)
+	senderKeyTweakProofs, err := handler.coordinatorSenderKeyTweakProofs(ctx, parsed.transferReq.GetTransferPackage())
+	if err != nil {
+		return nil, fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+	}
 	flow := &swapCounterTransferCoordinatorFlow{
-		SwapCounterTransferFlowHandler: NewSwapCounterTransferFlowHandler(config),
+		SwapCounterTransferFlowHandler: handler,
 		req:                            req,
 		parsed:                         parsed,
 		signingJobsByLeaf:              signingJobsByLeaf,
+		senderKeyTweakProofs:           senderKeyTweakProofs,
 	}
 	engine, err := consensus.GetEngine(ctx)
 	if err != nil {

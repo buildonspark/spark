@@ -496,6 +496,8 @@ type swapPrimaryTransferCoordinatorFlow struct {
 	parsed            parsedSwapTransferRequest
 	signingJobsByLeaf map[string]*sendTransferLeafSigningJobs
 
+	senderKeyTweakProofs map[string]*pb.SecretProof
+
 	// response is populated during BuildCommitPayload so the public
 	// InitiateSwapPrimaryTransfer handler can return it after engine.Execute.
 	response *pb.StartTransferResponse
@@ -504,7 +506,10 @@ type swapPrimaryTransferCoordinatorFlow struct {
 var _ consensus.CoordinatorFlow = (*swapPrimaryTransferCoordinatorFlow)(nil)
 
 func (f *swapPrimaryTransferCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.InitiateSwapPrimaryTransferPrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.InitiateSwapPrimaryTransferPrepareRequest{
+		OriginalRequest:      f.req,
+		SenderKeyTweakProofs: f.senderKeyTweakProofs,
+	}
 }
 
 func (f *swapPrimaryTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context, results map[string]*anypb.Any) (proto.Message, error) {
@@ -618,11 +623,17 @@ func (h *TransferHandler) initiateSwapPrimaryTransferConsensus(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
+	handler := NewSwapPrimaryTransferFlowHandler(h.config)
+	senderKeyTweakProofs, err := handler.coordinatorSenderKeyTweakProofs(ctx, parsed.transferReq.GetTransferPackage())
+	if err != nil {
+		return nil, fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+	}
 	flow := &swapPrimaryTransferCoordinatorFlow{
-		SwapPrimaryTransferFlowHandler: NewSwapPrimaryTransferFlowHandler(h.config),
+		SwapPrimaryTransferFlowHandler: handler,
 		req:                            req,
 		parsed:                         parsed,
 		signingJobsByLeaf:              signingJobsByLeaf,
+		senderKeyTweakProofs:           senderKeyTweakProofs,
 	}
 	engine, err := consensus.GetEngine(ctx)
 	if err != nil {

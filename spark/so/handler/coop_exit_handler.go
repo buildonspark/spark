@@ -284,7 +284,12 @@ func (h *TransferHandler) syncCoopExitInit(
 	}
 
 	if transfer.GetTransferPackage() != nil {
+		senderKeyTweakProofs, err := h.coordinatorSenderKeyTweakProofs(ctx, transfer.GetTransferPackage())
+		if err != nil {
+			return fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+		}
 		initTransferRequest.TransferPackage = transfer.GetTransferPackage()
+		initTransferRequest.SenderKeyTweakProofs = senderKeyTweakProofs
 		initTransferRequest.RefundSignatures = cpfpRefundSignatures
 		initTransferRequest.DirectRefundSignatures = directRefundSignatures
 		initTransferRequest.DirectFromCpfpRefundSignatures = directFromCpfpRefundSignatures

@@ -92,7 +92,8 @@ func (h *ClaimInstantStaticDepositFlowHandler) Prepare(ctx context.Context, op p
 	}
 	if req.GetTransfer() != nil {
 		transferResult, err := h.transfer.Prepare(ctx, &pbinternal.SendTransferPrepareRequest{
-			OriginalRequest: convertV2ToV3SendTransferRequest(req.GetTransfer()),
+			OriginalRequest:      convertV2ToV3SendTransferRequest(req.GetTransfer()),
+			SenderKeyTweakProofs: prepareReq.GetSenderKeyTweakProofs(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare claim secondary transfer: %w", err)

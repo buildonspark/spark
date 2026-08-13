@@ -371,6 +371,8 @@ type coopExitCoordinatorFlow struct {
 	connectorTx       []byte
 	signingJobsByLeaf map[string]*sendTransferLeafSigningJobs
 
+	senderKeyTweakProofs map[string]*pb.SecretProof
+
 	// response is populated during BuildCommitPayload so the public
 	// CooperativeExitV2 handler can return it after engine.Execute completes.
 	response *pb.CooperativeExitResponse
@@ -380,7 +382,10 @@ var _ consensus.CoordinatorFlow = (*coopExitCoordinatorFlow)(nil)
 
 // PrepareOp returns the prepare request sent to every SO (engine fans this out).
 func (f *coopExitCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.CoopExitPrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.CoopExitPrepareRequest{
+		OriginalRequest:      f.req,
+		SenderKeyTweakProofs: f.senderKeyTweakProofs,
+	}
 }
 
 // BuildCommitPayload aggregates FROST shares from all SOs, applies the resulting
@@ -500,12 +505,19 @@ func buildCoopExitCoordinatorFlow(ctx context.Context, config *so.Config, req *p
 		return nil, fmt.Errorf("unable to build coop exit signing-job helpers: %w", err)
 	}
 
+	handler := NewCoopExitFlowHandler(config)
+	senderKeyTweakProofs, err := handler.coordinatorSenderKeyTweakProofs(ctx, req.GetTransfer().GetTransferPackage())
+	if err != nil {
+		return nil, fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+	}
+
 	return &coopExitCoordinatorFlow{
-		CoopExitFlowHandler: NewCoopExitFlowHandler(config),
-		req:                 req,
-		parsed:              parsed,
-		connectorTx:         req.GetConnectorTx(),
-		signingJobsByLeaf:   jobsByLeaf,
+		CoopExitFlowHandler:  handler,
+		req:                  req,
+		parsed:               parsed,
+		connectorTx:          req.GetConnectorTx(),
+		signingJobsByLeaf:    jobsByLeaf,
+		senderKeyTweakProofs: senderKeyTweakProofs,
 	}, nil
 }
 

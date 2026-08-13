@@ -93,7 +93,8 @@ func (h *StaticDepositUtxoSwapFlowHandler) Prepare(ctx context.Context, op proto
 	}
 
 	transferResult, err := h.transfer.Prepare(ctx, &pbinternal.SendTransferPrepareRequest{
-		OriginalRequest: convertV2ToV3SendTransferRequest(req.GetTransfer()),
+		OriginalRequest:      convertV2ToV3SendTransferRequest(req.GetTransfer()),
+		SenderKeyTweakProofs: prepareReq.GetSenderKeyTweakProofs(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare utxo swap transfer: %w", err)

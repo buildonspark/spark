@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/proto"
 )
@@ -375,6 +376,41 @@ func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*p
 		validated[leafID] = validatedKeyTweak{pb: leafTweak}
 	}
 	return validated, nil
+}
+
+// coordinatorSenderKeyTweakProofs reads the proofs out of this SO's own slice for
+// a coordinator to fan out with its prepare op. Only that slice is decrypted; the
+// per-leaf verification stays in Prepare, which runs concurrently on every SO.
+func (h *BaseTransferHandler) coordinatorSenderKeyTweakProofs(ctx context.Context, pkg *pbspark.TransferPackage) (map[string]*pbspark.SecretProof, error) {
+	if pkg == nil {
+		return nil, nil
+	}
+	leafTweaksMap, err := h.decryptOwnKeyTweaks(pkg, transferLeafLimit(ctx))
+	if err != nil {
+		return nil, err
+	}
+	proofs := make(map[string]*pbspark.SecretProof, len(leafTweaksMap))
+	for leafID, leafTweak := range leafTweaksMap {
+		if leafTweak.GetSecretShareTweak() == nil {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", leafID))
+		}
+		proofs[leafID] = &pbspark.SecretProof{Proofs: leafTweak.GetSecretShareTweak().GetProofs()}
+	}
+	return proofs, nil
+}
+
+// senderKeyTweakProofsFromValidated extracts the per-leaf proofs a coordinator
+// fans out from key tweaks it has already validated, so entry points that ran
+// ValidateTransferPackage don't decrypt their slice a second time.
+func senderKeyTweakProofsFromValidated(keyTweakMap map[string]validatedKeyTweak) map[string]*pbspark.SecretProof {
+	if keyTweakMap == nil {
+		return nil
+	}
+	proofs := make(map[string]*pbspark.SecretProof, len(keyTweakMap))
+	for leafID, leafTweak := range keyTweakMap {
+		proofs[leafID] = &pbspark.SecretProof{Proofs: leafTweak.Proto().GetSecretShareTweak().GetProofs()}
+	}
+	return proofs
 }
 
 // transferPackageLeafIDs carries just the leaf IDs of a TransferPackage's

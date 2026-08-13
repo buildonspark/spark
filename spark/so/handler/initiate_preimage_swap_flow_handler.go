@@ -653,6 +653,8 @@ type initiatePreimageSwapCoordinatorFlow struct {
 	// AggregateFrost. nil for receive flows (no SO refund signing).
 	signingJobsByLeaf map[string]*sendTransferLeafSigningJobs
 
+	senderKeyTweakProofs map[string]*pbspark.SecretProof
+
 	// response is populated during BuildCommitPayload so the public
 	// InitiatePreimageSwapV3 handler can return it after engine.Execute completes.
 	response *pbspark.InitiatePreimageSwapResponse
@@ -664,7 +666,10 @@ var _ consensus.CoordinatorFlow = (*initiatePreimageSwapCoordinatorFlow)(nil)
 // already mutated by the entrypoint (expiry nulled for non-HODL receive) so
 // every SO agrees on the same transfer state.
 func (f *initiatePreimageSwapCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.InitiatePreimageSwapPrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.InitiatePreimageSwapPrepareRequest{
+		OriginalRequest:      f.req,
+		SenderKeyTweakProofs: f.senderKeyTweakProofs,
+	}
 }
 
 // BuildCommitPayload aggregates FROST shares (REASON_SEND), recovers the preimage
@@ -877,6 +882,15 @@ func buildInitiatePreimageSwapCoordinatorFlow(ctx context.Context, config *so.Co
 		req:                             req,
 		transferID:                      transferID,
 		isNonHodlReceive:                isNonHodlReceive,
+	}
+
+	if req.GetTransferRequest() != nil {
+		// Keyed off the transfer request rather than REASON_SEND, to match the
+		// condition Prepare validates the package under.
+		flow.senderKeyTweakProofs, err = flow.transfer.coordinatorSenderKeyTweakProofs(ctx, req.GetTransferRequest().GetTransferPackage())
+		if err != nil {
+			return nil, fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+		}
 	}
 
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND && req.GetTransferRequest() != nil {
