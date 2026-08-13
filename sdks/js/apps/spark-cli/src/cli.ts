@@ -17,6 +17,7 @@ import {
   Network,
   type NetworkType,
   protoToNetwork,
+  type ReceiveQuoteAmountBasis,
   SPARK_WALLET_CLEANUP_DISCONNECT_REASON,
   type SparkAddressFormat,
   SparkReadonlyClient,
@@ -228,6 +229,7 @@ const commands = [
   "signmanifest",
   "verifymanifest",
   "createinvoice",
+  "createquotedinvoice",
   "createhodlinvoice",
   "payinvoice",
   "createhtlc",
@@ -868,6 +870,7 @@ async function runCLI() {
   refundandbroadcaststaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund and broadcast a static deposit
   gettransfers [limit] [offset]                                       - Get a list of transfers
   createinvoice <amount> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice (includeSparkAddress and includeSparkInvoice are mutually exclusive)
+  createquotedinvoice <amount> [memo|_] [NET|GROSS] [descriptionHash] - Quote a lightning receive, sign the manifest and issue the invoice in one step; prints JSON. Pass _ for an empty memo, and only one of memo or descriptionHash. GROSS needs an SSP schema exposing amount_basis (rc)
   createhodlinvoice <amount> <paymentHash> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a HODL lightning invoice with payment hash (includeSparkAddress and includeSparkInvoice are mutually exclusive)
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
@@ -1703,6 +1706,50 @@ async function runCLI() {
             descriptionHash: args[5],
           });
           console.log(invoice);
+          break;
+        }
+        case "createquotedinvoice": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const basis = args[2]?.toUpperCase();
+          if (basis && basis !== "NET" && basis !== "GROSS") {
+            console.log(`Error: unknown amount basis ${args[2]}`);
+            break;
+          }
+          // Loaded here rather than at the top: the pinned spark-sdk release
+          // predates these exports, and a missing named import fails the whole
+          // module at startup — including commands that never quote anything.
+          const { manifestFeeSats, manifestGrossSats } =
+            await import("@buildonspark/spark-sdk");
+          const quotedAmountSats = parseInt(args[0]);
+          const quote = await wallet.getLightningReceiveQuote({
+            amountSats: quotedAmountSats,
+            amountBasis: basis as ReceiveQuoteAmountBasis | undefined,
+          });
+          const quotedInvoice = await wallet.createLightningInvoice({
+            amountSats: quotedAmountSats,
+            memo: args[1] === "_" ? undefined : args[1],
+            descriptionHash: args[3],
+            quote,
+          });
+          console.log(
+            JSON.stringify(
+              {
+                invoice: quotedInvoice.invoice.encodedInvoice,
+                receiveRequestId: quotedInvoice.id,
+                manifestTransferId: quote.manifest.transferId,
+                attributionStatus: quote.attributionStatus,
+                requestedSats: quotedAmountSats,
+                amountBasis: quote.amountBasis,
+                invoicedSats: manifestGrossSats(quote.manifest),
+                feeSats: manifestFeeSats(quote.manifest),
+              },
+              null,
+              2,
+            ),
+          );
           break;
         }
         case "createhodlinvoice": {

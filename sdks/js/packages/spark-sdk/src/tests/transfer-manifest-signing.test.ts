@@ -6,6 +6,7 @@ import { TransferManifest } from "../proto/spark.js";
 import { setSparkTokenPrimitivesOnce } from "../token-primitives-bindings/token-primitives-bindings.js";
 import { SparkTokenPrimitives } from "../token-primitives-bindings/token-primitives-bindings.node.js";
 import {
+  signSerializedTransferManifest,
   signTransferManifest,
   verifyTransferManifestSignature,
 } from "../utils/manifest-signing.js";
@@ -77,6 +78,30 @@ describe("TransferManifest sender signature", () => {
       expect(
         await verifyTransferManifestSignature(
           manifest,
+          signature,
+          TEST_PUBLIC_KEY,
+        ),
+      ).toBe(true);
+    });
+  }
+
+  for (const tc of cases) {
+    it(`signs ${tc.name} from its serialized bytes identically`, async () => {
+      // The bytes path and the decoded path must not diverge, or a
+      // countersignature would cover something other than what the peer sent.
+      const decoded = TransferManifest.fromJSON(tc.transferManifest);
+      const serialized = TransferManifest.encode(decoded).finish();
+
+      const signature = await signSerializedTransferManifest(serialized, {
+        signMessageWithIdentityKey: (message: Uint8Array) =>
+          Promise.resolve(
+            secp256k1.sign(message, TEST_PRIVATE_KEY).toDERRawBytes(),
+          ),
+      });
+
+      expect(
+        await verifyTransferManifestSignature(
+          decoded,
           signature,
           TEST_PUBLIC_KEY,
         ),

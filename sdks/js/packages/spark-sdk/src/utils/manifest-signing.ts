@@ -1,6 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import type { TransferManifest } from "../proto/spark.js";
-import { hashTransferManifest } from "./manifest-hashing.js";
+import {
+  hashSerializedTransferManifest,
+  hashTransferManifest,
+} from "./manifest-hashing.js";
 
 /**
  * The sender's identity-key ECDSA signature over `manifest_hash`.
@@ -35,6 +38,19 @@ export async function signTransferManifest(
 ): Promise<Uint8Array> {
   return signer.signMessageWithIdentityKey(
     await hashTransferManifest(manifest),
+  );
+}
+
+/**
+ * Countersign a manifest received as bytes. The peer's copy is what the
+ * operators bind, so the attestation is taken over it directly.
+ */
+export async function signSerializedTransferManifest(
+  manifestBytes: Uint8Array,
+  signer: ManifestSigner,
+): Promise<Uint8Array> {
+  return signer.signMessageWithIdentityKey(
+    await hashSerializedTransferManifest(manifestBytes),
   );
 }
 

@@ -25,7 +25,8 @@ import { DeleteSparkWalletWebhook } from "./mutations/DeleteSparkWalletWebhook.j
 import { GetChallenge } from "./mutations/GetChallenge.js";
 import { RegisterSparkWalletWebhook } from "./mutations/RegisterSparkWalletWebhook.js";
 import { RequestCoopExit } from "./mutations/RequestCoopExit.js";
-import { RequestLightningReceive } from "./mutations/RequestLightningReceive.js";
+import { lightningReceiveQuoteDocument } from "./mutations/LightningReceiveQuote.js";
+import { requestLightningReceiveDocument } from "./mutations/RequestLightningReceive.js";
 import { RequestLightningSend } from "./mutations/RequestLightningSend.js";
 import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
 import { VerifyChallenge } from "./mutations/VerifyChallenge.js";
@@ -62,6 +63,14 @@ import {
   type Transfer,
 } from "./objects/index.js";
 import { LeavesSwapFeeEstimateOutputFromJson } from "./objects/LeavesSwapFeeEstimateOutput.js";
+import { ReceiveQuoteAmountBasis } from "../utils/receive-quote.js";
+import {
+  CommittedQuoteInputToJson,
+  LightningReceiveQuoteOutputFromJson,
+  type CommittedQuoteInput,
+  type LightningReceiveQuoteOutput,
+  type LightningReceiveQuoteOutputWire,
+} from "./receive-quote.js";
 import type LeavesSwapRequest from "./objects/LeavesSwapRequest.js";
 import { LeavesSwapRequestFromJson } from "./objects/LeavesSwapRequest.js";
 import type LightningReceiveRequest from "./objects/LightningReceiveRequest.js";
@@ -334,6 +343,36 @@ export default class SspClient {
     });
   }
 
+  async lightningReceiveQuote({
+    amountSats,
+    network,
+    amountBasis,
+  }: {
+    amountSats: number;
+    network: BitcoinNetwork;
+    amountBasis?: ReceiveQuoteAmountBasis;
+  }): Promise<LightningReceiveQuoteOutput | null> {
+    // NET is the server-side default, so omitting the field keeps the request
+    // valid against schemas that predate amount_basis.
+    const sendsBasis =
+      amountBasis !== undefined && amountBasis !== ReceiveQuoteAmountBasis.NET;
+    return await this.executeRawQuery({
+      queryPayload: lightningReceiveQuoteDocument(sendsBasis),
+      variables: {
+        network: network,
+        amount_sats: amountSats,
+        ...(sendsBasis ? { amount_basis: amountBasis } : {}),
+      },
+      constructObject: (response: {
+        lightning_receive_quote: LightningReceiveQuoteOutputWire;
+      }) => {
+        return LightningReceiveQuoteOutputFromJson(
+          response.lightning_receive_quote,
+        );
+      },
+    });
+  }
+
   async requestLightningReceive({
     amountSats,
     network,
@@ -344,9 +383,14 @@ export default class SspClient {
     receiverIdentityPubkey,
     descriptionHash,
     sparkInvoice,
-  }: RequestLightningReceiveInput): Promise<LightningReceiveRequest | null> {
+    committedQuote,
+  }: RequestLightningReceiveInput & {
+    committedQuote?: CommittedQuoteInput;
+  }): Promise<LightningReceiveRequest | null> {
     return await this.executeRawQuery({
-      queryPayload: RequestLightningReceive,
+      queryPayload: requestLightningReceiveDocument(
+        committedQuote !== undefined,
+      ),
       variables: {
         amount_sats: amountSats,
         network: network,
@@ -357,6 +401,9 @@ export default class SspClient {
         receiver_identity_pubkey: receiverIdentityPubkey,
         description_hash: descriptionHash,
         spark_invoice: sparkInvoice,
+        ...(committedQuote
+          ? { committed_quote: CommittedQuoteInputToJson(committedQuote) }
+          : {}),
       },
       constructObject: (response: {
         request_lightning_receive: { request: unknown };

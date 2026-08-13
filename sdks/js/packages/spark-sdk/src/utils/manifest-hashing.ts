@@ -27,7 +27,19 @@ export async function hashTransferManifest(
   }
   validateEncodable(manifest);
 
-  const manifestBytes = TransferManifest.encode(manifest).finish();
+  return hashSerializedTransferManifest(
+    TransferManifest.encode(manifest).finish(),
+  );
+}
+
+/**
+ * Hash a manifest that arrived as bytes. The received bytes are themselves the
+ * subject, so there is nothing to validate for representability and nothing to
+ * gain from rebuilding them.
+ */
+export async function hashSerializedTransferManifest(
+  manifestBytes: Uint8Array,
+): Promise<Uint8Array> {
   try {
     return await getSparkTokenPrimitives().hashTransferManifest(manifestBytes);
   } catch (err) {

@@ -1,8 +1,10 @@
 import type { Transaction } from "@scure/btc-signer";
+import { type TransferManifest } from "../proto/spark.js";
 import {
   type OutputWithPreviousTransactionData,
   type TokenMetadata,
 } from "../proto/spark_token.js";
+import { type ReceiveQuoteAmountBasis } from "../utils/receive-quote.js";
 import { type ConfigOptions } from "../services/wallet-config.js";
 import type { SparkSigner } from "../signer/signer.js";
 import { type KeyDerivation } from "../signer/types.js";
@@ -29,6 +31,33 @@ export type WithdrawParams = {
   deductFeeFromWithdrawalAmount?: boolean;
 };
 
+export type GetLightningReceiveQuoteParams = {
+  amountSats: number;
+  /**
+   * Defaults to NET. GROSS requires an SSP schema exposing `amount_basis`;
+   * against an older one the request is refused rather than quietly quoted as
+   * NET, which would invoice for more than was asked for.
+   */
+  amountBasis?: ReceiveQuoteAmountBasis;
+};
+
+/**
+ * A quote issued by the SSP, carried verbatim into the invoice request.
+ *
+ * `serializedManifest` and `issuerSignature` are echoed exactly as received —
+ * re-encoding a decoded copy is not guaranteed to reproduce them. The amount
+ * and basis travel along so the checks run against what was actually asked
+ * for rather than whatever a caller passes second.
+ */
+export type LightningReceiveQuote = {
+  serializedManifest: string;
+  issuerSignature: string;
+  attributionStatus: string;
+  manifest: TransferManifest;
+  amountSats: number;
+  amountBasis: ReceiveQuoteAmountBasis;
+};
+
 export type CreateLightningInvoiceParams = {
   amountSats: number;
   memo?: string;
@@ -37,6 +66,8 @@ export type CreateLightningInvoiceParams = {
   includeSparkInvoice?: boolean;
   receiverIdentityPubkey?: string;
   descriptionHash?: string;
+  /** A quote to sign and send with this invoice. Omit for an unquoted invoice. */
+  quote?: LightningReceiveQuote;
 };
 
 export type CreateLightningHodlInvoiceParams = {
