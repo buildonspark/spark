@@ -59,6 +59,7 @@ func (f *staticDepositUtxoSwapCoordinatorFlow) PrepareOp() proto.Message {
 	return &pbinternal.StaticDepositUtxoSwapPrepareRequest{
 		OriginalRequest:           f.req,
 		SpendTxSigningCommitments: f.spendCommitments,
+		SenderKeyTweakProofs:      f.transferCoord.senderKeyTweakProofs,
 	}
 }
 

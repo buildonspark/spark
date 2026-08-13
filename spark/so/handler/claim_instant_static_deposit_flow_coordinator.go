@@ -49,10 +49,16 @@ type claimInstantStaticDepositCoordinatorFlow struct {
 var _ consensus.CoordinatorFlow = (*claimInstantStaticDepositCoordinatorFlow)(nil)
 
 func (f *claimInstantStaticDepositCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.ClaimInstantStaticDepositUtxoSwapPrepareRequest{
+	req := &pbinternal.ClaimInstantStaticDepositUtxoSwapPrepareRequest{
 		OriginalRequest:           f.req,
 		SpendTxSigningCommitments: f.spendCommitments,
 	}
+	// transferCoord is nil when the claim carries no secondary transfer; there
+	// is no package and therefore no proofs to fan out.
+	if f.transferCoord != nil {
+		req.SenderKeyTweakProofs = f.transferCoord.senderKeyTweakProofs
+	}
+	return req
 }
 
 // BuildCommitPayload first delegates the optional secondary transfer to the

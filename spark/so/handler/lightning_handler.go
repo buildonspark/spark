@@ -2029,6 +2029,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 			CpfpRefundSignatures:           cpfpSignatureMap,
 			DirectRefundSignatures:         directSignatureMap,
 			DirectFromCpfpRefundSignatures: directFromCpfpSignatureMap,
+			SenderKeyTweakProofs:           senderKeyTweakProofsFromValidated(keyTweakMap),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("unable to initiate preimage swap for payment hash: %x and transfer id: %s: %w", req.GetPaymentHash(), transfer.ID, err)

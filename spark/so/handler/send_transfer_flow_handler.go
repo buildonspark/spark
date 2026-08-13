@@ -395,6 +395,8 @@ type sendTransferCoordinatorFlow struct {
 	// StartTransferV2 request routed through the engine paid an invoice.
 	sparkInvoice string
 
+	senderKeyTweakProofs map[string]*pb.SecretProof
+
 	// response is populated during BuildCommitPayload so the public
 	// StartTransferV3 handler can return it after engine.Execute completes.
 	response *pb.StartTransferResponse
@@ -404,7 +406,11 @@ var _ consensus.CoordinatorFlow = (*sendTransferCoordinatorFlow)(nil)
 
 // PrepareOp returns the prepare request sent to every SO (engine fans this out).
 func (f *sendTransferCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.SendTransferPrepareRequest{OriginalRequest: f.req, SparkInvoice: f.sparkInvoice}
+	return &pbinternal.SendTransferPrepareRequest{
+		OriginalRequest:      f.req,
+		SparkInvoice:         f.sparkInvoice,
+		SenderKeyTweakProofs: f.senderKeyTweakProofs,
+	}
 }
 
 // BuildCommitPayload aggregates FROST shares from all SOs, applies the resulting
@@ -565,12 +571,18 @@ func buildSendTransferCoordinatorFlow(ctx context.Context, config *so.Config, re
 		return nil, fmt.Errorf("unable to build signing-job helpers: %w", err)
 	}
 
+	senderKeyTweakProofs, err := handler.coordinatorSenderKeyTweakProofs(ctx, parsed.senderPkg.GetTransferPackage())
+	if err != nil {
+		return nil, fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+	}
+
 	return &sendTransferCoordinatorFlow{
 		SendTransferFlowHandler: handler,
 		req:                     req,
 		parsed:                  parsed,
 		signingJobsByLeaf:       jobsByLeaf,
 		sparkInvoice:            sparkInvoice,
+		senderKeyTweakProofs:    senderKeyTweakProofs,
 	}, nil
 }
 

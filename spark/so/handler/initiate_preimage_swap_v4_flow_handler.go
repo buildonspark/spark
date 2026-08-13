@@ -193,7 +193,7 @@ func (h *LightningHandler) InitiatePreimageSwapV4(ctx context.Context, req *pbsp
 		return nil, validateErr
 	}
 
-	flow, err := buildInitiatePreimageSwapV4CoordinatorFlow(h.config, req, isNonHodlReceive)
+	flow, err := buildInitiatePreimageSwapV4CoordinatorFlow(ctx, h.config, req, isNonHodlReceive)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build coordinator flow: %w", err)
 	}
@@ -244,6 +244,8 @@ type initiatePreimageSwapV4CoordinatorFlow struct {
 	transferID       uuid.UUID
 	isNonHodlReceive bool
 
+	senderKeyTweakProofs map[string]*pbspark.SecretProof
+
 	// response is populated during BuildCommitPayload so the public entrypoint can return it
 	// once engine.Execute completes.
 	response *pbspark.InitiatePreimageSwapResponse
@@ -251,21 +253,34 @@ type initiatePreimageSwapV4CoordinatorFlow struct {
 
 var _ consensus.CoordinatorFlow = (*initiatePreimageSwapV4CoordinatorFlow)(nil)
 
-func buildInitiatePreimageSwapV4CoordinatorFlow(config *so.Config, req *pbspark.InitiatePreimageSwapV4Request, isNonHodlReceive bool) (*initiatePreimageSwapV4CoordinatorFlow, error) {
+func buildInitiatePreimageSwapV4CoordinatorFlow(ctx context.Context, config *so.Config, req *pbspark.InitiatePreimageSwapV4Request, isNonHodlReceive bool) (*initiatePreimageSwapV4CoordinatorFlow, error) {
 	transferID, err := uuid.Parse(v4PreparedTransferID(req))
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse transfer id: %w", err))
 	}
+	senderPkg, _, err := parseSendTransferEnvelope(req.GetTransferV3Request())
+	if err != nil {
+		return nil, err
+	}
+	handler := NewInitiatePreimageSwapV4FlowHandler(config)
+	senderKeyTweakProofs, err := handler.transfer.coordinatorSenderKeyTweakProofs(ctx, senderPkg.GetTransferPackage())
+	if err != nil {
+		return nil, fmt.Errorf("unable to read sender key tweak proofs from the coordinator's slice: %w", err)
+	}
 	return &initiatePreimageSwapV4CoordinatorFlow{
-		InitiatePreimageSwapV4FlowHandler: NewInitiatePreimageSwapV4FlowHandler(config),
+		InitiatePreimageSwapV4FlowHandler: handler,
 		req:                               req,
 		transferID:                        transferID,
 		isNonHodlReceive:                  isNonHodlReceive,
+		senderKeyTweakProofs:              senderKeyTweakProofs,
 	}, nil
 }
 
 func (f *initiatePreimageSwapV4CoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.InitiatePreimageSwapV4PrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.InitiatePreimageSwapV4PrepareRequest{
+		OriginalRequest:      f.req,
+		SenderKeyTweakProofs: f.senderKeyTweakProofs,
+	}
 }
 
 // BuildCommitPayload has no FROST-aggregation branch because v4 is receive-only: the SOs sign no

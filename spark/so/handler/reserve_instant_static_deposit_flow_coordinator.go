@@ -52,7 +52,10 @@ type reserveInstantStaticDepositCoordinatorFlow struct {
 var _ consensus.CoordinatorFlow = (*reserveInstantStaticDepositCoordinatorFlow)(nil)
 
 func (f *reserveInstantStaticDepositCoordinatorFlow) PrepareOp() proto.Message {
-	return &pbinternal.ReserveInstantStaticDepositUtxoSwapPrepareRequest{OriginalRequest: f.req}
+	return &pbinternal.ReserveInstantStaticDepositUtxoSwapPrepareRequest{
+		OriginalRequest:      f.req,
+		SenderKeyTweakProofs: f.transferCoord.senderKeyTweakProofs,
+	}
 }
 
 // BuildCommitPayload delegates the nested transfer to the send-transfer
