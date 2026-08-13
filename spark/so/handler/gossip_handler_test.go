@@ -213,6 +213,37 @@ func TestHandlePreimageSwapGossipRejectsAmbiguousPaymentHashWithoutTransferID(t 
 	require.Equal(t, 2, count)
 }
 
+// TestHandlePreimageGossipRejectsNon32BytePreimage verifies that a gossiped
+// preimage whose length is not 32 bytes is rejected before it can be persisted,
+// mirroring the length guard the user-facing ValidatePreimage path enforces.
+func TestHandlePreimageGossipRejectsNon32BytePreimage(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	short := []byte("too_short")
+	paymentHash := sha256.Sum256(short)
+
+	err := NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageGossipMessage(ctx, &pbgossip.GossipMessagePreimage{
+		Preimage:    short,
+		PaymentHash: paymentHash[:],
+	}, false)
+	require.ErrorContains(t, err, "preimage must be")
+}
+
+// TestHandlePreimageSwapGossipRejectsNon32BytePreimage is the same guard for the
+// swap-gossip path.
+func TestHandlePreimageSwapGossipRejectsNon32BytePreimage(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	short := []byte("too_short")
+	paymentHash := sha256.Sum256(short)
+
+	err := NewGossipHandler(sparktesting.TestConfig(t)).handlePreimageSwapGossipMessage(ctx, &pbgossip.GossipMessagePreimageSwap{
+		Preimage:    short,
+		PaymentHash: paymentHash[:],
+	}, false)
+	require.ErrorContains(t, err, "preimage must be")
+}
+
 func TestHandlePreimageGossipIgnoresReturnedRequestWhenActiveRequestExists(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	client, err := ent.GetDbFromContext(ctx)

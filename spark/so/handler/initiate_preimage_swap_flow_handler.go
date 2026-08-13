@@ -532,6 +532,10 @@ func isPreimageSwapSettleableStatus(status st.TransferStatus) bool {
 // the preimage from the commit payload on faith, so re-checking here closes the
 // Byzantine-coordinator / tampered-gossip gap (matching handlePreimageSwapGossipMessage).
 func (h *InitiatePreimageSwapFlowHandler) persistPreimage(ctx context.Context, transferID uuid.UUID, preimage []byte) error {
+	if len(preimage) != sha256.Size {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
+			"preimage must be %d bytes, got %d", sha256.Size, len(preimage)))
+	}
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get db context: %w", err)

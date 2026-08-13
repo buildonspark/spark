@@ -489,6 +489,11 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 		return nil
 	}
 
+	if len(gossip.GetPreimage()) != sha256.Size {
+		err := fmt.Errorf("preimage must be %d bytes, got %d", sha256.Size, len(gossip.GetPreimage()))
+		logger.Error(err.Error())
+		return err
+	}
 	calculatedHash := sha256.Sum256(gossip.GetPreimage())
 	if !bytes.Equal(calculatedHash[:], gossip.GetPaymentHash()) {
 		err := fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.GetPaymentHash())
@@ -535,6 +540,9 @@ func (h *GossipHandler) handlePreimageSwapGossipMessage(ctx context.Context, gos
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Handling preimage swap gossip message")
 
+	if len(gossip.GetPreimage()) != sha256.Size {
+		return fmt.Errorf("preimage must be %d bytes, got %d", sha256.Size, len(gossip.GetPreimage()))
+	}
 	calculatedHash := sha256.Sum256(gossip.GetPreimage())
 	if !bytes.Equal(calculatedHash[:], gossip.GetPaymentHash()) {
 		return fmt.Errorf("preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.GetPaymentHash())
