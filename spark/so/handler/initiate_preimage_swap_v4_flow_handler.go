@@ -339,7 +339,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) Prepare(ctx context.Context, op prot
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unrecognized preimage swap reason %d", r))
 	}
 
-	state, err := h.prepareStateV4(ctx, req)
+	state, err := h.prepareStateV4(ctx, req, prepareReq.GetSenderKeyTweakProofs())
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) Prepare(ctx context.Context, op prot
 // and requireAndBindManifest's exact cover proves those receivers aggregate exactly to the
 // sender-signed edges. Neither alone suffices — the first attests to routing nobody signed,
 // the second to an aggregate whose refunds may pay someone else.
-func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, req *pbspark.InitiatePreimageSwapV4Request) (*preimageSwapPreparedState, error) {
+func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, req *pbspark.InitiatePreimageSwapV4Request, senderKeyTweakProofs map[string]*pbspark.SecretProof) (*preimageSwapPreparedState, error) {
 	// v4 SEND needs an HTLC-refund validator for the per-leaf shape that does not exist yet, and
 	// send's fee cut rides the real user→SSP edge rather than separate fee legs, so it is a
 	// different design problem with no caller today. Fail closed rather than fall through to a
@@ -449,7 +449,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 		return nil, fmt.Errorf("unable to validate request for payment hash %x: %w", req.GetPaymentHash(), err)
 	}
 
-	keyTweakMap, err := h.transfer.ValidateTransferPackage(ctx, parsed.transferID, pkg, parsed.senderIDPK, false)
+	keyTweakMap, err := h.transfer.ValidateTransferPackage(ctx, parsed.transferID, pkg, parsed.senderIDPK, false, asParticipantDuringRollout(senderKeyTweakProofs))
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 	}

@@ -510,16 +510,12 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	// Validate the transfer package and the decrypted key tweak proofs if the package is present
 	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferPackage() != nil {
-		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIdentityPubKey, !transferType.IsSwap())
+		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIdentityPubKey, !transferType.IsSwap(), asParticipant(req.GetSenderKeyTweakProofs()))
 		if err != nil {
 			return err
 		}
 		if keyTweakMap == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer package produced no key tweaks for transfer %s", transferID))
-		}
-
-		if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.GetSenderKeyTweakProofs()); err != nil {
-			return err
 		}
 	}
 	if req.GetTransferPackage() == nil {
@@ -666,15 +662,12 @@ func (h *InternalTransferHandler) InitiateTransferV2(ctx context.Context, req *p
 	if senderPkg.GetTransferPackage() == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.GetTransferPackage(), senderIdentityPubKey, true)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, senderPkg.GetTransferPackage(), senderIdentityPubKey, true, asParticipant(req.GetSenderKeyTweakProofs()))
 	if err != nil {
 		return err
 	}
 	if keyTweakMap == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer package produced no key tweaks for transfer %s", transferID))
-	}
-	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.GetSenderKeyTweakProofs()); err != nil {
-		return err
 	}
 
 	pkg, err := transferpkg.ParsePackage(senderPkg.GetTransferPackage())
@@ -731,14 +724,8 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if err != nil {
 		return fmt.Errorf("invalid transfer id: %s", req.GetTransferId())
 	}
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIDPubKey, false)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderIDPubKey, false, asParticipant(req.GetSenderKeyTweakProofs()))
 	if err != nil {
-		return err
-	}
-
-	// Cross-SO consistency: the coordinator's plaintext proofs must match what we decrypted
-	// from our own ECIES blob, ensuring every SO's encrypted share comes from the same polynomial.
-	if err := verifySenderKeyTweakProofsMatch(keyTweakMap, req.GetSenderKeyTweakProofs()); err != nil {
 		return err
 	}
 
@@ -942,7 +929,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 
 	var keyTweakMap map[string]validatedKeyTweak
 	if transferReq.GetTransferPackage() != nil {
-		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.GetTransferPackage(), senderIDPubKey, true)
+		keyTweakMap, err = h.ValidateTransferPackage(ctx, transferID, transferReq.GetTransferPackage(), senderIDPubKey, true, asParticipantDuringRollout(transferReq.GetSenderKeyTweakProofs()))
 		if err != nil {
 			return err
 		}

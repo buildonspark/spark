@@ -85,7 +85,7 @@ func (h *SwapCounterTransferFlowHandler) Prepare(ctx context.Context, op proto.M
 	// createTransfer's CounterSwapV3 branch loads the primary ForUpdate and
 	// validates it, so the fence flip below can't race a concurrent counter
 	// for the same primary: the second one fails the status check.
-	counterTransfer, leafMap, err := h.prepareSwapTransfer(ctx, parsed, st.TransferTypeCounterSwapV3, primaryTransferID)
+	counterTransfer, leafMap, err := h.prepareSwapTransfer(ctx, parsed, st.TransferTypeCounterSwapV3, primaryTransferID, req.GetSenderKeyTweakProofs())
 	if err != nil {
 		return nil, err
 	}

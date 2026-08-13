@@ -103,17 +103,13 @@ func (h *SendTransferFlowHandler) Prepare(ctx context.Context, op proto.Message)
 		return nil, err
 	}
 
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), parsed.senderIDPK, h.requireDirectRefunds)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.senderPkg.GetTransferPackage(), parsed.senderIDPK, h.requireDirectRefunds, asParticipantDuringRollout(req.GetSenderKeyTweakProofs()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package: %w", err)
 	}
 	if len(keyTweakMap) == 0 {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("transfer package contains no key tweaks"))
 	}
-
-	// No cross-SO verifySenderKeyTweakProofsMatch call (legacy InitiateTransferV2
-	// has one). V3's TransferPackage is a single user-signed blob; ValidateTransferPackage
-	// above verifies that signature on every SO, which subsumes the legacy parallel-field check.
 
 	// Per-SO transfer-size limit, enforced with raw status.Errorf so clients
 	// see codes.InvalidArgument (the wire contract predates the consensus

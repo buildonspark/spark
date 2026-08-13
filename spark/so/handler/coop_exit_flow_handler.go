@@ -129,7 +129,7 @@ func (h *CoopExitFlowHandler) Prepare(ctx context.Context, op proto.Message) (pr
 		return nil, err
 	}
 
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, orig.GetTransfer().GetTransferPackage(), parsed.senderIDPK, true)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, orig.GetTransfer().GetTransferPackage(), parsed.senderIDPK, true, asParticipantDuringRollout(req.GetSenderKeyTweakProofs()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for coop exit %s: %w", parsed.transferID, err)
 	}

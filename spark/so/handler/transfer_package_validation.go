@@ -18,6 +18,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// senderTweakProofSource declares which side of the transfer-package fan-out a
+// ValidateTransferPackage caller is on. Each SO can decrypt only its own slice
+// of the key-tweak package, and the package signature binds the ciphertext map,
+// not the equality of the plaintexts — so slices built from different
+// polynomials all pass slice-local validation, and only comparing plaintext
+// proofs across operators catches the divergence. Making the source a required
+// parameter means no caller can skip that comparison by omission.
+type senderTweakProofSource struct {
+	isCoordinator     bool
+	allowAbsentProofs bool
+	proofs            map[string]*pbspark.SecretProof
+}
+
+// asCoordinator marks the caller as the operator that fans the package out: its
+// own decrypted slice is the reference the other operators are checked against,
+// so there is nothing to compare locally.
+func asCoordinator() senderTweakProofSource {
+	return senderTweakProofSource{isCoordinator: true}
+}
+
+// asParticipant carries the coordinator's fanned-out proofs, which must be
+// present and match the proofs this SO decrypts from its own slice.
+func asParticipant(proofs map[string]*pbspark.SecretProof) senderTweakProofSource {
+	return senderTweakProofSource{proofs: proofs}
+}
+
+// asParticipantDuringRollout is asParticipant for flows whose coordinators only
+// started fanning proofs out in this release: absent proofs pass, so a
+// not-yet-upgraded coordinator doesn't fail every transfer mid-deploy.
+// TODO(SP-3772): fold into asParticipant once every operator sends proofs.
+func asParticipantDuringRollout(proofs map[string]*pbspark.SecretProof) senderTweakProofSource {
+	return senderTweakProofSource{proofs: proofs, allowAbsentProofs: true}
+}
+
 // ValidateTransferPackage checks a sender-supplied TransferPackage and returns
 // this SO's validated per-leaf key tweaks, keyed by leaf ID. The returned map
 // is the boundary between request handling and the transfer core: everything
@@ -34,6 +68,7 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 	pkg *pbspark.TransferPackage,
 	senderIdentityPubKey keys.Public,
 	requireDirectFromCpfpLeaves bool,
+	proofSource senderTweakProofSource,
 ) (map[string]validatedKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if pkg == nil {
@@ -60,7 +95,18 @@ func (h *BaseTransferHandler) ValidateTransferPackage(
 		return nil, err
 	}
 
-	return h.validateKeyTweakShares(leafTweaksMap)
+	validated, err := h.validateKeyTweakShares(leafTweaksMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if !proofSource.isCoordinator && !(proofSource.allowAbsentProofs && len(proofSource.proofs) == 0) {
+		if err := verifySenderKeyTweakProofsMatch(validated, proofSource.proofs); err != nil {
+			return nil, err
+		}
+	}
+
+	return validated, nil
 }
 
 // transferLeafLimit returns the per-transfer leaf limit, runtime-configurable
@@ -318,9 +364,11 @@ func verifyTransferPackageSignature(
 }
 
 // validatedKeyTweak is a sender key tweak that has passed this SO's share
-// validation (Feldman check plus per-operator pubkey-share consistency).
-// The zero value is meaningless; the only construction site is
-// validateKeyTweakShares, so holding one is evidence of validation.
+// validation (Feldman check plus per-operator pubkey-share consistency) and,
+// on participants, ValidateTransferPackage's cross-operator proof comparison —
+// except through asParticipantDuringRollout with an absent proofs map, which
+// skips the comparison. The zero value is meaningless; the only construction
+// site is validateKeyTweakShares, so holding one is evidence of validation.
 type validatedKeyTweak struct{ pb *pbspark.SendLeafKeyTweak }
 
 // Proto returns the tweak's wire encoding, which is also its persistence
@@ -330,9 +378,11 @@ func (v validatedKeyTweak) Proto() *pbspark.SendLeafKeyTweak { return v.pb }
 // validateKeyTweakShares runs the cryptographic validation on each decrypted
 // key tweak: this SO's sub-share must lie on the polynomial committed to by
 // the proofs (Feldman verification), and every per-operator pubkey share must
-// match the same polynomial's public evaluation at that operator's index (so
-// operators can't be handed mutually inconsistent commitments that all pass
-// local checks).
+// match that same polynomial's public evaluation at that operator's index.
+//
+// Both read the proofs out of the slice under test, so they establish only that
+// one slice is self-consistent, never that all operators got one polynomial —
+// that is ValidateTransferPackage's cross-operator comparison.
 func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*pbspark.SendLeafKeyTweak) (map[string]validatedKeyTweak, error) {
 	validated := make(map[string]validatedKeyTweak, len(leafTweaksMap))
 	for leafID, leafTweak := range leafTweaksMap {

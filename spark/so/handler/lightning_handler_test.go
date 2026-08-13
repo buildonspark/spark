@@ -219,7 +219,7 @@ func TestLightningHandlersRejectNilRequests(t *testing.T) {
 		{
 			name: "GetPreimageShare",
 			call: func() error {
-				_, err := handler.GetPreimageShare(ctx, nil, nil, nil, nil)
+				_, err := handler.GetPreimageShare(ctx, nil, nil, nil, nil, nil)
 				return err
 			},
 		},
@@ -266,7 +266,7 @@ func TestGetPreimageShareRejectsMissingTransfer(t *testing.T) {
 
 	resp, err := handler.GetPreimageShare(t.Context(), &pb.InitiatePreimageSwapRequest{
 		ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-	}, nil, nil, nil)
+	}, nil, nil, nil, nil)
 
 	require.Nil(t, resp)
 	require.ErrorContains(t, err, "transfer_request is required")
@@ -3177,7 +3177,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 	t.Run("participant GetPreimageShare resolves and validates a send request", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
-		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 		// Past resolution and into amount validation — only the missing node stops it.
 		require.ErrorContains(t, err, "leaves but only")
 	})
@@ -3191,7 +3191,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 			SigningNonceCommitment: &pbcommon.SigningCommitment{},
 		}}, 0, 0)
 		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
-		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 		require.ErrorContains(t, err, "unable to get cpfpTransaction tree_node")
 	})
 
@@ -3199,7 +3199,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
 		req.ReceiverIdentityPublicKey = ownerPrivKey.Public().Serialize()
-		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 		require.ErrorContains(t, err, "receiver identity public key mismatch")
 	})
 
@@ -3207,7 +3207,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		flowHandler := NewInitiatePreimageSwapFlowHandler(config)
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
-		_, err := flowHandler.prepareState(ctx, req)
+		_, err := flowHandler.prepareState(ctx, req, nil)
 		require.ErrorContains(t, err, "leaves but only")
 	})
 

@@ -181,7 +181,7 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unrecognized preimage swap reason %d", r))
 	}
 
-	state, err := h.prepareState(ctx, req)
+	state, err := h.prepareState(ctx, req, prepareReq.GetSenderKeyTweakProofs())
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 // enforced the strict direct-tx check up front (initiatePreimageSwap passes
 // requireDirectTx=true) so participants could trust it; under 2PC Prepare is the
 // only createTransfer call site, so the check lives here on every SO.
-func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*preimageSwapPreparedState, error) {
+func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, senderKeyTweakProofs map[string]*pbspark.SecretProof) (*preimageSwapPreparedState, error) {
 	inputs, normErr := preimageSwapInputsFromRequest(req)
 	if normErr != nil {
 		return nil, normErr
@@ -334,7 +334,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 
 	var keyTweakMap map[string]validatedKeyTweak
 	if req.GetTransferRequest() != nil {
-		keyTweakMap, err = h.transfer.ValidateTransferPackage(ctx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false)
+		keyTweakMap, err = h.transfer.ValidateTransferPackage(ctx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asParticipantDuringRollout(senderKeyTweakProofs))
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
 		}

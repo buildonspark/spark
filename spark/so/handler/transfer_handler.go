@@ -248,7 +248,7 @@ func (h *TransferHandler) startTransferInternal(
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid transfer id: %w", err))
 	}
-	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), reqOwnerIdentityPubKey, !transferType.IsSwap())
+	leafTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), reqOwnerIdentityPubKey, !transferType.IsSwap(), asCoordinator())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", transferID, err)
 	}
@@ -1895,7 +1895,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if transfer.Status != st.TransferStatusSenderInitiated {
 		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in state %s; expected sender initiated status", transferID, transfer.Status))
 	}
-	coordinatorKeyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderPubkey, !transfer.Type.IsSwap())
+	coordinatorKeyTweakMap, err := h.ValidateTransferPackage(ctx, transferID, req.GetTransferPackage(), senderPubkey, !transfer.Type.IsSwap(), asCoordinator())
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package: %w", err)
 	}

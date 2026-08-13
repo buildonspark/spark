@@ -232,7 +232,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
-	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIDPubKey, false); err != nil {
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIDPubKey, false, asParticipantDuringRollout(reqWithSignature.GetSenderKeyTweakProofs())); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 
@@ -404,7 +404,7 @@ func (h *StaticDepositInternalHandler) CreateInstantStaticDepositUtxoSwap(ctx co
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 	transferHandler := NewBaseTransferHandler(h.config)
-	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIDPubKey, false); err != nil {
+	if _, err := transferHandler.ValidateTransferPackage(ctx, transferID, req.GetTransfer().GetTransferPackage(), reqTransferOwnerIDPubKey, false, asParticipantDuringRollout(reqWithSignature.GetSenderKeyTweakProofs())); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 
