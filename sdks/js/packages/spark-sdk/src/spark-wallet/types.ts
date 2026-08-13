@@ -39,6 +39,11 @@ export type GetLightningReceiveQuoteParams = {
    * NET, which would invoice for more than was asked for.
    */
   amountBasis?: ReceiveQuoteAmountBasis;
+  /**
+   * Partner JWT to attribute the quote to. Without one the SSP quotes feeless,
+   * reporting why in `attributionStatus`; a rejected token is never an error.
+   */
+  partnerJwt?: string;
 };
 
 /**
@@ -52,7 +57,8 @@ export type GetLightningReceiveQuoteParams = {
 export type LightningReceiveQuote = {
   serializedManifest: string;
   issuerSignature: string;
-  attributionStatus: string;
+  /** Absent on a quote rebuilt from its wire values; advisory either way. */
+  attributionStatus?: string;
   manifest: TransferManifest;
   amountSats: number;
   amountBasis: ReceiveQuoteAmountBasis;

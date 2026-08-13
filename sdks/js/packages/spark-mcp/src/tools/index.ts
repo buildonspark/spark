@@ -16,6 +16,11 @@ import {
   handleListTransfers,
 } from "./transfers.js";
 import {
+  handleCreateInvoiceFromQuote,
+  handleCreateQuotedInvoice,
+  handleLightningReceiveQuote,
+} from "./receive-quote.js";
+import {
   handleCreateInvoice,
   handlePayInvoice,
   handleGetLightningFeeEstimate,
@@ -481,6 +486,171 @@ export function registerAllTools(
     }) =>
       handleGetLightningFeeEstimate(
         invoice,
+        mnemonic,
+        makeResolve(network),
+        output,
+      ),
+  );
+
+  // Quoted receive tools. Both the split and one-shot forms ship: an agent
+  // almost always wants the one-shot, but reusing a quote must be refused, and
+  // only the split form can attempt that.
+  server.tool(
+    "spark_lightning_receive_quote",
+    "Request a Lightning receive fee quote from the SSP. Returns the signed manifest (echo it back verbatim), the issuer signature, the fee breakdown and the attribution status. Does NOT create an invoice — pass the result to spark_create_invoice_from_quote, or use spark_create_quoted_invoice to do both at once.",
+    {
+      amountSats: z
+        .number()
+        .int()
+        .positive()
+        .describe("Amount in satoshis, interpreted per amountBasis"),
+      amountBasis: z
+        .enum(["NET", "GROSS"])
+        .optional()
+        .describe(
+          "Whether amountSats is the receiver's net (default) or the invoice total. GROSS requires an SSP schema exposing amount_basis.",
+        ),
+      partnerJwt: z
+        .string()
+        .optional()
+        .describe(
+          "Partner JWT to attribute the quote to. Without one the quote comes back feeless and attributionStatus says why.",
+        ),
+      mnemonic: mnemonicParam,
+      network: networkParam,
+      output: outputParam,
+    },
+    ({
+      amountSats,
+      amountBasis,
+      partnerJwt,
+      mnemonic,
+      network,
+      output,
+    }: {
+      amountSats: number;
+      amountBasis?: string;
+      partnerJwt?: string;
+      mnemonic?: string;
+      network?: string;
+      output?: OutputMode;
+    }) =>
+      handleLightningReceiveQuote(
+        amountSats,
+        amountBasis,
+        partnerJwt,
+        mnemonic,
+        makeResolve(network),
+        output,
+      ),
+  );
+  server.tool(
+    "spark_create_invoice_from_quote",
+    "Create the Lightning invoice for a quote from spark_lightning_receive_quote. Pass serializedManifest and issuerSignature back exactly as returned. Reusing the same quote is refused, and quotes expire after a few minutes.",
+    {
+      serializedManifest: z
+        .string()
+        .describe("serializedManifest from the quote, verbatim hex"),
+      issuerSignature: z
+        .string()
+        .describe("issuerSignature from the quote, verbatim hex"),
+      amountSats: z
+        .number()
+        .int()
+        .positive()
+        .describe("The amount the quote was requested for"),
+      amountBasis: z
+        .enum(["NET", "GROSS"])
+        .optional()
+        .describe("The basis the quote was requested with"),
+      memo: z.string().optional().describe("Optional payment description"),
+      mnemonic: mnemonicParam,
+      network: networkParam,
+      output: outputParam,
+    },
+    ({
+      serializedManifest,
+      issuerSignature,
+      amountSats,
+      amountBasis,
+      memo,
+      mnemonic,
+      network,
+      output,
+    }: {
+      serializedManifest: string;
+      issuerSignature: string;
+      amountSats: number;
+      amountBasis?: string;
+      memo?: string;
+      mnemonic?: string;
+      network?: string;
+      output?: OutputMode;
+    }) =>
+      handleCreateInvoiceFromQuote(
+        serializedManifest,
+        issuerSignature,
+        amountSats,
+        amountBasis,
+        memo,
+        mnemonic,
+        makeResolve(network),
+        output,
+      ),
+  );
+  server.tool(
+    "spark_create_quoted_invoice",
+    [
+      "Quote a Lightning receive, sign the manifest and issue the invoice in one step — the usual way to create a fee-quoted invoice.",
+      "",
+      "This creates the invoice only. PAYING it is the counterparty's job and is out of scope for this server, which stays Spark-scoped — drive your own Lightning node.",
+      "If that node is the external lnd on a minikube LOCAL stack, two things will otherwise cost you a round trip: it runs with --lnddir=/data, so a plain lncli dies on a missing /root/.lnd/tls.cert, and payinvoice needs --force to be non-interactive.",
+    ].join("\n"),
+    {
+      amountSats: z
+        .number()
+        .int()
+        .positive()
+        .describe("Amount in satoshis, interpreted per amountBasis"),
+      amountBasis: z
+        .enum(["NET", "GROSS"])
+        .optional()
+        .describe(
+          "Whether amountSats is the receiver's net (default) or the invoice total",
+        ),
+      memo: z.string().optional().describe("Optional payment description"),
+      partnerJwt: z
+        .string()
+        .optional()
+        .describe(
+          "Partner JWT to attribute the quote to. Without one the invoice is feeless.",
+        ),
+      mnemonic: mnemonicParam,
+      network: networkParam,
+      output: outputParam,
+    },
+    ({
+      amountSats,
+      amountBasis,
+      memo,
+      partnerJwt,
+      mnemonic,
+      network,
+      output,
+    }: {
+      amountSats: number;
+      amountBasis?: string;
+      memo?: string;
+      partnerJwt?: string;
+      mnemonic?: string;
+      network?: string;
+      output?: OutputMode;
+    }) =>
+      handleCreateQuotedInvoice(
+        amountSats,
+        amountBasis,
+        memo,
+        partnerJwt,
         mnemonic,
         makeResolve(network),
         output,

@@ -205,6 +205,14 @@ Funding tools (`spark_fund_address`, `spark_deposit`) only work on the `LOCAL` n
 | `spark_pay_invoice`                | Pay a BOLT11 invoice                                     |
 | `spark_get_lightning_fee_estimate` | Estimate the fee for paying an invoice before committing |
 
+### Fee-quoted Lightning receives
+
+| Tool                              | Description                                                           |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `spark_create_quoted_invoice`     | Quote a receive, sign the manifest and issue the invoice in one step  |
+| `spark_lightning_receive_quote`   | Request a quote and inspect its manifest, fees and attribution status |
+| `spark_create_invoice_from_quote` | Create the invoice for a previously issued quote                      |
+
 ### Withdrawals (Spark → Bitcoin L1)
 
 | Tool                             | Description                                                 |

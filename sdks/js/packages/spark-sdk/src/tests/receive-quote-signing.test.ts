@@ -101,6 +101,7 @@ function walletWithSigner() {
     getLightningReceiveQuote: (params: {
       amountSats: number;
       amountBasis?: ReceiveQuoteAmountBasis;
+      partnerJwt?: string;
     }) => Promise<LightningReceiveQuote>;
     signReceiveQuote: (params: {
       quote: LightningReceiveQuote;
@@ -370,17 +371,19 @@ describe("requesting a receive quote", () => {
     expect(quote.attributionStatus).toBe("ATTRIBUTED");
   });
 
-  it("passes an explicit basis through to the SSP", async () => {
+  it("passes an explicit basis and partner token through to the SSP", async () => {
     const { wallet, quoteCalls } = walletWithSigner();
 
     await wallet.getLightningReceiveQuote({
       amountSats: 100_000,
       amountBasis: ReceiveQuoteAmountBasis.GROSS,
+      partnerJwt: "token",
     });
 
     expect(quoteCalls[0]).toMatchObject({
       amountSats: 100_000,
       amountBasis: ReceiveQuoteAmountBasis.GROSS,
+      partnerJwt: "token",
     });
   });
 

@@ -148,6 +148,7 @@ import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { parseCompressedPublicKeyHex } from "../utils/keys.js";
 import { signSerializedTransferManifest } from "../utils/manifest-signing.js";
 import {
+  ATTRIBUTED_STATUS,
   manifestFeeSats,
   manifestGrossSats,
   ReceiveQuoteAmountBasis,
@@ -3628,16 +3629,19 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   /**
    * Requests a fee quote for a Lightning receive. The quote is short-lived, so
-   * request it immediately before signing it.
+   * request it immediately before signing it. Quote calls on one wallet are
+   * serialized, since the partner token has no per-request channel.
    *
    * @param {Object} params - Parameters for the quote
    * @param {number} params.amountSats - Amount in satoshis, interpreted per amountBasis
    * @param {ReceiveQuoteAmountBasis} [params.amountBasis] - Whether amountSats is the receiver's net (default) or the invoice total
+   * @param {string} [params.partnerJwt] - Optional partner JWT; without one the quote comes back feeless
    * @returns {Promise<LightningReceiveQuote>} The quote, to be echoed back verbatim
    */
   public async getLightningReceiveQuote({
     amountSats,
     amountBasis = ReceiveQuoteAmountBasis.NET,
+    partnerJwt,
   }: GetLightningReceiveQuoteParams): Promise<LightningReceiveQuote> {
     const sspClient = this.getSspClient();
 
@@ -3653,6 +3657,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amountSats,
       network: this.toBitcoinNetwork(),
       amountBasis,
+      partnerJwt,
     });
 
     if (!quote) {
@@ -3661,13 +3666,25 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
+    const manifest = TransferManifest.decode(
+      hexToBytes(quote.issuedQuote.serializedManifest),
+    );
+
+    // A rejected partner token is deliberately not an error, so without this the
+    // only trace of lost attribution is a return field a caller may never read.
+    // Keyed on the status rather than a zero fee: a genuinely attributed markup
+    // floor-divides to zero on small amounts, which would warn on success.
+    if (partnerJwt && quote.attributionStatus !== ATTRIBUTED_STATUS) {
+      this.logger.warn(
+        `Partner token did not attribute a fee: ${quote.attributionStatus}`,
+      );
+    }
+
     return {
       serializedManifest: quote.issuedQuote.serializedManifest,
       issuerSignature: quote.issuedQuote.issuerSignature,
       attributionStatus: quote.attributionStatus,
-      manifest: TransferManifest.decode(
-        hexToBytes(quote.issuedQuote.serializedManifest),
-      ),
+      manifest,
       amountSats,
       amountBasis,
     };
