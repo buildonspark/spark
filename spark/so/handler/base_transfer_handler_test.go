@@ -1656,7 +1656,7 @@ func TestValidateTransferPackage_DuplicateLeafID(t *testing.T) {
 		},
 	}
 
-	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false, asCoordinator())
 	require.Error(t, err)
 	require.ErrorContains(t, err, "duplicate leaf id in LeavesToSend")
 }
@@ -1735,7 +1735,7 @@ func TestValidateTransferPackage_RejectsNilRefundJobEntries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var err error
 			require.NotPanics(t, func() {
-				_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), tt.pkg, keys.GeneratePrivateKey().Public(), false)
+				_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), tt.pkg, keys.GeneratePrivateKey().Public(), false, asCoordinator())
 			})
 			require.ErrorContains(t, err, tt.expectedErr)
 		})
@@ -1760,7 +1760,7 @@ func TestValidateTransferPackage_OrphanDirectLeaf(t *testing.T) {
 		},
 	}
 
-	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false, asCoordinator())
 	require.Error(t, err)
 	require.ErrorContains(t, err, "orphan leaf in DirectLeavesToSend")
 }
@@ -1778,13 +1778,13 @@ func TestValidateTransferPackage_MissingDirectFromCpfpLeaves(t *testing.T) {
 	}
 
 	// When requireDirectFromCpfpLeaves is true, missing DirectFromCpfpLeavesToSend should fail.
-	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), true)
+	_, err := h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), true, asCoordinator())
 	require.Error(t, err)
 	require.ErrorContains(t, err, "mismatched number of leaves")
 
 	// When requireDirectFromCpfpLeaves is false (swap), missing DirectFromCpfpLeavesToSend is allowed.
 	// The error should NOT be about mismatched leaves (it may fail later on other validation).
-	_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false)
+	_, err = h.ValidateTransferPackage(t.Context(), uuid.New(), pkg, keys.GeneratePrivateKey().Public(), false, asCoordinator())
 	if err != nil {
 		require.NotContains(t, err.Error(), "mismatched number of leaves")
 	}

@@ -277,7 +277,7 @@ func (h *SwapPrimaryTransferFlowHandler) Prepare(ctx context.Context, op proto.M
 	if err != nil {
 		return nil, err
 	}
-	_, leafMap, err := h.prepareSwapTransfer(ctx, parsed, st.TransferTypePrimarySwapV3, uuid.Nil)
+	_, leafMap, err := h.prepareSwapTransfer(ctx, parsed, st.TransferTypePrimarySwapV3, uuid.Nil, req.GetSenderKeyTweakProofs())
 	if err != nil {
 		return nil, err
 	}
@@ -294,8 +294,9 @@ func (h *SendTransferFlowHandler) prepareSwapTransfer(
 	parsed parsedSwapTransferRequest,
 	transferType st.TransferType,
 	primaryTransferID uuid.UUID,
+	senderKeyTweakProofs map[string]*pb.SecretProof,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.transferReq.GetTransferPackage(), parsed.senderIDPK, false)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, parsed.transferID, parsed.transferReq.GetTransferPackage(), parsed.senderIDPK, false, asParticipantDuringRollout(senderKeyTweakProofs))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", parsed.transferID, err)
 	}

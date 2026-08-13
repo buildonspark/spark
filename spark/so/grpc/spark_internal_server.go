@@ -99,15 +99,18 @@ func (s *SparkInternalServer) FinalizeExtendLeaf(_ context.Context, _ *pb.Finali
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+// The v1 wire shape is the bare public request, which cannot carry the
+// coordinator's sender key tweak proofs — only V2 callers get the
+// cross-operator check.
 func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err
 }
 
 func (s *SparkInternalServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req.GetRequest(), req.GetCpfpRefundSignatures(), req.GetDirectRefundSignatures(), req.GetDirectFromCpfpRefundSignatures())
+	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req.GetRequest(), req.GetCpfpRefundSignatures(), req.GetDirectRefundSignatures(), req.GetDirectFromCpfpRefundSignatures(), req.GetSenderKeyTweakProofs())
 	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err
 }
 

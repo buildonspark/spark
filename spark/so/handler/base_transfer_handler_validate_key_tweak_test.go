@@ -108,6 +108,7 @@ func TestValidateTransferPackage_MissingKeyTweakForRefundLeaf(t *testing.T) {
 		pkg,
 		senderPrivKey.Public(),
 		false,
+		asCoordinator(),
 	)
 
 	require.Error(t, err)
@@ -146,6 +147,7 @@ func TestValidateTransferPackage_AllLeavesHaveKeyTweaks(t *testing.T) {
 		pkg,
 		senderPrivKey.Public(),
 		false,
+		asCoordinator(),
 	)
 
 	require.NoError(t, err)
@@ -189,6 +191,7 @@ func TestValidateTransferPackage_MismatchedKeyTweakLeafID(t *testing.T) {
 		pkg,
 		senderPrivKey.Public(),
 		false,
+		asCoordinator(),
 	)
 
 	require.Error(t, err)
@@ -228,6 +231,7 @@ func TestValidateTransferPackage_ExtraKeyTweakForUnknownLeaf(t *testing.T) {
 		pkg,
 		senderPrivKey.Public(),
 		false,
+		asCoordinator(),
 	)
 
 	require.Error(t, err)
@@ -329,6 +333,7 @@ func TestValidateTransferPackage_PubkeyShareTweakMismatch(t *testing.T) {
 				pkg,
 				senderPrivKey.Public(),
 				false,
+				asCoordinator(),
 			)
 
 			require.Error(t, err)
@@ -363,6 +368,7 @@ func TestValidateTransferPackage_RejectsDuplicateEncryptedKeyTweakLeafID(t *test
 		pkg,
 		senderPrivKey.Public(),
 		false,
+		asCoordinator(),
 	)
 
 	require.Error(t, err)
@@ -423,7 +429,7 @@ func TestValidateTransferPackage_NilPackageIsNoop(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	h := NewBaseTransferHandler(cfg)
 
-	tweaksMap, err := h.ValidateTransferPackage(t.Context(), uuid.New(), nil, keys.Public{}, false)
+	tweaksMap, err := h.ValidateTransferPackage(t.Context(), uuid.New(), nil, keys.Public{}, false, asCoordinator())
 
 	require.NoError(t, err)
 	assert.Nil(t, tweaksMap)
@@ -440,7 +446,7 @@ func TestValidateTransferPackage_EmptyKeyTweakPackage(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "key tweak package is empty")
@@ -458,7 +464,7 @@ func TestValidateTransferPackage_EmptyUserSignature(t *testing.T) {
 	// Deliberately not signed.
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "user signature cannot be empty")
@@ -477,7 +483,7 @@ func TestValidateTransferPackage_WrongSigner(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, otherPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to verify user signature")
@@ -501,7 +507,7 @@ func TestValidateTransferPackage_NoKeyTweaksForThisOperator(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no key tweaks found for SO")
@@ -519,7 +525,7 @@ func TestValidateTransferPackage_UndecryptableKeyTweaks(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decrypt key tweaks")
@@ -542,7 +548,7 @@ func TestValidateTransferPackage_TooManyLeaves(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "too many leaves to send")
@@ -563,7 +569,7 @@ func TestValidateTransferPackage_InvalidSecretShare(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to validate share")
@@ -586,7 +592,7 @@ func TestValidateTransferPackage_MissingPubkeyShareForOperator(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pubkey share tweak missing for operator")
@@ -609,7 +615,7 @@ func TestValidateTransferPackage_AcceptsValidTypedSignature(t *testing.T) {
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	tweaksMap, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	tweaksMap, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.NoError(t, err)
 	typed := tweaksMap[leafID.String()].Proto().GetTypedSignature()
@@ -634,7 +640,7 @@ func TestValidateTransferPackage_RejectsTypedSignatureWithUnspecifiedScheme(t *t
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid typed signature")
@@ -657,7 +663,7 @@ func TestValidateTransferPackage_RejectsTypedSignatureWithUndefinedScheme(t *tes
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid typed signature")
@@ -679,7 +685,7 @@ func TestValidateTransferPackage_RejectsTypedSignatureWithEmptyBytes(t *testing.
 	signTransferPackage(t, pkg, transferID, senderPrivKey)
 
 	h := NewBaseTransferHandler(cfg)
-	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false)
+	_, err := h.ValidateTransferPackage(t.Context(), transferID, pkg, senderPrivKey.Public(), false, asCoordinator())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid typed signature")

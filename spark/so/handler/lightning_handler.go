@@ -1255,6 +1255,7 @@ func (h *LightningHandler) GetPreimageShare(
 	cpfpRefundSignatures map[string][]byte,
 	directRefundSignatures map[string][]byte,
 	directFromCpfpRefundSignatures map[string][]byte,
+	senderKeyTweakProofs map[string]*pbspark.SecretProof,
 ) (preimageShareBytes []byte, retErr error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
@@ -1395,7 +1396,7 @@ func (h *LightningHandler) GetPreimageShare(
 		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.GetPreimageShare.buildHTLCRefunds", spanOpt)
 		buildErr := func() error {
 			var err error
-			keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false)
+			keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asParticipantDuringRollout(senderKeyTweakProofs))
 			if err != nil {
 				return fmt.Errorf("unable to validate transfer package: %w", err)
 			}
@@ -1872,7 +1873,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pbspar
 		buildCtx, buildSpan := tracer.Start(ctx, "LightningHandler.initiatePreimageSwap.buildHTLCRefunds", spanOpt)
 		buildErr := func() error {
 			var err error
-			keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false)
+			keyTweakMap, err = transferHandler.ValidateTransferPackage(buildCtx, transferID, req.GetTransferRequest().GetTransferPackage(), ownerIdentityPubKey, false, asCoordinator())
 			if err != nil {
 				return fmt.Errorf("unable to validate transfer package: %w", err)
 			}
