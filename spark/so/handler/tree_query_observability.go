@@ -11,7 +11,10 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 )
 
-const ancestorChainPathLegacy = "legacy"
+const (
+	ancestorChainPathLegacy  = "legacy"
+	ancestorChainPathBatched = "batched"
+)
 
 var ancestorChainDuration metric.Float64Histogram
 var ancestorChainAdditionalNodeCount metric.Float64Histogram
@@ -59,11 +62,9 @@ func newAncestorChainAdditionalNodeCountHistogram() metric.Float64Histogram {
 }
 
 // additionalAncestorNodeCount returns how many entries in protoNodeMap are not in
-// requestedNodeIDs. It counts by membership rather than by len(protoNodeMap)-len(requestedNodeIDs):
-// on an early error, protoNodeMap is only ever partially populated (the request loop hasn't
-// reached every requested node yet) while requestedNodeIDs is prepopulated with every requested
-// node up front, so a size-difference shortcut can go negative. Membership counting stays correct
-// and non-negative regardless of how far the request got.
+// requestedNodeIDs. Counting by membership rather than by size difference keeps an ancestor that
+// the caller had also asked for by ID out of the total, so the metric reflects what the walk
+// actually discovered.
 func additionalAncestorNodeCount(protoNodeMap map[string]*pb.TreeNode, requestedNodeIDs map[string]struct{}) int {
 	count := 0
 	for id := range protoNodeMap {

@@ -183,6 +183,16 @@ const (
 	// transfer.
 	KnobMpcTransferEnabled = "spark.so.mpc_transfer.enabled"
 
+	// KnobUseBatchedAncestorChain routes QueryNodes' include_parents resolution through a
+	// recursive-CTE query instead of the per-hop getAncestorChain walk. Interpreted as a
+	// percentage (RolloutRandom), deliberately: both paths record into the same
+	// spark_tree_query_ancestor_chain_* histograms under a "path" label, so a split below 100
+	// has the two implementations serving a random sample of the same traffic in the same
+	// window. A binary flip would instead compare separate time periods, where a shift in
+	// request size — ancestor count per request ranges from 0 to several hundred — is
+	// indistinguishable from a change in the code.
+	KnobUseBatchedAncestorChain = "spark.so.use_batched_ancestor_chain"
+
 	// KnobUseConsensusInitiatePreimageSwap routes InitiatePreimageSwapV3 through
 	// the 2PC engine instead of the legacy initiatePreimageSwap fanout
 	// (InitiatePreimageSwapV2 -> GetPreimageShare) + PreimageSwap gossip.

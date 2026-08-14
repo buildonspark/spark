@@ -21,6 +21,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestTreeQueryHandlersRejectNilRequests(t *testing.T) {
@@ -1247,4 +1248,323 @@ func TestQueryBalance_NoSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint64(0), resp.GetBalance(), "Balance should be 0 when no session is provided and privacy is enabled")
 	assert.Empty(t, resp.GetNodeBalances(), "NodeBalances should be empty when no session is provided and privacy is enabled")
+}
+
+// getAncestorChainsBatched parity tests use db.ConnectToTestPostgres, since the batched walk's
+// raw SQL isn't SQLite-compatible; they're skipped when SKIP_POSTGRES_TESTS is set.
+
+func createBatchedTestTreeAndKeyshare(t *testing.T, ctx context.Context, tx *ent.Client, rng *rand.ChaCha8, owner keys.Public, network btcnetwork.Network) (*ent.Tree, *ent.SigningKeyshare) {
+	t.Helper()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secretShare).
+		SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(owner).
+		SetNetwork(network).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return tree, keyshare
+}
+
+func createBatchedTestNode(
+	t *testing.T,
+	ctx context.Context,
+	tx *ent.Client,
+	rng *rand.ChaCha8,
+	tree *ent.Tree,
+	parent *ent.TreeNode,
+	keyshare *ent.SigningKeyshare,
+	owner keys.Public,
+	createTime time.Time,
+	value uint64,
+	vout int16,
+) *ent.TreeNode {
+	t.Helper()
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	rawTx := createOldBitcoinTxBytes(t, verifyingPubKey)
+	refundTx := createOldBitcoinTxBytes(t, signingPubKey)
+
+	create := tx.TreeNode.Create().
+		SetCreateTime(createTime).
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(owner).
+		SetOwnerSigningPubkey(signingPubKey).
+		SetValue(value).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetSigningKeyshare(keyshare).
+		SetRawTx(rawTx).
+		SetRawRefundTx(refundTx).
+		SetDirectTx(rawTx).
+		SetDirectRefundTx(refundTx).
+		SetDirectFromCpfpRefundTx(refundTx).
+		SetVout(vout)
+	if parent != nil {
+		create = create.SetParent(parent)
+	}
+	node, err := create.Save(ctx)
+	require.NoError(t, err)
+	return node
+}
+
+// requireTreeNodeMapsEqual compares key-by-key with proto.Equal; generated proto messages carry
+// internal state that isn't safe to compare via a whole-map reflect.DeepEqual.
+func requireTreeNodeMapsEqual(t *testing.T, expected, actual map[string]*pb.TreeNode) {
+	t.Helper()
+	require.Len(t, actual, len(expected))
+	for id, expectedNode := range expected {
+		actualNode, ok := actual[id]
+		require.True(t, ok, "expected node %s to be present", id)
+		assert.True(t, proto.Equal(expectedNode, actualNode), "node %s mismatch:\nexpected: %v\nactual:   %v", id, expectedNode, actualNode)
+	}
+}
+
+// legacyAncestorChain runs getAncestorChain over each node into one shared map, exactly as
+// QueryNodes' non-batched path does — the baseline the batched implementation must match.
+func legacyAncestorChain(t *testing.T, ctx context.Context, dbClient *ent.Client, nodes []*ent.TreeNode, isSSP bool) map[string]*pb.TreeNode {
+	t.Helper()
+	legacyMap := make(map[string]*pb.TreeNode)
+	for _, node := range nodes {
+		require.NoError(t, getAncestorChain(ctx, dbClient, node, legacyMap, isSSP))
+	}
+	return legacyMap
+}
+
+// compareBatchedToLegacy asserts both paths agree and returns the batched result for further
+// test-specific assertions.
+func compareBatchedToLegacy(t *testing.T, ctx context.Context, dbClient *ent.Client, nodes []*ent.TreeNode, isSSP bool) map[string]*pb.TreeNode {
+	t.Helper()
+	legacyMap := legacyAncestorChain(t, ctx, dbClient, nodes, isSSP)
+	batchedMap, err := getAncestorChainsBatched(ctx, dbClient, nodes, isSSP)
+	require.NoError(t, err)
+	requireTreeNodeMapsEqual(t, legacyMap, batchedMap)
+	return batchedMap
+}
+
+func TestGetAncestorChainsBatched_ConvergingSiblings(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{10})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	postCutoff := ancestorChainRootSkipCutoff.Add(time.Hour)
+
+	tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Mainnet)
+	root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, postCutoff, 400000, 0)
+	branch := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, postCutoff, 300000, 0)
+	leafA := createBatchedTestNode(t, ctx, tc.Client, rng, tree, branch, keyshare, owner, postCutoff, 100000, 0)
+	leafB := createBatchedTestNode(t, ctx, tc.Client, rng, tree, branch, keyshare, owner, postCutoff, 100000, 1)
+
+	requested := []*ent.TreeNode{leafA, leafB}
+	batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, requested, false)
+
+	require.Len(t, batchedMap, 2, "branch and root should each appear once, deduped across both leaves' paths")
+	assert.Contains(t, batchedMap, branch.ID.String())
+	assert.Contains(t, batchedMap, root.ID.String())
+}
+
+func TestGetAncestorChainsBatched_MultipleTrees(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{11})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	postCutoff := ancestorChainRootSkipCutoff.Add(time.Hour)
+
+	tree1, keyshare1 := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Regtest)
+	root1 := createBatchedTestNode(t, ctx, tc.Client, rng, tree1, nil, keyshare1, owner, postCutoff, 200000, 0)
+	leaf1 := createBatchedTestNode(t, ctx, tc.Client, rng, tree1, root1, keyshare1, owner, postCutoff, 100000, 0)
+
+	tree2, keyshare2 := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Regtest)
+	root2 := createBatchedTestNode(t, ctx, tc.Client, rng, tree2, nil, keyshare2, owner, postCutoff, 200000, 0)
+	leaf2 := createBatchedTestNode(t, ctx, tc.Client, rng, tree2, root2, keyshare2, owner, postCutoff, 100000, 0)
+
+	requested := []*ent.TreeNode{leaf1, leaf2}
+	batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, requested, false)
+
+	require.Len(t, batchedMap, 2, "each tree's root should be resolved independently")
+	assert.Contains(t, batchedMap, root1.ID.String())
+	assert.Contains(t, batchedMap, root2.ID.String())
+}
+
+func TestGetAncestorChainsBatched_RootSuppression_AllPreCutoff(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{12})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	preCutoff := ancestorChainRootSkipCutoff.Add(-time.Hour)
+
+	tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Mainnet)
+	root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, preCutoff, 300000, 0)
+	branch := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, preCutoff, 200000, 0)
+	leaf := createBatchedTestNode(t, ctx, tc.Client, rng, tree, branch, keyshare, owner, preCutoff, 100000, 0)
+
+	requested := []*ent.TreeNode{leaf}
+	batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, requested, false)
+
+	assert.NotContains(t, batchedMap, root.ID.String(), "root must be suppressed when its only touched direct child predates the cutoff")
+	assert.Contains(t, batchedMap, branch.ID.String(), "non-root ancestors are never suppressed")
+
+	// isSSP bypasses suppression entirely, same as getAncestorChain today.
+	sspBatchedMap, err := getAncestorChainsBatched(ctx, tc.Client, requested, true)
+	require.NoError(t, err)
+	assert.Contains(t, sspBatchedMap, root.ID.String(), "SSP callers must still see the root")
+}
+
+// TestGetAncestorChainsBatched_RootSuppression_DepthOneLeaf: the leaf's parent IS the root
+// directly, so the leaf itself (never in the hydrated ancestor set) must count toward suppression.
+func TestGetAncestorChainsBatched_RootSuppression_DepthOneLeaf(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{15})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	preCutoff := ancestorChainRootSkipCutoff.Add(-time.Hour)
+	postCutoff := ancestorChainRootSkipCutoff.Add(time.Hour)
+
+	tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Mainnet)
+	root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, preCutoff, 200000, 0)
+	preCutoffLeaf := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, preCutoff, 100000, 0)
+	postCutoffLeaf := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, postCutoff, 100000, 1)
+
+	preCutoffMap := compareBatchedToLegacy(t, ctx, tc.Client, []*ent.TreeNode{preCutoffLeaf}, false)
+	assert.NotContains(t, preCutoffMap, root.ID.String(), "root must be suppressed when the requesting leaf itself predates the cutoff")
+
+	postCutoffMap := compareBatchedToLegacy(t, ctx, tc.Client, []*ent.TreeNode{postCutoffLeaf}, false)
+	assert.Contains(t, postCutoffMap, root.ID.String(), "root must be kept when the requesting leaf itself postdates the cutoff")
+}
+
+// TestGetAncestorChainsBatched_RootSuppression_MixedSiblingsKeepsRoot: a root is kept if any one
+// touched path's direct-child-of-root is post-cutoff, even if another path alone would suppress it.
+func TestGetAncestorChainsBatched_RootSuppression_MixedSiblingsKeepsRoot(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{13})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	preCutoff := ancestorChainRootSkipCutoff.Add(-time.Hour)
+	postCutoff := ancestorChainRootSkipCutoff.Add(time.Hour)
+
+	tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Mainnet)
+	root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, preCutoff, 400000, 0)
+	branchA := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, preCutoff, 150000, 0)
+	branchB := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, postCutoff, 150000, 1)
+	leafA := createBatchedTestNode(t, ctx, tc.Client, rng, tree, branchA, keyshare, owner, preCutoff, 100000, 0)
+	leafB := createBatchedTestNode(t, ctx, tc.Client, rng, tree, branchB, keyshare, owner, postCutoff, 100000, 0)
+
+	// leafA alone: its only path's direct-child-of-root (branchA) is pre-cutoff, so the root
+	// is suppressed — matches today's single-leaf behavior.
+	aloneMap, err := getAncestorChainsBatched(ctx, tc.Client, []*ent.TreeNode{leafA}, false)
+	require.NoError(t, err)
+	assert.NotContains(t, aloneMap, root.ID.String(), "requesting leafA alone should suppress the root")
+
+	// leafA + leafB together: leafB's path (via branchB, post-cutoff) does not suppress, so the
+	// root is kept in the shared response — even though leafA's own path would suppress it.
+	requested := []*ent.TreeNode{leafA, leafB}
+	batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, requested, false)
+	assert.Contains(t, batchedMap, root.ID.String(), "root must be kept: branchB's path does not suppress it")
+}
+
+// TestGetAncestorChainsBatched_RootSuppression_GateConditions exercises each condition
+// shouldSuppressRootForChild ANDs together with the other held constant. The other suppression
+// tests move the timestamp a full hour either side of the cutoff on mainnet trees only, so
+// neither the network gate nor the exact cutoff ever decides the outcome on its own.
+func TestGetAncestorChainsBatched_RootSuppression_GateConditions(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{22})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	t.Run("pre-cutoff node on a non-mainnet tree keeps its root", func(t *testing.T) {
+		preCutoff := ancestorChainRootSkipCutoff.Add(-time.Hour)
+		tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Regtest)
+		root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, preCutoff, 200000, 0)
+		leaf := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, preCutoff, 100000, 0)
+
+		batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, []*ent.TreeNode{leaf}, false)
+		assert.Contains(t, batchedMap, root.ID.String(), "suppression needs the mainnet gate, not a pre-cutoff timestamp alone")
+	})
+
+	t.Run("node created exactly at the cutoff keeps its root", func(t *testing.T) {
+		tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Mainnet)
+		root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, ancestorChainRootSkipCutoff, 200000, 0)
+		leaf := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, ancestorChainRootSkipCutoff, 100000, 0)
+
+		batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, []*ent.TreeNode{leaf}, false)
+		assert.Contains(t, batchedMap, root.ID.String(), "the cutoff is exclusive: created exactly at it is not created before it")
+	})
+}
+
+// TestGetAncestorChainsBatched_RequestedNodeIsAncestorOfAnother covers a requested node that is
+// itself another requested node's ancestor.
+func TestGetAncestorChainsBatched_RequestedNodeIsAncestorOfAnother(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{14})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	postCutoff := ancestorChainRootSkipCutoff.Add(time.Hour)
+
+	tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Mainnet)
+	root := createBatchedTestNode(t, ctx, tc.Client, rng, tree, nil, keyshare, owner, postCutoff, 200000, 0)
+	leaf := createBatchedTestNode(t, ctx, tc.Client, rng, tree, root, keyshare, owner, postCutoff, 100000, 0)
+
+	// Both the root (already a top-level requested node) and the leaf are requested together.
+	requested := []*ent.TreeNode{root, leaf}
+	batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, requested, false)
+	require.Contains(t, batchedMap, root.ID.String())
+}
+
+// TestGetAncestorChainsBatched_DepthBoundErrors pins that a walk stopped by the depth bound fails
+// loudly. Returning the truncated chain instead would hand a wallet an incomplete unilateral exit
+// path, and getAncestorChain (which walks unbounded) would have returned the full one.
+func TestGetAncestorChainsBatched_DepthBoundErrors(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{21})
+	owner := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	postCutoff := ancestorChainRootSkipCutoff.Add(time.Hour)
+
+	originalMaxDepth := ancestorChainMaxDepth
+	ancestorChainMaxDepth = 2
+	t.Cleanup(func() { ancestorChainMaxDepth = originalMaxDepth })
+
+	// buildChain returns the deepest leaf of a chain of ancestorCount+1 nodes.
+	buildChain := func(t *testing.T, ancestorCount int) *ent.TreeNode {
+		t.Helper()
+		tree, keyshare := createBatchedTestTreeAndKeyshare(t, ctx, tc.Client, rng, owner, btcnetwork.Regtest)
+		var node *ent.TreeNode
+		for i := 0; i <= ancestorCount; i++ {
+			node = createBatchedTestNode(t, ctx, tc.Client, rng, tree, node, keyshare, owner, postCutoff, 100000, int16(i))
+		}
+		return node
+	}
+
+	t.Run("chain ending exactly at the bound is complete, not truncated", func(t *testing.T) {
+		// Deepest ancestor sits at depth == ancestorChainMaxDepth. The walk reached the root, so
+		// this must succeed even though it touched the bound.
+		leaf := buildChain(t, ancestorChainMaxDepth+1)
+		batchedMap := compareBatchedToLegacy(t, ctx, tc.Client, []*ent.TreeNode{leaf}, false)
+		assert.Len(t, batchedMap, ancestorChainMaxDepth+1, "every ancestor above the leaf is returned")
+	})
+
+	t.Run("chain past the bound errors instead of truncating", func(t *testing.T) {
+		leaf := buildChain(t, ancestorChainMaxDepth+2)
+
+		_, err := getAncestorChainsBatched(ctx, tc.Client, []*ent.TreeNode{leaf}, false)
+		require.Error(t, err, "a walk stopped by the depth bound must not return a truncated chain")
+		assert.Contains(t, err.Error(), "depth bound")
+
+		// The legacy path walks unbounded, so it still resolves the full chain.
+		legacyMap := legacyAncestorChain(t, ctx, tc.Client, []*ent.TreeNode{leaf}, false)
+		assert.Len(t, legacyMap, ancestorChainMaxDepth+2, "legacy resolves every ancestor above the leaf")
+	})
+}
+
+func TestGetAncestorChainsBatched_EmptyInput(t *testing.T) {
+	ctx, tc := db.ConnectToTestPostgres(t)
+	batchedMap, err := getAncestorChainsBatched(ctx, tc.Client, nil, false)
+	require.NoError(t, err)
+	assert.Empty(t, batchedMap)
 }
