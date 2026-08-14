@@ -454,6 +454,19 @@ export class BitcoinFaucet {
     return await this.call<string[]>("generatetoaddress", [numBlocks, address]);
   }
 
+  /**
+   * Mines a block containing the given raw transactions, bypassing mempool
+   * policy — node transactions are zero-fee CPFP packages that relay rejects on
+   * their own. Pass a chain parent-first; they are mined in order.
+   */
+  async generateBlockWithTxs(rawTxHexes: string[]) {
+    return await this.call<{ hash: string }>("generateblock", [
+      this.miningAddress,
+      rawTxHexes,
+      true,
+    ]);
+  }
+
   async sendToAddressInternal(address: string, amountSats: number) {
     return await this.call<string>("sendtoaddress", [
       address,

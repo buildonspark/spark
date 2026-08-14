@@ -179,6 +179,15 @@ func TreeNodeStatusSchema(status pbspark.TreeNodeStatus) (st.TreeNodeStatus, err
 		return st.TreeNodeStatusRenewLocked, nil
 	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_CONSOLIDATED:
 		return st.TreeNodeStatusConsolidated, nil
+	// The exit family. An owner has to be able to list their stranded leaves to
+	// recover them, and to tell the recovered ones apart afterwards, so these have
+	// to be reachable as query filters.
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_PARENT_EXITED:
+		return st.TreeNodeStatusParentExited, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_WATCHTOWER_EXITED:
+		return st.TreeNodeStatusWatchtowerExited, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED:
+		return st.TreeNodeStatusWatchtowerExitRecovered, nil
 	default:
 		return "", fmt.Errorf("unknown tree node status: %s", status)
 	}

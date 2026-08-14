@@ -316,6 +316,11 @@ func (s *SparkServer) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitSingl
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }
 
+func (s *SparkServer) RecoverWatchtowerExitedLeaf(ctx context.Context, req *pb.RecoverWatchtowerExitedLeafRequest) (*pb.RecoverWatchtowerExitedLeafResponse, error) {
+	recoverHandler := handler.NewRecoverWatchtowerExitedLeafFlowHandler(s.config)
+	return recoverHandler.RecoverWatchtowerExitedLeaf(ctx, req)
+}
+
 func (s *SparkServer) QueryNodesDistribution(ctx context.Context, req *pb.QueryNodesDistributionRequest) (*pb.QueryNodesDistributionResponse, error) {
 	return nil, errors.UnimplementedMethodDisabled(errDeprecated)
 }

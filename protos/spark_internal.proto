@@ -666,6 +666,31 @@ message StaticDepositUtxoRefundRollbackRequest {
     spark.UTXO on_chain_utxo = 1;
 }
 
+// RecoverWatchtowerExitedLeafPrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_RECOVER_WATCHTOWER_EXITED_LEAF 2PC flow: the public
+// request plus the coordinator's FROST round-1 commitments, so the public RPC
+// stays a single call. The owner identity is deliberately absent — each SO reads
+// it off its own leaf row, so a payload value cannot stand in for the real owner.
+message RecoverWatchtowerExitedLeafPrepareRequest {
+    spark.RecoverWatchtowerExitedLeafRequest original_request = 1;
+    map<string, common.SigningCommitment> signing_commitments = 2;
+}
+
+// RecoverWatchtowerExitedLeafCommitRequest is the 2PC commit payload. Prepare
+// already wrote WATCHTOWER_EXIT_RECOVERED, so commit only confirms the decision; the
+// leaf id lets each SO bind it to what it prepared.
+message RecoverWatchtowerExitedLeafCommitRequest {
+    string leaf_id = 1;
+}
+
+// RecoverWatchtowerExitedLeafRollbackRequest is the 2PC rollback payload. Each
+// SO returns the leaf to WATCHTOWER_EXITED. Idempotent: a leaf that is not
+// WATCHTOWER_EXIT_RECOVERED is left alone, so a redelivered rollback cannot disturb a
+// later attempt that has since re-recovered the same leaf.
+message RecoverWatchtowerExitedLeafRollbackRequest {
+    string leaf_id = 1;
+}
+
 // StaticDepositUtxoSwapPrepareRequest is the prepare op for the
 // CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP 2PC flow (the fixed-amount
 // static deposit claim). Wraps the internal-mirror

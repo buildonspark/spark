@@ -162,6 +162,7 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_SubscribeToEvents_FullMethodName:                   {AuthMode: AuthSession},
 		pbspark.SparkService_InitiateStaticDepositUtxoRefund_FullMethodName:     {AuthMode: AuthSession},
 		pbspark.SparkService_ExitSingleNodeTrees_FullMethodName:                 {AuthMode: AuthSession},
+		pbspark.SparkService_RecoverWatchtowerExitedLeaf_FullMethodName:         {AuthMode: AuthSession},
 		pbspark.SparkService_CooperativeExitV2_FullMethodName:                   {AuthMode: AuthSession},
 		pbspark.SparkService_ClaimTransferSignRefundsV2_FullMethodName:          {AuthMode: AuthSession},
 		pbspark.SparkService_FinalizeNodeSignaturesV2_FullMethodName:            {AuthMode: AuthSession},

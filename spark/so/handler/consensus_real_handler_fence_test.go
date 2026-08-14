@@ -114,6 +114,14 @@ func TestConsensusDecisionFence_RealHandlersFenceForeignPayload(t *testing.T) {
 			foreignCommit: &pbinternal.InitiatePreimageSwapCommitRequest{TransferId: foreignID},
 			foreignRoll:   &pbinternal.InitiatePreimageSwapRollbackRequest{TransferId: foreignID},
 		},
+		{
+			name:          "recover_watchtower_exited_leaf",
+			opType:        pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RECOVER_WATCHTOWER_EXITED_LEAF,
+			handler:       NewRecoverWatchtowerExitedLeafFlowHandler(cfg),
+			prepare:       &pbinternal.RecoverWatchtowerExitedLeafPrepareRequest{OriginalRequest: &pb.RecoverWatchtowerExitedLeafRequest{LeafId: preparedID}},
+			foreignCommit: &pbinternal.RecoverWatchtowerExitedLeafCommitRequest{LeafId: foreignID},
+			foreignRoll:   &pbinternal.RecoverWatchtowerExitedLeafRollbackRequest{LeafId: foreignID},
+		},
 	}
 
 	for _, tc := range cases {

@@ -206,6 +206,9 @@ import {
 
 const MAX_FALLBACK_CLAIM_BATCHES = 100;
 
+/** Floor for a single-input spend's absolute fee; below it, relay rejects. */
+const MIN_SPEND_TX_FEE_SATS = 194;
+
 type TransferWithInvoiceInternalParams = TransferWithInvoiceParams & {
   transferId?: string;
 };
@@ -2250,11 +2253,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       ? satsPerVbyteFee * getTxEstimatedVbytesSizeByNumberOfInputsOutputs(1, 1)
       : fee!;
 
-    if (finalFee < 194) {
-      throw new SparkValidationError("Fee must be at least 194", {
-        field: "fee",
-        value: finalFee,
-      });
+    if (finalFee < MIN_SPEND_TX_FEE_SATS) {
+      throw new SparkValidationError(
+        `Fee must be at least ${MIN_SPEND_TX_FEE_SATS}`,
+        {
+          field: "fee",
+          value: finalFee,
+        },
+      );
     }
 
     const network = this.config.getNetwork();
@@ -2415,6 +2421,225 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     });
 
     return await this.broadcastTx(txHex);
+  }
+
+  /**
+   * Co-signs a transaction spending the on-chain output left behind when a
+   * watchtower exit cut off one of your leaves.
+   *
+   * The value survives in an output only your key and the SE's can spend
+   * together, but no pre-signed transaction reaches it, so recovery needs a
+   * fresh signing round. The leaf is retired in the same operation.
+   *
+   * Call again with a higher fee to replace a recovery confirming too slowly:
+   * every recovery spends the same output, so at most one can confirm.
+   *
+   * @param {Object} params - The recovery parameters
+   * @param {string} params.leafId - The watchtower-exited leaf to recover
+   * @param {string} params.recoveryTxid - Txid of the confirmed ancestor
+   *   transaction holding the output. Must be one of the leaf's ancestors.
+   * @param {number} [params.outputIndex] - Which output of that transaction.
+   *   Defaults to the one paying the leaf's key.
+   * @param {string} params.destinationAddress - Where the recovered funds go
+   * @param {number} params.satsPerVbyteFee - Fee rate for the recovery tx
+   * @returns {Promise<string>} The signed transaction hex, ready to broadcast
+   */
+  public async recoverWatchtowerExitedLeaf({
+    leafId,
+    recoveryTxid,
+    outputIndex,
+    destinationAddress,
+    satsPerVbyteFee,
+  }: {
+    leafId: string;
+    recoveryTxid: string;
+    outputIndex?: number;
+    destinationAddress: string;
+    satsPerVbyteFee: number;
+  }): Promise<string> {
+    // Bounded, not capped: comparisons against NaN are false, so an unparsed
+    // fee would slip every guard below and throw inside BigInt().
+    if (!(satsPerVbyteFee > 0 && satsPerVbyteFee <= 150)) {
+      throw new SparkValidationError(
+        "satsPerVbyteFee must be between 0 and 150",
+        {
+          field: "satsPerVbyteFee",
+          value: satsPerVbyteFee,
+        },
+      );
+    }
+
+    const network = this.config.getNetwork();
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    // The ancestor chain carries the transaction being spent, so the wallet
+    // needs no explorer.
+    const nodesResponse = await sparkClient.query_nodes({
+      source: { $case: "nodeIds", nodeIds: { nodeIds: [leafId] } },
+      includeParents: true,
+      network: this.config.getNetworkProto(),
+    });
+
+    const leaf = nodesResponse.nodes[leafId];
+    if (!leaf) {
+      throw new SparkValidationError("Leaf not found", {
+        field: "leafId",
+        value: leafId,
+      });
+    }
+
+    const sourceTx = Object.values(nodesResponse.nodes)
+      .map((node) => node.directTx)
+      .filter((directTx) => directTx.length > 0)
+      .map((directTx) => getTxFromRawTxBytes(directTx))
+      // getTxId rather than tx.id: .id refuses to compute on the operator's
+      // stored unsigned transactions, though a txid does not commit to witness.
+      .find((tx) => getTxId(tx) === recoveryTxid);
+    if (!sourceTx) {
+      throw new SparkValidationError(
+        "recoveryTxid is not an ancestor transaction of this leaf",
+        { field: "recoveryTxid", value: recoveryTxid },
+      );
+    }
+
+    // The output the leaf can spend is the one paying its verifying key: the
+    // combined user + SE key, which renewal copies forward unchanged.
+    const leafScript = getP2TRScriptFromPublicKey(
+      leaf.verifyingPublicKey,
+      network,
+    );
+    outputIndex ??= findOutputPayingScript(sourceTx, leafScript);
+    if (outputIndex === undefined) {
+      throw new SparkValidationError(
+        "No output of that transaction pays this leaf's key",
+        { field: "recoveryTxid", value: recoveryTxid },
+      );
+    }
+
+    const prevOut = sourceTx.getOutput(outputIndex);
+    const prevOutAmount = prevOut.amount;
+    if (prevOutAmount === undefined) {
+      throw new SparkValidationError("Recoverable output has no amount", {
+        field: "outputIndex",
+        value: outputIndex,
+      });
+    }
+
+    // Rounded up rather than rejecting a fractional rate, which is a normal
+    // thing to ask for: a fractional fee leaves recoveredAmount fractional, and
+    // BigInt() rejects that with a RangeError naming nothing.
+    const fee = Math.ceil(
+      satsPerVbyteFee * getTxEstimatedVbytesSizeByNumberOfInputsOutputs(1, 1),
+    );
+    // Same floor refundStaticDeposit applies: below it the transaction signs
+    // fine and is then rejected at relay, a confusing place to learn the rate
+    // was too low.
+    if (fee < MIN_SPEND_TX_FEE_SATS) {
+      throw new SparkValidationError(
+        `Fee must be at least ${MIN_SPEND_TX_FEE_SATS}`,
+        { field: "fee", value: fee },
+      );
+    }
+    const recoveredAmount = Number(prevOutAmount) - fee;
+    if (recoveredAmount <= 0) {
+      throw new SparkValidationError(
+        "Fee too large. Recovered amount must be greater than 0",
+        { field: "satsPerVbyteFee", value: satsPerVbyteFee },
+      );
+    }
+
+    const tx = new Transaction({ version: 3 });
+    tx.addInput({
+      txid: recoveryTxid,
+      index: outputIndex,
+      witnessScript: new Uint8Array(),
+    });
+    tx.addOutput({
+      script: OutScript.encode(
+        Address(getNetwork(network)).decode(destinationAddress),
+      ),
+      amount: BigInt(recoveredAmount),
+    });
+
+    const recoveryTxSighash = getSigHashFromTx(tx, 0, prevOut);
+
+    // Authorises this exact transaction. The channel reaching the other
+    // operators carries no session, so this is the only evidence of intent they
+    // can check — and the sighash inside it stops an earlier authorisation being
+    // replayed onto a new transaction.
+    const statement = sha256(
+      new Uint8Array([
+        ...new TextEncoder().encode("recover_watchtower_exited_leaf"),
+        ...new TextEncoder().encode(
+          networkToJSON(this.config.getNetworkProto()),
+        ),
+        ...new TextEncoder().encode(leafId),
+        ...recoveryTxSighash,
+      ]),
+    );
+    const userSignature =
+      await this.config.signer.signMessageWithIdentityKey(statement);
+
+    const signingNonceCommitment =
+      await this.config.signer.getRandomSigningCommitment();
+
+    const response = await sparkClient.recover_watchtower_exited_leaf({
+      leafId,
+      recoveryTxSigningJob: {
+        rawTx: tx.toBytes(),
+        signingPublicKey: leaf.ownerSigningPublicKey,
+        signingNonceCommitment: signingNonceCommitment.commitment,
+      },
+      userSignature,
+    });
+
+    const keyDerivation = {
+      type: KeyDerivationType.LEAF as const,
+      path: leafId,
+    };
+    const selfSignature = await this.config.signer.signFrost({
+      message: recoveryTxSighash,
+      publicKey: response.verifyingKey,
+      keyDerivation,
+      selfCommitment: signingNonceCommitment,
+      statechainCommitments:
+        response.recoveryTxSigningResult!.signingNonceCommitments,
+      verifyingKey: response.verifyingKey,
+    });
+    const signature = await this.config.signer.aggregateFrost({
+      message: recoveryTxSighash,
+      statechainSignatures: response.recoveryTxSigningResult!.signatureShares,
+      statechainPublicKeys: response.recoveryTxSigningResult!.publicKeys,
+      verifyingKey: response.verifyingKey,
+      statechainCommitments:
+        response.recoveryTxSigningResult!.signingNonceCommitments,
+      selfCommitment: signingNonceCommitment,
+      publicKey:
+        await this.config.signer.getPublicKeyFromDerivation(keyDerivation),
+      selfSignature,
+    });
+
+    tx.updateInput(0, { finalScriptWitness: [signature] });
+    return tx.hex;
+  }
+
+  /**
+   * Recovers a watchtower-exited leaf and broadcasts the transaction.
+   *
+   * @returns {Promise<string>} The broadcast transaction ID
+   */
+  public async recoverAndBroadcastWatchtowerExitedLeaf(params: {
+    leafId: string;
+    recoveryTxid: string;
+    outputIndex?: number;
+    destinationAddress: string;
+    satsPerVbyteFee: number;
+  }): Promise<string> {
+    return await this.broadcastTx(
+      await this.recoverWatchtowerExitedLeaf(params),
+    );
   }
 
   /**
@@ -6793,6 +7018,8 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "queryTokenTransactions",
   "queryTokenTransactionsByTxHashes",
   "queryTokenTransactionsWithFilters",
+  "recoverAndBroadcastWatchtowerExitedLeaf",
+  "recoverWatchtowerExitedLeaf",
   "refundAndBroadcastStaticDeposit",
   "refundStaticDeposit",
   "setPrivacyEnabled",
@@ -6848,6 +7075,18 @@ function isReceiverTransferStreamEvent(
   return Boolean(
     event?.$case === "receiverTransfer" && event.receiverTransfer.transfer,
   );
+}
+
+/** Index of the first output paying `script`, or undefined if none does. */
+function findOutputPayingScript(
+  tx: Transaction,
+  script: Uint8Array,
+): number | undefined {
+  for (let i = 0; i < tx.outputsLength; i++) {
+    const outputScript = tx.getOutput(i).script;
+    if (outputScript && equalBytes(outputScript, script)) return i;
+  }
+  return undefined;
 }
 
 function isSenderTransferStreamEvent(
