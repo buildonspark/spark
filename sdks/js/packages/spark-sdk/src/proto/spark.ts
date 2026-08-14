@@ -2676,6 +2676,57 @@ export interface ExitSingleNodeTreesResponse {
   signingResults: ExitSingleNodeTreeSigningResult[];
 }
 
+export interface RecoverWatchtowerExitedLeafRequest {
+  /**
+   * The leaf to recover. Must be owned by the authenticated caller and be
+   * WATCHTOWER_EXITED, or WATCHTOWER_EXIT_RECOVERED to re-sign.
+   */
+  leafId: string;
+  /**
+   * The recovery transaction, plus the caller's FROST nonce commitment. Its
+   * single input names the outpoint being recovered, which the SE checks
+   * against its own record of the leaf. The destination is unconstrained: the
+   * SE's shares are useless without the caller's own.
+   */
+  recoveryTxSigningJob:
+    | SigningJob
+    | undefined;
+  /**
+   * Signature of a statement authorising this recovery, under the leaf owner's
+   * identity key. Required in addition to the session: the operator-internal
+   * channel carrying this to the other SOs has none, so it is the only
+   * evidence of intent that survives the hop.
+   *
+   * The statement is the SHA-256 of, concatenated in order:
+   * 1. Action name: "recover_watchtower_exited_leaf" (UTF-8 string)
+   * 2. Network: the upper-case network name, e.g. "MAINNET" or "REGTEST"
+   *   (UTF-8 string). Note this differs from the lower-case, Bitcoin-style
+   *   naming the static deposit statements use.
+   * 3. Leaf ID: the leaf's UUID in canonical hyphenated form (UTF-8 string)
+   * 4. Signing payload: the recovery transaction's sighash (32 bytes)
+   *
+   * Signed with ECDSA using the owner's identity private key. Because the
+   * sighash is part of the statement, each re-signed transaction needs its own
+   * signature — an earlier authorisation cannot be replayed onto a new one.
+   */
+  userSignature: Uint8Array;
+}
+
+export interface RecoverWatchtowerExitedLeafResponse {
+  /**
+   * The SE's FROST shares over the recovery transaction's sighash. Aggregate
+   * with the caller's own share under verifying_key to finish the signature.
+   */
+  recoveryTxSigningResult:
+    | SigningResult
+    | undefined;
+  /**
+   * The leaf's verifying public key: the FROST aggregate of the SE keyshare
+   * and the owner's signing key, which is what the recovered output pays to.
+   */
+  verifyingKey: Uint8Array;
+}
+
 export interface QueryNodesDistributionRequest {
   ownerIdentityPublicKey: Uint8Array;
 }
@@ -21332,6 +21383,183 @@ export const ExitSingleNodeTreesResponse: MessageFns<ExitSingleNodeTreesResponse
   },
 };
 
+function createBaseRecoverWatchtowerExitedLeafRequest(): RecoverWatchtowerExitedLeafRequest {
+  return { leafId: "", recoveryTxSigningJob: undefined, userSignature: new Uint8Array(0) };
+}
+
+export const RecoverWatchtowerExitedLeafRequest: MessageFns<RecoverWatchtowerExitedLeafRequest> = {
+  encode(message: RecoverWatchtowerExitedLeafRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.recoveryTxSigningJob !== undefined) {
+      SigningJob.encode(message.recoveryTxSigningJob, writer.uint32(18).fork()).join();
+    }
+    if (message.userSignature.length !== 0) {
+      writer.uint32(26).bytes(message.userSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RecoverWatchtowerExitedLeafRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRecoverWatchtowerExitedLeafRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.recoveryTxSigningJob = SigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RecoverWatchtowerExitedLeafRequest {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      recoveryTxSigningJob: isSet(object.recoveryTxSigningJob)
+        ? SigningJob.fromJSON(object.recoveryTxSigningJob)
+        : undefined,
+      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RecoverWatchtowerExitedLeafRequest): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.recoveryTxSigningJob !== undefined) {
+      obj.recoveryTxSigningJob = SigningJob.toJSON(message.recoveryTxSigningJob);
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RecoverWatchtowerExitedLeafRequest>): RecoverWatchtowerExitedLeafRequest {
+    return RecoverWatchtowerExitedLeafRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RecoverWatchtowerExitedLeafRequest>): RecoverWatchtowerExitedLeafRequest {
+    const message = createBaseRecoverWatchtowerExitedLeafRequest();
+    message.leafId = object.leafId ?? "";
+    message.recoveryTxSigningJob = (object.recoveryTxSigningJob !== undefined && object.recoveryTxSigningJob !== null)
+      ? SigningJob.fromPartial(object.recoveryTxSigningJob)
+      : undefined;
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseRecoverWatchtowerExitedLeafResponse(): RecoverWatchtowerExitedLeafResponse {
+  return { recoveryTxSigningResult: undefined, verifyingKey: new Uint8Array(0) };
+}
+
+export const RecoverWatchtowerExitedLeafResponse: MessageFns<RecoverWatchtowerExitedLeafResponse> = {
+  encode(message: RecoverWatchtowerExitedLeafResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.recoveryTxSigningResult !== undefined) {
+      SigningResult.encode(message.recoveryTxSigningResult, writer.uint32(10).fork()).join();
+    }
+    if (message.verifyingKey.length !== 0) {
+      writer.uint32(18).bytes(message.verifyingKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RecoverWatchtowerExitedLeafResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRecoverWatchtowerExitedLeafResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.recoveryTxSigningResult = SigningResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.verifyingKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RecoverWatchtowerExitedLeafResponse {
+    return {
+      recoveryTxSigningResult: isSet(object.recoveryTxSigningResult)
+        ? SigningResult.fromJSON(object.recoveryTxSigningResult)
+        : undefined,
+      verifyingKey: isSet(object.verifyingKey) ? bytesFromBase64(object.verifyingKey) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RecoverWatchtowerExitedLeafResponse): unknown {
+    const obj: any = {};
+    if (message.recoveryTxSigningResult !== undefined) {
+      obj.recoveryTxSigningResult = SigningResult.toJSON(message.recoveryTxSigningResult);
+    }
+    if (message.verifyingKey.length !== 0) {
+      obj.verifyingKey = base64FromBytes(message.verifyingKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RecoverWatchtowerExitedLeafResponse>): RecoverWatchtowerExitedLeafResponse {
+    return RecoverWatchtowerExitedLeafResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RecoverWatchtowerExitedLeafResponse>): RecoverWatchtowerExitedLeafResponse {
+    const message = createBaseRecoverWatchtowerExitedLeafResponse();
+    message.recoveryTxSigningResult =
+      (object.recoveryTxSigningResult !== undefined && object.recoveryTxSigningResult !== null)
+        ? SigningResult.fromPartial(object.recoveryTxSigningResult)
+        : undefined;
+    message.verifyingKey = object.verifyingKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseQueryNodesDistributionRequest(): QueryNodesDistributionRequest {
   return { ownerIdentityPublicKey: new Uint8Array(0) };
 }
@@ -23560,6 +23788,24 @@ export const SparkServiceDefinition = {
       options: {},
     },
     /**
+     * Co-signs a transaction spending the on-chain output a watchtower exit left
+     * behind, for a leaf whose own exit path that exit destroyed. The caller
+     * supplies the transaction and aggregates the SE's FROST shares with its own
+     * to broadcast on L1. The leaf becomes WATCHTOWER_EXIT_RECOVERED in the same
+     * operation, so its value cannot also move off-chain.
+     *
+     * Calling again re-signs a new transaction, to raise the fee say; every such
+     * transaction spends the same output, so at most one can confirm.
+     */
+    recover_watchtower_exited_leaf: {
+      name: "recover_watchtower_exited_leaf",
+      requestType: RecoverWatchtowerExitedLeafRequest,
+      requestStream: false,
+      responseType: RecoverWatchtowerExitedLeafResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
      * The following endpoints enforce inclusion of Direct Transactions used
      * for unilateral exits
      */
@@ -23821,6 +24067,20 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ExitSingleNodeTreesResponse>>;
   /**
+   * Co-signs a transaction spending the on-chain output a watchtower exit left
+   * behind, for a leaf whose own exit path that exit destroyed. The caller
+   * supplies the transaction and aggregates the SE's FROST shares with its own
+   * to broadcast on L1. The leaf becomes WATCHTOWER_EXIT_RECOVERED in the same
+   * operation, so its value cannot also move off-chain.
+   *
+   * Calling again re-signs a new transaction, to raise the fee say; every such
+   * transaction spends the same output, so at most one can confirm.
+   */
+  recover_watchtower_exited_leaf(
+    request: RecoverWatchtowerExitedLeafRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<RecoverWatchtowerExitedLeafResponse>>;
+  /**
    * The following endpoints enforce inclusion of Direct Transactions used
    * for unilateral exits
    */
@@ -24022,6 +24282,20 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ExitSingleNodeTreesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<ExitSingleNodeTreesResponse>;
+  /**
+   * Co-signs a transaction spending the on-chain output a watchtower exit left
+   * behind, for a leaf whose own exit path that exit destroyed. The caller
+   * supplies the transaction and aggregates the SE's FROST shares with its own
+   * to broadcast on L1. The leaf becomes WATCHTOWER_EXIT_RECOVERED in the same
+   * operation, so its value cannot also move off-chain.
+   *
+   * Calling again re-signs a new transaction, to raise the fee say; every such
+   * transaction spends the same output, so at most one can confirm.
+   */
+  recover_watchtower_exited_leaf(
+    request: DeepPartial<RecoverWatchtowerExitedLeafRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RecoverWatchtowerExitedLeafResponse>;
   /**
    * The following endpoints enforce inclusion of Direct Transactions used
    * for unilateral exits

@@ -66,6 +66,16 @@ service SparkService {
 
     rpc exit_single_node_trees(ExitSingleNodeTreesRequest) returns (ExitSingleNodeTreesResponse) {}
 
+    // Co-signs a transaction spending the on-chain output a watchtower exit left
+    // behind, for a leaf whose own exit path that exit destroyed. The caller
+    // supplies the transaction and aggregates the SE's FROST shares with its own
+    // to broadcast on L1. The leaf becomes WATCHTOWER_EXIT_RECOVERED in the same
+    // operation, so its value cannot also move off-chain.
+    //
+    // Calling again re-signs a new transaction, to raise the fee say; every such
+    // transaction spends the same output, so at most one can confirm.
+    rpc recover_watchtower_exited_leaf(RecoverWatchtowerExitedLeafRequest) returns (RecoverWatchtowerExitedLeafResponse) {}
+
     // The following endpoints enforce inclusion of Direct Transactions used
     // for unilateral exits
     rpc cooperative_exit_v2(CooperativeExitRequest) returns (CooperativeExitResponse) {}
@@ -1739,6 +1749,43 @@ message ExitSingleNodeTreesRequest {
 
 message ExitSingleNodeTreesResponse {
     repeated ExitSingleNodeTreeSigningResult signing_results = 1;
+}
+
+message RecoverWatchtowerExitedLeafRequest {
+    // The leaf to recover. Must be owned by the authenticated caller and be
+    // WATCHTOWER_EXITED, or WATCHTOWER_EXIT_RECOVERED to re-sign.
+    string leaf_id = 1;
+    // The recovery transaction, plus the caller's FROST nonce commitment. Its
+    // single input names the outpoint being recovered, which the SE checks
+    // against its own record of the leaf. The destination is unconstrained: the
+    // SE's shares are useless without the caller's own.
+    SigningJob recovery_tx_signing_job = 2;
+    // Signature of a statement authorising this recovery, under the leaf owner's
+    // identity key. Required in addition to the session: the operator-internal
+    // channel carrying this to the other SOs has none, so it is the only
+    // evidence of intent that survives the hop.
+    //
+    // The statement is the SHA-256 of, concatenated in order:
+    // 1. Action name: "recover_watchtower_exited_leaf" (UTF-8 string)
+    // 2. Network: the upper-case network name, e.g. "MAINNET" or "REGTEST"
+    //   (UTF-8 string). Note this differs from the lower-case, Bitcoin-style
+    //   naming the static deposit statements use.
+    // 3. Leaf ID: the leaf's UUID in canonical hyphenated form (UTF-8 string)
+    // 4. Signing payload: the recovery transaction's sighash (32 bytes)
+    //
+    // Signed with ECDSA using the owner's identity private key. Because the
+    // sighash is part of the statement, each re-signed transaction needs its own
+    // signature — an earlier authorisation cannot be replayed onto a new one.
+    bytes user_signature = 3;
+}
+
+message RecoverWatchtowerExitedLeafResponse {
+    // The SE's FROST shares over the recovery transaction's sighash. Aggregate
+    // with the caller's own share under verifying_key to finish the signature.
+    SigningResult recovery_tx_signing_result = 1;
+    // The leaf's verifying public key: the FROST aggregate of the SE keyshare
+    // and the owner's signing key, which is what the recovered output pays to.
+    bytes verifying_key = 2;
 }
 
 message QueryNodesDistributionRequest {

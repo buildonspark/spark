@@ -828,26 +828,19 @@ func applyAggregateLeavesCommit(ctx context.Context, config *so.Config, req *pbi
 	return nil
 }
 
-// aggregateLeavesOnChainStatuses are the statuses recording that the subtree's
-// outpoint is already claimed on L1 — set by the chain watcher from observed
-// chain state, or by a recovery the SE co-signed.
-var aggregateLeavesOnChainStatuses = map[st.TreeNodeStatus]bool{
-	st.TreeNodeStatusOnChain:                 true,
-	st.TreeNodeStatusExited:                  true,
-	st.TreeNodeStatusParentExited:            true,
-	st.TreeNodeStatusWatchtowerExited:        true,
-	st.TreeNodeStatusWatchtowerExitRecovered: true,
-}
-
 // firstAggregateLeavesOnChainNode returns any node in the subtree whose status
-// records an observed on-chain spend, or nil. The target counts too: it is the
-// node whose outpoint the exit package spends.
+// records that its value has left for L1, or nil. The target counts too: it is
+// the node whose outpoint the exit package spends.
+//
+// IsExitedToL1 rather than a list held here: the two were the same set, and a
+// status added to schematype without being classified into a copy kept in this
+// file would silently read as still-aggregatable.
 func firstAggregateLeavesOnChainNode(subtree *aggregateLeavesSubtree) *ent.TreeNode {
-	if aggregateLeavesOnChainStatuses[subtree.target.Status] {
+	if subtree.target.Status.IsExitedToL1() {
 		return subtree.target
 	}
 	for _, node := range subtree.descendants() {
-		if aggregateLeavesOnChainStatuses[node.Status] {
+		if node.Status.IsExitedToL1() {
 			return node
 		}
 	}

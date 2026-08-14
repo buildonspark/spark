@@ -8640,6 +8640,403 @@ var _ interface {
 	ErrorName() string
 } = StaticDepositUtxoRefundRollbackRequestValidationError{}
 
+// Validate checks the field values on
+// RecoverWatchtowerExitedLeafPrepareRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *RecoverWatchtowerExitedLeafPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// RecoverWatchtowerExitedLeafPrepareRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// RecoverWatchtowerExitedLeafPrepareRequestMultiError, or nil if none found.
+func (m *RecoverWatchtowerExitedLeafPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RecoverWatchtowerExitedLeafPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RecoverWatchtowerExitedLeafPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RecoverWatchtowerExitedLeafPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RecoverWatchtowerExitedLeafPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSigningCommitments()))
+		i := 0
+		for key := range m.GetSigningCommitments() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSigningCommitments()[key]
+			_ = val
+
+			// no validation rules for SigningCommitments[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, RecoverWatchtowerExitedLeafPrepareRequestValidationError{
+							field:  fmt.Sprintf("SigningCommitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, RecoverWatchtowerExitedLeafPrepareRequestValidationError{
+							field:  fmt.Sprintf("SigningCommitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return RecoverWatchtowerExitedLeafPrepareRequestValidationError{
+						field:  fmt.Sprintf("SigningCommitments[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return RecoverWatchtowerExitedLeafPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RecoverWatchtowerExitedLeafPrepareRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// RecoverWatchtowerExitedLeafPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RecoverWatchtowerExitedLeafPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RecoverWatchtowerExitedLeafPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RecoverWatchtowerExitedLeafPrepareRequestMultiError) AllErrors() []error { return m }
+
+// RecoverWatchtowerExitedLeafPrepareRequestValidationError is the validation
+// error returned by RecoverWatchtowerExitedLeafPrepareRequest.Validate if the
+// designated constraints aren't met.
+type RecoverWatchtowerExitedLeafPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RecoverWatchtowerExitedLeafPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RecoverWatchtowerExitedLeafPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RecoverWatchtowerExitedLeafPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RecoverWatchtowerExitedLeafPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RecoverWatchtowerExitedLeafPrepareRequestValidationError) ErrorName() string {
+	return "RecoverWatchtowerExitedLeafPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RecoverWatchtowerExitedLeafPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRecoverWatchtowerExitedLeafPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RecoverWatchtowerExitedLeafPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RecoverWatchtowerExitedLeafPrepareRequestValidationError{}
+
+// Validate checks the field values on RecoverWatchtowerExitedLeafCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *RecoverWatchtowerExitedLeafCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// RecoverWatchtowerExitedLeafCommitRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// RecoverWatchtowerExitedLeafCommitRequestMultiError, or nil if none found.
+func (m *RecoverWatchtowerExitedLeafCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RecoverWatchtowerExitedLeafCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	if len(errors) > 0 {
+		return RecoverWatchtowerExitedLeafCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RecoverWatchtowerExitedLeafCommitRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// RecoverWatchtowerExitedLeafCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RecoverWatchtowerExitedLeafCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RecoverWatchtowerExitedLeafCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RecoverWatchtowerExitedLeafCommitRequestMultiError) AllErrors() []error { return m }
+
+// RecoverWatchtowerExitedLeafCommitRequestValidationError is the validation
+// error returned by RecoverWatchtowerExitedLeafCommitRequest.Validate if the
+// designated constraints aren't met.
+type RecoverWatchtowerExitedLeafCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RecoverWatchtowerExitedLeafCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RecoverWatchtowerExitedLeafCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RecoverWatchtowerExitedLeafCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RecoverWatchtowerExitedLeafCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RecoverWatchtowerExitedLeafCommitRequestValidationError) ErrorName() string {
+	return "RecoverWatchtowerExitedLeafCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RecoverWatchtowerExitedLeafCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRecoverWatchtowerExitedLeafCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RecoverWatchtowerExitedLeafCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RecoverWatchtowerExitedLeafCommitRequestValidationError{}
+
+// Validate checks the field values on
+// RecoverWatchtowerExitedLeafRollbackRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *RecoverWatchtowerExitedLeafRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// RecoverWatchtowerExitedLeafRollbackRequest with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// RecoverWatchtowerExitedLeafRollbackRequestMultiError, or nil if none found.
+func (m *RecoverWatchtowerExitedLeafRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RecoverWatchtowerExitedLeafRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	if len(errors) > 0 {
+		return RecoverWatchtowerExitedLeafRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RecoverWatchtowerExitedLeafRollbackRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// RecoverWatchtowerExitedLeafRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RecoverWatchtowerExitedLeafRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RecoverWatchtowerExitedLeafRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RecoverWatchtowerExitedLeafRollbackRequestMultiError) AllErrors() []error { return m }
+
+// RecoverWatchtowerExitedLeafRollbackRequestValidationError is the validation
+// error returned by RecoverWatchtowerExitedLeafRollbackRequest.Validate if
+// the designated constraints aren't met.
+type RecoverWatchtowerExitedLeafRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RecoverWatchtowerExitedLeafRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RecoverWatchtowerExitedLeafRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RecoverWatchtowerExitedLeafRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RecoverWatchtowerExitedLeafRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RecoverWatchtowerExitedLeafRollbackRequestValidationError) ErrorName() string {
+	return "RecoverWatchtowerExitedLeafRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RecoverWatchtowerExitedLeafRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRecoverWatchtowerExitedLeafRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RecoverWatchtowerExitedLeafRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RecoverWatchtowerExitedLeafRollbackRequestValidationError{}
+
 // Validate checks the field values on StaticDepositUtxoSwapPrepareRequest with
 // the rules defined in the proto definition for this message. If any rules
 // are violated, the first error encountered is returned, or nil if there are

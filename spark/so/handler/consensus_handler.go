@@ -62,6 +62,8 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 		return NewSwapCounterTransferFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_AGGREGATE_LEAVES:
 		return NewAggregateLeavesFlowHandler(config), nil
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RECOVER_WATCHTOWER_EXITED_LEAF:
+		return NewRecoverWatchtowerExitedLeafFlowHandler(config), nil
 	default:
 		return nil, fmt.Errorf("unknown consensus operation type: %d", opType)
 	}

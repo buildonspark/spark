@@ -45,6 +45,7 @@ const (
 	SparkService_SubscribeToEvents_FullMethodName                   = "/spark.SparkService/subscribe_to_events"
 	SparkService_InitiateStaticDepositUtxoRefund_FullMethodName     = "/spark.SparkService/initiate_static_deposit_utxo_refund"
 	SparkService_ExitSingleNodeTrees_FullMethodName                 = "/spark.SparkService/exit_single_node_trees"
+	SparkService_RecoverWatchtowerExitedLeaf_FullMethodName         = "/spark.SparkService/recover_watchtower_exited_leaf"
 	SparkService_CooperativeExitV2_FullMethodName                   = "/spark.SparkService/cooperative_exit_v2"
 	SparkService_ClaimTransferSignRefundsV2_FullMethodName          = "/spark.SparkService/claim_transfer_sign_refunds_v2"
 	SparkService_FinalizeNodeSignaturesV2_FullMethodName            = "/spark.SparkService/finalize_node_signatures_v2"
@@ -107,6 +108,15 @@ type SparkServiceClient interface {
 	// the funds. Returns an error if the UTXO has already been claimed.
 	InitiateStaticDepositUtxoRefund(ctx context.Context, in *InitiateStaticDepositUtxoRefundRequest, opts ...grpc.CallOption) (*InitiateStaticDepositUtxoRefundResponse, error)
 	ExitSingleNodeTrees(ctx context.Context, in *ExitSingleNodeTreesRequest, opts ...grpc.CallOption) (*ExitSingleNodeTreesResponse, error)
+	// Co-signs a transaction spending the on-chain output a watchtower exit left
+	// behind, for a leaf whose own exit path that exit destroyed. The caller
+	// supplies the transaction and aggregates the SE's FROST shares with its own
+	// to broadcast on L1. The leaf becomes WATCHTOWER_EXIT_RECOVERED in the same
+	// operation, so its value cannot also move off-chain.
+	//
+	// Calling again re-signs a new transaction, to raise the fee say; every such
+	// transaction spends the same output, so at most one can confirm.
+	RecoverWatchtowerExitedLeaf(ctx context.Context, in *RecoverWatchtowerExitedLeafRequest, opts ...grpc.CallOption) (*RecoverWatchtowerExitedLeafResponse, error)
 	// The following endpoints enforce inclusion of Direct Transactions used
 	// for unilateral exits
 	CooperativeExitV2(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
@@ -400,6 +410,16 @@ func (c *sparkServiceClient) ExitSingleNodeTrees(ctx context.Context, in *ExitSi
 	return out, nil
 }
 
+func (c *sparkServiceClient) RecoverWatchtowerExitedLeaf(ctx context.Context, in *RecoverWatchtowerExitedLeafRequest, opts ...grpc.CallOption) (*RecoverWatchtowerExitedLeafResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecoverWatchtowerExitedLeafResponse)
+	err := c.cc.Invoke(ctx, SparkService_RecoverWatchtowerExitedLeaf_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) CooperativeExitV2(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CooperativeExitResponse)
@@ -604,6 +624,15 @@ type SparkServiceServer interface {
 	// the funds. Returns an error if the UTXO has already been claimed.
 	InitiateStaticDepositUtxoRefund(context.Context, *InitiateStaticDepositUtxoRefundRequest) (*InitiateStaticDepositUtxoRefundResponse, error)
 	ExitSingleNodeTrees(context.Context, *ExitSingleNodeTreesRequest) (*ExitSingleNodeTreesResponse, error)
+	// Co-signs a transaction spending the on-chain output a watchtower exit left
+	// behind, for a leaf whose own exit path that exit destroyed. The caller
+	// supplies the transaction and aggregates the SE's FROST shares with its own
+	// to broadcast on L1. The leaf becomes WATCHTOWER_EXIT_RECOVERED in the same
+	// operation, so its value cannot also move off-chain.
+	//
+	// Calling again re-signs a new transaction, to raise the fee say; every such
+	// transaction spends the same output, so at most one can confirm.
+	RecoverWatchtowerExitedLeaf(context.Context, *RecoverWatchtowerExitedLeafRequest) (*RecoverWatchtowerExitedLeafResponse, error)
 	// The following endpoints enforce inclusion of Direct Transactions used
 	// for unilateral exits
 	CooperativeExitV2(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
@@ -712,6 +741,9 @@ func (UnimplementedSparkServiceServer) InitiateStaticDepositUtxoRefund(context.C
 }
 func (UnimplementedSparkServiceServer) ExitSingleNodeTrees(context.Context, *ExitSingleNodeTreesRequest) (*ExitSingleNodeTreesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExitSingleNodeTrees not implemented")
+}
+func (UnimplementedSparkServiceServer) RecoverWatchtowerExitedLeaf(context.Context, *RecoverWatchtowerExitedLeafRequest) (*RecoverWatchtowerExitedLeafResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecoverWatchtowerExitedLeaf not implemented")
 }
 func (UnimplementedSparkServiceServer) CooperativeExitV2(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CooperativeExitV2 not implemented")
@@ -1225,6 +1257,24 @@ func _SparkService_ExitSingleNodeTrees_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_RecoverWatchtowerExitedLeaf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecoverWatchtowerExitedLeafRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).RecoverWatchtowerExitedLeaf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_RecoverWatchtowerExitedLeaf_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).RecoverWatchtowerExitedLeaf(ctx, req.(*RecoverWatchtowerExitedLeafRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_CooperativeExitV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CooperativeExitRequest)
 	if err := dec(in); err != nil {
@@ -1615,6 +1665,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "exit_single_node_trees",
 			Handler:    _SparkService_ExitSingleNodeTrees_Handler,
+		},
+		{
+			MethodName: "recover_watchtower_exited_leaf",
+			Handler:    _SparkService_RecoverWatchtowerExitedLeaf_Handler,
 		},
 		{
 			MethodName: "cooperative_exit_v2",
