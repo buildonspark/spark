@@ -266,22 +266,16 @@ export default class SspClient {
     if (headers.get("X-GraphQL-Operation") !== PARTNER_ATTRIBUTED_OPERATION) {
       return init;
     }
-    // Gated on origin as well as operation. A custom header, unlike
-    // Authorization, is not stripped when a redirect crosses origins, so the
-    // token must never be attached to a request that is not already the SSP's.
+    // A custom header, unlike Authorization, survives a cross-origin redirect,
+    // so the token rides only requests already bound for the SSP — which also
+    // suffices, since only the SSP can redirect one and it already has it.
     if (!this.isSspOrigin(input)) {
       return init;
     }
     headers.set(PARTNER_JWT_HEADER, this.partnerJwt);
-    // A redirect would replay the credential onto whatever it names, so it is
-    // refused with no scheme carve-out: the only config that breaks is a
-    // plaintext remote endpoint, which is already sending a bearer token in
-    // cleartext. Runtimes that follow redirects themselves (bare-fetch, React
-    // Native's XHR fetch) ignore this, hence the origin gate above.
     return {
       ...init,
       headers: headers as unknown as HeadersInit,
-      redirect: "error",
     };
   }
 

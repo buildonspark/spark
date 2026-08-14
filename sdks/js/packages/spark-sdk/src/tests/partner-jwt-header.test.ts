@@ -55,39 +55,16 @@ describe("partner JWT header scoping", () => {
     expect(jwtFor("RequestLightningSend")).toBeNull();
   });
 
-  it("refuses redirects wherever the token is attached", () => {
-    // A redirect would replay the credential onto whatever it names, so the
-    // refusal is not carved out by scheme — including for a plaintext endpoint,
-    // which is already putting a bearer token on the wire in cleartext.
+  it("matches a plaintext SSP base url", () => {
     const { internals } = harness();
     internals.partnerJwt = "token";
+    internals.sspBaseUrl = "http://127.0.0.1:5000";
 
-    const initFor = (baseUrl: string) => {
-      internals.sspBaseUrl = baseUrl;
-      return internals.withPartnerJwt(baseUrl, {
-        headers: { "X-GraphQL-Operation": "LightningReceiveQuote" },
-      });
-    };
-
-    for (const base of ["https://ssp.example.com", "http://127.0.0.1:5000"]) {
-      expect(initFor(base)?.redirect).toBe("error");
-      expect(new Headers(initFor(base)?.headers).get("x-partner-jwt")).toBe(
-        "token",
-      );
-    }
-  });
-
-  it("leaves a request it does not attach to untouched", () => {
-    // No redirect mode imposed on anything the token does not ride on.
-    const { internals } = harness();
-    internals.partnerJwt = "token";
-    internals.sspBaseUrl = "https://ssp.example.com";
-
-    const other = internals.withPartnerJwt("https://ssp.example.com", {
-      headers: { "X-GraphQL-Operation": "RequestLightningReceive" },
+    const attached = internals.withPartnerJwt("http://127.0.0.1:5000", {
+      headers: { "X-GraphQL-Operation": "LightningReceiveQuote" },
     });
 
-    expect(other?.redirect).toBeUndefined();
+    expect(new Headers(attached?.headers).get("x-partner-jwt")).toBe("token");
   });
 
   it("builds the header set with the runtime's constructor", () => {
@@ -249,6 +226,13 @@ describe("partner JWT over a real request", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(sentPartnerJwt(mockFetch)).toBe("token");
+
+    const init = mockFetch.mock.calls[0]?.[1];
+    // Imposing a redirect mode would refuse same-origin hops too, failing the
+    // quote on the runtimes that honour one while the others carry on.
+    expect(init?.redirect).toBeUndefined();
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeDefined();
   });
 
   it("sends no token when none was supplied", async () => {
