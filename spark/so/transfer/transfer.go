@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -77,6 +78,28 @@ func MarkReceiversClaimPending(ctx context.Context, db *ent.Client, transferID u
 			enttransferreceiver.StatusEQ(st.TransferReceiverStatusInitiated),
 		).
 		SetStatus(st.TransferReceiverStatusReceiverClaimPending).
+		Save(ctx)
+	return err
+}
+
+// ResetReceiversToTransferStatus forces every transfer_receivers row for the
+// transfer to the status the given non-terminal transfer status maps to,
+// whatever it currently holds. Unlike MarkReceiversClaimPending this does not
+// filter on the current status: a receiver left CANCELLED by an earlier
+// terminal transition would otherwise keep the receiver-side pending query —
+// which filters on transfer_receivers.status alone — from ever returning the
+// transfer again.
+//
+// Terminal statuses are rejected because their receiver rows also carry
+// completion_time rules; route those through the terminal sync instead.
+func ResetReceiversToTransferStatus(ctx context.Context, db *ent.Client, transferID uuid.UUID, transferStatus st.TransferStatus) error {
+	if transferStatus.IsTerminal() {
+		return fmt.Errorf("ResetReceiversToTransferStatus called with terminal transfer status %s", transferStatus)
+	}
+	_, err := db.TransferReceiver.Update().
+		Where(enttransferreceiver.TransferIDEQ(transferID)).
+		SetStatus(MapTransferToReceiverStatus(transferStatus)).
+		ClearCompletionTime().
 		Save(ctx)
 	return err
 }
