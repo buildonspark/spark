@@ -3,9 +3,12 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -23,6 +26,8 @@ import (
 )
 
 var ancestorChainRootSkipCutoff = time.Date(2026, time.March, 17, 0, 0, 0, 0, time.UTC)
+
+var ancestorChainMaxDepth = 1024
 
 const DefaultMaxQueryNodesByID = 1000
 
@@ -169,22 +174,6 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	}
 
 	protoNodeMap := make(map[string]*pb.TreeNode)
-	includeParents := req.GetIncludeParents()
-	var requestedNodeIDs map[string]struct{}
-	var ancestorChainElapsed time.Duration
-	if includeParents {
-		// Populated upfront (not incrementally in the loop below) so it always reflects every
-		// requested node, even if the loop is interrupted by an error partway through: otherwise
-		// a not-yet-processed requested node reached early as another node's ancestor would be
-		// miscounted as an "additional" ancestor in the failure-path metric below.
-		requestedNodeIDs = make(map[string]struct{}, len(nodes))
-		for _, node := range nodes {
-			requestedNodeIDs[node.ID.String()] = struct{}{}
-		}
-	}
-	recordAncestorChain := func(err error) {
-		recordAncestorChainDuration(ctx, ancestorChainPathLegacy, ancestorChainElapsed, additionalAncestorNodeCount(protoNodeMap, requestedNodeIDs), err)
-	}
 	for _, node := range nodes {
 		protoNode, err := node.MarshalSparkProto(ctx)
 		if err != nil {
@@ -194,18 +183,26 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			protoNode.OwnerIdentityPublicKey = bitcointransaction.NUMSPoint().Serialize()
 		}
 		protoNodeMap[node.ID.String()] = protoNode
-		if includeParents {
-			chainStart := time.Now()
-			err := getAncestorChain(ctx, db, node, protoNodeMap, isSSP)
-			ancestorChainElapsed += time.Since(chainStart)
-			if err != nil {
-				recordAncestorChain(err)
-				return nil, err
-			}
-		}
 	}
-	if includeParents {
-		recordAncestorChain(nil)
+
+	if req.GetIncludeParents() {
+		// Snapshotted before the merge below so the metric can tell an ancestor the walk
+		// discovered apart from one the caller had already asked for by ID.
+		requestedNodeIDs := make(map[string]struct{}, len(nodes))
+		for _, node := range nodes {
+			requestedNodeIDs[node.ID.String()] = struct{}{}
+		}
+
+		useBatched := knobs.GetKnobsService(ctx).RolloutRandom(knobs.KnobUseBatchedAncestorChain, 0)
+
+		start := time.Now()
+		ancestors, path, err := resolveAncestorChains(ctx, db, nodes, isSSP, useBatched)
+		elapsed := time.Since(start)
+		maps.Copy(protoNodeMap, ancestors)
+		recordAncestorChainDuration(ctx, path, elapsed, additionalAncestorNodeCount(protoNodeMap, requestedNodeIDs), err)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &pb.QueryNodesResponse{Nodes: protoNodeMap}
@@ -272,6 +269,44 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 	}, nil
 }
 
+// resolveAncestorChains returns the ancestors of every requested node, excluding the requested
+// nodes themselves, along with the metric label for the implementation it used. Returning the
+// label keeps the choice of path and the name of that path in one place, so they can't disagree.
+func resolveAncestorChains(ctx context.Context, db *ent.Client, nodes []*ent.TreeNode, isSSP bool, useBatched bool) (map[string]*pb.TreeNode, string, error) {
+	if useBatched {
+		ancestors, err := getAncestorChainsBatched(ctx, db, nodes, isSSP)
+		return ancestors, ancestorChainPathBatched, err
+	}
+	ancestors := make(map[string]*pb.TreeNode)
+	for _, node := range nodes {
+		if err := getAncestorChain(ctx, db, node, ancestors, isSSP); err != nil {
+			return nil, ancestorChainPathLegacy, err
+		}
+	}
+	return ancestors, ancestorChainPathLegacy, nil
+}
+
+// shouldSuppressRootForChild decides whether a tree's root may be exposed to a non-SSP caller,
+// given one of the root's direct children. Legacy mainnet nodes predate the rollout that made
+// roots safe to return. Shared by both resolution paths so the business rule can't drift while
+// their tree-walking mechanisms differ.
+func shouldSuppressRootForChild(childCreateTime time.Time, network btcnetwork.Network, isSSP bool) bool {
+	return !isSSP && network == btcnetwork.Mainnet && childCreateTime.Before(ancestorChainRootSkipCutoff)
+}
+
+// marshalAncestor marshals a non-leaf node for an ancestor chain. Ancestors are by definition
+// non-leaf nodes, so their recorded owner is masked for external callers (see QueryNodes).
+func marshalAncestor(ctx context.Context, node *ent.TreeNode, isSSP bool) (*pb.TreeNode, error) {
+	proto, err := node.MarshalSparkProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal node %s: %w", node.ID, err)
+	}
+	if !isSSP {
+		proto.OwnerIdentityPublicKey = bitcointransaction.NUMSPoint().Serialize()
+	}
+	return proto, nil
+}
+
 func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, isSSP bool) error {
 	var err error
 	// Prefer eager-loaded edge when available
@@ -298,7 +333,7 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 				if err != nil {
 					return err
 				}
-				if nodeTree.Network == btcnetwork.Mainnet {
+				if shouldSuppressRootForChild(node.CreateTime, nodeTree.Network, isSSP) {
 					return nil
 				}
 			}
@@ -306,18 +341,156 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 	}
 
 	// Parent exists, continue search
-	protoParent, err := parent.MarshalSparkProto(ctx)
+	protoParent, err := marshalAncestor(ctx, parent, isSSP)
 	if err != nil {
-		return fmt.Errorf("unable to marshal node %s: %w", parent.ID, err)
-	}
-	// Parents are by definition non-leaf nodes, so their recorded owner is
-	// masked for external callers (see QueryNodes).
-	if !isSSP {
-		protoParent.OwnerIdentityPublicKey = bitcointransaction.NUMSPoint().Serialize()
+		return err
 	}
 	nodeMap[parent.ID.String()] = protoParent
 
 	return getAncestorChain(ctx, db, parent, nodeMap, isSSP)
+}
+
+// getAncestorChainsBatched resolves the same ancestors as getAncestorChain, but in a fixed two
+// queries for the whole node set rather than one per ancestor hop. The recursive CTE walks only
+// UUID columns, so the wide tx bytea columns are fetched once per distinct node in the hydration
+// query that follows, after deduplication.
+func getAncestorChainsBatched(ctx context.Context, db *ent.Client, nodes []*ent.TreeNode, isSSP bool) (map[string]*pb.TreeNode, error) {
+	if len(nodes) == 0 {
+		return map[string]*pb.TreeNode{}, nil
+	}
+
+	ids := make([]uuid.UUID, len(nodes))
+	for i, node := range nodes {
+		ids[i] = node.ID
+	}
+
+	ancestorIDs, err := queryAncestorIDs(ctx, db, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(ancestorIDs) == 0 {
+		return map[string]*pb.TreeNode{}, nil
+	}
+
+	// Requested nodes are hydrated alongside the ancestors because a requested leaf whose parent
+	// is already the root is itself an input to root visibility, even though it is never returned.
+	hydrated, err := hydrateNodes(ctx, db, append(ids, ancestorIDs...))
+	if err != nil {
+		return nil, err
+	}
+
+	return marshalAncestors(ctx, hydrated, ancestorIDs, visibleRoots(hydrated, isSSP), isSSP)
+}
+
+// queryAncestorIDs follows tree_node_parent upward from every id and returns the distinct ancestors
+// it reached. A walk stopped by ancestorChainMaxDepth is an error rather than a short list, which
+// is why the query reports each ancestor's depth.
+func queryAncestorIDs(ctx context.Context, db *ent.Client, ids []uuid.UUID) ([]uuid.UUID, error) {
+	//nolint:forbidigo // a recursive CTE isn't expressible through the ent query builder.
+	rows, err := db.QueryContext(ctx, `
+		WITH RECURSIVE ancestor_ids(id, depth) AS (
+			SELECT tree_node_parent, 0 FROM tree_nodes WHERE id = ANY($1::uuid[])
+		  UNION ALL
+			SELECT t.tree_node_parent, a.depth + 1
+			FROM tree_nodes t JOIN ancestor_ids a ON t.id = a.id
+			WHERE a.depth <= $2
+		)
+		SELECT id, max(depth) AS depth FROM ancestor_ids WHERE id IS NOT NULL GROUP BY id
+	`, pq.Array(ids), ancestorChainMaxDepth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query ancestor ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ancestorIDs []uuid.UUID
+	deepest := 0
+	for rows.Next() {
+		var id uuid.UUID
+		var depth int
+		if err := rows.Scan(&id, &depth); err != nil {
+			return nil, fmt.Errorf("failed to scan ancestor id: %w", err)
+		}
+		ancestorIDs = append(ancestorIDs, id)
+		if depth > deepest {
+			deepest = depth
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read ancestor ids: %w", err)
+	}
+	// The recursion is allowed one step past the bound so a chain that ends exactly at it still
+	// emits its NULL terminator and is recognised as complete; only a chain still climbing here
+	// was truncated.
+	if deepest > ancestorChainMaxDepth {
+		return nil, fmt.Errorf("ancestor chain for %d nodes reached the depth bound of %d: a parent pointer is cyclic, or the tree is deeper than this path supports", len(ids), ancestorChainMaxDepth)
+	}
+	return ancestorIDs, nil
+}
+
+// hydrateNodeBatch caps how many ids one hydration statement binds. Ent renders IDIn as one
+// placeholder per id and issues a further statement per eager-loaded edge, so an unbounded
+// wallet-wide QueryNodes over deep trees could otherwise cross Postgres' 65535-parameter ceiling
+// — a limit the per-hop legacy walk never approaches.
+const hydrateNodeBatch = 10000
+
+func hydrateNodes(ctx context.Context, db *ent.Client, ids []uuid.UUID) ([]*ent.TreeNode, error) {
+	hydrated := make([]*ent.TreeNode, 0, len(ids))
+	for chunk := range slices.Chunk(ids, hydrateNodeBatch) {
+		batch, err := db.TreeNode.Query().
+			Where(treenode.IDIn(chunk...)).
+			WithTree().
+			WithSigningKeyshare().
+			WithParent().
+			All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hydrate ancestor nodes: %w", err)
+		}
+		hydrated = append(hydrated, batch...)
+	}
+	return hydrated, nil
+}
+
+// visibleRoots reports which roots may be returned to this caller. A root is visible as soon as
+// any one of its direct children is allowed to see it, matching getAncestorChain, which walks
+// every requested node's chain into one shared response map. Entries whose key turns out to be a
+// branch rather than a root are simply never looked up.
+func visibleRoots(hydrated []*ent.TreeNode, isSSP bool) map[uuid.UUID]bool {
+	visible := make(map[uuid.UUID]bool)
+	for _, node := range hydrated {
+		parent := node.Edges.Parent
+		if parent == nil {
+			continue
+		}
+		if !shouldSuppressRootForChild(node.CreateTime, node.Edges.Tree.Network, isSSP) {
+			visible[parent.ID] = true
+		}
+	}
+	return visible
+}
+
+// marshalAncestors returns the ancestors among hydrated, dropping any root no child made visible.
+func marshalAncestors(ctx context.Context, hydrated []*ent.TreeNode, ancestorIDs []uuid.UUID, visibleRoots map[uuid.UUID]bool, isSSP bool) (map[string]*pb.TreeNode, error) {
+	isAncestor := make(map[uuid.UUID]bool, len(ancestorIDs))
+	for _, id := range ancestorIDs {
+		isAncestor[id] = true
+	}
+
+	result := make(map[string]*pb.TreeNode, len(ancestorIDs))
+	for _, node := range hydrated {
+		if !isAncestor[node.ID] {
+			continue
+		}
+		if node.Edges.Parent == nil && !visibleRoots[node.ID] {
+			continue
+		}
+
+		protoAncestor, err := marshalAncestor(ctx, node, isSSP)
+		if err != nil {
+			return nil, err
+		}
+		result[node.ID.String()] = protoAncestor
+	}
+	return result, nil
 }
 
 // filterNodesByWalletAccess drops leaves whose owner's wallet the requester
