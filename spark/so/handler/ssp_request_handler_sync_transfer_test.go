@@ -19,11 +19,12 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttransferreceiver "github.com/lightsparkdev/spark/so/ent/transferreceiver"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestUpdateTransferRejectsNewRemoteLeafWhenNodeUnavailable(t *testing.T) {
+func TestUpdateTransferLocksNewRemoteLeafFromAnyLocalNodeStatus(t *testing.T) {
 	testCases := []struct {
 		name   string
 		status st.TreeNodeStatus
@@ -51,45 +52,75 @@ func TestUpdateTransferRejectsNewRemoteLeafWhenNodeUnavailable(t *testing.T) {
 				remoteTransfer,
 				&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 			)
-			require.Error(t, err)
-			require.ErrorContains(t, err, "cannot be added to synced transfer")
+			require.NoError(t, err)
 
 			refreshed, err := dbTx.TreeNode.Get(ctx, node.ID)
 			require.NoError(t, err)
-			require.Equal(t, tc.status, refreshed.Status)
+			require.Equal(t, st.TreeNodeStatusTransferLocked, refreshed.Status)
+
+			transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
+			require.NoError(t, err)
+			require.Len(t, transferLeafs, 1)
 		})
 	}
 }
 
-func TestUpdateTransferRejectsNewRemoteLeafWhenSenderDoesNotOwnNode(t *testing.T) {
+func TestUpdateTransferLocksNewRemoteLeafWhenLocalOwnerDiverges(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	owner := keys.GeneratePrivateKey().Public()
-	attackerSender := keys.GeneratePrivateKey().Public()
+	staleOwner := keys.GeneratePrivateKey().Public()
+	sender := keys.GeneratePrivateKey().Public()
 	receiver := keys.GeneratePrivateKey().Public()
-	node := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
-	remoteTransfer := syncTransferRemoteTransfer(t, node, attackerSender, receiver)
+	node := createSyncTransferTestNode(t, ctx, dbTx, staleOwner, st.TreeNodeStatusAvailable)
+	remoteTransfer := syncTransferRemoteTransfer(t, node, sender, receiver)
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
 		remoteTransfer,
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "owner does not match")
+	require.NoError(t, err)
 
 	refreshed, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
-	require.Equal(t, st.TreeNodeStatusAvailable, refreshed.Status)
+	require.Equal(t, st.TreeNodeStatusTransferLocked, refreshed.Status)
+	// Locking without adopting the owner would leave the node in a state neither
+	// a rejection nor a completed repair produces.
+	require.True(t, refreshed.OwnerIdentityPubkey.Equals(sender))
 
 	transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
 	require.NoError(t, err)
-	require.Empty(t, transferLeafs)
+	require.Len(t, transferLeafs, 1)
 }
 
-func TestUpdateTransferRejectsExistingRemoteLeafWhenNodeUnavailable(t *testing.T) {
+func TestUpdateTransferSyncsRemoteRefundTxPayingUnexpectedReceiver(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	owner := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	otherReceiver := keys.GeneratePrivateKey().Public()
+	node := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
+	setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, otherReceiver)
+
+	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+		ctx,
+		remoteTransfer,
+		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+	)
+	require.NoError(t, err)
+
+	transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
+	require.NoError(t, err)
+	require.Len(t, transferLeafs, 1)
+	require.Equal(t, remoteTransfer.GetLeaves()[0].GetIntermediateRefundTx(), transferLeafs[0].IntermediateRefundTx)
+}
+
+func TestUpdateTransferSyncsExistingRemoteLeafFromAnyLocalNodeStatus(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -118,39 +149,45 @@ func TestUpdateTransferRejectsExistingRemoteLeafWhenNodeUnavailable(t *testing.T
 		remoteTransfer,
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "cannot be refreshed for synced transfer")
+	require.NoError(t, err)
 
 	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
-	require.Equal(t, st.TreeNodeStatusOnChain, refreshedNode.Status)
+	require.Equal(t, st.TreeNodeStatusTransferLocked, refreshedNode.Status)
 
 	refreshedLeaf, err := dbTx.TransferLeaf.Get(ctx, localLeaf.ID)
 	require.NoError(t, err)
-	require.Equal(t, []byte("local-secret"), refreshedLeaf.SecretCipher)
-	require.Equal(t, []byte("local-signature"), refreshedLeaf.Signature)
+	require.Equal(t, []byte("remote-secret"), refreshedLeaf.SecretCipher)
+	require.Equal(t, []byte("remote-signature"), refreshedLeaf.Signature)
 }
 
-func TestUpdateTransferRejectsRemoteRefundTxForWrongReceiver(t *testing.T) {
+// The refunds below sit one TimeLockInterval higher than this operator's node
+// implies, because the chosen operator has not advanced as far. That is the
+// divergence sync_transfers exists to repair.
+func TestUpdateTransferSyncsRemoteRefundTxWhoseTimelockDivergesFromLocalNode(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	owner := keys.GeneratePrivateKey().Public()
 	receiver := keys.GeneratePrivateKey().Public()
-	wrongReceiver := keys.GeneratePrivateKey().Public()
-	node := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+	node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
 	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
 
 	nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
 	require.NoError(t, err)
-	remoteTransfer.Leaves[0].IntermediateRefundTx = createVersion3CPFPRefundTx(
-		t,
-		nodeTx.TxHash(),
-		uint32(node.Vout),
-		wrongReceiver,
-		int64(node.Value),
-		sparkconst.InitialTimeLock-sparkconst.TimeLockInterval,
+	directTx, err := common.TxFromRawTxBytes(node.DirectTx)
+	require.NoError(t, err)
+	divergedTimelock := sparkconst.InitialTimeLock
+	remoteLeaf := remoteTransfer.GetLeaves()[0]
+	remoteLeaf.IntermediateRefundTx = createVersion3CPFPRefundTx(
+		t, nodeTx.TxHash(), uint32(node.Vout), receiver, int64(node.Value), divergedTimelock,
+	)
+	remoteLeaf.IntermediateDirectRefundTx = createVersion3DirectRefundTx(
+		t, directTx.TxHash(), 0, receiver, int64(node.Value), divergedTimelock+sparkconst.DirectTimelockOffset,
+	)
+	remoteLeaf.IntermediateDirectFromCpfpRefundTx = createVersion3DirectRefundTx(
+		t, nodeTx.TxHash(), uint32(node.Vout), receiver, int64(node.Value), divergedTimelock+sparkconst.DirectTimelockOffset,
 	)
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
@@ -158,16 +195,14 @@ func TestUpdateTransferRejectsRemoteRefundTxForWrongReceiver(t *testing.T) {
 		remoteTransfer,
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "refund tx is expected to send to receiver identity pubkey")
-
-	refreshed, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
-	require.Equal(t, st.TreeNodeStatusAvailable, refreshed.Status)
 
 	transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
 	require.NoError(t, err)
-	require.Empty(t, transferLeafs)
+	require.Len(t, transferLeafs, 1)
+	require.Equal(t, remoteLeaf.GetIntermediateRefundTx(), transferLeafs[0].IntermediateRefundTx)
+	require.Equal(t, remoteLeaf.GetIntermediateDirectRefundTx(), transferLeafs[0].IntermediateDirectRefundTx)
+	require.Equal(t, remoteLeaf.GetIntermediateDirectFromCpfpRefundTx(), transferLeafs[0].IntermediateDirectFromCpfpRefundTx)
 }
 
 func TestUpdateTransferAcceptsRemoteDirectRefundTxs(t *testing.T) {
@@ -319,157 +354,7 @@ func TestUpdateTransferRejectsInvalidTypedSignature(t *testing.T) {
 	}
 }
 
-func TestUpdateTransferRejectsMalformedRemoteDirectRefundTxs(t *testing.T) {
-	testCases := []struct {
-		name        string
-		mutate      func(t *testing.T, remoteTransfer *pb.Transfer, node *ent.TreeNode, wrongReceiver keys.Public)
-		errContains string
-	}{
-		{
-			name: "direct refund pays wrong receiver",
-			mutate: func(t *testing.T, remoteTransfer *pb.Transfer, node *ent.TreeNode, wrongReceiver keys.Public) {
-				directTx, err := common.TxFromRawTxBytes(node.DirectTx)
-				require.NoError(t, err)
-				remoteTransfer.Leaves[0].IntermediateDirectRefundTx = createVersion3DirectRefundTx(
-					t,
-					directTx.TxHash(),
-					0,
-					wrongReceiver,
-					int64(node.Value),
-					sparkconst.InitialTimeLock-sparkconst.TimeLockInterval+sparkconst.DirectTimelockOffset,
-				)
-			},
-			errContains: "refund tx is expected to send to receiver identity pubkey",
-		},
-		{
-			name: "direct from cpfp refund pays wrong receiver",
-			mutate: func(t *testing.T, remoteTransfer *pb.Transfer, node *ent.TreeNode, wrongReceiver keys.Public) {
-				nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
-				require.NoError(t, err)
-				remoteTransfer.Leaves[0].IntermediateDirectFromCpfpRefundTx = createVersion3DirectRefundTx(
-					t,
-					nodeTx.TxHash(),
-					uint32(node.Vout),
-					wrongReceiver,
-					int64(node.Value),
-					sparkconst.InitialTimeLock-sparkconst.TimeLockInterval+sparkconst.DirectTimelockOffset,
-				)
-			},
-			errContains: "refund tx is expected to send to receiver identity pubkey",
-		},
-		{
-			name: "missing direct refund pair member",
-			mutate: func(t *testing.T, remoteTransfer *pb.Transfer, node *ent.TreeNode, wrongReceiver keys.Public) {
-				remoteTransfer.Leaves[0].IntermediateDirectFromCpfpRefundTx = nil
-			},
-			errContains: "both direct refund txs are required",
-		},
-		{
-			name: "missing direct from cpfp refund pair member",
-			mutate: func(t *testing.T, remoteTransfer *pb.Transfer, node *ent.TreeNode, wrongReceiver keys.Public) {
-				remoteTransfer.Leaves[0].IntermediateDirectRefundTx = nil
-			},
-			errContains: "both direct refund txs are required",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx, _ := db.ConnectToTestPostgres(t)
-			dbTx, err := ent.GetDbFromContext(ctx)
-			require.NoError(t, err)
-
-			owner := keys.GeneratePrivateKey().Public()
-			receiver := keys.GeneratePrivateKey().Public()
-			wrongReceiver := keys.GeneratePrivateKey().Public()
-			node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
-			remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
-			addSyncTransferDirectRefunds(t, remoteTransfer, node, receiver)
-			tc.mutate(t, remoteTransfer, node, wrongReceiver)
-
-			err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
-				ctx,
-				remoteTransfer,
-				&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
-			)
-			require.Error(t, err)
-			require.ErrorContains(t, err, tc.errContains)
-
-			refreshed, err := dbTx.TreeNode.Get(ctx, node.ID)
-			require.NoError(t, err)
-			require.Equal(t, st.TreeNodeStatusAvailable, refreshed.Status)
-
-			transferLeafs, err := dbTx.TransferLeaf.Query().All(ctx)
-			require.NoError(t, err)
-			require.Empty(t, transferLeafs)
-		})
-	}
-}
-
-func TestUpdateTransferRejectsMalformedExistingRemoteDirectRefundTxs(t *testing.T) {
-	ctx, _ := db.ConnectToTestPostgres(t)
-	dbTx, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-
-	owner := keys.GeneratePrivateKey().Public()
-	receiver := keys.GeneratePrivateKey().Public()
-	wrongReceiver := keys.GeneratePrivateKey().Public()
-	node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
-	localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, owner, receiver)
-	localIntermediateRefundTx := createTestTxBytes(t, 3000)
-	localIntermediateDirectRefundTx := createTestTxBytes(t, 3001)
-	localIntermediateDirectFromCpfpRefundTx := createTestTxBytes(t, 3002)
-	localLeaf, err := dbTx.TransferLeaf.Create().
-		SetTransfer(localTransfer).
-		SetLeaf(node).
-		SetPreviousRefundTx(node.RawRefundTx).
-		SetPreviousDirectRefundTx(node.DirectRefundTx).
-		SetPreviousDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx).
-		SetIntermediateRefundTx(localIntermediateRefundTx).
-		SetIntermediateDirectRefundTx(localIntermediateDirectRefundTx).
-		SetIntermediateDirectFromCpfpRefundTx(localIntermediateDirectFromCpfpRefundTx).
-		SetSecretCipher([]byte("local-secret")).
-		SetSignature([]byte("local-signature")).
-		Save(ctx)
-	require.NoError(t, err)
-
-	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
-	remoteTransfer.Id = localTransfer.ID.String()
-	addSyncTransferDirectRefunds(t, remoteTransfer, node, receiver)
-	directTx, err := common.TxFromRawTxBytes(node.DirectTx)
-	require.NoError(t, err)
-	remoteTransfer.Leaves[0].IntermediateDirectRefundTx = createVersion3DirectRefundTx(
-		t,
-		directTx.TxHash(),
-		0,
-		wrongReceiver,
-		int64(node.Value),
-		sparkconst.InitialTimeLock-sparkconst.TimeLockInterval+sparkconst.DirectTimelockOffset,
-	)
-	remoteTransfer.Leaves[0].SecretCipher = []byte("remote-secret")
-	remoteTransfer.Leaves[0].Sig = &pb.TransferLeaf_Signature{Signature: []byte("remote-signature")}
-
-	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
-		ctx,
-		remoteTransfer,
-		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
-	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "refund tx is expected to send to receiver identity pubkey")
-
-	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
-	require.NoError(t, err)
-	require.Equal(t, st.TreeNodeStatusAvailable, refreshedNode.Status)
-
-	refreshedLeaf, err := dbTx.TransferLeaf.Get(ctx, localLeaf.ID)
-	require.NoError(t, err)
-	require.Equal(t, []byte("local-secret"), refreshedLeaf.SecretCipher)
-	require.Equal(t, []byte("local-signature"), refreshedLeaf.Signature)
-	require.Equal(t, localIntermediateDirectRefundTx, refreshedLeaf.IntermediateDirectRefundTx)
-	require.Equal(t, localIntermediateDirectFromCpfpRefundTx, refreshedLeaf.IntermediateDirectFromCpfpRefundTx)
-}
-
-func TestUpdateTransferRejectsOmittedRemoteDirectRefundsWhenLocalLeafHasThem(t *testing.T) {
+func TestUpdateTransferClearsLocalDirectRefundsWhenRemoteOmitsThem(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -505,19 +390,19 @@ func TestUpdateTransferRejectsOmittedRemoteDirectRefundsWhenLocalLeafHasThem(t *
 		remoteTransfer,
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "refusing to clear watchtower refund data")
+	require.NoError(t, err)
 
 	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
-	require.Equal(t, st.TreeNodeStatusAvailable, refreshedNode.Status)
+	require.Equal(t, st.TreeNodeStatusTransferLocked, refreshedNode.Status)
 
+	// An omission by the chosen operator is a value to adopt, not data to protect.
 	refreshedLeaf, err := dbTx.TransferLeaf.Get(ctx, localLeaf.ID)
 	require.NoError(t, err)
-	require.Equal(t, []byte("local-secret"), refreshedLeaf.SecretCipher)
-	require.Equal(t, []byte("local-signature"), refreshedLeaf.Signature)
-	require.Equal(t, localIntermediateDirectRefundTx, refreshedLeaf.IntermediateDirectRefundTx)
-	require.Equal(t, localIntermediateDirectFromCpfpRefundTx, refreshedLeaf.IntermediateDirectFromCpfpRefundTx)
+	require.Equal(t, []byte("remote-secret"), refreshedLeaf.SecretCipher)
+	require.Equal(t, []byte("remote-signature"), refreshedLeaf.Signature)
+	require.Empty(t, refreshedLeaf.IntermediateDirectRefundTx)
+	require.Empty(t, refreshedLeaf.IntermediateDirectFromCpfpRefundTx)
 }
 
 func TestUpdateTransferAcceptsOmittedRemoteDirectRefundsWhenLocalLeafLacksThem(t *testing.T) {
@@ -647,44 +532,67 @@ func TestUpdateTransferSyncsReceiverAsOwnerWhenRemoteHasApplied(t *testing.T) {
 	require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(receiver))
 }
 
-func TestUpdateTransferRejectsExistingRemoteLeafOwnerInconsistentWithStatus(t *testing.T) {
-	ctx, _ := db.ConnectToTestPostgres(t)
-	dbTx, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
+// The owner the chosen operator reports wins even against what the transfer's own
+// status implies: which side is stale is the requester's call, not the SO's.
+func TestUpdateTransferSyncsExistingRemoteLeafOwnerAgainstTransferStatus(t *testing.T) {
+	testCases := []struct {
+		name        string
+		remoteOwner func(sender, receiver, thirdParty keys.Public) keys.Public
+	}{
+		{
+			name:        "receiver while status still says sender",
+			remoteOwner: func(_, receiver, _ keys.Public) keys.Public { return receiver },
+		},
+		{
+			name:        "third party",
+			remoteOwner: func(_, _, thirdParty keys.Public) keys.Public { return thirdParty },
+		},
+	}
 
-	sender := keys.GeneratePrivateKey().Public()
-	receiver := keys.GeneratePrivateKey().Public()
-	node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, sender, st.TreeNodeStatusAvailable)
-	localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, sender, receiver)
-	_, err = dbTx.TransferLeaf.Create().
-		SetTransfer(localTransfer).
-		SetLeaf(node).
-		SetPreviousRefundTx(node.RawRefundTx).
-		SetIntermediateRefundTx(createTestTxBytes(t, 3000)).
-		SetSecretCipher([]byte("local-secret")).
-		SetSignature([]byte("local-signature")).
-		Save(ctx)
-	require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			dbTx, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
 
-	remoteTransfer := syncTransferRemoteTransfer(t, node, sender, receiver)
-	remoteTransfer.Id = localTransfer.ID.String()
-	remoteTransfer.Leaves[0].Leaf.OwnerIdentityPublicKey = receiver.Serialize()
-	setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
+			sender := keys.GeneratePrivateKey().Public()
+			receiver := keys.GeneratePrivateKey().Public()
+			thirdParty := keys.GeneratePrivateKey().Public()
+			node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, sender, st.TreeNodeStatusAvailable)
+			localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, sender, receiver)
+			_, err = dbTx.TransferLeaf.Create().
+				SetTransfer(localTransfer).
+				SetLeaf(node).
+				SetPreviousRefundTx(node.RawRefundTx).
+				SetIntermediateRefundTx(createTestTxBytes(t, 3000)).
+				SetSecretCipher([]byte("local-secret")).
+				SetSignature([]byte("local-signature")).
+				Save(ctx)
+			require.NoError(t, err)
 
-	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
-		ctx,
-		remoteTransfer,
-		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
-	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "does not match the owner expected for its transfer's status")
+			remoteOwner := tc.remoteOwner(sender, receiver, thirdParty)
+			remoteTransfer := syncTransferRemoteTransfer(t, node, sender, receiver)
+			remoteTransfer.Id = localTransfer.ID.String()
+			remoteTransfer.Leaves[0].Leaf.OwnerIdentityPublicKey = remoteOwner.Serialize()
+			setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
 
-	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
-	require.NoError(t, err)
-	require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(sender))
+			err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+				ctx,
+				remoteTransfer,
+				&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+			)
+			require.NoError(t, err)
+
+			refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
+			require.NoError(t, err)
+			require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(remoteOwner))
+		})
+	}
 }
 
-func TestUpdateTransferRejectsExistingRemoteLeafWhenSigningOwnerNotYetSynced(t *testing.T) {
+// A stale local owner_signing_pubkey is repaired by fix_keyshare / sync_tree_nodes,
+// not here, so it must not block the owner-identity sync.
+func TestUpdateTransferSyncsExistingRemoteLeafOwnerWhenLocalSigningOwnerDiverges(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -715,22 +623,21 @@ func TestUpdateTransferRejectsExistingRemoteLeafWhenSigningOwnerNotYetSynced(t *
 		remoteTransfer,
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "fix the signing keyshare before syncing owner identity")
+	require.NoError(t, err)
 
 	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
-	require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(sender))
+	require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(receiver))
 }
 
-func TestUpdateTransferRejectsExistingRemoteLeafOwnedByThirdParty(t *testing.T) {
+// An unparseable owner key describes no state a repair could legitimately write.
+func TestUpdateTransferRejectsExistingRemoteLeafWithMalformedOwnerKey(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	sender := keys.GeneratePrivateKey().Public()
 	receiver := keys.GeneratePrivateKey().Public()
-	thirdParty := keys.GeneratePrivateKey().Public()
 	node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, sender, st.TreeNodeStatusAvailable)
 	localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, sender, receiver)
 	_, err = dbTx.TransferLeaf.Create().
@@ -745,8 +652,8 @@ func TestUpdateTransferRejectsExistingRemoteLeafOwnedByThirdParty(t *testing.T) 
 
 	remoteTransfer := syncTransferRemoteTransfer(t, node, sender, receiver)
 	remoteTransfer.Id = localTransfer.ID.String()
-	remoteTransfer.Leaves[0].Leaf.OwnerIdentityPublicKey = thirdParty.Serialize()
 	setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
+	remoteTransfer.GetLeaves()[0].GetLeaf().OwnerIdentityPublicKey = []byte("not-a-key")
 
 	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
 		ctx,
@@ -754,59 +661,35 @@ func TestUpdateTransferRejectsExistingRemoteLeafOwnedByThirdParty(t *testing.T) 
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "does not match the owner expected for its transfer's status")
 
 	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
 	require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(sender))
 }
 
-func TestUpdateTransferRejectsExistingRemoteLeafWithMalformedOwnerKeys(t *testing.T) {
-	testCases := []struct {
-		name   string
-		mutate func(*pb.TreeNode)
-	}{
-		{name: "malformed owner identity key", mutate: func(leaf *pb.TreeNode) { leaf.OwnerIdentityPublicKey = []byte("not-a-key") }},
-		{name: "malformed owner signing key", mutate: func(leaf *pb.TreeNode) { leaf.OwnerSigningPublicKey = []byte("not-a-key") }},
-	}
+func TestUpdateTransferRejectsNewRemoteLeafWithMalformedOwnerKey(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx, _ := db.ConnectToTestPostgres(t)
-			dbTx, err := ent.GetDbFromContext(ctx)
-			require.NoError(t, err)
+	owner := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	node := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
+	remoteTransfer.GetLeaves()[0].GetLeaf().OwnerIdentityPublicKey = []byte("not-a-key")
 
-			sender := keys.GeneratePrivateKey().Public()
-			receiver := keys.GeneratePrivateKey().Public()
-			node := createSyncTransferWatchtowerReadyTestNode(t, ctx, dbTx, sender, st.TreeNodeStatusAvailable)
-			localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, sender, receiver)
-			_, err = dbTx.TransferLeaf.Create().
-				SetTransfer(localTransfer).
-				SetLeaf(node).
-				SetPreviousRefundTx(node.RawRefundTx).
-				SetIntermediateRefundTx(createTestTxBytes(t, 3000)).
-				SetSecretCipher([]byte("local-secret")).
-				SetSignature([]byte("local-signature")).
-				Save(ctx)
-			require.NoError(t, err)
+	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+		ctx,
+		remoteTransfer,
+		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+	)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid remote owner identity public key")
 
-			remoteTransfer := syncTransferRemoteTransfer(t, node, sender, receiver)
-			remoteTransfer.Id = localTransfer.ID.String()
-			setSyncTransferRemoteCpfpRefund(t, remoteTransfer, node, receiver)
-			tc.mutate(remoteTransfer.GetLeaves()[0].GetLeaf())
-
-			err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
-				ctx,
-				remoteTransfer,
-				&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
-			)
-			require.Error(t, err)
-
-			refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
-			require.NoError(t, err)
-			require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(sender))
-		})
-	}
+	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TreeNodeStatusAvailable, refreshedNode.Status)
+	require.True(t, refreshedNode.OwnerIdentityPubkey.Equals(owner))
 }
 
 func TestUpdateTransferRejectsMalformedRemoteLeaf(t *testing.T) {
@@ -868,7 +751,9 @@ func TestUpdateTransferRejectsMalformedRemoteLeaf(t *testing.T) {
 	}
 }
 
-func TestUpdateTransferRejectsRemoteNonTerminalRegressionFromReturned(t *testing.T) {
+// A local transfer wrongly parked in a terminal status is one of the states
+// sync_transfers exists to undo, so the sync must be able to move it back out.
+func TestUpdateTransferSyncsTransferOutOfLocalTerminalStatus(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -888,6 +773,13 @@ func TestUpdateTransferRejectsRemoteNonTerminalRegressionFromReturned(t *testing
 	require.NoError(t, err)
 	localTransfer, err = localTransfer.Update().SetStatus(st.TransferStatusReturned).Save(ctx)
 	require.NoError(t, err)
+	// The receiver row goes terminal alongside the transfer, and the
+	// receiver-side pending query filters on it alone.
+	_, err = dbTx.TransferReceiver.Update().
+		Where(enttransferreceiver.TransferIDEQ(localTransfer.ID)).
+		SetStatus(st.TransferReceiverStatusCancelled).
+		Save(ctx)
+	require.NoError(t, err)
 
 	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
 	remoteTransfer.Id = localTransfer.ID.String()
@@ -900,21 +792,138 @@ func TestUpdateTransferRejectsRemoteNonTerminalRegressionFromReturned(t *testing
 		remoteTransfer,
 		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "refusing to sync transfer")
+	require.NoError(t, err)
 
 	refreshedTransfer, err := dbTx.Transfer.Get(ctx, localTransfer.ID)
 	require.NoError(t, err)
-	require.Equal(t, st.TransferStatusReturned, refreshedTransfer.Status)
+	require.Equal(t, st.TransferStatusSenderKeyTweakPending, refreshedTransfer.Status)
+
+	refreshedReceivers, err := dbTx.TransferReceiver.Query().
+		Where(enttransferreceiver.TransferIDEQ(localTransfer.ID)).
+		All(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, refreshedReceivers)
+	for _, r := range refreshedReceivers {
+		require.Equal(t, st.TransferReceiverStatusInitiated, r.Status)
+		require.True(t, r.CompletionTime.IsZero())
+	}
 
 	refreshedNode, err := dbTx.TreeNode.Get(ctx, node.ID)
 	require.NoError(t, err)
-	require.Equal(t, st.TreeNodeStatusAvailable, refreshedNode.Status)
+	require.Equal(t, st.TreeNodeStatusTransferLocked, refreshedNode.Status)
 
 	refreshedLeaf, err := dbTx.TransferLeaf.Get(ctx, localLeaf.ID)
 	require.NoError(t, err)
-	require.Equal(t, []byte("local-secret"), refreshedLeaf.SecretCipher)
-	require.Equal(t, []byte("local-signature"), refreshedLeaf.Signature)
+	require.Equal(t, []byte("remote-secret"), refreshedLeaf.SecretCipher)
+	require.Equal(t, []byte("remote-signature"), refreshedLeaf.Signature)
+}
+
+// Chain-derived and quarantine node statuses are owned by other flows; a
+// terminal sync may only release the lock the transfer itself holds.
+func TestUpdateTransferTerminalSyncReleasesOnlyTransferLockedNodes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		status st.TreeNodeStatus
+	}{
+		{name: "on chain", status: st.TreeNodeStatusOnChain},
+		{name: "exited", status: st.TreeNodeStatusExited},
+		{name: "lost", status: st.TreeNodeStatusLost},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := db.ConnectToTestPostgres(t)
+			dbTx, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+
+			owner := keys.GeneratePrivateKey().Public()
+			receiver := keys.GeneratePrivateKey().Public()
+			lockedNode := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusTransferLocked)
+			untouchableNode := createSyncTransferTestNode(t, ctx, dbTx, owner, tc.status)
+			localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, lockedNode, owner, receiver)
+			for _, node := range []*ent.TreeNode{lockedNode, untouchableNode} {
+				_, err = dbTx.TransferLeaf.Create().
+					SetTransfer(localTransfer).
+					SetLeaf(node).
+					SetPreviousRefundTx(createTestTxBytes(t, 3000)).
+					SetIntermediateRefundTx(createTestTxBytes(t, 3001)).
+					SetSecretCipher([]byte("local-secret")).
+					SetSignature([]byte("local-signature")).
+					Save(ctx)
+				require.NoError(t, err)
+			}
+
+			remoteTransfer := syncTransferRemoteTransfer(t, lockedNode, owner, receiver)
+			remoteTransfer.Id = localTransfer.ID.String()
+			remoteTransfer.Status = pb.TransferStatus_TRANSFER_STATUS_COMPLETED
+
+			// The terminal branch ends by pulling fresh node bytes from the
+			// source operator, which needs a live peer this harness does not
+			// have. The status writes land first and are what this test pins.
+			err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+				ctx,
+				remoteTransfer,
+				&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+			)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "failed to sync tree nodes")
+
+			refreshedLocked, err := dbTx.TreeNode.Get(ctx, lockedNode.ID)
+			require.NoError(t, err)
+			require.Equal(t, st.TreeNodeStatusAvailable, refreshedLocked.Status)
+
+			refreshedUntouchable, err := dbTx.TreeNode.Get(ctx, untouchableNode.ID)
+			require.NoError(t, err)
+			require.Equal(t, tc.status, refreshedUntouchable.Status)
+		})
+	}
+}
+
+// EXPIRED is terminal but never reaches updateTransfer's RETURNED/COMPLETED
+// branch, so getOrCreateLocalTransfer must carry the receiver rows itself.
+func TestUpdateTransferSyncsExpiredTransferReceiversToCancelled(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	owner := keys.GeneratePrivateKey().Public()
+	receiver := keys.GeneratePrivateKey().Public()
+	node := createSyncTransferTestNode(t, ctx, dbTx, owner, st.TreeNodeStatusAvailable)
+	localTransfer := createSyncTransferLocalTransfer(t, ctx, dbTx, node, owner, receiver)
+	_, err = dbTx.TransferLeaf.Create().
+		SetTransfer(localTransfer).
+		SetLeaf(node).
+		SetPreviousRefundTx(createTestTxBytes(t, 3000)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 3001)).
+		SetSecretCipher([]byte("local-secret")).
+		SetSignature([]byte("local-signature")).
+		Save(ctx)
+	require.NoError(t, err)
+
+	remoteTransfer := syncTransferRemoteTransfer(t, node, owner, receiver)
+	remoteTransfer.Id = localTransfer.ID.String()
+	remoteTransfer.Status = pb.TransferStatus_TRANSFER_STATUS_EXPIRED
+
+	err = NewSspRequestHandler(&so.Config{Identifier: "test-operator"}).updateTransfer(
+		ctx,
+		remoteTransfer,
+		&pbssp.SyncTransferRequest{OperatorId: "source-operator"},
+	)
+	require.NoError(t, err)
+
+	refreshedTransfer, err := dbTx.Transfer.Get(ctx, localTransfer.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TransferStatusExpired, refreshedTransfer.Status)
+
+	refreshedReceivers, err := dbTx.TransferReceiver.Query().
+		Where(enttransferreceiver.TransferIDEQ(localTransfer.ID)).
+		All(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, refreshedReceivers)
+	for _, r := range refreshedReceivers {
+		require.Equal(t, st.TransferReceiverStatusCancelled, r.Status)
+		require.True(t, r.CompletionTime.IsZero())
+	}
 }
 
 func createSyncTransferTestNode(t *testing.T, ctx context.Context, dbTx *ent.Client, owner keys.Public, status st.TreeNodeStatus) *ent.TreeNode {
