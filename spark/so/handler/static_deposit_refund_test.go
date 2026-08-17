@@ -24,8 +24,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/utxo"
-	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 func createTestUtxoWithOutpointForDepositAddress(
@@ -144,87 +142,6 @@ func createStaticDepositRefundUserSignatureForTest(t *testing.T, utxo *ent.Utxo,
 	)
 }
 
-func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
-	sparktesting.RequireGripMock(t)
-	defer func() { _ = gripmock.Clear() }()
-
-	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	cfg := setUpTestConfigWithRegtestNoAuthz(t)
-	handler := NewStaticDepositHandler(cfg)
-
-	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
-	rng := rand.NewChaCha8([32]byte{})
-	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
-	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
-
-	testUtxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
-
-	successStub := map[string]any{
-		"UtxoDepositAddress": depositAddress.Address,
-	}
-	err := gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "utxo_swap_completed", nil, nil)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
-	require.NoError(t, err)
-
-	txidString := hex.EncodeToString(testUtxo.Txid)
-	utxoTxid, err := chainhash.NewHashFromStr(txidString)
-	require.NoError(t, err)
-	spendTx := createSpendTxSpendingOutpoint(t, *utxoTxid, testUtxo.Vout, ownerIdentityPubKey, int64(testUtxo.Amount))
-	refundTxBytes := mustSerializeTx(t, spendTx)
-
-	onChainTxOut := wire.NewTxOut(int64(testUtxo.Amount), testUtxo.PkScript)
-	spendTxSigHash, err := sighash.FromTx(spendTx, 0, onChainTxOut)
-	require.NoError(t, err)
-
-	totalAmount := int64(0)
-	for _, txOut := range spendTx.TxOut {
-		totalAmount += txOut.Value
-	}
-
-	userSignature := createValidUserSignatureForTest(
-		t,
-		testUtxo.Txid,
-		testUtxo.Vout,
-		btcnetwork.Regtest,
-		pb.UtxoSwapRequestType_Refund,
-		uint64(totalAmount),
-		spendTxSigHash.Serialize(),
-		ownerIdentityPrivKey,
-	)
-
-	req := &pb.InitiateStaticDepositUtxoRefundRequest{
-		OnChainUtxo: &pb.UTXO{
-			Txid:    testUtxo.Txid,
-			Vout:    testUtxo.Vout,
-			Network: pb.Network_REGTEST,
-		},
-		RefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPubKey.Serialize(),
-			RawTx:                  refundTxBytes,
-			SigningNonceCommitment: createTestSigningCommitment(rng),
-		},
-		UserSignature: userSignature,
-	}
-
-	err = handler.createStaticDepositUtxoRefundWithRollback(ctx, cfg, req)
-	require.NoError(t, err)
-}
-
 func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoNotToStaticDepositAddress(t *testing.T) {
 	sparktesting.RequireGripMock(t)
 	defer func() { _ = gripmock.Clear() }()
@@ -259,7 +176,7 @@ func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoNotToStaticDepositAddress(t 
 	req := createMockInitiateStaticDepositUtxoRefundRequest(t, rng, testUtxo, ownerIdentityPrivKey, ownerSigningPubKey)
 
 	_, err = handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req)
-	require.ErrorContains(t, err, "unable to claim a deposit to a non-static address")
+	require.ErrorContains(t, err, "unable to refund a deposit to a non-static address")
 }
 
 func TestInitiateStaticDepositUtxoRefund_UtxoNotConfirmed(t *testing.T) {
@@ -415,183 +332,6 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundAgainIfAlreadyRefinedBySameCal
 	require.NoError(t, err)
 	assert.Equal(t, st.UtxoSwapStatusCompleted, updatedSwap.Status)
 	assert.Equal(t, st.UtxoSwapRequestTypeRefund, updatedSwap.RequestType)
-}
-
-func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts(t *testing.T) {
-	sparktesting.RequireGripMock(t)
-	defer func() { _ = gripmock.Clear() }()
-
-	// Mock successful refund creation
-	successStub := map[string]any{
-		"UtxoDepositAddress": "bc1ptest_static_deposit_address_for_testing",
-	}
-	err := gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "utxo_swap_completed", nil, nil)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput)
-	require.NoError(t, err)
-
-	aggregateFrostStubOutput := map[string]any{
-		"signature": []byte("test_aggregated_signature"),
-	}
-	err = gripmock.AddStub("frost.FrostService", "aggregate_frost", nil, aggregateFrostStubOutput)
-	require.NoError(t, err)
-
-	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	cfg := setUpTestConfigWithRegtestNoAuthz(t)
-	handler := NewStaticDepositHandler(cfg)
-
-	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
-	rng := rand.NewChaCha8([32]byte{})
-	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
-	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
-	testUtxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
-
-	// Create previous failed refund attempts (cancelled)
-	previousRefundSwap, err := sessionCtx.Client.UtxoSwap.Create().
-		SetStatus(st.UtxoSwapStatusCancelled).
-		SetRequestType(st.UtxoSwapRequestTypeRefund).
-		SetUserIdentityPublicKey(ownerIdentityPubKey).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
-		SetUtxo(testUtxo).
-		SetUtxoValueSats(testUtxo.Amount).
-		SetCreditAmountSats(10000).
-		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Create previous failed claim attempt (cancelled)
-	previousClaimSwap, err := sessionCtx.Client.UtxoSwap.Create().
-		SetStatus(st.UtxoSwapStatusCancelled).
-		SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
-		SetUserIdentityPublicKey(ownerIdentityPubKey).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
-		SetUtxo(testUtxo).
-		SetUtxoValueSats(testUtxo.Amount).
-		SetCreditAmountSats(10000).
-		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey).
-		Save(ctx)
-	require.NoError(t, err)
-
-	req := createMockInitiateStaticDepositUtxoRefundRequest(t, rng, testUtxo, ownerIdentityPrivKey, ownerSigningPubKey)
-
-	// Should succeed despite previous failed attempts
-	resp, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req)
-	require.NoError(t, err)
-	assert.NotNil(t, resp.GetRefundTxSigningResult())
-
-	// Commit tx before checking the result
-	entTx, err := ent.GetTxFromContext(ctx)
-	require.NoError(t, err)
-	require.NoError(t, entTx.Commit())
-
-	// Verify previous failed swaps still exist with cancelled status in separate context
-	updatedRefundSwap, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), previousRefundSwap.ID)
-	require.NoError(t, err)
-	assert.Equal(t, st.UtxoSwapStatusCancelled, updatedRefundSwap.Status)
-
-	updatedClaimSwap, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), previousClaimSwap.ID)
-	require.NoError(t, err)
-	assert.Equal(t, st.UtxoSwapStatusCancelled, updatedClaimSwap.Status)
-
-	// Verify new UtxoSwap was created
-	allSwaps, err := sessionCtx.Client.UtxoSwap.Query().All(t.Context())
-	require.NoError(t, err)
-	assert.Greater(t, len(allSwaps), 2, "New UtxoSwap should be created despite previous failed attempts")
-}
-
-func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwap(t *testing.T) {
-	sparktesting.RequireGripMock(t)
-	defer func() { _ = gripmock.Clear() }()
-
-	// Mock successful refund creation
-	successStub := map[string]any{
-		"UtxoDepositAddress": "bc1ptest_static_deposit_address_for_testing",
-	}
-	err := gripmock.AddStub("spark_internal.SparkInternalService", "create_static_deposit_utxo_refund", nil, successStub)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "utxo_swap_completed", nil, nil)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput)
-	require.NoError(t, err)
-
-	err = gripmock.AddStub("frost.FrostService", "sign_frost", nil, nil)
-	require.NoError(t, err)
-
-	aggregateFrostStubOutput := map[string]any{
-		"signature": []byte("test_aggregated_signature"),
-	}
-	err = gripmock.AddStub("frost.FrostService", "aggregate_frost", nil, aggregateFrostStubOutput)
-	require.NoError(t, err)
-
-	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	cfg := setUpTestConfigWithRegtestNoAuthz(t)
-	handler := NewStaticDepositHandler(cfg)
-
-	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
-	rng := rand.NewChaCha8([32]byte{})
-	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
-	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
-	testUtxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
-
-	req := createMockInitiateStaticDepositUtxoRefundRequest(t, rng, testUtxo, ownerIdentityPrivKey, ownerSigningPubKey)
-
-	resp, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req)
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.NotNil(t, resp.GetRefundTxSigningResult())
-	assert.NotEmpty(t, resp.GetDepositAddress())
-
-	// Commit tx before checking the result
-	entTx, err := ent.GetTxFromContext(ctx)
-	require.NoError(t, err)
-	require.NoError(t, entTx.Commit())
-
-	// Find the specific refund swap created for this UTXO
-	createdSwap, err := sessionCtx.Client.UtxoSwap.Query().
-		Where(
-			utxoswap.HasUtxoWith(utxo.IDEQ(testUtxo.ID)),
-			utxoswap.RequestTypeEQ(st.UtxoSwapRequestTypeRefund),
-			utxoswap.StatusEQ(st.UtxoSwapStatusCompleted),
-		).
-		Only(t.Context())
-	require.NoError(t, err)
-	require.NotNil(t, createdSwap, "Refund UtxoSwap should be created for this UTXO")
-
-	assert.Equal(t, st.UtxoSwapStatusCompleted, createdSwap.Status)
-	assert.Equal(t, st.UtxoSwapRequestTypeRefund, createdSwap.RequestType)
-	assert.False(t, createdSwap.ConsensusManaged, "legacy refund create must not mark the row consensus-managed")
-
-	// Verify this is the only refund swap for this UTXO
-	refundSwapCount, err := sessionCtx.Client.UtxoSwap.Query().
-		Where(
-			utxoswap.HasUtxoWith(utxo.IDEQ(testUtxo.ID)),
-			utxoswap.RequestTypeEQ(st.UtxoSwapRequestTypeRefund),
-		).
-		Count(t.Context())
-	require.NoError(t, err)
-	assert.Equal(t, 1, refundSwapCount, "Should have exactly one refund swap for this UTXO")
 }
 
 func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t *testing.T) {

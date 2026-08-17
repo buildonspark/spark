@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
@@ -83,36 +82,6 @@ var (
 		},
 	}
 )
-
-func createValidBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
-	return createValidBitcoinTxBytesWithSequence(t, receiverPubKey, 9000)
-}
-
-func createValidBitcoinTxBytesWithSequence(t *testing.T, receiverPubKey keys.Public, sequence uint32) []byte {
-	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
-	require.NoError(t, err)
-
-	tx := wire.NewMsgTx(3)
-
-	tx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{
-			Hash:  chainhash.Hash{},
-			Index: 0xffffffff,
-		},
-		Sequence: sequence,
-	})
-
-	tx.AddTxOut(&wire.TxOut{
-		Value:    1000,
-		PkScript: p2trScript,
-	})
-
-	var buf bytes.Buffer
-	err = tx.Serialize(&buf)
-	require.NoError(t, err)
-
-	return buf.Bytes()
-}
 
 func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client) *ent.SigningKeyshare {
 	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)

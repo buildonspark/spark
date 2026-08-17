@@ -715,9 +715,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						Order(utxoswap.ByCreateTime(sql.OrderDesc())).
 						Limit(100)
 
-					// Consensus (2PC) swap rows — refunds under
-					// KnobUseConsensusStaticDepositUtxoRefund and fixed-amount swaps
-					// under KnobUseConsensusStaticDepositUtxoSwap — structurally never
+					// Consensus (2PC) refund and fixed-amount swap rows structurally never
 					// match this query: participant rows carry the coordinator's key
 					// (DispatchPrepare rejects a prepare naming the receiver as
 					// coordinator), and the coordinator's own row is created and
@@ -726,7 +724,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					// SO's key. Any CREATED refund or fixed-amount row matched here is
 					// therefore a legacy stray (coordinator died between create-fanout
 					// and complete), and sweeping it keeps the legacy self-heal path
-					// alive across the knob flips: refund retries only re-sign against
+					// alive: refund retries only re-sign against
 					// a COMPLETED swap, and fixed swaps have no re-sign path at all,
 					// so an unswept stray would block the UTXO's active-swap slot
 					// indefinitely.

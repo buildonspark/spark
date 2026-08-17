@@ -34,9 +34,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // StaticDepositUtxoRefundFlowHandler implements consensus.FlowHandler for
-// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND. Reached via the engine when
-// InitiateStaticDepositUtxoRefund routes through it (gated on
-// KnobUseConsensusStaticDepositUtxoRefund).
+// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND.
 //
 // The signing keeps the public RPC a single call: the coordinator collects FROST
 // round-1 commitments before engine.Execute and carries them in the prepare op, so
@@ -563,10 +561,8 @@ func buildStaticDepositUtxoRefundCoordinatorFlow(config *so.Config, req *pbspark
 // Coordinator entrypoint
 // ---------------------------------------------------------------------------
 
-// initiateStaticDepositUtxoRefundConsensus is the knob-gated 2PC entrypoint. It
-// runs the coordinator-only validation + idempotency short-circuit (identical to
-// the legacy InitiateStaticDepositUtxoRefund), collects FROST round-1 commitments
-// (keeping the public RPC a single call), then drives the flow through the engine.
+// initiateStaticDepositUtxoRefundConsensus drives the refund through the 2PC engine,
+// collecting FROST round-1 commitments up front so the public RPC stays a single call.
 func (o *StaticDepositHandler) initiateStaticDepositUtxoRefundConsensus(ctx context.Context, config *so.Config, req *pbspark.InitiateStaticDepositUtxoRefundRequest) (*pbspark.InitiateStaticDepositUtxoRefundResponse, error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
