@@ -76,7 +76,6 @@ knobs:
     spark.so.use_consensus_initiate_counter_transfer: 1
     spark.so.use_consensus_initiate_preimage_swap: 1
     spark.so.use_consensus_initiate_swap_primary_transfer: 1
-    spark.so.use_consensus_reserve_instant_static_deposit_utxo_swap: 1
     spark.so.grpc.server.stream_heartbeat.enabled: 100
     spark.so.log_transfer_query_invocations: 0
     spark.so.log_transfer_query_invocations_slow_ms: 0

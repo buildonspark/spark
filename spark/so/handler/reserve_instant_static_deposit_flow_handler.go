@@ -26,7 +26,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // ReserveInstantStaticDepositFlowHandler implements consensus.FlowHandler for phase one of the
-// instant static deposit claim (gated on KnobUseConsensusReserveInstantStaticDepositUtxoSwap).
+// instant static deposit claim.
 // Simpler than the fixed-amount swap: no spend-tx FROST signing (the UTXO may be unconfirmed;
 // the spend is signed at claim time) and the swap row STAYS CREATED at commit — CREATED-with-
 // transfer is the reserved state the claim phase consumes. Delegates the SSP→user transfer to

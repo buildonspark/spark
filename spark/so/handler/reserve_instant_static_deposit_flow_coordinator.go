@@ -117,16 +117,12 @@ func (f *reserveInstantStaticDepositCoordinatorFlow) RollbackPayload() proto.Mes
 // Coordinator entrypoint
 // ---------------------------------------------------------------------------
 
-// reserveInstantStaticDepositUtxoSwapConsensus is the knob-gated 2PC entrypoint for phase one
+// reserveInstantStaticDepositUtxoSwapConsensus is the 2PC entrypoint for phase one
 // of the instant static deposit claim. The caller has already done structural checks, auth, and
 // kill-switch; this re-runs coordinator-only validation (instant-enabled knob, soft UTXO check +
 // duplicate short-circuit), fast-fails the instant user signature before any cross-operator work,
 // then drives the engine. No FROST round-1 collection — reserve signs nothing against the UTXO.
 func (o *StaticDepositHandler) reserveInstantStaticDepositUtxoSwapConsensus(ctx context.Context, config *so.Config, req *pbssp.ReserveInstantStaticDepositUtxoSwapRequest) (*pbssp.ReserveInstantStaticDepositUtxoSwapResponse, error) {
-	if req.GetTransfer().GetTransferPackage() == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
-	}
-
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db: %w", err)
@@ -155,6 +151,12 @@ func (o *StaticDepositHandler) reserveInstantStaticDepositUtxoSwapConsensus(ctx 
 		if existingSwap != nil {
 			return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 		}
+	}
+
+	// Kept below the enabled-knob and duplicate gates so a disabled feature or
+	// replayed reserve reports its real error rather than a missing-field one.
+	if req.GetTransfer().GetTransferPackage() == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer_package is required"))
 	}
 
 	// Fast-fail the instant user signature (and the cheap checks it depends on)

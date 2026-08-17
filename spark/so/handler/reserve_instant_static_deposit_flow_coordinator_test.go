@@ -42,12 +42,14 @@ func validRegtestUtxo() *pb.UTXO {
 }
 
 // TestReserveInstantStaticDepositUtxoSwapConsensus_ErrorIfMissingTransferPackage
-// covers the structural transfer_package presence check at the very top of the
-// entrypoint (runs before knob/db/network resolution).
+// covers the structural transfer_package presence check, which sits below the
+// enabled-knob and duplicate gates so those report their own errors first.
 func TestReserveInstantStaticDepositUtxoSwapConsensus_ErrorIfMissingTransferPackage(t *testing.T) {
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	ctx = enableInstantKnob(ctx)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
+	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
 	req := &pbssp.ReserveInstantStaticDepositUtxoSwapRequest{
 		OnChainUtxo: validRegtestUtxo(),
