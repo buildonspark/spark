@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { decodeInvoice } from "../../../services/bolt11-spark.js";
@@ -17,6 +17,8 @@ import {
 
 const DEPOSIT_AMOUNT = 10000n;
 const INVOICE_AMOUNT = 1000;
+
+jest.retryTimes(0);
 
 const PENDING_SEND_STATUSES = [
   LightningSendRequestStatus.CREATED,
@@ -48,6 +50,8 @@ describe("HODL lightning invoice", () => {
     // Bob keeps the preimage local — it is never shared with the SOs, which is
     // what makes this a HODL invoice on Spark.
     const preimage = crypto.getRandomValues(new Uint8Array(32));
+    const wrongPreimage = new Uint8Array(preimage);
+    wrongPreimage.set([wrongPreimage[0]! ^ 1], 0);
     const paymentHash = bytesToHex(sha256(preimage));
 
     const invoice = await bobWallet.createLightningHodlInvoice({
@@ -90,6 +94,10 @@ describe("HODL lightning invoice", () => {
       timeoutMs: 90_000,
     });
 
+    await expect(
+      bobWallet.claimHTLC(bytesToHex(wrongPreimage)),
+    ).rejects.toThrow("preimage request not found");
+
     // Bob settles by revealing the preimage to the SO coordinator. This is
     // NOT_FOUND until the SSP creates the hash-locked receive-side transfer,
     // so retrying doubles as the readiness wait. Don't gate on receive-request
@@ -97,26 +105,46 @@ describe("HODL lightning invoice", () => {
     await retryUntilSuccess(() => bobWallet.claimHTLC(bytesToHex(preimage)), {
       maxAttempts: 30,
       delayMs: 2000,
+      timeoutMs: 60_000,
     });
 
     await bobClaimed;
     const { balance: bobBalance } = await bobWallet.getBalance();
     expect(bobBalance).toBe(BigInt(INVOICE_AMOUNT));
 
-    const completed = await retryUntilSuccess(
-      async () => {
-        const req = await aliceWallet.getLightningSendRequest(sendRequest.id);
-        if (req?.status !== LightningSendRequestStatus.TRANSFER_COMPLETED) {
-          throw new Error(
-            `send request ${sendRequest.id} not complete yet: ${req?.status}`,
-          );
-        }
-        return req;
-      },
-      { maxAttempts: 30, delayMs: 2000 },
-    );
+    const [completed, completedReceive] = await Promise.all([
+      retryUntilSuccess(
+        async () => {
+          const req = await aliceWallet.getLightningSendRequest(sendRequest.id);
+          if (req?.status !== LightningSendRequestStatus.TRANSFER_COMPLETED) {
+            throw new Error(
+              `send request ${sendRequest.id} not complete yet: ${req?.status}`,
+            );
+          }
+          return req;
+        },
+        { maxAttempts: 30, delayMs: 2000, timeoutMs: 60_000 },
+      ),
+      retryUntilSuccess(
+        async () => {
+          const req = await bobWallet.getLightningReceiveRequest(invoice.id);
+          if (
+            req?.status !== LightningReceiveRequestStatus.TRANSFER_COMPLETED
+          ) {
+            throw new Error(
+              `receive request ${invoice.id} not complete yet: ${req?.status}`,
+            );
+          }
+          return req;
+        },
+        { maxAttempts: 30, delayMs: 2000, timeoutMs: 60_000 },
+      ),
+    ]);
     expect(completed.status).toEqual(
       LightningSendRequestStatus.TRANSFER_COMPLETED,
+    );
+    expect(completedReceive.status).toEqual(
+      LightningReceiveRequestStatus.TRANSFER_COMPLETED,
     );
 
     // Sender was debited the payment amount (plus the SSP fee).

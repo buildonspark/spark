@@ -1,10 +1,13 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
+import { bytesToHex } from "@noble/curves/utils";
+import { sha256 } from "@noble/hashes/sha2";
 import { SparkValidationError } from "../../../errors/types.js";
 import { decodeInvoice } from "../../../services/bolt11-spark.js";
 import { type ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
   CurrencyUnit,
+  type LightningReceiveRequest,
   LightningReceiveRequestStatus,
   type LightningSendRequest,
   LightningSendRequestStatus,
@@ -24,10 +27,613 @@ import {
 
 const DEPOSIT_AMOUNT = 10000n;
 const INVOICE_AMOUNT = 1000;
+const APP_MINIKUBE_HOST = "app.minikube.local";
+const INTERNAL_GRAPHQL_PATH = "/graphql/internal";
+const FIRST_PARTY_GRAPHQL_PATH = "/graphql/frontend";
+const HERMETIC_SSP_USER_PASSWORD = "t3st1246!@_1!";
+const GRAPHQL_REQUEST_TIMEOUT_MS = 30_000;
+const EXPIRY_REFUND_KNOBS = {
+  "spark.ssp.lightning_receive.min_invoice_expiry_secs": 5,
+  "spark.ssp.lightning_receive.expiry_buffer_secs": 5,
+  "spark.ssp.internal_lightning_payment.max_preimage_swap_expiry_secs": 45,
+  "spark.ssp.internal_lightning_payment.state_machine.rollout_pct": 100,
+  "spark.ssp.internal_lightning_payment.wait_on_missing_preimage": 1,
+};
+const SSP_RELEASE_KNOBS = {
+  "spark.ssp.internal_lightning_payment.release_preimage_enqueue_enabled": 1,
+  "spark.ssp.internal_lightning_payment.state_machine.rollout_pct": 100,
+  "spark.ssp.internal_lightning_payment.wait_on_missing_preimage": 1,
+};
+// Sparkcore polls parked payments every three minutes, while SOs only return
+// preimage swaps after they have been stuck for five minutes.
+const PREIMAGE_SWAP_EXPIRY_TIMEOUT_MS = 9 * 60 * 1000;
+
+jest.retryTimes(0);
 
 const options: ConfigOptions = {
   network: "LOCAL",
 };
+
+type GraphqlError = {
+  message: string;
+};
+
+type KnobSnapshot = {
+  name: string;
+  target?: string | null;
+  value: number;
+};
+
+function randomPreimage(): Uint8Array {
+  const preimage = new Uint8Array(32);
+  crypto.getRandomValues(preimage);
+  return preimage;
+}
+
+function paymentHashForPreimage(preimage: Uint8Array): string {
+  return bytesToHex(sha256(preimage));
+}
+
+function endpointForPath(path: string): {
+  url: string;
+  headers: Record<string, string>;
+} {
+  const internalEndpoint =
+    process.env.LIGHTSPARK_INTERNAL_API_ENDPOINT ??
+    process.env.SPARK_INTERNAL_GRAPHQL_ENDPOINT;
+  if (path === INTERNAL_GRAPHQL_PATH && internalEndpoint) {
+    return { url: internalEndpoint, headers: {} };
+  }
+
+  const baseUrl = process.env.SPARKCORE_BASE_URL;
+  if (baseUrl) {
+    return { url: `${baseUrl.replace(/\/$/, "")}${path}`, headers: {} };
+  }
+
+  if (
+    path.startsWith("/graphql/server") &&
+    process.env.LIGHTSPARK_API_ENDPOINT
+  ) {
+    return { url: process.env.LIGHTSPARK_API_ENDPOINT, headers: {} };
+  }
+
+  if (path === INTERNAL_GRAPHQL_PATH && process.env.LIGHTSPARK_API_ENDPOINT) {
+    return {
+      url: new URL(path, process.env.LIGHTSPARK_API_ENDPOINT).toString(),
+      headers: {},
+    };
+  }
+
+  const ingressHost = process.env.SPARK_LOCAL_INGRESS_HOST;
+  if (ingressHost) {
+    return {
+      url: `http://${ingressHost}${path}`,
+      headers: { Host: APP_MINIKUBE_HOST },
+    };
+  }
+
+  if (path === INTERNAL_GRAPHQL_PATH) {
+    throw new Error(
+      "Missing internal GraphQL endpoint env. Set LIGHTSPARK_INTERNAL_API_ENDPOINT, SPARKCORE_BASE_URL, LIGHTSPARK_API_ENDPOINT, or SPARK_LOCAL_INGRESS_HOST so /graphql/internal can resolve in hermetic tests.",
+    );
+  }
+
+  return { url: `http://${APP_MINIKUBE_HOST}${path}`, headers: {} };
+}
+
+async function executeGraphql<T>({
+  path,
+  query,
+  variables,
+  additionalHeaders,
+}: {
+  path: string;
+  query: string;
+  variables: Record<string, unknown>;
+  additionalHeaders?: Record<string, string>;
+}): Promise<T> {
+  const endpoint = endpointForPath(path);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...endpoint.headers,
+    ...additionalHeaders,
+  };
+
+  const response = await fetch(endpoint.url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(GRAPHQL_REQUEST_TIMEOUT_MS),
+  });
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(`GraphQL HTTP ${response.status}: ${body}`);
+  }
+
+  const result = JSON.parse(body) as { data?: T; errors?: GraphqlError[] };
+  if (result.errors?.length) {
+    throw new Error(
+      `GraphQL errors: ${result.errors.map((e) => e.message).join("; ")}`,
+    );
+  }
+  if (!result.data) {
+    throw new Error(`GraphQL response missing data: ${body}`);
+  }
+  return result.data;
+}
+
+function envValue(...names: string[]): string | undefined {
+  return names.map((name) => process.env[name]).find(Boolean);
+}
+
+function sspApiTokenAuthorization(): string | undefined {
+  const clientId = envValue(
+    "SPARK_SSP_API_TOKEN_CLIENT_ID",
+    "LIGHTSPARK_SSP_API_TOKEN_CLIENT_ID",
+    "LIGHTSPARK_API_TOKEN_CLIENT_ID",
+  );
+  const clientSecret = envValue(
+    "SPARK_SSP_API_TOKEN_CLIENT_SECRET",
+    "LIGHTSPARK_SSP_API_TOKEN_CLIENT_SECRET",
+    "LIGHTSPARK_API_TOKEN_CLIENT_SECRET",
+  );
+  if (!clientId || !clientSecret) {
+    return undefined;
+  }
+  return `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`;
+}
+
+async function hermeticSspAuthorization(invoiceId: string): Promise<{
+  authorization: string;
+  apiTokenId: string;
+  sessionCookie: string;
+}> {
+  const userData = await executeGraphql<{
+    entity?: {
+      data?: {
+        destination?: {
+          owner?: {
+            users?: { entities?: Array<{ email?: string }> };
+          };
+        };
+      };
+    };
+  }>({
+    path: INTERNAL_GRAPHQL_PATH,
+    query: `
+      query GetSparkInvoiceOwnerUser($id: ID!) {
+        entity(id: $id) {
+          ... on Invoice {
+            data {
+              destination {
+                ... on LightsparkNode {
+                  owner {
+                    ... on Account {
+                      users(first: 1) {
+                      entities {
+                          email
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+    variables: { id: invoiceId },
+  });
+  const email =
+    userData.entity?.data?.destination?.owner?.users?.entities?.[0]?.email;
+  if (!email) {
+    throw new Error(`invoice ${invoiceId} did not expose an owner email`);
+  }
+
+  const endpoint = endpointForPath(FIRST_PARTY_GRAPHQL_PATH);
+  const loginResponse = await fetch(endpoint.url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...endpoint.headers,
+    },
+    body: JSON.stringify({
+      query: `
+        mutation LoginAsSparkInvoiceOwner($email: String!, $password: String!) {
+          login_with_password(input: {
+            email: $email
+            password: $password
+            recaptcha_token: ""
+          }) {
+            ... on LoginWithPasswordOutput {
+              account_id
+            }
+          }
+        }
+      `,
+      variables: { email, password: HERMETIC_SSP_USER_PASSWORD },
+    }),
+    signal: AbortSignal.timeout(GRAPHQL_REQUEST_TIMEOUT_MS),
+  });
+  const loginBody = await loginResponse.text();
+  if (!loginResponse.ok) {
+    throw new Error(`GraphQL HTTP ${loginResponse.status}: ${loginBody}`);
+  }
+  const loginResult = JSON.parse(loginBody) as { errors?: GraphqlError[] };
+  if (loginResult.errors?.length) {
+    throw new Error(
+      `GraphQL errors: ${loginResult.errors.map((error) => error.message).join("; ")}`,
+    );
+  }
+  const sessionCookie = loginResponse.headers
+    .get("set-cookie")
+    ?.match(/(?:^|,\s*)(session=[^;,]+)/)?.[1];
+  if (!sessionCookie) {
+    throw new Error("SSP user login did not return a session cookie");
+  }
+
+  const tokenData = await executeGraphql<{
+    create_api_token?: {
+      api_token?: { id?: string; client_id?: string };
+      client_secret?: string;
+    };
+  }>({
+    path: FIRST_PARTY_GRAPHQL_PATH,
+    query: `
+      mutation CreateSparkIntegrationTestApiToken {
+        create_api_token(input: {
+          name: "Spark hermetic integration test"
+          permissions: [ALL]
+        }) {
+          api_token {
+            id
+            client_id
+          }
+          client_secret
+        }
+      }
+    `,
+    variables: {},
+    additionalHeaders: { Cookie: sessionCookie },
+  });
+  const apiTokenId = tokenData.create_api_token?.api_token?.id;
+  const clientId = tokenData.create_api_token?.api_token?.client_id;
+  const clientSecret = tokenData.create_api_token?.client_secret;
+  if (!apiTokenId || !clientId || !clientSecret) {
+    throw new Error("SSP API token mutation did not return credentials");
+  }
+  return {
+    authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`,
+    apiTokenId,
+    sessionCookie,
+  };
+}
+
+async function deleteHermeticSspApiToken(
+  apiTokenId: string,
+  sessionCookie: string,
+): Promise<void> {
+  await executeGraphql<{ delete_api_token?: { __typename?: string } }>({
+    path: FIRST_PARTY_GRAPHQL_PATH,
+    query: `
+      mutation DeleteSparkIntegrationTestApiToken($apiTokenId: ID!) {
+        delete_api_token(input: { api_token_id: $apiTokenId }) {
+          __typename
+        }
+      }
+    `,
+    variables: { apiTokenId },
+    additionalHeaders: { Cookie: sessionCookie },
+  });
+}
+
+async function withSspAuthorization<T>(
+  invoiceId: string,
+  fn: (headers: Record<string, string>) => Promise<T>,
+): Promise<T> {
+  const authorization = sspApiTokenAuthorization();
+  if (authorization) {
+    return await fn({ Authorization: authorization });
+  }
+  if (process.env.HERMETIC_TEST === "true") {
+    const hermeticAuthorization = await hermeticSspAuthorization(invoiceId);
+    try {
+      return await fn({ Authorization: hermeticAuthorization.authorization });
+    } finally {
+      await deleteHermeticSspApiToken(
+        hermeticAuthorization.apiTokenId,
+        hermeticAuthorization.sessionCookie,
+      );
+    }
+  }
+  throw new Error(
+    "Missing SSP API token env. Set SPARK_SSP_API_TOKEN_CLIENT_ID and SPARK_SSP_API_TOKEN_CLIENT_SECRET for the account that owns the SSP Spark Lightning node.",
+  );
+}
+
+async function getLightningInvoiceId(
+  receiveRequestId: string,
+): Promise<string> {
+  const data = await executeGraphql<{
+    entity?: {
+      __typename?: string;
+      lightning_invoice?: { id?: string };
+    };
+  }>({
+    path: INTERNAL_GRAPHQL_PATH,
+    query: `
+      query GetSparkReceiveRequestInvoice($id: ID!) {
+        entity(id: $id) {
+          __typename
+          ... on LightningReceiveRequest {
+            lightning_invoice {
+              id
+            }
+          }
+        }
+      }
+    `,
+    variables: { id: receiveRequestId },
+  });
+
+  const invoiceId = data.entity?.lightning_invoice?.id;
+  if (!invoiceId) {
+    throw new Error(
+      `receive request ${receiveRequestId} did not expose an internal lightning invoice id`,
+    );
+  }
+  return invoiceId;
+}
+
+async function getInternalLightningReceiveRequestStatus(
+  receiveRequestId: string,
+): Promise<string> {
+  const data = await executeGraphql<{
+    entity?: {
+      __typename?: string;
+      status?: string;
+    };
+  }>({
+    path: INTERNAL_GRAPHQL_PATH,
+    query: `
+      query GetSparkReceiveRequestStatus($id: ID!) {
+        entity(id: $id) {
+          __typename
+          ... on LightningReceiveRequest {
+            status
+          }
+        }
+      }
+    `,
+    variables: { id: receiveRequestId },
+  });
+
+  const status = data.entity?.status;
+  if (!status) {
+    throw new Error(
+      `receive request ${receiveRequestId} did not expose a status`,
+    );
+  }
+  return status;
+}
+
+async function releasePaymentPreimage(
+  invoiceId: string,
+  preimage: Uint8Array,
+  additionalHeaders: Record<string, string>,
+): Promise<string> {
+  const data = await executeGraphql<{
+    release_payment_preimage?: {
+      invoice?: { id?: string };
+    };
+  }>({
+    path: "/graphql/server/rc",
+    query: `
+      mutation ReleasePaymentPreimage($invoiceId: ID!, $paymentPreimage: Hash32!) {
+        release_payment_preimage(input: {
+          invoice_id: $invoiceId
+          payment_preimage: $paymentPreimage
+        }) {
+          invoice {
+            id
+          }
+        }
+      }
+    `,
+    variables: {
+      invoiceId,
+      paymentPreimage: bytesToHex(preimage),
+    },
+    additionalHeaders,
+  });
+
+  const releasedInvoiceId = data.release_payment_preimage?.invoice?.id;
+  if (!releasedInvoiceId) {
+    throw new Error("release_payment_preimage did not return an invoice id");
+  }
+  return releasedInvoiceId;
+}
+
+async function getSparkcoreKnob(
+  name: string,
+): Promise<KnobSnapshot | undefined> {
+  const data = await executeGraphql<{
+    OPS_knobs?: {
+      entities?: KnobSnapshot[];
+    };
+  }>({
+    path: INTERNAL_GRAPHQL_PATH,
+    query: `
+      query GetSparkcoreKnob($name: String!) {
+        OPS_knobs(first: 20, name_contains: $name) {
+          entities {
+            name
+            target
+            value
+          }
+        }
+      }
+    `,
+    variables: { name },
+  });
+
+  return data.OPS_knobs?.entities?.find(
+    (knob) => knob.name === name && !knob.target,
+  );
+}
+
+async function setSparkcoreKnob(name: string, value: number): Promise<void> {
+  await executeGraphql<{ OPS_set_knob?: null }>({
+    path: INTERNAL_GRAPHQL_PATH,
+    query: `
+      mutation SetSparkcoreKnob($name: String!, $value: Float!) {
+        OPS_set_knob(input: {
+          name: $name
+          target: null
+          value: $value
+        })
+      }
+    `,
+    variables: { name, value },
+  });
+}
+
+async function deleteSparkcoreKnob(name: string): Promise<void> {
+  await executeGraphql<{ OPS_delete_knob?: null }>({
+    path: INTERNAL_GRAPHQL_PATH,
+    query: `
+      mutation DeleteSparkcoreKnob($name: String!) {
+        OPS_delete_knob(input: {
+          name: $name
+          target: null
+        })
+      }
+    `,
+    variables: { name },
+  });
+}
+
+async function withSparkcoreKnobs<T>(
+  knobs: Record<string, number>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const snapshots = new Map<string, KnobSnapshot | undefined>();
+  const attemptedKnobs = new Set<string>();
+  for (const name of Object.keys(knobs)) {
+    snapshots.set(name, await getSparkcoreKnob(name));
+  }
+
+  let outcome: { success: true; value: T } | { success: false; error: unknown };
+  try {
+    for (const [name, value] of Object.entries(knobs)) {
+      attemptedKnobs.add(name);
+      await setSparkcoreKnob(name, value);
+    }
+    outcome = { success: true, value: await fn() };
+  } catch (error) {
+    outcome = { success: false, error };
+  }
+
+  const restorationErrors: unknown[] = [];
+  for (const [name, snapshot] of snapshots) {
+    try {
+      if (snapshot) {
+        await setSparkcoreKnob(name, snapshot.value);
+      } else if (attemptedKnobs.has(name)) {
+        await deleteSparkcoreKnob(name);
+      }
+    } catch (error) {
+      restorationErrors.push(error);
+    }
+  }
+  if (restorationErrors.length > 0) {
+    const errors = outcome.success
+      ? restorationErrors
+      : [outcome.error, ...restorationErrors];
+    throw new AggregateError(errors, "Failed to restore sparkcore knobs");
+  }
+  if (!outcome.success) {
+    throw outcome.error;
+  }
+  return outcome.value;
+}
+
+async function fundWallet(wallet: SparkWalletTestingWithStream): Promise<void> {
+  const faucet = BitcoinFaucet.getInstance();
+
+  const depositAddress = await wallet.getSingleUseDepositAddress();
+  expect(depositAddress).toBeDefined();
+
+  const signedTx = await faucet.sendToAddress(depositAddress, DEPOSIT_AMOUNT);
+  await faucet.mineBlocksAndWaitForMiningToComplete(6);
+  await wallet.claimDeposit(signedTx.id);
+  await waitForBalance(wallet, DEPOSIT_AMOUNT);
+}
+
+async function waitForSendRequestStatus(
+  wallet: SparkWalletTestingWithStream,
+  requestId: string,
+  status: LightningSendRequestStatus,
+  retryOptions?: {
+    maxAttempts?: number;
+    delayMs?: number;
+    timeoutMs?: number;
+  },
+): Promise<LightningSendRequest> {
+  return await retryUntilSuccess(async () => {
+    const req = await wallet.getLightningSendRequest(requestId);
+    if (req?.status !== status) {
+      throw new Error(
+        `send request ${requestId} not ${status} yet: ${req?.status}`,
+      );
+    }
+    return req;
+  }, retryOptions);
+}
+
+async function waitForReceiveRequestStatus(
+  wallet: SparkWalletTestingWithStream,
+  requestId: string,
+  status: LightningReceiveRequestStatus,
+  retryOptions?: {
+    maxAttempts?: number;
+    delayMs?: number;
+    timeoutMs?: number;
+  },
+): Promise<LightningReceiveRequest> {
+  return await retryUntilSuccess(async () => {
+    const req = await wallet.getLightningReceiveRequest(requestId);
+    if (req?.status !== status) {
+      throw new Error(
+        `receive request ${requestId} not ${status} yet: ${req?.status}`,
+      );
+    }
+    return req;
+  }, retryOptions);
+}
+
+async function waitForInternalReceiveRequestStatus(
+  requestId: string,
+  status: string,
+  retryOptions?: {
+    maxAttempts?: number;
+    delayMs?: number;
+    timeoutMs?: number;
+  },
+): Promise<string> {
+  return await retryUntilSuccess(async () => {
+    const currentStatus =
+      await getInternalLightningReceiveRequestStatus(requestId);
+    if (currentStatus !== status) {
+      throw new Error(
+        `receive request ${requestId} not ${status} yet: ${currentStatus}`,
+      );
+    }
+    return currentStatus;
+  }, retryOptions);
+}
+
 const { wallet: walletStatic } = await SparkWallet.initialize({
   mnemonicOrSeed:
     "logic ripple layer execute smart disease marine hero monster talent crucial unfair horror shadow maze abuse avoid story loop jaguar sphere trap decrease turn",
@@ -687,20 +1293,23 @@ describe("Lightning Network provider", () => {
       // Sender leg: the send request surfaces terminal success. TRANSFER_COMPLETED
       // is reached by both the legacy flow and the internal flow, so this holds
       // regardless of the knob.
-      const completed = await retryUntilSuccess(
-        async () => {
-          const req = await aliceWallet.getLightningSendRequest(sendRequest.id);
-          if (req?.status !== LightningSendRequestStatus.TRANSFER_COMPLETED) {
-            throw new Error(
-              `send request ${sendRequest.id} not complete yet: ${req?.status}`,
-            );
-          }
-          return req;
-        },
+      const completed = await waitForSendRequestStatus(
+        aliceWallet,
+        sendRequest.id,
+        LightningSendRequestStatus.TRANSFER_COMPLETED,
         { maxAttempts: 30, delayMs: 2000 },
       );
       expect(completed.status).toEqual(
         LightningSendRequestStatus.TRANSFER_COMPLETED,
+      );
+      const completedReceive = await waitForReceiveRequestStatus(
+        bobWallet,
+        invoice.id,
+        LightningReceiveRequestStatus.TRANSFER_COMPLETED,
+        { maxAttempts: 30, delayMs: 2000 },
+      );
+      expect(completedReceive.status).toEqual(
+        LightningReceiveRequestStatus.TRANSFER_COMPLETED,
       );
 
       // Sender was debited the payment amount (plus the SSP fee).
@@ -709,5 +1318,204 @@ describe("Lightning Network provider", () => {
         DEPOSIT_AMOUNT - BigInt(INVOICE_AMOUNT),
       );
     }, 180_000);
+
+    it("advances an idempotent SSP release after the receiver supplies SO proof", async () => {
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+      const { wallet: bobWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+
+      await fundWallet(aliceWallet);
+
+      await withSparkcoreKnobs(SSP_RELEASE_KNOBS, async () => {
+        const preimage = randomPreimage();
+        const wrongPreimage = new Uint8Array(preimage);
+        wrongPreimage.set([wrongPreimage[0]! ^ 1], 0);
+        const invoice = await bobWallet.createLightningHodlInvoice({
+          amountSats: INVOICE_AMOUNT,
+          paymentHash: paymentHashForPreimage(preimage),
+          memo: "internal hodl ssp release test",
+          expirySeconds: 500,
+        });
+        expect(invoice.status).toEqual(
+          LightningReceiveRequestStatus.INVOICE_CREATED,
+        );
+
+        const payResult = await aliceWallet.payLightningInvoice({
+          invoice: invoice.invoice.encodedInvoice,
+          maxFeeSats: 100,
+        });
+        expect("transferDirection" in payResult).toBe(false);
+
+        const sendRequest = payResult as LightningSendRequest;
+        expect(sendRequest.id).toBeDefined();
+
+        const initiated = await waitForSendRequestStatus(
+          aliceWallet,
+          sendRequest.id,
+          LightningSendRequestStatus.LIGHTNING_PAYMENT_INITIATED,
+          { maxAttempts: 30, delayMs: 2000, timeoutMs: 60_000 },
+        );
+        expect(initiated.status).toEqual(
+          LightningSendRequestStatus.LIGHTNING_PAYMENT_INITIATED,
+        );
+
+        const invoiceId = await getLightningInvoiceId(invoice.id);
+        await withSspAuthorization(invoiceId, async (headers) => {
+          await expect(
+            releasePaymentPreimage(invoiceId, wrongPreimage, headers),
+          ).rejects.toThrow("Preimage does not match payment hash");
+
+          const releasedInvoiceId = await releasePaymentPreimage(
+            invoiceId,
+            preimage,
+            headers,
+          );
+          expect(releasedInvoiceId).toBe(invoiceId);
+
+          const { balance: bobBalanceBeforeProof } =
+            await bobWallet.getBalance();
+          expect(bobBalanceBeforeProof).toBe(0n);
+
+          // The SSP's invoice preimage is a release signal, not proof that the
+          // receiver-side SO swap can settle.
+          await retryUntilSuccess(
+            () => bobWallet.claimHTLC(bytesToHex(preimage)),
+            {
+              maxAttempts: 30,
+              delayMs: 2000,
+              timeoutMs: 60_000,
+            },
+          );
+
+          const retriedInvoiceId = await releasePaymentPreimage(
+            invoiceId,
+            preimage,
+            headers,
+          );
+          expect(retriedInvoiceId).toBe(invoiceId);
+          await waitForBalance(bobWallet, BigInt(INVOICE_AMOUNT), 90_000);
+
+          const { balance: bobBalance } = await bobWallet.getBalance();
+          expect(bobBalance).toBe(BigInt(INVOICE_AMOUNT));
+
+          const [completed, completedReceive] = await Promise.all([
+            waitForSendRequestStatus(
+              aliceWallet,
+              sendRequest.id,
+              LightningSendRequestStatus.TRANSFER_COMPLETED,
+              { maxAttempts: 90, delayMs: 1000, timeoutMs: 90_000 },
+            ),
+            waitForReceiveRequestStatus(
+              bobWallet,
+              invoice.id,
+              LightningReceiveRequestStatus.TRANSFER_COMPLETED,
+              { maxAttempts: 90, delayMs: 1000, timeoutMs: 90_000 },
+            ),
+          ]);
+          expect(completed.status).toEqual(
+            LightningSendRequestStatus.TRANSFER_COMPLETED,
+          );
+          expect(completedReceive.status).toEqual(
+            LightningReceiveRequestStatus.TRANSFER_COMPLETED,
+          );
+        });
+      });
+    }, 240_000);
+
+    it("refunds the sender after a locally-issued HODL swap expires", async () => {
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+      const { wallet: bobWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: { network: "LOCAL" },
+        });
+
+      await fundWallet(aliceWallet);
+
+      const preimage = randomPreimage();
+      await withSparkcoreKnobs(EXPIRY_REFUND_KNOBS, async () => {
+        const invoice = await bobWallet.createLightningHodlInvoice({
+          amountSats: INVOICE_AMOUNT,
+          paymentHash: paymentHashForPreimage(preimage),
+          memo: "internal hodl expiry refund test",
+          expirySeconds: 60,
+        });
+        expect(invoice.status).toEqual(
+          LightningReceiveRequestStatus.INVOICE_CREATED,
+        );
+
+        const payResult = await aliceWallet.payLightningInvoice({
+          invoice: invoice.invoice.encodedInvoice,
+          maxFeeSats: 100,
+        });
+        expect("transferDirection" in payResult).toBe(false);
+
+        const sendRequest = payResult as LightningSendRequest;
+        expect(sendRequest.id).toBeDefined();
+
+        const initiated = await waitForSendRequestStatus(
+          aliceWallet,
+          sendRequest.id,
+          LightningSendRequestStatus.LIGHTNING_PAYMENT_INITIATED,
+          { maxAttempts: 30, delayMs: 2000, timeoutMs: 60_000 },
+        );
+        expect(initiated.status).toEqual(
+          LightningSendRequestStatus.LIGHTNING_PAYMENT_INITIATED,
+        );
+
+        const { balance: bobBalanceBeforeRefund } =
+          await bobWallet.getBalance();
+        expect(bobBalanceBeforeRefund).toBe(0n);
+
+        const canceledReceive = await waitForInternalReceiveRequestStatus(
+          invoice.id,
+          "TRANSFER_CANCELED",
+          {
+            maxAttempts: PREIMAGE_SWAP_EXPIRY_TIMEOUT_MS / 1000,
+            delayMs: 1000,
+            timeoutMs: PREIMAGE_SWAP_EXPIRY_TIMEOUT_MS,
+          },
+        );
+        expect(canceledReceive).toBe("TRANSFER_CANCELED");
+
+        // Server-driven cancellation may complete without a sender stream event,
+        // so refresh from the SO before checking the returned leaves.
+        await retryUntilSuccess(
+          async () => {
+            await aliceWallet.experimental_syncWallet();
+            const { balance } = await aliceWallet.getBalance();
+            if (balance !== DEPOSIT_AMOUNT) {
+              throw new Error(
+                `sender refund is not available yet: expected ${DEPOSIT_AMOUNT}, got ${balance}`,
+              );
+            }
+          },
+          { maxAttempts: 45, delayMs: 2000, timeoutMs: 90_000 },
+        );
+
+        const { balance: bobBalance } = await bobWallet.getBalance();
+        expect(bobBalance).toBe(0n);
+
+        const { balance: aliceBalance } = await aliceWallet.getBalance();
+        expect(aliceBalance).toBe(DEPOSIT_AMOUNT);
+
+        const terminalSend = await aliceWallet.getLightningSendRequest(
+          sendRequest.id,
+        );
+        // The legacy observer can race the unified cancellation when stamping
+        // this compatibility status; the restored balance proves the refund.
+        expect([
+          LightningSendRequestStatus.USER_SWAP_RETURNED,
+          LightningSendRequestStatus.LIGHTNING_PAYMENT_FAILED,
+        ]).toContain(terminalSend?.status);
+      });
+    }, 660_000);
   });
 });
