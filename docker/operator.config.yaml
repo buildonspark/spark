@@ -61,6 +61,7 @@ knobs:
     spark.so.mpc_transfer.enabled: 0
     spark.so.use_batched_ancestor_chain: 100
     spark.so.initiate_preimage_swap_v4.enabled: 1
+    spark.so.lightning.enforce_htlc_refund_timelock_floor: 1
     spark.so.use_consensus_initiate_counter_transfer: 1
     spark.so.use_consensus_initiate_preimage_swap: 1
     spark.so.use_consensus_initiate_swap_primary_transfer: 1

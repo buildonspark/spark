@@ -1541,7 +1541,11 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 		// validateGetPreimageRequest) without any validation of their outputs. These are
 		// HTLC-shaped txs built by the SSP, so the destination/output checks applied to
 		// req.Transfer cannot be reused as-is; reconstruct-and-compare (as done below for
-		// REASON_SEND) is the intended fix.
+		// REASON_SEND) is the intended fix. That reconstruction must also apply
+		// ValidateRenewalTimelockFloor as the REASON_SEND path below does: a
+		// floor-timelock SSP leaf initiates fine today, and the user's claim of it is
+		// then permanently rejected by the claim-time floor after their LN payment
+		// settled.
 		return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
 	}
 
@@ -1555,6 +1559,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to parse owner signing public key: %w", err)
 	}
+	enforceTimelockFloor := knobs.GetKnobsService(ctx).GetValue(knobs.KnobEnforceLightningHtlcTimelockFloor, 0) > 0
 	for _, leaf := range transferRequest.GetTransferPackage().GetLeavesToSend() {
 		db, err := ent.GetDbFromContext(ctx)
 		if err != nil {
@@ -1588,6 +1593,21 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 		refundSequence := bitcointransaction.GetTimelockFromSequence(refundTx.TxIn[0].Sequence)
 		if refundSequence < bitcointransaction.HTLCSequenceOffset || refundSequence < bitcointransaction.DirectHTLCSequenceOffset {
 			return nil, nil, nil, fmt.Errorf("refund tx sequence is less than DirectHTLCSequenceOffset or HTLCSequenceOffset: %d", refundSequence)
+		}
+		// A floor-timelock leaf can initiate here (this path subtracts
+		// HTLCSequenceOffset, not TimeLockInterval), but the receiver's later
+		// claim of the HTLC refund is permanently rejected by ValidateSequence's
+		// unconditional renewal floor — the SSP pays the invoice and can never
+		// claim the leaf. Reject at initiate time instead, mirroring regular
+		// transfers.
+		if enforceTimelockFloor {
+			if err := bitcointransaction.ValidateRenewalTimelockFloor(refundSequence); err != nil {
+				return nil, nil, nil, sparkerrors.WrapErrorWithMessageAndMetadata(
+					err,
+					fmt.Sprintf("leaf %s must be renewed before it can be lightning-sent", leafID),
+					map[string]string{sparkerrors.ErrorMetadataLeafID: leafID.String()},
+				)
+			}
 		}
 		currentSequence := refundTx.TxIn[0].Sequence - bitcointransaction.HTLCSequenceOffset
 		directSequence := refundTx.TxIn[0].Sequence - bitcointransaction.DirectHTLCSequenceOffset
