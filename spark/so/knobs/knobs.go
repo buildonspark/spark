@@ -211,6 +211,20 @@ const (
 	// ProvidePreimage, not in this flow — matching legacy.
 	KnobUseConsensusInitiatePreimageSwap = "spark.so.use_consensus_initiate_preimage_swap"
 
+	// KnobEnforceLightningHtlcTimelockFloor rejects preimage-swap sends whose
+	// leaves' current refund timelock, rounded down to the timelock interval, is
+	// at or below spark.TimeLockInterval — the same LEAF_RENEWAL_REQUIRED floor
+	// regular transfers enforce in ValidateSequence. Without it, such a leaf can
+	// still be lightning-sent (the HTLC path only requires timelock >=
+	// HTLCSequenceOffset and subtracts that offset instead of TimeLockInterval),
+	// but the receiver's claim of the HTLC refund is then permanently rejected
+	// by the unconditional claim-time floor — the SSP pays the invoice and the
+	// leaf is stranded mid-transfer. This knob moves that failure to initiate
+	// time, where the sender gets an actionable renewal error before any money
+	// moves. Interpreted as binary (any non-zero value enables) — not a
+	// percentage rollout.
+	KnobEnforceLightningHtlcTimelockFloor = "spark.so.lightning.enforce_htlc_refund_timelock_floor"
+
 	// KnobInitiatePreimageSwapV4Enabled will admit InitiatePreimageSwapV4, the only
 	// preimage-swap version that accepts a transfer manifest and the only one that
 	// can pay more than one receiver. Interpreted as binary (any non-zero value

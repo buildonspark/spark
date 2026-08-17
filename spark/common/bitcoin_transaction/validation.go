@@ -287,9 +287,8 @@ func ValidateSequence(cpfpTimelock uint32, txType TxType, clientSequence uint32)
 	} else {
 		// For refund transaction, validate that the timelock is large enough to
 		// subtract TimeLockInterval without producing a zero-timelock refund.
-		if roundedCpfpTimelock <= spark.TimeLockInterval {
-			return 0, sparkerrors.InvalidArgumentLeafRenewalRequired(fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d without reaching zero",
-				roundedCpfpTimelock, cpfpTimelock, spark.TimeLockInterval))
+		if err := ValidateRenewalTimelockFloor(cpfpTimelock); err != nil {
+			return 0, err
 		}
 		// Calculate the expected new timelock (should be TimeLockInterval shorter)
 		expectedCPFPTimelock = roundedCpfpTimelock - spark.TimeLockInterval
@@ -387,6 +386,22 @@ func HasBlockRelativeTimelock(sequence uint32) bool {
 // roundDownToTimelockInterval handles leaves that have non-aligned timelocks (e.g., 740 instead of 700)
 func RoundDownToTimelockInterval(timelock uint32) uint32 {
 	return timelock - (timelock % spark.TimeLockInterval)
+}
+
+// ValidateRenewalTimelockFloor returns LEAF_RENEWAL_REQUIRED when the given
+// CPFP refund timelock, rounded down to the timelock interval, cannot fund
+// another TimeLockInterval decrement. This is the canonical renewal floor:
+// every flow that produces a successor refund tx for a leaf must apply it,
+// because a claim of that successor is unconditionally held to it via
+// ValidateSequence — an initiate path that skips the floor strands the leaf
+// at claim time instead of failing up front.
+func ValidateRenewalTimelockFloor(cpfpTimelock uint32) error {
+	roundedCpfpTimelock := RoundDownToTimelockInterval(cpfpTimelock)
+	if roundedCpfpTimelock <= spark.TimeLockInterval {
+		return sparkerrors.InvalidArgumentLeafRenewalRequired(fmt.Errorf("current timelock %d (rounded from %d) in CPFP refund transaction is too small to subtract TimeLockInterval %d without reaching zero",
+			roundedCpfpTimelock, cpfpTimelock, spark.TimeLockInterval))
+	}
+	return nil
 }
 
 // Decrement the timelock in the provided sequence by one step, preserving any other bits that are set.
