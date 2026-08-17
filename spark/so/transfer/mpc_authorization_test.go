@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	"github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,7 +74,7 @@ func parsePayload(t *testing.T, req *spark.StartTransferMpcRequest) []byte {
 
 func TestAuthorizationPayload_GoldenVector(t *testing.T) {
 	payload := parsePayload(t, deterministicMpcRequest(t))
-	assert.Equal(t, "3f77d9f3d2b586381a1f09332230b5ea21c61cfaccc9236854e50e29e3bb8efc", hex.EncodeToString(payload))
+	assert.Equal(t, "74ebd8323dc7406a58d913a516db26f37fd19a4d7a1a39015c07d9e03f7e1e5f", hex.EncodeToString(payload))
 }
 
 func TestAuthorizationPayload_IndependentOfWireOrder(t *testing.T) {
@@ -138,6 +139,15 @@ func TestAuthorizationPayload_BindsEveryFact(t *testing.T) {
 		},
 		"commitment proof": func(t *testing.T, req *spark.StartTransferMpcRequest) {
 			req.GetMpcTransferPackage().GetLeaves()[0].GetSubuserCommitments()[0].Proofs[0] = deterministicTestKey(t, 0x7F).Serialize()
+		},
+		"leaf signature": func(t *testing.T, req *spark.StartTransferMpcRequest) {
+			req.GetMpcTransferPackage().GetLeaves()[0].GetSignature().Signature = []byte{0x30, 0x02}
+		},
+		"leaf signature scheme": func(t *testing.T, req *spark.StartTransferMpcRequest) {
+			req.GetMpcTransferPackage().GetLeaves()[0].Signature = &pbcommon.Signature{
+				Scheme:    pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR,
+				Signature: bytes.Repeat([]byte{0x40}, SchnorrSignatureSize),
+			}
 		},
 		"refund sighashes digest": func(t *testing.T, req *spark.StartTransferMpcRequest) {
 			req.GetMpcTransferPackage().GetAuthorization().GetRefundSighashesDigest()[0] ^= 1

@@ -23,30 +23,31 @@ import (
 // refund outputs, and the refund-sighashes digest recomputed from prevouts taken from the operator's own leaf rows,
 // never from submitted bytes. Read-only: leaves are loaded without locks (the consensus prepare re-loads FOR UPDATE
 // before any state change), and the atomic transfer-id guard remains the insert's uniqueness constraint — the
-// freshness check here only converts a reused id into a precise early error.
-func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubmission) error {
+// freshness check here only converts a reused id into a precise early error. Returns the leaf rows it verified
+// against, so callers consuming leaf state (the tweak combination) read the same rows the facts were checked on.
+func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubmission) (map[uuid.UUID]*ent.TreeNode, error) {
 	if err := common.VerifySignatureWithScheme(
 		submission.SenderIdentityPublicKey(),
 		submission.AuthSignatureScheme(),
 		submission.AuthSignature(),
 		submission.AuthorizationPayload(),
 	); err != nil {
-		return sparkerrors.InvalidArgumentMpcAuthorizationSignatureInvalid(fmt.Errorf("transfer authorization signature does not verify: %w", err))
+		return nil, sparkerrors.InvalidArgumentMpcAuthorizationSignatureInvalid(fmt.Errorf("transfer authorization signature does not verify: %w", err))
 	}
 	if expiry := submission.ExpiryTime(); !expiry.After(time.Now()) {
-		return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorization expiry %s is not in the future", expiry))
+		return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorization expiry %s is not in the future", expiry))
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	exists, err := db.Transfer.Query().Where(enttransfer.IDEQ(submission.TransferID())).Exist(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to check for an existing transfer %s: %w", submission.TransferID(), err)
+		return nil, fmt.Errorf("unable to check for an existing transfer %s: %w", submission.TransferID(), err)
 	}
 	if exists {
-		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s already exists", submission.TransferID()))
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s already exists", submission.TransferID()))
 	}
 
 	leafIDMap := make(map[string][]byte, len(submission.Leaves()))
@@ -55,7 +56,7 @@ func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubm
 	}
 	dbLeaves, _, err := loadLeaves(ctx, db, leafIDMap, false)
 	if err != nil {
-		return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorized leaves do not match operator state: %w", err))
+		return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorized leaves do not match operator state: %w", err))
 	}
 	leavesByID := make(map[uuid.UUID]*ent.TreeNode, len(dbLeaves))
 	for _, dbLeaf := range dbLeaves {
@@ -70,29 +71,29 @@ func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubm
 	for _, leaf := range submission.Leaves() {
 		dbLeaf := leavesByID[leaf.LeafID()]
 		if err := leafAvailableStatus(dbLeaf); err != nil {
-			return err
+			return nil, err
 		}
 		if !dbLeaf.OwnerIdentityPubkey.Equals(submission.SenderIdentityPublicKey()) {
-			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("leaf %s is not owned by the sender", leaf.LeafID()))
+			return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("leaf %s is not owned by the sender", leaf.LeafID()))
 		}
 		if dbLeaf.Value != leaf.AmountSats() {
-			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorized amount %d for leaf %s does not match its on-file value %d", leaf.AmountSats(), leaf.LeafID(), dbLeaf.Value))
+			return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorized amount %d for leaf %s does not match its on-file value %d", leaf.AmountSats(), leaf.LeafID(), dbLeaf.Value))
 		}
 		if !dbLeaf.OwnerSigningPubkey.Equals(leaf.OwnerSigningPubKey()) {
-			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorized owner signing key for leaf %s does not match the on-file key", leaf.LeafID()))
+			return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorized owner signing key for leaf %s does not match the on-file key", leaf.LeafID()))
 		}
 
 		cpfp, err := mpcRefundSighash(cpfpJobs[leaf.LeafID()], dbLeaf.RawTx, leaf.ReceiverIdentityPubKey())
 		if err != nil {
-			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("cpfp refund for leaf %s: %w", leaf.LeafID(), err))
+			return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("cpfp refund for leaf %s: %w", leaf.LeafID(), err))
 		}
 		direct, err := mpcRefundSighash(directJobs[leaf.LeafID()], dbLeaf.DirectTx, leaf.ReceiverIdentityPubKey())
 		if err != nil {
-			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("direct refund for leaf %s: %w", leaf.LeafID(), err))
+			return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("direct refund for leaf %s: %w", leaf.LeafID(), err))
 		}
 		directFromCPFP, err := mpcRefundSighash(directFromCPFPJobs[leaf.LeafID()], dbLeaf.RawTx, leaf.ReceiverIdentityPubKey())
 		if err != nil {
-			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("direct-from-cpfp refund for leaf %s: %w", leaf.LeafID(), err))
+			return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("direct-from-cpfp refund for leaf %s: %w", leaf.LeafID(), err))
 		}
 		sighashes = append(sighashes, transferpkg.MpcLeafRefundSighashes{
 			LeafID:         leaf.LeafID(),
@@ -103,9 +104,9 @@ func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubm
 	}
 
 	if digest := transferpkg.MpcRefundSighashesDigest(sighashes); !bytes.Equal(digest, submission.RefundSighashesDigest()) {
-		return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("refund sighashes digest does not match the refund transactions verified against operator state"))
+		return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("refund sighashes digest does not match the refund transactions verified against operator state"))
 	}
-	return nil
+	return leavesByID, nil
 }
 
 func mpcJobsByLeafID(jobs []*transferpkg.MpcRefundSigningJob) map[uuid.UUID]*transferpkg.MpcRefundSigningJob {

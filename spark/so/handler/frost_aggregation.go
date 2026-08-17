@@ -571,3 +571,75 @@ func aggregateSendTransferLeafSignatures(
 	}
 	return leafSignatures, batch, nil
 }
+
+// aggregateMpcSendTransferLeafSignatures is aggregateSendTransferLeafSignatures'
+// multiparty form: every job aggregates in MPC user-group mode with the
+// sub-users' signature shares folded in, and all three refund variants are
+// always present (the multiparty parser requires them). Signing results are
+// always recorded — the MPC coordinator flow publishes them in its response.
+func aggregateMpcSendTransferLeafSignatures(
+	ctx context.Context,
+	config *so.Config,
+	frostClient pbfrost.FrostServiceClient,
+	signingJobsByLeaf map[string]*mpcSendTransferLeafSigningJobs,
+	allShares map[string]map[string][]byte,
+) ([]*pbinternal.SendTransferLeafSignatures, *frostAggregationBatch, error) {
+	leafIDs := slices.Sorted(maps.Keys(signingJobsByLeaf))
+
+	batch := newFrostAggregationBatch(config)
+	batch.recordSigningResults = true
+
+	keyshareIDSet := make(map[uuid.UUID]struct{}, len(signingJobsByLeaf))
+	keyshareIDs := make([]uuid.UUID, 0, len(signingJobsByLeaf))
+	for _, jobs := range signingJobsByLeaf {
+		for _, job := range []*helper.SigningJobWithPregeneratedNonce{jobs.cpfp, jobs.direct, jobs.dfc} {
+			if job == nil {
+				continue
+			}
+			if _, ok := keyshareIDSet[job.SigningKeyshareID]; !ok {
+				keyshareIDSet[job.SigningKeyshareID] = struct{}{}
+				keyshareIDs = append(keyshareIDs, job.SigningKeyshareID)
+			}
+		}
+	}
+	if err := batch.prefetchKeyPackages(ctx, keyshareIDs); err != nil {
+		return nil, nil, err
+	}
+
+	for _, leafID := range leafIDs {
+		jobs := signingJobsByLeaf[leafID]
+		verifyingKey := jobs.leaf.VerifyingPubkey
+		for _, variant := range []struct {
+			txKind string
+			job    *helper.SigningJobWithPregeneratedNonce
+			shares []*pbfrost.SubUserSignatureShare
+		}{
+			{txKindCPFP, jobs.cpfp, jobs.cpfpShares},
+			{txKindDirect, jobs.direct, jobs.directShares},
+			{txKindDirectFromCPFP, jobs.dfc, jobs.dfcShares},
+		} {
+			if variant.job == nil {
+				return nil, nil, sparkerrors.InternalDataInconsistency(fmt.Errorf("missing %s signing job for mpc leaf %s", variant.txKind, leafID))
+			}
+			if err := batch.addMpcJob(ctx, leafAggregationJobKey(leafID, variant.txKind), variant.job, allShares, verifyingKey, variant.shares); err != nil {
+				return nil, nil, fmt.Errorf("build %s aggregation job for mpc leaf %s: %w", variant.txKind, leafID, err)
+			}
+		}
+	}
+
+	signatures, err := batch.aggregate(ctx, frostClient)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	leafSignatures := make([]*pbinternal.SendTransferLeafSignatures, 0, len(leafIDs))
+	for _, leafID := range leafIDs {
+		leafSignatures = append(leafSignatures, &pbinternal.SendTransferLeafSignatures{
+			LeafId:                        leafID,
+			RefundSignature:               signatures[leafAggregationJobKey(leafID, txKindCPFP)],
+			DirectRefundSignature:         signatures[leafAggregationJobKey(leafID, txKindDirect)],
+			DirectFromCpfpRefundSignature: signatures[leafAggregationJobKey(leafID, txKindDirectFromCPFP)],
+		})
+	}
+	return leafSignatures, batch, nil
+}

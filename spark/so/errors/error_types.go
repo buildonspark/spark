@@ -49,6 +49,9 @@ const (
 	ReasonInvalidArgumentTimelockMismatch    = "TIMELOCK_MISMATCH"
 
 	ReasonInvalidArgumentMpcAuthorizationSignatureInvalid = "MPC_AUTHORIZATION_SIGNATURE_INVALID"
+	ReasonInvalidArgumentMpcSubShareUnsealable            = "MPC_SUBSHARE_UNSEALABLE"
+	ReasonInvalidArgumentMpcSubShareInvalid               = "MPC_SUBSHARE_INVALID"
+	ReasonInvalidArgumentMpcTweakBindingMismatch          = "MPC_TWEAK_BINDING_MISMATCH"
 
 	ReasonFailedPreconditionBadSignature              = "BAD_SIGNATURE"
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
@@ -268,6 +271,23 @@ func InvalidArgumentMpcAuthorizationSignatureInvalid(err error) error {
 // state (leaf ownership, value, owner signing key, receiver-bound outputs, refund sighashes, expiry).
 func FailedPreconditionMpcAuthorizationMismatch(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionMpcAuthorizationMismatch)
+}
+
+// Use when a sealed multiparty sub-share cannot be decrypted, or its decrypted payload misdescribes the transfer;
+// the failing participant position is named in the error.
+func InvalidArgumentMpcSubShareUnsealable(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMpcSubShareUnsealable)
+}
+
+// Use when an unsealed multiparty sub-share fails validation against its signed commitment vector.
+func InvalidArgumentMpcSubShareInvalid(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMpcSubShareInvalid)
+}
+
+// Use when the combined multiparty tweak commitment does not equal (leaf owner pubkey − signed mask commitment) —
+// a wrong or inconsistent mask, rejected before any state change instead of bricking the leaf after commit.
+func InvalidArgumentMpcTweakBindingMismatch(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMpcTweakBindingMismatch)
 }
 
 func FailedPreconditionExpired(err error) error {

@@ -18,10 +18,11 @@ var (
 
 // AuthorizationPayload computes the digest the sending group threshold-signs: the authorization's own facts plus
 // the public material an untrusted relay routes alongside them — the participant positions, each leaf's sub-user
-// commitment vectors, and each leaf's secret_cipher — so none of it can be substituted between signing and
-// operator verification. The sealed sub-shares are deliberately not hashed: the signed commitment vectors are
-// perfectly binding, so a tampered sealed blob can only decrypt to the committed share value or fail validation.
-// Leaves enter sorted by leaf id, making the digest independent of wire order.
+// commitment vectors, each leaf's secret_cipher, and each leaf's scheme-tagged identity signature (which the
+// receiver verifies at claim) — so none of it can be substituted between signing and operator verification. The
+// sealed sub-shares are deliberately not hashed: the signed commitment vectors are perfectly binding, so a
+// tampered sealed blob can only decrypt to the committed share value or fail validation. Leaves enter sorted by
+// leaf id, making the digest independent of wire order.
 func (s *MpcSubmission) AuthorizationPayload() []byte {
 	hasher := hashstructure.NewHasher(mpcSendAuthorizationTag).
 		AddBytes(s.transferID[:]).
@@ -39,7 +40,9 @@ func (s *MpcSubmission) AuthorizationPayload() []byte {
 			AddBytes(leaf.ownerSigningPubKey.Serialize()).
 			AddBytes(leaf.maskCommitment.Serialize()).
 			AddBytes(leaf.receiverIDPub.Serialize()).
-			AddBytes(leaf.secretCipher)
+			AddBytes(leaf.secretCipher).
+			AddUint32(uint32(leaf.signatureScheme)).
+			AddBytes(leaf.signature)
 		for _, vector := range leaf.subUserCommitments {
 			hasher.AddUint64(uint64(len(vector.proofs)))
 			for _, proof := range vector.proofs {

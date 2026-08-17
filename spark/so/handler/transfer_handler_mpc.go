@@ -65,7 +65,7 @@ func (h *TransferHandler) StartTransferMpc(ctx context.Context, req *pb.StartTra
 		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("multiparty transfers require exactly one distinct receiver, got %d", len(receivers)))
 	}
 
-	if err := verifyMpcAuthorization(ctx, submission); err != nil {
+	if _, err := verifyMpcAuthorization(ctx, submission); err != nil {
 		return nil, err
 	}
 
