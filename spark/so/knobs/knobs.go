@@ -231,17 +231,6 @@ const (
 	// rollback it caused.
 	KnobInitiatePreimageSwapV4Enabled = "spark.so.initiate_preimage_swap_v4.enabled"
 
-	// KnobUseConsensusStaticDepositUtxoSwap routes the fixed-amount static deposit claim
-	// through the 2PC consensus engine (0 = legacy, >0 = consensus). Enable only after every SO
-	// dispatches CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_SWAP AND carries the
-	// consensus-ownership fence (legacy rollback refusing consensus_managed rows). Once the
-	// fence is fleet-wide a stray legacy RollbackUtxoSwap can't wedge a fresh consensus swap,
-	// so no gossip drain is needed; until then (mid-rolling-deploy) keep the drain/canary gate
-	// — an un-upgraded SO would still cancel the row, and rows it prepared stay
-	// consensus_managed=false forever (the flag is immutable), so let those pre-fence rows
-	// drain too.
-	KnobUseConsensusStaticDepositUtxoSwap = "spark.so.use_consensus_static_deposit_utxo_swap"
-
 	// KnobUseConsensusReserveInstantStaticDepositUtxoSwap routes phase one of the instant
 	// static deposit claim through the 2PC consensus engine (0 = legacy, >0 = consensus).
 	// Enable only after every SO dispatches the op type AND carries the consensus-ownership

@@ -31,7 +31,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // StaticDepositUtxoSwapFlowHandler implements consensus.FlowHandler for the fixed-amount
-// static deposit claim (gated on KnobUseConsensusStaticDepositUtxoSwap): it delegates the
+// static deposit claim. It delegates the
 // SSP→user transfer to an embedded SendTransferFlowHandler and signs the deposit-UTXO spend
 // via the refund flow's round-1-prefetch pattern. Commit sends the transfer before completing
 // the swap; Rollback returns it before cancelling (CancelUtxoSwap refuses a sent transfer, SP-3261).

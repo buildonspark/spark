@@ -66,7 +66,6 @@ knobs:
     spark.so.use_consensus_initiate_preimage_swap: 1
     spark.so.use_consensus_initiate_swap_primary_transfer: 1
     spark.so.use_consensus_reserve_instant_static_deposit_utxo_swap: 1
-    spark.so.use_consensus_static_deposit_utxo_swap: 1
     spark.so.enable_partner_jwt: 1
     spark.so.signing_keyshare.backfill_secrets_enabled: 0
     spark.so.signing_keyshare.clear_secret_shares_enabled: 0
