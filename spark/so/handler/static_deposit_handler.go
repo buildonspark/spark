@@ -60,41 +60,6 @@ func NewStaticDepositHandler(config *so.Config) *StaticDepositHandler {
 	}
 }
 
-func (o *StaticDepositHandler) CreateStaticDepositUtxoSwapForAllOperators(ctx context.Context, config *so.Config, request *pbinternal.CreateStaticDepositUtxoSwapRequest) error {
-	ctx, span := tracer.Start(ctx, "StaticDepositHandler.CreateStaticDepositUtxoSwapForAllOperators")
-	defer span.End()
-
-	logger := logging.GetLoggerFromContext(ctx)
-
-	// Try to complete with other operators first.
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.CreateStaticDepositUtxoSwapResponse, error) {
-		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		internalResp, err := client.CreateStaticDepositUtxoSwap(ctx, request)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf(
-				"Failed to execute utxo swap creation task with operator %s",
-				operator.Identifier,
-			)
-			return nil, err
-		}
-		return internalResp, err
-	})
-	if err != nil {
-		return err
-	}
-	// If other operators return success, we can complete the swap in self.
-	internalDepositHandler := NewStaticDepositInternalHandler(config)
-	_, err = internalDepositHandler.CreateStaticDepositUtxoSwap(ctx, config, request)
-	return err
-}
-
 // GenerateRollbackStaticDepositUtxoSwapForUtxoRequest builds a signed
 // RollbackUtxoSwapRequest. confirmationThreshold is propagated to the
 // receiving operator so its UTXO re-verification matches the threshold the
@@ -137,38 +102,6 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 		CoordinatorPublicKey:  config.IdentityPublicKey().Serialize(),
 		ConfirmationThreshold: confirmationThreshold,
 	}, nil
-}
-
-func (o *StaticDepositHandler) rollbackUtxoSwapUsingGossip(ctx context.Context, config *so.Config, utxo *pb.UTXO, confirmationThreshold *uint32) {
-	logger := logging.GetLoggerFromContext(ctx)
-
-	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	participants, err := selection.OperatorIdentifierList(config)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get operator list for rollback utxo swap %x:%d", utxo.GetTxid(), utxo.GetVout())
-		return
-	}
-	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, config, utxo, confirmationThreshold)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create rollback request for rollback utxo swap %x:%d", utxo.GetTxid(), utxo.GetVout())
-		return
-	}
-	sendGossipHandler := NewSendGossipHandler(config)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-		Message: &pbgossip.GossipMessage_RollbackUtxoSwap{
-			RollbackUtxoSwap: &pbgossip.GossipMessageRollbackUtxoSwap{
-				OnChainUtxo:           utxo,
-				Signature:             rollbackRequest.GetSignature(),
-				CoordinatorPublicKey:  rollbackRequest.GetCoordinatorPublicKey(),
-				ConfirmationThreshold: confirmationThreshold,
-			},
-		},
-	}, participants)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to create and send gossip message for rollback utxo swap %x:%d", utxo.GetTxid(), utxo.GetVout())
-		return
-	}
-	logger.Sugar().Infof("UTXO swap rollback for %x:%d with gossip completed", utxo.GetTxid(), utxo.GetVout())
 }
 
 func (o *StaticDepositHandler) CreateInstantStaticDepositUtxoSwapForAllOperators(ctx context.Context, config *so.Config, request *pbinternal.CreateInstantStaticDepositUtxoSwapRequest) error {

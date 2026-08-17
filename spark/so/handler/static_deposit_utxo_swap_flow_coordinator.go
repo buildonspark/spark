@@ -199,7 +199,7 @@ func (f *staticDepositUtxoSwapCoordinatorFlow) RollbackPayload() proto.Message {
 // Coordinator entrypoint
 // ---------------------------------------------------------------------------
 
-// initiateStaticDepositUtxoSwapConsensus is the knob-gated 2PC entrypoint for the fixed-amount
+// initiateStaticDepositUtxoSwapConsensus is the 2PC entrypoint for the fixed-amount
 // claim. The caller has already done structural checks, auth, and kill-switch; this runs the
 // coordinator-only validation + idempotency short-circuit, fast-fails the user signature before
 // any cross-operator work, collects spend-tx FROST round-1 commitments, then drives the engine.
