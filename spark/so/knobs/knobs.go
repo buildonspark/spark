@@ -231,15 +231,6 @@ const (
 	// rollback it caused.
 	KnobInitiatePreimageSwapV4Enabled = "spark.so.initiate_preimage_swap_v4.enabled"
 
-	// KnobUseConsensusClaimInstantStaticDepositUtxoSwap routes phase two of the instant
-	// static deposit claim through the 2PC consensus engine (0 = legacy, >0 = consensus),
-	// folding the legacy save-utxo fanout, secondary transfer, separate spend-tx FROST round,
-	// and best-effort completion fanout into one engine round. Enable only after every SO
-	// dispatches CONSENSUS_OPERATION_TYPE_CLAIM_INSTANT_STATIC_DEPOSIT_UTXO_SWAP. The claim's
-	// rollback never cancels the reservation, so the legacy-rollback drain hazard of the two
-	// knobs above does not apply to this one.
-	KnobUseConsensusClaimInstantStaticDepositUtxoSwap = "spark.so.use_consensus_claim_instant_static_deposit_utxo_swap"
-
 	// KnobUseConsensusInitiateSwapPrimaryTransfer routes the swap v3 primary leg
 	// (initiate_swap_primary_transfer) through the 2PC consensus engine (0 = legacy,
 	// >0 = consensus; binary, not a percentage rollout), replacing the legacy

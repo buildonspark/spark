@@ -623,7 +623,7 @@ func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 			}
 		case ent.IsNotFound(err):
 			// Transfer doesn't exist yet (e.g. a rollback during the swap-creation
-			// phase, before initiateUtxoSwapTransfer runs) — there is nothing
+			// phase, before the transfer is initiated) — there is nothing
 			// claimable to orphan, so cancelling is safe.
 		default:
 			// Transfer state is unreadable (e.g. the transient DB disruption that

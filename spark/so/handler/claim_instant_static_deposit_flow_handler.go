@@ -28,7 +28,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // ClaimInstantStaticDepositFlowHandler implements consensus.FlowHandler for phase two of the
-// instant static deposit claim (gated on KnobUseConsensusClaimInstantStaticDepositUtxoSwap).
+// instant static deposit claim.
 // Prepare re-verifies the now-confirmed UTXO against this SO's reserved swap row and links the
 // utxo edge (the legacy SaveUtxoForInstantStaticDeposit work), prepares the optional secondary
 // transfer via the embedded SendTransferFlowHandler, and — for SOs in the coordinator-collected
@@ -266,7 +266,7 @@ func (h *ClaimInstantStaticDepositFlowHandler) validateSecondaryTransferAgainstR
 
 // validateInstantSecondaryTransferLeavesAmount lives here (untagged) rather
 // than the lightspark-tagged SSP handler so the OSS participant Prepare can
-// share it with the legacy coordinator path.
+// share it with the lightspark-tagged claim entrypoint.
 func validateInstantSecondaryTransferLeavesAmount(leaves []*ent.TreeNode, expectedAmount uint64) error {
 	actualAmount := getTotalTransferValue(leaves)
 	if actualAmount != expectedAmount {

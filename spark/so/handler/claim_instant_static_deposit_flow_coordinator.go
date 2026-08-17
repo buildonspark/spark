@@ -205,12 +205,12 @@ func (f *claimInstantStaticDepositCoordinatorFlow) RollbackPayload() proto.Messa
 // Coordinator entrypoint
 // ---------------------------------------------------------------------------
 
-// claimInstantStaticDepositUtxoSwapConsensus is the knob-gated 2PC entrypoint for phase two
+// claimInstantStaticDepositUtxoSwapConsensus is the 2PC entrypoint for phase two
 // of the instant static deposit claim. The caller (ClaimInstantStaticDepositUtxoSwap) has
-// already run the legacy validations — instant-enabled knob, the ForUpdate load of the
-// CREATED reservation, session-identity auth, kill switch, and the secondary-transfer
-// cross-field checks — so this validates the spend-tx job, collects FROST round-1
-// commitments (keeping the public RPC a single call), then drives the engine.
+// already run the shared entrypoint validations — instant-enabled knob, the ForUpdate
+// load of the CREATED reservation, session-identity auth, kill switch, and the
+// secondary-transfer cross-field checks — so this validates the spend-tx job, collects
+// FROST round-1 commitments (keeping the public RPC a single call), then drives the engine.
 func (o *StaticDepositHandler) claimInstantStaticDepositUtxoSwapConsensus(ctx context.Context, config *so.Config, req *pbssp.ClaimInstantStaticDepositUtxoSwapRequest, utxoSwap *ent.UtxoSwap) (*pbssp.ClaimInstantStaticDepositUtxoSwapResponse, error) {
 	// Reject a missing/malformed spend-tx job before any cross-operator work:
 	// round-1 collection consumes a persisted FROST nonce on every selected

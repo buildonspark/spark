@@ -26,12 +26,12 @@ func getCompleteUtxoSwapTask() (ScheduledTaskSpec, error) {
 }
 
 // TestCompleteUtxoSwap_RefundLegacyStray pins the sweep's interaction with a
-// stale CREATED refund swap. A CREATED
-// refund row carrying this SO's key as coordinator can only be a legacy stray
-// (consensus rows are never visible in that state — see the sweep's comment in
-// task.go), and sweeping it keeps the legacy self-heal path alive: refund
-// retries only re-sign against a COMPLETED swap, so an
-// unswept stray would block the UTXO's active-swap slot indefinitely.
+// stale CREATED refund swap. A CREATED refund row carrying this SO's key as
+// coordinator can only be a legacy stray (consensus rows are never visible in
+// that state — see the sweep's comment in task.go), and sweeping it keeps the
+// legacy self-heal path alive: refund retries only re-sign against a COMPLETED
+// swap, so an unswept stray would block the UTXO's active-swap slot
+// indefinitely.
 func TestCompleteUtxoSwap_RefundLegacyStray(t *testing.T) {
 	t.Parallel()
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
@@ -83,7 +83,7 @@ func TestCompleteUtxoSwap_RefundLegacyStray(t *testing.T) {
 		SetDepositAddress(depositAddress).
 		SaveX(ctx)
 
-		// REFUND swap in CREATED, coordinator = this SO, old enough for the sweep.
+	// REFUND swap in CREATED, coordinator = this SO, old enough for the sweep.
 	utxoSwap := client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
