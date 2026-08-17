@@ -79,6 +79,14 @@ func TestConsensusDecisionFence_RealHandlersFenceForeignPayload(t *testing.T) {
 			foreignRoll:   &pbinternal.SendTransferRollbackRequest{TransferId: foreignID},
 		},
 		{
+			name:          "mpc_send_transfer",
+			opType:        pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_MPC_SEND_TRANSFER,
+			handler:       NewMpcSendTransferFlowHandler(cfg),
+			prepare:       &pbinternal.MpcSendTransferPrepareRequest{OriginalRequest: &pb.StartTransferMpcRequest{TransferId: preparedID}},
+			foreignCommit: &pbinternal.SendTransferCommitRequest{TransferId: foreignID},
+			foreignRoll:   &pbinternal.SendTransferRollbackRequest{TransferId: foreignID},
+		},
+		{
 			name:          "claim_transfer",
 			opType:        pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CLAIM_TRANSFER,
 			handler:       NewClaimTransferFlowHandler(cfg),

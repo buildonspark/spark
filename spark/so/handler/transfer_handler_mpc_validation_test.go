@@ -286,6 +286,11 @@ func TestStartTransferMpc_AuthorizationSignatureInvalid(t *testing.T) {
 		"digest swapped after signing": func(t *testing.T, f *mpcVerificationFixture) {
 			f.auth().GetRefundSighashesDigest()[0] ^= 1
 		},
+		"leaf signature swapped after signing": func(t *testing.T, f *mpcVerificationFixture) {
+			// The receiver verifies this signature at claim time, so a coordinator rewriting it after the group
+			// signed must fail here, before commit, rather than surfacing as an unclaimable transfer.
+			f.req.GetMpcTransferPackage().GetLeaves()[0].GetSignature().Signature[0] ^= 1
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newMpcVerificationFixture(t, 1)
