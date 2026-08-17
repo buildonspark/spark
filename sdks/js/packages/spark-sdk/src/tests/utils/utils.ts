@@ -8,20 +8,65 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * @param fn - The function to retry.
  * @param maxAttempts - The maximum number of attempts.
  * @param delayMs - The delay between attempts.
+ * @param timeoutMs - The maximum total retry duration.
  * @returns The result of the function.
  */
 export async function retryUntilSuccess<T>(
   fn: () => Promise<T>,
-  { maxAttempts = 20, delayMs = 2000 } = {},
+  {
+    maxAttempts = 20,
+    delayMs = 2000,
+    timeoutMs,
+  }: {
+    maxAttempts?: number;
+    delayMs?: number;
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   let err: unknown;
+  const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
   for (let i = 1; i <= maxAttempts; i++) {
     try {
-      return await fn();
+      if (deadline === undefined) {
+        return await fn();
+      }
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        err ??= new Error(`retry timed out after ${timeoutMs}ms`);
+        break;
+      }
+
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          fn(),
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(
+              () => reject(new Error(`retry timed out after ${timeoutMs}ms`)),
+              remainingMs,
+            );
+          }),
+        ]);
+      } finally {
+        if (timeout !== undefined) {
+          clearTimeout(timeout);
+        }
+      }
     } catch (e) {
       err = e;
     }
-    await sleep(delayMs);
+    if (
+      i === maxAttempts ||
+      (deadline !== undefined && Date.now() >= deadline)
+    ) {
+      break;
+    }
+    await sleep(
+      deadline === undefined
+        ? delayMs
+        : Math.min(delayMs, Math.max(0, deadline - Date.now())),
+    );
   }
   throw err;
 }
