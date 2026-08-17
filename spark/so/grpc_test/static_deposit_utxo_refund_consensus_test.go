@@ -19,7 +19,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
-	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +31,7 @@ import (
 const opTypeStaticDepositUtxoRefund = int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_UTXO_REFUND)
 
 // TestStaticDepositUtxoRefund_Consensus_HappyPath drives a static-deposit refund
-// through the 2PC engine with KnobUseConsensusStaticDepositUtxoRefund set, and
+// through the 2PC engine and
 // verifies:
 //   - RefundStaticDeposit returns a signed spend tx that broadcasts on L1
 //     (proves the consensus-built SigningResult aggregates to a valid signature)
@@ -41,12 +40,6 @@ func TestStaticDepositUtxoRefund_Consensus_HappyPath(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
-	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusStaticDepositUtxoRefund, 100))
-
 	bitcoinClient := sparktesting.GetBitcoinClient()
 	aliceConfig, aliceCtx, aliceDepositPrivKey, spendTx, signedDepositTx, vout, userSignature := setUpConfirmedStaticDepositForRefund(t)
 
@@ -97,12 +90,6 @@ func TestStaticDepositUtxoRefund_Consensus_WritesFlowExecutionRows(t *testing.T)
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
 	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
-	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusStaticDepositUtxoRefund, 100))
-
 	aliceConfig, aliceCtx, aliceDepositPrivKey, spendTx, signedDepositTx, vout, userSignature := setUpConfirmedStaticDepositForRefund(t)
 	coordinatorIdx := int(aliceConfig.SigningOperators[aliceConfig.CoordinatorIdentifier].ID)
 	operatorIndices := operatorIndicesFromConfig(aliceConfig)
@@ -112,7 +99,7 @@ func TestStaticDepositUtxoRefund_Consensus_WritesFlowExecutionRows(t *testing.T)
 		preExistingIDs[i] = snapshotFlowExecutionIDs(t, operatorDatabasePath(t, i))
 	}
 
-	_, err = wallet.RefundStaticDeposit(aliceCtx, aliceConfig, wallet.RefundStaticDepositParams{
+	_, err := wallet.RefundStaticDeposit(aliceCtx, aliceConfig, wallet.RefundStaticDepositParams{
 		Network:                 btcnetwork.Regtest,
 		SpendTx:                 spendTx,
 		DepositAddressSecretKey: aliceDepositPrivKey,
@@ -143,54 +130,6 @@ func TestStaticDepositUtxoRefund_Consensus_WritesFlowExecutionRows(t *testing.T)
 		} else {
 			assert.Equal(t, st.FlowExecutionRoleParticipant, row.Role)
 		}
-	}
-}
-
-// TestStaticDepositUtxoRefund_Consensus_KnobOffUsesLegacyPath verifies the knob
-// actually gates routing: with the knob at 0 (default), RefundStaticDeposit goes
-// through the legacy CreateStaticDepositUtxoRefund fanout, which writes no
-// FlowExecution rows. This guards against the routing check silently flipping
-// under us.
-func TestStaticDepositUtxoRefund_Consensus_KnobOffUsesLegacyPath(t *testing.T) {
-	if !sparktesting.HasLocalSparkIngressHost() {
-		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
-	}
-	kc, err := sparktesting.NewKnobController(t)
-	if err != nil {
-		t.Skipf("knob controller unavailable, cannot guarantee knob=0: %v", err)
-	}
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusStaticDepositUtxoRefund, 0))
-
-	bitcoinClient := sparktesting.GetBitcoinClient()
-	aliceConfig, aliceCtx, aliceDepositPrivKey, spendTx, signedDepositTx, vout, userSignature := setUpConfirmedStaticDepositForRefund(t)
-	operatorIndices := operatorIndicesFromConfig(aliceConfig)
-
-	preExistingIDs := make(map[int]map[uuid.UUID]struct{}, len(operatorIndices))
-	for _, i := range operatorIndices {
-		preExistingIDs[i] = snapshotFlowExecutionIDs(t, operatorDatabasePath(t, i))
-	}
-
-	signedSpendTx, err := wallet.RefundStaticDeposit(aliceCtx, aliceConfig, wallet.RefundStaticDepositParams{
-		Network:                 btcnetwork.Regtest,
-		SpendTx:                 spendTx,
-		DepositAddressSecretKey: aliceDepositPrivKey,
-		UserSignature:           userSignature,
-		PrevTxOut:               signedDepositTx.TxOut[vout],
-	})
-	require.NoError(t, err, "legacy static deposit refund should still succeed with knob off")
-	txID, err := bitcoinClient.SendRawTransaction(signedSpendTx, true)
-	require.NoError(t, err, "signed refund tx from the legacy path must broadcast")
-	require.Len(t, txID, 32)
-
-	for _, i := range operatorIndices {
-		var refundRows []*ent.FlowExecution
-		for _, r := range newFlowExecutionsSince(t, operatorDatabasePath(t, i), preExistingIDs[i]) {
-			if r.OpType == opTypeStaticDepositUtxoRefund {
-				refundRows = append(refundRows, r)
-			}
-		}
-		assert.Empty(t, refundRows,
-			"operator %d should NOT have written a STATIC_DEPOSIT_UTXO_REFUND FlowExecution row when the knob is off", i)
 	}
 }
 
