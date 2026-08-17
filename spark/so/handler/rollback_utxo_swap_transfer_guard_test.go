@@ -236,8 +236,8 @@ func TestCancelUtxoSwap_FailsClosedWhenTransferStateUnreadable(t *testing.T) {
 // A consensus-managed swap is driven only by the 2PC engine's rollback, so the
 // legacy RollbackUtxoSwap gossip must refuse it (idempotent no-op) — even here,
 // where the transfer is not sent and the transfer-sent guard alone would allow
-// the cancel. This is the fence that lets the consensus knobs roll out without
-// first draining legacy rollback gossip.
+// the cancel. This is the fence that keeps stray legacy rollback gossip from
+// old binaries from wedging consensus-managed rows.
 func TestRollbackUtxoSwap_RefusesConsensusManagedRow(t *testing.T) {
 	sparktesting.RequireGripMock(t)
 	defer func() { _ = gripmock.Clear() }()

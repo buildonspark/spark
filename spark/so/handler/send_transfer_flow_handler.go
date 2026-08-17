@@ -57,10 +57,9 @@ type SendTransferFlowHandler struct {
 	partnerType  st.TransferPartnerType
 	// requireDirectRefunds is passed to both ValidateTransferPackage
 	// (requireDirectFromCpfpLeaves) and createTransferV3 (requireDirectTx).
-	// Plain v3 sends require direct refund txs; the utxo-swap transfer's legacy
-	// path accepts packages without them (initiateUtxoSwapTransfer →
-	// startTransferInternal passes requireDirectTx=false), so embedding flows
-	// choose per type to preserve their wire contract.
+	// Plain v3 sends require direct refund txs; utxo-swap transfers accept
+	// packages without them, so embedding flows choose per type to preserve
+	// their wire contract.
 	requireDirectRefunds bool
 }
 

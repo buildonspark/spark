@@ -588,8 +588,8 @@ func TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent(t *testing.T) {
 // legacy instant rollback must refuse it (no-op) unconditionally. The transfer is
 // not sent here — the transfer-sent guard alone would cancel (see
 // TestRollbackInstantUtxoSwap_CancelsWhenTransferNotSent) — so the reservation
-// staying CREATED proves the consensus_managed fence overrides it, closing both
-// knob-flip directions without a gossip drain.
+// staying CREATED proves the consensus_managed fence overrides it, shutting out
+// stray legacy rollback gossip from old binaries.
 func TestRollbackInstantUtxoSwap_RefusesConsensusManagedRow(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)

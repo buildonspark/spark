@@ -72,7 +72,6 @@ knobs:
     spark.so.use_batched_ancestor_chain: 100
     # Lightning preimage swap v4 — the manifest-bearing, multi-receiver version.
     spark.so.initiate_preimage_swap_v4.enabled: 1
-    spark.so.use_consensus_claim_instant_static_deposit_utxo_swap: 1
     spark.so.use_consensus_initiate_counter_transfer: 1
     spark.so.use_consensus_initiate_preimage_swap: 1
     spark.so.use_consensus_initiate_swap_primary_transfer: 1

@@ -10,7 +10,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/sighash"
-	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -80,66 +79,6 @@ func GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx context.Context, co
 		CoordinatorPublicKey:  config.IdentityPublicKey().Serialize(),
 		ConfirmationThreshold: confirmationThreshold,
 	}, nil
-}
-
-func (o *StaticDepositHandler) SaveUtxoForInstantStaticDepositForAllOperators(ctx context.Context, config *so.Config, request *pbinternal.SaveUtxoForInstantStaticDepositRequest) error {
-	ctx, span := tracer.Start(ctx, "StaticDepositHandler.SaveUtxoForInstantStaticDepositForAllOperators")
-	defer span.End()
-
-	logger := logging.GetLoggerFromContext(ctx)
-
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.SaveUtxoForInstantStaticDepositResponse, error) {
-		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		internalResp, err := client.SaveUtxoForInstantStaticDeposit(ctx, request)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Warnf(
-				"Failed to save utxo for instant static deposit with operator %s (will retry via SSP)",
-				operator.Identifier,
-			)
-			return nil, err
-		}
-		return internalResp, err
-	})
-	if err != nil {
-		return err
-	}
-	internalDepositHandler := NewStaticDepositInternalHandler(config)
-	_, err = internalDepositHandler.SaveUtxoForInstantStaticDeposit(ctx, config, request)
-	return err
-}
-
-// LinkUtxoSwapTransferForOtherOperators links the transfer edge to a utxo swap on non-coordinator SOs.
-// The coordinator already linked the edge in initiateUtxoSwapTransfer (ssp_request_handler.go:1484-1492).
-func (o *StaticDepositHandler) LinkUtxoSwapTransferForOtherOperators(ctx context.Context, config *so.Config, request *pbinternal.LinkUtxoSwapTransferRequest) error {
-	ctx, span := tracer.Start(ctx, "StaticDepositHandler.LinkUtxoSwapTransferForOtherOperators")
-	defer span.End()
-
-	logger := logging.GetLoggerFromContext(ctx)
-
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.LinkUtxoSwapTransferResponse, error) {
-		conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		internalResp, err := client.LinkUtxoSwapTransfer(ctx, request)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("Failed to link utxo swap transfer with operator %s", operator.Identifier)
-			return nil, err
-		}
-		return internalResp, err
-	})
-	return err
 }
 
 // InitiateStaticDepositUtxoRefund processes a request to refund a UTXO back to the User.

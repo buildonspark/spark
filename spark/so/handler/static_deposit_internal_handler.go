@@ -856,7 +856,8 @@ func (h *StaticDepositInternalHandler) ArchiveStaticDepositAddress(ctx context.C
 }
 
 // LinkUtxoSwapTransfer links the transfer edge to a utxo swap on a non-coordinator SO.
-// Called by the coordinator after initiateUtxoSwapTransfer during instant static deposit reservation.
+// Kept for pre-consensus coordinators mid-rolling-deploy; current coordinators link the
+// edge inside the reserve flow's Prepare instead.
 func (h *StaticDepositInternalHandler) LinkUtxoSwapTransfer(ctx context.Context, config *so.Config, req *pbinternal.LinkUtxoSwapTransferRequest) (*pbinternal.LinkUtxoSwapTransferResponse, error) {
 	ctx, span := tracer.Start(ctx, "StaticDepositInternalHandler.LinkUtxoSwapTransfer")
 	defer span.End()
