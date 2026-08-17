@@ -493,8 +493,6 @@ func (f *mpcSendTransferCoordinatorFlow) BuildCommitPayload(ctx context.Context,
 // non-locking for the same reason the single-party coordinator flow's is: the
 // engine-driven Prepare re-loads FOR UPDATE and rejects any leaf whose status
 // changed, so the worst case is a wasted job-builder pass.
-//
-//nolint:unused // The caller is the public endpoint, wired one PR up this stack; the directive is deleted there.
 func buildMpcSendTransferCoordinatorFlow(
 	ctx context.Context,
 	req *pb.StartTransferMpcRequest,

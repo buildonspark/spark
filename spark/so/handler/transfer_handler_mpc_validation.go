@@ -26,13 +26,8 @@ import (
 // freshness check here only converts a reused id into a precise early error. Returns the leaf rows it verified
 // against, so callers consuming leaf state (the tweak combination) read the same rows the facts were checked on.
 func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubmission) (map[uuid.UUID]*ent.TreeNode, error) {
-	if err := common.VerifySignatureWithScheme(
-		submission.SenderIdentityPublicKey(),
-		submission.AuthSignatureScheme(),
-		submission.AuthSignature(),
-		submission.AuthorizationPayload(),
-	); err != nil {
-		return nil, sparkerrors.InvalidArgumentMpcAuthorizationSignatureInvalid(fmt.Errorf("transfer authorization signature does not verify: %w", err))
+	if err := verifyMpcAuthorizationSignature(submission); err != nil {
+		return nil, err
 	}
 	if expiry := submission.ExpiryTime(); !expiry.After(time.Now()) {
 		return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("authorization expiry %s is not in the future", expiry))
@@ -107,6 +102,21 @@ func verifyMpcAuthorization(ctx context.Context, submission *transferpkg.MpcSubm
 		return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("refund sighashes digest does not match the refund transactions verified against operator state"))
 	}
 	return leavesByID, nil
+}
+
+// verifyMpcAuthorizationSignature checks the group's signature over the recomputed whole-submission payload.
+// Pure crypto, no operator state read — callers gate state access on it so an unauthorized request learns
+// nothing state-dependent from the error surface.
+func verifyMpcAuthorizationSignature(submission *transferpkg.MpcSubmission) error {
+	if err := common.VerifySignatureWithScheme(
+		submission.SenderIdentityPublicKey(),
+		submission.AuthSignatureScheme(),
+		submission.AuthSignature(),
+		submission.AuthorizationPayload(),
+	); err != nil {
+		return sparkerrors.InvalidArgumentMpcAuthorizationSignatureInvalid(fmt.Errorf("transfer authorization signature does not verify: %w", err))
+	}
+	return nil
 }
 
 func mpcJobsByLeafID(jobs []*transferpkg.MpcRefundSigningJob) map[uuid.UUID]*transferpkg.MpcRefundSigningJob {
