@@ -328,9 +328,8 @@ func TestStartTransferMpc_MultiReceiverRejected(t *testing.T) {
 	assert.Contains(t, err.Error(), "exactly one distinct receiver")
 }
 
-// A structurally valid submission whose authorization signature does not verify is rejected before any state is
-// read — the fixture's placeholder signature parses but proves nothing. The authorized-submission path (which
-// reaches the fail-closed tail) lives in transfer_handler_mpc_validation_test.go.
+// A submission whose authorization signature does not verify is rejected before any state is read: no leaf rows
+// exist for this request, so getting the signature reason rather than a state-dependent error pins the ordering.
 func TestStartTransferMpc_PlaceholderSignatureRejected(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	handler := NewTransferHandler(cfg)

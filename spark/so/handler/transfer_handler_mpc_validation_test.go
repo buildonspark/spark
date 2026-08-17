@@ -1,8 +1,10 @@
 package handler
 
-// Verification behavior is pinned at the endpoint: submissions are built and signed exactly as a client would,
-// operator state lives in real leaf rows, and assertions are on the gRPC status — so these tests survive the
-// verification call relocating into the consensus prepare.
+// Verification behavior is pinned at the boundary that owns it — the consensus flow's Prepare, which every operator
+// runs: submissions are built and signed exactly as a client would, operator state lives in real leaf rows, and
+// assertions are on the gRPC status. Sealed entries are placeholders, so an honest submission passes the whole
+// verification stack and fails at unsealing — the stage after the one under test here; the genuinely-sealed honest
+// path lives in the flow handler's own tests.
 
 import (
 	"bytes"
@@ -20,6 +22,8 @@ import (
 	"github.com/lightsparkdev/spark/common/sighash"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -36,7 +40,7 @@ import (
 
 type mpcVerificationFixture struct {
 	ctx      context.Context
-	handler  *TransferHandler
+	cfg      *so.Config
 	client   *ent.Client
 	sender   keys.Private
 	receiver keys.Private
@@ -210,9 +214,14 @@ func newMpcVerificationFixture(t *testing.T, numLeaves int) *mpcVerificationFixt
 		})
 	}
 
-	sealedShares := make([]*pb.MpcSealedShare, len(positions))
-	for k, position := range positions {
-		sealedShares[k] = &pb.MpcSealedShare{Ecies: []byte{0x04, byte(position)}}
+	cfg := sparktesting.TestConfig(t)
+	keyTweaks := make(map[string]*pb.MpcOperatorShares, len(cfg.SigningOperatorMap))
+	for operatorID := range cfg.SigningOperatorMap {
+		sealedShares := make([]*pb.MpcSealedShare, len(positions))
+		for k, position := range positions {
+			sealedShares[k] = &pb.MpcSealedShare{Ecies: []byte{0x04, byte(position)}}
+		}
+		keyTweaks[operatorID] = &pb.MpcOperatorShares{Shares: sealedShares}
 	}
 	transferID := uuid.NewString()
 	req := &pb.StartTransferMpcRequest{
@@ -221,7 +230,7 @@ func newMpcVerificationFixture(t *testing.T, numLeaves int) *mpcVerificationFixt
 		MpcTransferPackage: &pb.MpcTransferPackage{
 			Positions:                  positions,
 			Leaves:                     pubLeaves,
-			KeyTweaks:                  map[string]*pb.MpcOperatorShares{mpcTestOperatorID: {Shares: sealedShares}},
+			KeyTweaks:                  keyTweaks,
 			LeavesToSend:               cpfpJobs,
 			DirectLeavesToSend:         directJobs,
 			DirectFromCpfpLeavesToSend: directFromCPFPJobs,
@@ -237,7 +246,7 @@ func newMpcVerificationFixture(t *testing.T, numLeaves int) *mpcVerificationFixt
 
 	return &mpcVerificationFixture{
 		ctx:      ctx,
-		handler:  NewTransferHandler(sparktesting.TestConfig(t)),
+		cfg:      cfg,
 		client:   client,
 		sender:   sender,
 		receiver: receiver,
@@ -250,9 +259,14 @@ func (f *mpcVerificationFixture) auth() *pb.TransferAuthorization {
 	return f.req.GetMpcTransferPackage().GetAuthorization()
 }
 
-// A fully consistent, correctly signed submission passes verification and reaches the fail-closed tail — the only
-// signal a client gets that every implemented check passed.
-func TestStartTransferMpc_AuthorizedSubmissionFailsClosed(t *testing.T) {
+func (f *mpcVerificationFixture) prepare() error {
+	_, err := NewMpcSendTransferFlowHandler(f.cfg).Prepare(f.ctx, &pbinternal.MpcSendTransferPrepareRequest{OriginalRequest: f.req})
+	return err
+}
+
+// A fully consistent, correctly signed submission passes the whole verification stack: the first failure is the
+// placeholder sealed material — the stage after every check under test here.
+func TestMpcPrepare_AuthorizedSubmissionPassesVerification(t *testing.T) {
 	for name, scheme := range map[string]pbcommon.SignatureScheme{
 		"ecdsa":   pbcommon.SignatureScheme_SIGNATURE_SCHEME_ECDSA,
 		"schnorr": pbcommon.SignatureScheme_SIGNATURE_SCHEME_SCHNORR,
@@ -261,17 +275,17 @@ func TestStartTransferMpc_AuthorizedSubmissionFailsClosed(t *testing.T) {
 			f := newMpcVerificationFixture(t, 2)
 			signMpcAuthorization(t, f.req, f.sender, scheme)
 
-			_, err := f.handler.StartTransferMpc(f.ctx, f.req)
+			err := f.prepare()
 			require.Error(t, err)
-			assert.Equal(t, codes.Unimplemented, status.Code(err))
-			assert.Equal(t, sparkerrors.ReasonUnimplementedFeatureIncomplete, grpcErrorReason(t, err))
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			assert.Equal(t, sparkerrors.ReasonInvalidArgumentMpcSubShareUnsealable, grpcErrorReason(t, err))
 		})
 	}
 }
 
 // The signature is verified over the recomputed whole-submission payload, so signing with the wrong key — or
 // changing any signed byte after signing, including material outside the authorization message — invalidates it.
-func TestStartTransferMpc_AuthorizationSignatureInvalid(t *testing.T) {
+func TestMpcPrepare_AuthorizationSignatureInvalid(t *testing.T) {
 	for name, perturb := range map[string]func(t *testing.T, f *mpcVerificationFixture){
 		"signed by another key": func(t *testing.T, f *mpcVerificationFixture) {
 			signMpcAuthorization(t, f.req, keys.GeneratePrivateKey(), pbcommon.SignatureScheme_SIGNATURE_SCHEME_ECDSA)
@@ -296,7 +310,7 @@ func TestStartTransferMpc_AuthorizationSignatureInvalid(t *testing.T) {
 			f := newMpcVerificationFixture(t, 1)
 			perturb(t, f)
 
-			_, err := f.handler.StartTransferMpc(f.ctx, f.req)
+			err := f.prepare()
 			require.Error(t, err)
 			assert.Equal(t, codes.InvalidArgument, status.Code(err))
 			assert.Equal(t, sparkerrors.ReasonInvalidArgumentMpcAuthorizationSignatureInvalid, grpcErrorReason(t, err))
@@ -307,7 +321,7 @@ func TestStartTransferMpc_AuthorizationSignatureInvalid(t *testing.T) {
 // Every authorized fact is checked against the operator's own state: a validly signed authorization naming a fact
 // the operator disagrees with is rejected — including refund transactions, which are not signed bytes but are bound
 // through the sighash digest and the on-file prevout and receiver-output checks.
-func TestStartTransferMpc_AuthorizationFactMismatch(t *testing.T) {
+func TestMpcPrepare_AuthorizationFactMismatch(t *testing.T) {
 	for name, tc := range map[string]struct {
 		perturb              func(t *testing.T, f *mpcVerificationFixture)
 		expectedErrSubstring string
@@ -374,7 +388,7 @@ func TestStartTransferMpc_AuthorizationFactMismatch(t *testing.T) {
 			f := newMpcVerificationFixture(t, 1)
 			tc.perturb(t, f)
 
-			_, err := f.handler.StartTransferMpc(f.ctx, f.req)
+			err := f.prepare()
 			require.Error(t, err)
 			assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 			assert.Equal(t, sparkerrors.ReasonFailedPreconditionMpcAuthorizationMismatch, grpcErrorReason(t, err))
@@ -384,13 +398,13 @@ func TestStartTransferMpc_AuthorizationFactMismatch(t *testing.T) {
 }
 
 // State conflicts that are not authorization mismatches keep their deployed reasons.
-func TestStartTransferMpc_LeafStateConflicts(t *testing.T) {
+func TestMpcPrepare_LeafStateConflicts(t *testing.T) {
 	t.Run("leaf not available", func(t *testing.T) {
 		f := newMpcVerificationFixture(t, 1)
 		_, err := f.client.TreeNode.UpdateOneID(f.leafIDs[0]).SetStatus(st.TreeNodeStatusTransferLocked).Save(f.ctx)
 		require.NoError(t, err)
 
-		_, err = f.handler.StartTransferMpc(f.ctx, f.req)
+		err = f.prepare()
 		require.Error(t, err)
 		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 		assert.Equal(t, sparkerrors.ReasonFailedPreconditionLeafUnavailable, grpcErrorReason(t, err))
@@ -402,7 +416,7 @@ func TestStartTransferMpc_LeafStateConflicts(t *testing.T) {
 			SetOwnerIdentityPubkey(keys.GeneratePrivateKey().Public()).Save(f.ctx)
 		require.NoError(t, err)
 
-		_, err = f.handler.StartTransferMpc(f.ctx, f.req)
+		err = f.prepare()
 		require.Error(t, err)
 		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 		assert.Equal(t, sparkerrors.ReasonFailedPreconditionMpcAuthorizationMismatch, grpcErrorReason(t, err))
@@ -413,7 +427,7 @@ func TestStartTransferMpc_LeafStateConflicts(t *testing.T) {
 		f := newMpcVerificationFixture(t, 1)
 		require.NoError(t, f.client.TreeNode.DeleteOneID(f.leafIDs[0]).Exec(f.ctx))
 
-		_, err := f.handler.StartTransferMpc(f.ctx, f.req)
+		err := f.prepare()
 		require.Error(t, err)
 		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 		assert.Equal(t, sparkerrors.ReasonFailedPreconditionMpcAuthorizationMismatch, grpcErrorReason(t, err))
@@ -424,7 +438,7 @@ func TestStartTransferMpc_LeafStateConflicts(t *testing.T) {
 		_, err := f.client.TreeNode.UpdateOneID(f.leafIDs[0]).SetDirectTx(nil).Save(f.ctx)
 		require.NoError(t, err)
 
-		_, err = f.handler.StartTransferMpc(f.ctx, f.req)
+		err = f.prepare()
 		require.Error(t, err)
 		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 		assert.Contains(t, err.Error(), "no on-file source transaction")
@@ -444,7 +458,7 @@ func TestStartTransferMpc_LeafStateConflicts(t *testing.T) {
 			Save(f.ctx)
 		require.NoError(t, err)
 
-		_, err = f.handler.StartTransferMpc(f.ctx, f.req)
+		err = f.prepare()
 		require.Error(t, err)
 		assert.Equal(t, codes.AlreadyExists, status.Code(err))
 		assert.Equal(t, sparkerrors.ReasonAlreadyExistsDuplicateOperation, grpcErrorReason(t, err))
