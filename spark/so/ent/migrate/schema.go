@@ -1888,9 +1888,9 @@ var (
 				Columns: []*schema.Column{TreeNodesColumns[4]},
 			},
 			{
-				Name:    "treenode_status_network_update_time_create_time",
+				Name:    "treenode_status_network_update_time_create_time_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[5], TreeNodesColumns[4], TreeNodesColumns[2], TreeNodesColumns[1]},
+				Columns: []*schema.Column{TreeNodesColumns[5], TreeNodesColumns[4], TreeNodesColumns[2], TreeNodesColumns[1], TreeNodesColumns[23]},
 			},
 			{
 				Name:    "treenode_refund_confirmation_height_node_confirmation_height_network",
