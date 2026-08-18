@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/lightsparkdev/spark/so"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -70,11 +69,4 @@ func TestClassifyLightningMetricResult(t *testing.T) {
 			require.Equal(t, test.expectedResult, classifyLightningMetricResult(test.err))
 		})
 	}
-}
-
-func TestLightningTargetOperatorIndex(t *testing.T) {
-	require.Equal(t, "0", lightningTargetOperatorIndex(so.IndexToIdentifier(0)))
-	require.Equal(t, "41", lightningTargetOperatorIndex(so.IndexToIdentifier(41)))
-	require.Equal(t, "unknown", lightningTargetOperatorIndex("0"))
-	require.Equal(t, "unknown", lightningTargetOperatorIndex("operator1"))
 }

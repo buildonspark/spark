@@ -75,7 +75,6 @@ knobs:
     # Reject lightning sends of leaves at/below the renewal floor (mirrors regular-transfer LEAF_RENEWAL_REQUIRED).
     spark.so.lightning.enforce_htlc_refund_timelock_floor: 1
     spark.so.use_consensus_initiate_counter_transfer: 1
-    spark.so.use_consensus_initiate_preimage_swap: 1
     spark.so.use_consensus_initiate_swap_primary_transfer: 1
     spark.so.grpc.server.stream_heartbeat.enabled: 100
     spark.so.log_transfer_query_invocations: 0

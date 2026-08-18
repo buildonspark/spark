@@ -20,11 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// v4 refuses outright when the consensus knob is off rather than falling back to the legacy
-// fanout, so both knobs are preconditions and neither alone admits the endpoint.
 func enableInitiatePreimageSwapV4Knobs(t *testing.T, kc *sparktesting.KnobController) {
 	t.Helper()
-	require.NoError(t, kc.SetKnob(t, knobs.KnobUseConsensusInitiatePreimageSwap, 100))
 	require.NoError(t, kc.SetKnob(t, knobs.KnobInitiatePreimageSwapV4Enabled, 1))
 }
 

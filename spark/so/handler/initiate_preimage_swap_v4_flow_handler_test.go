@@ -113,8 +113,7 @@ func TestInitiatePreimageSwapV4PrepareGates(t *testing.T) {
 func TestInitiatePreimageSwapV4EntrypointRefusesNonReceiveReason(t *testing.T) {
 	handler := NewLightningHandler(sparktesting.TestConfig(t))
 	ctx := knobs.InjectKnobsService(t.Context(), knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobInitiatePreimageSwapV4Enabled:    1,
-		knobs.KnobUseConsensusInitiatePreimageSwap: 1,
+		knobs.KnobInitiatePreimageSwapV4Enabled: 1,
 	}))
 
 	resp, err := handler.InitiatePreimageSwapV4(ctx, &pb.InitiatePreimageSwapV4Request{})

@@ -455,12 +455,16 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 	)
 	require.Error(t, err, "should not be able to swap nodes with wrong payment hash")
 
-	// A 2PC abort rolls every SO back together, so a mismatched preimage leaves
-	// no transfer behind — not even a cancelled one.
+	// The preimage mismatch is detected in the engine's BuildCommitPayload,
+	// before the coordinator's request transaction commits, so no transfer
+	// survives at the coordinator; participants roll their prepared rows back.
 	transfers, _, err := wallet.QueryAllTransfers(t.Context(), sspConfig, 1, 0)
 	require.NoError(t, err)
 	require.Empty(t, transfers)
 
+	// The leaves must be released on every SO: this follow-up transfer over the
+	// same leaves succeeds only if the rollback returned them to AVAILABLE
+	// everywhere.
 	transfer, err := wallet.SendTransferWithKeyTweaks(t.Context(), sspConfig, leaves, userConfig.IdentityPublicKey(), time.Unix(0, 0))
 	require.NoError(t, err)
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, transfer.GetStatus())

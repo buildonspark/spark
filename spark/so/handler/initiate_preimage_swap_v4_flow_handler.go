@@ -95,20 +95,16 @@ func (h *InitiatePreimageSwapV4FlowHandler) Rollback(ctx context.Context, op pro
 	return h.rollbackPreimageSwapTransfer(ctx, transferIDStr)
 }
 
-// InitiatePreimageSwapV4 is the public entrypoint. Two knob gates, both failing closed:
-// KnobInitiatePreimageSwapV4Enabled keeps the endpoint answering Unimplemented until an operator
-// admits it, and a disabled KnobUseConsensusInitiatePreimageSwap is refused rather than served by
-// the legacy fanout — that fanout cannot carry a manifest, so falling back would silently drop the
-// binding this endpoint exists to enforce.
+// InitiatePreimageSwapV4 is the public entrypoint. KnobInitiatePreimageSwapV4Enabled fails
+// closed: the endpoint answers Unimplemented until an operator admits it. The consensus
+// preimage-swap path is unconditional, so the manifest binding this endpoint enforces can
+// never be dropped by a legacy fanout fallback.
 func (h *LightningHandler) InitiatePreimageSwapV4(ctx context.Context, req *pbspark.InitiatePreimageSwapV4Request) (resp *pbspark.InitiatePreimageSwapResponse, retErr error) {
 	if req == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))
 	}
 	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobInitiatePreimageSwapV4Enabled, 0) <= 0 {
 		return nil, sparkerrors.UnimplementedFeatureIncomplete(fmt.Errorf("initiate_preimage_swap_v4 is not enabled"))
-	}
-	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobUseConsensusInitiatePreimageSwap, 0) <= 0 {
-		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("initiate_preimage_swap_v4 requires the consensus preimage-swap path"))
 	}
 	// REASON_SEND is the proto3 default, so an omitted reason must be refused here, not in Prepare.
 	if req.GetReason() != pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {

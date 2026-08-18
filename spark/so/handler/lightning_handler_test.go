@@ -203,13 +203,6 @@ func TestLightningHandlersRejectNilRequests(t *testing.T) {
 			},
 		},
 		{
-			name: "InitiatePreimageSwapV2",
-			call: func() error {
-				_, err := handler.InitiatePreimageSwapV2(ctx, nil)
-				return err
-			},
-		},
-		{
 			name: "InitiatePreimageSwapV3",
 			call: func() error {
 				_, err := handler.InitiatePreimageSwapV3(ctx, nil)
@@ -1575,16 +1568,6 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			expectedErrMsg: "receiver identity public key is required",
 		},
 		{
-			name: "fee not allowed for receive",
-			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
-				req := sendRequest()
-				req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
-				req.FeeSats = 100
-				return req
-			},
-			expectedErrMsg: "fee is not allowed for receive preimage swap",
-		},
-		{
 			name: "too many transactions exceeds knob limit",
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				req := sendRequest()
@@ -1608,13 +1591,23 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			var resp *pb.InitiatePreimageSwapResponse
 			var err error
 			require.NotPanics(t, func() {
-				resp, err = lightningHandler.InitiatePreimageSwapV2(ctx, req)
+				resp, err = lightningHandler.InitiatePreimageSwapV3(ctx, req)
 			})
 
 			require.ErrorContains(t, err, tt.expectedErrMsg)
 			assert.Nil(t, resp)
 		})
 	}
+
+	// The fee-on-receive rejection is enforced on the participant path
+	// (GetPreimageShare / 2PC Prepare), not in the V3 coordinator validate.
+	t.Run("fee not allowed for receive", func(t *testing.T) {
+		req := sendRequest()
+		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+		req.FeeSats = 100
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
+		require.ErrorContains(t, err, "fee is not allowed for receive preimage swap")
+	})
 }
 
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8044
@@ -2976,7 +2969,7 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 			FeeSats: 0,
 		}
 
-		_, err := lightningHandler.InitiatePreimageSwapV2(ctx, req)
+		_, err := lightningHandler.InitiatePreimageSwapV3(ctx, req)
 
 		require.ErrorContains(t, err, "duplicate leaf id")
 	})
@@ -3096,18 +3089,22 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		}
 	}
 
+	// Payment-hash, duplicate-request, amount/fee, and leaf-status checks are
+	// enforced on the participant path (GetPreimageShare / 2PC Prepare), so
+	// those subtests drive GetPreimageShare; coordinator-side checks (existence/
+	// ownership, package size) drive InitiatePreimageSwapV3.
 	t.Run("send rejects invalid payment hash length", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
 		req.PaymentHash = []byte("short")
-		_, err := lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), req)
+		_, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 		require.ErrorContains(t, err, "invalid payment hash length")
 	})
 
 	t.Run("send rejects nonexistent leaves", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
-		_, err := lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), req)
+		_, err := lightningHandler.InitiatePreimageSwapV3(withKnobs(ctx), req)
 		require.ErrorContains(t, err, "leaves but only")
 	})
 
@@ -3124,10 +3121,10 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		require.NoError(t, err)
 		jobs := []*pb.UserSignedTxSigningJob{{LeafId: leafA.ID.String()}, {LeafId: leafB.ID.String()}}
 
-		_, err = lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), newSendRequest(jobs, 100, 2000))
+		_, err = lightningHandler.GetPreimageShare(ctx, newSendRequest(jobs, 100, 2000), nil, nil, nil, nil)
 		require.ErrorContains(t, err, "fee exceeds total amount")
 
-		_, err = lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), newSendRequest(jobs, 5000, 100))
+		_, err = lightningHandler.GetPreimageShare(ctx, newSendRequest(jobs, 5000, 100), nil, nil, nil, nil)
 		require.ErrorContains(t, err, "invalid amount, expected: 5000 or more, got: 1900")
 	})
 
@@ -3144,23 +3141,8 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
-		_, err = lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), req)
+		_, err = lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 		require.ErrorContains(t, err, "preimage request already exists")
-	})
-
-	t.Run("receive routes package leaves through plain validation", func(t *testing.T) {
-		ctx, _ := db.NewTestSQLiteContext(t)
-		req := newSendRequest([]*pb.UserSignedTxSigningJob{{
-			LeafId:                 uuid.NewString(),
-			RawTx:                  []byte{0x01},
-			SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
-			SigningNonceCommitment: &pbcommon.SigningCommitment{},
-		}}, 0, 0)
-		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
-		_, err := lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), req)
-		// The package leaf reached validateGetPreimageRequest's per-leaf node
-		// lookup — proof the plain machinery consumed the package lists.
-		require.ErrorContains(t, err, "unable to get cpfpTransaction tree_node")
 	})
 
 	t.Run("send rejects oversized package before node queries", func(t *testing.T) {
@@ -3169,7 +3151,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		for i := range jobs {
 			jobs[i] = &pb.UserSignedTxSigningJob{LeafId: uuid.NewString()}
 		}
-		_, err := lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), newSendRequest(jobs, 100, 0))
+		_, err := lightningHandler.InitiatePreimageSwapV3(withKnobs(ctx), newSendRequest(jobs, 100, 0))
 		require.ErrorContains(t, err, "too many transactions")
 	})
 
@@ -3211,14 +3193,27 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		require.ErrorContains(t, err, "leaves but only")
 	})
 
-	t.Run("v3 consensus coordinator ownership check consumes package leaves", func(t *testing.T) {
+	t.Run("2PC prepareState rejects fee on receive", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
-		consensusCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobUseConsensusInitiatePreimageSwap: 1,
+		flowHandler := NewInitiatePreimageSwapFlowHandler(config)
+		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 25)
+		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+		_, err := flowHandler.prepareState(ctx, req, nil)
+		require.ErrorContains(t, err, "fee is not allowed for receive preimage swap")
+	})
+
+	t.Run("2PC prepareState enforces hodl shutdown knob per SO", func(t *testing.T) {
+		ctx, _ := db.NewTestSQLiteContext(t)
+		flowHandler := NewInitiatePreimageSwapFlowHandler(config)
+		shutdownCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobShutdownHodlInvoices: 1,
 		}))
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
-		_, err := lightningHandler.InitiatePreimageSwapV3(consensusCtx, req)
-		require.ErrorContains(t, err, "leaves but only")
+		req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+		// No stored preimage share for this hash → the HODL branch, which each
+		// SO must refuse on its own knob, independent of the coordinator check.
+		_, err := flowHandler.prepareState(shutdownCtx, req, nil)
+		require.ErrorContains(t, err, "hodl invoices are currently disabled")
 	})
 
 	t.Run("send rejects unavailable leaves before package work", func(t *testing.T) {
@@ -3229,7 +3224,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		tree := createTestTreeForClaim(t, ctx, ownerPrivKey.Public(), tx)
 		leaf := createTestTreeNode(t, ctx, rng, tx, tree, keyshare) // TRANSFER_LOCKED
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String()}}, 100, 0)
-		_, err = lightningHandler.InitiatePreimageSwapV2(withKnobs(ctx), req)
+		_, err = lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil, nil)
 		require.ErrorContains(t, err, "not available to transfer")
 	})
 
@@ -3252,7 +3247,7 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		sessionCtx := authn.InjectSessionForTests(withKnobs(ctx), ownerPrivKey.Public(), time.Now().Add(time.Hour).Unix())
 
 		req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String()}}, 100, 0)
-		_, err = authzHandler.InitiatePreimageSwapV2(sessionCtx, req)
+		_, err = authzHandler.InitiatePreimageSwapV3(sessionCtx, req)
 		require.ErrorContains(t, err, "not owned by the authenticated identity")
 	})
 }
