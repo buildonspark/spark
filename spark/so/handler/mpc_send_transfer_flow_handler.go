@@ -215,11 +215,8 @@ func synthesizeMpcSendLeafKeyTweak(leaf *transferpkg.MpcLeaf, combined *transfer
 			SecretShare: combined.SecretShare().Serialize(),
 			Proofs:      proofBytes,
 		},
-		PubkeySharesTweak:             pubkeyShares,
-		SecretCipher:                  leaf.SecretCipher(),
-		RefundSignature:               leaf.RefundSignature(),
-		DirectRefundSignature:         leaf.DirectRefundSignature(),
-		DirectFromCpfpRefundSignature: leaf.DirectFromCPFPRefundSignature(),
+		PubkeySharesTweak: pubkeyShares,
+		SecretCipher:      leaf.SecretCipher(),
 	}
 	if leaf.SignatureScheme() == pbcommon.SignatureScheme_SIGNATURE_SCHEME_ECDSA {
 		out.Sig = &pb.SendLeafKeyTweak_Signature{Signature: leaf.Signature()}
@@ -516,7 +513,9 @@ func buildMpcSendTransferCoordinatorFlow(
 		return nil, fmt.Errorf("unable to preload leaves for mpc coordinator flow: %w", err)
 	}
 	if len(leaves) != len(leafUUIDs) {
-		return nil, fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafUUIDs))
+		// Typed like verifyMpcAuthorization's leaf checks: this builder runs before the engine reaches Prepare,
+		// so an untyped error here would surface a client-fixable mismatch as Internal.
+		return nil, sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("preload missed leaves: got %d, want %d", len(leaves), len(leafUUIDs)))
 	}
 	leafMap := make(map[string]*ent.TreeNode, len(leaves))
 	for _, leaf := range leaves {
@@ -532,7 +531,7 @@ func buildMpcSendTransferCoordinatorFlow(
 		leafID := job.LeafID().String()
 		leaf, ok := leafMap[leafID]
 		if !ok {
-			return fmt.Errorf("%s leaf %s not found in leaf map", txKind, leafID)
+			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("%s leaf %s not found in leaf map", txKind, leafID))
 		}
 		keyshareID, err := leafSigningKeyshareID(ctx, leaf)
 		if err != nil {
@@ -541,7 +540,7 @@ func buildMpcSendTransferCoordinatorFlow(
 		helperJob, err := buildMpcSigningJobForRefund(job, leaf.VerifyingPubkey, keyshareID, parentTxBytes(leaf),
 			mpcSendTransferJobID(submission.TransferID(), leafID, txKind))
 		if err != nil {
-			return fmt.Errorf("build %s signing job for leaf %s: %w", txKind, leafID, err)
+			return sparkerrors.FailedPreconditionMpcAuthorizationMismatch(fmt.Errorf("build %s signing job for leaf %s: %w", txKind, leafID, err))
 		}
 		set(jobsByLeaf[leafID], helperJob, mpcSubUserShares(job.Contributions()))
 		return nil
