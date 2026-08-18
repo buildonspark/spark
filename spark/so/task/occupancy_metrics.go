@@ -88,16 +88,42 @@ type transferReceiverOccupancyRow struct {
 	Min     time.Time                 `json:"min"`
 }
 
+// treeNodeKind splits tree nodes on parent-ness. A parentless node can only be
+// minted by the deposit flows (one per deposit address), while child nodes are
+// minted in bulk by tree creation — so the label separates the bounded producer
+// from the unbounded one.
+type treeNodeKind string
+
+const (
+	treeNodeKindRoot  treeNodeKind = "root"
+	treeNodeKindChild treeNodeKind = "child"
+)
+
+func treeNodeKindValues() []treeNodeKind {
+	return []treeNodeKind{treeNodeKindRoot, treeNodeKindChild}
+}
+
+func treeNodeKindExpr(parentColumn string) string {
+	return fmt.Sprintf(
+		"CASE WHEN %s IS NULL THEN '%s' ELSE '%s' END",
+		parentColumn,
+		treeNodeKindRoot,
+		treeNodeKindChild,
+	)
+}
+
 type treeNodeCellKey struct {
 	network btcnetwork.Network
 	status  st.TreeNodeStatus
 	cohort  occupancyCohort
+	kind    treeNodeKind
 }
 
 type treeNodeOccupancyRow struct {
 	Network btcnetwork.Network `json:"network"`
 	Status  st.TreeNodeStatus  `json:"status"`
 	Cohort  occupancyCohort    `json:"cohort"`
+	Kind    treeNodeKind       `json:"node_kind"`
 	Count   int64              `json:"count"`
 	Min     time.Time          `json:"min"`
 }
@@ -156,7 +182,7 @@ func init() {
 
 	treeNodeOccupancyGauge, err = occupancyMeter.Int64Gauge(
 		"spark_tree_node_occupancy",
-		metric.WithDescription("Tree nodes currently in each occupancy-tracked status, by status/network/cohort. Cohort splits rows on create_time at 2026-07-01 UTC: legacy is older, current is newer. Zero-filled: a drained status reports 0."),
+		metric.WithDescription("Tree nodes currently in each occupancy-tracked status, by status/network/cohort/node_kind. Cohort splits rows on create_time at 2026-07-01 UTC: legacy is older, current is newer. node_kind is root (parentless, minted one-per-deposit-address by the deposit flows) or child (minted in bulk by tree creation). Zero-filled: a drained status reports 0."),
 		metric.WithUnit("{row}"),
 	)
 	if err != nil {
@@ -166,7 +192,7 @@ func init() {
 
 	treeNodeOldestAgeGauge, err = occupancyMeter.Float64Gauge(
 		"spark_tree_node_oldest_age_seconds",
-		metric.WithDescription("Age in seconds of the oldest tree node (now - MIN(update_time)) per occupancy-tracked status; 0 when the status is empty. Split by cohort on create_time at 2026-07-01 UTC."),
+		metric.WithDescription("Age in seconds of the oldest tree node (now - MIN(update_time)) per occupancy-tracked status; 0 when the status is empty. Split by cohort on create_time at 2026-07-01 UTC and by node_kind (root vs child)."),
 	)
 	if err != nil {
 		otel.Handle(err)
@@ -220,6 +246,7 @@ func publishOccupancyMetrics(ctx context.Context, config *so.Config) error {
 			attribute.String("status", string(k.status)),
 			attribute.String("network", k.network.String()),
 			attribute.String("cohort", string(k.cohort)),
+			attribute.String("node_kind", string(k.kind)),
 		)
 		treeNodeOccupancyGauge.Record(ctx, c.count, attrs)
 		treeNodeOldestAgeGauge.Record(ctx, c.oldestAge.Seconds(), attrs)
@@ -324,13 +351,15 @@ func transferReceiverOccupancyCells(ctx context.Context, db *ent.Client, network
 }
 
 // treeNodeOccupancyCells is the tree_nodes twin of transferOccupancyCells
-// (no type dimension).
+// (node_kind instead of type).
 func treeNodeOccupancyCells(ctx context.Context, db *ent.Client, networks []btcnetwork.Network, now time.Time) (map[treeNodeCellKey]occupancyCell, error) {
 	cells := make(map[treeNodeCellKey]occupancyCell)
 	for _, network := range networks {
 		for _, status := range st.OccupancyTreeNodeStatuses() {
 			for _, cohort := range occupancyCohortValues() {
-				cells[treeNodeCellKey{network, status, cohort}] = occupancyCell{}
+				for _, kind := range treeNodeKindValues() {
+					cells[treeNodeCellKey{network, status, cohort, kind}] = occupancyCell{}
+				}
 			}
 		}
 	}
@@ -340,10 +369,12 @@ func treeNodeOccupancyCells(ctx context.Context, db *ent.Client, networks []btcn
 		Where(treenode.StatusIn(st.OccupancyTreeNodeStatuses()...)).
 		Modify(func(s *sql.Selector) {
 			cohort := occupancyCohortExpr(s.C(treenode.FieldCreateTime))
+			kind := treeNodeKindExpr(s.C(treenode.ParentColumn))
 			s.Select(
 				sql.As(s.C(treenode.FieldNetwork), "network"),
 				sql.As(s.C(treenode.FieldStatus), "status"),
 				sql.As(cohort, "cohort"),
+				sql.As(kind, "node_kind"),
 				sql.As(sql.Count("*"), "count"),
 				sql.As(sql.Min(s.C(treenode.FieldUpdateTime)), "min"),
 			)
@@ -351,13 +382,14 @@ func treeNodeOccupancyCells(ctx context.Context, db *ent.Client, networks []btcn
 				s.C(treenode.FieldNetwork),
 				s.C(treenode.FieldStatus),
 				cohort,
+				kind,
 			)
 		}).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("aggregate tree_node occupancy: %w", err)
 	}
 	for _, r := range rows {
-		cells[treeNodeCellKey{r.Network, r.Status, r.Cohort}] = occupancyCell{
+		cells[treeNodeCellKey{r.Network, r.Status, r.Cohort, r.Kind}] = occupancyCell{
 			count:     r.Count,
 			oldestAge: clampAge(now.Sub(r.Min)),
 		}
