@@ -857,9 +857,11 @@ message MpcTransferPackage {
     repeated uint32 positions = 7;
 }
 
-// Public (non-sealed) per-leaf sender material. secret_cipher, signature, and
-// the refund signatures carry the same semantics and byte formats as their
-// SendLeafKeyTweak counterparts; only the carrier message differs.
+// Public (non-sealed) per-leaf sender material. secret_cipher and signature
+// carry the same semantics and byte formats as their SendLeafKeyTweak
+// counterparts; only the carrier message differs. Refund authorization is not
+// carried here — it travels as the sub-users' FROST signing contributions in
+// the per-leaf signing jobs.
 message MpcSendLeaf {
     string leaf_id = 1;
     // Feldman commitment vectors, aligned to the package positions.
@@ -873,9 +875,6 @@ message MpcSendLeaf {
     // ECDSA only, so any sender — multiparty or not — that cannot assume a
     // scheme-aware receiver should sign ECDSA.
     common.Signature signature = 4;
-    bytes refund_signature = 5;
-    bytes direct_refund_signature = 6;
-    bytes direct_from_cpfp_refund_signature = 7;
 }
 
 // One sub-user's Feldman commitment vector for one leaf's key-tweak resharing.

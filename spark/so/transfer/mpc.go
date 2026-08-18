@@ -167,11 +167,8 @@ type MpcLeaf struct {
 	secretCipher       []byte
 	// The sender's scheme-tagged per-leaf identity signature over Sha256(leaf_id||transfer_id||secret_cipher),
 	// verified by the receiver, not here. Structure-checked only (defined scheme, plausible length).
-	signatureScheme               pbcommon.SignatureScheme
-	signature                     []byte
-	refundSignature               []byte
-	directRefundSignature         []byte
-	directFromCPFPRefundSignature []byte
+	signatureScheme pbcommon.SignatureScheme
+	signature       []byte
 }
 
 func (l *MpcLeaf) LeafID() uuid.UUID                   { return l.leafID }
@@ -187,15 +184,6 @@ func (l *MpcLeaf) SignatureScheme() pbcommon.SignatureScheme {
 	return l.signatureScheme
 }
 func (l *MpcLeaf) Signature() []byte { return slices.Clone(l.signature) }
-func (l *MpcLeaf) RefundSignature() []byte {
-	return slices.Clone(l.refundSignature)
-}
-func (l *MpcLeaf) DirectRefundSignature() []byte {
-	return slices.Clone(l.directRefundSignature)
-}
-func (l *MpcLeaf) DirectFromCPFPRefundSignature() []byte {
-	return slices.Clone(l.directFromCPFPRefundSignature)
-}
 
 // Positions returns the leaf's participating sub-user positions, sorted ascending.
 func (l *MpcLeaf) Positions() []uint32 {
@@ -476,18 +464,15 @@ func parseMpcLeaf(leafID uuid.UUID, pubLeaf *spark.MpcSendLeaf, authLeaf *spark.
 	}
 
 	return &MpcLeaf{
-		leafID:                        leafID,
-		amountSats:                    authLeaf.GetAmountSats(),
-		ownerSigningPubKey:            ownerSigningPubKey,
-		maskCommitment:                maskCommitment,
-		receiverIDPub:                 receiverIDPub,
-		subUserCommitments:            commitments,
-		secretCipher:                  pubLeaf.GetSecretCipher(),
-		signatureScheme:               signatureScheme,
-		signature:                     signature,
-		refundSignature:               pubLeaf.GetRefundSignature(),
-		directRefundSignature:         pubLeaf.GetDirectRefundSignature(),
-		directFromCPFPRefundSignature: pubLeaf.GetDirectFromCpfpRefundSignature(),
+		leafID:             leafID,
+		amountSats:         authLeaf.GetAmountSats(),
+		ownerSigningPubKey: ownerSigningPubKey,
+		maskCommitment:     maskCommitment,
+		receiverIDPub:      receiverIDPub,
+		subUserCommitments: commitments,
+		secretCipher:       pubLeaf.GetSecretCipher(),
+		signatureScheme:    signatureScheme,
+		signature:          signature,
 	}, nil
 }
 

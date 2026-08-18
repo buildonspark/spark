@@ -1742,9 +1742,11 @@ export interface MpcTransferPackage_KeyTweaksEntry {
 }
 
 /**
- * Public (non-sealed) per-leaf sender material. secret_cipher, signature, and
- * the refund signatures carry the same semantics and byte formats as their
- * SendLeafKeyTweak counterparts; only the carrier message differs.
+ * Public (non-sealed) per-leaf sender material. secret_cipher and signature
+ * carry the same semantics and byte formats as their SendLeafKeyTweak
+ * counterparts; only the carrier message differs. Refund authorization is not
+ * carried here — it travels as the sub-users' FROST signing contributions in
+ * the per-leaf signing jobs.
  */
 export interface MpcSendLeaf {
   leafId: string;
@@ -1763,9 +1765,6 @@ export interface MpcSendLeaf {
    * scheme-aware receiver should sign ECDSA.
    */
   signature: Signature | undefined;
-  refundSignature: Uint8Array;
-  directRefundSignature: Uint8Array;
-  directFromCpfpRefundSignature: Uint8Array;
 }
 
 /** One sub-user's Feldman commitment vector for one leaf's key-tweak resharing. */
@@ -10495,15 +10494,7 @@ export const MpcTransferPackage_KeyTweaksEntry: MessageFns<MpcTransferPackage_Ke
 };
 
 function createBaseMpcSendLeaf(): MpcSendLeaf {
-  return {
-    leafId: "",
-    subuserCommitments: [],
-    secretCipher: new Uint8Array(0),
-    signature: undefined,
-    refundSignature: new Uint8Array(0),
-    directRefundSignature: new Uint8Array(0),
-    directFromCpfpRefundSignature: new Uint8Array(0),
-  };
+  return { leafId: "", subuserCommitments: [], secretCipher: new Uint8Array(0), signature: undefined };
 }
 
 export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
@@ -10519,15 +10510,6 @@ export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
     }
     if (message.signature !== undefined) {
       Signature.encode(message.signature, writer.uint32(34).fork()).join();
-    }
-    if (message.refundSignature.length !== 0) {
-      writer.uint32(42).bytes(message.refundSignature);
-    }
-    if (message.directRefundSignature.length !== 0) {
-      writer.uint32(50).bytes(message.directRefundSignature);
-    }
-    if (message.directFromCpfpRefundSignature.length !== 0) {
-      writer.uint32(58).bytes(message.directFromCpfpRefundSignature);
     }
     return writer;
   },
@@ -10571,30 +10553,6 @@ export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
           message.signature = Signature.decode(reader, reader.uint32());
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.refundSignature = reader.bytes();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.directRefundSignature = reader.bytes();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.directFromCpfpRefundSignature = reader.bytes();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -10612,13 +10570,6 @@ export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
         : [],
       secretCipher: isSet(object.secretCipher) ? bytesFromBase64(object.secretCipher) : new Uint8Array(0),
       signature: isSet(object.signature) ? Signature.fromJSON(object.signature) : undefined,
-      refundSignature: isSet(object.refundSignature) ? bytesFromBase64(object.refundSignature) : new Uint8Array(0),
-      directRefundSignature: isSet(object.directRefundSignature)
-        ? bytesFromBase64(object.directRefundSignature)
-        : new Uint8Array(0),
-      directFromCpfpRefundSignature: isSet(object.directFromCpfpRefundSignature)
-        ? bytesFromBase64(object.directFromCpfpRefundSignature)
-        : new Uint8Array(0),
     };
   },
 
@@ -10636,15 +10587,6 @@ export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
     if (message.signature !== undefined) {
       obj.signature = Signature.toJSON(message.signature);
     }
-    if (message.refundSignature.length !== 0) {
-      obj.refundSignature = base64FromBytes(message.refundSignature);
-    }
-    if (message.directRefundSignature.length !== 0) {
-      obj.directRefundSignature = base64FromBytes(message.directRefundSignature);
-    }
-    if (message.directFromCpfpRefundSignature.length !== 0) {
-      obj.directFromCpfpRefundSignature = base64FromBytes(message.directFromCpfpRefundSignature);
-    }
     return obj;
   },
 
@@ -10659,9 +10601,6 @@ export const MpcSendLeaf: MessageFns<MpcSendLeaf> = {
     message.signature = (object.signature !== undefined && object.signature !== null)
       ? Signature.fromPartial(object.signature)
       : undefined;
-    message.refundSignature = object.refundSignature ?? new Uint8Array(0);
-    message.directRefundSignature = object.directRefundSignature ?? new Uint8Array(0);
-    message.directFromCpfpRefundSignature = object.directFromCpfpRefundSignature ?? new Uint8Array(0);
     return message;
   },
 };

@@ -9724,12 +9724,6 @@ func (m *MpcSendLeaf) validate(all bool) error {
 		}
 	}
 
-	// no validation rules for RefundSignature
-
-	// no validation rules for DirectRefundSignature
-
-	// no validation rules for DirectFromCpfpRefundSignature
-
 	if len(errors) > 0 {
 		return MpcSendLeafMultiError(errors)
 	}

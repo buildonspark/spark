@@ -397,6 +397,31 @@ func TestMpcPrepare_AuthorizationFactMismatch(t *testing.T) {
 	}
 }
 
+// The coordinator flow builder runs before the consensus engine reaches Prepare, so its leaf-state failures must
+// carry the same typed reason the verification stack gives the same conditions — untyped they would surface to
+// the caller as Internal.
+func TestStartTransferMpc_CoordinatorBuilderMismatchesAreTyped(t *testing.T) {
+	for name, perturb := range map[string]func(t *testing.T, f *mpcVerificationFixture){
+		"leaf missing from operator state": func(t *testing.T, f *mpcVerificationFixture) {
+			require.NoError(t, f.client.TreeNode.DeleteOneID(f.leafIDs[0]).Exec(f.ctx))
+		},
+		"leaf without direct tx": func(t *testing.T, f *mpcVerificationFixture) {
+			_, err := f.client.TreeNode.UpdateOneID(f.leafIDs[0]).SetDirectTx(nil).Save(f.ctx)
+			require.NoError(t, err)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newMpcVerificationFixture(t, 1)
+			perturb(t, f)
+
+			_, err := NewTransferHandler(f.cfg).StartTransferMpc(f.ctx, f.req)
+			require.Error(t, err)
+			assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+			assert.Equal(t, sparkerrors.ReasonFailedPreconditionMpcAuthorizationMismatch, grpcErrorReason(t, err))
+		})
+	}
+}
+
 // State conflicts that are not authorization mismatches keep their deployed reasons.
 func TestMpcPrepare_LeafStateConflicts(t *testing.T) {
 	t.Run("leaf not available", func(t *testing.T) {

@@ -5219,9 +5219,11 @@ func (x *MpcTransferPackage) GetPositions() []uint32 {
 	return nil
 }
 
-// Public (non-sealed) per-leaf sender material. secret_cipher, signature, and
-// the refund signatures carry the same semantics and byte formats as their
-// SendLeafKeyTweak counterparts; only the carrier message differs.
+// Public (non-sealed) per-leaf sender material. secret_cipher and signature
+// carry the same semantics and byte formats as their SendLeafKeyTweak
+// counterparts; only the carrier message differs. Refund authorization is not
+// carried here — it travels as the sub-users' FROST signing contributions in
+// the per-leaf signing jobs.
 type MpcSendLeaf struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	LeafId string                 `protobuf:"bytes,1,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
@@ -5235,12 +5237,9 @@ type MpcSendLeaf struct {
 	// by threshold-Schnorr (FROST); a deployed single-party receiver verifies
 	// ECDSA only, so any sender — multiparty or not — that cannot assume a
 	// scheme-aware receiver should sign ECDSA.
-	Signature                     *common.Signature `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
-	RefundSignature               []byte            `protobuf:"bytes,5,opt,name=refund_signature,json=refundSignature,proto3" json:"refund_signature,omitempty"`
-	DirectRefundSignature         []byte            `protobuf:"bytes,6,opt,name=direct_refund_signature,json=directRefundSignature,proto3" json:"direct_refund_signature,omitempty"`
-	DirectFromCpfpRefundSignature []byte            `protobuf:"bytes,7,opt,name=direct_from_cpfp_refund_signature,json=directFromCpfpRefundSignature,proto3" json:"direct_from_cpfp_refund_signature,omitempty"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	Signature     *common.Signature `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MpcSendLeaf) Reset() {
@@ -5297,27 +5296,6 @@ func (x *MpcSendLeaf) GetSecretCipher() []byte {
 func (x *MpcSendLeaf) GetSignature() *common.Signature {
 	if x != nil {
 		return x.Signature
-	}
-	return nil
-}
-
-func (x *MpcSendLeaf) GetRefundSignature() []byte {
-	if x != nil {
-		return x.RefundSignature
-	}
-	return nil
-}
-
-func (x *MpcSendLeaf) GetDirectRefundSignature() []byte {
-	if x != nil {
-		return x.DirectRefundSignature
-	}
-	return nil
-}
-
-func (x *MpcSendLeaf) GetDirectFromCpfpRefundSignature() []byte {
-	if x != nil {
-		return x.DirectFromCpfpRefundSignature
 	}
 	return nil
 }
@@ -13308,15 +13286,12 @@ const file_spark_proto_rawDesc = "" +
 	"\tpositions\x18\a \x03(\rR\tpositions\x1aV\n" +
 	"\x0eKeyTweaksEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
-	"\x05value\x18\x02 \x01(\v2\x18.spark.MpcOperatorSharesR\x05value:\x028\x01\"\xf4\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.spark.MpcOperatorSharesR\x05value:\x028\x01\"\xc7\x01\n" +
 	"\vMpcSendLeaf\x12\x17\n" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12I\n" +
 	"\x13subuser_commitments\x18\x02 \x03(\v2\x18.spark.SubUserCommitmentR\x12subuserCommitments\x12#\n" +
 	"\rsecret_cipher\x18\x03 \x01(\fR\fsecretCipher\x12/\n" +
-	"\tsignature\x18\x04 \x01(\v2\x11.common.SignatureR\tsignature\x12)\n" +
-	"\x10refund_signature\x18\x05 \x01(\fR\x0frefundSignature\x126\n" +
-	"\x17direct_refund_signature\x18\x06 \x01(\fR\x15directRefundSignature\x12H\n" +
-	"!direct_from_cpfp_refund_signature\x18\a \x01(\fR\x1ddirectFromCpfpRefundSignature\"+\n" +
+	"\tsignature\x18\x04 \x01(\v2\x11.common.SignatureR\tsignature\"+\n" +
 	"\x11SubUserCommitment\x12\x16\n" +
 	"\x06proofs\x18\x01 \x03(\fR\x06proofs\"B\n" +
 	"\x11MpcOperatorShares\x12-\n" +
