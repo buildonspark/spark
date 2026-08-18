@@ -439,20 +439,6 @@ func (h *BaseTransferHandler) coordinatorSenderKeyTweakProofs(ctx context.Contex
 	return proofs, nil
 }
 
-// senderKeyTweakProofsFromValidated extracts the per-leaf proofs a coordinator
-// fans out from key tweaks it has already validated, so entry points that ran
-// ValidateTransferPackage don't decrypt their slice a second time.
-func senderKeyTweakProofsFromValidated(keyTweakMap map[string]validatedKeyTweak) map[string]*pbspark.SecretProof {
-	if keyTweakMap == nil {
-		return nil
-	}
-	proofs := make(map[string]*pbspark.SecretProof, len(keyTweakMap))
-	for leafID, leafTweak := range keyTweakMap {
-		proofs[leafID] = &pbspark.SecretProof{Proofs: leafTweak.Proto().GetSecretShareTweak().GetProofs()}
-	}
-	return proofs
-}
-
 // transferPackageLeafIDs carries just the leaf IDs of a TransferPackage's
 // three refund-transaction lists — the only facts the transfer core needs
 // from the wire package. A nil value means the request used the legacy

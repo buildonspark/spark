@@ -66,16 +66,16 @@ func TestInitiatePreimageSwapEnforcesHtlcTimelockFloor(t *testing.T) {
 		return leaf
 	}
 
-	newRequest := func(t *testing.T, leaf *ent.TreeNode) *pb.InitiatePreimageSwapRequest {
+	newRequest := func(t *testing.T, leaf *ent.TreeNode) (*pb.InitiatePreimageSwapRequest, map[string]*pb.SecretProof) {
 		transferID := uuid.New()
-		keyTweakPackage, _ := buildKeyTweakPackageForLeaves(t, cfg, rng, []uuid.UUID{leaf.ID})
+		keyTweakPackage, keyTweakProofs := buildKeyTweakPackageForLeaves(t, cfg, rng, []uuid.UUID{leaf.ID})
 		pkg := &pb.TransferPackage{
 			LeavesToSend:    []*pb.UserSignedTxSigningJob{{LeafId: leaf.ID.String(), RawTx: createTestTxBytes(t, 1000)}},
 			KeyTweakPackage: keyTweakPackage,
 		}
 		signTransferPackage(t, pkg, transferID, ownerPrivKey)
 
-		return &pb.InitiatePreimageSwapRequest{
+		req := &pb.InitiatePreimageSwapRequest{
 			PaymentHash:               paymentHash[:],
 			InvoiceAmount:             &pb.InvoiceAmount{ValueSats: 900},
 			Reason:                    pb.InitiatePreimageSwapRequest_REASON_SEND,
@@ -88,6 +88,7 @@ func TestInitiatePreimageSwapEnforcesHtlcTimelockFloor(t *testing.T) {
 				TransferPackage:           pkg,
 			},
 		}
+		return req, keyTweakProofs
 	}
 
 	knobCtx := func(ctx context.Context, floorOn float64) context.Context {
@@ -99,7 +100,8 @@ func TestInitiatePreimageSwapEnforcesHtlcTimelockFloor(t *testing.T) {
 	t.Run("floor on rejects a leaf at the renewal floor", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		leaf := setupLeaf(t, ctx, 100)
-		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newRequest(t, leaf))
+		req, proofs := newRequest(t, leaf)
+		_, err := lightningHandler.GetPreimageShare(knobCtx(ctx, 1), req, nil, nil, nil, proofs)
 		require.ErrorContains(t, err, "must be renewed before it can be lightning-sent")
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -118,14 +120,16 @@ func TestInitiatePreimageSwapEnforcesHtlcTimelockFloor(t *testing.T) {
 	t.Run("floor on rejects a non-aligned timelock that rounds to the floor", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		leaf := setupLeaf(t, ctx, 199)
-		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newRequest(t, leaf))
+		req, proofs := newRequest(t, leaf)
+		_, err := lightningHandler.GetPreimageShare(knobCtx(ctx, 1), req, nil, nil, nil, proofs)
 		require.ErrorContains(t, err, "must be renewed before it can be lightning-sent")
 	})
 
 	t.Run("floor on allows the minimum sendable timelock", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		leaf := setupLeaf(t, ctx, 200)
-		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newRequest(t, leaf))
+		req, proofs := newRequest(t, leaf)
+		_, err := lightningHandler.GetPreimageShare(knobCtx(ctx, 1), req, nil, nil, nil, proofs)
 		// Past the floor check and into reconstruct-and-compare, which rejects
 		// the deliberately-mismatched client HTLC bytes.
 		require.ErrorContains(t, err, "cpfp leaf refund tx mismatch")
@@ -134,14 +138,16 @@ func TestInitiatePreimageSwapEnforcesHtlcTimelockFloor(t *testing.T) {
 	t.Run("floor on allows a leaf above the renewal floor", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		leaf := setupLeaf(t, ctx, 2000)
-		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 1), newRequest(t, leaf))
+		req, proofs := newRequest(t, leaf)
+		_, err := lightningHandler.GetPreimageShare(knobCtx(ctx, 1), req, nil, nil, nil, proofs)
 		require.ErrorContains(t, err, "cpfp leaf refund tx mismatch")
 	})
 
 	t.Run("floor off preserves legacy behavior for a floor-timelock leaf", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		leaf := setupLeaf(t, ctx, 100)
-		_, err := lightningHandler.InitiatePreimageSwapV2(knobCtx(ctx, 0), newRequest(t, leaf))
+		req, proofs := newRequest(t, leaf)
+		_, err := lightningHandler.GetPreimageShare(knobCtx(ctx, 0), req, nil, nil, nil, proofs)
 		require.ErrorContains(t, err, "cpfp leaf refund tx mismatch")
 	})
 }

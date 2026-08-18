@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"strconv"
 	"sync"
 	"time"
 
@@ -28,23 +27,11 @@ const (
 
 	lightningPhaseValidate         = "validate"
 	lightningPhaseConsensusExecute = "consensus_execute"
-	lightningPhaseCoordinatorStore = "coordinator_store"
 	lightningPhaseBuildHTLCRefunds = "build_htlc_refunds"
 	lightningPhaseCreateTransfer   = "create_transfer"
-	lightningPhaseSignRefunds      = "sign_refunds"
 	lightningPhaseApplySignatures  = "apply_signatures"
 	lightningPhaseStoreSignedTxs   = "store_signed_txs"
 	lightningPhaseStorePreimage    = "store_preimage"
-	lightningPhaseFanout           = "fanout"
-	lightningPhasePostFanoutCommit = "post_fanout_commit"
-	lightningPhaseRecoverPreimage  = "recover_preimage"
-	lightningPhaseSendGossip       = "send_gossip"
-	lightningPhaseReloadTransfer   = "reload_transfer"
-	lightningPhaseMarshalTransfer  = "marshal_transfer"
-
-	lightningOperationStorePreimageShare = "store_preimage_share"
-	lightningOperationGetPreimageShare   = "get_preimage_share"
-	lightningOperationProvidePreimage    = "provide_preimage"
 
 	lightningResultSuccess     = "success"
 	lightningResultError       = "failure"
@@ -54,12 +41,10 @@ const (
 )
 
 var (
-	lightningFlowKey                = attribute.Key("flow")
-	lightningFlowPathKey            = attribute.Key("path")
-	lightningPhaseKey               = attribute.Key("phase")
-	lightningResultKey              = attribute.Key("result")
-	lightningOperationKey           = attribute.Key("operation")
-	lightningTargetOperatorIndexKey = attribute.Key("target_operator_index")
+	lightningFlowKey     = attribute.Key("flow")
+	lightningFlowPathKey = attribute.Key("path")
+	lightningPhaseKey    = attribute.Key("phase")
+	lightningResultKey   = attribute.Key("result")
 )
 
 var lightningMetricBuckets = []float64{
@@ -67,11 +52,9 @@ var lightningMetricBuckets = []float64{
 }
 
 type lightningMetricInstruments struct {
-	flowDuration       metric.Float64Histogram
-	flowFailures       metric.Int64Counter
-	phaseDuration      metric.Float64Histogram
-	operatorRPC        metric.Float64Histogram
-	operatorRPCFailure metric.Int64Counter
+	flowDuration  metric.Float64Histogram
+	flowFailures  metric.Int64Counter
+	phaseDuration metric.Float64Histogram
 }
 
 var getLightningMetricInstruments = sync.OnceValue(func() *lightningMetricInstruments {
@@ -109,33 +92,10 @@ var getLightningMetricInstruments = sync.OnceValue(func() *lightningMetricInstru
 		phaseDuration = noop.Float64Histogram{}
 	}
 
-	operatorRPC, err := meter.Float64Histogram(
-		"spark_operator_fanout_rpc_duration_milliseconds",
-		metric.WithDescription("Duration of outbound operator fan-out RPCs used by Lightning flows"),
-		metric.WithUnit("ms"),
-		metric.WithExplicitBucketBoundaries(lightningMetricBuckets...),
-	)
-	if err != nil {
-		otel.Handle(err)
-		operatorRPC = noop.Float64Histogram{}
-	}
-
-	operatorRPCFailure, err := meter.Int64Counter(
-		"operator_fanout_rpc_failures_total",
-		metric.WithDescription("Total number of failed outbound operator fan-out RPCs used by Lightning flows"),
-		metric.WithUnit("1"),
-	)
-	if err != nil {
-		otel.Handle(err)
-		operatorRPCFailure = noop.Int64Counter{}
-	}
-
 	return &lightningMetricInstruments{
-		flowDuration:       flowDuration,
-		flowFailures:       flowFailures,
-		phaseDuration:      phaseDuration,
-		operatorRPC:        operatorRPC,
-		operatorRPCFailure: operatorRPCFailure,
+		flowDuration:  flowDuration,
+		flowFailures:  flowFailures,
+		phaseDuration: phaseDuration,
 	}
 })
 
@@ -169,31 +129,8 @@ func observeLightningPhase(ctx context.Context, flow, phase string, start time.T
 	)
 }
 
-func observeOperatorFanoutRPC(ctx context.Context, operation, targetOperatorIdentifier string, start time.Time, err error) {
-	instruments := getLightningMetricInstruments()
-	result := classifyLightningMetricResult(err)
-	attrs := metric.WithAttributes(
-		lightningOperationKey.String(operation),
-		lightningTargetOperatorIndexKey.String(lightningTargetOperatorIndex(targetOperatorIdentifier)),
-		lightningResultKey.String(result),
-	)
-
-	instruments.operatorRPC.Record(ctx, durationMilliseconds(start), attrs)
-	if err != nil {
-		instruments.operatorRPCFailure.Add(ctx, 1, attrs)
-	}
-}
-
 func durationMilliseconds(start time.Time) float64 {
 	return float64(time.Since(start)) / float64(time.Millisecond)
-}
-
-func lightningTargetOperatorIndex(operatorIdentifier string) string {
-	operatorIndexPlusOne, err := strconv.ParseUint(operatorIdentifier, 16, 64)
-	if err != nil || operatorIndexPlusOne == 0 {
-		return "unknown"
-	}
-	return strconv.FormatUint(operatorIndexPlusOne-1, 10)
 }
 
 func classifyLightningMetricResult(err error) string {

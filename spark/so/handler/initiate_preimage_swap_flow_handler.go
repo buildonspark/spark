@@ -43,8 +43,7 @@ import (
 
 // InitiatePreimageSwapFlowHandler implements consensus.FlowHandler for
 // CONSENSUS_OPERATION_TYPE_INITIATE_PREIMAGE_SWAP. Reached via the engine when
-// LightningHandler.InitiatePreimageSwapV3 routes through it (gated on
-// KnobUseConsensusInitiatePreimageSwap).
+// LightningHandler.InitiatePreimageSwapV3 routes through it.
 //
 // Holds a LightningHandler (validation + createTransfer + storeUserSignedTransactions
 // + buildHTLCRefundMaps) and a TransferHandler (ValidateTransferPackage,
@@ -220,14 +219,12 @@ func (h *InitiatePreimageSwapFlowHandler) Prepare(ctx context.Context, op proto.
 	return resp, nil
 }
 
-// prepareState runs the legacy GetPreimageShare validation + row-creation
-// sequence (minus the refund-signature application, which the refold moves to
-// Commit). Every validation call matches the legacy participant path exactly so
-// the consensus path preserves byte-for-byte parity. requireDirectTx=true on
-// every SO mirrors the SEND consensus flow's choice: the legacy coordinator
-// enforced the strict direct-tx check up front (initiatePreimageSwap passes
-// requireDirectTx=true) so participants could trust it; under 2PC Prepare is the
-// only createTransfer call site, so the check lives here on every SO.
+// prepareState runs the same validation + row-creation sequence as the
+// GetPreimageShare participant path (minus the refund-signature application,
+// which the refold moves to Commit), so the two paths stay in byte-for-byte
+// parity. requireDirectTx=true on every SO mirrors the SEND consensus flow's
+// choice: under 2PC Prepare is the only createTransfer call site, so the strict
+// direct-tx check lives here on every SO.
 func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest, senderKeyTweakProofs map[string]*pbspark.SecretProof) (*preimageSwapPreparedState, error) {
 	inputs, normErr := preimageSwapInputsFromRequest(req)
 	if normErr != nil {
@@ -257,6 +254,12 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 			if !ent.IsNotFound(err) {
 				return nil, fmt.Errorf("unable to get preimage share for payment hash %x: %w", req.GetPaymentHash(), err)
 			}
+			// Enforce the HODL shutdown per-SO, not just in the coordinator's
+			// validate: each SO's own knob must be able to keep it out of new
+			// HODL flows even if the coordinator's check was skipped.
+			if knobs.GetKnobsService(ctx).GetValue(knobs.KnobShutdownHodlInvoices, 0) > 0 {
+				return nil, sparkerrors.UnavailableMethodDisabled(fmt.Errorf("hodl invoices are currently disabled"))
+			}
 			preimageShare = nil
 		} else if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
@@ -265,7 +268,7 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 	}
 
 	// Derive the invoice amount from the stored bolt11 (not the client-claimed
-	// amount) whenever a preimage share exists, matching legacy.
+	// amount) whenever a preimage share exists, matching GetPreimageShare.
 	invoiceAmount := req.GetInvoiceAmount()
 	if preimageShare != nil {
 		storedInvoice, err := bolt11.Parse(preimageShare.InvoiceString, preimageShare.PaymentHash)
@@ -756,8 +759,7 @@ func (f *initiatePreimageSwapCoordinatorFlow) aggregateRefundSignatures(ctx cont
 
 // recoverPreimage reconstructs the payment preimage from the threshold of shares
 // returned in the SOs' prepare results and verifies it against the payment hash.
-// The share index for each SO is its operator identifier parsed as hex, matching
-// the legacy initiatePreimageSwap recovery.
+// The share index for each SO is its operator identifier parsed as hex.
 func (h *InitiatePreimageSwapFlowHandler) recoverPreimage(paymentHash []byte, results map[string]*anypb.Any) ([]byte, error) {
 	var shares []*secretsharing.SecretShare
 	for identifier, anyResult := range results {
@@ -951,7 +953,7 @@ func preloadLeavesForTransferPackage(ctx context.Context, pkg *transferpkg.Packa
 // Coordinator entrypoint
 // ---------------------------------------------------------------------------
 
-// initiatePreimageSwapV3Consensus is the knob-gated 2PC entrypoint for
+// initiatePreimageSwapV3Consensus is the 2PC entrypoint for
 // InitiatePreimageSwapV3. It performs the coordinator-only checks that need the
 // user session (session-identity match, kill-switch, node ownership), applies the
 // V3 expiry mutation (non-HODL receive transfers carry no expiry so the
@@ -966,11 +968,10 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 		return nil, normErr
 	}
 
-	// Observability parity with the legacy initiatePreimageSwap and the
-	// ProvidePreimage consensus path: emit the same lightningFlowInitiatePreimage
-	// flow/phase metrics + tracing spans so the existing dashboards keep working
-	// when this knob ramps. flowPath is refined during validation once the
-	// HODL vs non-HODL receive distinction is known.
+	// Observability parity with the ProvidePreimage consensus path: emit the
+	// same lightningFlowInitiatePreimage flow/phase metrics + tracing spans so
+	// the existing dashboards keep working. flowPath is refined during
+	// validation once the HODL vs non-HODL receive distinction is known.
 	flowStart := time.Now()
 	flowPath := lightningFlowPathUnknown
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
@@ -1008,8 +1009,8 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 		}
 
 		// Resolve the preimage share once (non-HODL vs HODL receive) and apply the
-		// expiry mutation, mirroring legacy initiatePreimageSwap. For V3 there is no
-		// positive expiry override; only the non-HODL-receive "no expiry" rule applies.
+		// expiry mutation. For V3 there is no positive expiry override; only the
+		// non-HODL-receive "no expiry" rule applies.
 		effectiveExpiry := inputs.expiryTime
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
 			db, err := ent.GetDbFromContext(validateCtx)
@@ -1036,9 +1037,9 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 		}
 		isNonHodlReceive = req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && preimageShare != nil
 
-		// Reject an already-expired expiry up front, matching legacy initiatePreimageSwap.
-		// createTransfer re-checks this inside Prepare, but failing here gives the
-		// client the same early InvalidArgument and avoids fanning out a doomed flow.
+		// Reject an already-expired expiry up front. createTransfer re-checks this
+		// inside Prepare, but failing here gives the client the same early
+		// InvalidArgument and avoids fanning out a doomed flow.
 		expiryTime := effectiveExpiry.AsTime()
 		if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expiry time is before current time"))
@@ -1094,7 +1095,7 @@ func (h *LightningHandler) initiatePreimageSwapV3Consensus(ctx context.Context, 
 		return nil, fmt.Errorf("initiate preimage swap consensus completed without building a response for transfer %s", flow.transferID)
 	}
 
-	// Partner attribution, mirroring legacy. Best-effort; failures are logged.
+	// Partner attribution. Best-effort; failures are logged.
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_SEND {
 		partner.SaveTransferPartner(ctx, flow.transferID, st.TransferPartnerTypeLightningSend)
 	} else if isNonHodlReceive {
@@ -1133,9 +1134,8 @@ func (h *LightningHandler) validateLeafOwnershipForPreimageSwap(ctx context.Cont
 	}
 	// IDIn silently drops ids that don't exist, so a request referencing a
 	// nonexistent (or duplicate) leaf would otherwise slip past this gate and
-	// only fail later inside Prepare — after the engine flow has started. Surface
-	// it up front, matching the legacy path where missing nodes failed early in
-	// validateGetPreimageRequest. (Duplicate leaf ids also trip this; they are
+	// only fail later inside Prepare — after the engine flow has started, so
+	// surface it up front. (Duplicate leaf ids also trip this; they are
 	// invalid anyway, and ValidateDuplicateLeaves only runs later in Prepare.)
 	if len(nodes) != len(leafIDs) {
 		return sparkerrors.InvalidArgumentMalformedField(

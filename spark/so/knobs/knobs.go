@@ -206,24 +206,6 @@ const (
 	// indistinguishable from a change in the code.
 	KnobUseBatchedAncestorChain = "spark.so.use_batched_ancestor_chain"
 
-	// KnobUseConsensusInitiatePreimageSwap routes InitiatePreimageSwapV3 through
-	// the 2PC engine instead of the legacy initiatePreimageSwap fanout
-	// (InitiatePreimageSwapV2 -> GetPreimageShare) + PreimageSwap gossip.
-	// Interpreted as binary (any non-zero value enables) — not a percentage
-	// rollout.
-	//
-	// Prepare validates + creates the transfer/preimage_request/user_signed_transaction
-	// rows on every SO and produces FROST round-2 shares over the HTLC refund txs
-	// (REASON_SEND); BuildCommitPayload aggregates those signatures and, on the
-	// non-HODL REASON_RECEIVE path, recovers the preimage from a threshold of
-	// shares. The engine records the COMMITTED decision atomically with the
-	// coordinator's domain commit (single request-tx DbCommit), so a crash before
-	// that commit rolls every SO back with an IN_FLIGHT row (sweep -> ROLLED_BACK,
-	// consistent) and a crash after it leaves a COMMITTED row the reconciler drives
-	// forward (SP-3195). Sender key tweaks for REASON_SEND are settled later by
-	// ProvidePreimage, not in this flow — matching legacy.
-	KnobUseConsensusInitiatePreimageSwap = "spark.so.use_consensus_initiate_preimage_swap"
-
 	// KnobEnforceLightningHtlcTimelockFloor rejects preimage-swap sends whose
 	// leaves' current refund timelock, rounded down to the timelock interval, is
 	// at or below spark.TimeLockInterval — the same LEAF_RENEWAL_REQUIRED floor
@@ -246,10 +228,7 @@ const (
 	// Nothing reads it yet: the endpoint answers Unimplemented at either setting
 	// until the handler lands, so flipping this on today changes nothing. Once the
 	// handler exists, off keeps that Unimplemented rather than silently degrading to
-	// v3 semantics, and v4 stays on the 2PC engine — with
-	// KnobUseConsensusInitiatePreimageSwap off it fails closed instead of falling
-	// back to the legacy fanout, which cannot carry the manifest to participants and
-	// would leave them binding nothing.
+	// v3 semantics; v4, like v3, runs on the 2PC engine.
 	//
 	// Deploy precondition: do not flip this until every SO — and every pod, since a
 	// rolling deploy straddles builds — resolves the v4 consensus op type. This knob
