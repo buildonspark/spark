@@ -310,23 +310,28 @@ func TestTreeNodeOccupancyCells_CountsTrackedStatusesAndZeroFills(t *testing.T) 
 
 	// Only the TRANSFER_LOCKED leaf is legacy, so its status is the one place a
 	// cohort mix-up would show as a count in the wrong bucket.
-	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare,
+	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare, nil,
 		st.TreeNodeStatusTransferLocked, occupancyCohortCutoff.Add(-24*time.Hour))
-	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare,
+	available := createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare, nil,
 		st.TreeNodeStatusAvailable, occupancyCohortCutoff.Add(24*time.Hour))
-	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare,
+	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare, nil,
 		st.TreeNodeStatusSplitted, occupancyCohortCutoff.Add(24*time.Hour))
+	// A parented node lands in the child bucket, not root.
+	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare, available,
+		st.TreeNodeStatusCreating, occupancyCohortCutoff.Add(24*time.Hour))
 
 	now := time.Now()
 	cells, err := treeNodeOccupancyCells(ctx, client, []btcnetwork.Network{btcnetwork.Regtest}, now)
 	require.NoError(t, err)
 
-	assert.Len(t, cells, len(st.OccupancyTreeNodeStatuses())*len(occupancyCohortValues()))
+	assert.Len(t, cells,
+		len(st.OccupancyTreeNodeStatuses())*len(occupancyCohortValues())*len(treeNodeKindValues()))
 
 	locked := cells[treeNodeCellKey{
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusTransferLocked,
 		cohort:  occupancyCohortLegacy,
+		kind:    treeNodeKindRoot,
 	}]
 	assert.EqualValues(t, 1, locked.count)
 	assert.Greater(t, locked.oldestAge, time.Duration(0))
@@ -336,8 +341,26 @@ func TestTreeNodeOccupancyCells_CountsTrackedStatusesAndZeroFills(t *testing.T) 
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusTransferLocked,
 		cohort:  occupancyCohortCurrent,
+		kind:    treeNodeKindRoot,
 	}]
 	assert.EqualValues(t, 0, lockedCurrent.count)
+
+	creatingChild := cells[treeNodeCellKey{
+		network: btcnetwork.Regtest,
+		status:  st.TreeNodeStatusCreating,
+		cohort:  occupancyCohortCurrent,
+		kind:    treeNodeKindChild,
+	}]
+	assert.EqualValues(t, 1, creatingChild.count)
+
+	// The root bucket of the same status zero-fills rather than absorbing the child.
+	creatingRoot := cells[treeNodeCellKey{
+		network: btcnetwork.Regtest,
+		status:  st.TreeNodeStatusCreating,
+		cohort:  occupancyCohortCurrent,
+		kind:    treeNodeKindRoot,
+	}]
+	assert.EqualValues(t, 0, creatingRoot.count)
 
 	// Neither the terminal SPLITTED leaf nor the resting AVAILABLE leaf
 	// contributes a cell.
@@ -345,12 +368,14 @@ func TestTreeNodeOccupancyCells_CountsTrackedStatusesAndZeroFills(t *testing.T) 
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusSplitted,
 		cohort:  occupancyCohortLegacy,
+		kind:    treeNodeKindRoot,
 	}]
 	assert.False(t, exists)
 	_, exists = cells[treeNodeCellKey{
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusAvailable,
 		cohort:  occupancyCohortCurrent,
+		kind:    treeNodeKindRoot,
 	}]
 	assert.False(t, exists)
 
@@ -358,6 +383,7 @@ func TestTreeNodeOccupancyCells_CountsTrackedStatusesAndZeroFills(t *testing.T) 
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusRenewLocked,
 		cohort:  occupancyCohortCurrent,
+		kind:    treeNodeKindRoot,
 	}]
 	assert.EqualValues(t, 0, empty.count)
 }
@@ -374,9 +400,9 @@ func TestTreeNodeOccupancyCells_CutoffBoundaryIsCurrent(t *testing.T) {
 	keyshare := createSenderInitiatedExpirySigningKeyshare(t, ctx, rng, client)
 	tree := createSenderInitiatedExpiryTree(t, ctx, owner, client)
 
-	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare,
+	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare, nil,
 		st.TreeNodeStatusTransferLocked, occupancyCohortCutoff)
-	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare,
+	createOccupancyLeafAt(t, ctx, rng, client, tree, keyshare, nil,
 		st.TreeNodeStatusTransferLocked, occupancyCohortCutoff.Add(-time.Microsecond))
 
 	cells, err := treeNodeOccupancyCells(
@@ -387,11 +413,13 @@ func TestTreeNodeOccupancyCells_CutoffBoundaryIsCurrent(t *testing.T) {
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusTransferLocked,
 		cohort:  occupancyCohortCurrent,
+		kind:    treeNodeKindRoot,
 	}]
 	legacy := cells[treeNodeCellKey{
 		network: btcnetwork.Regtest,
 		status:  st.TreeNodeStatusTransferLocked,
 		cohort:  occupancyCohortLegacy,
+		kind:    treeNodeKindRoot,
 	}]
 	assert.EqualValues(t, 1, current.count, "a row exactly at the cutoff is current")
 	assert.EqualValues(t, 1, legacy.count, "one microsecond before the cutoff is legacy")
@@ -443,12 +471,13 @@ func createOccupancyLeafAt(
 	client *ent.Client,
 	tree *ent.Tree,
 	keyshare *ent.SigningKeyshare,
+	parent *ent.TreeNode,
 	status st.TreeNodeStatus,
 	createTime time.Time,
 ) *ent.TreeNode {
 	t.Helper()
 
-	leaf, err := client.TreeNode.Create().
+	create := client.TreeNode.Create().
 		SetStatus(status).
 		SetTree(tree).
 		SetNetwork(tree.Network).
@@ -463,8 +492,11 @@ func createOccupancyLeafAt(
 		SetDirectRefundTx(senderInitiatedExpiryRawTxBytes(t, 3)).
 		SetDirectFromCpfpRefundTx(senderInitiatedExpiryRawTxBytes(t, 4)).
 		SetVout(0).
-		SetCreateTime(createTime).
-		Save(ctx)
+		SetCreateTime(createTime)
+	if parent != nil {
+		create = create.SetParent(parent)
+	}
+	leaf, err := create.Save(ctx)
 	require.NoError(t, err)
 	return leaf
 }
