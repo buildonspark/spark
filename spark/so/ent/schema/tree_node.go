@@ -180,7 +180,9 @@ func (TreeNode) Indexes() []ent.Index {
 		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
 		index.Fields("network"),
 		// Occupancy metrics.
-		index.Fields("status", "network", "update_time", "create_time"),
+		index.Fields("status", "network", "update_time", "create_time").
+			Edges("parent").
+			StorageKey("treenode_status_network_update_time_create_time_parent"),
 		// Composite index for watchtower queries that check for nodes with confirmed
 		// node tx but unconfirmed refund tx on a specific network.
 		index.Fields("refund_confirmation_height", "node_confirmation_height", "network"),
