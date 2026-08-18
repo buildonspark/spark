@@ -81,7 +81,7 @@ func validateTransferManifestForHashing(manifest *pb.TransferManifest) error {
 	if manifest.GetTransferId() == "" {
 		return fmt.Errorf("transfer_id must be set")
 	}
-	if manifest.GetNetwork() == pb.Network_UNSPECIFIED || !isKnownEnumValue(pb.Network_name, int32(manifest.GetNetwork())) {
+	if !isSignableProtoNetwork(manifest.GetNetwork()) {
 		return fmt.Errorf("network must be a known value: %d", manifest.GetNetwork())
 	}
 	if err := validateManifestTimestamp(manifest.GetTransferExpiryTime()); err != nil {

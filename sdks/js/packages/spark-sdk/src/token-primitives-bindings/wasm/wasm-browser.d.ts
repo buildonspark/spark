@@ -5,6 +5,8 @@ export function build_broadcast_transaction_request(request: any): Uint8Array;
 
 export function construct_partial_transfer_transaction(request: any): any;
 
+export function coop_exit_target(withdrawal_address: string, leaf_set_hash: Uint8Array): Uint8Array;
+
 export function finalize_token_invoice(request: any): string;
 
 export function hash_partial_token_transaction(partial_token_transaction_bytes: Uint8Array): Uint8Array;
@@ -13,12 +15,21 @@ export function hash_transfer_manifest(transfer_manifest_bytes: Uint8Array): Uin
 
 export function prepare_token_invoice(request: any): any;
 
+export function quote_envelope_digest(network: number, manifest_hash: Uint8Array, reason: number, role: number, target: Uint8Array): Uint8Array;
+
+export function receive_attestor_target(payment_hash: Uint8Array): Uint8Array;
+
+export function send_target(payment_hash: Uint8Array): Uint8Array;
+
+export function static_deposit_target(txid: Uint8Array, vout: number): Uint8Array;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly build_broadcast_transaction_request: (a: any) => [number, number, number, number];
     readonly construct_partial_transfer_transaction: (a: any) => [number, number, number];
+    readonly coop_exit_target: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly ffi_spark_token_primitives_rust_future_cancel_f32: (a: bigint) => void;
     readonly ffi_spark_token_primitives_rust_future_cancel_f64: (a: bigint) => void;
     readonly ffi_spark_token_primitives_rust_future_cancel_i16: (a: bigint) => void;
@@ -80,18 +91,32 @@ export interface InitOutput {
     readonly hash_partial_token_transaction: (a: number, b: number) => [number, number, number, number];
     readonly hash_transfer_manifest: (a: number, b: number) => [number, number, number, number];
     readonly prepare_token_invoice: (a: any) => [number, number, number];
+    readonly quote_envelope_digest: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
+    readonly receive_attestor_target: (a: number, b: number) => [number, number, number, number];
+    readonly send_target: (a: number, b: number) => [number, number, number, number];
+    readonly static_deposit_target: (a: number, b: number, c: number) => [number, number, number, number];
     readonly uniffi_spark_token_primitives_checksum_func_build_broadcast_transaction_request: () => number;
     readonly uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction: () => number;
+    readonly uniffi_spark_token_primitives_checksum_func_coop_exit_target: () => number;
     readonly uniffi_spark_token_primitives_checksum_func_finalize_token_invoice: () => number;
     readonly uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction: () => number;
     readonly uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest: () => number;
     readonly uniffi_spark_token_primitives_checksum_func_prepare_token_invoice: () => number;
+    readonly uniffi_spark_token_primitives_checksum_func_quote_envelope_digest: () => number;
+    readonly uniffi_spark_token_primitives_checksum_func_receive_attestor_target: () => number;
+    readonly uniffi_spark_token_primitives_checksum_func_send_target: () => number;
+    readonly uniffi_spark_token_primitives_checksum_func_static_deposit_target: () => number;
     readonly uniffi_spark_token_primitives_fn_func_build_broadcast_transaction_request: (a: number, b: number, c: number) => void;
     readonly uniffi_spark_token_primitives_fn_func_construct_partial_transfer_transaction: (a: number, b: number, c: number) => void;
+    readonly uniffi_spark_token_primitives_fn_func_coop_exit_target: (a: number, b: number, c: number, d: number) => void;
     readonly uniffi_spark_token_primitives_fn_func_finalize_token_invoice: (a: number, b: number, c: number) => void;
     readonly uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction: (a: number, b: number, c: number) => void;
     readonly uniffi_spark_token_primitives_fn_func_hash_transfer_manifest: (a: number, b: number, c: number) => void;
     readonly uniffi_spark_token_primitives_fn_func_prepare_token_invoice: (a: number, b: number, c: number) => void;
+    readonly uniffi_spark_token_primitives_fn_func_quote_envelope_digest: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly uniffi_spark_token_primitives_fn_func_receive_attestor_target: (a: number, b: number, c: number) => void;
+    readonly uniffi_spark_token_primitives_fn_func_send_target: (a: number, b: number, c: number) => void;
+    readonly uniffi_spark_token_primitives_fn_func_static_deposit_target: (a: number, b: number, c: number, d: number) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

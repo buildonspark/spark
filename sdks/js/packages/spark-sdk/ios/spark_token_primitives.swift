@@ -1484,6 +1484,15 @@ public func constructPartialTransferTransaction(request: TransferBuildRequest) t
     })
 }
 
+public func coopExitTarget(withdrawalAddress: String, leafSetHash: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_coop_exit_target(
+            FfiConverterString.lower(withdrawalAddress),
+            FfiConverterData.lower(leafSetHash), $0
+        )
+    })
+}
+
 public func finalizeTokenInvoice(request: FinalizeTokenInvoiceRequest) throws -> String {
     return try FfiConverterString.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
         uniffi_spark_token_primitives_fn_func_finalize_token_invoice(
@@ -1516,6 +1525,43 @@ public func prepareTokenInvoice(request: PrepareTokenInvoiceRequest) throws -> P
     })
 }
 
+public func quoteEnvelopeDigest(network: UInt32, manifestHash: Data, reason: UInt32, role: UInt32, target: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_quote_envelope_digest(
+            FfiConverterUInt32.lower(network),
+            FfiConverterData.lower(manifestHash),
+            FfiConverterUInt32.lower(reason),
+            FfiConverterUInt32.lower(role),
+            FfiConverterData.lower(target), $0
+        )
+    })
+}
+
+public func receiveAttestorTarget(paymentHash: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_receive_attestor_target(
+            FfiConverterData.lower(paymentHash), $0
+        )
+    })
+}
+
+public func sendTarget(paymentHash: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_send_target(
+            FfiConverterData.lower(paymentHash), $0
+        )
+    })
+}
+
+public func staticDepositTarget(txid: Data, vout: UInt32) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_static_deposit_target(
+            FfiConverterData.lower(txid),
+            FfiConverterUInt32.lower(vout), $0
+        )
+    })
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -1538,6 +1584,9 @@ private var initializationResult: InitializationResult = {
     if uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction() != 48271 {
         return InitializationResult.apiChecksumMismatch
     }
+    if uniffi_spark_token_primitives_checksum_func_coop_exit_target() != 31757 {
+        return InitializationResult.apiChecksumMismatch
+    }
     if uniffi_spark_token_primitives_checksum_func_finalize_token_invoice() != 61372 {
         return InitializationResult.apiChecksumMismatch
     }
@@ -1548,6 +1597,18 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_token_primitives_checksum_func_quote_envelope_digest() != 47246 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_token_primitives_checksum_func_receive_attestor_target() != 48637 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_token_primitives_checksum_func_send_target() != 33781 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_token_primitives_checksum_func_static_deposit_target() != 10361 {
         return InitializationResult.apiChecksumMismatch
     }
 

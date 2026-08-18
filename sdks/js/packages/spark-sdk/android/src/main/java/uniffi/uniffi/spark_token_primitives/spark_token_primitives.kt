@@ -723,6 +723,16 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -742,6 +752,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_spark_token_primitives_fn_func_construct_partial_transfer_transaction(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_spark_token_primitives_fn_func_coop_exit_target(`withdrawalAddress`: RustBuffer.ByValue,`leafSetHash`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_spark_token_primitives_fn_func_finalize_token_invoice(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction(`partialTokenTransactionBytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -749,6 +761,14 @@ internal interface UniffiLib : Library {
     fun uniffi_spark_token_primitives_fn_func_hash_transfer_manifest(`transferManifestBytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_spark_token_primitives_fn_func_prepare_token_invoice(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_spark_token_primitives_fn_func_quote_envelope_digest(`network`: Int,`manifestHash`: RustBuffer.ByValue,`reason`: Int,`role`: Int,`target`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_spark_token_primitives_fn_func_receive_attestor_target(`paymentHash`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_spark_token_primitives_fn_func_send_target(`paymentHash`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_spark_token_primitives_fn_func_static_deposit_target(`txid`: RustBuffer.ByValue,`vout`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_spark_token_primitives_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -866,6 +886,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction(
     ): Short
+    fun uniffi_spark_token_primitives_checksum_func_coop_exit_target(
+    ): Short
     fun uniffi_spark_token_primitives_checksum_func_finalize_token_invoice(
     ): Short
     fun uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction(
@@ -873,6 +895,14 @@ internal interface UniffiLib : Library {
     fun uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest(
     ): Short
     fun uniffi_spark_token_primitives_checksum_func_prepare_token_invoice(
+    ): Short
+    fun uniffi_spark_token_primitives_checksum_func_quote_envelope_digest(
+    ): Short
+    fun uniffi_spark_token_primitives_checksum_func_receive_attestor_target(
+    ): Short
+    fun uniffi_spark_token_primitives_checksum_func_send_target(
+    ): Short
+    fun uniffi_spark_token_primitives_checksum_func_static_deposit_target(
     ): Short
     fun ffi_spark_token_primitives_uniffi_contract_version(
     ): Int
@@ -897,6 +927,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction() != 48271.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_spark_token_primitives_checksum_func_coop_exit_target() != 31757.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_spark_token_primitives_checksum_func_finalize_token_invoice() != 61372.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -907,6 +940,18 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_spark_token_primitives_checksum_func_quote_envelope_digest() != 47246.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_spark_token_primitives_checksum_func_receive_attestor_target() != 48637.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_spark_token_primitives_checksum_func_send_target() != 33781.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_spark_token_primitives_checksum_func_static_deposit_target() != 10361.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1782,6 +1827,16 @@ public object FfiConverterSequenceTypeSignatureWithIndexInput: FfiConverterRustB
     }
     
 
+    @Throws(SparkTokenPrimitivesException::class) fun `coopExitTarget`(`withdrawalAddress`: kotlin.String, `leafSetHash`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_coop_exit_target(
+        FfiConverterString.lower(`withdrawalAddress`),FfiConverterByteArray.lower(`leafSetHash`),_status)
+}
+    )
+    }
+    
+
     @Throws(SparkTokenPrimitivesException::class) fun `finalizeTokenInvoice`(`request`: FinalizeTokenInvoiceRequest): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
@@ -1817,6 +1872,46 @@ public object FfiConverterSequenceTypeSignatureWithIndexInput: FfiConverterRustB
     uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
     UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_prepare_token_invoice(
         FfiConverterTypePrepareTokenInvoiceRequest.lower(`request`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SparkTokenPrimitivesException::class) fun `quoteEnvelopeDigest`(`network`: kotlin.UInt, `manifestHash`: kotlin.ByteArray, `reason`: kotlin.UInt, `role`: kotlin.UInt, `target`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_quote_envelope_digest(
+        FfiConverterUInt.lower(`network`),FfiConverterByteArray.lower(`manifestHash`),FfiConverterUInt.lower(`reason`),FfiConverterUInt.lower(`role`),FfiConverterByteArray.lower(`target`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SparkTokenPrimitivesException::class) fun `receiveAttestorTarget`(`paymentHash`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_receive_attestor_target(
+        FfiConverterByteArray.lower(`paymentHash`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SparkTokenPrimitivesException::class) fun `sendTarget`(`paymentHash`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_send_target(
+        FfiConverterByteArray.lower(`paymentHash`),_status)
+}
+    )
+    }
+    
+
+    @Throws(SparkTokenPrimitivesException::class) fun `staticDepositTarget`(`txid`: kotlin.ByteArray, `vout`: kotlin.UInt): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(SparkTokenPrimitivesException) { _status ->
+    UniffiLib.INSTANCE.uniffi_spark_token_primitives_fn_func_static_deposit_target(
+        FfiConverterByteArray.lower(`txid`),FfiConverterUInt.lower(`vout`),_status)
 }
     )
     }

@@ -29,6 +29,25 @@ export function construct_partial_transfer_transaction(request) {
 }
 
 /**
+ * @param {string} withdrawal_address
+ * @param {Uint8Array} leaf_set_hash
+ * @returns {Uint8Array}
+ */
+export function coop_exit_target(withdrawal_address, leaf_set_hash) {
+    const ptr0 = passStringToWasm0(withdrawal_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(leaf_set_hash, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.coop_exit_target(ptr0, len0, ptr1, len1);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v3;
+}
+
+/**
  * @param {any} request
  * @returns {string}
  */
@@ -93,6 +112,77 @@ export function prepare_token_invoice(request) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {number} network
+ * @param {Uint8Array} manifest_hash
+ * @param {number} reason
+ * @param {number} role
+ * @param {Uint8Array} target
+ * @returns {Uint8Array}
+ */
+export function quote_envelope_digest(network, manifest_hash, reason, role, target) {
+    const ptr0 = passArray8ToWasm0(manifest_hash, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(target, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.quote_envelope_digest(network, ptr0, len0, reason, role, ptr1, len1);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v3;
+}
+
+/**
+ * @param {Uint8Array} payment_hash
+ * @returns {Uint8Array}
+ */
+export function receive_attestor_target(payment_hash) {
+    const ptr0 = passArray8ToWasm0(payment_hash, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.receive_attestor_target(ptr0, len0);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * @param {Uint8Array} payment_hash
+ * @returns {Uint8Array}
+ */
+export function send_target(payment_hash) {
+    const ptr0 = passArray8ToWasm0(payment_hash, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.send_target(ptr0, len0);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * @param {Uint8Array} txid
+ * @param {number} vout
+ * @returns {Uint8Array}
+ */
+export function static_deposit_target(txid, vout) {
+    const ptr0 = passArray8ToWasm0(txid, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.static_deposit_target(ptr0, len0, vout);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
 }
 function __wbg_get_imports() {
     const import0 = {
