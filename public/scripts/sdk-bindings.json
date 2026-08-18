@@ -1,0 +1,325 @@
+{
+  "schema_version": 2,
+  "manifest": "sdks/js/sdk-bindings-manifest.json",
+  "tool_versions": {
+    "android_api": "21",
+    "android_ndk": "r25c",
+    "protoc": "33.2",
+    "wasm_pack": "0.13.1",
+    "windows_llvm": "20.1.8"
+  },
+  "bare_tool_versions": {
+    "bare-make": "1.6.3",
+    "cmake-bare": "1.6.5",
+    "cmake-cargo": "0.0.5",
+    "cmake-npm": "1.1.0",
+    "cmake-runtime": "4.1.1",
+    "cmake-toolchains": "1.8.4",
+    "ninja-runtime": "1.13.1"
+  },
+  "source_hash_transforms": {
+    "sdks/js/packages/spark-frost-bare-addon/package.json": {
+      "remove_top_level_json_fields": ["version"]
+    }
+  },
+  "managed_output_patterns": [
+    "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/**",
+    "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/**",
+    "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/**",
+    "sdks/js/packages/spark-sdk/android/src/main/jniLibs/**",
+    "sdks/js/packages/spark-sdk/ios/spark_frost.swift",
+    "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/**",
+    "sdks/js/packages/spark-sdk/ios/spark_token_primitives.swift",
+    "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/**",
+    "sdks/js/packages/spark-frost-bare-addon/prebuilds/**"
+  ],
+  "executable_output_patterns": [
+    "sdks/js/packages/spark-sdk/android/src/main/jniLibs/**"
+  ],
+  "force_all_triggers": [
+    ".github/workflows/sdk-bindings.yaml",
+    ".github/workflows/bare-prebuild.yaml",
+    ".github/workflows/run-spark-hermetic-test.yaml"
+  ],
+  "trusted_producer_paths": [
+    ".github/workflows/bare-prebuild.yaml",
+    ".github/workflows/run-spark-hermetic-test.yaml",
+    ".github/workflows/sdk-bindings.yaml",
+    "public/actions/setup-node-yarn-install/**",
+    "public/actions/yarn-install/**",
+    "public/scripts/sdk-bindings.json",
+    "public/scripts/build-sdk-android-bindings.sh",
+    "public/scripts/build-sdk-ios-bindings.sh",
+    "public/scripts/sdk-bindings.js",
+    "public/scripts/tests/test-sdk-bindings.js",
+    "public/scripts/verify-android-min-api.sh",
+    "public/scripts/verify-android-page-size.sh",
+    "scripts/sdk-bindings/commit-sdk-bindings.js",
+    "scripts/sdk-bindings/tests/test-commit-sdk-bindings.js",
+    "sdks/js/packages/spark-frost-bare-addon/scripts/normalize-win32-prebuilds.js",
+    "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-browser.mjs",
+    "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-nodejs.mjs",
+    "sdks/js/packages/spark-sdk/wasm/patch-wasm-browser.mjs",
+    "sdks/js/packages/spark-sdk/wasm/patch-wasm-browser.test.mjs",
+    "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.mjs",
+    "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.test.mjs",
+    "signer/spark-frost-uniffi/build-bindings.sh",
+    "signer/spark-token-primitives-uniffi/build-bindings.sh"
+  ],
+  "common_inputs": [
+    "public/scripts/sdk-bindings.json",
+    "public/scripts/sdk-bindings.js",
+    "signer/.cargo/config.toml",
+    "signer/Cargo.lock",
+    "signer/Cargo.toml",
+    "signer/rust-toolchain.toml"
+  ],
+  "packages": {
+    "@buildonspark/spark-sdk": "sdks/js/packages/spark-sdk",
+    "@buildonspark/spark-frost-bare-addon": "sdks/js/packages/spark-frost-bare-addon"
+  },
+  "groups": {
+    "frost-wasm": {
+      "platform": "wasm",
+      "family": "frost",
+      "inputs": [
+        "protos/common.proto",
+        "protos/frost.proto",
+        "protos/validate/validate.proto",
+        "signer/spark-frost/Cargo.toml",
+        "signer/spark-frost/build.rs",
+        "signer/spark-frost/src/**",
+        "signer/spark-frost-uniffi/Cargo.toml",
+        "signer/spark-frost-uniffi/.cargo/config.toml",
+        "signer/spark-frost-uniffi/build.rs",
+        "signer/spark-frost-uniffi/build-bindings.sh",
+        "signer/spark-frost-uniffi/src/**",
+        "signer/spark-frost-uniffi/uniffi-bindgen.rs",
+        "sdks/js/packages/spark-sdk/wasm/patch-wasm-browser.mjs",
+        "sdks/js/packages/spark-sdk/wasm/patch-wasm-browser.test.mjs",
+        "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.mjs",
+        "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.test.mjs"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser-bg.wasm",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser-bg.wasm.d.ts",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser.d.ts",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser.js",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm.d.ts",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.d.ts",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js"
+      ]
+    },
+    "token-wasm": {
+      "platform": "wasm",
+      "family": "token",
+      "inputs": [
+        "protos/common.proto",
+        "protos/multisig.proto",
+        "protos/spark.proto",
+        "protos/spark_token.proto",
+        "protos/validate/validate.proto",
+        "signer/spark-token-primitives/Cargo.toml",
+        "signer/spark-token-primitives/build.rs",
+        "signer/spark-token-primitives/src/**",
+        "signer/spark-token-primitives-uniffi/Cargo.toml",
+        "signer/spark-token-primitives-uniffi/.cargo/config.toml",
+        "signer/spark-token-primitives-uniffi/build.rs",
+        "signer/spark-token-primitives-uniffi/build-bindings.sh",
+        "signer/spark-token-primitives-uniffi/src/**",
+        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs",
+        "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-browser.mjs",
+        "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-nodejs.mjs"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser-bg.wasm",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser-bg.wasm.d.ts",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser.d.ts",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser.js",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm.d.ts",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.d.ts",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js"
+      ]
+    },
+    "frost-android": {
+      "platform": "android",
+      "family": "frost",
+      "inputs": [
+        "protos/common.proto",
+        "protos/frost.proto",
+        "protos/validate/validate.proto",
+        "public/scripts/build-sdk-android-bindings.sh",
+        "public/scripts/verify-android-min-api.sh",
+        "public/scripts/verify-android-page-size.sh",
+        "signer/spark-frost/Cargo.toml",
+        "signer/spark-frost/build.rs",
+        "signer/spark-frost/src/**",
+        "signer/spark-frost-uniffi/.cargo/config.toml",
+        "signer/spark-frost-uniffi/Cargo.toml",
+        "signer/spark-frost-uniffi/build.rs",
+        "signer/spark-frost-uniffi/src/**",
+        "signer/spark-frost-uniffi/uniffi-bindgen.rs"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/uniffi/spark_frost/spark_frost.kt",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_frost.so",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_frost.so",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_frost.so",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so"
+      ]
+    },
+    "token-android": {
+      "platform": "android",
+      "family": "token",
+      "inputs": [
+        "protos/common.proto",
+        "protos/multisig.proto",
+        "protos/spark.proto",
+        "protos/spark_token.proto",
+        "protos/validate/validate.proto",
+        "public/scripts/build-sdk-android-bindings.sh",
+        "public/scripts/verify-android-min-api.sh",
+        "public/scripts/verify-android-page-size.sh",
+        "signer/spark-token-primitives/Cargo.toml",
+        "signer/spark-token-primitives/build.rs",
+        "signer/spark-token-primitives/src/**",
+        "signer/spark-token-primitives-uniffi/.cargo/config.toml",
+        "signer/spark-token-primitives-uniffi/Cargo.toml",
+        "signer/spark-token-primitives-uniffi/build.rs",
+        "signer/spark-token-primitives-uniffi/src/**",
+        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/uniffi/spark_token_primitives/spark_token_primitives.kt",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_token_primitives.so",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_token_primitives.so",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_token_primitives.so",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so"
+      ]
+    },
+    "frost-ios": {
+      "platform": "ios",
+      "family": "frost",
+      "inputs": [
+        "protos/common.proto",
+        "protos/frost.proto",
+        "protos/validate/validate.proto",
+        "public/scripts/build-sdk-ios-bindings.sh",
+        "signer/spark-frost/Cargo.toml",
+        "signer/spark-frost/build.rs",
+        "signer/spark-frost/src/**",
+        "signer/spark-frost-uniffi/.cargo/config.toml",
+        "signer/spark-frost-uniffi/Cargo.toml",
+        "signer/spark-frost-uniffi/build.rs",
+        "signer/spark-frost-uniffi/spark-frost-swift/**",
+        "signer/spark-frost-uniffi/src/**",
+        "signer/spark-frost-uniffi/uniffi-bindgen.rs"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-sdk/ios/spark_frost.swift",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/Info.plist",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/SparkFrost",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Headers/spark_frostFFI.h",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Modules/module.modulemap",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/spark_frostFFI",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/SparkFrost",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Headers/spark_frostFFI.h",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Modules/module.modulemap",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/spark_frostFFI",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI.h",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Modules/module.modulemap",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI"
+      ]
+    },
+    "token-ios": {
+      "platform": "ios",
+      "family": "token",
+      "inputs": [
+        "protos/common.proto",
+        "protos/multisig.proto",
+        "protos/spark.proto",
+        "protos/spark_token.proto",
+        "protos/validate/validate.proto",
+        "public/scripts/build-sdk-ios-bindings.sh",
+        "signer/spark-token-primitives/Cargo.toml",
+        "signer/spark-token-primitives/build.rs",
+        "signer/spark-token-primitives/src/**",
+        "signer/spark-token-primitives-uniffi/.cargo/config.toml",
+        "signer/spark-token-primitives-uniffi/Cargo.toml",
+        "signer/spark-token-primitives-uniffi/build.rs",
+        "signer/spark-token-primitives-uniffi/spark-token-primitives-swift/**",
+        "signer/spark-token-primitives-uniffi/src/**",
+        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitives.swift",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/Info.plist",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/SparkTokenPrimitives",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/Modules/module.modulemap",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/SparkTokenPrimitives",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/Modules/module.modulemap",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/spark_token_primitivesFFI",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Modules/module.modulemap",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI"
+      ]
+    },
+    "frost-bare": {
+      "platform": "bare",
+      "family": "frost",
+      "inputs": [
+        "protos/common.proto",
+        "protos/frost.proto",
+        "protos/validate/validate.proto",
+        "signer/spark-frost/Cargo.toml",
+        "signer/spark-frost/build.rs",
+        "signer/spark-frost/src/**",
+        "sdks/js/.yarn/**",
+        "sdks/js/.yarnrc.yml",
+        "sdks/js/package.json",
+        "sdks/js/packages/spark-frost-bare-addon/CMakeLists.txt",
+        "sdks/js/packages/spark-frost-bare-addon/Cargo.lock",
+        "sdks/js/packages/spark-frost-bare-addon/Cargo.toml",
+        "sdks/js/packages/spark-frost-bare-addon/binding.c",
+        "sdks/js/packages/spark-frost-bare-addon/binding.js",
+        "sdks/js/packages/spark-frost-bare-addon/binding.rs",
+        "sdks/js/packages/spark-frost-bare-addon/build.sh",
+        "sdks/js/packages/spark-frost-bare-addon/package.json",
+        "sdks/js/packages/spark-frost-bare-addon/rust-toolchain.toml",
+        "sdks/js/packages/spark-frost-bare-addon/scripts/normalize-win32-prebuilds.js",
+        "sdks/js/postinstall.sh"
+      ],
+      "trigger_inputs": [
+        "public/actions/setup-node-yarn-install/**",
+        "public/actions/yarn-install/**",
+        "sdks/js/yarn.lock"
+      ],
+      "outputs": [
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare"
+      ]
+    }
+  }
+}

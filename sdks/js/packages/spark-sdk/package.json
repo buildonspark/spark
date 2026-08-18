@@ -114,6 +114,7 @@
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
     "lint": "eslint .",
     "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
+    "prepublishOnly": "node ../../../../public/scripts/sdk-bindings.js check",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "yarn test-cmd src/tests --testPathIgnorePatterns=/src/tests/integration/",

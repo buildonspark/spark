@@ -27,14 +27,15 @@
     "generate:proto:check": "yarn workspace @buildonspark/spark-sdk generate:proto:check",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
-    "release": "yarn build:packages && changeset publish",
+    "release": "yarn build:packages && yarn verify:bindings && changeset publish",
     "package:checks": "turbo run package:checks",
     "start": "turbo run start",
     "test": "turbo run test",
     "test:all": "yarn deps:check && turbo run test test:integration test:integration:ssp",
     "test:integration": "yarn deps:check && turbo run test:integration",
     "test:integration:ssp": "yarn deps:check && turbo run test:integration:ssp",
-    "types": "turbo run types"
+    "types": "turbo run types",
+    "verify:bindings": "node ../../public/scripts/sdk-bindings.js verify-packages"
   },
   "workspaces": [
     "apps/*",

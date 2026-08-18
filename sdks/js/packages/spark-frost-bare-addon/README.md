@@ -34,7 +34,7 @@ const balance = await wallet.getBalance();
 
 ## Publishing
 
-When publishing the spark-frost-bare-addon to NPM you should include all prebuilds for tier 1 platforms listed in the [bare docs](https://github.com/holepunchto/bare?tab=readme-ov-file#platform-support). These docs link to an [example prebuild workflow](https://github.com/holepunchto/bare/blob/main/.github/workflows/prebuild.yml) on which our prebuild workflow is based, but ours also includes steps required to set up Rust to build the bindings. This workflow will run automatically on any changes to spark-frost-bare-addon files or its dependencies. Before publishing to NPM locally you should navigate to the "Bare prebuild" workflow run when the commit lands in main, click "Summary", and download the "prebuilds" articact which contains files for all platforms. Replace your local "prebuilds" directory with this one to ensure they're all included when you publish to NPM.
+The committed package includes prebuilds for every tier 1 platform listed in the [Bare documentation](https://github.com/holepunchto/bare?tab=readme-ov-file#platform-support). The `SDK bindings` workflow rebuilds and commits all of them when the addon or one of its declared dependencies changes. Its manifest and package-content checks must pass before publishing; `prepublishOnly` also rejects stale or missing prebuilds. Publish from the committed package after the SDK bindings gate is green rather than downloading a separate workflow artifact.
 
 ## Advanced build options
 

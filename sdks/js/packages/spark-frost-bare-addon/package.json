@@ -25,7 +25,7 @@
     "lint:fix": "eslint --fix .",
     "lint": "eslint .",
     "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
-    "prepublishOnly": "node scripts/ensure-prebuilds-present.js"
+    "prepublishOnly": "node scripts/ensure-prebuilds-present.js && node ../../../../public/scripts/sdk-bindings.js check --groups frost-bare"
   },
   "installConfig": {
     "hoistingLimits": "dependencies"

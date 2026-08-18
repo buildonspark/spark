@@ -61,7 +61,7 @@ Rust source (lib.rs with #[wasm_bindgen])
   ├─ wasm-pack --target nodejs  →  wasm/nodejs/wasm_nodejs.{js,wasm,d.ts}
   └─ wasm-pack --target web     →  wasm/browser/wasm_browser.{js,wasm,d.ts}
   │
-  └─ yarn patch-wasm  (post-processing)
+  └─ Node post-processing scripts
        ├─ patch-wasm-nodejs.mjs  →  src/spark-bindings/wasm/wasm-nodejs.js
        │   • Converts CJS → ESM
        │   • Inlines .wasm binary as base64 (self-contained, no external file)
@@ -126,12 +126,17 @@ src/spark-bindings/
     ├── wasm-nodejs-bg.wasm.d.ts    # TypeScript declarations for Node.js WASM internals
     ├── wasm-browser.js             # Patched WASM loader (ESM)
     ├── wasm-browser.d.ts           # TypeScript declarations for browser WASM
-    ├── wasm-browser-bg.js          # Browser WASM glue code
     ├── wasm-browser-bg.wasm        # Browser WASM binary (loaded at runtime)
     └── wasm-browser-bg.wasm.d.ts   # TypeScript declarations for browser WASM internals
 ```
 
 **Singleton pattern:** Each `index.{platform}.ts` entry point creates the platform-specific `SparkFrost` subclass and registers it via `setSparkFrostOnce()`. All SDK code accesses bindings through `getSparkFrost()`.
+
+### Generated Binding Ownership
+
+`public/scripts/sdk-bindings.json` maps the committed FROST and token-primitives WASM, Android, iOS, and Bare artifacts to their inputs. Shared Rust, proto, Cargo, and toolchain changes rebuild every dependent group, while family- or platform-specific changes rebuild only their dependents. Generation updates `sdks/js/sdk-bindings-manifest.json`, and releases verify the manifest and both npm package contents before publishing.
+
+The generation scripts remain available for local iteration, but generated files and the manifest must match automated builds before merge.
 
 **React Native data marshaling:** The RN bridge doesn't support `Uint8Array` or `bigint`. `SparkFrostReactNative` converts `Uint8Array` → `number[]` and `bigint` → `string` before crossing the bridge, then converts back on return.
 

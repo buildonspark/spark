@@ -8,11 +8,11 @@ import Foundation
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
 #if canImport(spark_token_primitivesFFI)
-import spark_token_primitivesFFI
+    import spark_token_primitivesFFI
 #endif
 
-fileprivate extension RustBuffer {
-    // Allocate a new buffer, copying the contents of a `UInt8` array.
+private extension RustBuffer {
+    /// Allocate a new buffer, copying the contents of a `UInt8` array.
     init(bytes: [UInt8]) {
         let rbuf = bytes.withUnsafeBufferPointer { ptr in
             RustBuffer.from(ptr)
@@ -21,21 +21,21 @@ fileprivate extension RustBuffer {
     }
 
     static func empty() -> RustBuffer {
-        RustBuffer(capacity: 0, len:0, data: nil)
+        RustBuffer(capacity: 0, len: 0, data: nil)
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
         try! rustCall { ffi_spark_token_primitives_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
-    // Frees the buffer in place.
-    // The buffer must not be used after this is called.
+    /// Frees the buffer in place.
+    /// The buffer must not be used after this is called.
     func deallocate() {
         try! rustCall { ffi_spark_token_primitives_rustbuffer_free(self, $0) }
     }
 }
 
-fileprivate extension ForeignBytes {
+private extension ForeignBytes {
     init(bufferPointer: UnsafeBufferPointer<UInt8>) {
         self.init(len: Int32(bufferPointer.count), data: bufferPointer.baseAddress)
     }
@@ -48,7 +48,7 @@ fileprivate extension ForeignBytes {
 // Helper classes/extensions that don't change.
 // Someday, this will be in a library of its own.
 
-fileprivate extension Data {
+private extension Data {
     init(rustBuffer: RustBuffer) {
         self.init(
             bytesNoCopy: rustBuffer.data!,
@@ -72,15 +72,15 @@ fileprivate extension Data {
 //
 // Instead, the read() method and these helper functions input a tuple of data
 
-fileprivate func createReader(data: Data) -> (data: Data, offset: Data.Index) {
+private func createReader(data: Data) -> (data: Data, offset: Data.Index) {
     (data: data, offset: 0)
 }
 
-// Reads an integer at the current offset, in big-endian order, and advances
-// the offset on success. Throws if reading the integer would move the
-// offset past the end of the buffer.
-fileprivate func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
-    let range = reader.offset..<reader.offset + MemoryLayout<T>.size
+/// Reads an integer at the current offset, in big-endian order, and advances
+/// the offset on success. Throws if reading the integer would move the
+/// offset past the end of the buffer.
+private func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
+    let range = reader.offset ..< reader.offset + MemoryLayout<T>.size
     guard reader.data.count >= range.upperBound else {
         throw UniffiInternalError.bufferOverflow
     }
@@ -90,38 +90,38 @@ fileprivate func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offs
         return value as! T
     }
     var value: T = 0
-    let _ = withUnsafeMutableBytes(of: &value, { reader.data.copyBytes(to: $0, from: range)})
+    let _ = withUnsafeMutableBytes(of: &value) { reader.data.copyBytes(to: $0, from: range) }
     reader.offset = range.upperBound
     return value.bigEndian
 }
 
-// Reads an arbitrary number of bytes, to be used to read
-// raw bytes, this is useful when lifting strings
-fileprivate func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> Array<UInt8> {
-    let range = reader.offset..<(reader.offset+count)
+/// Reads an arbitrary number of bytes, to be used to read
+/// raw bytes, this is useful when lifting strings
+private func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> [UInt8] {
+    let range = reader.offset ..< (reader.offset + count)
     guard reader.data.count >= range.upperBound else {
         throw UniffiInternalError.bufferOverflow
     }
     var value = [UInt8](repeating: 0, count: count)
-    value.withUnsafeMutableBufferPointer({ buffer in
+    value.withUnsafeMutableBufferPointer { buffer in
         reader.data.copyBytes(to: buffer, from: range)
-    })
+    }
     reader.offset = range.upperBound
     return value
 }
 
-// Reads a float at the current offset.
-fileprivate func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
-    return Float(bitPattern: try readInt(&reader))
+/// Reads a float at the current offset.
+private func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
+    return try Float(bitPattern: readInt(&reader))
 }
 
-// Reads a float at the current offset.
-fileprivate func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
-    return Double(bitPattern: try readInt(&reader))
+/// Reads a float at the current offset.
+private func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
+    return try Double(bitPattern: readInt(&reader))
 }
 
-// Indicates if the offset has reached the end of the buffer.
-fileprivate func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
+/// Indicates if the offset has reached the end of the buffer.
+private func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
     return reader.offset < reader.data.count
 }
 
@@ -129,34 +129,34 @@ fileprivate func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Boo
 // struct, but we use standalone functions instead in order to make external
 // types work.  See the above discussion on Readers for details.
 
-fileprivate func createWriter() -> [UInt8] {
+private func createWriter() -> [UInt8] {
     return []
 }
 
-fileprivate func writeBytes<S>(_ writer: inout [UInt8], _ byteArr: S) where S: Sequence, S.Element == UInt8 {
+private func writeBytes<S: Sequence>(_ writer: inout [UInt8], _ byteArr: S) where S.Element == UInt8 {
     writer.append(contentsOf: byteArr)
 }
 
-// Writes an integer in big-endian order.
-//
-// Warning: make sure what you are trying to write
-// is in the correct type!
-fileprivate func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
+/// Writes an integer in big-endian order.
+///
+/// Warning: make sure what you are trying to write
+/// is in the correct type!
+private func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
     var value = value.bigEndian
     withUnsafeBytes(of: &value) { writer.append(contentsOf: $0) }
 }
 
-fileprivate func writeFloat(_ writer: inout [UInt8], _ value: Float) {
+private func writeFloat(_ writer: inout [UInt8], _ value: Float) {
     writeInt(&writer, value.bitPattern)
 }
 
-fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
+private func writeDouble(_ writer: inout [UInt8], _ value: Double) {
     writeInt(&writer, value.bitPattern)
 }
 
-// Protocol for types that transfer other types across the FFI. This is
-// analogous to the Rust trait of the same name.
-fileprivate protocol FfiConverter {
+/// Protocol for types that transfer other types across the FFI. This is
+/// analogous to the Rust trait of the same name.
+private protocol FfiConverter {
     associatedtype FfiType
     associatedtype SwiftType
 
@@ -166,33 +166,33 @@ fileprivate protocol FfiConverter {
     static func write(_ value: SwiftType, into buf: inout [UInt8])
 }
 
-// Types conforming to `Primitive` pass themselves directly over the FFI.
-fileprivate protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType { }
+/// Types conforming to `Primitive` pass themselves directly over the FFI.
+private protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType {}
 
 extension FfiConverterPrimitive {
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lift(_ value: FfiType) throws -> SwiftType {
         return value
     }
 
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lower(_ value: SwiftType) -> FfiType {
         return value
     }
 }
 
-// Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
-// Used for complex types where it's hard to write a custom lift/lower.
-fileprivate protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
+/// Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
+/// Used for complex types where it's hard to write a custom lift/lower.
+private protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lift(_ buf: RustBuffer) throws -> SwiftType {
         var reader = createReader(data: Data(rustBuffer: buf))
         let value = try read(from: &reader)
@@ -203,18 +203,19 @@ extension FfiConverterRustBuffer {
         return value
     }
 
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lower(_ value: SwiftType) -> RustBuffer {
-          var writer = createWriter()
-          write(value, into: &writer)
-          return RustBuffer(bytes: writer)
+        var writer = createWriter()
+        write(value, into: &writer)
+        return RustBuffer(bytes: writer)
     }
 }
-// An error type for FFI errors. These errors occur at the UniFFI level, not
-// the library level.
-fileprivate enum UniffiInternalError: LocalizedError {
+
+/// An error type for FFI errors. These errors occur at the UniFFI level, not
+/// the library level.
+private enum UniffiInternalError: LocalizedError {
     case bufferOverflow
     case incompleteData
     case unexpectedOptionalTag
@@ -225,7 +226,7 @@ fileprivate enum UniffiInternalError: LocalizedError {
     case unexpectedStaleHandle
     case rustPanic(_ message: String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .bufferOverflow: return "Reading the requested value would read past the end of the buffer"
         case .incompleteData: return "The buffer still has data after lifting its containing value"
@@ -240,24 +241,24 @@ fileprivate enum UniffiInternalError: LocalizedError {
     }
 }
 
-fileprivate extension NSLock {
+private extension NSLock {
     func withLock<T>(f: () throws -> T) rethrows -> T {
-        self.lock()
+        lock()
         defer { self.unlock() }
         return try f()
     }
 }
 
-fileprivate let CALL_SUCCESS: Int8 = 0
-fileprivate let CALL_ERROR: Int8 = 1
-fileprivate let CALL_UNEXPECTED_ERROR: Int8 = 2
-fileprivate let CALL_CANCELLED: Int8 = 3
+private let CALL_SUCCESS: Int8 = 0
+private let CALL_ERROR: Int8 = 1
+private let CALL_UNEXPECTED_ERROR: Int8 = 2
+private let CALL_CANCELLED: Int8 = 3
 
-fileprivate extension RustCallStatus {
+private extension RustCallStatus {
     init() {
         self.init(
             code: CALL_SUCCESS,
-            errorBuf: RustBuffer.init(
+            errorBuf: RustBuffer(
                 capacity: 0,
                 len: 0,
                 data: nil
@@ -273,7 +274,8 @@ private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T
 
 private func rustCallWithError<T, E: Swift.Error>(
     _ errorHandler: @escaping (RustBuffer) throws -> E,
-    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
+    _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T
+) throws -> T {
     try makeRustCall(callback, errorHandler: errorHandler)
 }
 
@@ -282,7 +284,7 @@ private func makeRustCall<T, E: Swift.Error>(
     errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
     uniffiEnsureInitialized()
-    var callStatus = RustCallStatus.init()
+    var callStatus = RustCallStatus()
     let returnedVal = callback(&callStatus)
     try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
     return returnedVal
@@ -293,44 +295,44 @@ private func uniffiCheckCallStatus<E: Swift.Error>(
     errorHandler: ((RustBuffer) throws -> E)?
 ) throws {
     switch callStatus.code {
-        case CALL_SUCCESS:
-            return
+    case CALL_SUCCESS:
+        return
 
-        case CALL_ERROR:
-            if let errorHandler = errorHandler {
-                throw try errorHandler(callStatus.errorBuf)
-            } else {
-                callStatus.errorBuf.deallocate()
-                throw UniffiInternalError.unexpectedRustCallError
-            }
+    case CALL_ERROR:
+        if let errorHandler = errorHandler {
+            throw try errorHandler(callStatus.errorBuf)
+        } else {
+            callStatus.errorBuf.deallocate()
+            throw UniffiInternalError.unexpectedRustCallError
+        }
 
-        case CALL_UNEXPECTED_ERROR:
-            // When the rust code sees a panic, it tries to construct a RustBuffer
-            // with the message.  But if that code panics, then it just sends back
-            // an empty buffer.
-            if callStatus.errorBuf.len > 0 {
-                throw UniffiInternalError.rustPanic(try FfiConverterString.lift(callStatus.errorBuf))
-            } else {
-                callStatus.errorBuf.deallocate()
-                throw UniffiInternalError.rustPanic("Rust panic")
-            }
+    case CALL_UNEXPECTED_ERROR:
+        // When the rust code sees a panic, it tries to construct a RustBuffer
+        // with the message.  But if that code panics, then it just sends back
+        // an empty buffer.
+        if callStatus.errorBuf.len > 0 {
+            throw try UniffiInternalError.rustPanic(FfiConverterString.lift(callStatus.errorBuf))
+        } else {
+            callStatus.errorBuf.deallocate()
+            throw UniffiInternalError.rustPanic("Rust panic")
+        }
 
-        case CALL_CANCELLED:
-            fatalError("Cancellation not supported yet")
+    case CALL_CANCELLED:
+        fatalError("Cancellation not supported yet")
 
-        default:
-            throw UniffiInternalError.unexpectedRustCallStatusCode
+    default:
+        throw UniffiInternalError.unexpectedRustCallStatusCode
     }
 }
 
 private func uniffiTraitInterfaceCall<T>(
     callStatus: UnsafeMutablePointer<RustCallStatus>,
     makeCall: () throws -> T,
-    writeReturn: (T) -> ()
+    writeReturn: (T) -> Void
 ) {
     do {
         try writeReturn(makeCall())
-    } catch let error {
+    } catch {
         callStatus.pointee.code = CALL_UNEXPECTED_ERROR
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
@@ -339,7 +341,7 @@ private func uniffiTraitInterfaceCall<T>(
 private func uniffiTraitInterfaceCallWithError<T, E>(
     callStatus: UnsafeMutablePointer<RustCallStatus>,
     makeCall: () throws -> T,
-    writeReturn: (T) -> (),
+    writeReturn: (T) -> Void,
     lowerError: (E) -> RustBuffer
 ) {
     do {
@@ -352,7 +354,8 @@ private func uniffiTraitInterfaceCallWithError<T, E>(
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
 }
-fileprivate class UniffiHandleMap<T> {
+
+private class UniffiHandleMap<T> {
     private var map: [UInt64: T] = [:]
     private let lock = NSLock()
     private var currentHandle: UInt64 = 1
@@ -366,7 +369,7 @@ fileprivate class UniffiHandleMap<T> {
         }
     }
 
-     func get(handle: UInt64) throws -> T {
+    func get(handle: UInt64) throws -> T {
         try lock.withLock {
             guard let obj = map[handle] else {
                 throw UniffiInternalError.unexpectedStaleHandle
@@ -386,72 +389,68 @@ fileprivate class UniffiHandleMap<T> {
     }
 
     var count: Int {
-        get {
-            map.count
-        }
+        map.count
     }
 }
-
 
 // Public interface members begin here.
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
+private struct FfiConverterUInt32: FfiConverterPrimitive {
     typealias FfiType = UInt32
     typealias SwiftType = UInt32
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
+private struct FfiConverterUInt64: FfiConverterPrimitive {
     typealias FfiType = UInt64
     typealias SwiftType = UInt64
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterInt64: FfiConverterPrimitive {
+private struct FfiConverterInt64: FfiConverterPrimitive {
     typealias FfiType = Int64
     typealias SwiftType = Int64
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Int64 {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Int64 {
         return try lift(readInt(&buf))
     }
 
-    public static func write(_ value: Int64, into buf: inout [UInt8]) {
+    static func write(_ value: Int64, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterString: FfiConverter {
+private struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
 
-    public static func lift(_ value: RustBuffer) throws -> String {
+    static func lift(_ value: RustBuffer) throws -> String {
         defer {
             value.deallocate()
         }
@@ -462,7 +461,7 @@ fileprivate struct FfiConverterString: FfiConverter {
         return String(bytes: bytes, encoding: String.Encoding.utf8)!
     }
 
-    public static func lower(_ value: String) -> RustBuffer {
+    static func lower(_ value: String) -> RustBuffer {
         return value.utf8CString.withUnsafeBufferPointer { ptr in
             // The swift string gives us int8_t, we want uint8_t.
             ptr.withMemoryRebound(to: UInt8.self) { ptr in
@@ -473,12 +472,12 @@ fileprivate struct FfiConverterString: FfiConverter {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> String {
         let len: Int32 = try readInt(&buf)
-        return String(bytes: try readBytes(&buf, count: Int(len)), encoding: String.Encoding.utf8)!
+        return try String(bytes: readBytes(&buf, count: Int(len)), encoding: String.Encoding.utf8)!
     }
 
-    public static func write(_ value: String, into buf: inout [UInt8]) {
+    static func write(_ value: String, into buf: inout [UInt8]) {
         let len = Int32(value.utf8.count)
         writeInt(&buf, len)
         writeBytes(&buf, value.utf8)
@@ -486,31 +485,30 @@ fileprivate struct FfiConverterString: FfiConverter {
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterData: FfiConverterRustBuffer {
+private struct FfiConverterData: FfiConverterRustBuffer {
     typealias SwiftType = Data
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
         let len: Int32 = try readInt(&buf)
-        return Data(try readBytes(&buf, count: Int(len)))
+        return try Data(readBytes(&buf, count: Int(len)))
     }
 
-    public static func write(_ value: Data, into buf: inout [UInt8]) {
+    static func write(_ value: Data, into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         writeBytes(&buf, value)
     }
 }
 
-
 public struct BroadcastBuildRequest {
     public var identityPublicKey: Data
     public var partialTokenTransactionBytes: Data
     public var ownerSignatures: [SignatureWithIndexInput]
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(identityPublicKey: Data, partialTokenTransactionBytes: Data, ownerSignatures: [SignatureWithIndexInput]) {
         self.identityPublicKey = identityPublicKey
         self.partialTokenTransactionBytes = partialTokenTransactionBytes
@@ -518,10 +516,8 @@ public struct BroadcastBuildRequest {
     }
 }
 
-
-
 extension BroadcastBuildRequest: Equatable, Hashable {
-    public static func ==(lhs: BroadcastBuildRequest, rhs: BroadcastBuildRequest) -> Bool {
+    public static func == (lhs: BroadcastBuildRequest, rhs: BroadcastBuildRequest) -> Bool {
         if lhs.identityPublicKey != rhs.identityPublicKey {
             return false
         }
@@ -541,18 +537,17 @@ extension BroadcastBuildRequest: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeBroadcastBuildRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BroadcastBuildRequest {
         return
             try BroadcastBuildRequest(
-                identityPublicKey: FfiConverterData.read(from: &buf), 
-                partialTokenTransactionBytes: FfiConverterData.read(from: &buf), 
+                identityPublicKey: FfiConverterData.read(from: &buf),
+                partialTokenTransactionBytes: FfiConverterData.read(from: &buf),
                 ownerSignatures: FfiConverterSequenceTypeSignatureWithIndexInput.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: BroadcastBuildRequest, into buf: inout [UInt8]) {
@@ -562,21 +557,19 @@ public struct FfiConverterTypeBroadcastBuildRequest: FfiConverterRustBuffer {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeBroadcastBuildRequest_lift(_ buf: RustBuffer) throws -> BroadcastBuildRequest {
     return try FfiConverterTypeBroadcastBuildRequest.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeBroadcastBuildRequest_lower(_ value: BroadcastBuildRequest) -> RustBuffer {
     return FfiConverterTypeBroadcastBuildRequest.lower(value)
 }
-
 
 public struct FinalizeTokenInvoiceRequest {
     public var receiverIdentityPublicKey: Data
@@ -584,8 +577,8 @@ public struct FinalizeTokenInvoiceRequest {
     public var sparkInvoiceFieldsBytes: Data
     public var signature: Data?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(receiverIdentityPublicKey: Data, network: UInt32, sparkInvoiceFieldsBytes: Data, signature: Data?) {
         self.receiverIdentityPublicKey = receiverIdentityPublicKey
         self.network = network
@@ -594,10 +587,8 @@ public struct FinalizeTokenInvoiceRequest {
     }
 }
 
-
-
 extension FinalizeTokenInvoiceRequest: Equatable, Hashable {
-    public static func ==(lhs: FinalizeTokenInvoiceRequest, rhs: FinalizeTokenInvoiceRequest) -> Bool {
+    public static func == (lhs: FinalizeTokenInvoiceRequest, rhs: FinalizeTokenInvoiceRequest) -> Bool {
         if lhs.receiverIdentityPublicKey != rhs.receiverIdentityPublicKey {
             return false
         }
@@ -621,19 +612,18 @@ extension FinalizeTokenInvoiceRequest: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeFinalizeTokenInvoiceRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FinalizeTokenInvoiceRequest {
         return
             try FinalizeTokenInvoiceRequest(
-                receiverIdentityPublicKey: FfiConverterData.read(from: &buf), 
-                network: FfiConverterUInt32.read(from: &buf), 
-                sparkInvoiceFieldsBytes: FfiConverterData.read(from: &buf), 
+                receiverIdentityPublicKey: FfiConverterData.read(from: &buf),
+                network: FfiConverterUInt32.read(from: &buf),
+                sparkInvoiceFieldsBytes: FfiConverterData.read(from: &buf),
                 signature: FfiConverterOptionData.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: FinalizeTokenInvoiceRequest, into buf: inout [UInt8]) {
@@ -644,38 +634,34 @@ public struct FfiConverterTypeFinalizeTokenInvoiceRequest: FfiConverterRustBuffe
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeFinalizeTokenInvoiceRequest_lift(_ buf: RustBuffer) throws -> FinalizeTokenInvoiceRequest {
     return try FfiConverterTypeFinalizeTokenInvoiceRequest.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeFinalizeTokenInvoiceRequest_lower(_ value: FinalizeTokenInvoiceRequest) -> RustBuffer {
     return FfiConverterTypeFinalizeTokenInvoiceRequest.lower(value)
 }
 
-
 public struct PartialTransferBuildResult {
     public var partialTokenTransactionBytes: Data
     public var partialTokenTransactionHash: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(partialTokenTransactionBytes: Data, partialTokenTransactionHash: Data) {
         self.partialTokenTransactionBytes = partialTokenTransactionBytes
         self.partialTokenTransactionHash = partialTokenTransactionHash
     }
 }
 
-
-
 extension PartialTransferBuildResult: Equatable, Hashable {
-    public static func ==(lhs: PartialTransferBuildResult, rhs: PartialTransferBuildResult) -> Bool {
+    public static func == (lhs: PartialTransferBuildResult, rhs: PartialTransferBuildResult) -> Bool {
         if lhs.partialTokenTransactionBytes != rhs.partialTokenTransactionBytes {
             return false
         }
@@ -691,17 +677,16 @@ extension PartialTransferBuildResult: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypePartialTransferBuildResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PartialTransferBuildResult {
         return
             try PartialTransferBuildResult(
-                partialTokenTransactionBytes: FfiConverterData.read(from: &buf), 
+                partialTokenTransactionBytes: FfiConverterData.read(from: &buf),
                 partialTokenTransactionHash: FfiConverterData.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: PartialTransferBuildResult, into buf: inout [UInt8]) {
@@ -710,21 +695,19 @@ public struct FfiConverterTypePartialTransferBuildResult: FfiConverterRustBuffer
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypePartialTransferBuildResult_lift(_ buf: RustBuffer) throws -> PartialTransferBuildResult {
     return try FfiConverterTypePartialTransferBuildResult.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypePartialTransferBuildResult_lower(_ value: PartialTransferBuildResult) -> RustBuffer {
     return FfiConverterTypePartialTransferBuildResult.lower(value)
 }
-
 
 public struct PrepareTokenInvoiceRequest {
     public var receiverIdentityPublicKey: Data
@@ -736,8 +719,8 @@ public struct PrepareTokenInvoiceRequest {
     public var expiryTimeUnixMillis: UInt64?
     public var invoiceId: Data?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(receiverIdentityPublicKey: Data, network: UInt32, tokenIdentifier: Data?, tokenAmount: Data?, memo: String?, senderSparkAddress: String?, expiryTimeUnixMillis: UInt64?, invoiceId: Data?) {
         self.receiverIdentityPublicKey = receiverIdentityPublicKey
         self.network = network
@@ -750,10 +733,8 @@ public struct PrepareTokenInvoiceRequest {
     }
 }
 
-
-
 extension PrepareTokenInvoiceRequest: Equatable, Hashable {
-    public static func ==(lhs: PrepareTokenInvoiceRequest, rhs: PrepareTokenInvoiceRequest) -> Bool {
+    public static func == (lhs: PrepareTokenInvoiceRequest, rhs: PrepareTokenInvoiceRequest) -> Bool {
         if lhs.receiverIdentityPublicKey != rhs.receiverIdentityPublicKey {
             return false
         }
@@ -793,23 +774,22 @@ extension PrepareTokenInvoiceRequest: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypePrepareTokenInvoiceRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PrepareTokenInvoiceRequest {
         return
             try PrepareTokenInvoiceRequest(
-                receiverIdentityPublicKey: FfiConverterData.read(from: &buf), 
-                network: FfiConverterUInt32.read(from: &buf), 
-                tokenIdentifier: FfiConverterOptionData.read(from: &buf), 
-                tokenAmount: FfiConverterOptionData.read(from: &buf), 
-                memo: FfiConverterOptionString.read(from: &buf), 
-                senderSparkAddress: FfiConverterOptionString.read(from: &buf), 
-                expiryTimeUnixMillis: FfiConverterOptionUInt64.read(from: &buf), 
+                receiverIdentityPublicKey: FfiConverterData.read(from: &buf),
+                network: FfiConverterUInt32.read(from: &buf),
+                tokenIdentifier: FfiConverterOptionData.read(from: &buf),
+                tokenAmount: FfiConverterOptionData.read(from: &buf),
+                memo: FfiConverterOptionString.read(from: &buf),
+                senderSparkAddress: FfiConverterOptionString.read(from: &buf),
+                expiryTimeUnixMillis: FfiConverterOptionUInt64.read(from: &buf),
                 invoiceId: FfiConverterOptionData.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: PrepareTokenInvoiceRequest, into buf: inout [UInt8]) {
@@ -824,29 +804,27 @@ public struct FfiConverterTypePrepareTokenInvoiceRequest: FfiConverterRustBuffer
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypePrepareTokenInvoiceRequest_lift(_ buf: RustBuffer) throws -> PrepareTokenInvoiceRequest {
     return try FfiConverterTypePrepareTokenInvoiceRequest.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypePrepareTokenInvoiceRequest_lower(_ value: PrepareTokenInvoiceRequest) -> RustBuffer {
     return FfiConverterTypePrepareTokenInvoiceRequest.lower(value)
 }
-
 
 public struct PreparedTokenInvoice {
     public var sparkInvoiceFieldsBytes: Data
     public var sparkInvoiceHash: Data
     public var unsignedSparkAddress: String
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(sparkInvoiceFieldsBytes: Data, sparkInvoiceHash: Data, unsignedSparkAddress: String) {
         self.sparkInvoiceFieldsBytes = sparkInvoiceFieldsBytes
         self.sparkInvoiceHash = sparkInvoiceHash
@@ -854,10 +832,8 @@ public struct PreparedTokenInvoice {
     }
 }
 
-
-
 extension PreparedTokenInvoice: Equatable, Hashable {
-    public static func ==(lhs: PreparedTokenInvoice, rhs: PreparedTokenInvoice) -> Bool {
+    public static func == (lhs: PreparedTokenInvoice, rhs: PreparedTokenInvoice) -> Bool {
         if lhs.sparkInvoiceFieldsBytes != rhs.sparkInvoiceFieldsBytes {
             return false
         }
@@ -877,18 +853,17 @@ extension PreparedTokenInvoice: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypePreparedTokenInvoice: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PreparedTokenInvoice {
         return
             try PreparedTokenInvoice(
-                sparkInvoiceFieldsBytes: FfiConverterData.read(from: &buf), 
-                sparkInvoiceHash: FfiConverterData.read(from: &buf), 
+                sparkInvoiceFieldsBytes: FfiConverterData.read(from: &buf),
+                sparkInvoiceHash: FfiConverterData.read(from: &buf),
                 unsignedSparkAddress: FfiConverterString.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: PreparedTokenInvoice, into buf: inout [UInt8]) {
@@ -898,29 +873,27 @@ public struct FfiConverterTypePreparedTokenInvoice: FfiConverterRustBuffer {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypePreparedTokenInvoice_lift(_ buf: RustBuffer) throws -> PreparedTokenInvoice {
     return try FfiConverterTypePreparedTokenInvoice.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypePreparedTokenInvoice_lower(_ value: PreparedTokenInvoice) -> RustBuffer {
     return FfiConverterTypePreparedTokenInvoice.lower(value)
 }
-
 
 public struct ReceiverTokenOutput {
     public var receiverSparkAddress: String
     public var tokenIdentifier: Data?
     public var tokenAmount: Data?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(receiverSparkAddress: String, tokenIdentifier: Data?, tokenAmount: Data?) {
         self.receiverSparkAddress = receiverSparkAddress
         self.tokenIdentifier = tokenIdentifier
@@ -928,10 +901,8 @@ public struct ReceiverTokenOutput {
     }
 }
 
-
-
 extension ReceiverTokenOutput: Equatable, Hashable {
-    public static func ==(lhs: ReceiverTokenOutput, rhs: ReceiverTokenOutput) -> Bool {
+    public static func == (lhs: ReceiverTokenOutput, rhs: ReceiverTokenOutput) -> Bool {
         if lhs.receiverSparkAddress != rhs.receiverSparkAddress {
             return false
         }
@@ -951,18 +922,17 @@ extension ReceiverTokenOutput: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeReceiverTokenOutput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReceiverTokenOutput {
         return
             try ReceiverTokenOutput(
-                receiverSparkAddress: FfiConverterString.read(from: &buf), 
-                tokenIdentifier: FfiConverterOptionData.read(from: &buf), 
+                receiverSparkAddress: FfiConverterString.read(from: &buf),
+                tokenIdentifier: FfiConverterOptionData.read(from: &buf),
                 tokenAmount: FfiConverterOptionData.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: ReceiverTokenOutput, into buf: inout [UInt8]) {
@@ -972,21 +942,19 @@ public struct FfiConverterTypeReceiverTokenOutput: FfiConverterRustBuffer {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeReceiverTokenOutput_lift(_ buf: RustBuffer) throws -> ReceiverTokenOutput {
     return try FfiConverterTypeReceiverTokenOutput.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeReceiverTokenOutput_lower(_ value: ReceiverTokenOutput) -> RustBuffer {
     return FfiConverterTypeReceiverTokenOutput.lower(value)
 }
-
 
 public struct SelectedTokenOutput {
     public var previousTransactionHash: Data
@@ -995,8 +963,8 @@ public struct SelectedTokenOutput {
     public var tokenIdentifier: Data
     public var tokenAmount: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(previousTransactionHash: Data, previousTransactionVout: UInt32, ownerPublicKey: Data, tokenIdentifier: Data, tokenAmount: Data) {
         self.previousTransactionHash = previousTransactionHash
         self.previousTransactionVout = previousTransactionVout
@@ -1006,10 +974,8 @@ public struct SelectedTokenOutput {
     }
 }
 
-
-
 extension SelectedTokenOutput: Equatable, Hashable {
-    public static func ==(lhs: SelectedTokenOutput, rhs: SelectedTokenOutput) -> Bool {
+    public static func == (lhs: SelectedTokenOutput, rhs: SelectedTokenOutput) -> Bool {
         if lhs.previousTransactionHash != rhs.previousTransactionHash {
             return false
         }
@@ -1037,20 +1003,19 @@ extension SelectedTokenOutput: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeSelectedTokenOutput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SelectedTokenOutput {
         return
             try SelectedTokenOutput(
-                previousTransactionHash: FfiConverterData.read(from: &buf), 
-                previousTransactionVout: FfiConverterUInt32.read(from: &buf), 
-                ownerPublicKey: FfiConverterData.read(from: &buf), 
-                tokenIdentifier: FfiConverterData.read(from: &buf), 
+                previousTransactionHash: FfiConverterData.read(from: &buf),
+                previousTransactionVout: FfiConverterUInt32.read(from: &buf),
+                ownerPublicKey: FfiConverterData.read(from: &buf),
+                tokenIdentifier: FfiConverterData.read(from: &buf),
                 tokenAmount: FfiConverterData.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: SelectedTokenOutput, into buf: inout [UInt8]) {
@@ -1062,29 +1027,27 @@ public struct FfiConverterTypeSelectedTokenOutput: FfiConverterRustBuffer {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeSelectedTokenOutput_lift(_ buf: RustBuffer) throws -> SelectedTokenOutput {
     return try FfiConverterTypeSelectedTokenOutput.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeSelectedTokenOutput_lower(_ value: SelectedTokenOutput) -> RustBuffer {
     return FfiConverterTypeSelectedTokenOutput.lower(value)
 }
-
 
 public struct SignatureWithIndexInput {
     public var inputIndex: UInt32
     public var publicKey: Data
     public var signature: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(inputIndex: UInt32, publicKey: Data, signature: Data) {
         self.inputIndex = inputIndex
         self.publicKey = publicKey
@@ -1092,10 +1055,8 @@ public struct SignatureWithIndexInput {
     }
 }
 
-
-
 extension SignatureWithIndexInput: Equatable, Hashable {
-    public static func ==(lhs: SignatureWithIndexInput, rhs: SignatureWithIndexInput) -> Bool {
+    public static func == (lhs: SignatureWithIndexInput, rhs: SignatureWithIndexInput) -> Bool {
         if lhs.inputIndex != rhs.inputIndex {
             return false
         }
@@ -1115,18 +1076,17 @@ extension SignatureWithIndexInput: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeSignatureWithIndexInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SignatureWithIndexInput {
         return
             try SignatureWithIndexInput(
-                inputIndex: FfiConverterUInt32.read(from: &buf), 
-                publicKey: FfiConverterData.read(from: &buf), 
+                inputIndex: FfiConverterUInt32.read(from: &buf),
+                publicKey: FfiConverterData.read(from: &buf),
                 signature: FfiConverterData.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: SignatureWithIndexInput, into buf: inout [UInt8]) {
@@ -1136,21 +1096,19 @@ public struct FfiConverterTypeSignatureWithIndexInput: FfiConverterRustBuffer {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeSignatureWithIndexInput_lift(_ buf: RustBuffer) throws -> SignatureWithIndexInput {
     return try FfiConverterTypeSignatureWithIndexInput.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeSignatureWithIndexInput_lower(_ value: SignatureWithIndexInput) -> RustBuffer {
     return FfiConverterTypeSignatureWithIndexInput.lower(value)
 }
-
 
 public struct TransferBuildRequest {
     public var identityPublicKey: Data
@@ -1164,8 +1122,8 @@ public struct TransferBuildRequest {
     public var withdrawRelativeBlockLocktime: UInt64
     public var executeBeforeUnixMicros: Int64?
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(identityPublicKey: Data, selectedOutputs: [SelectedTokenOutput], receiverOutputs: [ReceiverTokenOutput], operatorIdentityPublicKeys: [Data], network: UInt32, validityDurationSeconds: UInt64, clientCreatedTimestampUnixMicros: Int64, withdrawBondSats: UInt64, withdrawRelativeBlockLocktime: UInt64, executeBeforeUnixMicros: Int64?) {
         self.identityPublicKey = identityPublicKey
         self.selectedOutputs = selectedOutputs
@@ -1180,10 +1138,8 @@ public struct TransferBuildRequest {
     }
 }
 
-
-
 extension TransferBuildRequest: Equatable, Hashable {
-    public static func ==(lhs: TransferBuildRequest, rhs: TransferBuildRequest) -> Bool {
+    public static func == (lhs: TransferBuildRequest, rhs: TransferBuildRequest) -> Bool {
         if lhs.identityPublicKey != rhs.identityPublicKey {
             return false
         }
@@ -1231,25 +1187,24 @@ extension TransferBuildRequest: Equatable, Hashable {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeTransferBuildRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TransferBuildRequest {
         return
             try TransferBuildRequest(
-                identityPublicKey: FfiConverterData.read(from: &buf), 
-                selectedOutputs: FfiConverterSequenceTypeSelectedTokenOutput.read(from: &buf), 
-                receiverOutputs: FfiConverterSequenceTypeReceiverTokenOutput.read(from: &buf), 
-                operatorIdentityPublicKeys: FfiConverterSequenceData.read(from: &buf), 
-                network: FfiConverterUInt32.read(from: &buf), 
-                validityDurationSeconds: FfiConverterUInt64.read(from: &buf), 
-                clientCreatedTimestampUnixMicros: FfiConverterInt64.read(from: &buf), 
-                withdrawBondSats: FfiConverterUInt64.read(from: &buf), 
-                withdrawRelativeBlockLocktime: FfiConverterUInt64.read(from: &buf), 
+                identityPublicKey: FfiConverterData.read(from: &buf),
+                selectedOutputs: FfiConverterSequenceTypeSelectedTokenOutput.read(from: &buf),
+                receiverOutputs: FfiConverterSequenceTypeReceiverTokenOutput.read(from: &buf),
+                operatorIdentityPublicKeys: FfiConverterSequenceData.read(from: &buf),
+                network: FfiConverterUInt32.read(from: &buf),
+                validityDurationSeconds: FfiConverterUInt64.read(from: &buf),
+                clientCreatedTimestampUnixMicros: FfiConverterInt64.read(from: &buf),
+                withdrawBondSats: FfiConverterUInt64.read(from: &buf),
+                withdrawRelativeBlockLocktime: FfiConverterUInt64.read(from: &buf),
                 executeBeforeUnixMicros: FfiConverterOptionInt64.read(from: &buf)
-        )
+            )
     }
 
     public static func write(_ value: TransferBuildRequest, into buf: inout [UInt8]) {
@@ -1266,33 +1221,26 @@ public struct FfiConverterTypeTransferBuildRequest: FfiConverterRustBuffer {
     }
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeTransferBuildRequest_lift(_ buf: RustBuffer) throws -> TransferBuildRequest {
     return try FfiConverterTypeTransferBuildRequest.lift(buf)
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public func FfiConverterTypeTransferBuildRequest_lower(_ value: TransferBuildRequest) -> RustBuffer {
     return FfiConverterTypeTransferBuildRequest.lower(value)
 }
 
-
 public enum SparkTokenPrimitivesError {
-
-    
-    
     case Spark(message: String)
-    
 }
 
-
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeSparkTokenPrimitivesError: FfiConverterRustBuffer {
     typealias SwiftType = SparkTokenPrimitivesError
@@ -1300,14 +1248,9 @@ public struct FfiConverterTypeSparkTokenPrimitivesError: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SparkTokenPrimitivesError {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
-        
-
-        
-        case 1: return .Spark(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
+        case 1: return try .Spark(
+                message: FfiConverterString.read(from: &buf)
+            )
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1315,18 +1258,11 @@ public struct FfiConverterTypeSparkTokenPrimitivesError: FfiConverterRustBuffer 
 
     public static func write(_ value: SparkTokenPrimitivesError, into buf: inout [UInt8]) {
         switch value {
-
-        
-
-        
-        case .Spark(_ /* message is ignored*/):
+        case .Spark(_ /* message is ignored*/ ):
             writeInt(&buf, Int32(1))
-
-        
         }
     }
 }
-
 
 extension SparkTokenPrimitivesError: Equatable, Hashable {}
 
@@ -1337,12 +1273,12 @@ extension SparkTokenPrimitivesError: Foundation.LocalizedError {
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
+private struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
     typealias SwiftType = UInt64?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1351,7 +1287,7 @@ fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt64.read(from: &buf)
@@ -1361,12 +1297,12 @@ fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionInt64: FfiConverterRustBuffer {
+private struct FfiConverterOptionInt64: FfiConverterRustBuffer {
     typealias SwiftType = Int64?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1375,7 +1311,7 @@ fileprivate struct FfiConverterOptionInt64: FfiConverterRustBuffer {
         FfiConverterInt64.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterInt64.read(from: &buf)
@@ -1385,12 +1321,12 @@ fileprivate struct FfiConverterOptionInt64: FfiConverterRustBuffer {
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
+private struct FfiConverterOptionString: FfiConverterRustBuffer {
     typealias SwiftType = String?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1399,7 +1335,7 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
         FfiConverterString.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterString.read(from: &buf)
@@ -1409,12 +1345,12 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
+private struct FfiConverterOptionData: FfiConverterRustBuffer {
     typealias SwiftType = Data?
 
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
             writeInt(&buf, Int8(0))
             return
@@ -1423,7 +1359,7 @@ fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
         FfiConverterData.write(value, into: &buf)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterData.read(from: &buf)
@@ -1433,12 +1369,12 @@ fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceData: FfiConverterRustBuffer {
+private struct FfiConverterSequenceData: FfiConverterRustBuffer {
     typealias SwiftType = [Data]
 
-    public static func write(_ value: [Data], into buf: inout [UInt8]) {
+    static func write(_ value: [Data], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1446,24 +1382,24 @@ fileprivate struct FfiConverterSequenceData: FfiConverterRustBuffer {
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Data] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Data] {
         let len: Int32 = try readInt(&buf)
         var seq = [Data]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterData.read(from: &buf))
+            try seq.append(FfiConverterData.read(from: &buf))
         }
         return seq
     }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeReceiverTokenOutput: FfiConverterRustBuffer {
+private struct FfiConverterSequenceTypeReceiverTokenOutput: FfiConverterRustBuffer {
     typealias SwiftType = [ReceiverTokenOutput]
 
-    public static func write(_ value: [ReceiverTokenOutput], into buf: inout [UInt8]) {
+    static func write(_ value: [ReceiverTokenOutput], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1471,24 +1407,24 @@ fileprivate struct FfiConverterSequenceTypeReceiverTokenOutput: FfiConverterRust
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ReceiverTokenOutput] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ReceiverTokenOutput] {
         let len: Int32 = try readInt(&buf)
         var seq = [ReceiverTokenOutput]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeReceiverTokenOutput.read(from: &buf))
+            try seq.append(FfiConverterTypeReceiverTokenOutput.read(from: &buf))
         }
         return seq
     }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeSelectedTokenOutput: FfiConverterRustBuffer {
+private struct FfiConverterSequenceTypeSelectedTokenOutput: FfiConverterRustBuffer {
     typealias SwiftType = [SelectedTokenOutput]
 
-    public static func write(_ value: [SelectedTokenOutput], into buf: inout [UInt8]) {
+    static func write(_ value: [SelectedTokenOutput], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1496,24 +1432,24 @@ fileprivate struct FfiConverterSequenceTypeSelectedTokenOutput: FfiConverterRust
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SelectedTokenOutput] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SelectedTokenOutput] {
         let len: Int32 = try readInt(&buf)
         var seq = [SelectedTokenOutput]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeSelectedTokenOutput.read(from: &buf))
+            try seq.append(FfiConverterTypeSelectedTokenOutput.read(from: &buf))
         }
         return seq
     }
 }
 
 #if swift(>=5.8)
-@_documentation(visibility: private)
+    @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeSignatureWithIndexInput: FfiConverterRustBuffer {
+private struct FfiConverterSequenceTypeSignatureWithIndexInput: FfiConverterRustBuffer {
     typealias SwiftType = [SignatureWithIndexInput]
 
-    public static func write(_ value: [SignatureWithIndexInput], into buf: inout [UInt8]) {
+    static func write(_ value: [SignatureWithIndexInput], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
@@ -1521,57 +1457,63 @@ fileprivate struct FfiConverterSequenceTypeSignatureWithIndexInput: FfiConverter
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SignatureWithIndexInput] {
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SignatureWithIndexInput] {
         let len: Int32 = try readInt(&buf)
         var seq = [SignatureWithIndexInput]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeSignatureWithIndexInput.read(from: &buf))
+            try seq.append(FfiConverterTypeSignatureWithIndexInput.read(from: &buf))
         }
         return seq
     }
 }
-public func buildBroadcastTransactionRequest(request: BroadcastBuildRequest)throws  -> Data {
-    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
-    uniffi_spark_token_primitives_fn_func_build_broadcast_transaction_request(
-        FfiConverterTypeBroadcastBuildRequest.lower(request),$0
-    )
-})
+
+public func buildBroadcastTransactionRequest(request: BroadcastBuildRequest) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_build_broadcast_transaction_request(
+            FfiConverterTypeBroadcastBuildRequest.lower(request), $0
+        )
+    })
 }
-public func constructPartialTransferTransaction(request: TransferBuildRequest)throws  -> PartialTransferBuildResult {
-    return try  FfiConverterTypePartialTransferBuildResult.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
-    uniffi_spark_token_primitives_fn_func_construct_partial_transfer_transaction(
-        FfiConverterTypeTransferBuildRequest.lower(request),$0
-    )
-})
+
+public func constructPartialTransferTransaction(request: TransferBuildRequest) throws -> PartialTransferBuildResult {
+    return try FfiConverterTypePartialTransferBuildResult.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_construct_partial_transfer_transaction(
+            FfiConverterTypeTransferBuildRequest.lower(request), $0
+        )
+    })
 }
-public func finalizeTokenInvoice(request: FinalizeTokenInvoiceRequest)throws  -> String {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
-    uniffi_spark_token_primitives_fn_func_finalize_token_invoice(
-        FfiConverterTypeFinalizeTokenInvoiceRequest.lower(request),$0
-    )
-})
+
+public func finalizeTokenInvoice(request: FinalizeTokenInvoiceRequest) throws -> String {
+    return try FfiConverterString.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_finalize_token_invoice(
+            FfiConverterTypeFinalizeTokenInvoiceRequest.lower(request), $0
+        )
+    })
 }
-public func hashPartialTokenTransaction(partialTokenTransactionBytes: Data)throws  -> Data {
-    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
-    uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction(
-        FfiConverterData.lower(partialTokenTransactionBytes),$0
-    )
-})
+
+public func hashPartialTokenTransaction(partialTokenTransactionBytes: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_hash_partial_token_transaction(
+            FfiConverterData.lower(partialTokenTransactionBytes), $0
+        )
+    })
 }
-public func hashTransferManifest(transferManifestBytes: Data)throws  -> Data {
-    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
-    uniffi_spark_token_primitives_fn_func_hash_transfer_manifest(
-        FfiConverterData.lower(transferManifestBytes),$0
-    )
-})
+
+public func hashTransferManifest(transferManifestBytes: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_hash_transfer_manifest(
+            FfiConverterData.lower(transferManifestBytes), $0
+        )
+    })
 }
-public func prepareTokenInvoice(request: PrepareTokenInvoiceRequest)throws  -> PreparedTokenInvoice {
-    return try  FfiConverterTypePreparedTokenInvoice.lift(try rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
-    uniffi_spark_token_primitives_fn_func_prepare_token_invoice(
-        FfiConverterTypePrepareTokenInvoiceRequest.lower(request),$0
-    )
-})
+
+public func prepareTokenInvoice(request: PrepareTokenInvoiceRequest) throws -> PreparedTokenInvoice {
+    return try FfiConverterTypePreparedTokenInvoice.lift(rustCallWithError(FfiConverterTypeSparkTokenPrimitivesError.lift) {
+        uniffi_spark_token_primitives_fn_func_prepare_token_invoice(
+            FfiConverterTypePrepareTokenInvoiceRequest.lower(request), $0
+        )
+    })
 }
 
 private enum InitializationResult {
@@ -1579,8 +1521,9 @@ private enum InitializationResult {
     case contractVersionMismatch
     case apiChecksumMismatch
 }
-// Use a global variable to perform the versioning checks. Swift ensures that
-// the code inside is only computed once.
+
+/// Use a global variable to perform the versioning checks. Swift ensures that
+/// the code inside is only computed once.
 private var initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 26
@@ -1589,22 +1532,22 @@ private var initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_spark_token_primitives_checksum_func_build_broadcast_transaction_request() != 6918) {
+    if uniffi_spark_token_primitives_checksum_func_build_broadcast_transaction_request() != 6918 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction() != 48271) {
+    if uniffi_spark_token_primitives_checksum_func_construct_partial_transfer_transaction() != 48271 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_spark_token_primitives_checksum_func_finalize_token_invoice() != 61372) {
+    if uniffi_spark_token_primitives_checksum_func_finalize_token_invoice() != 61372 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction() != 26626) {
+    if uniffi_spark_token_primitives_checksum_func_hash_partial_token_transaction() != 26626 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest() != 23619) {
+    if uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest() != 23619 {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985) {
+    if uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985 {
         return InitializationResult.apiChecksumMismatch
     }
 
