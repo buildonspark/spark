@@ -1,8 +1,9 @@
 //! BIP-340-style tagged hashing, mirroring `spark/common/hashstructure/hasher.go`
 //! (Go) and `sdks/js/packages/spark-sdk/src/utils/hashstructure.ts` (JS).
 //!
-//! Only the subset the transfer-manifest digest needs is ported; add the other
-//! `Add*` variants from the Go reference if a new caller requires them.
+//! Only the subset the transfer-manifest and quote-envelope digests need is
+//! ported; add the other `Add*` variants from the Go reference if a new caller
+//! requires them.
 //!
 //! Construction:
 //!
@@ -39,6 +40,14 @@ impl Hasher {
         self
     }
 
+    pub(crate) fn add_uint64(self, value: u64) -> Self {
+        self.add_bytes(&value.to_be_bytes())
+    }
+
+    pub(crate) fn add_string(self, value: &str) -> Self {
+        self.add_bytes(value.as_bytes())
+    }
+
     pub(crate) fn hash(self) -> Vec<u8> {
         self.hasher.finalize().to_vec()
     }
@@ -63,6 +72,12 @@ mod tests {
         assert_eq!(
             hex(&hash),
             "4d18d5d3166ebfde902314ab397790413893c736b41e18d72cd726d707de6c42"
+        );
+
+        let with_uint = Hasher::new(&["test", "vector"]).add_uint64(64).hash();
+        assert_eq!(
+            hex(&with_uint),
+            "532c136f20f288d73c20170d9586f6ca5e1f6388551a21299e93be73411dd371"
         );
 
         let empty = Hasher::new(&[]).hash();

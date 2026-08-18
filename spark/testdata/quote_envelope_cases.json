@@ -1,0 +1,380 @@
+{
+  "description": "Quote envelope digests and their target derivations. quote_envelope_digest(network, manifest_hash, reason, role, target) = tagged_hash([\"spark\",\"quote\",\"v1\"]) over uint64 network, 32-byte manifest_hash, uint64 reason, uint64 role, then the target bytes. Each target has its own tag: receive_attestor_target(payment_hash), send_target(payment_hash), coop_exit_target(withdrawal_address, leaf_set_hash), static_deposit_target(txid, vout). Two implementations are held to these vectors: common/quote_envelope.go (native, the SO links no Rust) and signer/spark-token-primitives/src/quote_envelope.rs (the shared core). THIS FILE IS THE SOURCE OF TRUTH: a rule change must land in both and re-mint this file. COVERAGE IS ASYMMETRIC BY DESIGN: the Rust core implements all four targets; the Go port implements only receive_attestor_target, which is the only one the operators verify, and asserts only those vectors. `reasons` and `roles` pin the name-to-number mapping, which each implementation asserts against its own named constants \u2014 the digests alone cannot catch a renumbering. network values are the spark proto Network enum (MAINNET=1, REGTEST=2, TESTNET=3, SIGNET=4); UNSPECIFIED=0 is refused. An ISSUER may sign an empty target (at quote time there is nothing else to bind); an ATTESTOR may not.",
+  "reasons": {
+    "RECEIVE": 1,
+    "SEND": 2,
+    "COOP_EXIT": 3,
+    "STATIC_DEPOSIT": 4
+  },
+  "roles": {
+    "ISSUER": 1,
+    "ATTESTOR": 2
+  },
+  "testCases": [
+    {
+      "name": "receive_issuer_mainnet",
+      "description": "The issuer's inputs carrying a target, so its pair with role_swap_differs varies nothing but the role",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": "b9abb661d840eaaac3c87be741806deb87da1d654451c5548fdff74cb540fbb3",
+      "expectedDigest": "41e3fcec6c7075801429679ad08d60cf2ddc930fc8e1f4bd63d0deb6fe0e289b"
+    },
+    {
+      "name": "receive_attestor_mainnet",
+      "description": "The preimage-share owner at commit time, binding the invoice it settles",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 2,
+      "paymentHash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "target": "b9abb661d840eaaac3c87be741806deb87da1d654451c5548fdff74cb540fbb3",
+      "expectedDigest": "224701050ebbf51222a75d046e4101afae635015fca3b4d5a509b9679f4f60b1"
+    },
+    {
+      "name": "receive_attestor_regtest",
+      "description": "Same role on another network: the network component must move the digest",
+      "network": 2,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 2,
+      "paymentHash": "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
+      "target": "2208662b1e67e1f7a362d9d9910ac84731156ac4c10bd111a003f626d64bb3cc",
+      "expectedDigest": "6c0b9c40835f6c362232f174f69ee1b0f9b8739b39f689ceab7e901af2b41a19"
+    },
+    {
+      "name": "receive_attestor_zero_hashes",
+      "description": "All-zero hashes: hashstructure is length-prefixed, not zero-eliding, so an objecthash-style implementation that omits empty fields diverges here",
+      "network": 2,
+      "manifestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reason": 1,
+      "role": 2,
+      "paymentHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "target": "16c205c594e2ce63a7e98fe302ef31a45f279f0eed6356e2174973bc5290f902",
+      "expectedDigest": "4930da591f9f8b6b8d097b8d8760a29b23270ea2f262585269f2897354fea3ae"
+    },
+    {
+      "name": "role_swap_differs",
+      "description": "receive_issuer_mainnet's inputs with only the role changed, holding a non-empty target constant so the pair isolates `role` alone",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 2,
+      "target": "b9abb661d840eaaac3c87be741806deb87da1d654451c5548fdff74cb540fbb3",
+      "expectedDigest": "224701050ebbf51222a75d046e4101afae635015fca3b4d5a509b9679f4f60b1"
+    },
+    {
+      "name": "send_issuer_mainnet",
+      "description": "receive_issuer_mainnet with only the reason changed; proves appending role did not collide the reason and role byte positions",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 2,
+      "role": 1,
+      "target": "",
+      "expectedDigest": "ee5f37405b2267f4dc5e071a3a1176065186b8d677f768d586310c0b55741788"
+    },
+    {
+      "name": "coop_exit_issuer_mainnet",
+      "description": "Pins REASON_COOP_EXIT = 3 by hash, not only by the reasons map",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 3,
+      "role": 1,
+      "target": "",
+      "expectedDigest": "cfb6ccf367ab720b6c4e91ac6f29462b8aec299aec3922beef2f7cd547e9df89"
+    },
+    {
+      "name": "static_deposit_issuer_mainnet",
+      "description": "Pins REASON_STATIC_DEPOSIT = 4 by hash, not only by the reasons map",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 4,
+      "role": 1,
+      "target": "",
+      "expectedDigest": "ba2e0b10bd6d8fc8da5df6b5daa20150a76a3f357580b125e04eb09fb8013f7a"
+    },
+    {
+      "name": "receive_issuer_testnet",
+      "description": "Pins the accepted-network range at TESTNET=3; without it a port could narrow the range and stay green",
+      "network": 3,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": "",
+      "expectedDigest": "1c1f26261c1da62b2bab77ebf72dd2de47ac1e322fadcc7e09ab8eae3cbba906"
+    },
+    {
+      "name": "receive_issuer_signet",
+      "description": "Pins the top of the accepted-network range at SIGNET=4",
+      "network": 4,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": "",
+      "expectedDigest": "5ec22e11086d1de420b477c3146b7d4043c4b5856a946f69c65ba713d4b2f8fc"
+    },
+    {
+      "name": "receive_issuer_empty_target",
+      "description": "The SSP at quote time: no invoice exists yet, so the issuer's target is empty. This is the shape P3 sends once sparkcore routes its issuer digest through the core.",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": "",
+      "expectedDigest": "de89fe1cf431cd50239003d6b762756fed246c791f603a04785964686ee65253"
+    }
+  ],
+  "distinctDigestPairs": [
+    {
+      "name": "role_separation",
+      "description": "Identical inputs under different roles must not share a digest",
+      "a": "receive_issuer_mainnet",
+      "b": "role_swap_differs"
+    },
+    {
+      "name": "reason_separation",
+      "description": "Identical inputs under different reasons must not share a digest",
+      "a": "receive_issuer_mainnet",
+      "b": "send_issuer_mainnet"
+    },
+    {
+      "name": "reason_separation_upper",
+      "description": "The two later reasons must separate from each other too",
+      "a": "coop_exit_issuer_mainnet",
+      "b": "static_deposit_issuer_mainnet"
+    },
+    {
+      "name": "network_separation",
+      "description": "Identical inputs on different networks must not share a digest, so every enum component in the envelope has a pair",
+      "a": "receive_issuer_mainnet",
+      "b": "receive_issuer_testnet"
+    }
+  ],
+  "invalidCases": [
+    {
+      "name": "manifest_hash_31_bytes",
+      "description": "Short manifest hash",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "manifest_hash must be 32 bytes",
+      "network": 1,
+      "manifestHash": "ababababababababababababababababababababababababababababababab",
+      "reason": 1,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "manifest_hash_33_bytes",
+      "description": "Long manifest hash",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "manifest_hash must be 32 bytes",
+      "network": 1,
+      "manifestHash": "ababababababababababababababababababababababababababababababababab",
+      "reason": 1,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "payment_hash_31_bytes",
+      "description": "Short payment hash",
+      "call": "receiveAttestationTarget",
+      "expectedError": "payment_hash must be 32 bytes",
+      "paymentHash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    },
+    {
+      "name": "payment_hash_33_bytes",
+      "description": "Long payment hash",
+      "call": "receiveAttestationTarget",
+      "expectedError": "payment_hash must be 32 bytes",
+      "paymentHash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    },
+    {
+      "name": "network_unspecified",
+      "description": "Network 0 is the unset sentinel; accepting it would collapse every network onto one digest and defeat the component",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported network",
+      "network": 0,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "network_out_of_range",
+      "description": "Network above the last defined network",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported network",
+      "network": 5,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "reason_unset",
+      "description": "Reason 0 is the unset sentinel, never a signable flow",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported quote reason",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 0,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "reason_out_of_range",
+      "description": "Reason above the last defined flow",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported quote reason",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 5,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "role_unset",
+      "description": "Role 0 is the unset sentinel, never a signing party",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported quote role",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 0,
+      "target": ""
+    },
+    {
+      "name": "role_out_of_range",
+      "description": "Role above the last defined party",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported quote role",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 3,
+      "target": ""
+    },
+    {
+      "name": "network_high_bits_alias_mainnet",
+      "description": "2^32+1 truncates to MAINNET in a 32-bit lookup while the full width is what gets hashed, so a guard that casts before bounding accepts a network it never validated",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported network",
+      "network": 4294967297,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "network_high_bits_alias_unspecified",
+      "description": "2^32 truncates to UNSPECIFIED, whose name IS in the descriptor, so a truncating guard admits the one value the unspecified case exists to refuse",
+      "call": "quoteEnvelopeDigest",
+      "expectedError": "unsupported network",
+      "network": 4294967296,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 1,
+      "target": ""
+    },
+    {
+      "name": "attestor_empty_target",
+      "description": "An attestor signs at commit time, when the payment hash exists, so an empty target is a caller that dropped the binding rather than one with nothing to bind",
+      "call": "quoteEnvelopeDigest",
+      "network": 1,
+      "manifestHash": "56a23f58799776190d566f70d88d8c3be8db059a598c8932b3250a8076abbacd",
+      "reason": 1,
+      "role": 2,
+      "target": "",
+      "expectedError": "attestor target must be non-empty"
+    }
+  ],
+  "targetCases": [
+    {
+      "name": "receive_attestor",
+      "call": "receiveAttestorTarget",
+      "ports": [
+        "go",
+        "rust"
+      ],
+      "description": "The only target the operators verify, hence the only one the Go port implements",
+      "paymentHash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "expectedDigest": "b9abb661d840eaaac3c87be741806deb87da1d654451c5548fdff74cb540fbb3"
+    },
+    {
+      "name": "send",
+      "call": "sendTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "Matches sparkcore's pinned c0d8ef2f... for this input",
+      "paymentHash": "0101010101010101010101010101010101010101010101010101010101010101",
+      "expectedDigest": "c0d8ef2f7e819b3726d9c8c3aa68e4921eae14b46cef9fa9e3b3939dea15aaa5"
+    },
+    {
+      "name": "coop_exit_valid_lowercase",
+      "call": "coopExitTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "A valid segwit address canonicalizes to itself",
+      "withdrawalAddress": "bcrt1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysnard0ew",
+      "leafSetHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "expectedDigest": "2995600b16fedae81ade97172073c7e2e2c2945c0e648d60a59c8912ef1969f0"
+    },
+    {
+      "name": "coop_exit_valid_uppercase",
+      "call": "coopExitTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "MUST equal coop_exit_valid_lowercase. Bech32 is case-insensitive (BIP-173), so equivalent-case renderings of one address must hash identically at quote and at commit. This is the only test of the lowercasing branch in any port.",
+      "withdrawalAddress": "BCRT1QQQQSYQCYQ5RQWZQFPG9SCRGWPUGPZYSNARD0EW",
+      "leafSetHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "expectedDigest": "2995600b16fedae81ade97172073c7e2e2c2945c0e648d60a59c8912ef1969f0"
+    },
+    {
+      "name": "coop_exit_mixed_case_verbatim",
+      "call": "coopExitTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "Mixed case is refused by the segwit validator, so the address is bound verbatim rather than lowercased \u2014 a port that lowercases unconditionally diverges here",
+      "withdrawalAddress": "bcrt1QqQqsyqcyq5rqwzqfpg9scrgwpugpzysnard0ew",
+      "leafSetHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "expectedDigest": "03e9bfe61c7dcd9bed7aec834bb666b72f788646a3c6f21ec42adeffab98dcc2"
+    },
+    {
+      "name": "coop_exit_base58_verbatim",
+      "call": "coopExitTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "Base58 is case-sensitive, so a non-segwit address is bound exactly as given",
+      "withdrawalAddress": "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
+      "leafSetHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "expectedDigest": "33a9bb35a2a0f9519de83f7792df24a8e871711fdae7e4a0c68b1d2c51c160bd"
+    },
+    {
+      "name": "coop_exit_bad_checksum_verbatim",
+      "call": "coopExitTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "An invalid checksum is not a segwit address, so it is bound verbatim",
+      "withdrawalAddress": "bcrt1qqqqsyqcyq5rqwzqfpg9scrgwpugpzysnard0eq",
+      "leafSetHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "expectedDigest": "886fb85c499e53e6f2996405247554363e2fb8ed796cdfcc4613777b518cd354"
+    },
+    {
+      "name": "static_deposit",
+      "call": "staticDepositTarget",
+      "ports": [
+        "rust"
+      ],
+      "description": "Matches sparkcore's pinned c55b021c... for this input. vout is bounded to uint32 but committed as a uint64 \u2014 the width in the stream is not the width of the bound.",
+      "txid": "0303030303030303030303030303030303030303030303030303030303030303",
+      "vout": 1,
+      "expectedDigest": "c55b021c02cb20271d25619926e9d84bfbebae2aab56708e61f90c97387ecb34"
+    }
+  ]
+}

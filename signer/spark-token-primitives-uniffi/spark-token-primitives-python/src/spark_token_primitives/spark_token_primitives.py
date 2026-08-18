@@ -472,6 +472,10 @@ def _uniffi_check_api_checksums(lib):
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice() != 61985:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_spark_token_primitives_checksum_func_quote_envelope_digest() != 47246:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_spark_token_primitives_checksum_func_receive_attestation_target() != 1196:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
 
 # A ctypes library to expose the extern-C FFI definitions.
 # This is an implementation detail which will be called internally by the public API.
@@ -608,6 +612,20 @@ _UniffiLib.uniffi_spark_token_primitives_fn_func_prepare_token_invoice.argtypes 
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.uniffi_spark_token_primitives_fn_func_prepare_token_invoice.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_spark_token_primitives_fn_func_quote_envelope_digest.argtypes = (
+    ctypes.c_uint32,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_spark_token_primitives_fn_func_quote_envelope_digest.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_spark_token_primitives_fn_func_receive_attestation_target.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_spark_token_primitives_fn_func_receive_attestation_target.restype = _UniffiRustBuffer
 _UniffiLib.ffi_spark_token_primitives_rustbuffer_alloc.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
@@ -894,6 +912,12 @@ _UniffiLib.uniffi_spark_token_primitives_checksum_func_hash_transfer_manifest.re
 _UniffiLib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice.argtypes = (
 )
 _UniffiLib.uniffi_spark_token_primitives_checksum_func_prepare_token_invoice.restype = ctypes.c_uint16
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_quote_envelope_digest.argtypes = (
+)
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_quote_envelope_digest.restype = ctypes.c_uint16
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_receive_attestation_target.argtypes = (
+)
+_UniffiLib.uniffi_spark_token_primitives_checksum_func_receive_attestation_target.restype = ctypes.c_uint16
 _UniffiLib.ffi_spark_token_primitives_uniffi_contract_version.argtypes = (
 )
 _UniffiLib.ffi_spark_token_primitives_uniffi_contract_version.restype = ctypes.c_uint32
@@ -1775,6 +1799,32 @@ def prepare_token_invoice(request: "PrepareTokenInvoiceRequest") -> "PreparedTok
         _UniffiConverterTypePrepareTokenInvoiceRequest.lower(request)))
 
 
+def quote_envelope_digest(network: "int",manifest_hash: "bytes",reason: "int",role: "int",target: "bytes") -> "bytes":
+    _UniffiConverterUInt32.check_lower(network)
+    
+    _UniffiConverterBytes.check_lower(manifest_hash)
+    
+    _UniffiConverterUInt32.check_lower(reason)
+    
+    _UniffiConverterUInt32.check_lower(role)
+    
+    _UniffiConverterBytes.check_lower(target)
+    
+    return _UniffiConverterBytes.lift(_uniffi_rust_call_with_error(_UniffiConverterTypeSparkTokenPrimitivesError,_UniffiLib.uniffi_spark_token_primitives_fn_func_quote_envelope_digest,
+        _UniffiConverterUInt32.lower(network),
+        _UniffiConverterBytes.lower(manifest_hash),
+        _UniffiConverterUInt32.lower(reason),
+        _UniffiConverterUInt32.lower(role),
+        _UniffiConverterBytes.lower(target)))
+
+
+def receive_attestation_target(payment_hash: "bytes") -> "bytes":
+    _UniffiConverterBytes.check_lower(payment_hash)
+    
+    return _UniffiConverterBytes.lift(_uniffi_rust_call_with_error(_UniffiConverterTypeSparkTokenPrimitivesError,_UniffiLib.uniffi_spark_token_primitives_fn_func_receive_attestation_target,
+        _UniffiConverterBytes.lower(payment_hash)))
+
+
 __all__ = [
     "InternalError",
     "SparkTokenPrimitivesError",
@@ -1793,5 +1843,7 @@ __all__ = [
     "hash_partial_token_transaction",
     "hash_transfer_manifest",
     "prepare_token_invoice",
+    "quote_envelope_digest",
+    "receive_attestation_target",
 ]
 

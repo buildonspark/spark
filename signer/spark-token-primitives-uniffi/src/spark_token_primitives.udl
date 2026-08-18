@@ -9,6 +9,18 @@ namespace spark_token_primitives {
     bytes hash_transfer_manifest(bytes transfer_manifest_bytes);
 
     [Throws=SparkTokenPrimitivesError]
+    bytes receive_attestor_target(bytes payment_hash);
+    [Throws=SparkTokenPrimitivesError]
+    bytes send_target(bytes payment_hash);
+    [Throws=SparkTokenPrimitivesError]
+    bytes coop_exit_target(string withdrawal_address, bytes leaf_set_hash);
+    [Throws=SparkTokenPrimitivesError]
+    bytes static_deposit_target(bytes txid, u32 vout);
+
+    [Throws=SparkTokenPrimitivesError]
+    bytes quote_envelope_digest(u32 network, bytes manifest_hash, u32 reason, u32 role, bytes target);
+
+    [Throws=SparkTokenPrimitivesError]
     bytes build_broadcast_transaction_request(BroadcastBuildRequest request);
 
     [Throws=SparkTokenPrimitivesError]

@@ -33,6 +33,40 @@ pub fn hash_transfer_manifest(
     spark_token_primitives::hash_transfer_manifest(transfer_manifest_bytes)
 }
 
+pub fn receive_attestor_target(
+    payment_hash: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    spark_token_primitives::receive_attestor_target(payment_hash)
+}
+
+pub fn send_target(payment_hash: Vec<u8>) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    spark_token_primitives::send_target(payment_hash)
+}
+
+pub fn coop_exit_target(
+    withdrawal_address: String,
+    leaf_set_hash: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    spark_token_primitives::coop_exit_target(withdrawal_address, leaf_set_hash)
+}
+
+pub fn static_deposit_target(
+    txid: Vec<u8>,
+    vout: u32,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    spark_token_primitives::static_deposit_target(txid, vout)
+}
+
+pub fn quote_envelope_digest(
+    network: u32,
+    manifest_hash: Vec<u8>,
+    reason: u32,
+    role: u32,
+    target: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    spark_token_primitives::quote_envelope_digest(network, manifest_hash, reason, role, target)
+}
+
 pub fn build_broadcast_transaction_request(
     request: BroadcastBuildRequest,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
@@ -300,6 +334,45 @@ pub fn wasm_hash_partial_token_transaction(
 #[wasm_bindgen(js_name = hash_transfer_manifest)]
 pub fn wasm_hash_transfer_manifest(transfer_manifest_bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
     hash_transfer_manifest(transfer_manifest_bytes).map_err(js_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = receive_attestor_target)]
+pub fn wasm_receive_attestor_target(payment_hash: Vec<u8>) -> Result<Vec<u8>, JsValue> {
+    receive_attestor_target(payment_hash).map_err(js_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = send_target)]
+pub fn wasm_send_target(payment_hash: Vec<u8>) -> Result<Vec<u8>, JsValue> {
+    send_target(payment_hash).map_err(js_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = coop_exit_target)]
+pub fn wasm_coop_exit_target(
+    withdrawal_address: String,
+    leaf_set_hash: Vec<u8>,
+) -> Result<Vec<u8>, JsValue> {
+    coop_exit_target(withdrawal_address, leaf_set_hash).map_err(js_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = static_deposit_target)]
+pub fn wasm_static_deposit_target(txid: Vec<u8>, vout: u32) -> Result<Vec<u8>, JsValue> {
+    static_deposit_target(txid, vout).map_err(js_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = quote_envelope_digest)]
+pub fn wasm_quote_envelope_digest(
+    network: u32,
+    manifest_hash: Vec<u8>,
+    reason: u32,
+    role: u32,
+    target: Vec<u8>,
+) -> Result<Vec<u8>, JsValue> {
+    quote_envelope_digest(network, manifest_hash, reason, role, target).map_err(js_error)
 }
 
 #[cfg(target_arch = "wasm32")]

@@ -16,5 +16,6 @@ cp ../target/x86_64-apple-darwin/release-smaller/libspark_token_primitives.dylib
 echo "Bundling golden vectors..."
 mkdir -p spark-token-primitives-python/src/spark_token_primitives/testdata
 cp ../../spark/testdata/transfer_manifest_hash_cases.json spark-token-primitives-python/src/spark_token_primitives/testdata/
+cp ../../spark/testdata/quote_envelope_cases.json spark-token-primitives-python/src/spark_token_primitives/testdata/
 
 echo "Done."

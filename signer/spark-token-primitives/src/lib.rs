@@ -2,6 +2,7 @@ mod hashstructure;
 mod invoice;
 pub mod proto;
 pub mod protohash;
+mod quote_envelope;
 mod token_transaction;
 mod transfer_manifest;
 
@@ -128,6 +129,46 @@ pub fn hash_transfer_manifest(
     transfer_manifest_bytes: Vec<u8>,
 ) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
     transfer_manifest::hash_transfer_manifest_impl(&transfer_manifest_bytes)
+}
+
+pub fn receive_attestor_target(
+    payment_hash: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    quote_envelope::receive_attestor_target_impl(&payment_hash)
+}
+
+pub fn send_target(payment_hash: Vec<u8>) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    quote_envelope::send_target_impl(&payment_hash)
+}
+
+pub fn coop_exit_target(
+    withdrawal_address: String,
+    leaf_set_hash: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    quote_envelope::coop_exit_target_impl(&withdrawal_address, &leaf_set_hash)
+}
+
+pub fn static_deposit_target(
+    txid: Vec<u8>,
+    vout: u32,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    quote_envelope::static_deposit_target_impl(&txid, vout)
+}
+
+pub fn quote_envelope_digest(
+    network: u32,
+    manifest_hash: Vec<u8>,
+    reason: u32,
+    role: u32,
+    target: Vec<u8>,
+) -> Result<Vec<u8>, SparkTokenPrimitivesError> {
+    quote_envelope::quote_envelope_digest_impl(
+        u64::from(network),
+        &manifest_hash,
+        u64::from(reason),
+        u64::from(role),
+        &target,
+    )
 }
 
 pub fn build_broadcast_transaction_request(
