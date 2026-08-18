@@ -153,6 +153,9 @@ jobs:
           cwd: "sdks/js"
           enable-corepack: "true"
 
+      - name: Verify committed SDK bindings
+        run: node public/scripts/sdk-bindings.js check
+
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1

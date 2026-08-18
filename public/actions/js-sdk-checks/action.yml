@@ -37,6 +37,20 @@ runs:
       working-directory: ${{ inputs.workspace }}
       run: yarn run generate:proto:check
 
+    - name: "Configure bounded Ubuntu package downloads"
+      shell: bash
+      run: |
+        # The Azure mirror can serve release metadata and then stall on package indexes.
+        if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
+        sudo tee /etc/apt/apt.conf.d/80-ci-network >/dev/null <<'EOF'
+        Acquire::Retries "3";
+        Acquire::http::Timeout "30";
+        Acquire::https::Timeout "30";
+        DPkg::Lock::Timeout "60";
+        EOF
+
     - name: "Verify Android 16kb page size alignment"
       shell: bash
       working-directory: ${{ inputs.workspace }}

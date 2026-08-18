@@ -5,6 +5,13 @@ find_package(cmake-cargo REQUIRED PATHS node_modules/cmake-cargo)
 
 project(bare_addon C)
 
+# PE output participates in byte-for-byte freshness checks. MSVC needs the
+# reproducibility flag during both object compilation and final linking.
+if (WIN32)
+  add_compile_options("/Brepro")
+  add_link_options("/Brepro")
+endif ()
+
 add_crate()
 
 add_bare_module(bare_addon)

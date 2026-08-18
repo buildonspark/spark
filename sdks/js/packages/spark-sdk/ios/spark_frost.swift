@@ -12,7 +12,7 @@ import Foundation
 #endif
 
 private extension RustBuffer {
-    // Allocate a new buffer, copying the contents of a `UInt8` array.
+    /// Allocate a new buffer, copying the contents of a `UInt8` array.
     init(bytes: [UInt8]) {
         let rbuf = bytes.withUnsafeBufferPointer { ptr in
             RustBuffer.from(ptr)
@@ -28,8 +28,8 @@ private extension RustBuffer {
         try! rustCall { ffi_spark_frost_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
-    // Frees the buffer in place.
-    // The buffer must not be used after this is called.
+    /// Frees the buffer in place.
+    /// The buffer must not be used after this is called.
     func deallocate() {
         try! rustCall { ffi_spark_frost_rustbuffer_free(self, $0) }
     }
@@ -76,9 +76,9 @@ private func createReader(data: Data) -> (data: Data, offset: Data.Index) {
     (data: data, offset: 0)
 }
 
-// Reads an integer at the current offset, in big-endian order, and advances
-// the offset on success. Throws if reading the integer would move the
-// offset past the end of the buffer.
+/// Reads an integer at the current offset, in big-endian order, and advances
+/// the offset on success. Throws if reading the integer would move the
+/// offset past the end of the buffer.
 private func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: Data.Index)) throws -> T {
     let range = reader.offset ..< reader.offset + MemoryLayout<T>.size
     guard reader.data.count >= range.upperBound else {
@@ -95,8 +95,8 @@ private func readInt<T: FixedWidthInteger>(_ reader: inout (data: Data, offset: 
     return value.bigEndian
 }
 
-// Reads an arbitrary number of bytes, to be used to read
-// raw bytes, this is useful when lifting strings
+/// Reads an arbitrary number of bytes, to be used to read
+/// raw bytes, this is useful when lifting strings
 private func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: Int) throws -> [UInt8] {
     let range = reader.offset ..< (reader.offset + count)
     guard reader.data.count >= range.upperBound else {
@@ -110,17 +110,17 @@ private func readBytes(_ reader: inout (data: Data, offset: Data.Index), count: 
     return value
 }
 
-// Reads a float at the current offset.
+/// Reads a float at the current offset.
 private func readFloat(_ reader: inout (data: Data, offset: Data.Index)) throws -> Float {
     return try Float(bitPattern: readInt(&reader))
 }
 
-// Reads a float at the current offset.
+/// Reads a float at the current offset.
 private func readDouble(_ reader: inout (data: Data, offset: Data.Index)) throws -> Double {
     return try Double(bitPattern: readInt(&reader))
 }
 
-// Indicates if the offset has reached the end of the buffer.
+/// Indicates if the offset has reached the end of the buffer.
 private func hasRemaining(_ reader: (data: Data, offset: Data.Index)) -> Bool {
     return reader.offset < reader.data.count
 }
@@ -133,14 +133,14 @@ private func createWriter() -> [UInt8] {
     return []
 }
 
-private func writeBytes<S>(_ writer: inout [UInt8], _ byteArr: S) where S: Sequence, S.Element == UInt8 {
+private func writeBytes<S: Sequence>(_ writer: inout [UInt8], _ byteArr: S) where S.Element == UInt8 {
     writer.append(contentsOf: byteArr)
 }
 
-// Writes an integer in big-endian order.
-//
-// Warning: make sure what you are trying to write
-// is in the correct type!
+/// Writes an integer in big-endian order.
+///
+/// Warning: make sure what you are trying to write
+/// is in the correct type!
 private func writeInt<T: FixedWidthInteger>(_ writer: inout [UInt8], _ value: T) {
     var value = value.bigEndian
     withUnsafeBytes(of: &value) { writer.append(contentsOf: $0) }
@@ -154,8 +154,8 @@ private func writeDouble(_ writer: inout [UInt8], _ value: Double) {
     writeInt(&writer, value.bitPattern)
 }
 
-// Protocol for types that transfer other types across the FFI. This is
-// analogous to the Rust trait of the same name.
+/// Protocol for types that transfer other types across the FFI. This is
+/// analogous to the Rust trait of the same name.
 private protocol FfiConverter {
     associatedtype FfiType
     associatedtype SwiftType
@@ -166,7 +166,7 @@ private protocol FfiConverter {
     static func write(_ value: SwiftType, into buf: inout [UInt8])
 }
 
-// Types conforming to `Primitive` pass themselves directly over the FFI.
+/// Types conforming to `Primitive` pass themselves directly over the FFI.
 private protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType {}
 
 extension FfiConverterPrimitive {
@@ -185,8 +185,8 @@ extension FfiConverterPrimitive {
     }
 }
 
-// Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
-// Used for complex types where it's hard to write a custom lift/lower.
+/// Types conforming to `FfiConverterRustBuffer` lift and lower into a `RustBuffer`.
+/// Used for complex types where it's hard to write a custom lift/lower.
 private protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
@@ -213,8 +213,8 @@ extension FfiConverterRustBuffer {
     }
 }
 
-// An error type for FFI errors. These errors occur at the UniFFI level, not
-// the library level.
+/// An error type for FFI errors. These errors occur at the UniFFI level, not
+/// the library level.
 private enum UniffiInternalError: LocalizedError {
     case bufferOverflow
     case incompleteData
@@ -530,8 +530,8 @@ public struct AdaptorSignatureResult {
     public var signature: Data
     public var adaptorPrivateKey: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(signature: Data, adaptorPrivateKey: Data) {
         self.signature = signature
         self.adaptorPrivateKey = adaptorPrivateKey
@@ -591,8 +591,8 @@ public struct DummyTx {
     public var tx: Data
     public var txid: String
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(tx: Data, txid: String) {
         self.tx = tx
         self.txid = txid
@@ -654,8 +654,8 @@ public struct HtlcSpendResult {
     public var script: Data
     public var controlBlock: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(tx: Data, sighash: Data, script: Data, controlBlock: Data) {
         self.tx = tx
         self.sighash = sighash
@@ -730,8 +730,8 @@ public struct KeyPackage {
     public var publicKey: Data
     public var verifyingKey: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(secretKey: Data, publicKey: Data, verifyingKey: Data) {
         self.secretKey = secretKey
         self.publicKey = publicKey
@@ -798,8 +798,8 @@ public struct NodeTxPairResult {
     public var cpfp: TransactionResult
     public var direct: TransactionResult
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(cpfp: TransactionResult, direct: TransactionResult) {
         self.cpfp = cpfp
         self.direct = direct
@@ -859,8 +859,8 @@ public struct NonceResult {
     public var nonce: SigningNonce
     public var commitment: SigningCommitment
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(nonce: SigningNonce, commitment: SigningCommitment) {
         self.nonce = nonce
         self.commitment = commitment
@@ -921,8 +921,8 @@ public struct RefundTxTrioResult {
     public var directRefund: TransactionResult?
     public var directFromCpfpRefund: TransactionResult
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(cpfpRefund: TransactionResult, directRefund: TransactionResult?, directFromCpfpRefund: TransactionResult) {
         self.cpfpRefund = cpfpRefund
         self.directRefund = directRefund
@@ -990,8 +990,8 @@ public struct SecretShareResult {
     public var index: UInt32
     public var share: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(threshold: UInt32, index: UInt32, share: Data) {
         self.threshold = threshold
         self.index = index
@@ -1058,8 +1058,8 @@ public struct SigningCommitment {
     public var hiding: Data
     public var binding: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(hiding: Data, binding: Data) {
         self.hiding = hiding
         self.binding = binding
@@ -1119,8 +1119,8 @@ public struct SigningNonce {
     public var hiding: Data
     public var binding: Data
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(hiding: Data, binding: Data) {
         self.hiding = hiding
         self.binding = binding
@@ -1180,8 +1180,8 @@ public struct TimelockResult {
     public var nextSequence: UInt32
     public var nextDirectSequence: UInt32
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(nextSequence: UInt32, nextDirectSequence: UInt32) {
         self.nextSequence = nextSequence
         self.nextDirectSequence = nextDirectSequence
@@ -1242,8 +1242,8 @@ public struct TransactionResult {
     public var sighash: Data
     public var inputs: [TxInResult]
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(tx: Data, sighash: Data, inputs: [TxInResult]) {
         self.tx = tx
         self.sighash = sighash
@@ -1309,8 +1309,8 @@ public func FfiConverterTypeTransactionResult_lower(_ value: TransactionResult) 
 public struct TxInResult {
     public var sequence: UInt32
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(sequence: UInt32) {
         self.sequence = sequence
     }
@@ -1365,8 +1365,8 @@ public struct VerifiableSecretShareResult {
     public var share: Data
     public var proofs: [Data]
 
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
+    /// Default memberwise initializers are never public by default, so we
+    /// declare one manually.
     public init(threshold: UInt32, index: UInt32, share: Data, proofs: [Data]) {
         self.threshold = threshold
         self.index = index
@@ -1750,11 +1750,12 @@ public func applyAdaptorToSignature(pubKey: Data, hash: Data, signature: Data, a
     })
 }
 
-public func checkIfValidSequence(sequence: UInt32) throws { try rustCallWithError(FfiConverterTypeError.lift) {
-    uniffi_spark_frost_fn_func_check_if_valid_sequence(
-        FfiConverterUInt32.lower(sequence), $0
-    )
-}
+public func checkIfValidSequence(sequence: UInt32) throws {
+    try rustCallWithError(FfiConverterTypeError.lift) {
+        uniffi_spark_frost_fn_func_check_if_valid_sequence(
+            FfiConverterUInt32.lower(sequence), $0
+        )
+    }
 }
 
 public func computeMultiInputSighashUniffi(tx: Data, inputIndex: UInt32, prevOutScripts: [Data], prevOutValues: [UInt64]) throws -> Data {
@@ -1986,8 +1987,7 @@ public func nextSequence(currSequence: UInt32, timeLockInterval: UInt32, directT
 
 public func randomSecretKeyBytes() throws -> Data {
     return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeError.lift) {
-        uniffi_spark_frost_fn_func_random_secret_key_bytes($0
-        )
+        uniffi_spark_frost_fn_func_random_secret_key_bytes($0)
     })
 }
 
@@ -2041,24 +2041,26 @@ public func splitSecretWithProofsUniffi(secret: Data, threshold: UInt32, numShar
     })
 }
 
-public func validateAdaptorSignature(pubKey: Data, hash: Data, signature: Data, adaptorPubKey: Data) throws { try rustCallWithError(FfiConverterTypeError.lift) {
-    uniffi_spark_frost_fn_func_validate_adaptor_signature(
-        FfiConverterData.lower(pubKey),
-        FfiConverterData.lower(hash),
-        FfiConverterData.lower(signature),
-        FfiConverterData.lower(adaptorPubKey), $0
-    )
-}
+public func validateAdaptorSignature(pubKey: Data, hash: Data, signature: Data, adaptorPubKey: Data) throws {
+    try rustCallWithError(FfiConverterTypeError.lift) {
+        uniffi_spark_frost_fn_func_validate_adaptor_signature(
+            FfiConverterData.lower(pubKey),
+            FfiConverterData.lower(hash),
+            FfiConverterData.lower(signature),
+            FfiConverterData.lower(adaptorPubKey), $0
+        )
+    }
 }
 
-public func validateShareUniffi(share: Data, index: UInt32, threshold: UInt32, proofs: [Data]) throws { try rustCallWithError(FfiConverterTypeError.lift) {
-    uniffi_spark_frost_fn_func_validate_share_uniffi(
-        FfiConverterData.lower(share),
-        FfiConverterUInt32.lower(index),
-        FfiConverterUInt32.lower(threshold),
-        FfiConverterSequenceData.lower(proofs), $0
-    )
-}
+public func validateShareUniffi(share: Data, index: UInt32, threshold: UInt32, proofs: [Data]) throws {
+    try rustCallWithError(FfiConverterTypeError.lift) {
+        uniffi_spark_frost_fn_func_validate_share_uniffi(
+            FfiConverterData.lower(share),
+            FfiConverterUInt32.lower(index),
+            FfiConverterUInt32.lower(threshold),
+            FfiConverterSequenceData.lower(proofs), $0
+        )
+    }
 }
 
 public func validateSignatureShare(msg: Data, statechainCommitments: [String: SigningCommitment], selfCommitment: SigningCommitment, signatureShare: Data, publicShare: Data, verifyingKey: Data) -> Bool {
@@ -2090,8 +2092,8 @@ private enum InitializationResult {
     case apiChecksumMismatch
 }
 
-// Use a global variable to perform the versioning checks. Swift ensures that
-// the code inside is only computed once.
+/// Use a global variable to perform the versioning checks. Swift ensures that
+/// the code inside is only computed once.
 private var initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 26
