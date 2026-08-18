@@ -18,3 +18,6 @@ target/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Symlinked target (worktree build-cache sharing) — target/ above only matches real dirs
+target

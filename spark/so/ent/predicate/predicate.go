@@ -81,6 +81,9 @@ type SigningNonce func(*sql.Selector)
 // SparkInvoice is the predicate function for sparkinvoice builders.
 type SparkInvoice func(*sql.Selector)
 
+// TokenAllowance is the predicate function for tokenallowance builders.
+type TokenAllowance func(*sql.Selector)
+
 // TokenCreate is the predicate function for tokencreate builders.
 type TokenCreate func(*sql.Selector)
 

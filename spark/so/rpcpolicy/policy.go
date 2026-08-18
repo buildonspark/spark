@@ -239,6 +239,8 @@ func sparkTokenServicePolicies() map[string]Policy {
 		pbtoken.SparkTokenService_QueryTokenOutputs_FullMethodName:      {AuthMode: AuthAnonymous},
 		pbtoken.SparkTokenService_FreezeTokens_FullMethodName:           {AuthMode: AuthSession},
 		pbtoken.SparkTokenService_BroadcastTransaction_FullMethodName:   {AuthMode: AuthSession},
+		pbtoken.SparkTokenService_CreateTokenAllowance_FullMethodName:   {AuthMode: AuthSession},
+		pbtoken.SparkTokenService_QueryTokenAllowances_FullMethodName:   {AuthMode: AuthSession},
 	}
 }
 
@@ -250,6 +252,7 @@ func sparkTokenInternalServicePolicies() map[string]Policy {
 		pbtokeninternal.SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName:      operatorInternal,
 		pbtokeninternal.SparkTokenInternalService_SignTokenTransaction_FullMethodName:                 operatorInternal,
 		pbtokeninternal.SparkTokenInternalService_InternalFreezeTokens_FullMethodName:                 operatorInternal,
+		pbtokeninternal.SparkTokenInternalService_InternalCreateTokenAllowance_FullMethodName:         operatorInternal,
 	}
 }
 

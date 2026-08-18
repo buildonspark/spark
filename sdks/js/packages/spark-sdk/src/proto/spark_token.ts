@@ -209,6 +209,51 @@ export function tokenTransactionStatusToJSON(object: TokenTransactionStatus): st
   }
 }
 
+export enum TokenAllowanceStatus {
+  TOKEN_ALLOWANCE_STATUS_UNSPECIFIED = 0,
+  TOKEN_ALLOWANCE_STATUS_ACTIVE = 1,
+  TOKEN_ALLOWANCE_STATUS_REVOKED = 2,
+  TOKEN_ALLOWANCE_STATUS_EXHAUSTED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function tokenAllowanceStatusFromJSON(object: any): TokenAllowanceStatus {
+  switch (object) {
+    case 0:
+    case "TOKEN_ALLOWANCE_STATUS_UNSPECIFIED":
+      return TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_UNSPECIFIED;
+    case 1:
+    case "TOKEN_ALLOWANCE_STATUS_ACTIVE":
+      return TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_ACTIVE;
+    case 2:
+    case "TOKEN_ALLOWANCE_STATUS_REVOKED":
+      return TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_REVOKED;
+    case 3:
+    case "TOKEN_ALLOWANCE_STATUS_EXHAUSTED":
+      return TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_EXHAUSTED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TokenAllowanceStatus.UNRECOGNIZED;
+  }
+}
+
+export function tokenAllowanceStatusToJSON(object: TokenAllowanceStatus): string {
+  switch (object) {
+    case TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_UNSPECIFIED:
+      return "TOKEN_ALLOWANCE_STATUS_UNSPECIFIED";
+    case TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_ACTIVE:
+      return "TOKEN_ALLOWANCE_STATUS_ACTIVE";
+    case TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_REVOKED:
+      return "TOKEN_ALLOWANCE_STATUS_REVOKED";
+    case TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_EXHAUSTED:
+      return "TOKEN_ALLOWANCE_STATUS_EXHAUSTED";
+    case TokenAllowanceStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * This proto is constructed by the wallet to specify leaves it wants to spend
  * as part of the token transaction.
@@ -390,7 +435,7 @@ export interface FinalTokenTransaction {
   finalTokenOutputs: FinalTokenOutput[];
   /**
    * Optional client-specified deadline for transaction execution.
-   * Included in the final hash to prevent malleability — an attacker cannot
+   * Included in the final hash to prevent malleability - an attacker cannot
    * change the deadline without invalidating operator signatures.
    */
   executeBefore?: Date | undefined;
@@ -646,6 +691,97 @@ export interface FreezeTokensResponse {
   impactedTokenAmount: Uint8Array;
   impactedTokenOutputs: TokenOutputRef[];
   freezeProgress: FreezeProgress | undefined;
+}
+
+/**
+ * Owner-signed policy object granting a spender bounded authority to spend the
+ * owner's token outputs. Replicated to every SO, which independently enforces
+ * it at prepare. Deterministically hashed to produce the message the owner
+ * signs; see HashCreateTokenAllowancePayload.
+ */
+export interface TokenAllowancePayload {
+  version: number;
+  /** Client-generated UUID (16 bytes) identifying the allowance across all SOs. */
+  allowanceId: Uint8Array;
+  ownerPublicKey: Uint8Array;
+  spenderPublicKey: Uint8Array;
+  tokenIdentifier: Uint8Array;
+  /** Maximum value a single delegated transaction may move; uint128 big-endian. */
+  perTransactionCap: Uint8Array;
+  /** Cumulative value the spender may move over the allowance lifetime; uint128 big-endian. */
+  totalLimit: Uint8Array;
+  /**
+   * Recipient keys the spender may pay. Empty permits any recipient. Capped
+   * at 256 entries: generous for real merchant/payout sets while bounding
+   * stored row size and the per-spend allowlist scan (DoS hardening).
+   */
+  recipientAllowlist: Uint8Array[];
+  expiryTime:
+    | Date
+    | undefined;
+  /**
+   * Fees are deliberately absent from the owner-signed grant: a pull settles at
+   * face value, so the owner's debit always equals the authorized pull amount.
+   * TODO(spark-pull): add the merchant-side network-fee layer (fee carved from
+   * the merchant's proceeds at a network-set rate; no owner approval).
+   */
+  network: Network;
+  /** Wallet-provided creation timestamp in milliseconds, used to order updates. */
+  ownerProvidedTimestamp: number;
+}
+
+export interface CreateTokenAllowanceRequest {
+  allowancePayload:
+    | TokenAllowancePayload
+    | undefined;
+  /** Schnorr or ECDSA DER signature (64-73 bytes) by the owner over the payload hash. */
+  ownerSignature: Uint8Array;
+}
+
+/** AllowanceProgress tracks the coordinated allowance status across operators. */
+export interface AllowanceProgress {
+  appliedOperatorPublicKeys: Uint8Array[];
+}
+
+export interface CreateTokenAllowanceResponse {
+  allowanceProgress: AllowanceProgress | undefined;
+}
+
+export interface TokenAllowanceInfo {
+  allowancePayload:
+    | TokenAllowancePayload
+    | undefined;
+  /** Decoded uint128 */
+  spentAmount: Uint8Array;
+  status: TokenAllowanceStatus;
+  /**
+   * The owner's signature over the create statement hash. Lets clients
+   * recompute HashCreateTokenAllowancePayload from the returned payload and
+   * verify the owner authored these policy terms - the queried SO cannot
+   * fabricate or alter grant terms.
+   */
+  ownerSignature: Uint8Array;
+}
+
+/** Request constraints are combined using an AND relation. */
+export interface QueryTokenAllowancesRequest {
+  ownerPublicKey?: Uint8Array | undefined;
+  spenderPublicKey?: Uint8Array | undefined;
+  tokenIdentifier?:
+    | Uint8Array
+    | undefined;
+  /** When false, only ACTIVE allowances are returned. */
+  includeInactive: boolean;
+  /** Page size; defaults to 100 if not set, values above 100 are clamped to 100. */
+  limit: number;
+  /** defaults to 0 if not set. */
+  offset: number;
+}
+
+export interface QueryTokenAllowancesResponse {
+  allowances: TokenAllowanceInfo[];
+  /** defaults to -1 if there are no more results */
+  offset: number;
 }
 
 function createBaseTokenOutputToSpend(): TokenOutputToSpend {
@@ -5301,6 +5437,787 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
   },
 };
 
+function createBaseTokenAllowancePayload(): TokenAllowancePayload {
+  return {
+    version: 0,
+    allowanceId: new Uint8Array(0),
+    ownerPublicKey: new Uint8Array(0),
+    spenderPublicKey: new Uint8Array(0),
+    tokenIdentifier: new Uint8Array(0),
+    perTransactionCap: new Uint8Array(0),
+    totalLimit: new Uint8Array(0),
+    recipientAllowlist: [],
+    expiryTime: undefined,
+    network: 0,
+    ownerProvidedTimestamp: 0,
+  };
+}
+
+export const TokenAllowancePayload: MessageFns<TokenAllowancePayload> = {
+  encode(message: TokenAllowancePayload, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.version !== 0) {
+      writer.uint32(8).uint32(message.version);
+    }
+    if (message.allowanceId.length !== 0) {
+      writer.uint32(18).bytes(message.allowanceId);
+    }
+    if (message.ownerPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.ownerPublicKey);
+    }
+    if (message.spenderPublicKey.length !== 0) {
+      writer.uint32(34).bytes(message.spenderPublicKey);
+    }
+    if (message.tokenIdentifier.length !== 0) {
+      writer.uint32(42).bytes(message.tokenIdentifier);
+    }
+    if (message.perTransactionCap.length !== 0) {
+      writer.uint32(50).bytes(message.perTransactionCap);
+    }
+    if (message.totalLimit.length !== 0) {
+      writer.uint32(58).bytes(message.totalLimit);
+    }
+    for (const v of message.recipientAllowlist) {
+      writer.uint32(66).bytes(v!);
+    }
+    if (message.expiryTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(74).fork()).join();
+    }
+    if (message.network !== 0) {
+      writer.uint32(104).int32(message.network);
+    }
+    if (message.ownerProvidedTimestamp !== 0) {
+      writer.uint32(112).uint64(message.ownerProvidedTimestamp);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenAllowancePayload {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenAllowancePayload();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.version = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.allowanceId = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.ownerPublicKey = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.spenderPublicKey = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tokenIdentifier = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.perTransactionCap = reader.bytes();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.totalLimit = reader.bytes();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.recipientAllowlist.push(reader.bytes());
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.expiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
+        case 14: {
+          if (tag !== 112) {
+            break;
+          }
+
+          message.ownerProvidedTimestamp = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenAllowancePayload {
+    return {
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      allowanceId: isSet(object.allowanceId) ? bytesFromBase64(object.allowanceId) : new Uint8Array(0),
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
+      spenderPublicKey: isSet(object.spenderPublicKey) ? bytesFromBase64(object.spenderPublicKey) : new Uint8Array(0),
+      tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : new Uint8Array(0),
+      perTransactionCap: isSet(object.perTransactionCap)
+        ? bytesFromBase64(object.perTransactionCap)
+        : new Uint8Array(0),
+      totalLimit: isSet(object.totalLimit) ? bytesFromBase64(object.totalLimit) : new Uint8Array(0),
+      recipientAllowlist: globalThis.Array.isArray(object?.recipientAllowlist)
+        ? object.recipientAllowlist.map((e: any) => bytesFromBase64(e))
+        : [],
+      expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      ownerProvidedTimestamp: isSet(object.ownerProvidedTimestamp)
+        ? globalThis.Number(object.ownerProvidedTimestamp)
+        : 0,
+    };
+  },
+
+  toJSON(message: TokenAllowancePayload): unknown {
+    const obj: any = {};
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.allowanceId.length !== 0) {
+      obj.allowanceId = base64FromBytes(message.allowanceId);
+    }
+    if (message.ownerPublicKey.length !== 0) {
+      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
+    }
+    if (message.spenderPublicKey.length !== 0) {
+      obj.spenderPublicKey = base64FromBytes(message.spenderPublicKey);
+    }
+    if (message.tokenIdentifier.length !== 0) {
+      obj.tokenIdentifier = base64FromBytes(message.tokenIdentifier);
+    }
+    if (message.perTransactionCap.length !== 0) {
+      obj.perTransactionCap = base64FromBytes(message.perTransactionCap);
+    }
+    if (message.totalLimit.length !== 0) {
+      obj.totalLimit = base64FromBytes(message.totalLimit);
+    }
+    if (message.recipientAllowlist?.length) {
+      obj.recipientAllowlist = message.recipientAllowlist.map((e) => base64FromBytes(e));
+    }
+    if (message.expiryTime !== undefined) {
+      obj.expiryTime = message.expiryTime.toISOString();
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
+    if (message.ownerProvidedTimestamp !== 0) {
+      obj.ownerProvidedTimestamp = Math.round(message.ownerProvidedTimestamp);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenAllowancePayload>): TokenAllowancePayload {
+    return TokenAllowancePayload.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenAllowancePayload>): TokenAllowancePayload {
+    const message = createBaseTokenAllowancePayload();
+    message.version = object.version ?? 0;
+    message.allowanceId = object.allowanceId ?? new Uint8Array(0);
+    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
+    message.spenderPublicKey = object.spenderPublicKey ?? new Uint8Array(0);
+    message.tokenIdentifier = object.tokenIdentifier ?? new Uint8Array(0);
+    message.perTransactionCap = object.perTransactionCap ?? new Uint8Array(0);
+    message.totalLimit = object.totalLimit ?? new Uint8Array(0);
+    message.recipientAllowlist = object.recipientAllowlist?.map((e) => e) || [];
+    message.expiryTime = object.expiryTime ?? undefined;
+    message.network = object.network ?? 0;
+    message.ownerProvidedTimestamp = object.ownerProvidedTimestamp ?? 0;
+    return message;
+  },
+};
+
+function createBaseCreateTokenAllowanceRequest(): CreateTokenAllowanceRequest {
+  return { allowancePayload: undefined, ownerSignature: new Uint8Array(0) };
+}
+
+export const CreateTokenAllowanceRequest: MessageFns<CreateTokenAllowanceRequest> = {
+  encode(message: CreateTokenAllowanceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.allowancePayload !== undefined) {
+      TokenAllowancePayload.encode(message.allowancePayload, writer.uint32(10).fork()).join();
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(18).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateTokenAllowanceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateTokenAllowanceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.allowancePayload = TokenAllowancePayload.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateTokenAllowanceRequest {
+    return {
+      allowancePayload: isSet(object.allowancePayload)
+        ? TokenAllowancePayload.fromJSON(object.allowancePayload)
+        : undefined,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: CreateTokenAllowanceRequest): unknown {
+    const obj: any = {};
+    if (message.allowancePayload !== undefined) {
+      obj.allowancePayload = TokenAllowancePayload.toJSON(message.allowancePayload);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateTokenAllowanceRequest>): CreateTokenAllowanceRequest {
+    return CreateTokenAllowanceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateTokenAllowanceRequest>): CreateTokenAllowanceRequest {
+    const message = createBaseCreateTokenAllowanceRequest();
+    message.allowancePayload = (object.allowancePayload !== undefined && object.allowancePayload !== null)
+      ? TokenAllowancePayload.fromPartial(object.allowancePayload)
+      : undefined;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseAllowanceProgress(): AllowanceProgress {
+  return { appliedOperatorPublicKeys: [] };
+}
+
+export const AllowanceProgress: MessageFns<AllowanceProgress> = {
+  encode(message: AllowanceProgress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.appliedOperatorPublicKeys) {
+      writer.uint32(10).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AllowanceProgress {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAllowanceProgress();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.appliedOperatorPublicKeys.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AllowanceProgress {
+    return {
+      appliedOperatorPublicKeys: globalThis.Array.isArray(object?.appliedOperatorPublicKeys)
+        ? object.appliedOperatorPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+    };
+  },
+
+  toJSON(message: AllowanceProgress): unknown {
+    const obj: any = {};
+    if (message.appliedOperatorPublicKeys?.length) {
+      obj.appliedOperatorPublicKeys = message.appliedOperatorPublicKeys.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AllowanceProgress>): AllowanceProgress {
+    return AllowanceProgress.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AllowanceProgress>): AllowanceProgress {
+    const message = createBaseAllowanceProgress();
+    message.appliedOperatorPublicKeys = object.appliedOperatorPublicKeys?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseCreateTokenAllowanceResponse(): CreateTokenAllowanceResponse {
+  return { allowanceProgress: undefined };
+}
+
+export const CreateTokenAllowanceResponse: MessageFns<CreateTokenAllowanceResponse> = {
+  encode(message: CreateTokenAllowanceResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.allowanceProgress !== undefined) {
+      AllowanceProgress.encode(message.allowanceProgress, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateTokenAllowanceResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateTokenAllowanceResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.allowanceProgress = AllowanceProgress.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateTokenAllowanceResponse {
+    return {
+      allowanceProgress: isSet(object.allowanceProgress)
+        ? AllowanceProgress.fromJSON(object.allowanceProgress)
+        : undefined,
+    };
+  },
+
+  toJSON(message: CreateTokenAllowanceResponse): unknown {
+    const obj: any = {};
+    if (message.allowanceProgress !== undefined) {
+      obj.allowanceProgress = AllowanceProgress.toJSON(message.allowanceProgress);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateTokenAllowanceResponse>): CreateTokenAllowanceResponse {
+    return CreateTokenAllowanceResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateTokenAllowanceResponse>): CreateTokenAllowanceResponse {
+    const message = createBaseCreateTokenAllowanceResponse();
+    message.allowanceProgress = (object.allowanceProgress !== undefined && object.allowanceProgress !== null)
+      ? AllowanceProgress.fromPartial(object.allowanceProgress)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseTokenAllowanceInfo(): TokenAllowanceInfo {
+  return { allowancePayload: undefined, spentAmount: new Uint8Array(0), status: 0, ownerSignature: new Uint8Array(0) };
+}
+
+export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
+  encode(message: TokenAllowanceInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.allowancePayload !== undefined) {
+      TokenAllowancePayload.encode(message.allowancePayload, writer.uint32(10).fork()).join();
+    }
+    if (message.spentAmount.length !== 0) {
+      writer.uint32(18).bytes(message.spentAmount);
+    }
+    if (message.status !== 0) {
+      writer.uint32(24).int32(message.status);
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(34).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenAllowanceInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenAllowanceInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.allowancePayload = TokenAllowancePayload.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.spentAmount = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenAllowanceInfo {
+    return {
+      allowancePayload: isSet(object.allowancePayload)
+        ? TokenAllowancePayload.fromJSON(object.allowancePayload)
+        : undefined,
+      spentAmount: isSet(object.spentAmount) ? bytesFromBase64(object.spentAmount) : new Uint8Array(0),
+      status: isSet(object.status) ? tokenAllowanceStatusFromJSON(object.status) : 0,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: TokenAllowanceInfo): unknown {
+    const obj: any = {};
+    if (message.allowancePayload !== undefined) {
+      obj.allowancePayload = TokenAllowancePayload.toJSON(message.allowancePayload);
+    }
+    if (message.spentAmount.length !== 0) {
+      obj.spentAmount = base64FromBytes(message.spentAmount);
+    }
+    if (message.status !== 0) {
+      obj.status = tokenAllowanceStatusToJSON(message.status);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenAllowanceInfo>): TokenAllowanceInfo {
+    return TokenAllowanceInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenAllowanceInfo>): TokenAllowanceInfo {
+    const message = createBaseTokenAllowanceInfo();
+    message.allowancePayload = (object.allowancePayload !== undefined && object.allowancePayload !== null)
+      ? TokenAllowancePayload.fromPartial(object.allowancePayload)
+      : undefined;
+    message.spentAmount = object.spentAmount ?? new Uint8Array(0);
+    message.status = object.status ?? 0;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryTokenAllowancesRequest(): QueryTokenAllowancesRequest {
+  return {
+    ownerPublicKey: undefined,
+    spenderPublicKey: undefined,
+    tokenIdentifier: undefined,
+    includeInactive: false,
+    limit: 0,
+    offset: 0,
+  };
+}
+
+export const QueryTokenAllowancesRequest: MessageFns<QueryTokenAllowancesRequest> = {
+  encode(message: QueryTokenAllowancesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerPublicKey !== undefined) {
+      writer.uint32(10).bytes(message.ownerPublicKey);
+    }
+    if (message.spenderPublicKey !== undefined) {
+      writer.uint32(18).bytes(message.spenderPublicKey);
+    }
+    if (message.tokenIdentifier !== undefined) {
+      writer.uint32(26).bytes(message.tokenIdentifier);
+    }
+    if (message.includeInactive !== false) {
+      writer.uint32(32).bool(message.includeInactive);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(40).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(48).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenAllowancesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTokenAllowancesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.spenderPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tokenIdentifier = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.includeInactive = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTokenAllowancesRequest {
+    return {
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : undefined,
+      spenderPublicKey: isSet(object.spenderPublicKey) ? bytesFromBase64(object.spenderPublicKey) : undefined,
+      tokenIdentifier: isSet(object.tokenIdentifier) ? bytesFromBase64(object.tokenIdentifier) : undefined,
+      includeInactive: isSet(object.includeInactive) ? globalThis.Boolean(object.includeInactive) : false,
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryTokenAllowancesRequest): unknown {
+    const obj: any = {};
+    if (message.ownerPublicKey !== undefined) {
+      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
+    }
+    if (message.spenderPublicKey !== undefined) {
+      obj.spenderPublicKey = base64FromBytes(message.spenderPublicKey);
+    }
+    if (message.tokenIdentifier !== undefined) {
+      obj.tokenIdentifier = base64FromBytes(message.tokenIdentifier);
+    }
+    if (message.includeInactive !== false) {
+      obj.includeInactive = message.includeInactive;
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTokenAllowancesRequest>): QueryTokenAllowancesRequest {
+    return QueryTokenAllowancesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTokenAllowancesRequest>): QueryTokenAllowancesRequest {
+    const message = createBaseQueryTokenAllowancesRequest();
+    message.ownerPublicKey = object.ownerPublicKey ?? undefined;
+    message.spenderPublicKey = object.spenderPublicKey ?? undefined;
+    message.tokenIdentifier = object.tokenIdentifier ?? undefined;
+    message.includeInactive = object.includeInactive ?? false;
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryTokenAllowancesResponse(): QueryTokenAllowancesResponse {
+  return { allowances: [], offset: 0 };
+}
+
+export const QueryTokenAllowancesResponse: MessageFns<QueryTokenAllowancesResponse> = {
+  encode(message: QueryTokenAllowancesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.allowances) {
+      TokenAllowanceInfo.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenAllowancesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTokenAllowancesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.allowances.push(TokenAllowanceInfo.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTokenAllowancesResponse {
+    return {
+      allowances: globalThis.Array.isArray(object?.allowances)
+        ? object.allowances.map((e: any) => TokenAllowanceInfo.fromJSON(e))
+        : [],
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryTokenAllowancesResponse): unknown {
+    const obj: any = {};
+    if (message.allowances?.length) {
+      obj.allowances = message.allowances.map((e) => TokenAllowanceInfo.toJSON(e));
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTokenAllowancesResponse>): QueryTokenAllowancesResponse {
+    return QueryTokenAllowancesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTokenAllowancesResponse>): QueryTokenAllowancesResponse {
+    const message = createBaseQueryTokenAllowancesResponse();
+    message.allowances = object.allowances?.map((e) => TokenAllowanceInfo.fromPartial(e)) || [];
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
 export type SparkTokenServiceDefinition = typeof SparkTokenServiceDefinition;
 export const SparkTokenServiceDefinition = {
   name: "SparkTokenService",
@@ -5371,6 +6288,26 @@ export const SparkTokenServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * Install an owner-signed spending allowance granting a spender bounded
+     * authority over the owner's token outputs. Coordinated across all SOs.
+     */
+    create_token_allowance: {
+      name: "create_token_allowance",
+      requestType: CreateTokenAllowanceRequest,
+      requestStream: false,
+      responseType: CreateTokenAllowanceResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_token_allowances: {
+      name: "query_token_allowances",
+      requestType: QueryTokenAllowancesRequest,
+      requestStream: false,
+      responseType: QueryTokenAllowancesResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -5412,6 +6349,18 @@ export interface SparkTokenServiceImplementation<CallContextExt = {}> {
     request: BroadcastTransactionRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<BroadcastTransactionResponse>>;
+  /**
+   * Install an owner-signed spending allowance granting a spender bounded
+   * authority over the owner's token outputs. Coordinated across all SOs.
+   */
+  create_token_allowance(
+    request: CreateTokenAllowanceRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CreateTokenAllowanceResponse>>;
+  query_token_allowances(
+    request: QueryTokenAllowancesRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryTokenAllowancesResponse>>;
 }
 
 export interface SparkTokenServiceClient<CallOptionsExt = {}> {
@@ -5452,6 +6401,18 @@ export interface SparkTokenServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<BroadcastTransactionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<BroadcastTransactionResponse>;
+  /**
+   * Install an owner-signed spending allowance granting a spender bounded
+   * authority over the owner's token outputs. Coordinated across all SOs.
+   */
+  create_token_allowance(
+    request: DeepPartial<CreateTokenAllowanceRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CreateTokenAllowanceResponse>;
+  query_token_allowances(
+    request: DeepPartial<QueryTokenAllowancesRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryTokenAllowancesResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {

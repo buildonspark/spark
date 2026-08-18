@@ -70,9 +70,11 @@ type TokenCreateEdges struct {
 	TokenOutput []*TokenOutput `json:"token_output,omitempty"`
 	// TokenFreeze holds the value of the token_freeze edge.
 	TokenFreeze []*TokenFreeze `json:"token_freeze,omitempty"`
+	// TokenAllowance holds the value of the token_allowance edge.
+	TokenAllowance []*TokenAllowance `json:"token_allowance,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // TokenTransactionOrErr returns the TokenTransaction value or an error if the edge
@@ -111,6 +113,15 @@ func (e TokenCreateEdges) TokenFreezeOrErr() ([]*TokenFreeze, error) {
 		return e.TokenFreeze, nil
 	}
 	return nil, &NotLoadedError{edge: "token_freeze"}
+}
+
+// TokenAllowanceOrErr returns the TokenAllowance value or an error if the edge
+// was not loaded in eager-loading.
+func (e TokenCreateEdges) TokenAllowanceOrErr() ([]*TokenAllowance, error) {
+	if e.loadedTypes[4] {
+		return e.TokenAllowance, nil
+	}
+	return nil, &NotLoadedError{edge: "token_allowance"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -285,6 +296,11 @@ func (tc *TokenCreate) QueryTokenOutput() *TokenOutputQuery {
 // QueryTokenFreeze queries the "token_freeze" edge of the TokenCreate entity.
 func (tc *TokenCreate) QueryTokenFreeze() *TokenFreezeQuery {
 	return NewTokenCreateClient(tc.config).QueryTokenFreeze(tc)
+}
+
+// QueryTokenAllowance queries the "token_allowance" edge of the TokenCreate entity.
+func (tc *TokenCreate) QueryTokenAllowance() *TokenAllowanceQuery {
+	return NewTokenCreateClient(tc.config).QueryTokenAllowance(tc)
 }
 
 // Update returns a builder for updating this TokenCreate.

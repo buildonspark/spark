@@ -75,6 +75,7 @@ const (
 
 	ReasonResourceExhaustedRateLimitExceeded        = "RATE_LIMIT_EXCEEDED"
 	ReasonResourceExhaustedConcurrencyLimitExceeded = "CONCURRENCY_LIMIT_EXCEEDED"
+	ReasonResourceExhaustedQuotaExceeded            = "QUOTA_EXCEEDED"
 
 	ReasonPermissionDeniedNoReadAccess = "NO_READ_ACCESS"
 
@@ -345,6 +346,12 @@ func ResourceExhaustedRateLimitExceeded(err error) error {
 
 func ResourceExhaustedConcurrencyLimitExceeded(err error) error {
 	return newGRPCError(codes.ResourceExhausted, err, ReasonResourceExhaustedConcurrencyLimitExceeded)
+}
+
+// ResourceExhaustedQuotaExceeded is for when a per-owner or per-object stored-resource
+// quota is hit. Not retryable until the caller frees quota.
+func ResourceExhaustedQuotaExceeded(err error) error {
+	return newGRPCError(codes.ResourceExhausted, err, ReasonResourceExhaustedQuotaExceeded)
 }
 
 func PermissionDeniedNoReadAccess(err error) error {

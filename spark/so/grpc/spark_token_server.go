@@ -77,3 +77,16 @@ func (s *SparkTokenServer) BroadcastTransaction(ctx context.Context, req *tokenp
 	resp, err := broadcastTokenTransactionHandler.BroadcastTokenTransaction(ctx, req)
 	return resp, err
 }
+
+// CreateTokenAllowance installs an owner-signed spending allowance granting a spender bounded
+// authority to move the owner's token outputs.
+func (s *SparkTokenServer) CreateTokenAllowance(ctx context.Context, req *tokenpb.CreateTokenAllowanceRequest) (*tokenpb.CreateTokenAllowanceResponse, error) {
+	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig)
+	return allowanceHandler.CreateTokenAllowance(ctx, req)
+}
+
+// QueryTokenAllowances returns allowances the caller is a party to (as owner or spender).
+func (s *SparkTokenServer) QueryTokenAllowances(ctx context.Context, req *tokenpb.QueryTokenAllowancesRequest) (*tokenpb.QueryTokenAllowancesResponse, error) {
+	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig)
+	return allowanceHandler.QueryTokenAllowances(ctx, req)
+}

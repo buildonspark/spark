@@ -24,6 +24,7 @@ const (
 	SparkTokenInternalService_ExchangeRevocationSecretsShares_FullMethodName      = "/spark_token.SparkTokenInternalService/exchange_revocation_secrets_shares"
 	SparkTokenInternalService_SignTokenTransaction_FullMethodName                 = "/spark_token.SparkTokenInternalService/sign_token_transaction"
 	SparkTokenInternalService_InternalFreezeTokens_FullMethodName                 = "/spark_token.SparkTokenInternalService/internal_freeze_tokens"
+	SparkTokenInternalService_InternalCreateTokenAllowance_FullMethodName         = "/spark_token.SparkTokenInternalService/internal_create_token_allowance"
 )
 
 // SparkTokenInternalServiceClient is the client API for SparkTokenInternalService service.
@@ -42,6 +43,8 @@ type SparkTokenInternalServiceClient interface {
 	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
 	// Internal freeze tokens (SO-to-SO coordination)
 	InternalFreezeTokens(ctx context.Context, in *InternalFreezeTokensRequest, opts ...grpc.CallOption) (*InternalFreezeTokensResponse, error)
+	// Internal create token allowance (SO-to-SO coordination)
+	InternalCreateTokenAllowance(ctx context.Context, in *InternalCreateTokenAllowanceRequest, opts ...grpc.CallOption) (*InternalCreateTokenAllowanceResponse, error)
 }
 
 type sparkTokenInternalServiceClient struct {
@@ -102,6 +105,16 @@ func (c *sparkTokenInternalServiceClient) InternalFreezeTokens(ctx context.Conte
 	return out, nil
 }
 
+func (c *sparkTokenInternalServiceClient) InternalCreateTokenAllowance(ctx context.Context, in *InternalCreateTokenAllowanceRequest, opts ...grpc.CallOption) (*InternalCreateTokenAllowanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InternalCreateTokenAllowanceResponse)
+	err := c.cc.Invoke(ctx, SparkTokenInternalService_InternalCreateTokenAllowance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkTokenInternalServiceServer is the server API for SparkTokenInternalService service.
 // All implementations must embed UnimplementedSparkTokenInternalServiceServer
 // for forward compatibility.
@@ -118,6 +131,8 @@ type SparkTokenInternalServiceServer interface {
 	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
 	// Internal freeze tokens (SO-to-SO coordination)
 	InternalFreezeTokens(context.Context, *InternalFreezeTokensRequest) (*InternalFreezeTokensResponse, error)
+	// Internal create token allowance (SO-to-SO coordination)
+	InternalCreateTokenAllowance(context.Context, *InternalCreateTokenAllowanceRequest) (*InternalCreateTokenAllowanceResponse, error)
 	mustEmbedUnimplementedSparkTokenInternalServiceServer()
 }
 
@@ -142,6 +157,9 @@ func (UnimplementedSparkTokenInternalServiceServer) SignTokenTransaction(context
 }
 func (UnimplementedSparkTokenInternalServiceServer) InternalFreezeTokens(context.Context, *InternalFreezeTokensRequest) (*InternalFreezeTokensResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InternalFreezeTokens not implemented")
+}
+func (UnimplementedSparkTokenInternalServiceServer) InternalCreateTokenAllowance(context.Context, *InternalCreateTokenAllowanceRequest) (*InternalCreateTokenAllowanceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InternalCreateTokenAllowance not implemented")
 }
 func (UnimplementedSparkTokenInternalServiceServer) mustEmbedUnimplementedSparkTokenInternalServiceServer() {
 }
@@ -255,6 +273,24 @@ func _SparkTokenInternalService_InternalFreezeTokens_Handler(srv interface{}, ct
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkTokenInternalService_InternalCreateTokenAllowance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InternalCreateTokenAllowanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkTokenInternalServiceServer).InternalCreateTokenAllowance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkTokenInternalService_InternalCreateTokenAllowance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkTokenInternalServiceServer).InternalCreateTokenAllowance(ctx, req.(*InternalCreateTokenAllowanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkTokenInternalService_ServiceDesc is the grpc.ServiceDesc for SparkTokenInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -281,6 +317,10 @@ var SparkTokenInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "internal_freeze_tokens",
 			Handler:    _SparkTokenInternalService_InternalFreezeTokens_Handler,
+		},
+		{
+			MethodName: "internal_create_token_allowance",
+			Handler:    _SparkTokenInternalService_InternalCreateTokenAllowance_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

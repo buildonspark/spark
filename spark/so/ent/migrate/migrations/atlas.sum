@@ -1,4 +1,4 @@
-h1:8J9gb3adxD3NgHtEtEhjGBZx1Ufpwa6cU7/+dGoK1Oc=
+h1:1a3fSOWJYbmc9ClCSQhq43OqLK7/sCvvQoBkjsQOP/I=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -178,3 +178,4 @@ h1:8J9gb3adxD3NgHtEtEhjGBZx1Ufpwa6cU7/+dGoK1Oc=
 20260727235446_add_transfer_leaf_signature_scheme.sql h1:LHxPoB+j7UcJGy2fMrf+Yq6E7m2ZJCRiSykzSdPH/HE=
 20260806001405_instant_ssp_signature_unique.sql h1:2PfNwYYBjPngPxXnjdUP+UM2j+u9SHwbh53drdFP7Dk=
 20260810120000_extend_treenode_occupancy_idx_create_time.sql h1:Z1hTyrpFAMWAyHNa8tJEdt/w8K0vtM3/gaMF/X21UuI=
+20260813230000_add_token_allowances.sql h1:6b1BJZvP2apn5uT8Gm5uR+1CekgOHDyDVPaG+Bbc7K8=

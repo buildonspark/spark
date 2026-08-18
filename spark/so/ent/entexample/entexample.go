@@ -3517,6 +3517,390 @@ func (si *SparkInvoiceExample) Exec(ctx context.Context) (*ent.SparkInvoice, err
 	return create.Save(ctx)
 }
 
+// TokenAllowanceExample is a test fixture builder for TokenAllowance.
+type TokenAllowanceExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	AllowanceID                  *uuid.UUID
+	OwnerPublicKey               *keys.Public
+	SpenderPublicKey             *keys.Public
+	TokenIdentifier              *[]byte
+	TokenCreateID                *uuid.UUID
+	PerTransactionCap            *[]byte
+	TotalLimit                   *[]byte
+	RecipientAllowlist           *[][]uint8
+	ExpiryTime                   *time.Time
+	Network                      *btcnetwork.Network
+	OwnerSignature               *[]byte
+	StatementHash                *[]byte
+	Version                      *uint64
+	OwnerProvidedTimestamp       *uint64
+	OwnerProvidedRevokeTimestamp *uint64
+	RevokeSignature              *[]byte
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	TokenCreate *ent.TokenCreate
+}
+
+// NewTokenAllowanceExample creates a new TokenAllowanceExample for testing.
+func NewTokenAllowanceExample(t *testing.T, client *ent.Client) *TokenAllowanceExample {
+	return &TokenAllowanceExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetAllowanceID sets the allowance_id field.
+func (ta *TokenAllowanceExample) SetAllowanceID(v uuid.UUID) *TokenAllowanceExample {
+	ta.AllowanceID = &v
+	return ta
+}
+
+// SetOwnerPublicKey sets the owner_public_key field.
+func (ta *TokenAllowanceExample) SetOwnerPublicKey(v keys.Public) *TokenAllowanceExample {
+	ta.OwnerPublicKey = &v
+	return ta
+}
+
+// SetSpenderPublicKey sets the spender_public_key field.
+func (ta *TokenAllowanceExample) SetSpenderPublicKey(v keys.Public) *TokenAllowanceExample {
+	ta.SpenderPublicKey = &v
+	return ta
+}
+
+// SetTokenIdentifier sets the token_identifier field.
+func (ta *TokenAllowanceExample) SetTokenIdentifier(v []byte) *TokenAllowanceExample {
+	ta.TokenIdentifier = &v
+	return ta
+}
+
+// SetTokenCreateID sets the token_create_id field.
+func (ta *TokenAllowanceExample) SetTokenCreateID(v uuid.UUID) *TokenAllowanceExample {
+	ta.TokenCreateID = &v
+	return ta
+}
+
+// SetPerTransactionCap sets the per_transaction_cap field.
+func (ta *TokenAllowanceExample) SetPerTransactionCap(v []byte) *TokenAllowanceExample {
+	ta.PerTransactionCap = &v
+	return ta
+}
+
+// SetTotalLimit sets the total_limit field.
+func (ta *TokenAllowanceExample) SetTotalLimit(v []byte) *TokenAllowanceExample {
+	ta.TotalLimit = &v
+	return ta
+}
+
+// SetRecipientAllowlist sets the recipient_allowlist field.
+func (ta *TokenAllowanceExample) SetRecipientAllowlist(v [][]uint8) *TokenAllowanceExample {
+	ta.RecipientAllowlist = &v
+	return ta
+}
+
+// SetExpiryTime sets the expiry_time field.
+func (ta *TokenAllowanceExample) SetExpiryTime(v time.Time) *TokenAllowanceExample {
+	ta.ExpiryTime = &v
+	return ta
+}
+
+// SetNetwork sets the network field.
+func (ta *TokenAllowanceExample) SetNetwork(v btcnetwork.Network) *TokenAllowanceExample {
+	ta.Network = &v
+	return ta
+}
+
+// SetOwnerSignature sets the owner_signature field.
+func (ta *TokenAllowanceExample) SetOwnerSignature(v []byte) *TokenAllowanceExample {
+	ta.OwnerSignature = &v
+	return ta
+}
+
+// SetStatementHash sets the statement_hash field.
+func (ta *TokenAllowanceExample) SetStatementHash(v []byte) *TokenAllowanceExample {
+	ta.StatementHash = &v
+	return ta
+}
+
+// SetVersion sets the version field.
+func (ta *TokenAllowanceExample) SetVersion(v uint64) *TokenAllowanceExample {
+	ta.Version = &v
+	return ta
+}
+
+// SetOwnerProvidedTimestamp sets the owner_provided_timestamp field.
+func (ta *TokenAllowanceExample) SetOwnerProvidedTimestamp(v uint64) *TokenAllowanceExample {
+	ta.OwnerProvidedTimestamp = &v
+	return ta
+}
+
+// SetOwnerProvidedRevokeTimestamp sets the owner_provided_revoke_timestamp field.
+func (ta *TokenAllowanceExample) SetOwnerProvidedRevokeTimestamp(v uint64) *TokenAllowanceExample {
+	ta.OwnerProvidedRevokeTimestamp = &v
+	return ta
+}
+
+// SetRevokeSignature sets the revoke_signature field.
+func (ta *TokenAllowanceExample) SetRevokeSignature(v []byte) *TokenAllowanceExample {
+	ta.RevokeSignature = &v
+	return ta
+}
+
+// SetTokenCreate sets the token_create edge.
+func (ta *TokenAllowanceExample) SetTokenCreate(v *ent.TokenCreate) *TokenAllowanceExample {
+	ta.TokenCreate = v
+	return ta
+}
+
+// MustExec builds and saves the TokenAllowance entity to the database.
+// It panics if the save fails.
+func (ta *TokenAllowanceExample) MustExec(ctx context.Context) *ent.TokenAllowance {
+	create := ta.client.TokenAllowance.Create()
+
+	// Set fields
+	if ta.AllowanceID != nil {
+		create.SetAllowanceID(*ta.AllowanceID)
+	} else {
+		// Use default from annotation
+		create.SetAllowanceID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
+	}
+	if ta.OwnerPublicKey != nil {
+		create.SetOwnerPublicKey(*ta.OwnerPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetOwnerPublicKey(keys.MustParsePublicKeyHex("02ca75659458529755b77663f18282f4aa130313e098fac40deffb1208207a2ffe"))
+	}
+	if ta.SpenderPublicKey != nil {
+		create.SetSpenderPublicKey(*ta.SpenderPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetSpenderPublicKey(keys.MustParsePublicKeyHex("033e40d72117ee89f7bda15d2b3d779843e6721e8e4c5078c192b50fb3782de2f5"))
+	}
+	if ta.TokenIdentifier != nil {
+		create.SetTokenIdentifier(*ta.TokenIdentifier)
+	} else {
+		// Use default from annotation
+		create.SetTokenIdentifier(func() []byte {
+			b, _ := hex.DecodeString("3e534a8d9798fe5e20516f9b1aa05f5d78d718ece893e8af89d678c3d88f2451")
+			return b
+		}())
+	}
+	if ta.TokenCreateID != nil {
+		create.SetTokenCreateID(*ta.TokenCreateID)
+	} else {
+		// Use default from annotation
+		create.SetTokenCreateID(uuid.MustParse("01982f4a-791d-78cd-892b-8e558d509271"))
+	}
+	if ta.PerTransactionCap != nil {
+		create.SetPerTransactionCap(*ta.PerTransactionCap)
+	} else {
+		// Use default from annotation
+		create.SetPerTransactionCap(func() []byte { b, _ := hex.DecodeString("00000000000000000000000000002710"); return b }())
+	}
+	if ta.TotalLimit != nil {
+		create.SetTotalLimit(*ta.TotalLimit)
+	} else {
+		// Use default from annotation
+		create.SetTotalLimit(func() []byte { b, _ := hex.DecodeString("000000000000000000000000000186a0"); return b }())
+	}
+	if ta.RecipientAllowlist != nil {
+		create.SetRecipientAllowlist(*ta.RecipientAllowlist)
+	} else {
+	}
+	if ta.ExpiryTime != nil {
+		create.SetExpiryTime(*ta.ExpiryTime)
+	} else {
+		// Use default from annotation
+		create.SetExpiryTime(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if ta.Network != nil {
+		create.SetNetwork(*ta.Network)
+	} else {
+		// Use default from annotation
+		create.SetNetwork(2)
+	}
+	if ta.OwnerSignature != nil {
+		create.SetOwnerSignature(*ta.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f")
+			return b
+		}())
+	}
+	if ta.StatementHash != nil {
+		create.SetStatementHash(*ta.StatementHash)
+	} else {
+		// Use default from annotation
+		create.SetStatementHash(func() []byte {
+			b, _ := hex.DecodeString("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90")
+			return b
+		}())
+	}
+	if ta.Version != nil {
+		create.SetVersion(*ta.Version)
+	} else {
+		// Use default from annotation
+		create.SetVersion(uint64(1))
+	}
+	if ta.OwnerProvidedTimestamp != nil {
+		create.SetOwnerProvidedTimestamp(*ta.OwnerProvidedTimestamp)
+	} else {
+		// Use default from annotation
+		create.SetOwnerProvidedTimestamp(uint64(1747337980820))
+	}
+	if ta.OwnerProvidedRevokeTimestamp != nil {
+		create.SetOwnerProvidedRevokeTimestamp(*ta.OwnerProvidedRevokeTimestamp)
+	} else {
+	}
+	if ta.RevokeSignature != nil {
+		create.SetRevokeSignature(*ta.RevokeSignature)
+	} else {
+	}
+
+	// Handle edges
+	if ta.TokenCreate != nil {
+		create.SetTokenCreate(ta.TokenCreate)
+	} else {
+		// Auto-create required edge
+		ta.t.Helper()
+		ta.TokenCreate = NewTokenCreateExample(ta.t, ta.client).MustExec(ctx)
+		create.SetTokenCreate(ta.TokenCreate)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		ta.t.Helper()
+		ta.t.Fatalf("failed to create TokenAllowance: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the TokenAllowance entity to the database.
+// It returns an error if the save fails.
+func (ta *TokenAllowanceExample) Exec(ctx context.Context) (*ent.TokenAllowance, error) {
+	create := ta.client.TokenAllowance.Create()
+
+	// Set fields
+	if ta.AllowanceID != nil {
+		create.SetAllowanceID(*ta.AllowanceID)
+	} else {
+		// Use default from annotation
+		create.SetAllowanceID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
+	}
+	if ta.OwnerPublicKey != nil {
+		create.SetOwnerPublicKey(*ta.OwnerPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetOwnerPublicKey(keys.MustParsePublicKeyHex("02ca75659458529755b77663f18282f4aa130313e098fac40deffb1208207a2ffe"))
+	}
+	if ta.SpenderPublicKey != nil {
+		create.SetSpenderPublicKey(*ta.SpenderPublicKey)
+	} else {
+		// Use default from annotation
+		create.SetSpenderPublicKey(keys.MustParsePublicKeyHex("033e40d72117ee89f7bda15d2b3d779843e6721e8e4c5078c192b50fb3782de2f5"))
+	}
+	if ta.TokenIdentifier != nil {
+		create.SetTokenIdentifier(*ta.TokenIdentifier)
+	} else {
+		// Use default from annotation
+		create.SetTokenIdentifier(func() []byte {
+			b, _ := hex.DecodeString("3e534a8d9798fe5e20516f9b1aa05f5d78d718ece893e8af89d678c3d88f2451")
+			return b
+		}())
+	}
+	if ta.TokenCreateID != nil {
+		create.SetTokenCreateID(*ta.TokenCreateID)
+	} else {
+		// Use default from annotation
+		create.SetTokenCreateID(uuid.MustParse("01982f4a-791d-78cd-892b-8e558d509271"))
+	}
+	if ta.PerTransactionCap != nil {
+		create.SetPerTransactionCap(*ta.PerTransactionCap)
+	} else {
+		// Use default from annotation
+		create.SetPerTransactionCap(func() []byte { b, _ := hex.DecodeString("00000000000000000000000000002710"); return b }())
+	}
+	if ta.TotalLimit != nil {
+		create.SetTotalLimit(*ta.TotalLimit)
+	} else {
+		// Use default from annotation
+		create.SetTotalLimit(func() []byte { b, _ := hex.DecodeString("000000000000000000000000000186a0"); return b }())
+	}
+	if ta.RecipientAllowlist != nil {
+		create.SetRecipientAllowlist(*ta.RecipientAllowlist)
+	} else {
+	}
+	if ta.ExpiryTime != nil {
+		create.SetExpiryTime(*ta.ExpiryTime)
+	} else {
+		// Use default from annotation
+		create.SetExpiryTime(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if ta.Network != nil {
+		create.SetNetwork(*ta.Network)
+	} else {
+		// Use default from annotation
+		create.SetNetwork(2)
+	}
+	if ta.OwnerSignature != nil {
+		create.SetOwnerSignature(*ta.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f")
+			return b
+		}())
+	}
+	if ta.StatementHash != nil {
+		create.SetStatementHash(*ta.StatementHash)
+	} else {
+		// Use default from annotation
+		create.SetStatementHash(func() []byte {
+			b, _ := hex.DecodeString("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90")
+			return b
+		}())
+	}
+	if ta.Version != nil {
+		create.SetVersion(*ta.Version)
+	} else {
+		// Use default from annotation
+		create.SetVersion(uint64(1))
+	}
+	if ta.OwnerProvidedTimestamp != nil {
+		create.SetOwnerProvidedTimestamp(*ta.OwnerProvidedTimestamp)
+	} else {
+		// Use default from annotation
+		create.SetOwnerProvidedTimestamp(uint64(1747337980820))
+	}
+	if ta.OwnerProvidedRevokeTimestamp != nil {
+		create.SetOwnerProvidedRevokeTimestamp(*ta.OwnerProvidedRevokeTimestamp)
+	} else {
+	}
+	if ta.RevokeSignature != nil {
+		create.SetRevokeSignature(*ta.RevokeSignature)
+	} else {
+	}
+
+	// Handle edges
+	if ta.TokenCreate != nil {
+		create.SetTokenCreate(ta.TokenCreate)
+	} else {
+		// Auto-create required edge
+		var err error
+		ta.TokenCreate, err = NewTokenCreateExample(ta.t, ta.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create token_create: %w", err)
+		}
+		create.SetTokenCreate(ta.TokenCreate)
+	}
+
+	return create.Save(ctx)
+}
+
 // TokenCreateExample is a test fixture builder for TokenCreate.
 type TokenCreateExample struct {
 	client *ent.Client
@@ -3542,6 +3926,7 @@ type TokenCreateExample struct {
 	L1TokenCreate    *ent.L1TokenCreate
 	TokenOutput      []*ent.TokenOutput
 	TokenFreeze      []*ent.TokenFreeze
+	TokenAllowance   []*ent.TokenAllowance
 }
 
 // NewTokenCreateExample creates a new TokenCreateExample for testing.
@@ -3672,6 +4057,18 @@ func (tc *TokenCreateExample) SetTokenFreeze(v []*ent.TokenFreeze) *TokenCreateE
 	return tc
 }
 
+// AddTokenAllowance adds a TokenAllowance to the token_allowance edge.
+func (tc *TokenCreateExample) AddTokenAllowance(v *ent.TokenAllowance) *TokenCreateExample {
+	tc.TokenAllowance = append(tc.TokenAllowance, v)
+	return tc
+}
+
+// SetTokenAllowance sets the token_allowance edge.
+func (tc *TokenCreateExample) SetTokenAllowance(v []*ent.TokenAllowance) *TokenCreateExample {
+	tc.TokenAllowance = v
+	return tc
+}
+
 // MustExec builds and saves the TokenCreate entity to the database.
 // It panics if the save fails.
 func (tc *TokenCreateExample) MustExec(ctx context.Context) *ent.TokenCreate {
@@ -3769,6 +4166,9 @@ func (tc *TokenCreateExample) MustExec(ctx context.Context) *ent.TokenCreate {
 	}
 	if len(tc.TokenFreeze) > 0 {
 		create.AddTokenFreeze(tc.TokenFreeze...)
+	}
+	if len(tc.TokenAllowance) > 0 {
+		create.AddTokenAllowance(tc.TokenAllowance...)
 	}
 
 	entity, err := create.Save(ctx)
@@ -3877,6 +4277,9 @@ func (tc *TokenCreateExample) Exec(ctx context.Context) (*ent.TokenCreate, error
 	}
 	if len(tc.TokenFreeze) > 0 {
 		create.AddTokenFreeze(tc.TokenFreeze...)
+	}
+	if len(tc.TokenAllowance) > 0 {
+		create.AddTokenAllowance(tc.TokenAllowance...)
 	}
 
 	return create.Save(ctx)

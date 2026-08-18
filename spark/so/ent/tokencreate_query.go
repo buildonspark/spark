@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -33,6 +34,7 @@ type TokenCreateQuery struct {
 	withL1TokenCreate    *L1TokenCreateQuery
 	withTokenOutput      *TokenOutputQuery
 	withTokenFreeze      *TokenFreezeQuery
+	withTokenAllowance   *TokenAllowanceQuery
 	withFKs              bool
 	modifiers            []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -152,6 +154,28 @@ func (tcq *TokenCreateQuery) QueryTokenFreeze() *TokenFreezeQuery {
 			sqlgraph.From(tokencreate.Table, tokencreate.FieldID, selector),
 			sqlgraph.To(tokenfreeze.Table, tokenfreeze.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, tokencreate.TokenFreezeTable, tokencreate.TokenFreezeColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tcq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTokenAllowance chains the current query on the "token_allowance" edge.
+func (tcq *TokenCreateQuery) QueryTokenAllowance() *TokenAllowanceQuery {
+	query := (&TokenAllowanceClient{config: tcq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tcq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tcq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokencreate.Table, tokencreate.FieldID, selector),
+			sqlgraph.To(tokenallowance.Table, tokenallowance.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, tokencreate.TokenAllowanceTable, tokencreate.TokenAllowanceColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tcq.driver.Dialect(), step)
 		return fromU, nil
@@ -355,6 +379,7 @@ func (tcq *TokenCreateQuery) Clone() *TokenCreateQuery {
 		withL1TokenCreate:    tcq.withL1TokenCreate.Clone(),
 		withTokenOutput:      tcq.withTokenOutput.Clone(),
 		withTokenFreeze:      tcq.withTokenFreeze.Clone(),
+		withTokenAllowance:   tcq.withTokenAllowance.Clone(),
 		// clone intermediate query.
 		sql:       tcq.sql.Clone(),
 		path:      tcq.path,
@@ -403,6 +428,17 @@ func (tcq *TokenCreateQuery) WithTokenFreeze(opts ...func(*TokenFreezeQuery)) *T
 		opt(query)
 	}
 	tcq.withTokenFreeze = query
+	return tcq
+}
+
+// WithTokenAllowance tells the query-builder to eager-load the nodes that are connected to
+// the "token_allowance" edge. The optional arguments are used to configure the query builder of the edge.
+func (tcq *TokenCreateQuery) WithTokenAllowance(opts ...func(*TokenAllowanceQuery)) *TokenCreateQuery {
+	query := (&TokenAllowanceClient{config: tcq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tcq.withTokenAllowance = query
 	return tcq
 }
 
@@ -485,11 +521,12 @@ func (tcq *TokenCreateQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		nodes       = []*TokenCreate{}
 		withFKs     = tcq.withFKs
 		_spec       = tcq.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			tcq.withTokenTransaction != nil,
 			tcq.withL1TokenCreate != nil,
 			tcq.withTokenOutput != nil,
 			tcq.withTokenFreeze != nil,
+			tcq.withTokenAllowance != nil,
 		}
 	)
 	if tcq.withL1TokenCreate != nil {
@@ -545,6 +582,13 @@ func (tcq *TokenCreateQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		if err := tcq.loadTokenFreeze(ctx, query, nodes,
 			func(n *TokenCreate) { n.Edges.TokenFreeze = []*TokenFreeze{} },
 			func(n *TokenCreate, e *TokenFreeze) { n.Edges.TokenFreeze = append(n.Edges.TokenFreeze, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tcq.withTokenAllowance; query != nil {
+		if err := tcq.loadTokenAllowance(ctx, query, nodes,
+			func(n *TokenCreate) { n.Edges.TokenAllowance = []*TokenAllowance{} },
+			func(n *TokenCreate, e *TokenAllowance) { n.Edges.TokenAllowance = append(n.Edges.TokenAllowance, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -660,6 +704,36 @@ func (tcq *TokenCreateQuery) loadTokenFreeze(ctx context.Context, query *TokenFr
 	}
 	query.Where(predicate.TokenFreeze(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(tokencreate.TokenFreezeColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.TokenCreateID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "token_create_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (tcq *TokenCreateQuery) loadTokenAllowance(ctx context.Context, query *TokenAllowanceQuery, nodes []*TokenCreate, init func(*TokenCreate), assign func(*TokenCreate, *TokenAllowance)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*TokenCreate)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(tokenallowance.FieldTokenCreateID)
+	}
+	query.Where(predicate.TokenAllowance(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(tokencreate.TokenAllowanceColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

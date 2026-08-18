@@ -44,6 +44,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -99,6 +100,7 @@ const (
 	TypeSigningKeyshare                   = "SigningKeyshare"
 	TypeSigningNonce                      = "SigningNonce"
 	TypeSparkInvoice                      = "SparkInvoice"
+	TypeTokenAllowance                    = "TokenAllowance"
 	TypeTokenCreate                       = "TokenCreate"
 	TypeTokenFreeze                       = "TokenFreeze"
 	TypeTokenMint                         = "TokenMint"
@@ -18056,6 +18058,1598 @@ func (m *SparkInvoiceMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown SparkInvoice edge %s", name)
 }
 
+// TokenAllowanceMutation represents an operation that mutates the TokenAllowance nodes in the graph.
+type TokenAllowanceMutation struct {
+	config
+	op                                 Op
+	typ                                string
+	id                                 *uuid.UUID
+	create_time                        *time.Time
+	update_time                        *time.Time
+	allowance_id                       *uuid.UUID
+	status                             *schematype.TokenAllowanceStatus
+	owner_public_key                   *keys.Public
+	spender_public_key                 *keys.Public
+	token_identifier                   *[]byte
+	per_transaction_cap                *[]byte
+	total_limit                        *[]byte
+	spent_amount                       *[]byte
+	recipient_allowlist                *[][]uint8
+	appendrecipient_allowlist          [][]uint8
+	expiry_time                        *time.Time
+	network                            *btcnetwork.Network
+	owner_signature                    *[]byte
+	statement_hash                     *[]byte
+	version                            *uint64
+	addversion                         *int64
+	owner_provided_timestamp           *uint64
+	addowner_provided_timestamp        *int64
+	owner_provided_revoke_timestamp    *uint64
+	addowner_provided_revoke_timestamp *int64
+	revoke_signature                   *[]byte
+	clearedFields                      map[string]struct{}
+	token_create                       *uuid.UUID
+	clearedtoken_create                bool
+	done                               bool
+	oldValue                           func(context.Context) (*TokenAllowance, error)
+	predicates                         []predicate.TokenAllowance
+}
+
+var _ ent.Mutation = (*TokenAllowanceMutation)(nil)
+
+// tokenallowanceOption allows management of the mutation configuration using functional options.
+type tokenallowanceOption func(*TokenAllowanceMutation)
+
+// newTokenAllowanceMutation creates new mutation for the TokenAllowance entity.
+func newTokenAllowanceMutation(c config, op Op, opts ...tokenallowanceOption) *TokenAllowanceMutation {
+	m := &TokenAllowanceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTokenAllowance,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTokenAllowanceID sets the ID field of the mutation.
+func withTokenAllowanceID(id uuid.UUID) tokenallowanceOption {
+	return func(m *TokenAllowanceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TokenAllowance
+		)
+		m.oldValue = func(ctx context.Context) (*TokenAllowance, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TokenAllowance.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTokenAllowance sets the old TokenAllowance of the mutation.
+func withTokenAllowance(node *TokenAllowance) tokenallowanceOption {
+	return func(m *TokenAllowanceMutation) {
+		m.oldValue = func(context.Context) (*TokenAllowance, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TokenAllowanceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TokenAllowanceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TokenAllowance entities.
+func (m *TokenAllowanceMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TokenAllowanceMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TokenAllowanceMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TokenAllowance.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TokenAllowanceMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TokenAllowanceMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TokenAllowanceMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TokenAllowanceMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TokenAllowanceMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TokenAllowanceMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetAllowanceID sets the "allowance_id" field.
+func (m *TokenAllowanceMutation) SetAllowanceID(u uuid.UUID) {
+	m.allowance_id = &u
+}
+
+// AllowanceID returns the value of the "allowance_id" field in the mutation.
+func (m *TokenAllowanceMutation) AllowanceID() (r uuid.UUID, exists bool) {
+	v := m.allowance_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowanceID returns the old "allowance_id" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldAllowanceID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowanceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowanceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowanceID: %w", err)
+	}
+	return oldValue.AllowanceID, nil
+}
+
+// ResetAllowanceID resets all changes to the "allowance_id" field.
+func (m *TokenAllowanceMutation) ResetAllowanceID() {
+	m.allowance_id = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *TokenAllowanceMutation) SetStatus(sas schematype.TokenAllowanceStatus) {
+	m.status = &sas
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *TokenAllowanceMutation) Status() (r schematype.TokenAllowanceStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldStatus(ctx context.Context) (v schematype.TokenAllowanceStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *TokenAllowanceMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetOwnerPublicKey sets the "owner_public_key" field.
+func (m *TokenAllowanceMutation) SetOwnerPublicKey(k keys.Public) {
+	m.owner_public_key = &k
+}
+
+// OwnerPublicKey returns the value of the "owner_public_key" field in the mutation.
+func (m *TokenAllowanceMutation) OwnerPublicKey() (r keys.Public, exists bool) {
+	v := m.owner_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerPublicKey returns the old "owner_public_key" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldOwnerPublicKey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerPublicKey: %w", err)
+	}
+	return oldValue.OwnerPublicKey, nil
+}
+
+// ResetOwnerPublicKey resets all changes to the "owner_public_key" field.
+func (m *TokenAllowanceMutation) ResetOwnerPublicKey() {
+	m.owner_public_key = nil
+}
+
+// SetSpenderPublicKey sets the "spender_public_key" field.
+func (m *TokenAllowanceMutation) SetSpenderPublicKey(k keys.Public) {
+	m.spender_public_key = &k
+}
+
+// SpenderPublicKey returns the value of the "spender_public_key" field in the mutation.
+func (m *TokenAllowanceMutation) SpenderPublicKey() (r keys.Public, exists bool) {
+	v := m.spender_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSpenderPublicKey returns the old "spender_public_key" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldSpenderPublicKey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSpenderPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSpenderPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSpenderPublicKey: %w", err)
+	}
+	return oldValue.SpenderPublicKey, nil
+}
+
+// ResetSpenderPublicKey resets all changes to the "spender_public_key" field.
+func (m *TokenAllowanceMutation) ResetSpenderPublicKey() {
+	m.spender_public_key = nil
+}
+
+// SetTokenIdentifier sets the "token_identifier" field.
+func (m *TokenAllowanceMutation) SetTokenIdentifier(b []byte) {
+	m.token_identifier = &b
+}
+
+// TokenIdentifier returns the value of the "token_identifier" field in the mutation.
+func (m *TokenAllowanceMutation) TokenIdentifier() (r []byte, exists bool) {
+	v := m.token_identifier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenIdentifier returns the old "token_identifier" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldTokenIdentifier(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenIdentifier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenIdentifier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenIdentifier: %w", err)
+	}
+	return oldValue.TokenIdentifier, nil
+}
+
+// ResetTokenIdentifier resets all changes to the "token_identifier" field.
+func (m *TokenAllowanceMutation) ResetTokenIdentifier() {
+	m.token_identifier = nil
+}
+
+// SetTokenCreateID sets the "token_create_id" field.
+func (m *TokenAllowanceMutation) SetTokenCreateID(u uuid.UUID) {
+	m.token_create = &u
+}
+
+// TokenCreateID returns the value of the "token_create_id" field in the mutation.
+func (m *TokenAllowanceMutation) TokenCreateID() (r uuid.UUID, exists bool) {
+	v := m.token_create
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenCreateID returns the old "token_create_id" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldTokenCreateID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenCreateID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenCreateID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenCreateID: %w", err)
+	}
+	return oldValue.TokenCreateID, nil
+}
+
+// ResetTokenCreateID resets all changes to the "token_create_id" field.
+func (m *TokenAllowanceMutation) ResetTokenCreateID() {
+	m.token_create = nil
+}
+
+// SetPerTransactionCap sets the "per_transaction_cap" field.
+func (m *TokenAllowanceMutation) SetPerTransactionCap(b []byte) {
+	m.per_transaction_cap = &b
+}
+
+// PerTransactionCap returns the value of the "per_transaction_cap" field in the mutation.
+func (m *TokenAllowanceMutation) PerTransactionCap() (r []byte, exists bool) {
+	v := m.per_transaction_cap
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPerTransactionCap returns the old "per_transaction_cap" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldPerTransactionCap(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPerTransactionCap is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPerTransactionCap requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPerTransactionCap: %w", err)
+	}
+	return oldValue.PerTransactionCap, nil
+}
+
+// ResetPerTransactionCap resets all changes to the "per_transaction_cap" field.
+func (m *TokenAllowanceMutation) ResetPerTransactionCap() {
+	m.per_transaction_cap = nil
+}
+
+// SetTotalLimit sets the "total_limit" field.
+func (m *TokenAllowanceMutation) SetTotalLimit(b []byte) {
+	m.total_limit = &b
+}
+
+// TotalLimit returns the value of the "total_limit" field in the mutation.
+func (m *TokenAllowanceMutation) TotalLimit() (r []byte, exists bool) {
+	v := m.total_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTotalLimit returns the old "total_limit" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldTotalLimit(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTotalLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTotalLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTotalLimit: %w", err)
+	}
+	return oldValue.TotalLimit, nil
+}
+
+// ResetTotalLimit resets all changes to the "total_limit" field.
+func (m *TokenAllowanceMutation) ResetTotalLimit() {
+	m.total_limit = nil
+}
+
+// SetSpentAmount sets the "spent_amount" field.
+func (m *TokenAllowanceMutation) SetSpentAmount(b []byte) {
+	m.spent_amount = &b
+}
+
+// SpentAmount returns the value of the "spent_amount" field in the mutation.
+func (m *TokenAllowanceMutation) SpentAmount() (r []byte, exists bool) {
+	v := m.spent_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSpentAmount returns the old "spent_amount" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldSpentAmount(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSpentAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSpentAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSpentAmount: %w", err)
+	}
+	return oldValue.SpentAmount, nil
+}
+
+// ResetSpentAmount resets all changes to the "spent_amount" field.
+func (m *TokenAllowanceMutation) ResetSpentAmount() {
+	m.spent_amount = nil
+}
+
+// SetRecipientAllowlist sets the "recipient_allowlist" field.
+func (m *TokenAllowanceMutation) SetRecipientAllowlist(u [][]uint8) {
+	m.recipient_allowlist = &u
+	m.appendrecipient_allowlist = nil
+}
+
+// RecipientAllowlist returns the value of the "recipient_allowlist" field in the mutation.
+func (m *TokenAllowanceMutation) RecipientAllowlist() (r [][]uint8, exists bool) {
+	v := m.recipient_allowlist
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipientAllowlist returns the old "recipient_allowlist" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldRecipientAllowlist(ctx context.Context) (v [][]uint8, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipientAllowlist is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipientAllowlist requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipientAllowlist: %w", err)
+	}
+	return oldValue.RecipientAllowlist, nil
+}
+
+// AppendRecipientAllowlist adds u to the "recipient_allowlist" field.
+func (m *TokenAllowanceMutation) AppendRecipientAllowlist(u [][]uint8) {
+	m.appendrecipient_allowlist = append(m.appendrecipient_allowlist, u...)
+}
+
+// AppendedRecipientAllowlist returns the list of values that were appended to the "recipient_allowlist" field in this mutation.
+func (m *TokenAllowanceMutation) AppendedRecipientAllowlist() ([][]uint8, bool) {
+	if len(m.appendrecipient_allowlist) == 0 {
+		return nil, false
+	}
+	return m.appendrecipient_allowlist, true
+}
+
+// ClearRecipientAllowlist clears the value of the "recipient_allowlist" field.
+func (m *TokenAllowanceMutation) ClearRecipientAllowlist() {
+	m.recipient_allowlist = nil
+	m.appendrecipient_allowlist = nil
+	m.clearedFields[tokenallowance.FieldRecipientAllowlist] = struct{}{}
+}
+
+// RecipientAllowlistCleared returns if the "recipient_allowlist" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) RecipientAllowlistCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldRecipientAllowlist]
+	return ok
+}
+
+// ResetRecipientAllowlist resets all changes to the "recipient_allowlist" field.
+func (m *TokenAllowanceMutation) ResetRecipientAllowlist() {
+	m.recipient_allowlist = nil
+	m.appendrecipient_allowlist = nil
+	delete(m.clearedFields, tokenallowance.FieldRecipientAllowlist)
+}
+
+// SetExpiryTime sets the "expiry_time" field.
+func (m *TokenAllowanceMutation) SetExpiryTime(t time.Time) {
+	m.expiry_time = &t
+}
+
+// ExpiryTime returns the value of the "expiry_time" field in the mutation.
+func (m *TokenAllowanceMutation) ExpiryTime() (r time.Time, exists bool) {
+	v := m.expiry_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiryTime returns the old "expiry_time" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldExpiryTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiryTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiryTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiryTime: %w", err)
+	}
+	return oldValue.ExpiryTime, nil
+}
+
+// ResetExpiryTime resets all changes to the "expiry_time" field.
+func (m *TokenAllowanceMutation) ResetExpiryTime() {
+	m.expiry_time = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *TokenAllowanceMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *TokenAllowanceMutation) Network() (r btcnetwork.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *TokenAllowanceMutation) ResetNetwork() {
+	m.network = nil
+}
+
+// SetOwnerSignature sets the "owner_signature" field.
+func (m *TokenAllowanceMutation) SetOwnerSignature(b []byte) {
+	m.owner_signature = &b
+}
+
+// OwnerSignature returns the value of the "owner_signature" field in the mutation.
+func (m *TokenAllowanceMutation) OwnerSignature() (r []byte, exists bool) {
+	v := m.owner_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerSignature returns the old "owner_signature" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldOwnerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerSignature: %w", err)
+	}
+	return oldValue.OwnerSignature, nil
+}
+
+// ResetOwnerSignature resets all changes to the "owner_signature" field.
+func (m *TokenAllowanceMutation) ResetOwnerSignature() {
+	m.owner_signature = nil
+}
+
+// SetStatementHash sets the "statement_hash" field.
+func (m *TokenAllowanceMutation) SetStatementHash(b []byte) {
+	m.statement_hash = &b
+}
+
+// StatementHash returns the value of the "statement_hash" field in the mutation.
+func (m *TokenAllowanceMutation) StatementHash() (r []byte, exists bool) {
+	v := m.statement_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatementHash returns the old "statement_hash" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldStatementHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatementHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatementHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatementHash: %w", err)
+	}
+	return oldValue.StatementHash, nil
+}
+
+// ResetStatementHash resets all changes to the "statement_hash" field.
+func (m *TokenAllowanceMutation) ResetStatementHash() {
+	m.statement_hash = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *TokenAllowanceMutation) SetVersion(u uint64) {
+	m.version = &u
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *TokenAllowanceMutation) Version() (r uint64, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldVersion(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds u to the "version" field.
+func (m *TokenAllowanceMutation) AddVersion(u int64) {
+	if m.addversion != nil {
+		*m.addversion += u
+	} else {
+		m.addversion = &u
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *TokenAllowanceMutation) AddedVersion() (r int64, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *TokenAllowanceMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetOwnerProvidedTimestamp sets the "owner_provided_timestamp" field.
+func (m *TokenAllowanceMutation) SetOwnerProvidedTimestamp(u uint64) {
+	m.owner_provided_timestamp = &u
+	m.addowner_provided_timestamp = nil
+}
+
+// OwnerProvidedTimestamp returns the value of the "owner_provided_timestamp" field in the mutation.
+func (m *TokenAllowanceMutation) OwnerProvidedTimestamp() (r uint64, exists bool) {
+	v := m.owner_provided_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerProvidedTimestamp returns the old "owner_provided_timestamp" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldOwnerProvidedTimestamp(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerProvidedTimestamp is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerProvidedTimestamp requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerProvidedTimestamp: %w", err)
+	}
+	return oldValue.OwnerProvidedTimestamp, nil
+}
+
+// AddOwnerProvidedTimestamp adds u to the "owner_provided_timestamp" field.
+func (m *TokenAllowanceMutation) AddOwnerProvidedTimestamp(u int64) {
+	if m.addowner_provided_timestamp != nil {
+		*m.addowner_provided_timestamp += u
+	} else {
+		m.addowner_provided_timestamp = &u
+	}
+}
+
+// AddedOwnerProvidedTimestamp returns the value that was added to the "owner_provided_timestamp" field in this mutation.
+func (m *TokenAllowanceMutation) AddedOwnerProvidedTimestamp() (r int64, exists bool) {
+	v := m.addowner_provided_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOwnerProvidedTimestamp resets all changes to the "owner_provided_timestamp" field.
+func (m *TokenAllowanceMutation) ResetOwnerProvidedTimestamp() {
+	m.owner_provided_timestamp = nil
+	m.addowner_provided_timestamp = nil
+}
+
+// SetOwnerProvidedRevokeTimestamp sets the "owner_provided_revoke_timestamp" field.
+func (m *TokenAllowanceMutation) SetOwnerProvidedRevokeTimestamp(u uint64) {
+	m.owner_provided_revoke_timestamp = &u
+	m.addowner_provided_revoke_timestamp = nil
+}
+
+// OwnerProvidedRevokeTimestamp returns the value of the "owner_provided_revoke_timestamp" field in the mutation.
+func (m *TokenAllowanceMutation) OwnerProvidedRevokeTimestamp() (r uint64, exists bool) {
+	v := m.owner_provided_revoke_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerProvidedRevokeTimestamp returns the old "owner_provided_revoke_timestamp" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldOwnerProvidedRevokeTimestamp(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerProvidedRevokeTimestamp is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerProvidedRevokeTimestamp requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerProvidedRevokeTimestamp: %w", err)
+	}
+	return oldValue.OwnerProvidedRevokeTimestamp, nil
+}
+
+// AddOwnerProvidedRevokeTimestamp adds u to the "owner_provided_revoke_timestamp" field.
+func (m *TokenAllowanceMutation) AddOwnerProvidedRevokeTimestamp(u int64) {
+	if m.addowner_provided_revoke_timestamp != nil {
+		*m.addowner_provided_revoke_timestamp += u
+	} else {
+		m.addowner_provided_revoke_timestamp = &u
+	}
+}
+
+// AddedOwnerProvidedRevokeTimestamp returns the value that was added to the "owner_provided_revoke_timestamp" field in this mutation.
+func (m *TokenAllowanceMutation) AddedOwnerProvidedRevokeTimestamp() (r int64, exists bool) {
+	v := m.addowner_provided_revoke_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearOwnerProvidedRevokeTimestamp clears the value of the "owner_provided_revoke_timestamp" field.
+func (m *TokenAllowanceMutation) ClearOwnerProvidedRevokeTimestamp() {
+	m.owner_provided_revoke_timestamp = nil
+	m.addowner_provided_revoke_timestamp = nil
+	m.clearedFields[tokenallowance.FieldOwnerProvidedRevokeTimestamp] = struct{}{}
+}
+
+// OwnerProvidedRevokeTimestampCleared returns if the "owner_provided_revoke_timestamp" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) OwnerProvidedRevokeTimestampCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldOwnerProvidedRevokeTimestamp]
+	return ok
+}
+
+// ResetOwnerProvidedRevokeTimestamp resets all changes to the "owner_provided_revoke_timestamp" field.
+func (m *TokenAllowanceMutation) ResetOwnerProvidedRevokeTimestamp() {
+	m.owner_provided_revoke_timestamp = nil
+	m.addowner_provided_revoke_timestamp = nil
+	delete(m.clearedFields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
+}
+
+// SetRevokeSignature sets the "revoke_signature" field.
+func (m *TokenAllowanceMutation) SetRevokeSignature(b []byte) {
+	m.revoke_signature = &b
+}
+
+// RevokeSignature returns the value of the "revoke_signature" field in the mutation.
+func (m *TokenAllowanceMutation) RevokeSignature() (r []byte, exists bool) {
+	v := m.revoke_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevokeSignature returns the old "revoke_signature" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldRevokeSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevokeSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevokeSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevokeSignature: %w", err)
+	}
+	return oldValue.RevokeSignature, nil
+}
+
+// ClearRevokeSignature clears the value of the "revoke_signature" field.
+func (m *TokenAllowanceMutation) ClearRevokeSignature() {
+	m.revoke_signature = nil
+	m.clearedFields[tokenallowance.FieldRevokeSignature] = struct{}{}
+}
+
+// RevokeSignatureCleared returns if the "revoke_signature" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) RevokeSignatureCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldRevokeSignature]
+	return ok
+}
+
+// ResetRevokeSignature resets all changes to the "revoke_signature" field.
+func (m *TokenAllowanceMutation) ResetRevokeSignature() {
+	m.revoke_signature = nil
+	delete(m.clearedFields, tokenallowance.FieldRevokeSignature)
+}
+
+// ClearTokenCreate clears the "token_create" edge to the TokenCreate entity.
+func (m *TokenAllowanceMutation) ClearTokenCreate() {
+	m.clearedtoken_create = true
+	m.clearedFields[tokenallowance.FieldTokenCreateID] = struct{}{}
+}
+
+// TokenCreateCleared reports if the "token_create" edge to the TokenCreate entity was cleared.
+func (m *TokenAllowanceMutation) TokenCreateCleared() bool {
+	return m.clearedtoken_create
+}
+
+// TokenCreateIDs returns the "token_create" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TokenCreateID instead. It exists only for internal usage by the builders.
+func (m *TokenAllowanceMutation) TokenCreateIDs() (ids []uuid.UUID) {
+	if id := m.token_create; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTokenCreate resets all changes to the "token_create" edge.
+func (m *TokenAllowanceMutation) ResetTokenCreate() {
+	m.token_create = nil
+	m.clearedtoken_create = false
+}
+
+// Where appends a list predicates to the TokenAllowanceMutation builder.
+func (m *TokenAllowanceMutation) Where(ps ...predicate.TokenAllowance) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TokenAllowanceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TokenAllowanceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TokenAllowance, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TokenAllowanceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TokenAllowanceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TokenAllowance).
+func (m *TokenAllowanceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TokenAllowanceMutation) Fields() []string {
+	fields := make([]string, 0, 20)
+	if m.create_time != nil {
+		fields = append(fields, tokenallowance.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, tokenallowance.FieldUpdateTime)
+	}
+	if m.allowance_id != nil {
+		fields = append(fields, tokenallowance.FieldAllowanceID)
+	}
+	if m.status != nil {
+		fields = append(fields, tokenallowance.FieldStatus)
+	}
+	if m.owner_public_key != nil {
+		fields = append(fields, tokenallowance.FieldOwnerPublicKey)
+	}
+	if m.spender_public_key != nil {
+		fields = append(fields, tokenallowance.FieldSpenderPublicKey)
+	}
+	if m.token_identifier != nil {
+		fields = append(fields, tokenallowance.FieldTokenIdentifier)
+	}
+	if m.token_create != nil {
+		fields = append(fields, tokenallowance.FieldTokenCreateID)
+	}
+	if m.per_transaction_cap != nil {
+		fields = append(fields, tokenallowance.FieldPerTransactionCap)
+	}
+	if m.total_limit != nil {
+		fields = append(fields, tokenallowance.FieldTotalLimit)
+	}
+	if m.spent_amount != nil {
+		fields = append(fields, tokenallowance.FieldSpentAmount)
+	}
+	if m.recipient_allowlist != nil {
+		fields = append(fields, tokenallowance.FieldRecipientAllowlist)
+	}
+	if m.expiry_time != nil {
+		fields = append(fields, tokenallowance.FieldExpiryTime)
+	}
+	if m.network != nil {
+		fields = append(fields, tokenallowance.FieldNetwork)
+	}
+	if m.owner_signature != nil {
+		fields = append(fields, tokenallowance.FieldOwnerSignature)
+	}
+	if m.statement_hash != nil {
+		fields = append(fields, tokenallowance.FieldStatementHash)
+	}
+	if m.version != nil {
+		fields = append(fields, tokenallowance.FieldVersion)
+	}
+	if m.owner_provided_timestamp != nil {
+		fields = append(fields, tokenallowance.FieldOwnerProvidedTimestamp)
+	}
+	if m.owner_provided_revoke_timestamp != nil {
+		fields = append(fields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
+	}
+	if m.revoke_signature != nil {
+		fields = append(fields, tokenallowance.FieldRevokeSignature)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TokenAllowanceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tokenallowance.FieldCreateTime:
+		return m.CreateTime()
+	case tokenallowance.FieldUpdateTime:
+		return m.UpdateTime()
+	case tokenallowance.FieldAllowanceID:
+		return m.AllowanceID()
+	case tokenallowance.FieldStatus:
+		return m.Status()
+	case tokenallowance.FieldOwnerPublicKey:
+		return m.OwnerPublicKey()
+	case tokenallowance.FieldSpenderPublicKey:
+		return m.SpenderPublicKey()
+	case tokenallowance.FieldTokenIdentifier:
+		return m.TokenIdentifier()
+	case tokenallowance.FieldTokenCreateID:
+		return m.TokenCreateID()
+	case tokenallowance.FieldPerTransactionCap:
+		return m.PerTransactionCap()
+	case tokenallowance.FieldTotalLimit:
+		return m.TotalLimit()
+	case tokenallowance.FieldSpentAmount:
+		return m.SpentAmount()
+	case tokenallowance.FieldRecipientAllowlist:
+		return m.RecipientAllowlist()
+	case tokenallowance.FieldExpiryTime:
+		return m.ExpiryTime()
+	case tokenallowance.FieldNetwork:
+		return m.Network()
+	case tokenallowance.FieldOwnerSignature:
+		return m.OwnerSignature()
+	case tokenallowance.FieldStatementHash:
+		return m.StatementHash()
+	case tokenallowance.FieldVersion:
+		return m.Version()
+	case tokenallowance.FieldOwnerProvidedTimestamp:
+		return m.OwnerProvidedTimestamp()
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		return m.OwnerProvidedRevokeTimestamp()
+	case tokenallowance.FieldRevokeSignature:
+		return m.RevokeSignature()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TokenAllowanceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tokenallowance.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case tokenallowance.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case tokenallowance.FieldAllowanceID:
+		return m.OldAllowanceID(ctx)
+	case tokenallowance.FieldStatus:
+		return m.OldStatus(ctx)
+	case tokenallowance.FieldOwnerPublicKey:
+		return m.OldOwnerPublicKey(ctx)
+	case tokenallowance.FieldSpenderPublicKey:
+		return m.OldSpenderPublicKey(ctx)
+	case tokenallowance.FieldTokenIdentifier:
+		return m.OldTokenIdentifier(ctx)
+	case tokenallowance.FieldTokenCreateID:
+		return m.OldTokenCreateID(ctx)
+	case tokenallowance.FieldPerTransactionCap:
+		return m.OldPerTransactionCap(ctx)
+	case tokenallowance.FieldTotalLimit:
+		return m.OldTotalLimit(ctx)
+	case tokenallowance.FieldSpentAmount:
+		return m.OldSpentAmount(ctx)
+	case tokenallowance.FieldRecipientAllowlist:
+		return m.OldRecipientAllowlist(ctx)
+	case tokenallowance.FieldExpiryTime:
+		return m.OldExpiryTime(ctx)
+	case tokenallowance.FieldNetwork:
+		return m.OldNetwork(ctx)
+	case tokenallowance.FieldOwnerSignature:
+		return m.OldOwnerSignature(ctx)
+	case tokenallowance.FieldStatementHash:
+		return m.OldStatementHash(ctx)
+	case tokenallowance.FieldVersion:
+		return m.OldVersion(ctx)
+	case tokenallowance.FieldOwnerProvidedTimestamp:
+		return m.OldOwnerProvidedTimestamp(ctx)
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		return m.OldOwnerProvidedRevokeTimestamp(ctx)
+	case tokenallowance.FieldRevokeSignature:
+		return m.OldRevokeSignature(ctx)
+	}
+	return nil, fmt.Errorf("unknown TokenAllowance field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenAllowanceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tokenallowance.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case tokenallowance.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case tokenallowance.FieldAllowanceID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowanceID(v)
+		return nil
+	case tokenallowance.FieldStatus:
+		v, ok := value.(schematype.TokenAllowanceStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case tokenallowance.FieldOwnerPublicKey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerPublicKey(v)
+		return nil
+	case tokenallowance.FieldSpenderPublicKey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSpenderPublicKey(v)
+		return nil
+	case tokenallowance.FieldTokenIdentifier:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenIdentifier(v)
+		return nil
+	case tokenallowance.FieldTokenCreateID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenCreateID(v)
+		return nil
+	case tokenallowance.FieldPerTransactionCap:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPerTransactionCap(v)
+		return nil
+	case tokenallowance.FieldTotalLimit:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTotalLimit(v)
+		return nil
+	case tokenallowance.FieldSpentAmount:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSpentAmount(v)
+		return nil
+	case tokenallowance.FieldRecipientAllowlist:
+		v, ok := value.([][]uint8)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipientAllowlist(v)
+		return nil
+	case tokenallowance.FieldExpiryTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiryTime(v)
+		return nil
+	case tokenallowance.FieldNetwork:
+		v, ok := value.(btcnetwork.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
+		return nil
+	case tokenallowance.FieldOwnerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerSignature(v)
+		return nil
+	case tokenallowance.FieldStatementHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatementHash(v)
+		return nil
+	case tokenallowance.FieldVersion:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case tokenallowance.FieldOwnerProvidedTimestamp:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerProvidedTimestamp(v)
+		return nil
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerProvidedRevokeTimestamp(v)
+		return nil
+	case tokenallowance.FieldRevokeSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevokeSignature(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenAllowance field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TokenAllowanceMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, tokenallowance.FieldVersion)
+	}
+	if m.addowner_provided_timestamp != nil {
+		fields = append(fields, tokenallowance.FieldOwnerProvidedTimestamp)
+	}
+	if m.addowner_provided_revoke_timestamp != nil {
+		fields = append(fields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TokenAllowanceMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tokenallowance.FieldVersion:
+		return m.AddedVersion()
+	case tokenallowance.FieldOwnerProvidedTimestamp:
+		return m.AddedOwnerProvidedTimestamp()
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		return m.AddedOwnerProvidedRevokeTimestamp()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenAllowanceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case tokenallowance.FieldVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	case tokenallowance.FieldOwnerProvidedTimestamp:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOwnerProvidedTimestamp(v)
+		return nil
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOwnerProvidedRevokeTimestamp(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenAllowance numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TokenAllowanceMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(tokenallowance.FieldRecipientAllowlist) {
+		fields = append(fields, tokenallowance.FieldRecipientAllowlist)
+	}
+	if m.FieldCleared(tokenallowance.FieldOwnerProvidedRevokeTimestamp) {
+		fields = append(fields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
+	}
+	if m.FieldCleared(tokenallowance.FieldRevokeSignature) {
+		fields = append(fields, tokenallowance.FieldRevokeSignature)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TokenAllowanceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TokenAllowanceMutation) ClearField(name string) error {
+	switch name {
+	case tokenallowance.FieldRecipientAllowlist:
+		m.ClearRecipientAllowlist()
+		return nil
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		m.ClearOwnerProvidedRevokeTimestamp()
+		return nil
+	case tokenallowance.FieldRevokeSignature:
+		m.ClearRevokeSignature()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenAllowance nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TokenAllowanceMutation) ResetField(name string) error {
+	switch name {
+	case tokenallowance.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case tokenallowance.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case tokenallowance.FieldAllowanceID:
+		m.ResetAllowanceID()
+		return nil
+	case tokenallowance.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case tokenallowance.FieldOwnerPublicKey:
+		m.ResetOwnerPublicKey()
+		return nil
+	case tokenallowance.FieldSpenderPublicKey:
+		m.ResetSpenderPublicKey()
+		return nil
+	case tokenallowance.FieldTokenIdentifier:
+		m.ResetTokenIdentifier()
+		return nil
+	case tokenallowance.FieldTokenCreateID:
+		m.ResetTokenCreateID()
+		return nil
+	case tokenallowance.FieldPerTransactionCap:
+		m.ResetPerTransactionCap()
+		return nil
+	case tokenallowance.FieldTotalLimit:
+		m.ResetTotalLimit()
+		return nil
+	case tokenallowance.FieldSpentAmount:
+		m.ResetSpentAmount()
+		return nil
+	case tokenallowance.FieldRecipientAllowlist:
+		m.ResetRecipientAllowlist()
+		return nil
+	case tokenallowance.FieldExpiryTime:
+		m.ResetExpiryTime()
+		return nil
+	case tokenallowance.FieldNetwork:
+		m.ResetNetwork()
+		return nil
+	case tokenallowance.FieldOwnerSignature:
+		m.ResetOwnerSignature()
+		return nil
+	case tokenallowance.FieldStatementHash:
+		m.ResetStatementHash()
+		return nil
+	case tokenallowance.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case tokenallowance.FieldOwnerProvidedTimestamp:
+		m.ResetOwnerProvidedTimestamp()
+		return nil
+	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		m.ResetOwnerProvidedRevokeTimestamp()
+		return nil
+	case tokenallowance.FieldRevokeSignature:
+		m.ResetRevokeSignature()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenAllowance field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TokenAllowanceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.token_create != nil {
+		edges = append(edges, tokenallowance.EdgeTokenCreate)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TokenAllowanceMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tokenallowance.EdgeTokenCreate:
+		if id := m.token_create; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TokenAllowanceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TokenAllowanceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TokenAllowanceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedtoken_create {
+		edges = append(edges, tokenallowance.EdgeTokenCreate)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TokenAllowanceMutation) EdgeCleared(name string) bool {
+	switch name {
+	case tokenallowance.EdgeTokenCreate:
+		return m.clearedtoken_create
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TokenAllowanceMutation) ClearEdge(name string) error {
+	switch name {
+	case tokenallowance.EdgeTokenCreate:
+		m.ClearTokenCreate()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenAllowance unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TokenAllowanceMutation) ResetEdge(name string) error {
+	switch name {
+	case tokenallowance.EdgeTokenCreate:
+		m.ResetTokenCreate()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenAllowance edge %s", name)
+}
+
 // TokenCreateMutation represents an operation that mutates the TokenCreate nodes in the graph.
 type TokenCreateMutation struct {
 	config
@@ -18091,6 +19685,9 @@ type TokenCreateMutation struct {
 	token_freeze                       map[uuid.UUID]struct{}
 	removedtoken_freeze                map[uuid.UUID]struct{}
 	clearedtoken_freeze                bool
+	token_allowance                    map[uuid.UUID]struct{}
+	removedtoken_allowance             map[uuid.UUID]struct{}
+	clearedtoken_allowance             bool
 	done                               bool
 	oldValue                           func(context.Context) (*TokenCreate, error)
 	predicates                         []predicate.TokenCreate
@@ -19034,6 +20631,60 @@ func (m *TokenCreateMutation) ResetTokenFreeze() {
 	m.removedtoken_freeze = nil
 }
 
+// AddTokenAllowanceIDs adds the "token_allowance" edge to the TokenAllowance entity by ids.
+func (m *TokenCreateMutation) AddTokenAllowanceIDs(ids ...uuid.UUID) {
+	if m.token_allowance == nil {
+		m.token_allowance = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.token_allowance[ids[i]] = struct{}{}
+	}
+}
+
+// ClearTokenAllowance clears the "token_allowance" edge to the TokenAllowance entity.
+func (m *TokenCreateMutation) ClearTokenAllowance() {
+	m.clearedtoken_allowance = true
+}
+
+// TokenAllowanceCleared reports if the "token_allowance" edge to the TokenAllowance entity was cleared.
+func (m *TokenCreateMutation) TokenAllowanceCleared() bool {
+	return m.clearedtoken_allowance
+}
+
+// RemoveTokenAllowanceIDs removes the "token_allowance" edge to the TokenAllowance entity by IDs.
+func (m *TokenCreateMutation) RemoveTokenAllowanceIDs(ids ...uuid.UUID) {
+	if m.removedtoken_allowance == nil {
+		m.removedtoken_allowance = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.token_allowance, ids[i])
+		m.removedtoken_allowance[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedTokenAllowance returns the removed IDs of the "token_allowance" edge to the TokenAllowance entity.
+func (m *TokenCreateMutation) RemovedTokenAllowanceIDs() (ids []uuid.UUID) {
+	for id := range m.removedtoken_allowance {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// TokenAllowanceIDs returns the "token_allowance" edge IDs in the mutation.
+func (m *TokenCreateMutation) TokenAllowanceIDs() (ids []uuid.UUID) {
+	for id := range m.token_allowance {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetTokenAllowance resets all changes to the "token_allowance" edge.
+func (m *TokenCreateMutation) ResetTokenAllowance() {
+	m.token_allowance = nil
+	m.clearedtoken_allowance = false
+	m.removedtoken_allowance = nil
+}
+
 // Where appends a list predicates to the TokenCreateMutation builder.
 func (m *TokenCreateMutation) Where(ps ...predicate.TokenCreate) {
 	m.predicates = append(m.predicates, ps...)
@@ -19459,7 +21110,7 @@ func (m *TokenCreateMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenCreateMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.token_transaction != nil {
 		edges = append(edges, tokencreate.EdgeTokenTransaction)
 	}
@@ -19471,6 +21122,9 @@ func (m *TokenCreateMutation) AddedEdges() []string {
 	}
 	if m.token_freeze != nil {
 		edges = append(edges, tokencreate.EdgeTokenFreeze)
+	}
+	if m.token_allowance != nil {
+		edges = append(edges, tokencreate.EdgeTokenAllowance)
 	}
 	return edges
 }
@@ -19501,13 +21155,19 @@ func (m *TokenCreateMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case tokencreate.EdgeTokenAllowance:
+		ids := make([]ent.Value, 0, len(m.token_allowance))
+		for id := range m.token_allowance {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenCreateMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedtoken_transaction != nil {
 		edges = append(edges, tokencreate.EdgeTokenTransaction)
 	}
@@ -19516,6 +21176,9 @@ func (m *TokenCreateMutation) RemovedEdges() []string {
 	}
 	if m.removedtoken_freeze != nil {
 		edges = append(edges, tokencreate.EdgeTokenFreeze)
+	}
+	if m.removedtoken_allowance != nil {
+		edges = append(edges, tokencreate.EdgeTokenAllowance)
 	}
 	return edges
 }
@@ -19542,13 +21205,19 @@ func (m *TokenCreateMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case tokencreate.EdgeTokenAllowance:
+		ids := make([]ent.Value, 0, len(m.removedtoken_allowance))
+		for id := range m.removedtoken_allowance {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenCreateMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedtoken_transaction {
 		edges = append(edges, tokencreate.EdgeTokenTransaction)
 	}
@@ -19560,6 +21229,9 @@ func (m *TokenCreateMutation) ClearedEdges() []string {
 	}
 	if m.clearedtoken_freeze {
 		edges = append(edges, tokencreate.EdgeTokenFreeze)
+	}
+	if m.clearedtoken_allowance {
+		edges = append(edges, tokencreate.EdgeTokenAllowance)
 	}
 	return edges
 }
@@ -19576,6 +21248,8 @@ func (m *TokenCreateMutation) EdgeCleared(name string) bool {
 		return m.clearedtoken_output
 	case tokencreate.EdgeTokenFreeze:
 		return m.clearedtoken_freeze
+	case tokencreate.EdgeTokenAllowance:
+		return m.clearedtoken_allowance
 	}
 	return false
 }
@@ -19606,6 +21280,9 @@ func (m *TokenCreateMutation) ResetEdge(name string) error {
 		return nil
 	case tokencreate.EdgeTokenFreeze:
 		m.ResetTokenFreeze()
+		return nil
+	case tokencreate.EdgeTokenAllowance:
+		m.ResetTokenAllowance()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenCreate edge %s", name)

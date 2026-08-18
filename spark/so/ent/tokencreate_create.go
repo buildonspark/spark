@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -220,6 +221,21 @@ func (tcc *TokenCreateCreate) AddTokenFreeze(t ...*TokenFreeze) *TokenCreateCrea
 		ids[i] = t[i].ID
 	}
 	return tcc.AddTokenFreezeIDs(ids...)
+}
+
+// AddTokenAllowanceIDs adds the "token_allowance" edge to the TokenAllowance entity by IDs.
+func (tcc *TokenCreateCreate) AddTokenAllowanceIDs(ids ...uuid.UUID) *TokenCreateCreate {
+	tcc.mutation.AddTokenAllowanceIDs(ids...)
+	return tcc
+}
+
+// AddTokenAllowance adds the "token_allowance" edges to the TokenAllowance entity.
+func (tcc *TokenCreateCreate) AddTokenAllowance(t ...*TokenAllowance) *TokenCreateCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tcc.AddTokenAllowanceIDs(ids...)
 }
 
 // Mutation returns the TokenCreateMutation object of the builder.
@@ -490,6 +506,22 @@ func (tcc *TokenCreateCreate) createSpec() (*TokenCreate, *sqlgraph.CreateSpec) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokenfreeze.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tcc.mutation.TokenAllowanceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

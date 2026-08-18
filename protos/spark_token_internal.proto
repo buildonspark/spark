@@ -33,6 +33,10 @@ service SparkTokenInternalService {
     // Internal freeze tokens (SO-to-SO coordination)
     rpc internal_freeze_tokens(InternalFreezeTokensRequest)
         returns (InternalFreezeTokensResponse) {}
+
+    // Internal create token allowance (SO-to-SO coordination)
+    rpc internal_create_token_allowance(InternalCreateTokenAllowanceRequest)
+        returns (InternalCreateTokenAllowanceResponse) {}
 }
 
 message PrepareTransactionRequest {
@@ -156,3 +160,11 @@ message InternalFreezeTokensResponse {
     repeated spark_token.TokenOutputRef impacted_token_outputs = 1;
     bytes impacted_token_amount = 2;  // Decoded uint128
 }
+
+// Internal create token allowance request (SO-to-SO)
+message InternalCreateTokenAllowanceRequest {
+    spark_token.TokenAllowancePayload allowance_payload = 1;
+    bytes owner_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message InternalCreateTokenAllowanceResponse {}

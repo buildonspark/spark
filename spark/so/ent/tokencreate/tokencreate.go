@@ -55,6 +55,8 @@ const (
 	EdgeTokenOutput = "token_output"
 	// EdgeTokenFreeze holds the string denoting the token_freeze edge name in mutations.
 	EdgeTokenFreeze = "token_freeze"
+	// EdgeTokenAllowance holds the string denoting the token_allowance edge name in mutations.
+	EdgeTokenAllowance = "token_allowance"
 	// Table holds the table name of the tokencreate in the database.
 	Table = "token_creates"
 	// TokenTransactionTable is the table that holds the token_transaction relation/edge.
@@ -85,6 +87,13 @@ const (
 	TokenFreezeInverseTable = "token_freezes"
 	// TokenFreezeColumn is the table column denoting the token_freeze relation/edge.
 	TokenFreezeColumn = "token_create_id"
+	// TokenAllowanceTable is the table that holds the token_allowance relation/edge.
+	TokenAllowanceTable = "token_allowances"
+	// TokenAllowanceInverseTable is the table name for the TokenAllowance entity.
+	// It exists in this package in order to avoid circular dependency with the "tokenallowance" package.
+	TokenAllowanceInverseTable = "token_allowances"
+	// TokenAllowanceColumn is the table column denoting the token_allowance relation/edge.
+	TokenAllowanceColumn = "token_create_id"
 )
 
 // Columns holds all SQL columns for tokencreate fields.
@@ -259,6 +268,20 @@ func ByTokenFreeze(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTokenFreezeStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByTokenAllowanceCount orders the results by token_allowance count.
+func ByTokenAllowanceCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTokenAllowanceStep(), opts...)
+	}
+}
+
+// ByTokenAllowance orders the results by token_allowance terms.
+func ByTokenAllowance(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTokenAllowanceStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTokenTransactionStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -285,5 +308,12 @@ func newTokenFreezeStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TokenFreezeInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, TokenFreezeTable, TokenFreezeColumn),
+	)
+}
+func newTokenAllowanceStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TokenAllowanceInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, TokenAllowanceTable, TokenAllowanceColumn),
 	)
 }

@@ -64,6 +64,8 @@ type Tx struct {
 	SigningNonce *SigningNonceClient
 	// SparkInvoice is the client for interacting with the SparkInvoice builders.
 	SparkInvoice *SparkInvoiceClient
+	// TokenAllowance is the client for interacting with the TokenAllowance builders.
+	TokenAllowance *TokenAllowanceClient
 	// TokenCreate is the client for interacting with the TokenCreate builders.
 	TokenCreate *TokenCreateClient
 	// TokenFreeze is the client for interacting with the TokenFreeze builders.
@@ -256,6 +258,7 @@ func (tx *Tx) init() {
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)
 	tx.SigningNonce = NewSigningNonceClient(tx.config)
 	tx.SparkInvoice = NewSparkInvoiceClient(tx.config)
+	tx.TokenAllowance = NewTokenAllowanceClient(tx.config)
 	tx.TokenCreate = NewTokenCreateClient(tx.config)
 	tx.TokenFreeze = NewTokenFreezeClient(tx.config)
 	tx.TokenMint = NewTokenMintClient(tx.config)
