@@ -33,6 +33,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -712,6 +713,33 @@ func init() {
 	sparkinvoiceDescID := sparkinvoiceMixinFields0[0].Descriptor()
 	// sparkinvoice.DefaultID holds the default value on creation for the id field.
 	sparkinvoice.DefaultID = sparkinvoiceDescID.Default.(func() uuid.UUID)
+	tokenallowanceMixin := schema.TokenAllowance{}.Mixin()
+	tokenallowanceMixinFields0 := tokenallowanceMixin[0].Fields()
+	_ = tokenallowanceMixinFields0
+	tokenallowanceFields := schema.TokenAllowance{}.Fields()
+	_ = tokenallowanceFields
+	// tokenallowanceDescCreateTime is the schema descriptor for create_time field.
+	tokenallowanceDescCreateTime := tokenallowanceMixinFields0[1].Descriptor()
+	// tokenallowance.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokenallowance.DefaultCreateTime = tokenallowanceDescCreateTime.Default.(func() time.Time)
+	// tokenallowanceDescUpdateTime is the schema descriptor for update_time field.
+	tokenallowanceDescUpdateTime := tokenallowanceMixinFields0[2].Descriptor()
+	// tokenallowance.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokenallowance.DefaultUpdateTime = tokenallowanceDescUpdateTime.Default.(func() time.Time)
+	// tokenallowance.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokenallowance.UpdateDefaultUpdateTime = tokenallowanceDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenallowanceDescSpentAmount is the schema descriptor for spent_amount field.
+	tokenallowanceDescSpentAmount := tokenallowanceFields[8].Descriptor()
+	// tokenallowance.DefaultSpentAmount holds the default value on creation for the spent_amount field.
+	tokenallowance.DefaultSpentAmount = tokenallowanceDescSpentAmount.Default.([]byte)
+	// tokenallowanceDescOwnerSignature is the schema descriptor for owner_signature field.
+	tokenallowanceDescOwnerSignature := tokenallowanceFields[12].Descriptor()
+	// tokenallowance.OwnerSignatureValidator is a validator for the "owner_signature" field. It is called by the builders before save.
+	tokenallowance.OwnerSignatureValidator = tokenallowanceDescOwnerSignature.Validators[0].(func([]byte) error)
+	// tokenallowanceDescID is the schema descriptor for id field.
+	tokenallowanceDescID := tokenallowanceMixinFields0[0].Descriptor()
+	// tokenallowance.DefaultID holds the default value on creation for the id field.
+	tokenallowance.DefaultID = tokenallowanceDescID.Default.(func() uuid.UUID)
 	tokencreateMixin := schema.TokenCreate{}.Mixin()
 	tokencreateMixinFields0 := tokencreateMixin[0].Fields()
 	_ = tokencreateMixinFields0

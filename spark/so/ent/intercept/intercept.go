@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -785,6 +786,33 @@ func (f TraverseSparkInvoice) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.SparkInvoiceQuery", q)
 }
 
+// The TokenAllowanceFunc type is an adapter to allow the use of ordinary function as a Querier.
+type TokenAllowanceFunc func(context.Context, *ent.TokenAllowanceQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f TokenAllowanceFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.TokenAllowanceQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.TokenAllowanceQuery", q)
+}
+
+// The TraverseTokenAllowance type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseTokenAllowance func(context.Context, *ent.TokenAllowanceQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseTokenAllowance) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseTokenAllowance) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.TokenAllowanceQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.TokenAllowanceQuery", q)
+}
+
 // The TokenCreateFunc type is an adapter to allow the use of ordinary function as a Querier.
 type TokenCreateFunc func(context.Context, *ent.TokenCreateQuery) (ent.Value, error)
 
@@ -1324,6 +1352,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.SigningNonceQuery, predicate.SigningNonce, signingnonce.OrderOption]{typ: ent.TypeSigningNonce, tq: q}, nil
 	case *ent.SparkInvoiceQuery:
 		return &query[*ent.SparkInvoiceQuery, predicate.SparkInvoice, sparkinvoice.OrderOption]{typ: ent.TypeSparkInvoice, tq: q}, nil
+	case *ent.TokenAllowanceQuery:
+		return &query[*ent.TokenAllowanceQuery, predicate.TokenAllowance, tokenallowance.OrderOption]{typ: ent.TypeTokenAllowance, tq: q}, nil
 	case *ent.TokenCreateQuery:
 		return &query[*ent.TokenCreateQuery, predicate.TokenCreate, tokencreate.OrderOption]{typ: ent.TypeTokenCreate, tq: q}, nil
 	case *ent.TokenFreezeQuery:

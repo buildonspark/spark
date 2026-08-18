@@ -55,5 +55,6 @@ func (TokenCreate) Edges() []ent.Edge {
 			Unique(),
 		edge.To("token_output", TokenOutput.Type),
 		edge.To("token_freeze", TokenFreeze.Type),
+		edge.To("token_allowance", TokenAllowance.Type),
 	}
 }

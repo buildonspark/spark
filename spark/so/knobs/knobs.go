@@ -131,6 +131,19 @@ const (
 	// transactions on behalf of any identity, bypassing the sender identity check.
 	// Use as a per-pubkey target: spark.so.tokens.broadcast_allowed_pubkeys@<identityPubKeyHex> = 1
 	KnobTokenBroadcastAllowedPubkeys = "spark.so.tokens.broadcast_allowed_pubkeys"
+	// KnobTokenAllowancesEnabled gates the token spending allowance lifecycle RPCs
+	// (create/revoke/query). When disabled (0), the public and internal allowance
+	// methods return UnimplementedMethodDisabled; when enabled they apply locally,
+	// commit, and fan the grant out to every other operator. Binary killswitch:
+	// 0 = off, 100 = on.
+	KnobTokenAllowancesEnabled = "spark.so.tokens.allowances_enabled"
+	// KnobTokenMaxActiveAllowancesPerOwner caps the number of ACTIVE token
+	// allowances a single owner may hold across all spenders and tokens. The
+	// (owner, spender, token) partial-unique index already prevents duplicates,
+	// but without a total cap one owner could mint unbounded allowance rows (one
+	// per spender key) on every SO. Enforced fail-closed at create time on every
+	// operator. Default 100.
+	KnobTokenMaxActiveAllowancesPerOwner = "spark.so.tokens.max_active_allowances_per_owner"
 
 	// Tokens - Killswitches
 	// When enabled (> 0), enforces owner signature validation for token withdrawals.

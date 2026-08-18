@@ -90,11 +90,13 @@ knobs:
     spark.so.reconcile_signing_keyshare_secret_pointers_max_scan_count: 100000
     # Tokens
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
+    spark.so.tokens.allowances_enabled: 100
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
     spark.so.tokens.coordinated_freeze_enabled: 0
     spark.so.tokens.enable_justice_transactions: 1
     spark.so.tokens.enforce_withdrawal_signature_validation: 0
     spark.so.tokens.l1_exit_withdrawals_enabled: 1
+    spark.so.tokens.max_active_allowances_per_owner: 100
     spark.so.tokens.multisig_issuer_enabled: 0
     spark.so.tokens.token_transaction_v3_enabled: 100
     spark.so.tokens.token_transaction_v3_phase2_enabled: 100

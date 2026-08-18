@@ -741,6 +741,64 @@ var (
 		Columns:    SparkInvoicesColumns,
 		PrimaryKey: []*schema.Column{SparkInvoicesColumns[0]},
 	}
+	// TokenAllowancesColumns holds the columns for the "token_allowances" table.
+	TokenAllowancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "allowance_id", Type: field.TypeUUID, Unique: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "REVOKED", "EXHAUSTED"}, Default: "ACTIVE"},
+		{Name: "owner_public_key", Type: field.TypeBytes},
+		{Name: "spender_public_key", Type: field.TypeBytes},
+		{Name: "token_identifier", Type: field.TypeBytes},
+		{Name: "per_transaction_cap", Type: field.TypeBytes},
+		{Name: "total_limit", Type: field.TypeBytes},
+		{Name: "spent_amount", Type: field.TypeBytes},
+		{Name: "recipient_allowlist", Type: field.TypeJSON, Nullable: true},
+		{Name: "expiry_time", Type: field.TypeTime},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "owner_signature", Type: field.TypeBytes, Unique: true},
+		{Name: "statement_hash", Type: field.TypeBytes},
+		{Name: "version", Type: field.TypeUint64},
+		{Name: "owner_provided_timestamp", Type: field.TypeUint64},
+		{Name: "owner_provided_revoke_timestamp", Type: field.TypeUint64, Nullable: true},
+		{Name: "revoke_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "token_create_id", Type: field.TypeUUID},
+	}
+	// TokenAllowancesTable holds the schema information for the "token_allowances" table.
+	TokenAllowancesTable = &schema.Table{
+		Name:       "token_allowances",
+		Columns:    TokenAllowancesColumns,
+		PrimaryKey: []*schema.Column{TokenAllowancesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_allowances_token_creates_token_allowance",
+				Columns:    []*schema.Column{TokenAllowancesColumns[20]},
+				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokenallowance_unique_active_grant",
+				Unique:  true,
+				Columns: []*schema.Column{TokenAllowancesColumns[5], TokenAllowancesColumns[6], TokenAllowancesColumns[20]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'ACTIVE'",
+				},
+			},
+			{
+				Name:    "tokenallowance_spender_public_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{TokenAllowancesColumns[6], TokenAllowancesColumns[4]},
+			},
+			{
+				Name:    "tokenallowance_owner_public_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{TokenAllowancesColumns[5], TokenAllowancesColumns[4]},
+			},
+		},
+	}
 	// TokenCreatesColumns holds the columns for the "token_creates" table.
 	TokenCreatesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -2142,6 +2200,7 @@ var (
 		SigningKeysharesTable,
 		SigningNoncesTable,
 		SparkInvoicesTable,
+		TokenAllowancesTable,
 		TokenCreatesTable,
 		TokenFreezesTable,
 		TokenMintsTable,
@@ -2180,6 +2239,7 @@ func init() {
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	PreimageSharePartnersTable.ForeignKeys[0].RefTable = PartnersTable
 	PreimageSharePartnersTable.ForeignKeys[1].RefTable = PreimageSharesTable
+	TokenAllowancesTable.ForeignKeys[0].RefTable = TokenCreatesTable
 	TokenCreatesTable.ForeignKeys[0].RefTable = L1tokenCreatesTable
 	TokenFreezesTable.ForeignKeys[0].RefTable = TokenCreatesTable
 	TokenOutputsTable.ForeignKeys[0].RefTable = TokenCreatesTable

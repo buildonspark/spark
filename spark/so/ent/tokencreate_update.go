@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -128,6 +129,21 @@ func (tcu *TokenCreateUpdate) AddTokenFreeze(t ...*TokenFreeze) *TokenCreateUpda
 	return tcu.AddTokenFreezeIDs(ids...)
 }
 
+// AddTokenAllowanceIDs adds the "token_allowance" edge to the TokenAllowance entity by IDs.
+func (tcu *TokenCreateUpdate) AddTokenAllowanceIDs(ids ...uuid.UUID) *TokenCreateUpdate {
+	tcu.mutation.AddTokenAllowanceIDs(ids...)
+	return tcu
+}
+
+// AddTokenAllowance adds the "token_allowance" edges to the TokenAllowance entity.
+func (tcu *TokenCreateUpdate) AddTokenAllowance(t ...*TokenAllowance) *TokenCreateUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tcu.AddTokenAllowanceIDs(ids...)
+}
+
 // Mutation returns the TokenCreateMutation object of the builder.
 func (tcu *TokenCreateUpdate) Mutation() *TokenCreateMutation {
 	return tcu.mutation
@@ -200,6 +216,27 @@ func (tcu *TokenCreateUpdate) RemoveTokenFreeze(t ...*TokenFreeze) *TokenCreateU
 		ids[i] = t[i].ID
 	}
 	return tcu.RemoveTokenFreezeIDs(ids...)
+}
+
+// ClearTokenAllowance clears all "token_allowance" edges to the TokenAllowance entity.
+func (tcu *TokenCreateUpdate) ClearTokenAllowance() *TokenCreateUpdate {
+	tcu.mutation.ClearTokenAllowance()
+	return tcu
+}
+
+// RemoveTokenAllowanceIDs removes the "token_allowance" edge to TokenAllowance entities by IDs.
+func (tcu *TokenCreateUpdate) RemoveTokenAllowanceIDs(ids ...uuid.UUID) *TokenCreateUpdate {
+	tcu.mutation.RemoveTokenAllowanceIDs(ids...)
+	return tcu
+}
+
+// RemoveTokenAllowance removes "token_allowance" edges to TokenAllowance entities.
+func (tcu *TokenCreateUpdate) RemoveTokenAllowance(t ...*TokenAllowance) *TokenCreateUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tcu.RemoveTokenAllowanceIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -451,6 +488,51 @@ func (tcu *TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tcu.mutation.TokenAllowanceCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tcu.mutation.RemovedTokenAllowanceIDs(); len(nodes) > 0 && !tcu.mutation.TokenAllowanceCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tcu.mutation.TokenAllowanceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(tcu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tcu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -567,6 +649,21 @@ func (tcuo *TokenCreateUpdateOne) AddTokenFreeze(t ...*TokenFreeze) *TokenCreate
 	return tcuo.AddTokenFreezeIDs(ids...)
 }
 
+// AddTokenAllowanceIDs adds the "token_allowance" edge to the TokenAllowance entity by IDs.
+func (tcuo *TokenCreateUpdateOne) AddTokenAllowanceIDs(ids ...uuid.UUID) *TokenCreateUpdateOne {
+	tcuo.mutation.AddTokenAllowanceIDs(ids...)
+	return tcuo
+}
+
+// AddTokenAllowance adds the "token_allowance" edges to the TokenAllowance entity.
+func (tcuo *TokenCreateUpdateOne) AddTokenAllowance(t ...*TokenAllowance) *TokenCreateUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tcuo.AddTokenAllowanceIDs(ids...)
+}
+
 // Mutation returns the TokenCreateMutation object of the builder.
 func (tcuo *TokenCreateUpdateOne) Mutation() *TokenCreateMutation {
 	return tcuo.mutation
@@ -639,6 +736,27 @@ func (tcuo *TokenCreateUpdateOne) RemoveTokenFreeze(t ...*TokenFreeze) *TokenCre
 		ids[i] = t[i].ID
 	}
 	return tcuo.RemoveTokenFreezeIDs(ids...)
+}
+
+// ClearTokenAllowance clears all "token_allowance" edges to the TokenAllowance entity.
+func (tcuo *TokenCreateUpdateOne) ClearTokenAllowance() *TokenCreateUpdateOne {
+	tcuo.mutation.ClearTokenAllowance()
+	return tcuo
+}
+
+// RemoveTokenAllowanceIDs removes the "token_allowance" edge to TokenAllowance entities by IDs.
+func (tcuo *TokenCreateUpdateOne) RemoveTokenAllowanceIDs(ids ...uuid.UUID) *TokenCreateUpdateOne {
+	tcuo.mutation.RemoveTokenAllowanceIDs(ids...)
+	return tcuo
+}
+
+// RemoveTokenAllowance removes "token_allowance" edges to TokenAllowance entities.
+func (tcuo *TokenCreateUpdateOne) RemoveTokenAllowance(t ...*TokenAllowance) *TokenCreateUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tcuo.RemoveTokenAllowanceIDs(ids...)
 }
 
 // Where appends a list predicates to the TokenCreateUpdate builder.
@@ -913,6 +1031,51 @@ func (tcuo *TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *TokenCrea
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokenfreeze.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tcuo.mutation.TokenAllowanceCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tcuo.mutation.RemovedTokenAllowanceIDs(); len(nodes) > 0 && !tcuo.mutation.TokenAllowanceCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tcuo.mutation.TokenAllowanceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokencreate.TokenAllowanceTable,
+			Columns: []string{tokencreate.TokenAllowanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowance.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
