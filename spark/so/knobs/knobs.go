@@ -273,6 +273,49 @@ const (
 	// query + coordinator self-sweep), not the legacy cron.
 	KnobUseConsensusInitiateCounterTransfer = "spark.so.use_consensus_initiate_counter_transfer"
 
+	// KnobUseConsensusTokenCreate routes token CREATE broadcasts
+	// (BroadcastTokenTransaction with a create input) through the 2PC consensus
+	// engine (0 = legacy, >0 = consensus; binary, not a percentage rollout),
+	// folding the legacy sign fanout, the empty-share
+	// exchange_revocation_secrets_shares finalize fanout, and the 30s retry
+	// cron into one engine round: Prepare validates + persists the SIGNED
+	// TokenTransaction/TokenCreate rows and returns each SO's ECDSA signature;
+	// commit persists the aggregated signatures and finalizes on every SO; a
+	// lost commit is recovered by gossip retry + the FlowExecution reconciler.
+	// Mint/transfer broadcasts stay on the legacy pipeline regardless of this
+	// knob.
+	//
+	// Failure semantics change at the flip: a failed create aborts (rollback
+	// deletes the SIGNED rows, freeing the unique token identifier) instead of
+	// retrying forward via the cron; the issuer simply resubmits. A create
+	// locks no user funds, so abort-on-failure is safe for this flow. A
+	// resubmit that races the aborted attempt's still-propagating rollback
+	// fails Prepare on any SO that still holds the stale row (consensus
+	// Prepare refuses to adopt a row it did not create — that refusal is what
+	// keeps rollback's delete-by-final-hash from ever destroying a newer
+	// attempt's state) and succeeds once the rollback lands, bounded by
+	// gossip retry / the FlowExecution reconciler. For the same reason two
+	// truly concurrent broadcasts of a byte-identical partial can both abort
+	// (each winning the Prepare race on a different SO) where legacy would
+	// converge on one row — both callers just resubmit; sequential replays
+	// are still absorbed by the entrypoint's partial-hash idempotency.
+	//
+	// Rollout ordering: enable only after every SO runs a binary that
+	// dispatches CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION
+	// (consensusFlowHandler) — an SO without the handler fails
+	// prepare/commit/rollback for op type 16, and the consensus entrypoint has
+	// no legacy fallback. Legacy interplay: the legacy pipeline has no
+	// rollback/cancellation that could wedge a consensus row, the retry cron
+	// never selects consensus rows (the coordinator's engine tx only ever
+	// commits fully-finalized state, and participant rows fail the cron's
+	// this-SO-is-coordinator filter), and a consensus rollback can never
+	// delete a legacy-created row (Prepare's adoption refusal means consensus
+	// rollbacks only ever target consensus-created rows). Because a mixed
+	// fleet still interleaves the two pipelines' fanouts for the same create,
+	// flip coordinators together rather than running a prolonged mixed-
+	// coordinator period.
+	KnobUseConsensusTokenCreate = "spark.so.use_consensus_token_create"
+
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"

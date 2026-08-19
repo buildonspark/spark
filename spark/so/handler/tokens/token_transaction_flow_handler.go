@@ -28,10 +28,13 @@ import (
 // ---------------------------------------------------------------------------
 
 // TokenTransactionFlowHandler implements consensus.FlowHandler for
-// CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION. The transaction type is
-// discriminated by the token_inputs oneof on the prepared transaction; CREATE
-// is the first (and currently only) branch implemented — Prepare fails closed
-// on mint/transfer, so a coordinator cannot drive an unimplemented branch.
+// CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION. Reached via the engine when
+// BroadcastTokenTransaction routes a CREATE through
+// broadcastCreateTokenTransactionConsensus (gated on
+// KnobUseConsensusTokenCreate). The transaction type is discriminated by the
+// token_inputs oneof on the prepared transaction; CREATE is the first (and
+// currently only) branch implemented — Prepare fails closed on mint/transfer,
+// so a coordinator cannot drive an unimplemented branch.
 //
 // Prepare reuses the exact peer signing leg the legacy phase-2 broadcast runs
 // (SignTokenTransaction: validateAndLockForCommit, entity persistence directly
