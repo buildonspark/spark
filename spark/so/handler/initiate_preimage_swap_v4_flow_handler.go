@@ -33,8 +33,12 @@ import (
 // are shared verbatim. What v4 changes is the transfer it prepares — riding
 // StartTransferV3Request, every leaf names its own receiver, which is what makes a fee-bearing
 // receive expressible at all. v3's single receiver_identity_public_key was both the swap
-// counterparty and the sole destination; v4 separates them, so the counterparty keys only the
+// counterparty and the sole destination; v4 separates them, so the attestor keys only the
 // preimage request while destinations come from the per-leaf map.
+//
+// The preimage request still stores that key in a column called receiver_identity_pubkey, which is
+// accurate for every v3 row and merely narrow for a v4 one. Renaming it moves a partial unique
+// index on a hot path, so it is deliberately not undertaken at this time.
 type InitiatePreimageSwapV4FlowHandler struct {
 	*InitiatePreimageSwapFlowHandler
 }
@@ -373,11 +377,11 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	counterparty, err := keys.ParsePublicKey(req.GetCounterpartyIdentityPublicKey())
+	attestor, err := keys.ParsePublicKey(req.GetAttestorIdentityPublicKey())
 	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse counterparty identity public key: %w", err))
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse attestor identity public key: %w", err))
 	}
-	if err := verifyCounterpartyManifestSignature(ctx, req, counterparty); err != nil {
+	if err := verifyAttestorSignature(ctx, req, attestor); err != nil {
 		return nil, err
 	}
 
@@ -387,13 +391,21 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 	}
 	// HODL invoices have no preimage share yet — the user provides it later via ProvidePreimage,
 	// so a missing share is that path, not an error.
+	//
+	// v3 compared this owner against its receiver only because the two were the same party; the
+	// owner is the anchor either way, so whoever holds the share names the attestor.
+	//
+	// TODO(SP-3393): with no share there is nothing to compare the attestor against, and
+	// ProvidePreimage then looks the request up by that same attestor — so a HODL receive whose
+	// attestor is not the preimage holder can never be settled through it. Anchor the attestor to the
+	// invoice here rather than deferring it.
 	preimageShare, err := tx.PreimageShare.Query().Where(preimageshare.PaymentHash(req.GetPaymentHash())).First(ctx)
 	if err != nil {
 		if !ent.IsNotFound(err) {
 			return nil, fmt.Errorf("unable to get preimage share for payment hash %x: %w", req.GetPaymentHash(), err)
 		}
 		preimageShare = nil
-	} else if !preimageShare.OwnerIdentityPubkey.Equals(counterparty) {
+	} else if !preimageShare.OwnerIdentityPubkey.Equals(attestor) {
 		return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(
 			fmt.Errorf("preimage share owner identity public key mismatch for payment hash %x", req.GetPaymentHash()))
 	}
@@ -436,7 +448,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 		directJobs,
 		dfcJobs,
 		invoiceAmount,
-		counterparty,
+		attestor,
 		destinations,
 		0,
 		req.GetReason(),
@@ -467,12 +479,9 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 		return nil, fmt.Errorf("unable to create transfer for payment hash %x: %w", req.GetPaymentHash(), err)
 	}
 
-	// Both read the locked rows: the cover check needs their owners and amounts, and what the
-	// counterparty is paid has to be summed from those amounts rather than the request's.
+	// The cover check reads the locked rows because it needs their owners and amounts, which the
+	// request does not get to state.
 	if err := requireAndBindManifest(ctx, manifestEndpointInitiatePreimageSwapV4, v3req, transfer.Network, leafMap); err != nil {
-		return nil, err
-	}
-	if err := assertCounterpartyIsPaid(ctx, counterparty, leafMap, destinations, req.GetReason()); err != nil {
 		return nil, err
 	}
 
@@ -480,6 +489,11 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 	if preimageShare != nil {
 		status = st.PreimageRequestStatusPreimageShared
 	}
+
+	// In v4, the attestor public key is stored in preimage_requests.receiver_identity_pubkey, whose
+	// name predates multi-receiver and understates it. The party that settles is the share owner
+	// rather than the payee. Renaming this column is not trivial; QueryPreimage and ProvidePreimage
+	// key on it.
 	if _, err := h.lightning.storeUserSignedTransactions(
 		ctx,
 		req.GetPaymentHash(),
@@ -487,7 +501,7 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 		cpfpJobs,
 		transfer,
 		status,
-		counterparty,
+		attestor,
 		parsed.senderIDPK,
 	); err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions for payment hash %x and transfer id %s: %w", req.GetPaymentHash(), transfer.ID, err)

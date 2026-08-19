@@ -15651,9 +15651,9 @@ func (m *InitiatePreimageSwapV4Request) validate(all bool) error {
 
 	// no validation rules for Reason
 
-	if len(m.GetCounterpartyIdentityPublicKey()) != 33 {
+	if len(m.GetAttestorIdentityPublicKey()) != 33 {
 		err := InitiatePreimageSwapV4RequestValidationError{
-			field:  "CounterpartyIdentityPublicKey",
+			field:  "AttestorIdentityPublicKey",
 			reason: "value length must be 33 bytes",
 		}
 		if !all {
@@ -15662,7 +15662,7 @@ func (m *InitiatePreimageSwapV4Request) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for CounterpartyManifestSignature
+	// no validation rules for AttestorSignature
 
 	if m.GetTransferV3Request() == nil {
 		err := InitiatePreimageSwapV4RequestValidationError{

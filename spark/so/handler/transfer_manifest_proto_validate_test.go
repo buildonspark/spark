@@ -270,37 +270,37 @@ func TestInitiatePreimageSwapV4Request_ValidatesInput(t *testing.T) {
 	}{
 		{
 			"valid",
-			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, CounterpartyIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(1)},
+			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, AttestorIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(1)},
 			false,
 		},
 		{
 			"missing payment hash",
-			&pb.InitiatePreimageSwapV4Request{CounterpartyIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(1)},
+			&pb.InitiatePreimageSwapV4Request{AttestorIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(1)},
 			true,
 		},
 		{
 			"short payment hash",
-			&pb.InitiatePreimageSwapV4Request{PaymentHash: make([]byte, 31), CounterpartyIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(1)},
+			&pb.InitiatePreimageSwapV4Request{PaymentHash: make([]byte, 31), AttestorIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(1)},
 			true,
 		},
 		{
-			"missing counterparty",
+			"missing attestor",
 			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, TransferV3Request: transferRequest(1)},
 			true,
 		},
 		{
-			"uncompressed counterparty",
-			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, CounterpartyIdentityPublicKey: make([]byte, 65), TransferV3Request: transferRequest(1)},
+			"uncompressed attestor",
+			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, AttestorIdentityPublicKey: make([]byte, 65), TransferV3Request: transferRequest(1)},
 			true,
 		},
 		{
 			"missing transfer request",
-			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, CounterpartyIdentityPublicKey: receiver.Serialize()},
+			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, AttestorIdentityPublicKey: receiver.Serialize()},
 			true,
 		},
 		{
 			"embedded transfer request with malformed manifest",
-			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, CounterpartyIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(0)},
+			&pb.InitiatePreimageSwapV4Request{PaymentHash: paymentHash, AttestorIdentityPublicKey: receiver.Serialize(), TransferV3Request: transferRequest(0)},
 			true,
 		},
 	}

@@ -64,7 +64,8 @@ type receiveLeg struct {
 func (l *receiveLeg) receiver() keys.Public { return l.config.IdentityPublicKey() }
 
 // v4Receive is the shared fixture: preimage shares distributed across the SOs make the swap
-// non-HODL, and legs[0] is the counterparty, who must be the one owning the invoice.
+// non-HODL. The attestor owns the invoice, and unless a fixture says otherwise legs[0]'s receiver is
+// that same wallet.
 type v4Receive struct {
 	sspConfig   *wallet.TestWalletConfig
 	userConfig  *wallet.TestWalletConfig
@@ -84,7 +85,7 @@ const fakeInvoiceSats = 12_345
 func newV4Receive(t *testing.T) *v4Receive {
 	t.Helper()
 	return newV4ReceiveWithLegs(t, fakeInvoiceSats, []*receiveLeg{
-		{name: "counterparty", sats: 12345},
+		{name: "payee", sats: 12345},
 		{name: "fee recipient", sats: 2345},
 	})
 }
@@ -93,7 +94,19 @@ func newV4Receive(t *testing.T) *v4Receive {
 // the request, so the invoice, not the caller, decides what the routing has to add up to.
 func newV4ReceiveWithLegs(t *testing.T, invoiceSats uint64, legs []*receiveLeg) *v4Receive {
 	t.Helper()
-	require.NotEmpty(t, legs, "a receive needs at least the counterparty leg")
+	return newV4ReceiveFixture(t, invoiceSats, legs, false)
+}
+
+// newV4ReceiveDelegated gives every leg its own wallet, so the invoice owner — and therefore the
+// attestor — is routed nothing by the transfer it attests to.
+func newV4ReceiveDelegated(t *testing.T, invoiceSats uint64, legs []*receiveLeg) *v4Receive {
+	t.Helper()
+	return newV4ReceiveFixture(t, invoiceSats, legs, true)
+}
+
+func newV4ReceiveFixture(t *testing.T, invoiceSats uint64, legs []*receiveLeg, delegated bool) *v4Receive {
+	t.Helper()
+	require.NotEmpty(t, legs, "a receive needs at least one payee leg")
 
 	sspConfig := wallet.NewTestWalletConfig(t)
 	userPrivKey := keys.GeneratePrivateKey()
@@ -115,7 +128,7 @@ func newV4ReceiveWithLegs(t *testing.T, invoiceSats uint64, legs []*receiveLeg) 
 	leaves := make([]wallet.LeafKeyTweak, 0, len(legs))
 	for i, leg := range legs {
 		switch {
-		case i == 0:
+		case i == 0 && !delegated:
 			leg.config = userConfig
 		case leg.selfSend:
 			leg.config = sspConfig
@@ -175,14 +188,14 @@ func (f *v4Receive) claimPendingByReceiver() map[keys.Public]st.TransferReceiver
 
 func (f *v4Receive) swap(edges []*spark.ManifestEdge) wallet.PreimageSwapV4 {
 	return wallet.PreimageSwapV4{
-		Leaves:              f.leaves,
-		LeafReceivers:       f.leafReceivers(),
-		CounterpartyPrivKey: f.userPrivKey,
-		PaymentHash:         f.paymentHash[:],
-		Invoice:             f.invoice,
-		AmountSats:          f.invoiceSats,
-		Reason:              spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
-		Edges:               edges,
+		Leaves:          f.leaves,
+		LeafReceivers:   f.leafReceivers(),
+		AttestorPrivKey: f.userPrivKey,
+		PaymentHash:     f.paymentHash[:],
+		Invoice:         f.invoice,
+		AmountSats:      f.invoiceSats,
+		Reason:          spark.InitiatePreimageSwapRequest_REASON_RECEIVE,
+		Edges:           edges,
 	}
 }
 
@@ -213,7 +226,7 @@ func claimLeg(t *testing.T, transferID uuid.UUID, leg *receiveLeg) {
 }
 
 // TestInitiatePreimageSwapV4_Consensus_MultiReceiverReceiveHappyPath drives a non-HODL lightning
-// receive that pays the swap counterparty and a separate fee recipient in one v4 transfer.
+// receive that pays the swap payee and a separate fee recipient in one v4 transfer.
 func TestInitiatePreimageSwapV4_Consensus_MultiReceiverReceiveHappyPath(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
 		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
@@ -235,7 +248,7 @@ func TestInitiatePreimageSwapV4_Consensus_MultiReceiverReceiveHappyPath(t *testi
 	require.Equal(t, transferID.String(), senderTransfer.GetId())
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, senderTransfer.GetStatus())
 
-	counterparty := fixture.leg(t, "counterparty")
+	payee := fixture.leg(t, "payee")
 	feeRecipient := fixture.leg(t, "fee recipient")
 	for _, i := range operatorIndicesFromConfig(fixture.sspConfig) {
 		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
@@ -252,25 +265,70 @@ func TestInitiatePreimageSwapV4_Consensus_MultiReceiverReceiveHappyPath(t *testi
 	coordinatorClient := db.NewPostgresEntClientForIntegrationTest(t, fixture.sspConfig.CoordinatorDatabaseURI)
 	t.Cleanup(func() { _ = coordinatorClient.Close() })
 
-	claimLeg(t, transferID, counterparty)
+	claimLeg(t, transferID, payee)
 
 	// Per-receiver status is the only status that answers "did this receiver get paid": the
 	// parent stays at SENDER_KEY_TWEAKED whenever receiver status is authoritative.
 	assert.Equal(t, st.TransferReceiverStatusCompleted,
-		transferReceiverStatus(t, coordinatorClient, transferID, counterparty.receiver()))
+		transferReceiverStatus(t, coordinatorClient, transferID, payee.receiver()))
 	assert.Equal(t, st.TransferReceiverStatusReceiverClaimPending,
 		transferReceiverStatus(t, coordinatorClient, transferID, feeRecipient.receiver()),
-		"the fee recipient must still be claim-pending after the counterparty's claim")
+		"the fee recipient must still be claim-pending after the payee's claim")
 
 	claimLeg(t, transferID, feeRecipient)
 
 	assert.Equal(t, map[keys.Public]st.TransferReceiverStatus{
-		counterparty.receiver(): st.TransferReceiverStatusCompleted,
+		payee.receiver():        st.TransferReceiverStatusCompleted,
 		feeRecipient.receiver(): st.TransferReceiverStatusCompleted,
 	}, transferReceiverStatusesByPubKey(t, coordinatorClient, transferID))
 }
 
-// Markup-on-net: the invoice goes out for the gross while the counterparty is owed only the net, so
+// TestInitiatePreimageSwapV4_Consensus_DelegatedReceivePaysNoAttestor is the shape the attestor
+// envelope exists to permit: the party owning the preimage share signs the attestation and is routed
+// nothing, while every sat goes to wallets that signed nothing.
+func TestInitiatePreimageSwapV4_Consensus_DelegatedReceivePaysNoAttestor(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	}
+	enableInitiatePreimageSwapV4Knobs(t, kc)
+
+	fixture := newV4ReceiveDelegated(t, fakeInvoiceSats, []*receiveLeg{
+		{name: "payee", sats: 12345},
+		{name: "fee recipient", sats: 2345},
+	})
+	defer cleanUp(t, fixture.userConfig, fixture.paymentHash)
+
+	attestor := fixture.userPrivKey.Public()
+	for _, leg := range fixture.legs {
+		require.NotEqual(t, attestor, leg.receiver(),
+			"the %s leg must not be the attestor, or this is not a delegated receive", leg.name)
+	}
+
+	response, transferID, err := wallet.InitiatePreimageSwapV4(t.Context(), fixture.sspConfig, fixture.swap(nil))
+	require.NoError(t, err, "a receive whose attestor is paid nothing must still settle")
+	assert.Equal(t, fixture.preimage[:], response.GetPreimage())
+
+	coordinatorClient := db.NewPostgresEntClientForIntegrationTest(t, fixture.sspConfig.CoordinatorDatabaseURI)
+	t.Cleanup(func() { _ = coordinatorClient.Close() })
+
+	statuses := transferReceiverStatusesByPubKey(t, coordinatorClient, transferID)
+	assert.Equal(t, fixture.claimPendingByReceiver(), statuses)
+	assert.NotContains(t, statuses, attestor, "the attestor receives nothing, so it must hold no receiver row")
+
+	for _, leg := range fixture.legs {
+		claimLeg(t, transferID, leg)
+	}
+
+	for receiver, status := range transferReceiverStatusesByPubKey(t, coordinatorClient, transferID) {
+		assert.Equal(t, st.TransferReceiverStatusCompleted, status, "receiver %s must complete", receiver)
+	}
+}
+
+// Markup-on-net: the invoice goes out for the gross while the payee is owed only the net, so
 // the three cuts must exhaust the markup and the gross must equal what the fixture invoice really
 // carries — otherwise the leaves over-fund it and the SO's amount floor never binds.
 //
@@ -305,7 +363,7 @@ func TestInitiatePreimageSwapV4_Consensus_FeeBearingReceiveHappyPath(t *testing.
 		"the gross must equal the invoice the fixture can actually issue, or the leaves over-fund the floor")
 
 	fixture := newV4ReceiveWithLegs(t, grossSats, []*receiveLeg{
-		{name: "counterparty", sats: feeBearingNetSats},
+		{name: "payee", sats: feeBearingNetSats},
 		{name: "partner", sats: feeBearingPartnerCut},
 		{name: "affiliate", sats: feeBearingAffiliateCut},
 		{name: "lightspark cut", sats: feeBearingLightsparkCut, selfSend: true},
@@ -337,7 +395,7 @@ func TestInitiatePreimageSwapV4_Consensus_FeeBearingReceiveHappyPath(t *testing.
 		assert.Equal(t, st.TransferStatusSenderKeyTweaked, row.Status, "operator %d transfer status mismatch", i)
 
 		assert.Equal(t, fixture.claimPendingByReceiver(), transferReceiverStatusesByPubKey(t, entClient, transferID),
-			"operator %d must route a claim-pending receiver per fee leg and the counterparty", i)
+			"operator %d must route a claim-pending receiver per fee leg and the payee", i)
 	}
 
 	coordinatorClient := db.NewPostgresEntClientForIntegrationTest(t, fixture.sspConfig.CoordinatorDatabaseURI)
@@ -345,7 +403,7 @@ func TestInitiatePreimageSwapV4_Consensus_FeeBearingReceiveHappyPath(t *testing.
 
 	// Self-send last, so a stuck SSP receiver cannot be blamed on the legs around it.
 	claimOrder := []*receiveLeg{
-		fixture.leg(t, "counterparty"),
+		fixture.leg(t, "payee"),
 		fixture.leg(t, "partner"),
 		fixture.leg(t, "affiliate"),
 		lightsparkCut,
@@ -369,8 +427,59 @@ func TestInitiatePreimageSwapV4_Consensus_FeeBearingReceiveHappyPath(t *testing.
 	assert.Equal(t, completedByReceiver, transferReceiverStatusesByPubKey(t, coordinatorClient, transferID))
 }
 
+func TestInitiatePreimageSwapV4_Consensus_RefusesAttestationBoundToAnotherInvoice(t *testing.T) {
+	if !sparktesting.HasLocalSparkIngressHost() {
+		t.Skip("skipping cross-operator integration test without minikube ingress (set SPARK_LOCAL_INGRESS_HOST)")
+	}
+	kc, err := sparktesting.NewKnobController(t)
+	if err != nil {
+		t.Skipf("knob controller unavailable, cannot route through consensus engine: %v", err)
+	}
+	enableInitiatePreimageSwapV4Knobs(t, kc)
+
+	fixture := newV4Receive(t)
+	defer cleanUp(t, fixture.userConfig, fixture.paymentHash)
+
+	otherInvoice := fixture.paymentHash
+	otherInvoice[0] ^= 0xff
+
+	swap := fixture.swap(nil)
+	swap.AttestationPaymentHash = otherInvoice[:]
+
+	_, transferID, err := wallet.InitiatePreimageSwapV4(t.Context(), fixture.sspConfig, swap)
+	require.ErrorContains(t, err, "signature is invalid")
+
+	leafIDs := make([]uuid.UUID, 0, len(fixture.leaves))
+	for _, leaf := range fixture.leaves {
+		leafID, err := uuid.Parse(leaf.Leaf.GetId())
+		require.NoError(t, err)
+		leafIDs = append(leafIDs, leafID)
+	}
+
+	for _, i := range operatorIndicesFromConfig(fixture.sspConfig) {
+		entClient := db.NewPostgresEntClientForIntegrationTest(t, operatorDatabasePath(t, i))
+		t.Cleanup(func() { _ = entClient.Close() })
+
+		leafRows, err := entClient.TreeNode.Query().Where(treenode.IDIn(leafIDs...)).All(t.Context())
+		require.NoError(t, err)
+		require.Len(t, leafRows, len(leafIDs), "operator %d is missing leaf rows", i)
+		for _, leafRow := range leafRows {
+			assert.Equal(t, st.TreeNodeStatusAvailable, leafRow.Status,
+				"operator %d left leaf %s locked after refusing the attestation", i, leafRow.ID)
+		}
+
+		row, err := entClient.Transfer.Query().Where(transferent.IDEQ(transferID)).Only(t.Context())
+		if ent.IsNotFound(err) {
+			continue
+		}
+		require.NoError(t, err)
+		assert.Equal(t, st.TransferStatusReturned, row.Status,
+			"operator %d settled a transfer whose attestation names another invoice", i)
+	}
+}
+
 // TestInitiatePreimageSwapV4_Consensus_RefusesManifestNotCoveringExecutedLeaves omits the fee
-// recipient's edge, so the manifest the counterparty and sender both signed covers only one of
+// recipient's edge, so the manifest the attestor and sender both signed covers only one of
 // the two leaves the transfer moves.
 func TestInitiatePreimageSwapV4_Consensus_RefusesManifestNotCoveringExecutedLeaves(t *testing.T) {
 	if !sparktesting.HasLocalSparkIngressHost() {
@@ -385,16 +494,16 @@ func TestInitiatePreimageSwapV4_Consensus_RefusesManifestNotCoveringExecutedLeav
 	fixture := newV4Receive(t)
 	defer cleanUp(t, fixture.userConfig, fixture.paymentHash)
 
-	counterparty := fixture.leg(t, "counterparty")
-	counterpartyOnlyEdges := []*spark.ManifestEdge{{
+	payee := fixture.leg(t, "payee")
+	payeeOnlyEdges := []*spark.ManifestEdge{{
 		SenderIdentityPublicKey:   fixture.sspConfig.IdentityPublicKey().Serialize(),
-		ReceiverIdentityPublicKey: counterparty.receiver().Serialize(),
+		ReceiverIdentityPublicKey: payee.receiver().Serialize(),
 		Amount: &spark.ManifestAmount{
-			Amount: &spark.ManifestAmount_Sats{Sats: counterparty.leaf.GetValue()},
+			Amount: &spark.ManifestAmount_Sats{Sats: payee.leaf.GetValue()},
 		},
 	}}
 
-	_, transferID, err := wallet.InitiatePreimageSwapV4(t.Context(), fixture.sspConfig, fixture.swap(counterpartyOnlyEdges))
+	_, transferID, err := wallet.InitiatePreimageSwapV4(t.Context(), fixture.sspConfig, fixture.swap(payeeOnlyEdges))
 	require.ErrorContains(t, err, "executed leaves have no matching manifest edge")
 
 	leafIDs := make([]uuid.UUID, 0, len(fixture.leaves))

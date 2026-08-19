@@ -8017,15 +8017,15 @@ type InitiatePreimageSwapV4Request struct {
 	PaymentHash   []byte                             `protobuf:"bytes,1,opt,name=payment_hash,json=paymentHash,proto3" json:"payment_hash,omitempty"`
 	InvoiceAmount *InvoiceAmount                     `protobuf:"bytes,2,opt,name=invoice_amount,json=invoiceAmount,proto3" json:"invoice_amount,omitempty"`
 	Reason        InitiatePreimageSwapRequest_Reason `protobuf:"varint,3,opt,name=reason,proto3,enum=spark.InitiatePreimageSwapRequest_Reason" json:"reason,omitempty"`
-	// The party opposite the sender: the lightning service on REASON_SEND, the
-	// invoice owner on REASON_RECEIVE. Keys the preimage request.
-	CounterpartyIdentityPublicKey []byte `protobuf:"bytes,4,opt,name=counterparty_identity_public_key,json=counterpartyIdentityPublicKey,proto3" json:"counterparty_identity_public_key,omitempty"`
-	// The counterparty's signature over the manifest hash, made with the key above:
-	// attests that the invoice owner agreed to this edge set.
-	CounterpartyManifestSignature []byte                  `protobuf:"bytes,5,opt,name=counterparty_manifest_signature,json=counterpartyManifestSignature,proto3" json:"counterparty_manifest_signature,omitempty"`
-	TransferV3Request             *StartTransferV3Request `protobuf:"bytes,6,opt,name=transfer_v3_request,json=transferV3Request,proto3" json:"transfer_v3_request,omitempty"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	// Owns this invoice's preimage share and attests to the quoted terms. Not necessarily a
+	// payee: a delegated receive pays a wallet that never signed anything.
+	AttestorIdentityPublicKey []byte `protobuf:"bytes,4,opt,name=attestor_identity_public_key,json=attestorIdentityPublicKey,proto3" json:"attestor_identity_public_key,omitempty"`
+	// The attestor's signature over the quote envelope under QuoteRole.ATTESTOR, whose target
+	// binds payment_hash. Required on REASON_RECEIVE, unset on REASON_SEND.
+	AttestorSignature []byte                  `protobuf:"bytes,5,opt,name=attestor_signature,json=attestorSignature,proto3" json:"attestor_signature,omitempty"`
+	TransferV3Request *StartTransferV3Request `protobuf:"bytes,6,opt,name=transfer_v3_request,json=transferV3Request,proto3" json:"transfer_v3_request,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *InitiatePreimageSwapV4Request) Reset() {
@@ -8079,16 +8079,16 @@ func (x *InitiatePreimageSwapV4Request) GetReason() InitiatePreimageSwapRequest_
 	return InitiatePreimageSwapRequest_REASON_SEND
 }
 
-func (x *InitiatePreimageSwapV4Request) GetCounterpartyIdentityPublicKey() []byte {
+func (x *InitiatePreimageSwapV4Request) GetAttestorIdentityPublicKey() []byte {
 	if x != nil {
-		return x.CounterpartyIdentityPublicKey
+		return x.AttestorIdentityPublicKey
 	}
 	return nil
 }
 
-func (x *InitiatePreimageSwapV4Request) GetCounterpartyManifestSignature() []byte {
+func (x *InitiatePreimageSwapV4Request) GetAttestorSignature() []byte {
 	if x != nil {
-		return x.CounterpartyManifestSignature
+		return x.AttestorSignature
 	}
 	return nil
 }
@@ -13506,13 +13506,13 @@ const file_spark_proto_rawDesc = "" +
 	"\x10transfer_request\x18\a \x01(\v2\x1b.spark.StartTransferRequestR\x0ftransferRequest\"-\n" +
 	"\x06Reason\x12\x0f\n" +
 	"\vREASON_SEND\x10\x00\x12\x12\n" +
-	"\x0eREASON_RECEIVE\x10\x01J\x04\b\x04\x10\x05R\btransfer\"\xbe\x03\n" +
+	"\x0eREASON_RECEIVE\x10\x01J\x04\b\x04\x10\x05R\btransfer\"\x9d\x03\n" +
 	"\x1dInitiatePreimageSwapV4Request\x12*\n" +
 	"\fpayment_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\vpaymentHash\x12;\n" +
 	"\x0einvoice_amount\x18\x02 \x01(\v2\x14.spark.InvoiceAmountR\rinvoiceAmount\x12A\n" +
-	"\x06reason\x18\x03 \x01(\x0e2).spark.InitiatePreimageSwapRequest.ReasonR\x06reason\x12P\n" +
-	" counterparty_identity_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x1dcounterpartyIdentityPublicKey\x12F\n" +
-	"\x1fcounterparty_manifest_signature\x18\x05 \x01(\fR\x1dcounterpartyManifestSignature\x12W\n" +
+	"\x06reason\x18\x03 \x01(\x0e2).spark.InitiatePreimageSwapRequest.ReasonR\x06reason\x12H\n" +
+	"\x1cattestor_identity_public_key\x18\x04 \x01(\fB\a\xfaB\x04z\x02h!R\x19attestorIdentityPublicKey\x12-\n" +
+	"\x12attestor_signature\x18\x05 \x01(\fR\x11attestorSignature\x12W\n" +
 	"\x13transfer_v3_request\x18\x06 \x01(\v2\x1d.spark.StartTransferV3RequestB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x11transferV3Request\"g\n" +
 	"\x1cInitiatePreimageSwapResponse\x12\x1a\n" +
 	"\bpreimage\x18\x01 \x01(\fR\bpreimage\x12+\n" +

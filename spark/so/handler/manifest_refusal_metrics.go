@@ -18,26 +18,48 @@ import (
 type manifestRefusalKind string
 
 const (
-	manifestRefusalEdgeCover              manifestRefusalKind = "edge_cover"
-	manifestRefusalAmountOverflow         manifestRefusalKind = "amount_overflow"
-	manifestRefusalDuplicate              manifestRefusalKind = "duplicate"
-	manifestRefusalExpiry                 manifestRefusalKind = "expiry"
-	manifestRefusalNetwork                manifestRefusalKind = "network"
-	manifestRefusalSizeCap                manifestRefusalKind = "size_cap"
-	manifestRefusalSignature              manifestRefusalKind = "signature"
-	manifestRefusalStraySignature         manifestRefusalKind = "stray_signature"
-	manifestRefusalSenderKey              manifestRefusalKind = "sender_key"
-	manifestRefusalReceiverKey            manifestRefusalKind = "receiver_key"
-	manifestRefusalLeafOwner              manifestRefusalKind = "leaf_owner"
-	manifestRefusalTransferID             manifestRefusalKind = "transfer_id"
-	manifestRefusalUnknownLeaf            manifestRefusalKind = "unknown_leaf"
-	manifestRefusalMissingManifest        manifestRefusalKind = "missing_manifest"
-	manifestRefusalCounterpartySignature  manifestRefusalKind = "counterparty_signature"
-	manifestRefusalMissingCounterpartySig manifestRefusalKind = "missing_counterparty_signature"
-	manifestRefusalCounterpartyUnpaid     manifestRefusalKind = "counterparty_unpaid"
-	manifestRefusalLeafDestination        manifestRefusalKind = "leaf_destination"
-	manifestRefusalOther                  manifestRefusalKind = "other"
+	manifestRefusalEdgeCover          manifestRefusalKind = "edge_cover"
+	manifestRefusalAmountOverflow     manifestRefusalKind = "amount_overflow"
+	manifestRefusalDuplicate          manifestRefusalKind = "duplicate"
+	manifestRefusalExpiry             manifestRefusalKind = "expiry"
+	manifestRefusalNetwork            manifestRefusalKind = "network"
+	manifestRefusalSizeCap            manifestRefusalKind = "size_cap"
+	manifestRefusalSignature          manifestRefusalKind = "signature"
+	manifestRefusalStraySignature     manifestRefusalKind = "stray_signature"
+	manifestRefusalSenderKey          manifestRefusalKind = "sender_key"
+	manifestRefusalReceiverKey        manifestRefusalKind = "receiver_key"
+	manifestRefusalLeafOwner          manifestRefusalKind = "leaf_owner"
+	manifestRefusalTransferID         manifestRefusalKind = "transfer_id"
+	manifestRefusalUnknownLeaf        manifestRefusalKind = "unknown_leaf"
+	manifestRefusalMissingManifest    manifestRefusalKind = "missing_manifest"
+	manifestRefusalAttestorSignature  manifestRefusalKind = "attestor_signature"
+	manifestRefusalMissingAttestorSig manifestRefusalKind = "missing_attestor_signature"
+	manifestRefusalReason             manifestRefusalKind = "reason"
+	manifestRefusalOther              manifestRefusalKind = "other"
 )
+
+// allManifestRefusalKinds ties the const block above to the test that pins each scraped label, so a
+// new kind fails the suite until its label string is stated.
+var allManifestRefusalKinds = []manifestRefusalKind{
+	manifestRefusalEdgeCover,
+	manifestRefusalAmountOverflow,
+	manifestRefusalDuplicate,
+	manifestRefusalExpiry,
+	manifestRefusalNetwork,
+	manifestRefusalSizeCap,
+	manifestRefusalSignature,
+	manifestRefusalStraySignature,
+	manifestRefusalSenderKey,
+	manifestRefusalReceiverKey,
+	manifestRefusalLeafOwner,
+	manifestRefusalTransferID,
+	manifestRefusalUnknownLeaf,
+	manifestRefusalMissingManifest,
+	manifestRefusalAttestorSignature,
+	manifestRefusalMissingAttestorSig,
+	manifestRefusalReason,
+	manifestRefusalOther,
+}
 
 // manifestBindEndpoint names the endpoint whose contract the refused manifest was bound under;
 // the shared gate cannot infer it. Not the `flow` label key, which carries a different vocabulary.
@@ -134,16 +156,16 @@ func manifestBindEndpointForTransferType(transferType st.TransferType) manifestB
 	}
 }
 
-// counterpartySignatureRefusalKind splits the gate's refusals three ways: no manifest (it reads one,
+// attestorSignatureRefusalKind splits the gate's refusals three ways: no manifest (it reads one,
 // so it refuses first), no signature (a caller yet to ship the field), or one that does not verify.
-func counterpartySignatureRefusalKind(req *pb.StartTransferV3Request, signature []byte) manifestRefusalKind {
+func attestorSignatureRefusalKind(req *pb.StartTransferV3Request, signature []byte) manifestRefusalKind {
 	if req.GetTransferManifest() == nil {
 		return manifestRefusalMissingManifest
 	}
 	if len(signature) == 0 {
-		return manifestRefusalMissingCounterpartySig
+		return manifestRefusalMissingAttestorSig
 	}
-	return manifestRefusalCounterpartySignature
+	return manifestRefusalAttestorSignature
 }
 
 func recordManifestRefusal(ctx context.Context, endpoint manifestBindEndpoint, kind manifestRefusalKind) {

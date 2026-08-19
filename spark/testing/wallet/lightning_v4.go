@@ -18,19 +18,22 @@ import (
 type PreimageSwapV4 struct {
 	Leaves        []LeafKeyTweak
 	LeafReceivers map[string]keys.Public
-	// The counterparty signs the manifest hash as well as keying the preimage request, so the
+	// The attestor signs the quote envelope as well as keying the preimage request, so the
 	// driver needs its private half.
-	CounterpartyPrivKey keys.Private
-	PaymentHash         []byte
-	Invoice             string
-	AmountSats          uint64
-	Reason              pb.InitiatePreimageSwapRequest_Reason
+	AttestorPrivKey keys.Private
+	PaymentHash     []byte
+	Invoice         string
+	AmountSats      uint64
+	Reason          pb.InitiatePreimageSwapRequest_Reason
 	// A zero ExpiryTime omits the expiry from both request and manifest, which is the only
 	// shape a non-HODL receive can take: the SO strips the request's expiry before the fanout.
 	ExpiryTime time.Time
 	// Edges replaces the exact cover the driver derives, for callers that must present a
 	// manifest the operators are expected to refuse.
 	Edges []*pb.ManifestEdge
+	// AttestationPaymentHash attests to a different invoice than the one being settled, for callers
+	// presenting an attestation the operators must refuse. Empty binds PaymentHash.
+	AttestationPaymentHash []byte
 }
 
 // ManifestEdgesForLeaves derives the exact cover the operators require: one edge per
@@ -61,8 +64,7 @@ func ManifestEdgesForLeaves(sender keys.Public, leaves []LeafKeyTweak, leafRecei
 	return edges, nil
 }
 
-// SignTransferManifest produces the manifest-hash signature every contributing sender and the
-// swap counterparty must each supply.
+// SignTransferManifest produces the manifest-hash signature every contributing sender supplies.
 func SignTransferManifest(signer keys.Private, manifest *pb.TransferManifest) ([]byte, error) {
 	manifestHash, err := common.HashTransferManifest(manifest)
 	if err != nil {
@@ -71,8 +73,27 @@ func SignTransferManifest(signer keys.Private, manifest *pb.TransferManifest) ([
 	return ecdsa.Sign(signer.ToBTCEC(), manifestHash).Serialize(), nil
 }
 
+// SignReceiveAttestation binds this manifest to this invoice under the attestor's own role.
+func SignReceiveAttestation(signer keys.Private, manifest *pb.TransferManifest, paymentHash []byte) ([]byte, error) {
+	manifestHash, err := common.HashTransferManifest(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("unable to hash transfer manifest: %w", err)
+	}
+	target, err := common.ReceiveAttestorTarget(paymentHash)
+	if err != nil {
+		return nil, fmt.Errorf("unable to derive receive attestation target: %w", err)
+	}
+	digest, err := common.QuoteEnvelopeDigest(
+		manifest.GetNetwork(), manifestHash,
+		common.QuoteReasonReceive, common.QuoteRoleAttestor, target)
+	if err != nil {
+		return nil, fmt.Errorf("unable to derive quote envelope digest: %w", err)
+	}
+	return ecdsa.Sign(signer.ToBTCEC(), digest).Serialize(), nil
+}
+
 // BuildInitiatePreimageSwapV4Request assembles the per-leaf routed transfer package, the manifest
-// covering it, and both manifest signatures.
+// covering it, the sender's manifest signature and the attestor's attestation.
 func BuildInitiatePreimageSwapV4Request(
 	ctx context.Context,
 	config *TestWalletConfig,
@@ -109,7 +130,11 @@ func BuildInitiatePreimageSwapV4Request(
 	if err != nil {
 		return nil, err
 	}
-	counterpartyManifestSignature, err := SignTransferManifest(swap.CounterpartyPrivKey, manifest)
+	attestedHash := swap.AttestationPaymentHash
+	if len(attestedHash) == 0 {
+		attestedHash = swap.PaymentHash
+	}
+	attestorSignature, err := SignReceiveAttestation(swap.AttestorPrivKey, manifest, attestedHash)
 	if err != nil {
 		return nil, err
 	}
@@ -125,9 +150,9 @@ func BuildInitiatePreimageSwapV4Request(
 			ValueSats:          swap.AmountSats,
 			InvoiceAmountProof: &pb.InvoiceAmountProof{Bolt11Invoice: swap.Invoice},
 		},
-		Reason:                        swap.Reason,
-		CounterpartyIdentityPublicKey: swap.CounterpartyPrivKey.Public().Serialize(),
-		CounterpartyManifestSignature: counterpartyManifestSignature,
+		Reason:                    swap.Reason,
+		AttestorIdentityPublicKey: swap.AttestorPrivKey.Public().Serialize(),
+		AttestorSignature:         attestorSignature,
 		TransferV3Request: &pb.StartTransferV3Request{
 			TransferId: transferID.String(),
 			SenderPackages: []*pb.SenderTransferPackage{{
