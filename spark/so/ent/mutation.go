@@ -18088,6 +18088,8 @@ type TokenAllowanceMutation struct {
 	owner_provided_revoke_timestamp    *uint64
 	addowner_provided_revoke_timestamp *int64
 	revoke_signature                   *[]byte
+	revoke_version                     *uint64
+	addrevoke_version                  *int64
 	clearedFields                      map[string]struct{}
 	token_create                       *uuid.UUID
 	clearedtoken_create                bool
@@ -19085,6 +19087,76 @@ func (m *TokenAllowanceMutation) ResetRevokeSignature() {
 	delete(m.clearedFields, tokenallowance.FieldRevokeSignature)
 }
 
+// SetRevokeVersion sets the "revoke_version" field.
+func (m *TokenAllowanceMutation) SetRevokeVersion(u uint64) {
+	m.revoke_version = &u
+	m.addrevoke_version = nil
+}
+
+// RevokeVersion returns the value of the "revoke_version" field in the mutation.
+func (m *TokenAllowanceMutation) RevokeVersion() (r uint64, exists bool) {
+	v := m.revoke_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevokeVersion returns the old "revoke_version" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldRevokeVersion(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevokeVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevokeVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevokeVersion: %w", err)
+	}
+	return oldValue.RevokeVersion, nil
+}
+
+// AddRevokeVersion adds u to the "revoke_version" field.
+func (m *TokenAllowanceMutation) AddRevokeVersion(u int64) {
+	if m.addrevoke_version != nil {
+		*m.addrevoke_version += u
+	} else {
+		m.addrevoke_version = &u
+	}
+}
+
+// AddedRevokeVersion returns the value that was added to the "revoke_version" field in this mutation.
+func (m *TokenAllowanceMutation) AddedRevokeVersion() (r int64, exists bool) {
+	v := m.addrevoke_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRevokeVersion clears the value of the "revoke_version" field.
+func (m *TokenAllowanceMutation) ClearRevokeVersion() {
+	m.revoke_version = nil
+	m.addrevoke_version = nil
+	m.clearedFields[tokenallowance.FieldRevokeVersion] = struct{}{}
+}
+
+// RevokeVersionCleared returns if the "revoke_version" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) RevokeVersionCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldRevokeVersion]
+	return ok
+}
+
+// ResetRevokeVersion resets all changes to the "revoke_version" field.
+func (m *TokenAllowanceMutation) ResetRevokeVersion() {
+	m.revoke_version = nil
+	m.addrevoke_version = nil
+	delete(m.clearedFields, tokenallowance.FieldRevokeVersion)
+}
+
 // ClearTokenCreate clears the "token_create" edge to the TokenCreate entity.
 func (m *TokenAllowanceMutation) ClearTokenCreate() {
 	m.clearedtoken_create = true
@@ -19146,7 +19218,7 @@ func (m *TokenAllowanceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenAllowanceMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.create_time != nil {
 		fields = append(fields, tokenallowance.FieldCreateTime)
 	}
@@ -19210,6 +19282,9 @@ func (m *TokenAllowanceMutation) Fields() []string {
 	if m.revoke_signature != nil {
 		fields = append(fields, tokenallowance.FieldRevokeSignature)
 	}
+	if m.revoke_version != nil {
+		fields = append(fields, tokenallowance.FieldRevokeVersion)
+	}
 	return fields
 }
 
@@ -19260,6 +19335,8 @@ func (m *TokenAllowanceMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerProvidedRevokeTimestamp()
 	case tokenallowance.FieldRevokeSignature:
 		return m.RevokeSignature()
+	case tokenallowance.FieldRevokeVersion:
+		return m.RevokeVersion()
 	}
 	return nil, false
 }
@@ -19311,6 +19388,8 @@ func (m *TokenAllowanceMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldOwnerProvidedRevokeTimestamp(ctx)
 	case tokenallowance.FieldRevokeSignature:
 		return m.OldRevokeSignature(ctx)
+	case tokenallowance.FieldRevokeVersion:
+		return m.OldRevokeVersion(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenAllowance field %s", name)
 }
@@ -19467,6 +19546,13 @@ func (m *TokenAllowanceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRevokeSignature(v)
 		return nil
+	case tokenallowance.FieldRevokeVersion:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevokeVersion(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenAllowance field %s", name)
 }
@@ -19484,6 +19570,9 @@ func (m *TokenAllowanceMutation) AddedFields() []string {
 	if m.addowner_provided_revoke_timestamp != nil {
 		fields = append(fields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
 	}
+	if m.addrevoke_version != nil {
+		fields = append(fields, tokenallowance.FieldRevokeVersion)
+	}
 	return fields
 }
 
@@ -19498,6 +19587,8 @@ func (m *TokenAllowanceMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedOwnerProvidedTimestamp()
 	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 		return m.AddedOwnerProvidedRevokeTimestamp()
+	case tokenallowance.FieldRevokeVersion:
+		return m.AddedRevokeVersion()
 	}
 	return nil, false
 }
@@ -19528,6 +19619,13 @@ func (m *TokenAllowanceMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddOwnerProvidedRevokeTimestamp(v)
 		return nil
+	case tokenallowance.FieldRevokeVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevokeVersion(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenAllowance numeric field %s", name)
 }
@@ -19547,6 +19645,9 @@ func (m *TokenAllowanceMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(tokenallowance.FieldRevokeSignature) {
 		fields = append(fields, tokenallowance.FieldRevokeSignature)
+	}
+	if m.FieldCleared(tokenallowance.FieldRevokeVersion) {
+		fields = append(fields, tokenallowance.FieldRevokeVersion)
 	}
 	return fields
 }
@@ -19573,6 +19674,9 @@ func (m *TokenAllowanceMutation) ClearField(name string) error {
 		return nil
 	case tokenallowance.FieldRevokeSignature:
 		m.ClearRevokeSignature()
+		return nil
+	case tokenallowance.FieldRevokeVersion:
+		m.ClearRevokeVersion()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenAllowance nullable field %s", name)
@@ -19644,6 +19748,9 @@ func (m *TokenAllowanceMutation) ResetField(name string) error {
 		return nil
 	case tokenallowance.FieldRevokeSignature:
 		m.ResetRevokeSignature()
+		return nil
+	case tokenallowance.FieldRevokeVersion:
+		m.ResetRevokeVersion()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenAllowance field %s", name)

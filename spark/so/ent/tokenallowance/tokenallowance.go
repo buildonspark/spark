@@ -60,6 +60,8 @@ const (
 	FieldOwnerProvidedRevokeTimestamp = "owner_provided_revoke_timestamp"
 	// FieldRevokeSignature holds the string denoting the revoke_signature field in the database.
 	FieldRevokeSignature = "revoke_signature"
+	// FieldRevokeVersion holds the string denoting the revoke_version field in the database.
+	FieldRevokeVersion = "revoke_version"
 	// EdgeTokenCreate holds the string denoting the token_create edge name in mutations.
 	EdgeTokenCreate = "token_create"
 	// Table holds the table name of the tokenallowance in the database.
@@ -97,6 +99,7 @@ var Columns = []string{
 	FieldFlowExecutionID,
 	FieldOwnerProvidedRevokeTimestamp,
 	FieldRevokeSignature,
+	FieldRevokeVersion,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -207,6 +210,11 @@ func ByFlowExecutionID(opts ...sql.OrderTermOption) OrderOption {
 // ByOwnerProvidedRevokeTimestamp orders the results by the owner_provided_revoke_timestamp field.
 func ByOwnerProvidedRevokeTimestamp(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOwnerProvidedRevokeTimestamp, opts...).ToFunc()
+}
+
+// ByRevokeVersion orders the results by the revoke_version field.
+func ByRevokeVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRevokeVersion, opts...).ToFunc()
 }
 
 // ByTokenCreateField orders the results by token_create field.

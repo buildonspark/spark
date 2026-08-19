@@ -69,6 +69,16 @@ func validCreatePayload(t *testing.T) *tokenpb.TokenAllowancePayload {
 	return payload
 }
 
+func deterministicRevokePayload(t *testing.T) *tokenpb.RevokeTokenAllowancePayload {
+	t.Helper()
+	return &tokenpb.RevokeTokenAllowancePayload{
+		Version:                1,
+		AllowanceId:            mustHex(t, allowanceIDHex),
+		OwnerPublicKey:         pubKeyBytes(t, allowanceOwnerKeyHex),
+		OwnerProvidedTimestamp: allowanceProvidedTsMillis,
+	}
+}
+
 func TestHashCreateTokenAllowancePayload_Deterministic(t *testing.T) {
 	payload := deterministicCreatePayload(t)
 
@@ -130,6 +140,46 @@ func TestHashCreateTokenAllowancePayload_AllowlistOrderCanonical(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, ascendingHash, descendingHash, "allowlist ordering must not affect the hash")
+}
+
+func TestHashRevokeTokenAllowancePayload_Deterministic(t *testing.T) {
+	first, err := HashRevokeTokenAllowancePayload(deterministicRevokePayload(t))
+	require.NoError(t, err)
+	second, err := HashRevokeTokenAllowancePayload(deterministicRevokePayload(t))
+	require.NoError(t, err)
+
+	assert.Equal(t, first, second)
+	assert.Len(t, first, 32)
+
+	// The revoke hash must not collide with the create hash for the same allowance.
+	createHash, err := HashCreateTokenAllowancePayload(deterministicCreatePayload(t))
+	require.NoError(t, err)
+	assert.NotEqual(t, createHash, first)
+}
+
+func TestValidateRevokeTokenAllowancePayload_RejectsUnsupportedVersion(t *testing.T) {
+	payload := deterministicRevokePayload(t)
+	payload.Version = 99
+
+	err := ValidateRevokeTokenAllowancePayload(payload)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unsupported token allowance revoke version")
+}
+
+func TestValidateRevokeTokenAllowancePayload_AcceptsSupportedVersion(t *testing.T) {
+	require.NoError(t, ValidateRevokeTokenAllowancePayload(deterministicRevokePayload(t)))
+}
+
+// TestHashRevokeTokenAllowancePayload_KnownVector pins the wire format of the revoke statement
+// hash. If this changes, the TypeScript SDK's implementation must be updated to match, and any
+// already-signed revocations would be invalidated. The vector was computed once from
+// deterministicRevokePayload; do not edit the expected value without a deliberate format change.
+func TestHashRevokeTokenAllowancePayload_KnownVector(t *testing.T) {
+	const frozenHashHex = "e35cf0188bae34706871d27f8c87797aa00df737d63ff65191ef0e62d2afc256"
+
+	hash, err := HashRevokeTokenAllowancePayload(deterministicRevokePayload(t))
+	require.NoError(t, err)
+	assert.Equal(t, frozenHashHex, hex.EncodeToString(hash))
 }
 
 func TestValidateTokenAllowancePayload_RejectsSpenderEqualsOwner(t *testing.T) {

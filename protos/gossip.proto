@@ -40,6 +40,7 @@ message GossipMessage {
         GossipMessageConsensusCommit consensus_commit = 22;
         GossipMessageConsensusRollback consensus_rollback = 23;
         GossipMessagePreimageSwap preimage_swap = 24;
+        GossipMessageRevokeTokenAllowance revoke_token_allowance = 28;
     }
 }
 
@@ -245,4 +246,18 @@ message GossipMessageConsensusRollback {
     // pre-upgrade coordinator and the receiver should skip the row
     // transition.
     string flow_execution_id = 3;
+}
+
+// GossipMessageRevokeTokenAllowance durably propagates an owner-signed token
+// allowance revocation to every other operator. It carries the exact fields of
+// the owner-signed RevokeTokenAllowancePayload plus the signature, so each
+// receiving operator re-verifies the owner signature independently before
+// tombstoning - the transport is durable (per-participant receipts + retry)
+// but confers no trust: a peer applies only what the owner signed.
+message GossipMessageRevokeTokenAllowance {
+    bytes allowance_id = 1;
+    bytes owner_public_key = 2;
+    uint32 revoke_version = 3;
+    uint64 owner_provided_timestamp = 4;
+    bytes owner_signature = 5;
 }

@@ -3540,6 +3540,7 @@ type TokenAllowanceExample struct {
 	FlowExecutionID              *uuid.UUID
 	OwnerProvidedRevokeTimestamp *uint64
 	RevokeSignature              *[]byte
+	RevokeVersion                *uint64
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 	TokenCreate *ent.TokenCreate
@@ -3652,6 +3653,12 @@ func (ta *TokenAllowanceExample) SetOwnerProvidedRevokeTimestamp(v uint64) *Toke
 // SetRevokeSignature sets the revoke_signature field.
 func (ta *TokenAllowanceExample) SetRevokeSignature(v []byte) *TokenAllowanceExample {
 	ta.RevokeSignature = &v
+	return ta
+}
+
+// SetRevokeVersion sets the revoke_version field.
+func (ta *TokenAllowanceExample) SetRevokeVersion(v uint64) *TokenAllowanceExample {
+	ta.RevokeVersion = &v
 	return ta
 }
 
@@ -3768,6 +3775,10 @@ func (ta *TokenAllowanceExample) MustExec(ctx context.Context) *ent.TokenAllowan
 	}
 	if ta.RevokeSignature != nil {
 		create.SetRevokeSignature(*ta.RevokeSignature)
+	} else {
+	}
+	if ta.RevokeVersion != nil {
+		create.SetRevokeVersion(*ta.RevokeVersion)
 	} else {
 	}
 
@@ -3897,6 +3908,10 @@ func (ta *TokenAllowanceExample) Exec(ctx context.Context) (*ent.TokenAllowance,
 	}
 	if ta.RevokeSignature != nil {
 		create.SetRevokeSignature(*ta.RevokeSignature)
+	} else {
+	}
+	if ta.RevokeVersion != nil {
+		create.SetRevokeVersion(*ta.RevokeVersion)
 	} else {
 	}
 

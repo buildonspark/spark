@@ -747,6 +747,26 @@ export interface CreateTokenAllowanceResponse {
   allowance: TokenAllowanceInfo | undefined;
 }
 
+export interface RevokeTokenAllowancePayload {
+  version: number;
+  allowanceId: Uint8Array;
+  ownerPublicKey: Uint8Array;
+  /** Wallet-provided revoke timestamp in milliseconds, used to order updates. */
+  ownerProvidedTimestamp: number;
+}
+
+export interface RevokeTokenAllowanceRequest {
+  revokeAllowancePayload:
+    | RevokeTokenAllowancePayload
+    | undefined;
+  /** Schnorr or ECDSA DER signature (64-73 bytes) by the owner over the payload hash. */
+  ownerSignature: Uint8Array;
+}
+
+export interface RevokeTokenAllowanceResponse {
+  allowanceProgress: AllowanceProgress | undefined;
+}
+
 export interface TokenAllowanceInfo {
   allowancePayload:
     | TokenAllowancePayload
@@ -761,6 +781,18 @@ export interface TokenAllowanceInfo {
    * fabricate or alter grant terms.
    */
   ownerSignature: Uint8Array;
+  /**
+   * The owner's signature over the revoke statement hash, present once the
+   * allowance is REVOKED. Together with owner_provided_revoke_timestamp and
+   * revoke_version, clients can reconstruct RevokeTokenAllowancePayload,
+   * recompute HashRevokeTokenAllowancePayload, and verify the owner
+   * authorized the revocation.
+   */
+  revokeSignature: Uint8Array;
+  /** Wallet-provided revoke timestamp in milliseconds, set once REVOKED. */
+  ownerProvidedRevokeTimestamp: number;
+  /** Version of the revoke payload the owner signed, set once REVOKED. */
+  revokeVersion: number;
 }
 
 /** Request constraints are combined using an AND relation. */
@@ -5877,8 +5909,271 @@ export const CreateTokenAllowanceResponse: MessageFns<CreateTokenAllowanceRespon
   },
 };
 
+function createBaseRevokeTokenAllowancePayload(): RevokeTokenAllowancePayload {
+  return { version: 0, allowanceId: new Uint8Array(0), ownerPublicKey: new Uint8Array(0), ownerProvidedTimestamp: 0 };
+}
+
+export const RevokeTokenAllowancePayload: MessageFns<RevokeTokenAllowancePayload> = {
+  encode(message: RevokeTokenAllowancePayload, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.version !== 0) {
+      writer.uint32(8).uint32(message.version);
+    }
+    if (message.allowanceId.length !== 0) {
+      writer.uint32(18).bytes(message.allowanceId);
+    }
+    if (message.ownerPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.ownerPublicKey);
+    }
+    if (message.ownerProvidedTimestamp !== 0) {
+      writer.uint32(32).uint64(message.ownerProvidedTimestamp);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeTokenAllowancePayload {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeTokenAllowancePayload();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.version = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.allowanceId = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.ownerPublicKey = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.ownerProvidedTimestamp = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeTokenAllowancePayload {
+    return {
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      allowanceId: isSet(object.allowanceId) ? bytesFromBase64(object.allowanceId) : new Uint8Array(0),
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
+      ownerProvidedTimestamp: isSet(object.ownerProvidedTimestamp)
+        ? globalThis.Number(object.ownerProvidedTimestamp)
+        : 0,
+    };
+  },
+
+  toJSON(message: RevokeTokenAllowancePayload): unknown {
+    const obj: any = {};
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.allowanceId.length !== 0) {
+      obj.allowanceId = base64FromBytes(message.allowanceId);
+    }
+    if (message.ownerPublicKey.length !== 0) {
+      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
+    }
+    if (message.ownerProvidedTimestamp !== 0) {
+      obj.ownerProvidedTimestamp = Math.round(message.ownerProvidedTimestamp);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeTokenAllowancePayload>): RevokeTokenAllowancePayload {
+    return RevokeTokenAllowancePayload.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeTokenAllowancePayload>): RevokeTokenAllowancePayload {
+    const message = createBaseRevokeTokenAllowancePayload();
+    message.version = object.version ?? 0;
+    message.allowanceId = object.allowanceId ?? new Uint8Array(0);
+    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
+    message.ownerProvidedTimestamp = object.ownerProvidedTimestamp ?? 0;
+    return message;
+  },
+};
+
+function createBaseRevokeTokenAllowanceRequest(): RevokeTokenAllowanceRequest {
+  return { revokeAllowancePayload: undefined, ownerSignature: new Uint8Array(0) };
+}
+
+export const RevokeTokenAllowanceRequest: MessageFns<RevokeTokenAllowanceRequest> = {
+  encode(message: RevokeTokenAllowanceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.revokeAllowancePayload !== undefined) {
+      RevokeTokenAllowancePayload.encode(message.revokeAllowancePayload, writer.uint32(10).fork()).join();
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(18).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeTokenAllowanceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeTokenAllowanceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.revokeAllowancePayload = RevokeTokenAllowancePayload.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeTokenAllowanceRequest {
+    return {
+      revokeAllowancePayload: isSet(object.revokeAllowancePayload)
+        ? RevokeTokenAllowancePayload.fromJSON(object.revokeAllowancePayload)
+        : undefined,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RevokeTokenAllowanceRequest): unknown {
+    const obj: any = {};
+    if (message.revokeAllowancePayload !== undefined) {
+      obj.revokeAllowancePayload = RevokeTokenAllowancePayload.toJSON(message.revokeAllowancePayload);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeTokenAllowanceRequest>): RevokeTokenAllowanceRequest {
+    return RevokeTokenAllowanceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeTokenAllowanceRequest>): RevokeTokenAllowanceRequest {
+    const message = createBaseRevokeTokenAllowanceRequest();
+    message.revokeAllowancePayload =
+      (object.revokeAllowancePayload !== undefined && object.revokeAllowancePayload !== null)
+        ? RevokeTokenAllowancePayload.fromPartial(object.revokeAllowancePayload)
+        : undefined;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseRevokeTokenAllowanceResponse(): RevokeTokenAllowanceResponse {
+  return { allowanceProgress: undefined };
+}
+
+export const RevokeTokenAllowanceResponse: MessageFns<RevokeTokenAllowanceResponse> = {
+  encode(message: RevokeTokenAllowanceResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.allowanceProgress !== undefined) {
+      AllowanceProgress.encode(message.allowanceProgress, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeTokenAllowanceResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeTokenAllowanceResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.allowanceProgress = AllowanceProgress.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeTokenAllowanceResponse {
+    return {
+      allowanceProgress: isSet(object.allowanceProgress)
+        ? AllowanceProgress.fromJSON(object.allowanceProgress)
+        : undefined,
+    };
+  },
+
+  toJSON(message: RevokeTokenAllowanceResponse): unknown {
+    const obj: any = {};
+    if (message.allowanceProgress !== undefined) {
+      obj.allowanceProgress = AllowanceProgress.toJSON(message.allowanceProgress);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeTokenAllowanceResponse>): RevokeTokenAllowanceResponse {
+    return RevokeTokenAllowanceResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeTokenAllowanceResponse>): RevokeTokenAllowanceResponse {
+    const message = createBaseRevokeTokenAllowanceResponse();
+    message.allowanceProgress = (object.allowanceProgress !== undefined && object.allowanceProgress !== null)
+      ? AllowanceProgress.fromPartial(object.allowanceProgress)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseTokenAllowanceInfo(): TokenAllowanceInfo {
-  return { allowancePayload: undefined, spentAmount: new Uint8Array(0), status: 0, ownerSignature: new Uint8Array(0) };
+  return {
+    allowancePayload: undefined,
+    spentAmount: new Uint8Array(0),
+    status: 0,
+    ownerSignature: new Uint8Array(0),
+    revokeSignature: new Uint8Array(0),
+    ownerProvidedRevokeTimestamp: 0,
+    revokeVersion: 0,
+  };
 }
 
 export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
@@ -5894,6 +6189,15 @@ export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
     }
     if (message.ownerSignature.length !== 0) {
       writer.uint32(34).bytes(message.ownerSignature);
+    }
+    if (message.revokeSignature.length !== 0) {
+      writer.uint32(42).bytes(message.revokeSignature);
+    }
+    if (message.ownerProvidedRevokeTimestamp !== 0) {
+      writer.uint32(48).uint64(message.ownerProvidedRevokeTimestamp);
+    }
+    if (message.revokeVersion !== 0) {
+      writer.uint32(56).uint32(message.revokeVersion);
     }
     return writer;
   },
@@ -5937,6 +6241,30 @@ export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
           message.ownerSignature = reader.bytes();
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.revokeSignature = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.ownerProvidedRevokeTimestamp = longToNumber(reader.uint64());
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.revokeVersion = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5954,6 +6282,11 @@ export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
       spentAmount: isSet(object.spentAmount) ? bytesFromBase64(object.spentAmount) : new Uint8Array(0),
       status: isSet(object.status) ? tokenAllowanceStatusFromJSON(object.status) : 0,
       ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+      revokeSignature: isSet(object.revokeSignature) ? bytesFromBase64(object.revokeSignature) : new Uint8Array(0),
+      ownerProvidedRevokeTimestamp: isSet(object.ownerProvidedRevokeTimestamp)
+        ? globalThis.Number(object.ownerProvidedRevokeTimestamp)
+        : 0,
+      revokeVersion: isSet(object.revokeVersion) ? globalThis.Number(object.revokeVersion) : 0,
     };
   },
 
@@ -5971,6 +6304,15 @@ export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
     if (message.ownerSignature.length !== 0) {
       obj.ownerSignature = base64FromBytes(message.ownerSignature);
     }
+    if (message.revokeSignature.length !== 0) {
+      obj.revokeSignature = base64FromBytes(message.revokeSignature);
+    }
+    if (message.ownerProvidedRevokeTimestamp !== 0) {
+      obj.ownerProvidedRevokeTimestamp = Math.round(message.ownerProvidedRevokeTimestamp);
+    }
+    if (message.revokeVersion !== 0) {
+      obj.revokeVersion = Math.round(message.revokeVersion);
+    }
     return obj;
   },
 
@@ -5985,6 +6327,9 @@ export const TokenAllowanceInfo: MessageFns<TokenAllowanceInfo> = {
     message.spentAmount = object.spentAmount ?? new Uint8Array(0);
     message.status = object.status ?? 0;
     message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    message.revokeSignature = object.revokeSignature ?? new Uint8Array(0);
+    message.ownerProvidedRevokeTimestamp = object.ownerProvidedRevokeTimestamp ?? 0;
+    message.revokeVersion = object.revokeVersion ?? 0;
     return message;
   },
 };
@@ -6296,6 +6641,15 @@ export const SparkTokenServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** Tombstone an existing allowance so no further delegated spends succeed. */
+    revoke_token_allowance: {
+      name: "revoke_token_allowance",
+      requestType: RevokeTokenAllowanceRequest,
+      requestStream: false,
+      responseType: RevokeTokenAllowanceResponse,
+      responseStream: false,
+      options: {},
+    },
     query_token_allowances: {
       name: "query_token_allowances",
       requestType: QueryTokenAllowancesRequest,
@@ -6353,6 +6707,11 @@ export interface SparkTokenServiceImplementation<CallContextExt = {}> {
     request: CreateTokenAllowanceRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CreateTokenAllowanceResponse>>;
+  /** Tombstone an existing allowance so no further delegated spends succeed. */
+  revoke_token_allowance(
+    request: RevokeTokenAllowanceRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<RevokeTokenAllowanceResponse>>;
   query_token_allowances(
     request: QueryTokenAllowancesRequest,
     context: CallContext & CallContextExt,
@@ -6405,6 +6764,11 @@ export interface SparkTokenServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<CreateTokenAllowanceRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CreateTokenAllowanceResponse>;
+  /** Tombstone an existing allowance so no further delegated spends succeed. */
+  revoke_token_allowance(
+    request: DeepPartial<RevokeTokenAllowanceRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RevokeTokenAllowanceResponse>;
   query_token_allowances(
     request: DeepPartial<QueryTokenAllowancesRequest>,
     options?: CallOptions & CallOptionsExt,

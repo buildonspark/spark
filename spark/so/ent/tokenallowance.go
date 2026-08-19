@@ -65,6 +65,8 @@ type TokenAllowance struct {
 	OwnerProvidedRevokeTimestamp uint64 `json:"owner_provided_revoke_timestamp,omitempty"`
 	// The owner's signature over the revoke statement hash, present once revoked.
 	RevokeSignature []byte `json:"revoke_signature,omitempty"`
+	// Version of the revoke payload the owner signed; persisted so the tombstoned grant can be served back with a verifiable revoke proof.
+	RevokeVersion uint64 `json:"revoke_version,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenAllowanceQuery when eager-loading is set.
 	Edges        TokenAllowanceEdges `json:"edges"`
@@ -104,7 +106,7 @@ func (*TokenAllowance) scanValues(columns []string) ([]any, error) {
 			values[i] = new(btcnetwork.Network)
 		case tokenallowance.FieldOwnerPublicKey, tokenallowance.FieldSpenderPublicKey:
 			values[i] = new(keys.Public)
-		case tokenallowance.FieldVersion, tokenallowance.FieldOwnerProvidedTimestamp, tokenallowance.FieldOwnerProvidedRevokeTimestamp:
+		case tokenallowance.FieldVersion, tokenallowance.FieldOwnerProvidedTimestamp, tokenallowance.FieldOwnerProvidedRevokeTimestamp, tokenallowance.FieldRevokeVersion:
 			values[i] = new(sql.NullInt64)
 		case tokenallowance.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -262,6 +264,12 @@ func (ta *TokenAllowance) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				ta.RevokeSignature = *value
 			}
+		case tokenallowance.FieldRevokeVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field revoke_version", values[i])
+			} else if value.Valid {
+				ta.RevokeVersion = uint64(value.Int64)
+			}
 		default:
 			ta.selectValues.Set(columns[i], values[i])
 		}
@@ -367,6 +375,9 @@ func (ta *TokenAllowance) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("revoke_signature=")
 	builder.WriteString(fmt.Sprintf("%v", ta.RevokeSignature))
+	builder.WriteString(", ")
+	builder.WriteString("revoke_version=")
+	builder.WriteString(fmt.Sprintf("%v", ta.RevokeVersion))
 	builder.WriteByte(')')
 	return builder.String()
 }

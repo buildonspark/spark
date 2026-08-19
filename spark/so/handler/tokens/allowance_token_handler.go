@@ -27,11 +27,15 @@ import (
 
 type AllowanceTokenHandler struct {
 	config *so.Config
+	// gossip is injected rather than constructed here: so/handler imports this package for the
+	// consensus flow handlers, so importing it back would be an import cycle.
+	gossip consensus.GossipSender
 }
 
-func NewAllowanceTokenHandler(config *so.Config) *AllowanceTokenHandler {
+func NewAllowanceTokenHandler(config *so.Config, gossip consensus.GossipSender) *AllowanceTokenHandler {
 	return &AllowanceTokenHandler{
 		config: config,
+		gossip: gossip,
 	}
 }
 
@@ -106,6 +110,65 @@ func (h *AllowanceTokenHandler) CreateTokenAllowance(ctx context.Context, req *t
 		return &tokenpb.CreateTokenAllowanceResponse{}, nil
 	}
 	return &tokenpb.CreateTokenAllowanceResponse{Allowance: allowance}, nil
+}
+
+// RevokeTokenAllowance tombstones an existing allowance so no further delegated spends succeed.
+//
+// Unlike create and query, revoke is deliberately NOT gated on the allowances-enable knob, so an
+// owner can still revoke a grant they made while the feature was on. The wallet kill switch does
+// gate it, like every other state-mutating handler.
+func (h *AllowanceTokenHandler) RevokeTokenAllowance(ctx context.Context, req *tokenpb.RevokeTokenAllowanceRequest) (*tokenpb.RevokeTokenAllowanceResponse, error) {
+	revokePayload := req.GetRevokeAllowancePayload()
+	ownerPublicKey, err := keys.ParsePublicKey(revokePayload.GetOwnerPublicKey())
+	if err != nil {
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner public key: %w", err))
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerPublicKey); err != nil {
+		return nil, err
+	}
+	if err := authz.EnforceWalletNotKillSwitched(ctx, ownerPublicKey); err != nil {
+		return nil, err
+	}
+
+	// Freshness is enforced only at this public edge; see CreateTokenAllowance for rationale.
+	if err := ValidateTimestampMillis(revokePayload.GetOwnerProvidedTimestamp()); err != nil {
+		return nil, err
+	}
+
+	if err := ValidateAndApplyRevokeAllowance(ctx, h.config, revokePayload, req.GetOwnerSignature()); err != nil {
+		return nil, err
+	}
+
+	// Propagate the revocation to every other operator over durable gossip: the
+	// Gossip row is created in the SAME transaction as the tombstone and
+	// committed atomically, then best-effort sent. The send_gossip retry task
+	// redelivers to any operator that has not acked until the per-participant
+	// receipts bitmap is full, so a partial fan-out self-heals (fail-closed)
+	// without owner action - replacing the previous best-effort fan-out and its
+	// reconcile cron. Each operator re-verifies the owner signature carried in
+	// the message, so durability confers no trust.
+	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	participants, err := excludeSelf.OperatorIdentifierList(h.config)
+	if err != nil {
+		return nil, errors.InternalUnhandledError(fmt.Errorf("failed to list operators for allowance revoke gossip: %w", err))
+	}
+
+	var gossipRow *ent.Gossip
+	if len(participants) > 0 {
+		gossipRow, err = h.gossip.CreateCommitAndSendGossipMessage(
+			ctx, revokeAllowanceGossipMessage(revokePayload, req.GetOwnerSignature()), participants,
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else if err := ent.DbCommit(ctx); err != nil {
+		// Single-operator federation: nothing to gossip, just commit the tombstone.
+		return nil, errors.InternalDatabaseWriteError(fmt.Errorf("failed to commit token allowance revocation: %w", err))
+	}
+
+	return &tokenpb.RevokeTokenAllowanceResponse{
+		AllowanceProgress: buildAllowanceRevokeProgress(h.config, participants, gossipRow),
+	}, nil
 }
 
 // allowanceQueryPageSize is the default and maximum page size for
@@ -247,12 +310,20 @@ func allowanceRowToInfo(row *ent.TokenAllowance) (*tokenpb.TokenAllowanceInfo, e
 		OwnerProvidedTimestamp: row.OwnerProvidedTimestamp,
 	}
 
-	return &tokenpb.TokenAllowanceInfo{
+	info := &tokenpb.TokenAllowanceInfo{
 		AllowancePayload: payload,
 		SpentAmount:      row.SpentAmount,
 		Status:           allowanceStatusToProto(row.Status),
 		OwnerSignature:   row.OwnerSignature,
-	}, nil
+	}
+	// Serve the revoke proof for tombstoned rows so clients can verify the
+	// owner authorized the revocation, mirroring the create proof above.
+	if row.Status == schematype.TokenAllowanceStatusRevoked {
+		info.RevokeSignature = row.RevokeSignature
+		info.OwnerProvidedRevokeTimestamp = row.OwnerProvidedRevokeTimestamp
+		info.RevokeVersion = uint32(row.RevokeVersion)
+	}
+	return info, nil
 }
 
 func allowanceStatusToProto(status schematype.TokenAllowanceStatus) tokenpb.TokenAllowanceStatus {

@@ -240,6 +240,7 @@ func sparkTokenServicePolicies() map[string]Policy {
 		pbtoken.SparkTokenService_FreezeTokens_FullMethodName:           {AuthMode: AuthSession},
 		pbtoken.SparkTokenService_BroadcastTransaction_FullMethodName:   {AuthMode: AuthSession},
 		pbtoken.SparkTokenService_CreateTokenAllowance_FullMethodName:   {AuthMode: AuthSession},
+		pbtoken.SparkTokenService_RevokeTokenAllowance_FullMethodName:   {AuthMode: AuthSession},
 		pbtoken.SparkTokenService_QueryTokenAllowances_FullMethodName:   {AuthMode: AuthSession},
 	}
 }

@@ -116,6 +116,33 @@ func (tau *TokenAllowanceUpdate) ClearRevokeSignature() *TokenAllowanceUpdate {
 	return tau
 }
 
+// SetRevokeVersion sets the "revoke_version" field.
+func (tau *TokenAllowanceUpdate) SetRevokeVersion(u uint64) *TokenAllowanceUpdate {
+	tau.mutation.ResetRevokeVersion()
+	tau.mutation.SetRevokeVersion(u)
+	return tau
+}
+
+// SetNillableRevokeVersion sets the "revoke_version" field if the given value is not nil.
+func (tau *TokenAllowanceUpdate) SetNillableRevokeVersion(u *uint64) *TokenAllowanceUpdate {
+	if u != nil {
+		tau.SetRevokeVersion(*u)
+	}
+	return tau
+}
+
+// AddRevokeVersion adds u to the "revoke_version" field.
+func (tau *TokenAllowanceUpdate) AddRevokeVersion(u int64) *TokenAllowanceUpdate {
+	tau.mutation.AddRevokeVersion(u)
+	return tau
+}
+
+// ClearRevokeVersion clears the value of the "revoke_version" field.
+func (tau *TokenAllowanceUpdate) ClearRevokeVersion() *TokenAllowanceUpdate {
+	tau.mutation.ClearRevokeVersion()
+	return tau
+}
+
 // Mutation returns the TokenAllowanceMutation object of the builder.
 func (tau *TokenAllowanceUpdate) Mutation() *TokenAllowanceMutation {
 	return tau.mutation
@@ -221,6 +248,15 @@ func (tau *TokenAllowanceUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if tau.mutation.RevokeSignatureCleared() {
 		_spec.ClearField(tokenallowance.FieldRevokeSignature, field.TypeBytes)
 	}
+	if value, ok := tau.mutation.RevokeVersion(); ok {
+		_spec.SetField(tokenallowance.FieldRevokeVersion, field.TypeUint64, value)
+	}
+	if value, ok := tau.mutation.AddedRevokeVersion(); ok {
+		_spec.AddField(tokenallowance.FieldRevokeVersion, field.TypeUint64, value)
+	}
+	if tau.mutation.RevokeVersionCleared() {
+		_spec.ClearField(tokenallowance.FieldRevokeVersion, field.TypeUint64)
+	}
 	_spec.AddModifiers(tau.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -325,6 +361,33 @@ func (tauo *TokenAllowanceUpdateOne) SetRevokeSignature(b []byte) *TokenAllowanc
 // ClearRevokeSignature clears the value of the "revoke_signature" field.
 func (tauo *TokenAllowanceUpdateOne) ClearRevokeSignature() *TokenAllowanceUpdateOne {
 	tauo.mutation.ClearRevokeSignature()
+	return tauo
+}
+
+// SetRevokeVersion sets the "revoke_version" field.
+func (tauo *TokenAllowanceUpdateOne) SetRevokeVersion(u uint64) *TokenAllowanceUpdateOne {
+	tauo.mutation.ResetRevokeVersion()
+	tauo.mutation.SetRevokeVersion(u)
+	return tauo
+}
+
+// SetNillableRevokeVersion sets the "revoke_version" field if the given value is not nil.
+func (tauo *TokenAllowanceUpdateOne) SetNillableRevokeVersion(u *uint64) *TokenAllowanceUpdateOne {
+	if u != nil {
+		tauo.SetRevokeVersion(*u)
+	}
+	return tauo
+}
+
+// AddRevokeVersion adds u to the "revoke_version" field.
+func (tauo *TokenAllowanceUpdateOne) AddRevokeVersion(u int64) *TokenAllowanceUpdateOne {
+	tauo.mutation.AddRevokeVersion(u)
+	return tauo
+}
+
+// ClearRevokeVersion clears the value of the "revoke_version" field.
+func (tauo *TokenAllowanceUpdateOne) ClearRevokeVersion() *TokenAllowanceUpdateOne {
+	tauo.mutation.ClearRevokeVersion()
 	return tauo
 }
 
@@ -462,6 +525,15 @@ func (tauo *TokenAllowanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenA
 	}
 	if tauo.mutation.RevokeSignatureCleared() {
 		_spec.ClearField(tokenallowance.FieldRevokeSignature, field.TypeBytes)
+	}
+	if value, ok := tauo.mutation.RevokeVersion(); ok {
+		_spec.SetField(tokenallowance.FieldRevokeVersion, field.TypeUint64, value)
+	}
+	if value, ok := tauo.mutation.AddedRevokeVersion(); ok {
+		_spec.AddField(tokenallowance.FieldRevokeVersion, field.TypeUint64, value)
+	}
+	if tauo.mutation.RevokeVersionCleared() {
+		_spec.ClearField(tokenallowance.FieldRevokeVersion, field.TypeUint64)
 	}
 	_spec.AddModifiers(tauo.modifiers...)
 	_node = &TokenAllowance{config: tauo.config}

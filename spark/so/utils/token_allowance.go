@@ -20,7 +20,7 @@ const (
 	tokenAllowancePayloadVersion uint32 = 1
 	// maxRecipientAllowlistEntries bounds recipient_allowlist. 256 recipients is
 	// orders of magnitude beyond realistic merchant/payout sets while keeping the
-	// stored row (~8.4KB of keys) and the per-spend allowlist scan bounded - an
+	// stored row (~8.4KB of keys) and the per-spend allowlist scan bounded — an
 	// unbounded list would let one owner-signed payload amplify storage and
 	// validation cost on every SO. Mirrored by the proto max_items rule.
 	maxRecipientAllowlistEntries = 256
@@ -35,6 +35,11 @@ const (
 // allowance creation can never be replayed as any other statement. Bump the version component
 // on any layout change: the hash is what the owner signs.
 var createTokenAllowanceHashTag = []string{"spark", "token", "create_token_allowance", "v1"}
+
+// revokeTokenAllowanceHashTag domain-separates the statement hash so a signature over an
+// allowance revocation can never be replayed as any other statement. Bump the version component
+// on any layout change: the hash is what the owner signs.
+var revokeTokenAllowanceHashTag = []string{"spark", "token", "revoke_token_allowance", "v1"}
 
 // HashCreateTokenAllowancePayload returns the canonical statement hash the owner signs to
 // authorize a token allowance. Values are added, in order: version, the lowercase network name,
@@ -94,6 +99,46 @@ func HashCreateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload) ([]
 		AddUint64(expiryUnixSeconds(payload)).
 		AddUint64(payload.GetOwnerProvidedTimestamp()).
 		Hash(), nil
+}
+
+// HashRevokeTokenAllowancePayload returns the canonical statement hash the owner signs to revoke
+// an allowance. Values are added, in order: version, allowance_id, owner_public_key, and
+// owner_provided_timestamp.
+//
+// The layout is consumed cross-language: the TypeScript SDK MUST produce an identical hash. See
+// TestHashRevokeTokenAllowancePayload_KnownVector for the frozen reference vector.
+func HashRevokeTokenAllowancePayload(payload *tokenpb.RevokeTokenAllowancePayload) ([]byte, error) {
+	if payload == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("revoke token allowance payload cannot be nil"))
+	}
+
+	if err := requireByteLen("allowance_id", payload.GetAllowanceId(), allowanceIDLength); err != nil {
+		return nil, err
+	}
+	if err := requireByteLen("owner_public_key", payload.GetOwnerPublicKey(), allowancePubKeyLength); err != nil {
+		return nil, err
+	}
+
+	return hashstructure.NewHasher(revokeTokenAllowanceHashTag).
+		AddUint32(payload.GetVersion()).
+		AddBytes(payload.GetAllowanceId()).
+		AddBytes(payload.GetOwnerPublicKey()).
+		AddUint64(payload.GetOwnerProvidedTimestamp()).
+		Hash(), nil
+}
+
+// ValidateRevokeTokenAllowancePayload enforces the policy invariants a revocation must satisfy
+// before an SO tombstones a grant. Only the version needs checking: every other revoke field is
+// bound either by the stored allowance or by the statement hash. It does not verify the owner
+// signature; callers do that separately against the hash from HashRevokeTokenAllowancePayload.
+func ValidateRevokeTokenAllowancePayload(payload *tokenpb.RevokeTokenAllowancePayload) error {
+	if payload == nil {
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("revoke token allowance payload cannot be nil"))
+	}
+	if payload.GetVersion() != tokenAllowancePayloadVersion {
+		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token allowance revoke version: %d", payload.GetVersion()))
+	}
+	return nil
 }
 
 // ValidateTokenAllowancePayload enforces the policy invariants an allowance must satisfy before

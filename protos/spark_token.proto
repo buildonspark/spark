@@ -39,6 +39,10 @@ service SparkTokenService {
     rpc create_token_allowance(CreateTokenAllowanceRequest)
         returns (CreateTokenAllowanceResponse) {}
 
+    // Tombstone an existing allowance so no further delegated spends succeed.
+    rpc revoke_token_allowance(RevokeTokenAllowanceRequest)
+        returns (RevokeTokenAllowanceResponse) {}
+
     rpc query_token_allowances(QueryTokenAllowancesRequest)
         returns (QueryTokenAllowancesResponse) {}
 }
@@ -497,6 +501,24 @@ message CreateTokenAllowanceResponse {
     TokenAllowanceInfo allowance = 1;
 }
 
+message RevokeTokenAllowancePayload {
+    uint32 version = 1;
+    bytes allowance_id = 2 [(validate.rules).bytes.len = 16];
+    bytes owner_public_key = 3 [(validate.rules).bytes.len = 33];
+    // Wallet-provided revoke timestamp in milliseconds, used to order updates.
+    uint64 owner_provided_timestamp = 4;
+}
+
+message RevokeTokenAllowanceRequest {
+    RevokeTokenAllowancePayload revoke_allowance_payload = 1;
+    // Schnorr or ECDSA DER signature (64-73 bytes) by the owner over the payload hash.
+    bytes owner_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message RevokeTokenAllowanceResponse {
+    AllowanceProgress allowance_progress = 1;
+}
+
 enum TokenAllowanceStatus {
     TOKEN_ALLOWANCE_STATUS_UNSPECIFIED = 0;
     TOKEN_ALLOWANCE_STATUS_ACTIVE = 1;
@@ -513,6 +535,16 @@ message TokenAllowanceInfo {
     // verify the owner authored these policy terms - the queried SO cannot
     // fabricate or alter grant terms.
     bytes owner_signature = 4;
+    // The owner's signature over the revoke statement hash, present once the
+    // allowance is REVOKED. Together with owner_provided_revoke_timestamp and
+    // revoke_version, clients can reconstruct RevokeTokenAllowancePayload,
+    // recompute HashRevokeTokenAllowancePayload, and verify the owner
+    // authorized the revocation.
+    bytes revoke_signature = 5;
+    // Wallet-provided revoke timestamp in milliseconds, set once REVOKED.
+    uint64 owner_provided_revoke_timestamp = 6;
+    // Version of the revoke payload the owner signed, set once REVOKED.
+    uint32 revoke_version = 7;
 }
 
 // Request constraints are combined using an AND relation.

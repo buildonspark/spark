@@ -194,6 +194,20 @@ func (tac *TokenAllowanceCreate) SetRevokeSignature(b []byte) *TokenAllowanceCre
 	return tac
 }
 
+// SetRevokeVersion sets the "revoke_version" field.
+func (tac *TokenAllowanceCreate) SetRevokeVersion(u uint64) *TokenAllowanceCreate {
+	tac.mutation.SetRevokeVersion(u)
+	return tac
+}
+
+// SetNillableRevokeVersion sets the "revoke_version" field if the given value is not nil.
+func (tac *TokenAllowanceCreate) SetNillableRevokeVersion(u *uint64) *TokenAllowanceCreate {
+	if u != nil {
+		tac.SetRevokeVersion(*u)
+	}
+	return tac
+}
+
 // SetID sets the "id" field.
 func (tac *TokenAllowanceCreate) SetID(u uuid.UUID) *TokenAllowanceCreate {
 	tac.mutation.SetID(u)
@@ -457,6 +471,10 @@ func (tac *TokenAllowanceCreate) createSpec() (*TokenAllowance, *sqlgraph.Create
 		_spec.SetField(tokenallowance.FieldRevokeSignature, field.TypeBytes, value)
 		_node.RevokeSignature = value
 	}
+	if value, ok := tac.mutation.RevokeVersion(); ok {
+		_spec.SetField(tokenallowance.FieldRevokeVersion, field.TypeUint64, value)
+		_node.RevokeVersion = value
+	}
 	if nodes := tac.mutation.TokenCreateIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -619,6 +637,30 @@ func (u *TokenAllowanceUpsert) UpdateRevokeSignature() *TokenAllowanceUpsert {
 // ClearRevokeSignature clears the value of the "revoke_signature" field.
 func (u *TokenAllowanceUpsert) ClearRevokeSignature() *TokenAllowanceUpsert {
 	u.SetNull(tokenallowance.FieldRevokeSignature)
+	return u
+}
+
+// SetRevokeVersion sets the "revoke_version" field.
+func (u *TokenAllowanceUpsert) SetRevokeVersion(v uint64) *TokenAllowanceUpsert {
+	u.Set(tokenallowance.FieldRevokeVersion, v)
+	return u
+}
+
+// UpdateRevokeVersion sets the "revoke_version" field to the value that was provided on create.
+func (u *TokenAllowanceUpsert) UpdateRevokeVersion() *TokenAllowanceUpsert {
+	u.SetExcluded(tokenallowance.FieldRevokeVersion)
+	return u
+}
+
+// AddRevokeVersion adds v to the "revoke_version" field.
+func (u *TokenAllowanceUpsert) AddRevokeVersion(v uint64) *TokenAllowanceUpsert {
+	u.Add(tokenallowance.FieldRevokeVersion, v)
+	return u
+}
+
+// ClearRevokeVersion clears the value of the "revoke_version" field.
+func (u *TokenAllowanceUpsert) ClearRevokeVersion() *TokenAllowanceUpsert {
+	u.SetNull(tokenallowance.FieldRevokeVersion)
 	return u
 }
 
@@ -824,6 +866,34 @@ func (u *TokenAllowanceUpsertOne) UpdateRevokeSignature() *TokenAllowanceUpsertO
 func (u *TokenAllowanceUpsertOne) ClearRevokeSignature() *TokenAllowanceUpsertOne {
 	return u.Update(func(s *TokenAllowanceUpsert) {
 		s.ClearRevokeSignature()
+	})
+}
+
+// SetRevokeVersion sets the "revoke_version" field.
+func (u *TokenAllowanceUpsertOne) SetRevokeVersion(v uint64) *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.SetRevokeVersion(v)
+	})
+}
+
+// AddRevokeVersion adds v to the "revoke_version" field.
+func (u *TokenAllowanceUpsertOne) AddRevokeVersion(v uint64) *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.AddRevokeVersion(v)
+	})
+}
+
+// UpdateRevokeVersion sets the "revoke_version" field to the value that was provided on create.
+func (u *TokenAllowanceUpsertOne) UpdateRevokeVersion() *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.UpdateRevokeVersion()
+	})
+}
+
+// ClearRevokeVersion clears the value of the "revoke_version" field.
+func (u *TokenAllowanceUpsertOne) ClearRevokeVersion() *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.ClearRevokeVersion()
 	})
 }
 
@@ -1196,6 +1266,34 @@ func (u *TokenAllowanceUpsertBulk) UpdateRevokeSignature() *TokenAllowanceUpsert
 func (u *TokenAllowanceUpsertBulk) ClearRevokeSignature() *TokenAllowanceUpsertBulk {
 	return u.Update(func(s *TokenAllowanceUpsert) {
 		s.ClearRevokeSignature()
+	})
+}
+
+// SetRevokeVersion sets the "revoke_version" field.
+func (u *TokenAllowanceUpsertBulk) SetRevokeVersion(v uint64) *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.SetRevokeVersion(v)
+	})
+}
+
+// AddRevokeVersion adds v to the "revoke_version" field.
+func (u *TokenAllowanceUpsertBulk) AddRevokeVersion(v uint64) *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.AddRevokeVersion(v)
+	})
+}
+
+// UpdateRevokeVersion sets the "revoke_version" field to the value that was provided on create.
+func (u *TokenAllowanceUpsertBulk) UpdateRevokeVersion() *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.UpdateRevokeVersion()
+	})
+}
+
+// ClearRevokeVersion clears the value of the "revoke_version" field.
+func (u *TokenAllowanceUpsertBulk) ClearRevokeVersion() *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.ClearRevokeVersion()
 	})
 }
 
