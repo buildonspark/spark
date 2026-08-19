@@ -1,8 +1,10 @@
+import { bytesToHex } from "@noble/curves/utils";
 import { type ConfigOptions } from "../../services/wallet-config.js";
 import { type TreeNode } from "../../proto/spark.js";
 import {
   getCurrentTimelock,
   getTxFromRawTxBytes,
+  getTxFromRawTxHex,
   getTxId,
 } from "../../utils/index.js";
 import { SparkWalletTestingIntegrationWithStream } from "../utils/spark-testing-wallet.js";
@@ -101,10 +103,29 @@ async function waitForStatus(
   );
 }
 
-describe("Recover a watchtower-exited leaf", () => {
-  it("co-signs a spend of the stranded output and retires the leaf", async () => {
-    const faucet = BitcoinFaucet.getInstance();
+/** The outpoint a signed recovery transaction spends. */
+function spentOutpoint(txHex: string): string {
+  const input = getTxFromRawTxHex(txHex).getInput(0);
+  return `${bytesToHex(input.txid!)}:${input.index}`;
+}
 
+/**
+ * Stranding a leaf costs dozens of transfers, so the cases below share one and
+ * run in order rather than each building their own. Recovery is repeatable by
+ * design — every attempt spends the same output and at most one can confirm —
+ * so a later case re-signing after an earlier one is the intended usage, not an
+ * artefact of the sharing.
+ */
+describe("Recover a watchtower-exited leaf", () => {
+  const faucet = BitcoinFaucet.getInstance();
+  let holder: Wallet;
+  let other: Wallet;
+  let leafId: string;
+  let parentDirectTxid: string;
+  let destinationAddress: string;
+  let explicitRecoveryTxHex: string;
+
+  beforeAll(async () => {
     const { wallet: walletA } =
       await SparkWalletTestingIntegrationWithStream.initialize({ options });
     const { wallet: walletB } =
@@ -121,13 +142,13 @@ describe("Recover a watchtower-exited leaf", () => {
 
     let leaf = await onlyLeaf(walletA);
     expect(refundTimelockOf(leaf)).toBe(INITIAL_TIMELOCK);
-    const leafId = leaf.id;
+    leafId = leaf.id;
 
     // ---- Transfer back and forth until the leaf renews twice -------------
     // A deposit-root leaf's node tx has a final sequence, so every renewal
     // takes the zero-timelock path and appends a split node.
-    let holder: Wallet = walletA;
-    let other: Wallet = walletB;
+    holder = walletA;
+    other = walletB;
     let renewals = 0;
     let previousTimelock = refundTimelockOf(leaf);
 
@@ -172,29 +193,84 @@ describe("Recover a watchtower-exited leaf", () => {
     await faucet.mineBlocksAndWaitForMiningToComplete(55);
     await waitForStatus(holder, leafId, "WATCHTOWER_EXITED", faucet);
 
-    // ---- Recover -----------------------------------------------------------
-    const parentDirectTx = getTxFromRawTxBytes(parent!.directTx);
-    const destinationAddress = await faucet.getNewAddress();
+    parentDirectTxid = getTxId(getTxFromRawTxBytes(parent!.directTx));
+    destinationAddress = await faucet.getNewAddress();
+  }, 900_000);
 
-    const recoveryTxHex = await holder.recoverWatchtowerExitedLeaf({
-      leafId,
-      recoveryTxid: getTxId(parentDirectTx),
+  it("lists the stranded leaf with the output that can still be spent", async () => {
+    // Nothing else surfaces this leaf: it stopped being AVAILABLE the moment
+    // the watchtower's transaction confirmed, so it is absent from the balance
+    // and from getLeaves.
+    expect(await holder.getLeaves()).toEqual([]);
+
+    const stranded = await holder.getWatchtowerExitedLeaves();
+
+    expect(stranded.length).toBe(1);
+    const [entry] = stranded;
+    expect(entry!.leafId).toBe(leafId);
+    expect(entry!.status).toBe("WATCHTOWER_EXITED");
+    expect(entry!.valueSats).toBe(TRANSFER_AMOUNT);
+    // Resolved from ancestor status alone, with no txid supplied — the renewal
+    // chain holds several transactions paying this same key.
+    expect(entry!.recovery?.txid).toBe(parentDirectTxid);
+    expect(entry!.recovery?.valueSats).toBeGreaterThan(0);
+  }, 120_000);
+
+  it("co-signs the output the listing named, and retires the leaf", async () => {
+    // Fed from the listing rather than from parentDirectTxid, so the two halves
+    // of the API are exercised as a caller would use them: whatever
+    // getWatchtowerExitedLeaves resolved is what gets spent, output index
+    // included.
+    const [stranded] = await holder.getWatchtowerExitedLeaves();
+    const recovery = stranded!.recovery!;
+
+    explicitRecoveryTxHex = await holder.recoverWatchtowerExitedLeaf({
+      leafId: stranded!.leafId,
+      recoveryTxid: recovery.txid,
+      outputIndex: recovery.outputIndex,
       destinationAddress,
       satsPerVbyteFee: 5,
     });
-    expect(recoveryTxHex).toBeTruthy();
+    expect(spentOutpoint(explicitRecoveryTxHex)).toBe(
+      `${recovery.txid}:${recovery.outputIndex}`,
+    );
+    expect(
+      Number(getTxFromRawTxHex(explicitRecoveryTxHex).getOutput(0).amount),
+    ).toBeLessThan(recovery.valueSats);
 
     // The signature is what retires the leaf, not the broadcast.
     expect(await nodeStatus(holder, leafId)).toBe("WATCHTOWER_EXIT_RECOVERED");
 
-    const recoveryTxid = await faucet.broadcastTx(recoveryTxHex);
+    const [recovered] = await holder.getWatchtowerExitedLeaves();
+    expect(recovered?.status).toBe("WATCHTOWER_EXIT_RECOVERED");
+  }, 120_000);
+
+  it("re-signs at a higher fee without a recoveryTxid, spending the same output", async () => {
+    const bumpedRecoveryTxHex = await holder.recoverWatchtowerExitedLeaf({
+      leafId,
+      destinationAddress,
+      satsPerVbyteFee: 20,
+    });
+
+    // Picking the source transaction unaided has to land on the same outpoint,
+    // or the two recoveries would not be alternatives to each other.
+    expect(spentOutpoint(bumpedRecoveryTxHex)).toBe(
+      spentOutpoint(explicitRecoveryTxHex),
+    );
+    const bumped = getTxFromRawTxHex(bumpedRecoveryTxHex).getOutput(0).amount!;
+    const original = getTxFromRawTxHex(explicitRecoveryTxHex).getOutput(
+      0,
+    ).amount!;
+    expect(bumped).toBeLessThan(original);
+
+    const recoveryTxid = await faucet.broadcastTx(bumpedRecoveryTxHex);
     expect(recoveryTxid).toBeTruthy();
     await faucet.mineBlocksAndWaitForMiningToComplete(2);
+  }, 120_000);
 
-    // That a recovered leaf can no longer move off-chain is not asserted here:
-    // the wallet has no spendable leaf left either way, so a transfer would be
-    // refused for want of funds whatever the status rule said. The status check
-    // above is the real evidence, and the rule itself is covered by the
-    // transfer handler's own tests.
-  }, 900_000);
+  // That a recovered leaf can no longer move off-chain is deliberately not
+  // asserted here: the wallet has no spendable leaf left either way, so a
+  // transfer would be refused for want of funds whatever the status rule said.
+  // The WATCHTOWER_EXIT_RECOVERED assertions above are the real evidence, and the
+  // rule itself is covered by the transfer handler's own tests.
 });

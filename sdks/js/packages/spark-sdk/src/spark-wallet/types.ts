@@ -315,3 +315,24 @@ export type CreateHTLCParams = {
   preimage?: string;
   expiryTime: Date;
 };
+
+/**
+ * A leaf whose exit path a watchtower exit cut off, as returned by
+ * SparkWallet.getWatchtowerExitedLeaves.
+ */
+export type WatchtowerExitedLeaf = {
+  leafId: string;
+  status: "WATCHTOWER_EXITED" | "WATCHTOWER_EXIT_RECOVERED";
+  /** The leaf's recorded value. */
+  valueSats: number;
+  /**
+   * The on-chain output to spend, absent when none could be resolved. Its
+   * valueSats is what recovery actually pays out from, before the fee — the
+   * output predates the leaf's last renewals, so it can differ from the leaf's.
+   */
+  recovery?: {
+    txid: string;
+    outputIndex: number;
+    valueSats: number;
+  };
+};

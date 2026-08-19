@@ -1770,6 +1770,29 @@ export default class LeafManager {
   // Network Queries
   // ---------------------------------------------------------------------------
 
+  /**
+   * Queries the nodes a watchtower exit stranded, ancestors included.
+   *
+   * Ancestors come back inline rather than from a follow-up nodeIds lookup,
+   * which the operator caps at 1000 ids — enough to fail the whole listing for
+   * exactly the long-lived wallets this exists for. Paging carries no such cap.
+   */
+  public async queryWatchtowerExitedNodes(): Promise<TreeNode[]> {
+    const response = await this.queryNodes({
+      source: {
+        $case: "ownerIdentityPubkey",
+        ownerIdentityPubkey: await this.config.signer.getIdentityPublicKey(),
+      },
+      includeParents: true,
+      network: this.config.getNetworkProto(),
+      statuses: [
+        TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXITED,
+        TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED,
+      ],
+    });
+    return Object.values(response.nodes);
+  }
+
   private async queryNodes(
     baseRequest: Omit<QueryNodesRequest, "limit" | "offset">,
     sparkClientAddress?: string,
@@ -1792,6 +1815,12 @@ export default class LeafManager {
 
       Object.assign(aggregatedNodes, response.nodes ?? {});
 
+      // Counted locally rather than driven off response.offset: that field is
+      // proto3, so an operator that never sets it is indistinguishable from one
+      // asking to resume at 0, and the loop would never end. The cost is that
+      // ancestors count towards the total under includeParents, so a final page
+      // they pad out buys one extra empty request. It cannot stop early — the
+      // total is never below the matched count.
       const received = Object.keys(response.nodes ?? {}).length;
       if (received < pageSize || baseRequest.source?.$case === "nodeIds") {
         return {
