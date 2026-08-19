@@ -15460,6 +15460,708 @@ var _ interface {
 	ErrorName() string
 } = CoopExitRollbackRequestValidationError{}
 
+// Validate checks the field values on TokenTransactionPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TokenTransactionPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TokenTransactionPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// TokenTransactionPrepareRequestMultiError, or nil if none found.
+func (m *TokenTransactionPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TokenTransactionPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TokenTransactionPrepareRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TokenTransactionPrepareRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TokenTransactionPrepareRequestValidationError{
+				field:  "FinalTokenTransaction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetTokenTransactionSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TokenTransactionPrepareRequestValidationError{
+						field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TokenTransactionPrepareRequestValidationError{
+						field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TokenTransactionPrepareRequestValidationError{
+					field:  fmt.Sprintf("TokenTransactionSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.ExecuteBefore != nil {
+
+		if all {
+			switch v := interface{}(m.GetExecuteBefore()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TokenTransactionPrepareRequestValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TokenTransactionPrepareRequestValidationError{
+						field:  "ExecuteBefore",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExecuteBefore()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TokenTransactionPrepareRequestValidationError{
+					field:  "ExecuteBefore",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return TokenTransactionPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// TokenTransactionPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by TokenTransactionPrepareRequest.ValidateAll()
+// if the designated constraints aren't met.
+type TokenTransactionPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TokenTransactionPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TokenTransactionPrepareRequestMultiError) AllErrors() []error { return m }
+
+// TokenTransactionPrepareRequestValidationError is the validation error
+// returned by TokenTransactionPrepareRequest.Validate if the designated
+// constraints aren't met.
+type TokenTransactionPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TokenTransactionPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TokenTransactionPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TokenTransactionPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TokenTransactionPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TokenTransactionPrepareRequestValidationError) ErrorName() string {
+	return "TokenTransactionPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TokenTransactionPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTokenTransactionPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TokenTransactionPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TokenTransactionPrepareRequestValidationError{}
+
+// Validate checks the field values on TokenTransactionPrepareResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TokenTransactionPrepareResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TokenTransactionPrepareResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// TokenTransactionPrepareResponseMultiError, or nil if none found.
+func (m *TokenTransactionPrepareResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TokenTransactionPrepareResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetSparkOperatorSignature()); l < 64 || l > 73 {
+		err := TokenTransactionPrepareResponseValidationError{
+			field:  "SparkOperatorSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return TokenTransactionPrepareResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// TokenTransactionPrepareResponseMultiError is an error wrapping multiple
+// validation errors returned by TokenTransactionPrepareResponse.ValidateAll()
+// if the designated constraints aren't met.
+type TokenTransactionPrepareResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TokenTransactionPrepareResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TokenTransactionPrepareResponseMultiError) AllErrors() []error { return m }
+
+// TokenTransactionPrepareResponseValidationError is the validation error
+// returned by TokenTransactionPrepareResponse.Validate if the designated
+// constraints aren't met.
+type TokenTransactionPrepareResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TokenTransactionPrepareResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TokenTransactionPrepareResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TokenTransactionPrepareResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TokenTransactionPrepareResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TokenTransactionPrepareResponseValidationError) ErrorName() string {
+	return "TokenTransactionPrepareResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TokenTransactionPrepareResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTokenTransactionPrepareResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TokenTransactionPrepareResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TokenTransactionPrepareResponseValidationError{}
+
+// Validate checks the field values on TokenTransactionOperatorSignature with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *TokenTransactionOperatorSignature) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TokenTransactionOperatorSignature
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// TokenTransactionOperatorSignatureMultiError, or nil if none found.
+func (m *TokenTransactionOperatorSignature) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TokenTransactionOperatorSignature) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetOperatorIdentityPublicKey()) != 33 {
+		err := TokenTransactionOperatorSignatureValidationError{
+			field:  "OperatorIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetSignature()); l < 64 || l > 73 {
+		err := TokenTransactionOperatorSignatureValidationError{
+			field:  "Signature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return TokenTransactionOperatorSignatureMultiError(errors)
+	}
+
+	return nil
+}
+
+// TokenTransactionOperatorSignatureMultiError is an error wrapping multiple
+// validation errors returned by
+// TokenTransactionOperatorSignature.ValidateAll() if the designated
+// constraints aren't met.
+type TokenTransactionOperatorSignatureMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TokenTransactionOperatorSignatureMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TokenTransactionOperatorSignatureMultiError) AllErrors() []error { return m }
+
+// TokenTransactionOperatorSignatureValidationError is the validation error
+// returned by TokenTransactionOperatorSignature.Validate if the designated
+// constraints aren't met.
+type TokenTransactionOperatorSignatureValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TokenTransactionOperatorSignatureValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TokenTransactionOperatorSignatureValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TokenTransactionOperatorSignatureValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TokenTransactionOperatorSignatureValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TokenTransactionOperatorSignatureValidationError) ErrorName() string {
+	return "TokenTransactionOperatorSignatureValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TokenTransactionOperatorSignatureValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTokenTransactionOperatorSignature.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TokenTransactionOperatorSignatureValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TokenTransactionOperatorSignatureValidationError{}
+
+// Validate checks the field values on TokenTransactionCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TokenTransactionCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TokenTransactionCommitRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// TokenTransactionCommitRequestMultiError, or nil if none found.
+func (m *TokenTransactionCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TokenTransactionCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetFinalTokenTransactionHash()) != 32 {
+		err := TokenTransactionCommitRequestValidationError{
+			field:  "FinalTokenTransactionHash",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetOperatorTransactionSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TokenTransactionCommitRequestValidationError{
+						field:  fmt.Sprintf("OperatorTransactionSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TokenTransactionCommitRequestValidationError{
+						field:  fmt.Sprintf("OperatorTransactionSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TokenTransactionCommitRequestValidationError{
+					field:  fmt.Sprintf("OperatorTransactionSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return TokenTransactionCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// TokenTransactionCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by TokenTransactionCommitRequest.ValidateAll()
+// if the designated constraints aren't met.
+type TokenTransactionCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TokenTransactionCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TokenTransactionCommitRequestMultiError) AllErrors() []error { return m }
+
+// TokenTransactionCommitRequestValidationError is the validation error
+// returned by TokenTransactionCommitRequest.Validate if the designated
+// constraints aren't met.
+type TokenTransactionCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TokenTransactionCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TokenTransactionCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TokenTransactionCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TokenTransactionCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TokenTransactionCommitRequestValidationError) ErrorName() string {
+	return "TokenTransactionCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TokenTransactionCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTokenTransactionCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TokenTransactionCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TokenTransactionCommitRequestValidationError{}
+
+// Validate checks the field values on TokenTransactionRollbackRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *TokenTransactionRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TokenTransactionRollbackRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// TokenTransactionRollbackRequestMultiError, or nil if none found.
+func (m *TokenTransactionRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TokenTransactionRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetFinalTokenTransactionHash()) != 32 {
+		err := TokenTransactionRollbackRequestValidationError{
+			field:  "FinalTokenTransactionHash",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return TokenTransactionRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// TokenTransactionRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by TokenTransactionRollbackRequest.ValidateAll()
+// if the designated constraints aren't met.
+type TokenTransactionRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TokenTransactionRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TokenTransactionRollbackRequestMultiError) AllErrors() []error { return m }
+
+// TokenTransactionRollbackRequestValidationError is the validation error
+// returned by TokenTransactionRollbackRequest.Validate if the designated
+// constraints aren't met.
+type TokenTransactionRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TokenTransactionRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TokenTransactionRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TokenTransactionRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TokenTransactionRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TokenTransactionRollbackRequestValidationError) ErrorName() string {
+	return "TokenTransactionRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e TokenTransactionRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTokenTransactionRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TokenTransactionRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TokenTransactionRollbackRequestValidationError{}
+
 // Validate checks the field values on ConsensusPrepareRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
