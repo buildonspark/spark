@@ -1,0 +1,13 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test:integration": {
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "test:integration:ssp": {
+      "cache": false,
+      "dependsOn": ["^build"]
+    }
+  }
+}
