@@ -33,6 +33,7 @@ service SparkTokenInternalService {
     // Internal freeze tokens (SO-to-SO coordination)
     rpc internal_freeze_tokens(InternalFreezeTokensRequest)
         returns (InternalFreezeTokensResponse) {}
+
 }
 
 message PrepareTransactionRequest {
@@ -156,3 +157,4 @@ message InternalFreezeTokensResponse {
     repeated spark_token.TokenOutputRef impacted_token_outputs = 1;
     bytes impacted_token_amount = 2;  // Decoded uint128
 }
+

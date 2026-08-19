@@ -120,6 +120,9 @@ func (TokenAllowance) Fields() []ent.Field {
 		field.Bytes("revoke_signature").
 			Optional().
 			Comment("The owner's signature over the revoke statement hash, present once revoked."),
+		field.Uint64("revoke_version").
+			Optional().
+			Comment("Version of the revoke payload the owner signed; persisted so the tombstoned grant can be served back with a verifiable revoke proof."),
 	}
 }
 

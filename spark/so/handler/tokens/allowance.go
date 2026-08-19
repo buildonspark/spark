@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/consensus"
@@ -364,4 +365,115 @@ func duplicateAllowanceCreateError(allowanceID uuid.UUID, err error) error {
 	default:
 		return errors.AlreadyExistsDuplicateOperation(fmt.Errorf("token allowance violates a uniqueness constraint: %w", err))
 	}
+}
+
+// ValidateAndApplyRevokeAllowance verifies an owner-signed revocation and tombstones the allowance
+// on this SO. Rows are never deleted; the tombstone is the replay protection. Shared between the
+// coordinator and the peer entry point, with each operator validating independently.
+//
+// Like ValidateAndApplyCreateAllowance, timestamp freshness is enforced only at the public
+// coordinator edge so replication recovery can replay the original signed payload indefinitely.
+func ValidateAndApplyRevokeAllowance(
+	ctx context.Context,
+	config *so.Config,
+	revokePayload *tokenpb.RevokeTokenAllowancePayload,
+	ownerSignature []byte,
+) error {
+	if err := utils.ValidateRevokeTokenAllowancePayload(revokePayload); err != nil {
+		return err
+	}
+
+	revokeTimestamp := revokePayload.GetOwnerProvidedTimestamp()
+
+	statementHash, err := utils.HashRevokeTokenAllowancePayload(revokePayload)
+	if err != nil {
+		return errors.InternalUnhandledError(fmt.Errorf("failed to hash revoke token allowance payload: %w", err))
+	}
+
+	allowanceID, err := uuid.FromBytes(revokePayload.GetAllowanceId())
+	if err != nil {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("invalid allowance_id: %w", err))
+	}
+
+	stored, err := ent.GetAllowanceByAllowanceIDForUpdate(ctx, allowanceID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.NotFoundMissingEntity(fmt.Errorf("allowance %s not found", allowanceID))
+		}
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to load allowance %s: %w", allowanceID, err))
+	}
+
+	payloadOwnerPublicKey, err := keys.ParsePublicKey(revokePayload.GetOwnerPublicKey())
+	if err != nil {
+		return errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse revoke owner public key: %w", err))
+	}
+	if !payloadOwnerPublicKey.Equals(stored.OwnerPublicKey) {
+		return errors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("revoke owner public key does not match the stored allowance owner public key"))
+	}
+
+	if err := utils.ValidateOwnershipSignature(ownerSignature, statementHash, stored.OwnerPublicKey); err != nil {
+		return errors.FailedPreconditionBadSignature(fmt.Errorf("invalid owner signature to revoke allowance %s: %w", allowanceID, err))
+	}
+
+	if revokeTimestamp < stored.OwnerProvidedTimestamp {
+		return errors.FailedPreconditionReplay(fmt.Errorf(
+			"stale revoke request: revoke timestamp %d predates grant timestamp %d",
+			revokeTimestamp, stored.OwnerProvidedTimestamp,
+		))
+	}
+
+	supersedingTombstone := false
+	if stored.Status == st.TokenAllowanceStatusRevoked {
+		if stored.RevokeVersion == uint64(revokePayload.GetVersion()) &&
+			stored.OwnerProvidedRevokeTimestamp == revokeTimestamp &&
+			bytes.Equal(stored.RevokeSignature, ownerSignature) {
+			return nil
+		}
+		if !revokeProofPrecedes(
+			revokeTimestamp,
+			ownerSignature,
+			stored.OwnerProvidedRevokeTimestamp,
+			stored.RevokeSignature,
+		) {
+			logging.GetLoggerFromContext(ctx).Sugar().Infof(
+				"token allowance %s dropped a non-canonical revoke proof with timestamp %d",
+				allowanceID,
+				revokeTimestamp,
+			)
+			return nil
+		}
+		supersedingTombstone = true
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := db.TokenAllowance.UpdateOneID(stored.ID).
+		SetStatus(st.TokenAllowanceStatusRevoked).
+		SetOwnerProvidedRevokeTimestamp(revokeTimestamp).
+		SetRevokeSignature(ownerSignature).
+		// Persist the revoke payload's version so the tombstoned grant can be
+		// served back with a verifiable owner-signed revoke proof.
+		SetRevokeVersion(uint64(revokePayload.GetVersion())).
+		Save(ctx); err != nil {
+		return errors.InternalDatabaseWriteError(fmt.Errorf("failed to revoke token allowance %s: %w", allowanceID, err))
+	}
+	if supersedingTombstone {
+		logging.GetLoggerFromContext(ctx).Sugar().Infof(
+			"token allowance %s revoke tombstone superseded by canonical proof with timestamp %d",
+			allowanceID,
+			revokeTimestamp,
+		)
+	}
+
+	return nil
+}
+
+// revokeProofPrecedes makes every operator select the same tombstone regardless of proof arrival order.
+func revokeProofPrecedes(incomingTimestamp uint64, incomingSignature []byte, storedTimestamp uint64, storedSignature []byte) bool {
+	if incomingTimestamp != storedTimestamp {
+		return incomingTimestamp < storedTimestamp
+	}
+	return bytes.Compare(incomingSignature, storedSignature) < 0
 }

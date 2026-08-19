@@ -149,6 +149,11 @@ func RevokeSignature(v []byte) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldEQ(FieldRevokeSignature, v))
 }
 
+// RevokeVersion applies equality check predicate on the "revoke_version" field. It's identical to RevokeVersionEQ.
+func RevokeVersion(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldRevokeVersion, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldEQ(FieldCreateTime, v))
@@ -937,6 +942,56 @@ func RevokeSignatureIsNil() predicate.TokenAllowance {
 // RevokeSignatureNotNil applies the NotNil predicate on the "revoke_signature" field.
 func RevokeSignatureNotNil() predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldNotNull(FieldRevokeSignature))
+}
+
+// RevokeVersionEQ applies the EQ predicate on the "revoke_version" field.
+func RevokeVersionEQ(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldRevokeVersion, v))
+}
+
+// RevokeVersionNEQ applies the NEQ predicate on the "revoke_version" field.
+func RevokeVersionNEQ(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNEQ(FieldRevokeVersion, v))
+}
+
+// RevokeVersionIn applies the In predicate on the "revoke_version" field.
+func RevokeVersionIn(vs ...uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldIn(FieldRevokeVersion, vs...))
+}
+
+// RevokeVersionNotIn applies the NotIn predicate on the "revoke_version" field.
+func RevokeVersionNotIn(vs ...uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNotIn(FieldRevokeVersion, vs...))
+}
+
+// RevokeVersionGT applies the GT predicate on the "revoke_version" field.
+func RevokeVersionGT(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldGT(FieldRevokeVersion, v))
+}
+
+// RevokeVersionGTE applies the GTE predicate on the "revoke_version" field.
+func RevokeVersionGTE(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldGTE(FieldRevokeVersion, v))
+}
+
+// RevokeVersionLT applies the LT predicate on the "revoke_version" field.
+func RevokeVersionLT(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldLT(FieldRevokeVersion, v))
+}
+
+// RevokeVersionLTE applies the LTE predicate on the "revoke_version" field.
+func RevokeVersionLTE(v uint64) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldLTE(FieldRevokeVersion, v))
+}
+
+// RevokeVersionIsNil applies the IsNil predicate on the "revoke_version" field.
+func RevokeVersionIsNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldIsNull(FieldRevokeVersion))
+}
+
+// RevokeVersionNotNil applies the NotNil predicate on the "revoke_version" field.
+func RevokeVersionNotNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNotNull(FieldRevokeVersion))
 }
 
 // HasTokenCreate applies the HasEdge predicate on the "token_create" edge.

@@ -764,6 +764,7 @@ var (
 		{Name: "flow_execution_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "owner_provided_revoke_timestamp", Type: field.TypeUint64, Nullable: true},
 		{Name: "revoke_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "revoke_version", Type: field.TypeUint64, Nullable: true},
 		{Name: "token_create_id", Type: field.TypeUUID},
 	}
 	// TokenAllowancesTable holds the schema information for the "token_allowances" table.
@@ -774,7 +775,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_allowances_token_creates_token_allowance",
-				Columns:    []*schema.Column{TokenAllowancesColumns[21]},
+				Columns:    []*schema.Column{TokenAllowancesColumns[22]},
 				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -783,7 +784,7 @@ var (
 			{
 				Name:    "tokenallowance_unique_active_grant",
 				Unique:  true,
-				Columns: []*schema.Column{TokenAllowancesColumns[5], TokenAllowancesColumns[6], TokenAllowancesColumns[21]},
+				Columns: []*schema.Column{TokenAllowancesColumns[5], TokenAllowancesColumns[6], TokenAllowancesColumns[22]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status = 'ACTIVE'",
 				},

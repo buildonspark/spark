@@ -27,6 +27,7 @@ const (
 	SparkTokenService_FreezeTokens_FullMethodName           = "/spark_token.SparkTokenService/freeze_tokens"
 	SparkTokenService_BroadcastTransaction_FullMethodName   = "/spark_token.SparkTokenService/broadcast_transaction"
 	SparkTokenService_CreateTokenAllowance_FullMethodName   = "/spark_token.SparkTokenService/create_token_allowance"
+	SparkTokenService_RevokeTokenAllowance_FullMethodName   = "/spark_token.SparkTokenService/revoke_token_allowance"
 	SparkTokenService_QueryTokenAllowances_FullMethodName   = "/spark_token.SparkTokenService/query_token_allowances"
 )
 
@@ -49,6 +50,8 @@ type SparkTokenServiceClient interface {
 	// Install an owner-signed spending allowance granting a spender bounded
 	// authority over the owner's token outputs. Coordinated across all SOs.
 	CreateTokenAllowance(ctx context.Context, in *CreateTokenAllowanceRequest, opts ...grpc.CallOption) (*CreateTokenAllowanceResponse, error)
+	// Tombstone an existing allowance so no further delegated spends succeed.
+	RevokeTokenAllowance(ctx context.Context, in *RevokeTokenAllowanceRequest, opts ...grpc.CallOption) (*RevokeTokenAllowanceResponse, error)
 	QueryTokenAllowances(ctx context.Context, in *QueryTokenAllowancesRequest, opts ...grpc.CallOption) (*QueryTokenAllowancesResponse, error)
 }
 
@@ -140,6 +143,16 @@ func (c *sparkTokenServiceClient) CreateTokenAllowance(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *sparkTokenServiceClient) RevokeTokenAllowance(ctx context.Context, in *RevokeTokenAllowanceRequest, opts ...grpc.CallOption) (*RevokeTokenAllowanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeTokenAllowanceResponse)
+	err := c.cc.Invoke(ctx, SparkTokenService_RevokeTokenAllowance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkTokenServiceClient) QueryTokenAllowances(ctx context.Context, in *QueryTokenAllowancesRequest, opts ...grpc.CallOption) (*QueryTokenAllowancesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryTokenAllowancesResponse)
@@ -169,6 +182,8 @@ type SparkTokenServiceServer interface {
 	// Install an owner-signed spending allowance granting a spender bounded
 	// authority over the owner's token outputs. Coordinated across all SOs.
 	CreateTokenAllowance(context.Context, *CreateTokenAllowanceRequest) (*CreateTokenAllowanceResponse, error)
+	// Tombstone an existing allowance so no further delegated spends succeed.
+	RevokeTokenAllowance(context.Context, *RevokeTokenAllowanceRequest) (*RevokeTokenAllowanceResponse, error)
 	QueryTokenAllowances(context.Context, *QueryTokenAllowancesRequest) (*QueryTokenAllowancesResponse, error)
 	mustEmbedUnimplementedSparkTokenServiceServer()
 }
@@ -203,6 +218,9 @@ func (UnimplementedSparkTokenServiceServer) BroadcastTransaction(context.Context
 }
 func (UnimplementedSparkTokenServiceServer) CreateTokenAllowance(context.Context, *CreateTokenAllowanceRequest) (*CreateTokenAllowanceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTokenAllowance not implemented")
+}
+func (UnimplementedSparkTokenServiceServer) RevokeTokenAllowance(context.Context, *RevokeTokenAllowanceRequest) (*RevokeTokenAllowanceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeTokenAllowance not implemented")
 }
 func (UnimplementedSparkTokenServiceServer) QueryTokenAllowances(context.Context, *QueryTokenAllowancesRequest) (*QueryTokenAllowancesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryTokenAllowances not implemented")
@@ -372,6 +390,24 @@ func _SparkTokenService_CreateTokenAllowance_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkTokenService_RevokeTokenAllowance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeTokenAllowanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkTokenServiceServer).RevokeTokenAllowance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkTokenService_RevokeTokenAllowance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkTokenServiceServer).RevokeTokenAllowance(ctx, req.(*RevokeTokenAllowanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkTokenService_QueryTokenAllowances_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryTokenAllowancesRequest)
 	if err := dec(in); err != nil {
@@ -428,6 +464,10 @@ var SparkTokenService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "create_token_allowance",
 			Handler:    _SparkTokenService_CreateTokenAllowance_Handler,
+		},
+		{
+			MethodName: "revoke_token_allowance",
+			Handler:    _SparkTokenService_RevokeTokenAllowance_Handler,
 		},
 		{
 			MethodName: "query_token_allowances",

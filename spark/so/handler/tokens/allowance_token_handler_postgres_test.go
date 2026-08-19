@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"bytes"
 	"context"
 	cryptorand "crypto/rand"
 	stderrors "errors"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -77,9 +79,25 @@ func newAllowancePayload(tokenCreate *ent.TokenCreate, ownerPub, spenderPub keys
 	}
 }
 
+func newRevokePayload(allowanceID uuid.UUID, ownerPub keys.Public, revokeTimestamp uint64) *tokenpb.RevokeTokenAllowancePayload {
+	return &tokenpb.RevokeTokenAllowancePayload{
+		Version:                1,
+		AllowanceId:            allowanceID[:],
+		OwnerPublicKey:         ownerPub.Serialize(),
+		OwnerProvidedTimestamp: revokeTimestamp,
+	}
+}
+
 func signCreateAllowance(t *testing.T, payload *tokenpb.TokenAllowancePayload, key keys.Private) []byte {
 	t.Helper()
 	hash, err := utils.HashCreateTokenAllowancePayload(payload)
+	require.NoError(t, err)
+	return ecdsa.Sign(key.ToBTCEC(), hash).Serialize()
+}
+
+func signRevokeAllowance(t *testing.T, payload *tokenpb.RevokeTokenAllowancePayload, key keys.Private) []byte {
+	t.Helper()
+	hash, err := utils.HashRevokeTokenAllowancePayload(payload)
 	require.NoError(t, err)
 	return ecdsa.Sign(key.ToBTCEC(), hash).Serialize()
 }
@@ -109,6 +127,17 @@ func (s *cancelingAllowanceGossipSender) CreateCommitAndSendGossipMessage(
 
 // setupAllowanceTest returns a handler with allowances enabled and a
 // single-operator consensus engine.
+func schnorrSignRevokeAllowance(t *testing.T, payload *tokenpb.RevokeTokenAllowancePayload, key keys.Private) []byte {
+	t.Helper()
+	hash, err := utils.HashRevokeTokenAllowancePayload(payload)
+	require.NoError(t, err)
+	signature, err := schnorr.Sign(key.ToBTCEC(), hash)
+	require.NoError(t, err)
+	return signature.Serialize()
+}
+
+// setupAllowanceTest returns a handler with allowances enabled and a single-operator map so
+// create/revoke apply locally without attempting to fan out to operators that aren't running.
 func setupAllowanceTest(t *testing.T) (context.Context, *db.TestContext, *so.Config, *AllowanceTokenHandler) {
 	t.Helper()
 	ctx, tc := db.ConnectToTestPostgres(t)
@@ -122,7 +151,61 @@ func setupAllowanceTest(t *testing.T) (context.Context, *db.TestContext, *so.Con
 	}
 	engine := consensus.NewTwoPCEngine(cfg, &discardAllowanceGossipSender{}, db.NewDefaultSessionFactory(tc.Client))
 	ctx = consensus.InjectEngine(ctx, engine)
-	return ctx, tc, cfg, NewAllowanceTokenHandler(cfg)
+	return ctx, tc, cfg, NewAllowanceTokenHandler(cfg, &discardAllowanceGossipSender{})
+}
+
+func installAllowanceForRevokeTest(
+	t *testing.T,
+	ctx context.Context,
+	tc *db.TestContext,
+	cfg *so.Config,
+	allowanceID uuid.UUID,
+	grantTimestamp uint64,
+) {
+	t.Helper()
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, grantTimestamp)
+	require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, payload, signCreateAllowance(t, payload, allowanceOwnerKey)))
+	require.NoError(t, ent.DbCommit(ctx))
+}
+
+func applyRevokeProof(
+	t *testing.T,
+	ctx context.Context,
+	cfg *so.Config,
+	payload *tokenpb.RevokeTokenAllowancePayload,
+	signature []byte,
+) {
+	t.Helper()
+	require.NoError(t, ValidateAndApplyRevokeAllowance(ctx, cfg, payload, signature))
+	require.NoError(t, ent.DbCommit(ctx))
+}
+
+type storedRevokeTombstone struct {
+	version   uint64
+	timestamp uint64
+	signature []byte
+}
+
+func requireStoredRevokeProof(
+	t *testing.T,
+	tc *db.TestContext,
+	allowanceID uuid.UUID,
+	payload *tokenpb.RevokeTokenAllowancePayload,
+	signature []byte,
+) storedRevokeTombstone {
+	t.Helper()
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, schematype.TokenAllowanceStatusRevoked, row.Status)
+	require.Equal(t, uint64(payload.GetVersion()), row.RevokeVersion)
+	require.Equal(t, payload.GetOwnerProvidedTimestamp(), row.OwnerProvidedRevokeTimestamp)
+	require.Equal(t, signature, row.RevokeSignature)
+	return storedRevokeTombstone{
+		version:   row.RevokeVersion,
+		timestamp: row.OwnerProvidedRevokeTimestamp,
+		signature: bytes.Clone(row.RevokeSignature),
+	}
 }
 
 // --- Create tests ---
@@ -163,7 +246,7 @@ func TestCreateTokenAllowance_ReadBackFailureReturnsCommittedSuccess(t *testing.
 
 	allowanceID := uuid.New()
 	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
-	resp, err := NewAllowanceTokenHandler(cfg).CreateTokenAllowance(requestCtx, &tokenpb.CreateTokenAllowanceRequest{
+	resp, err := NewAllowanceTokenHandler(cfg, &discardAllowanceGossipSender{}).CreateTokenAllowance(requestCtx, &tokenpb.CreateTokenAllowanceRequest{
 		AllowancePayload: payload,
 		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
 	})
@@ -261,7 +344,7 @@ func TestCreateTokenAllowance_RejectsWhenKnobDisabled(t *testing.T) {
 	ctx, tc := db.ConnectToTestPostgres(t)
 	cfg := sparktesting.TestConfig(t)
 	// No allowance knob injected -> feature disabled.
-	handler := NewAllowanceTokenHandler(cfg)
+	handler := NewAllowanceTokenHandler(cfg, &discardAllowanceGossipSender{})
 	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
 
 	allowanceID := uuid.New()
@@ -445,6 +528,35 @@ func TestAllowanceCreateConstraintErrorMessages(t *testing.T) {
 	}
 }
 
+func TestCreateTokenAllowance_RejectsReuseOfRevokedAllowanceID(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	createReq := &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: payload,
+		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+	}
+	_, err := handler.CreateTokenAllowance(ctx, createReq)
+	require.NoError(t, err)
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	revokeReq := &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	}
+	_, err = handler.RevokeTokenAllowance(ctx, revokeReq)
+	require.NoError(t, err)
+
+	// Reusing the tombstoned allowance_id must never resurrect it.
+	resp, err := handler.CreateTokenAllowance(ctx, createReq)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "revoked")
+}
+
 // TestCreateTokenAllowance_RejectsOverOwnerQuota: the N+1th ACTIVE allowance
 // for one owner fails closed at the public edge; revoking an allowance frees
 // quota (only ACTIVE rows count).
@@ -520,6 +632,391 @@ func TestCreateTokenAllowance_RejectsOverOwnerQuota(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
 	assert.Contains(t, err.Error(), "per-owner cap")
+
+	// Revoking the first allowance frees the quota.
+	revokePayload := newRevokePayload(firstID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	_, err = handler.RevokeTokenAllowance(ctx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+	require.NoError(t, create(createRequest(token2, uuid.New(), 5*time.Second)))
+}
+
+// --- Revoke tests ---
+
+func TestRevokeTokenAllowance_Success(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	createPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	createReq := &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: createPayload,
+		OwnerSignature:   signCreateAllowance(t, createPayload, allowanceOwnerKey),
+	}
+	_, err := handler.CreateTokenAllowance(ctx, createReq)
+	require.NoError(t, err)
+
+	revokeTimestamp := recentTimestamp(10 * time.Second)
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), revokeTimestamp)
+	revokeReq := &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	}
+
+	resp, err := handler.RevokeTokenAllowance(ctx, revokeReq)
+	require.NoError(t, err)
+	require.NotNil(t, resp.GetAllowanceProgress())
+	assert.Len(t, resp.GetAllowanceProgress().GetAppliedOperatorPublicKeys(), 1)
+
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TokenAllowanceStatusRevoked, row.Status)
+	assert.Equal(t, revokeTimestamp, row.OwnerProvidedRevokeTimestamp)
+	assert.NotEmpty(t, row.RevokeSignature)
+}
+
+func TestRevokeTokenAllowance_RejectsMismatchedOwnerField(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	createPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: createPayload,
+		OwnerSignature:   signCreateAllowance(t, createPayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+
+	revokePayload := newRevokePayload(allowanceID, allowanceWrongKey.Public(), recentTimestamp(10*time.Second))
+	resp, err := handler.RevokeTokenAllowance(ctx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "does not match the stored allowance owner public key")
+
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, row.Status)
+}
+
+func TestRevokeTokenAllowance_ExactTombstoneReplayIsIdempotent(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	createPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: createPayload,
+		OwnerSignature:   signCreateAllowance(t, createPayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	revokeReq := &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	}
+	_, err = handler.RevokeTokenAllowance(ctx, revokeReq)
+	require.NoError(t, err)
+
+	resp, err := handler.RevokeTokenAllowance(ctx, revokeReq)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, uint64(revokePayload.GetVersion()), row.RevokeVersion)
+	assert.Equal(t, revokePayload.GetOwnerProvidedTimestamp(), row.OwnerProvidedRevokeTimestamp)
+	assert.Equal(t, revokeReq.GetOwnerSignature(), row.RevokeSignature)
+}
+
+// TestRevokeTokenAllowance_SucceedsWhenKnobDisabled verifies the public revoke edge is not gated on
+// the allowances-enable knob. Revocation is a security control that must stay available even during
+// a full rollback (feature off everywhere), so an owner can always tombstone a grant they made
+// while it was on.
+func TestRevokeTokenAllowance_SucceedsWhenKnobDisabled(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	createPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: createPayload,
+		OwnerSignature:   signCreateAllowance(t, createPayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+
+	knobOffCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenAllowancesEnabled: 0.0,
+	}))
+	revokeTimestamp := recentTimestamp(10 * time.Second)
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), revokeTimestamp)
+	resp, err := handler.RevokeTokenAllowance(knobOffCtx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp.GetAllowanceProgress())
+
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TokenAllowanceStatusRevoked, row.Status)
+}
+
+func TestRevokeTokenAllowance_RejectsUnsupportedPayloadVersion(t *testing.T) {
+	ctx, tc, cfg, handler := setupAllowanceTest(t)
+
+	allowanceID := uuid.New()
+	installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, recentTimestamp(20*time.Second))
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	revokePayload.Version = 99
+	resp, err := handler.RevokeTokenAllowance(ctx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "unsupported token allowance revoke version")
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, loadAllowanceRow(t, tc, allowanceID).Status)
+}
+
+func TestRevokeTokenAllowance_AcceptsSupportedPayloadVersion(t *testing.T) {
+	ctx, tc, cfg, handler := setupAllowanceTest(t)
+
+	allowanceID := uuid.New()
+	installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, recentTimestamp(20*time.Second))
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	_, err := handler.RevokeTokenAllowance(ctx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TokenAllowanceStatusRevoked, loadAllowanceRow(t, tc, allowanceID).Status)
+}
+
+func TestValidateAndApplyRevokeAllowance_OrderIndependent(t *testing.T) {
+	allowanceID := uuid.New()
+	proofA := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 200)
+	proofASignature := signRevokeAllowance(t, proofA, allowanceOwnerKey)
+	proofB := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 300)
+	proofBSignature := signRevokeAllowance(t, proofB, allowanceOwnerKey)
+
+	orders := []struct {
+		name            string
+		firstPayload    *tokenpb.RevokeTokenAllowancePayload
+		firstSignature  []byte
+		secondPayload   *tokenpb.RevokeTokenAllowancePayload
+		secondSignature []byte
+	}{
+		{"A then B", proofA, proofASignature, proofB, proofBSignature},
+		{"B then A", proofB, proofBSignature, proofA, proofASignature},
+	}
+	var tombstones [2]storedRevokeTombstone
+	for i, order := range orders {
+		t.Run(order.name, func(t *testing.T) {
+			ctx, tc, cfg, _ := setupAllowanceTest(t)
+			installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, 100)
+			applyRevokeProof(t, ctx, cfg, order.firstPayload, order.firstSignature)
+			applyRevokeProof(t, ctx, cfg, order.secondPayload, order.secondSignature)
+			tombstones[i] = requireStoredRevokeProof(t, tc, allowanceID, proofA, proofASignature)
+		})
+	}
+	require.Equal(t, tombstones[0], tombstones[1])
+}
+
+func TestValidateAndApplyRevokeAllowance_SupersedingProofOverwritesTombstone(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	allowanceID := uuid.New()
+	installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, 100)
+
+	firstPayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 300)
+	applyRevokeProof(t, ctx, cfg, firstPayload, signRevokeAllowance(t, firstPayload, allowanceOwnerKey))
+
+	canonicalPayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 200)
+	canonicalSignature := signRevokeAllowance(t, canonicalPayload, allowanceOwnerKey)
+	applyRevokeProof(t, ctx, cfg, canonicalPayload, canonicalSignature)
+	requireStoredRevokeProof(t, tc, allowanceID, canonicalPayload, canonicalSignature)
+}
+
+func TestValidateAndApplyRevokeAllowance_NonCanonicalProofIsNoOp(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	allowanceID := uuid.New()
+	installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, 100)
+
+	canonicalPayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 200)
+	canonicalSignature := signRevokeAllowance(t, canonicalPayload, allowanceOwnerKey)
+	applyRevokeProof(t, ctx, cfg, canonicalPayload, canonicalSignature)
+
+	nonCanonicalPayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 300)
+	applyRevokeProof(t, ctx, cfg, nonCanonicalPayload, signRevokeAllowance(t, nonCanonicalPayload, allowanceOwnerKey))
+	requireStoredRevokeProof(t, tc, allowanceID, canonicalPayload, canonicalSignature)
+}
+
+func TestValidateAndApplyRevokeAllowance_SignatureTiebreakIsOrderIndependent(t *testing.T) {
+	allowanceID := uuid.New()
+	// Same statement, two signature encodings the owner-signature check both accept, so the
+	// tiebreak runs on signature bytes alone with the timestamp held equal.
+	proofA := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 200)
+	proofASignature := signRevokeAllowance(t, proofA, allowanceOwnerKey)
+	proofB := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 200)
+	proofBSignature := schnorrSignRevokeAllowance(t, proofB, allowanceOwnerKey)
+	require.NotEqual(t, proofASignature, proofBSignature)
+
+	canonicalPayload, canonicalSignature := proofA, proofASignature
+	nonCanonicalPayload, nonCanonicalSignature := proofB, proofBSignature
+	if bytes.Compare(proofBSignature, proofASignature) < 0 {
+		canonicalPayload, canonicalSignature = proofB, proofBSignature
+		nonCanonicalPayload, nonCanonicalSignature = proofA, proofASignature
+	}
+
+	orders := []struct {
+		name            string
+		firstPayload    *tokenpb.RevokeTokenAllowancePayload
+		firstSignature  []byte
+		secondPayload   *tokenpb.RevokeTokenAllowancePayload
+		secondSignature []byte
+	}{
+		{"smaller then larger", canonicalPayload, canonicalSignature, nonCanonicalPayload, nonCanonicalSignature},
+		{"larger then smaller", nonCanonicalPayload, nonCanonicalSignature, canonicalPayload, canonicalSignature},
+	}
+	for _, order := range orders {
+		t.Run(order.name, func(t *testing.T) {
+			ctx, tc, cfg, _ := setupAllowanceTest(t)
+			installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, 100)
+			applyRevokeProof(t, ctx, cfg, order.firstPayload, order.firstSignature)
+			applyRevokeProof(t, ctx, cfg, order.secondPayload, order.secondSignature)
+			requireStoredRevokeProof(t, tc, allowanceID, canonicalPayload, canonicalSignature)
+		})
+	}
+}
+
+func TestRevokeTokenAllowance_RejectsNonOwnerSession(t *testing.T) {
+	ctx, tc, cfg, handler := setupAllowanceTest(t)
+	cfg.AuthzEnforced = true
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	createPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	createReq := &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: createPayload,
+		OwnerSignature:   signCreateAllowance(t, createPayload, allowanceOwnerKey),
+	}
+	ownerCtx := authn.InjectSessionForTests(ctx, allowanceOwnerKey.Public(), time.Now().Add(time.Hour).Unix())
+	_, err := handler.CreateTokenAllowance(ownerCtx, createReq)
+	require.NoError(t, err)
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	revokeReq := &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	}
+	// Session identity belongs to a different key than the allowance owner.
+	wrongCtx := authn.InjectSessionForTests(ctx, allowanceWrongKey.Public(), time.Now().Add(time.Hour).Unix())
+	resp, err := handler.RevokeTokenAllowance(wrongCtx, revokeReq)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+}
+
+// TestRevokeTokenAllowance_RejectsKillSwitchedOwner: the kill switch gates revoke even though
+// revoke is otherwise ungated, and it must be indistinguishable from any other permission failure
+// on the wire, so a probing caller cannot use the response to detect that a wallet is switched off.
+func TestRevokeTokenAllowance_RejectsKillSwitchedOwner(t *testing.T) {
+	ctx, tc, cfg, handler := setupAllowanceTest(t)
+	cfg.AuthzEnforced = true
+
+	allowanceID := uuid.New()
+	installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, recentTimestamp(20*time.Second))
+
+	killSwitchedCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenAllowancesEnabled:                                      1.0,
+		knobs.KnobKillSwitchWallet + "@" + allowanceOwnerKey.Public().ToHex(): 1,
+	}))
+	killSwitchedCtx = authn.InjectSessionForTests(killSwitchedCtx, allowanceOwnerKey.Public(), time.Now().Add(time.Hour).Unix())
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	resp, err := handler.RevokeTokenAllowance(killSwitchedCtx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.Error(t, err)
+	require.Nil(t, resp)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, loadAllowanceRow(t, tc, allowanceID).Status,
+		"a kill-switched revoke must not tombstone the grant")
+}
+
+// TestRevokeTokenAllowance_AllowsOwnerWhenAnotherWalletIsKillSwitched proves the guard is scoped to
+// the requesting owner rather than switching off revoke for everyone.
+func TestRevokeTokenAllowance_AllowsOwnerWhenAnotherWalletIsKillSwitched(t *testing.T) {
+	ctx, tc, cfg, handler := setupAllowanceTest(t)
+	cfg.AuthzEnforced = true
+
+	allowanceID := uuid.New()
+	installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, recentTimestamp(20*time.Second))
+
+	otherSwitchedCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenAllowancesEnabled:                                      1.0,
+		knobs.KnobKillSwitchWallet + "@" + allowanceWrongKey.Public().ToHex(): 1,
+	}))
+	otherSwitchedCtx = authn.InjectSessionForTests(otherSwitchedCtx, allowanceOwnerKey.Public(), time.Now().Add(time.Hour).Unix())
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	_, err := handler.RevokeTokenAllowance(otherSwitchedCtx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TokenAllowanceStatusRevoked, loadAllowanceRow(t, tc, allowanceID).Status)
+}
+
+func TestValidateAndApplyRevokeAllowance_RejectsStaleTimestampForEveryStatus(t *testing.T) {
+	tests := []struct {
+		name           string
+		alreadyRevoked bool
+	}{
+		{"active", false},
+		{"revoked", true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, tc, cfg, _ := setupAllowanceTest(t)
+			allowanceID := uuid.New()
+			installAllowanceForRevokeTest(t, ctx, tc, cfg, allowanceID, 200)
+
+			var storedPayload *tokenpb.RevokeTokenAllowancePayload
+			var storedSignature []byte
+			if test.alreadyRevoked {
+				storedPayload = newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 300)
+				storedSignature = signRevokeAllowance(t, storedPayload, allowanceOwnerKey)
+				applyRevokeProof(t, ctx, cfg, storedPayload, storedSignature)
+			}
+
+			stalePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), 100)
+			staleSignature := signRevokeAllowance(t, stalePayload, allowanceOwnerKey)
+			err := ValidateAndApplyRevokeAllowance(ctx, cfg, stalePayload, staleSignature)
+			require.Error(t, err)
+			assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+			assert.Contains(t, err.Error(), "stale revoke")
+			require.NoError(t, ent.DbRollback(ctx))
+
+			row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+			require.NoError(t, err)
+			if test.alreadyRevoked {
+				requireStoredRevokeProof(t, tc, allowanceID, storedPayload, storedSignature)
+			} else {
+				assert.Equal(t, schematype.TokenAllowanceStatusActive, row.Status)
+			}
+		})
+	}
 }
 
 // --- Query tests ---
@@ -559,9 +1056,9 @@ func TestQueryTokenAllowances_FiltersByOwnerSpenderToken(t *testing.T) {
 		return id
 	}
 
-	create(token1, ownerA, spenderX) // ownerA / spenderX / token1
-	create(token1, ownerA, spenderY) // ownerA / spenderY / token1
-	create(token2, ownerB, spenderX) // ownerB / spenderX / token2
+	id1 := create(token1, ownerA, spenderX) // ownerA / spenderX / token1
+	create(token1, ownerA, spenderY)        // ownerA / spenderY / token1
+	create(token2, ownerB, spenderX)        // ownerB / spenderX / token2
 
 	t.Run("by owner", func(t *testing.T) {
 		resp, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
@@ -600,6 +1097,29 @@ func TestQueryTokenAllowances_FiltersByOwnerSpenderToken(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, resp.GetAllowances(), 1)
 		assert.Equal(t, ownerB.Public().Serialize(), resp.GetAllowances()[0].GetAllowancePayload().GetOwnerPublicKey())
+	})
+
+	t.Run("include_inactive filters revoked", func(t *testing.T) {
+		revokePayload := newRevokePayload(id1, ownerA.Public(), recentTimestamp(5*time.Second))
+		revokeReq := &tokenpb.RevokeTokenAllowanceRequest{
+			RevokeAllowancePayload: revokePayload,
+			OwnerSignature:         signRevokeAllowance(t, revokePayload, ownerA),
+		}
+		_, err := handler.RevokeTokenAllowance(ctx, revokeReq)
+		require.NoError(t, err)
+
+		activeOnly, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+			OwnerPublicKey: ownerA.Public().Serialize(),
+		})
+		require.NoError(t, err)
+		assert.Len(t, activeOnly.GetAllowances(), 1)
+
+		withInactive, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+			OwnerPublicKey:  ownerA.Public().Serialize(),
+			IncludeInactive: true,
+		})
+		require.NoError(t, err)
+		assert.Len(t, withInactive.GetAllowances(), 2)
 	})
 
 	t.Run("authz allows the owner and rejects a non-party", func(t *testing.T) {
@@ -742,4 +1262,99 @@ func TestQueryTokenAllowances_ReturnsVerifiableOwnerProof(t *testing.T) {
 	tamperedHash, err := utils.HashCreateTokenAllowancePayload(record.GetAllowancePayload())
 	require.NoError(t, err)
 	require.Error(t, utils.ValidateOwnershipSignature(record.GetOwnerSignature(), tamperedHash, returnedOwner))
+}
+
+// TestQueryTokenAllowances_ReturnsVerifiableRevokeProof mirrors the create
+// proof for tombstoned rows: a client reconstructs the revoke payload from the
+// response fields, recomputes the revoke statement hash, and verifies
+// revoke_signature against the returned owner key.
+func TestQueryTokenAllowances_ReturnsVerifiableRevokeProof(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: payload,
+		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	_, err = handler.RevokeTokenAllowance(ctx, &tokenpb.RevokeTokenAllowanceRequest{
+		RevokeAllowancePayload: revokePayload,
+		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
+	})
+	require.NoError(t, err)
+
+	resp, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+		OwnerPublicKey:  allowanceOwnerKey.Public().Serialize(),
+		IncludeInactive: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.GetAllowances(), 1)
+	record := resp.GetAllowances()[0]
+	require.Equal(t, tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_REVOKED, record.GetStatus())
+
+	// Everything below uses only the response, exactly as a client would.
+	returnedPayload := record.GetAllowancePayload()
+	returnedOwner, err := keys.ParsePublicKey(returnedPayload.GetOwnerPublicKey())
+	require.NoError(t, err)
+	reconstructed := &tokenpb.RevokeTokenAllowancePayload{
+		Version:                record.GetRevokeVersion(),
+		AllowanceId:            returnedPayload.GetAllowanceId(),
+		OwnerPublicKey:         returnedPayload.GetOwnerPublicKey(),
+		OwnerProvidedTimestamp: record.GetOwnerProvidedRevokeTimestamp(),
+	}
+	revokeHash, err := utils.HashRevokeTokenAllowancePayload(reconstructed)
+	require.NoError(t, err)
+	require.NoError(t, utils.ValidateOwnershipSignature(record.GetRevokeSignature(), revokeHash, returnedOwner))
+
+	// A forged revoke timestamp breaks verification: the proof binds the terms.
+	reconstructed.OwnerProvidedTimestamp++
+	forgedHash, err := utils.HashRevokeTokenAllowancePayload(reconstructed)
+	require.NoError(t, err)
+	require.Error(t, utils.ValidateOwnershipSignature(record.GetRevokeSignature(), forgedHash, returnedOwner))
+}
+
+// TestQueryTokenAllowances_NoSpuriousEmptyPageAtExactBoundary verifies that when the result count
+// is an exact multiple of the page size, the last full page reports exhaustion (offset -1) rather
+// than pointing one page past the end and forcing the caller to fetch an empty page.
+func TestQueryTokenAllowances_NoSpuriousEmptyPageAtExactBoundary(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	owner := keys.GeneratePrivateKey()
+
+	for range 4 {
+		tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+		payload := newAllowancePayload(tokenCreate, owner.Public(), allowanceSpenderKey.Public(), uuid.New(), recentTimestamp(10*time.Second))
+		_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: payload,
+			OwnerSignature:   signCreateAllowance(t, payload, owner),
+		})
+		require.NoError(t, err)
+	}
+	ownerFilter := owner.Public().Serialize()
+
+	first, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+		OwnerPublicKey: ownerFilter, Limit: 2, Offset: 0,
+	})
+	require.NoError(t, err)
+	require.Len(t, first.GetAllowances(), 2)
+	require.EqualValues(t, 2, first.GetOffset())
+
+	second, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+		OwnerPublicKey: ownerFilter, Limit: 2, Offset: first.GetOffset(),
+	})
+	require.NoError(t, err)
+	require.Len(t, second.GetAllowances(), 2)
+	require.EqualValues(t, -1, second.GetOffset(), "exact-boundary final page must report exhaustion, not a spurious next page")
+}
+
+// loadAllowanceRow reads the allowance row directly, bypassing the query handler's
+// visibility filters, so a test can assert the persisted state.
+func loadAllowanceRow(t *testing.T, tc *db.TestContext, allowanceID uuid.UUID) *ent.TokenAllowance {
+	t.Helper()
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	return row
 }

@@ -7557,6 +7557,410 @@ var _ interface {
 	ErrorName() string
 } = CreateTokenAllowanceResponseValidationError{}
 
+// Validate checks the field values on RevokeTokenAllowancePayload with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeTokenAllowancePayload) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeTokenAllowancePayload with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RevokeTokenAllowancePayloadMultiError, or nil if none found.
+func (m *RevokeTokenAllowancePayload) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeTokenAllowancePayload) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Version
+
+	if len(m.GetAllowanceId()) != 16 {
+		err := RevokeTokenAllowancePayloadValidationError{
+			field:  "AllowanceId",
+			reason: "value length must be 16 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOwnerPublicKey()) != 33 {
+		err := RevokeTokenAllowancePayloadValidationError{
+			field:  "OwnerPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for OwnerProvidedTimestamp
+
+	if len(errors) > 0 {
+		return RevokeTokenAllowancePayloadMultiError(errors)
+	}
+
+	return nil
+}
+
+// RevokeTokenAllowancePayloadMultiError is an error wrapping multiple
+// validation errors returned by RevokeTokenAllowancePayload.ValidateAll() if
+// the designated constraints aren't met.
+type RevokeTokenAllowancePayloadMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeTokenAllowancePayloadMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeTokenAllowancePayloadMultiError) AllErrors() []error { return m }
+
+// RevokeTokenAllowancePayloadValidationError is the validation error returned
+// by RevokeTokenAllowancePayload.Validate if the designated constraints
+// aren't met.
+type RevokeTokenAllowancePayloadValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeTokenAllowancePayloadValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeTokenAllowancePayloadValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeTokenAllowancePayloadValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeTokenAllowancePayloadValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeTokenAllowancePayloadValidationError) ErrorName() string {
+	return "RevokeTokenAllowancePayloadValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeTokenAllowancePayloadValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeTokenAllowancePayload.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeTokenAllowancePayloadValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeTokenAllowancePayloadValidationError{}
+
+// Validate checks the field values on RevokeTokenAllowanceRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeTokenAllowanceRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeTokenAllowanceRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RevokeTokenAllowanceRequestMultiError, or nil if none found.
+func (m *RevokeTokenAllowanceRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeTokenAllowanceRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetRevokeAllowancePayload()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RevokeTokenAllowanceRequestValidationError{
+					field:  "RevokeAllowancePayload",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RevokeTokenAllowanceRequestValidationError{
+					field:  "RevokeAllowancePayload",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRevokeAllowancePayload()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RevokeTokenAllowanceRequestValidationError{
+				field:  "RevokeAllowancePayload",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := RevokeTokenAllowanceRequestValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return RevokeTokenAllowanceRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RevokeTokenAllowanceRequestMultiError is an error wrapping multiple
+// validation errors returned by RevokeTokenAllowanceRequest.ValidateAll() if
+// the designated constraints aren't met.
+type RevokeTokenAllowanceRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeTokenAllowanceRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeTokenAllowanceRequestMultiError) AllErrors() []error { return m }
+
+// RevokeTokenAllowanceRequestValidationError is the validation error returned
+// by RevokeTokenAllowanceRequest.Validate if the designated constraints
+// aren't met.
+type RevokeTokenAllowanceRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeTokenAllowanceRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeTokenAllowanceRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeTokenAllowanceRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeTokenAllowanceRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeTokenAllowanceRequestValidationError) ErrorName() string {
+	return "RevokeTokenAllowanceRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeTokenAllowanceRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeTokenAllowanceRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeTokenAllowanceRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeTokenAllowanceRequestValidationError{}
+
+// Validate checks the field values on RevokeTokenAllowanceResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeTokenAllowanceResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeTokenAllowanceResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RevokeTokenAllowanceResponseMultiError, or nil if none found.
+func (m *RevokeTokenAllowanceResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeTokenAllowanceResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetAllowanceProgress()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RevokeTokenAllowanceResponseValidationError{
+					field:  "AllowanceProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RevokeTokenAllowanceResponseValidationError{
+					field:  "AllowanceProgress",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAllowanceProgress()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RevokeTokenAllowanceResponseValidationError{
+				field:  "AllowanceProgress",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RevokeTokenAllowanceResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RevokeTokenAllowanceResponseMultiError is an error wrapping multiple
+// validation errors returned by RevokeTokenAllowanceResponse.ValidateAll() if
+// the designated constraints aren't met.
+type RevokeTokenAllowanceResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeTokenAllowanceResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeTokenAllowanceResponseMultiError) AllErrors() []error { return m }
+
+// RevokeTokenAllowanceResponseValidationError is the validation error returned
+// by RevokeTokenAllowanceResponse.Validate if the designated constraints
+// aren't met.
+type RevokeTokenAllowanceResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeTokenAllowanceResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeTokenAllowanceResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeTokenAllowanceResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeTokenAllowanceResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeTokenAllowanceResponseValidationError) ErrorName() string {
+	return "RevokeTokenAllowanceResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeTokenAllowanceResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeTokenAllowanceResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeTokenAllowanceResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeTokenAllowanceResponseValidationError{}
+
 // Validate checks the field values on TokenAllowanceInfo with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -7613,6 +8017,12 @@ func (m *TokenAllowanceInfo) validate(all bool) error {
 	// no validation rules for Status
 
 	// no validation rules for OwnerSignature
+
+	// no validation rules for RevokeSignature
+
+	// no validation rules for OwnerProvidedRevokeTimestamp
+
+	// no validation rules for RevokeVersion
 
 	if len(errors) > 0 {
 		return TokenAllowanceInfoMultiError(errors)

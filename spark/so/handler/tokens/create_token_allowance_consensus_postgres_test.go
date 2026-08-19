@@ -248,7 +248,7 @@ func (c *allowanceConsensusCluster) executeCreate(req *tokenpb.CreateTokenAllowa
 	coordinator := c.nodes[0]
 	engine := consensus.NewTwoPCEngine(coordinator.config, c.gossip, db.NewDefaultSessionFactory(coordinator.client))
 	ctx := consensus.InjectEngine(coordinator.ctx, engine)
-	_, err := tokenhandler.NewAllowanceTokenHandler(coordinator.config).CreateTokenAllowance(ctx, req)
+	_, err := tokenhandler.NewAllowanceTokenHandler(coordinator.config, c.gossip).CreateTokenAllowance(ctx, req)
 	return err
 }
 

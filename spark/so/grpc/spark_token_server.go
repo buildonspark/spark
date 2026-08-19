@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
 	sotokens "github.com/lightsparkdev/spark/so/tokens"
 )
@@ -81,12 +82,18 @@ func (s *SparkTokenServer) BroadcastTransaction(ctx context.Context, req *tokenp
 // CreateTokenAllowance installs an owner-signed spending allowance granting a spender bounded
 // authority to move the owner's token outputs.
 func (s *SparkTokenServer) CreateTokenAllowance(ctx context.Context, req *tokenpb.CreateTokenAllowanceRequest) (*tokenpb.CreateTokenAllowanceResponse, error) {
-	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig)
+	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig, handler.NewSendGossipHandler(s.soConfig))
 	return allowanceHandler.CreateTokenAllowance(ctx, req)
+}
+
+// RevokeTokenAllowance tombstones an existing allowance so no further delegated spends succeed.
+func (s *SparkTokenServer) RevokeTokenAllowance(ctx context.Context, req *tokenpb.RevokeTokenAllowanceRequest) (*tokenpb.RevokeTokenAllowanceResponse, error) {
+	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig, handler.NewSendGossipHandler(s.soConfig))
+	return allowanceHandler.RevokeTokenAllowance(ctx, req)
 }
 
 // QueryTokenAllowances returns allowances the caller is a party to (as owner or spender).
 func (s *SparkTokenServer) QueryTokenAllowances(ctx context.Context, req *tokenpb.QueryTokenAllowancesRequest) (*tokenpb.QueryTokenAllowancesResponse, error) {
-	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig)
+	allowanceHandler := tokens.NewAllowanceTokenHandler(s.soConfig, handler.NewSendGossipHandler(s.soConfig))
 	return allowanceHandler.QueryTokenAllowances(ctx, req)
 }

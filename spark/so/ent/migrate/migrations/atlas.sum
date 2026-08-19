@@ -1,4 +1,4 @@
-h1:9BTe7/aAhKu0ZsEDfF2H42pxOuQ9F3h2DaeJZkZ1B5w=
+h1:8Mh4Z6Wgb/iAR9p9yMY3mHsQGHPjBaQfOquN8R8cpYE=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -181,3 +181,4 @@ h1:9BTe7/aAhKu0ZsEDfF2H42pxOuQ9F3h2DaeJZkZ1B5w=
 20260813230000_add_token_allowances.sql h1:6b1BJZvP2apn5uT8Gm5uR+1CekgOHDyDVPaG+Bbc7K8=
 20260818221238_extend_treenode_occupancy_idx_parent.sql h1:8uTLQ4PmLOmOFlMkfJI4jqTLKcb1q4TntWD9f/pxmz0=
 20260818222238_add_token_allowance_flow_execution_id.sql h1:XDuoo0JIVkGg135s4yKLFOIzIHzZIGIOkgglLTeGcl4=
+20260818223238_add_token_allowance_revoke_version.sql h1:dXNEgotj+P2g+a2nG9k7D/8xrEgvvmDJKAT9rQwQ5k4=

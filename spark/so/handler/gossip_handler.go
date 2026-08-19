@@ -192,6 +192,10 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 				err = dispatchConsensusRollback(ctx, h.config, rollback.GetOpType(), rollback.GetFlowExecutionId(), op)
 			}
 		}
+	case *pbgossip.GossipMessage_RevokeTokenAllowance:
+		if !forCoordinator {
+			err = h.handleRevokeTokenAllowanceGossipMessage(ctx, gossipMessage.GetRevokeTokenAllowance())
+		}
 	default:
 		err = fmt.Errorf("unsupported gossip message type: %T", gossipMessage.GetMessage())
 	}
