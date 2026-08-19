@@ -64,6 +64,8 @@ const (
 	FieldRevokeVersion = "revoke_version"
 	// EdgeTokenCreate holds the string denoting the token_create edge name in mutations.
 	EdgeTokenCreate = "token_create"
+	// EdgeTokenAllowanceSpend holds the string denoting the token_allowance_spend edge name in mutations.
+	EdgeTokenAllowanceSpend = "token_allowance_spend"
 	// Table holds the table name of the tokenallowance in the database.
 	Table = "token_allowances"
 	// TokenCreateTable is the table that holds the token_create relation/edge.
@@ -73,6 +75,13 @@ const (
 	TokenCreateInverseTable = "token_creates"
 	// TokenCreateColumn is the table column denoting the token_create relation/edge.
 	TokenCreateColumn = "token_create_id"
+	// TokenAllowanceSpendTable is the table that holds the token_allowance_spend relation/edge.
+	TokenAllowanceSpendTable = "token_allowance_spends"
+	// TokenAllowanceSpendInverseTable is the table name for the TokenAllowanceSpend entity.
+	// It exists in this package in order to avoid circular dependency with the "tokenallowancespend" package.
+	TokenAllowanceSpendInverseTable = "token_allowance_spends"
+	// TokenAllowanceSpendColumn is the table column denoting the token_allowance_spend relation/edge.
+	TokenAllowanceSpendColumn = "token_allowance_id"
 )
 
 // Columns holds all SQL columns for tokenallowance fields.
@@ -223,10 +232,31 @@ func ByTokenCreateField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTokenCreateStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByTokenAllowanceSpendCount orders the results by token_allowance_spend count.
+func ByTokenAllowanceSpendCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTokenAllowanceSpendStep(), opts...)
+	}
+}
+
+// ByTokenAllowanceSpend orders the results by token_allowance_spend terms.
+func ByTokenAllowanceSpend(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTokenAllowanceSpendStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTokenCreateStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TokenCreateInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, TokenCreateTable, TokenCreateColumn),
+	)
+}
+func newTokenAllowanceSpendStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TokenAllowanceSpendInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, TokenAllowanceSpendTable, TokenAllowanceSpendColumn),
 	)
 }

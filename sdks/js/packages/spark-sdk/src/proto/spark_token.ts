@@ -445,6 +445,17 @@ export interface InvoiceAttachment {
   sparkInvoice: string;
 }
 
+/**
+ * A spender's authorization to spend an input TTXO under a delegated
+ * allowance. Cited in place of the owner's own signature; the SO validates
+ * spender_signature against the spender key recorded in the referenced
+ * allowance rather than against the TTXO owner key.
+ */
+export interface AllowanceSignature {
+  allowanceId: Uint8Array;
+  spenderSignature: KeyedSignature | undefined;
+}
+
 export interface SignatureWithIndex {
   /** Deprecated: use authority_signatures instead. */
   signature?:
@@ -452,11 +463,12 @@ export interface SignatureWithIndex {
     | undefined;
   /** The index of the TTXO associated with this signature. */
   inputIndex: number;
-  /** Supports single-key or multisig signatures. */
-  authoritySignatures?: { $case: "singleSignature"; singleSignature: KeyedSignature } | {
-    $case: "multisigSignatures";
-    multisigSignatures: MultisigSignatureSet;
-  } | undefined;
+  /** Supports single-key, multisig, or delegated allowance signatures. */
+  authoritySignatures?:
+    | { $case: "singleSignature"; singleSignature: KeyedSignature }
+    | { $case: "multisigSignatures"; multisigSignatures: MultisigSignatureSet }
+    | { $case: "allowanceSignature"; allowanceSignature: AllowanceSignature }
+    | undefined;
 }
 
 /**
@@ -2542,6 +2554,84 @@ export const InvoiceAttachment: MessageFns<InvoiceAttachment> = {
   },
 };
 
+function createBaseAllowanceSignature(): AllowanceSignature {
+  return { allowanceId: new Uint8Array(0), spenderSignature: undefined };
+}
+
+export const AllowanceSignature: MessageFns<AllowanceSignature> = {
+  encode(message: AllowanceSignature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.allowanceId.length !== 0) {
+      writer.uint32(10).bytes(message.allowanceId);
+    }
+    if (message.spenderSignature !== undefined) {
+      KeyedSignature.encode(message.spenderSignature, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AllowanceSignature {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAllowanceSignature();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.allowanceId = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.spenderSignature = KeyedSignature.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AllowanceSignature {
+    return {
+      allowanceId: isSet(object.allowanceId) ? bytesFromBase64(object.allowanceId) : new Uint8Array(0),
+      spenderSignature: isSet(object.spenderSignature) ? KeyedSignature.fromJSON(object.spenderSignature) : undefined,
+    };
+  },
+
+  toJSON(message: AllowanceSignature): unknown {
+    const obj: any = {};
+    if (message.allowanceId.length !== 0) {
+      obj.allowanceId = base64FromBytes(message.allowanceId);
+    }
+    if (message.spenderSignature !== undefined) {
+      obj.spenderSignature = KeyedSignature.toJSON(message.spenderSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AllowanceSignature>): AllowanceSignature {
+    return AllowanceSignature.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AllowanceSignature>): AllowanceSignature {
+    const message = createBaseAllowanceSignature();
+    message.allowanceId = object.allowanceId ?? new Uint8Array(0);
+    message.spenderSignature = (object.spenderSignature !== undefined && object.spenderSignature !== null)
+      ? KeyedSignature.fromPartial(object.spenderSignature)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseSignatureWithIndex(): SignatureWithIndex {
   return { signature: undefined, inputIndex: 0, authoritySignatures: undefined };
 }
@@ -2560,6 +2650,9 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
         break;
       case "multisigSignatures":
         MultisigSignatureSet.encode(message.authoritySignatures.multisigSignatures, writer.uint32(34).fork()).join();
+        break;
+      case "allowanceSignature":
+        AllowanceSignature.encode(message.authoritySignatures.allowanceSignature, writer.uint32(42).fork()).join();
         break;
     }
     return writer;
@@ -2610,6 +2703,17 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
           };
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.authoritySignatures = {
+            $case: "allowanceSignature",
+            allowanceSignature: AllowanceSignature.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2627,6 +2731,8 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
         ? { $case: "singleSignature", singleSignature: KeyedSignature.fromJSON(object.singleSignature) }
         : isSet(object.multisigSignatures)
         ? { $case: "multisigSignatures", multisigSignatures: MultisigSignatureSet.fromJSON(object.multisigSignatures) }
+        : isSet(object.allowanceSignature)
+        ? { $case: "allowanceSignature", allowanceSignature: AllowanceSignature.fromJSON(object.allowanceSignature) }
         : undefined,
     };
   },
@@ -2643,6 +2749,8 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
       obj.singleSignature = KeyedSignature.toJSON(message.authoritySignatures.singleSignature);
     } else if (message.authoritySignatures?.$case === "multisigSignatures") {
       obj.multisigSignatures = MultisigSignatureSet.toJSON(message.authoritySignatures.multisigSignatures);
+    } else if (message.authoritySignatures?.$case === "allowanceSignature") {
+      obj.allowanceSignature = AllowanceSignature.toJSON(message.authoritySignatures.allowanceSignature);
     }
     return obj;
   },
@@ -2675,6 +2783,18 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
           message.authoritySignatures = {
             $case: "multisigSignatures",
             multisigSignatures: MultisigSignatureSet.fromPartial(object.authoritySignatures.multisigSignatures),
+          };
+        }
+        break;
+      }
+      case "allowanceSignature": {
+        if (
+          object.authoritySignatures?.allowanceSignature !== undefined &&
+          object.authoritySignatures?.allowanceSignature !== null
+        ) {
+          message.authoritySignatures = {
+            $case: "allowanceSignature",
+            allowanceSignature: AllowanceSignature.fromPartial(object.authoritySignatures.allowanceSignature),
           };
         }
         break;

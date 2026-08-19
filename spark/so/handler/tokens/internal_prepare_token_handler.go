@@ -80,12 +80,38 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	}
 
 	// Save the token transaction, created output ents, and update the outputs to spend.
-	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTx, req.GetTokenTransactionSignatures(), req.GetKeyshareIds(), inputTtxos, coordinatorPubKey)
+	tokenTxEnt, err := ent.CreateStartedTransactionEntities(ctx, finalTokenTx, req.GetTokenTransactionSignatures(), req.GetKeyshareIds(), inputTtxos, coordinatorPubKey)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.GetFinalTokenTransaction(), err)
 	}
 
+	// Delegated spends are metered in the same database transaction that created the started
+	// entities, so a policy failure rolls back the whole prepare.
+	if err := meterAllowanceSpendIfDelegated(ctx, h.config, finalTokenTx, req.GetTokenTransactionSignatures(), tokenTxEnt, inputTtxos); err != nil {
+		return nil, tokens.FormatErrorWithTransactionProto("failed to meter allowance spend", finalTokenTx, err)
+	}
+
 	return &tokeninternalpb.PrepareTransactionResponse{}, nil
+}
+
+// meterAllowanceSpendIfDelegated meters an allowance spend when the transfer's input signatures
+// cite an allowance; owner-signed transactions are untouched.
+func meterAllowanceSpendIfDelegated(
+	ctx context.Context,
+	config *so.Config,
+	finalTokenTx *tokenpb.TokenTransaction,
+	tokenTransactionSignatures []*tokenpb.SignatureWithIndex,
+	tokenTxEnt *ent.TokenTransaction,
+	inputTtxos []*ent.TokenOutput,
+) error {
+	allowanceID, err := extractAllowanceAuthorization(tokenTransactionSignatures)
+	if err != nil {
+		return err
+	}
+	if allowanceID == nil {
+		return nil
+	}
+	return validateAndMeterAllowanceSpend(ctx, config, finalTokenTx, *allowanceID, tokenTxEnt, inputTtxos)
 }
 
 func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
@@ -239,6 +265,11 @@ func (h *InternalPrepareTokenHandler) validateAndLockForCommit(
 			if err := preemptOrRejectTransactionsWithInputEnts(ctx, finalTokenTx, inputTtxos); err != nil {
 				return nil, err
 			}
+			// Preemption resolution passed, so every remaining competing transaction on these
+			// inputs loses; return any allowance budget those losers still hold.
+			if err := releaseAllowanceSpendsForTransactions(ctx, losingCompetingTransactions(inputTtxos)); err != nil {
+				return nil, err
+			}
 		}
 	default:
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type unknown"))
@@ -292,6 +323,30 @@ func anyTtxosHaveSpentTransactions(ttxos []*ent.TokenOutput) bool {
 		}
 	}
 	return false
+}
+
+// losingCompetingTransactions returns the unique competing transactions on the given inputs that
+// lose to the new transaction once preemption resolution has passed. REVEALED and FINALIZED
+// competitors never lose (preemption would have rejected the new transaction instead), so they
+// are excluded; everything else on these inputs is being displaced.
+func losingCompetingTransactions(inputTtxos []*ent.TokenOutput) []*ent.TokenTransaction {
+	losersByID := make(map[uuid.UUID]*ent.TokenTransaction)
+	for _, ttxo := range inputTtxos {
+		competingTx := ttxo.Edges.OutputSpentTokenTransaction
+		if competingTx == nil {
+			continue
+		}
+		if competingTx.Status == st.TokenTransactionStatusRevealed ||
+			competingTx.Status == st.TokenTransactionStatusFinalized {
+			continue
+		}
+		losersByID[competingTx.ID] = competingTx
+	}
+	losers := make([]*ent.TokenTransaction, 0, len(losersByID))
+	for _, tx := range losersByID {
+		losers = append(losers, tx)
+	}
+	return losers
 }
 
 // validateAndReserveKeyshares parses keyshare IDs, checks for duplicates, marks them as used, and returns expected revocation public keys
@@ -428,9 +483,16 @@ func validateTransferOwnerSignatures(ctx context.Context, operatorIdentityPublic
 		return tokens.FormatErrorWithTransactionEnt("failed to hash operator-specific payload", tokenTransaction, err)
 	}
 
+	// Sign-time mirror of the prepare-time allowance check: signatures citing an allowance are
+	// only accepted when the transaction carries a matching RESERVED spend recorded at prepare.
+	allowance, err := loadAllowanceForSigningIfDelegated(ctx, signaturesByIndex, tokenTransaction)
+	if err != nil {
+		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOwnerSignature, tokenTransaction, err)
+	}
+
 	for i, sig := range signaturesByIndex {
 		output := spentOutputs[i]
-		if err := ValidateOwnershipSignatureFromAuthority(ctx, sig, payloadHash, output.OwnerPublicKey); err != nil {
+		if err := ValidateOwnershipOrAllowanceSignature(ctx, sig, payloadHash, output.OwnerPublicKey, allowance); err != nil {
 			return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOwnerSignature, tokenTransaction, err)
 		}
 	}
@@ -522,6 +584,14 @@ func validateCreateSignature(
 	sig := signaturesWithIndex[0]
 	if err = validateDeprecatedSignatureConsistency(sig); err != nil {
 		return tokens.FormatErrorWithTransactionProto("deprecated signature field inconsistency", tokenTransaction, err)
+	}
+	// Delegated allowance signatures never substitute for the issuer key on create.
+	if _, ok := sig.GetAuthoritySignatures().(*tokenpb.SignatureWithIndex_AllowanceSignature); ok {
+		return tokens.FormatErrorWithTransactionProto(
+			"allowance signatures are not valid for token creation",
+			tokenTransaction,
+			sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("allowance signatures are not valid in this context")),
+		)
 	}
 	singleSig := signature.GetEffectiveSingleSignature(sig)
 	if singleSig == nil {
@@ -695,6 +765,24 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		ownerSignaturesByIndex[sig.GetInputIndex()] = sig
 	}
 
+	// A transfer is either fully owner-signed or fully authorized under a single allowance.
+	// The allowance is read without a lock here; policy checks and metering take the ForUpdate
+	// lock after the started entities are created.
+	allowanceID, err := extractAllowanceAuthorization(signaturesWithIndex)
+	if err != nil {
+		return err
+	}
+	var allowance *ent.TokenAllowance
+	if allowanceID != nil {
+		allowance, err = ent.GetAllowanceByAllowanceID(ctx, *allowanceID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return sparkerrors.NotFoundMissingEntity(fmt.Errorf("%s: %s", tokens.ErrAllowanceNotFound, *allowanceID))
+			}
+			return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to load allowance %s: %w", *allowanceID, err))
+		}
+	}
+
 	if len(signaturesWithIndex) != len(tokenTransaction.GetTransferInput().GetOutputsToSpend()) {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("number of signatures must match number of outputs to spend"))
 	}
@@ -712,7 +800,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		if outputEnt == nil {
 			return sparkerrors.NotFoundMissingEntity(fmt.Errorf("could not find output entity for output to spend at index %d", i))
 		}
-		if err := ValidateOwnershipSignatureFromAuthority(ctx, ownershipSignature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
+		if err := ValidateOwnershipOrAllowanceSignature(ctx, ownershipSignature, partialTokenTransactionHash, outputEnt.OwnerPublicKey, allowance); err != nil {
 			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
 		}
 		if err := validateOutputIsSpendable(ctx, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {

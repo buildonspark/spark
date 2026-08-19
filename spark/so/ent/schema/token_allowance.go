@@ -136,6 +136,8 @@ func (TokenAllowance) Edges() []ent.Edge {
 			Immutable().
 			Required().
 			Comment("Token create contains the token metadata associated with this allowance."),
+		edge.To("token_allowance_spend", TokenAllowanceSpend.Type).
+			Comment("Metered spends recorded against this allowance."),
 	}
 }
 

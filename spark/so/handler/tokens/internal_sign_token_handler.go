@@ -261,6 +261,10 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 			if err := validateNoActiveFreezesForOutputsToSpend(ctx, req.GetOutputsToSpend()); err != nil {
 				return nil, tokens.FormatErrorWithTransactionEnt("frozen transfer cannot exchange revocation secrets", tokenTransaction, err)
 			}
+			// Peer-side pre-reveal allowance checkpoint with the same enforcement window as freeze.
+			if err := validateAllowanceNotRevokedForTransaction(ctx, tokenTransaction); err != nil {
+				return nil, tokens.FormatErrorWithTransactionEnt(allowanceExchangeBlockedMessage(err), tokenTransaction, err)
+			}
 		}
 		if !tokenTransactionSpentOutputsMatchFinalInputs(tokenTransaction, req.GetFinalTokenTransaction().GetTransferInput().GetOutputsToSpend()) {
 			err = h.reclaimOutputsSpentOnDifferentStartedTransaction(ctx, tokenTransaction, operatorSignatures, req)

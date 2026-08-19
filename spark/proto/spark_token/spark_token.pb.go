@@ -1374,18 +1374,75 @@ func (x *InvoiceAttachment) GetSparkInvoice() string {
 	return ""
 }
 
+// A spender's authorization to spend an input TTXO under a delegated
+// allowance. Cited in place of the owner's own signature; the SO validates
+// spender_signature against the spender key recorded in the referenced
+// allowance rather than against the TTXO owner key.
+type AllowanceSignature struct {
+	state            protoimpl.MessageState   `protogen:"open.v1"`
+	AllowanceId      []byte                   `protobuf:"bytes,1,opt,name=allowance_id,json=allowanceId,proto3" json:"allowance_id,omitempty"`
+	SpenderSignature *multisig.KeyedSignature `protobuf:"bytes,2,opt,name=spender_signature,json=spenderSignature,proto3" json:"spender_signature,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AllowanceSignature) Reset() {
+	*x = AllowanceSignature{}
+	mi := &file_spark_token_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllowanceSignature) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllowanceSignature) ProtoMessage() {}
+
+func (x *AllowanceSignature) ProtoReflect() protoreflect.Message {
+	mi := &file_spark_token_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllowanceSignature.ProtoReflect.Descriptor instead.
+func (*AllowanceSignature) Descriptor() ([]byte, []int) {
+	return file_spark_token_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AllowanceSignature) GetAllowanceId() []byte {
+	if x != nil {
+		return x.AllowanceId
+	}
+	return nil
+}
+
+func (x *AllowanceSignature) GetSpenderSignature() *multisig.KeyedSignature {
+	if x != nil {
+		return x.SpenderSignature
+	}
+	return nil
+}
+
 type SignatureWithIndex struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Deprecated: use authority_signatures instead.
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3,oneof" json:"signature,omitempty"`
 	// The index of the TTXO associated with this signature.
 	InputIndex uint32 `protobuf:"varint,2,opt,name=input_index,json=inputIndex,proto3" json:"input_index,omitempty"`
-	// Supports single-key or multisig signatures.
+	// Supports single-key, multisig, or delegated allowance signatures.
 	//
 	// Types that are valid to be assigned to AuthoritySignatures:
 	//
 	//	*SignatureWithIndex_SingleSignature
 	//	*SignatureWithIndex_MultisigSignatures
+	//	*SignatureWithIndex_AllowanceSignature
 	AuthoritySignatures isSignatureWithIndex_AuthoritySignatures `protobuf_oneof:"authority_signatures"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
@@ -1393,7 +1450,7 @@ type SignatureWithIndex struct {
 
 func (x *SignatureWithIndex) Reset() {
 	*x = SignatureWithIndex{}
-	mi := &file_spark_token_proto_msgTypes[12]
+	mi := &file_spark_token_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1405,7 +1462,7 @@ func (x *SignatureWithIndex) String() string {
 func (*SignatureWithIndex) ProtoMessage() {}
 
 func (x *SignatureWithIndex) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[12]
+	mi := &file_spark_token_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1418,7 +1475,7 @@ func (x *SignatureWithIndex) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignatureWithIndex.ProtoReflect.Descriptor instead.
 func (*SignatureWithIndex) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{12}
+	return file_spark_token_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SignatureWithIndex) GetSignature() []byte {
@@ -1460,6 +1517,15 @@ func (x *SignatureWithIndex) GetMultisigSignatures() *multisig.MultisigSignature
 	return nil
 }
 
+func (x *SignatureWithIndex) GetAllowanceSignature() *AllowanceSignature {
+	if x != nil {
+		if x, ok := x.AuthoritySignatures.(*SignatureWithIndex_AllowanceSignature); ok {
+			return x.AllowanceSignature
+		}
+	}
+	return nil
+}
+
 type isSignatureWithIndex_AuthoritySignatures interface {
 	isSignatureWithIndex_AuthoritySignatures()
 }
@@ -1472,9 +1538,15 @@ type SignatureWithIndex_MultisigSignatures struct {
 	MultisigSignatures *multisig.MultisigSignatureSet `protobuf:"bytes,4,opt,name=multisig_signatures,json=multisigSignatures,proto3,oneof"`
 }
 
+type SignatureWithIndex_AllowanceSignature struct {
+	AllowanceSignature *AllowanceSignature `protobuf:"bytes,5,opt,name=allowance_signature,json=allowanceSignature,proto3,oneof"`
+}
+
 func (*SignatureWithIndex_SingleSignature) isSignatureWithIndex_AuthoritySignatures() {}
 
 func (*SignatureWithIndex_MultisigSignatures) isSignatureWithIndex_AuthoritySignatures() {}
+
+func (*SignatureWithIndex_AllowanceSignature) isSignatureWithIndex_AuthoritySignatures() {}
 
 // A group of signatures for the input TTXOs binding them to the final token
 // transaction hash. This bundle of signatures is specific to a given operator.
@@ -1488,7 +1560,7 @@ type InputTtxoSignaturesPerOperator struct {
 
 func (x *InputTtxoSignaturesPerOperator) Reset() {
 	*x = InputTtxoSignaturesPerOperator{}
-	mi := &file_spark_token_proto_msgTypes[13]
+	mi := &file_spark_token_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1500,7 +1572,7 @@ func (x *InputTtxoSignaturesPerOperator) String() string {
 func (*InputTtxoSignaturesPerOperator) ProtoMessage() {}
 
 func (x *InputTtxoSignaturesPerOperator) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[13]
+	mi := &file_spark_token_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1513,7 +1585,7 @@ func (x *InputTtxoSignaturesPerOperator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InputTtxoSignaturesPerOperator.ProtoReflect.Descriptor instead.
 func (*InputTtxoSignaturesPerOperator) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{13}
+	return file_spark_token_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *InputTtxoSignaturesPerOperator) GetTtxoSignatures() []*SignatureWithIndex {
@@ -1550,7 +1622,7 @@ type StartTransactionRequest struct {
 
 func (x *StartTransactionRequest) Reset() {
 	*x = StartTransactionRequest{}
-	mi := &file_spark_token_proto_msgTypes[14]
+	mi := &file_spark_token_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1562,7 +1634,7 @@ func (x *StartTransactionRequest) String() string {
 func (*StartTransactionRequest) ProtoMessage() {}
 
 func (x *StartTransactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[14]
+	mi := &file_spark_token_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1575,7 +1647,7 @@ func (x *StartTransactionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartTransactionRequest.ProtoReflect.Descriptor instead.
 func (*StartTransactionRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{14}
+	return file_spark_token_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StartTransactionRequest) GetIdentityPublicKey() []byte {
@@ -1616,7 +1688,7 @@ type StartTransactionResponse struct {
 
 func (x *StartTransactionResponse) Reset() {
 	*x = StartTransactionResponse{}
-	mi := &file_spark_token_proto_msgTypes[15]
+	mi := &file_spark_token_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1628,7 +1700,7 @@ func (x *StartTransactionResponse) String() string {
 func (*StartTransactionResponse) ProtoMessage() {}
 
 func (x *StartTransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[15]
+	mi := &file_spark_token_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1641,7 +1713,7 @@ func (x *StartTransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartTransactionResponse.ProtoReflect.Descriptor instead.
 func (*StartTransactionResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{15}
+	return file_spark_token_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartTransactionResponse) GetFinalTokenTransaction() *TokenTransaction {
@@ -1670,7 +1742,7 @@ type CommitTransactionRequest struct {
 
 func (x *CommitTransactionRequest) Reset() {
 	*x = CommitTransactionRequest{}
-	mi := &file_spark_token_proto_msgTypes[16]
+	mi := &file_spark_token_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1682,7 +1754,7 @@ func (x *CommitTransactionRequest) String() string {
 func (*CommitTransactionRequest) ProtoMessage() {}
 
 func (x *CommitTransactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[16]
+	mi := &file_spark_token_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1695,7 +1767,7 @@ func (x *CommitTransactionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitTransactionRequest.ProtoReflect.Descriptor instead.
 func (*CommitTransactionRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{16}
+	return file_spark_token_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CommitTransactionRequest) GetFinalTokenTransaction() *TokenTransaction {
@@ -1736,7 +1808,7 @@ type CommitProgress struct {
 
 func (x *CommitProgress) Reset() {
 	*x = CommitProgress{}
-	mi := &file_spark_token_proto_msgTypes[17]
+	mi := &file_spark_token_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1748,7 +1820,7 @@ func (x *CommitProgress) String() string {
 func (*CommitProgress) ProtoMessage() {}
 
 func (x *CommitProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[17]
+	mi := &file_spark_token_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1761,7 +1833,7 @@ func (x *CommitProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitProgress.ProtoReflect.Descriptor instead.
 func (*CommitProgress) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{17}
+	return file_spark_token_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CommitProgress) GetCommittedOperatorPublicKeys() [][]byte {
@@ -1790,7 +1862,7 @@ type CommitTransactionResponse struct {
 
 func (x *CommitTransactionResponse) Reset() {
 	*x = CommitTransactionResponse{}
-	mi := &file_spark_token_proto_msgTypes[18]
+	mi := &file_spark_token_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1802,7 +1874,7 @@ func (x *CommitTransactionResponse) String() string {
 func (*CommitTransactionResponse) ProtoMessage() {}
 
 func (x *CommitTransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[18]
+	mi := &file_spark_token_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1815,7 +1887,7 @@ func (x *CommitTransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitTransactionResponse.ProtoReflect.Descriptor instead.
 func (*CommitTransactionResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{18}
+	return file_spark_token_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CommitTransactionResponse) GetCommitStatus() CommitStatus {
@@ -1854,7 +1926,7 @@ type BroadcastTransactionRequest struct {
 
 func (x *BroadcastTransactionRequest) Reset() {
 	*x = BroadcastTransactionRequest{}
-	mi := &file_spark_token_proto_msgTypes[19]
+	mi := &file_spark_token_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1866,7 +1938,7 @@ func (x *BroadcastTransactionRequest) String() string {
 func (*BroadcastTransactionRequest) ProtoMessage() {}
 
 func (x *BroadcastTransactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[19]
+	mi := &file_spark_token_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1879,7 +1951,7 @@ func (x *BroadcastTransactionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BroadcastTransactionRequest.ProtoReflect.Descriptor instead.
 func (*BroadcastTransactionRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{19}
+	return file_spark_token_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *BroadcastTransactionRequest) GetIdentityPublicKey() []byte {
@@ -1916,7 +1988,7 @@ type BroadcastTransactionResponse struct {
 
 func (x *BroadcastTransactionResponse) Reset() {
 	*x = BroadcastTransactionResponse{}
-	mi := &file_spark_token_proto_msgTypes[20]
+	mi := &file_spark_token_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1928,7 +2000,7 @@ func (x *BroadcastTransactionResponse) String() string {
 func (*BroadcastTransactionResponse) ProtoMessage() {}
 
 func (x *BroadcastTransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[20]
+	mi := &file_spark_token_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1941,7 +2013,7 @@ func (x *BroadcastTransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BroadcastTransactionResponse.ProtoReflect.Descriptor instead.
 func (*BroadcastTransactionResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{20}
+	return file_spark_token_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *BroadcastTransactionResponse) GetFinalTokenTransaction() *FinalTokenTransaction {
@@ -1982,7 +2054,7 @@ type QueryTokenMetadataRequest struct {
 
 func (x *QueryTokenMetadataRequest) Reset() {
 	*x = QueryTokenMetadataRequest{}
-	mi := &file_spark_token_proto_msgTypes[21]
+	mi := &file_spark_token_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1994,7 +2066,7 @@ func (x *QueryTokenMetadataRequest) String() string {
 func (*QueryTokenMetadataRequest) ProtoMessage() {}
 
 func (x *QueryTokenMetadataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[21]
+	mi := &file_spark_token_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2007,7 +2079,7 @@ func (x *QueryTokenMetadataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenMetadataRequest.ProtoReflect.Descriptor instead.
 func (*QueryTokenMetadataRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{21}
+	return file_spark_token_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *QueryTokenMetadataRequest) GetTokenIdentifiers() [][]byte {
@@ -2041,7 +2113,7 @@ type TokenMetadata struct {
 
 func (x *TokenMetadata) Reset() {
 	*x = TokenMetadata{}
-	mi := &file_spark_token_proto_msgTypes[22]
+	mi := &file_spark_token_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2053,7 +2125,7 @@ func (x *TokenMetadata) String() string {
 func (*TokenMetadata) ProtoMessage() {}
 
 func (x *TokenMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[22]
+	mi := &file_spark_token_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2066,7 +2138,7 @@ func (x *TokenMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenMetadata.ProtoReflect.Descriptor instead.
 func (*TokenMetadata) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{22}
+	return file_spark_token_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TokenMetadata) GetIssuerPublicKey() []byte {
@@ -2141,7 +2213,7 @@ type QueryTokenMetadataResponse struct {
 
 func (x *QueryTokenMetadataResponse) Reset() {
 	*x = QueryTokenMetadataResponse{}
-	mi := &file_spark_token_proto_msgTypes[23]
+	mi := &file_spark_token_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2153,7 +2225,7 @@ func (x *QueryTokenMetadataResponse) String() string {
 func (*QueryTokenMetadataResponse) ProtoMessage() {}
 
 func (x *QueryTokenMetadataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[23]
+	mi := &file_spark_token_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2166,7 +2238,7 @@ func (x *QueryTokenMetadataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenMetadataResponse.ProtoReflect.Descriptor instead.
 func (*QueryTokenMetadataResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{23}
+	return file_spark_token_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *QueryTokenMetadataResponse) GetTokenMetadata() []*TokenMetadata {
@@ -2191,7 +2263,7 @@ type QueryTokenOutputsRequest struct {
 
 func (x *QueryTokenOutputsRequest) Reset() {
 	*x = QueryTokenOutputsRequest{}
-	mi := &file_spark_token_proto_msgTypes[24]
+	mi := &file_spark_token_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2203,7 +2275,7 @@ func (x *QueryTokenOutputsRequest) String() string {
 func (*QueryTokenOutputsRequest) ProtoMessage() {}
 
 func (x *QueryTokenOutputsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[24]
+	mi := &file_spark_token_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2216,7 +2288,7 @@ func (x *QueryTokenOutputsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenOutputsRequest.ProtoReflect.Descriptor instead.
 func (*QueryTokenOutputsRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{24}
+	return file_spark_token_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *QueryTokenOutputsRequest) GetOwnerPublicKeys() [][]byte {
@@ -2281,7 +2353,7 @@ type QueryTokenTransactionsRequest struct {
 
 func (x *QueryTokenTransactionsRequest) Reset() {
 	*x = QueryTokenTransactionsRequest{}
-	mi := &file_spark_token_proto_msgTypes[25]
+	mi := &file_spark_token_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2293,7 +2365,7 @@ func (x *QueryTokenTransactionsRequest) String() string {
 func (*QueryTokenTransactionsRequest) ProtoMessage() {}
 
 func (x *QueryTokenTransactionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[25]
+	mi := &file_spark_token_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2306,7 +2378,7 @@ func (x *QueryTokenTransactionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenTransactionsRequest.ProtoReflect.Descriptor instead.
 func (*QueryTokenTransactionsRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{25}
+	return file_spark_token_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *QueryTokenTransactionsRequest) GetQueryType() isQueryTokenTransactionsRequest_QueryType {
@@ -2415,7 +2487,7 @@ type QueryTokenTransactionsByTxHash struct {
 
 func (x *QueryTokenTransactionsByTxHash) Reset() {
 	*x = QueryTokenTransactionsByTxHash{}
-	mi := &file_spark_token_proto_msgTypes[26]
+	mi := &file_spark_token_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2427,7 +2499,7 @@ func (x *QueryTokenTransactionsByTxHash) String() string {
 func (*QueryTokenTransactionsByTxHash) ProtoMessage() {}
 
 func (x *QueryTokenTransactionsByTxHash) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[26]
+	mi := &file_spark_token_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2440,7 +2512,7 @@ func (x *QueryTokenTransactionsByTxHash) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenTransactionsByTxHash.ProtoReflect.Descriptor instead.
 func (*QueryTokenTransactionsByTxHash) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{26}
+	return file_spark_token_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *QueryTokenTransactionsByTxHash) GetTokenTransactionHashes() [][]byte {
@@ -2468,7 +2540,7 @@ type QueryTokenTransactionsByFilters struct {
 
 func (x *QueryTokenTransactionsByFilters) Reset() {
 	*x = QueryTokenTransactionsByFilters{}
-	mi := &file_spark_token_proto_msgTypes[27]
+	mi := &file_spark_token_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2480,7 +2552,7 @@ func (x *QueryTokenTransactionsByFilters) String() string {
 func (*QueryTokenTransactionsByFilters) ProtoMessage() {}
 
 func (x *QueryTokenTransactionsByFilters) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[27]
+	mi := &file_spark_token_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2493,7 +2565,7 @@ func (x *QueryTokenTransactionsByFilters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenTransactionsByFilters.ProtoReflect.Descriptor instead.
 func (*QueryTokenTransactionsByFilters) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{27}
+	return file_spark_token_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *QueryTokenTransactionsByFilters) GetOutputIds() []string {
@@ -2542,7 +2614,7 @@ type QueryTokenTransactionsResponse struct {
 
 func (x *QueryTokenTransactionsResponse) Reset() {
 	*x = QueryTokenTransactionsResponse{}
-	mi := &file_spark_token_proto_msgTypes[28]
+	mi := &file_spark_token_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2554,7 +2626,7 @@ func (x *QueryTokenTransactionsResponse) String() string {
 func (*QueryTokenTransactionsResponse) ProtoMessage() {}
 
 func (x *QueryTokenTransactionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[28]
+	mi := &file_spark_token_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2567,7 +2639,7 @@ func (x *QueryTokenTransactionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenTransactionsResponse.ProtoReflect.Descriptor instead.
 func (*QueryTokenTransactionsResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{28}
+	return file_spark_token_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *QueryTokenTransactionsResponse) GetTokenTransactionsWithStatus() []*TokenTransactionWithStatus {
@@ -2602,7 +2674,7 @@ type OutputWithPreviousTransactionData struct {
 
 func (x *OutputWithPreviousTransactionData) Reset() {
 	*x = OutputWithPreviousTransactionData{}
-	mi := &file_spark_token_proto_msgTypes[29]
+	mi := &file_spark_token_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2614,7 +2686,7 @@ func (x *OutputWithPreviousTransactionData) String() string {
 func (*OutputWithPreviousTransactionData) ProtoMessage() {}
 
 func (x *OutputWithPreviousTransactionData) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[29]
+	mi := &file_spark_token_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2627,7 +2699,7 @@ func (x *OutputWithPreviousTransactionData) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use OutputWithPreviousTransactionData.ProtoReflect.Descriptor instead.
 func (*OutputWithPreviousTransactionData) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{29}
+	return file_spark_token_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *OutputWithPreviousTransactionData) GetOutput() *TokenOutput {
@@ -2661,7 +2733,7 @@ type QueryTokenOutputsResponse struct {
 
 func (x *QueryTokenOutputsResponse) Reset() {
 	*x = QueryTokenOutputsResponse{}
-	mi := &file_spark_token_proto_msgTypes[30]
+	mi := &file_spark_token_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2673,7 +2745,7 @@ func (x *QueryTokenOutputsResponse) String() string {
 func (*QueryTokenOutputsResponse) ProtoMessage() {}
 
 func (x *QueryTokenOutputsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[30]
+	mi := &file_spark_token_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2686,7 +2758,7 @@ func (x *QueryTokenOutputsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenOutputsResponse.ProtoReflect.Descriptor instead.
 func (*QueryTokenOutputsResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{30}
+	return file_spark_token_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *QueryTokenOutputsResponse) GetOutputsWithPreviousTransactionData() []*OutputWithPreviousTransactionData {
@@ -2713,7 +2785,7 @@ type SpentTokenOutputMetadata struct {
 
 func (x *SpentTokenOutputMetadata) Reset() {
 	*x = SpentTokenOutputMetadata{}
-	mi := &file_spark_token_proto_msgTypes[31]
+	mi := &file_spark_token_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2725,7 +2797,7 @@ func (x *SpentTokenOutputMetadata) String() string {
 func (*SpentTokenOutputMetadata) ProtoMessage() {}
 
 func (x *SpentTokenOutputMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[31]
+	mi := &file_spark_token_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2738,7 +2810,7 @@ func (x *SpentTokenOutputMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpentTokenOutputMetadata.ProtoReflect.Descriptor instead.
 func (*SpentTokenOutputMetadata) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{31}
+	return file_spark_token_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SpentTokenOutputMetadata) GetOutputId() string {
@@ -2764,7 +2836,7 @@ type TokenTransactionConfirmationMetadata struct {
 
 func (x *TokenTransactionConfirmationMetadata) Reset() {
 	*x = TokenTransactionConfirmationMetadata{}
-	mi := &file_spark_token_proto_msgTypes[32]
+	mi := &file_spark_token_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2776,7 +2848,7 @@ func (x *TokenTransactionConfirmationMetadata) String() string {
 func (*TokenTransactionConfirmationMetadata) ProtoMessage() {}
 
 func (x *TokenTransactionConfirmationMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[32]
+	mi := &file_spark_token_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2789,7 +2861,7 @@ func (x *TokenTransactionConfirmationMetadata) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use TokenTransactionConfirmationMetadata.ProtoReflect.Descriptor instead.
 func (*TokenTransactionConfirmationMetadata) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{32}
+	return file_spark_token_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TokenTransactionConfirmationMetadata) GetSpentTokenOutputsMetadata() []*SpentTokenOutputMetadata {
@@ -2815,7 +2887,7 @@ type TokenTransactionWithStatus struct {
 
 func (x *TokenTransactionWithStatus) Reset() {
 	*x = TokenTransactionWithStatus{}
-	mi := &file_spark_token_proto_msgTypes[33]
+	mi := &file_spark_token_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2827,7 +2899,7 @@ func (x *TokenTransactionWithStatus) String() string {
 func (*TokenTransactionWithStatus) ProtoMessage() {}
 
 func (x *TokenTransactionWithStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[33]
+	mi := &file_spark_token_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2840,7 +2912,7 @@ func (x *TokenTransactionWithStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenTransactionWithStatus.ProtoReflect.Descriptor instead.
 func (*TokenTransactionWithStatus) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{33}
+	return file_spark_token_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *TokenTransactionWithStatus) GetTokenTransaction() *TokenTransaction {
@@ -2887,7 +2959,7 @@ type FreezeTokensPayload struct {
 
 func (x *FreezeTokensPayload) Reset() {
 	*x = FreezeTokensPayload{}
-	mi := &file_spark_token_proto_msgTypes[34]
+	mi := &file_spark_token_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2899,7 +2971,7 @@ func (x *FreezeTokensPayload) String() string {
 func (*FreezeTokensPayload) ProtoMessage() {}
 
 func (x *FreezeTokensPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[34]
+	mi := &file_spark_token_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2912,7 +2984,7 @@ func (x *FreezeTokensPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FreezeTokensPayload.ProtoReflect.Descriptor instead.
 func (*FreezeTokensPayload) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{34}
+	return file_spark_token_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *FreezeTokensPayload) GetVersion() uint32 {
@@ -2975,7 +3047,7 @@ type FreezeTokensRequest struct {
 
 func (x *FreezeTokensRequest) Reset() {
 	*x = FreezeTokensRequest{}
-	mi := &file_spark_token_proto_msgTypes[35]
+	mi := &file_spark_token_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2987,7 +3059,7 @@ func (x *FreezeTokensRequest) String() string {
 func (*FreezeTokensRequest) ProtoMessage() {}
 
 func (x *FreezeTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[35]
+	mi := &file_spark_token_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3000,7 +3072,7 @@ func (x *FreezeTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FreezeTokensRequest.ProtoReflect.Descriptor instead.
 func (*FreezeTokensRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{35}
+	return file_spark_token_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *FreezeTokensRequest) GetFreezeTokensPayload() *FreezeTokensPayload {
@@ -3028,7 +3100,7 @@ type TokenOutputRef struct {
 
 func (x *TokenOutputRef) Reset() {
 	*x = TokenOutputRef{}
-	mi := &file_spark_token_proto_msgTypes[36]
+	mi := &file_spark_token_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3040,7 +3112,7 @@ func (x *TokenOutputRef) String() string {
 func (*TokenOutputRef) ProtoMessage() {}
 
 func (x *TokenOutputRef) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[36]
+	mi := &file_spark_token_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3053,7 +3125,7 @@ func (x *TokenOutputRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenOutputRef.ProtoReflect.Descriptor instead.
 func (*TokenOutputRef) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{36}
+	return file_spark_token_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *TokenOutputRef) GetTransactionHash() []byte {
@@ -3080,7 +3152,7 @@ type FreezeProgress struct {
 
 func (x *FreezeProgress) Reset() {
 	*x = FreezeProgress{}
-	mi := &file_spark_token_proto_msgTypes[37]
+	mi := &file_spark_token_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3092,7 +3164,7 @@ func (x *FreezeProgress) String() string {
 func (*FreezeProgress) ProtoMessage() {}
 
 func (x *FreezeProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[37]
+	mi := &file_spark_token_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3105,7 +3177,7 @@ func (x *FreezeProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FreezeProgress.ProtoReflect.Descriptor instead.
 func (*FreezeProgress) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{37}
+	return file_spark_token_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *FreezeProgress) GetAppliedOperatorPublicKeys() [][]byte {
@@ -3130,7 +3202,7 @@ type FreezeTokensResponse struct {
 
 func (x *FreezeTokensResponse) Reset() {
 	*x = FreezeTokensResponse{}
-	mi := &file_spark_token_proto_msgTypes[38]
+	mi := &file_spark_token_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3142,7 +3214,7 @@ func (x *FreezeTokensResponse) String() string {
 func (*FreezeTokensResponse) ProtoMessage() {}
 
 func (x *FreezeTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[38]
+	mi := &file_spark_token_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3155,7 +3227,7 @@ func (x *FreezeTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FreezeTokensResponse.ProtoReflect.Descriptor instead.
 func (*FreezeTokensResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{38}
+	return file_spark_token_proto_rawDescGZIP(), []int{39}
 }
 
 // Deprecated: Marked as deprecated in spark_token.proto.
@@ -3221,7 +3293,7 @@ type TokenAllowancePayload struct {
 
 func (x *TokenAllowancePayload) Reset() {
 	*x = TokenAllowancePayload{}
-	mi := &file_spark_token_proto_msgTypes[39]
+	mi := &file_spark_token_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3233,7 +3305,7 @@ func (x *TokenAllowancePayload) String() string {
 func (*TokenAllowancePayload) ProtoMessage() {}
 
 func (x *TokenAllowancePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[39]
+	mi := &file_spark_token_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3246,7 +3318,7 @@ func (x *TokenAllowancePayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenAllowancePayload.ProtoReflect.Descriptor instead.
 func (*TokenAllowancePayload) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{39}
+	return file_spark_token_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *TokenAllowancePayload) GetVersion() uint32 {
@@ -3337,7 +3409,7 @@ type CreateTokenAllowanceRequest struct {
 
 func (x *CreateTokenAllowanceRequest) Reset() {
 	*x = CreateTokenAllowanceRequest{}
-	mi := &file_spark_token_proto_msgTypes[40]
+	mi := &file_spark_token_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3349,7 +3421,7 @@ func (x *CreateTokenAllowanceRequest) String() string {
 func (*CreateTokenAllowanceRequest) ProtoMessage() {}
 
 func (x *CreateTokenAllowanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[40]
+	mi := &file_spark_token_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3362,7 +3434,7 @@ func (x *CreateTokenAllowanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTokenAllowanceRequest.ProtoReflect.Descriptor instead.
 func (*CreateTokenAllowanceRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{40}
+	return file_spark_token_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *CreateTokenAllowanceRequest) GetAllowancePayload() *TokenAllowancePayload {
@@ -3389,7 +3461,7 @@ type AllowanceProgress struct {
 
 func (x *AllowanceProgress) Reset() {
 	*x = AllowanceProgress{}
-	mi := &file_spark_token_proto_msgTypes[41]
+	mi := &file_spark_token_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3401,7 +3473,7 @@ func (x *AllowanceProgress) String() string {
 func (*AllowanceProgress) ProtoMessage() {}
 
 func (x *AllowanceProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[41]
+	mi := &file_spark_token_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3414,7 +3486,7 @@ func (x *AllowanceProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllowanceProgress.ProtoReflect.Descriptor instead.
 func (*AllowanceProgress) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{41}
+	return file_spark_token_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *AllowanceProgress) GetAppliedOperatorPublicKeys() [][]byte {
@@ -3433,7 +3505,7 @@ type CreateTokenAllowanceResponse struct {
 
 func (x *CreateTokenAllowanceResponse) Reset() {
 	*x = CreateTokenAllowanceResponse{}
-	mi := &file_spark_token_proto_msgTypes[42]
+	mi := &file_spark_token_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3445,7 +3517,7 @@ func (x *CreateTokenAllowanceResponse) String() string {
 func (*CreateTokenAllowanceResponse) ProtoMessage() {}
 
 func (x *CreateTokenAllowanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[42]
+	mi := &file_spark_token_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3458,7 +3530,7 @@ func (x *CreateTokenAllowanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTokenAllowanceResponse.ProtoReflect.Descriptor instead.
 func (*CreateTokenAllowanceResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{42}
+	return file_spark_token_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *CreateTokenAllowanceResponse) GetAllowance() *TokenAllowanceInfo {
@@ -3481,7 +3553,7 @@ type RevokeTokenAllowancePayload struct {
 
 func (x *RevokeTokenAllowancePayload) Reset() {
 	*x = RevokeTokenAllowancePayload{}
-	mi := &file_spark_token_proto_msgTypes[43]
+	mi := &file_spark_token_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3493,7 +3565,7 @@ func (x *RevokeTokenAllowancePayload) String() string {
 func (*RevokeTokenAllowancePayload) ProtoMessage() {}
 
 func (x *RevokeTokenAllowancePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[43]
+	mi := &file_spark_token_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3506,7 +3578,7 @@ func (x *RevokeTokenAllowancePayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeTokenAllowancePayload.ProtoReflect.Descriptor instead.
 func (*RevokeTokenAllowancePayload) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{43}
+	return file_spark_token_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RevokeTokenAllowancePayload) GetVersion() uint32 {
@@ -3548,7 +3620,7 @@ type RevokeTokenAllowanceRequest struct {
 
 func (x *RevokeTokenAllowanceRequest) Reset() {
 	*x = RevokeTokenAllowanceRequest{}
-	mi := &file_spark_token_proto_msgTypes[44]
+	mi := &file_spark_token_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3560,7 +3632,7 @@ func (x *RevokeTokenAllowanceRequest) String() string {
 func (*RevokeTokenAllowanceRequest) ProtoMessage() {}
 
 func (x *RevokeTokenAllowanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[44]
+	mi := &file_spark_token_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3573,7 +3645,7 @@ func (x *RevokeTokenAllowanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeTokenAllowanceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeTokenAllowanceRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{44}
+	return file_spark_token_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *RevokeTokenAllowanceRequest) GetRevokeAllowancePayload() *RevokeTokenAllowancePayload {
@@ -3599,7 +3671,7 @@ type RevokeTokenAllowanceResponse struct {
 
 func (x *RevokeTokenAllowanceResponse) Reset() {
 	*x = RevokeTokenAllowanceResponse{}
-	mi := &file_spark_token_proto_msgTypes[45]
+	mi := &file_spark_token_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3611,7 +3683,7 @@ func (x *RevokeTokenAllowanceResponse) String() string {
 func (*RevokeTokenAllowanceResponse) ProtoMessage() {}
 
 func (x *RevokeTokenAllowanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[45]
+	mi := &file_spark_token_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3624,7 +3696,7 @@ func (x *RevokeTokenAllowanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeTokenAllowanceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeTokenAllowanceResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{45}
+	return file_spark_token_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *RevokeTokenAllowanceResponse) GetAllowanceProgress() *AllowanceProgress {
@@ -3660,7 +3732,7 @@ type TokenAllowanceInfo struct {
 
 func (x *TokenAllowanceInfo) Reset() {
 	*x = TokenAllowanceInfo{}
-	mi := &file_spark_token_proto_msgTypes[46]
+	mi := &file_spark_token_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3672,7 +3744,7 @@ func (x *TokenAllowanceInfo) String() string {
 func (*TokenAllowanceInfo) ProtoMessage() {}
 
 func (x *TokenAllowanceInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[46]
+	mi := &file_spark_token_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3685,7 +3757,7 @@ func (x *TokenAllowanceInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenAllowanceInfo.ProtoReflect.Descriptor instead.
 func (*TokenAllowanceInfo) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{46}
+	return file_spark_token_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *TokenAllowanceInfo) GetAllowancePayload() *TokenAllowancePayload {
@@ -3754,7 +3826,7 @@ type QueryTokenAllowancesRequest struct {
 
 func (x *QueryTokenAllowancesRequest) Reset() {
 	*x = QueryTokenAllowancesRequest{}
-	mi := &file_spark_token_proto_msgTypes[47]
+	mi := &file_spark_token_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3766,7 +3838,7 @@ func (x *QueryTokenAllowancesRequest) String() string {
 func (*QueryTokenAllowancesRequest) ProtoMessage() {}
 
 func (x *QueryTokenAllowancesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[47]
+	mi := &file_spark_token_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3779,7 +3851,7 @@ func (x *QueryTokenAllowancesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenAllowancesRequest.ProtoReflect.Descriptor instead.
 func (*QueryTokenAllowancesRequest) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{47}
+	return file_spark_token_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *QueryTokenAllowancesRequest) GetOwnerPublicKey() []byte {
@@ -3834,7 +3906,7 @@ type QueryTokenAllowancesResponse struct {
 
 func (x *QueryTokenAllowancesResponse) Reset() {
 	*x = QueryTokenAllowancesResponse{}
-	mi := &file_spark_token_proto_msgTypes[48]
+	mi := &file_spark_token_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3846,7 +3918,7 @@ func (x *QueryTokenAllowancesResponse) String() string {
 func (*QueryTokenAllowancesResponse) ProtoMessage() {}
 
 func (x *QueryTokenAllowancesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_token_proto_msgTypes[48]
+	mi := &file_spark_token_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3859,7 +3931,7 @@ func (x *QueryTokenAllowancesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryTokenAllowancesResponse.ProtoReflect.Descriptor instead.
 func (*QueryTokenAllowancesResponse) Descriptor() ([]byte, []int) {
-	return file_spark_token_proto_rawDescGZIP(), []int{48}
+	return file_spark_token_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *QueryTokenAllowancesResponse) GetAllowances() []*TokenAllowanceInfo {
@@ -3981,13 +4053,17 @@ const file_spark_token_proto_rawDesc = "" +
 	"\ftoken_inputsB\x11\n" +
 	"\x0f_execute_before\"8\n" +
 	"\x11InvoiceAttachment\x12#\n" +
-	"\rspark_invoice\x18\x01 \x01(\tR\fsparkInvoice\"\xa5\x02\n" +
+	"\rspark_invoice\x18\x01 \x01(\tR\fsparkInvoice\"\x91\x01\n" +
+	"\x12AllowanceSignature\x12*\n" +
+	"\fallowance_id\x18\x01 \x01(\fB\a\xfaB\x04z\x02h\x10R\vallowanceId\x12O\n" +
+	"\x11spender_signature\x18\x02 \x01(\v2\x18.multisig.KeyedSignatureB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x10spenderSignature\"\xf9\x02\n" +
 	"\x12SignatureWithIndex\x12.\n" +
 	"\tsignature\x18\x01 \x01(\fB\v\xfaB\bz\x06\x10@\x18Ip\x01H\x01R\tsignature\x88\x01\x01\x12\x1f\n" +
 	"\vinput_index\x18\x02 \x01(\rR\n" +
 	"inputIndex\x12E\n" +
 	"\x10single_signature\x18\x03 \x01(\v2\x18.multisig.KeyedSignatureH\x00R\x0fsingleSignature\x12Q\n" +
-	"\x13multisig_signatures\x18\x04 \x01(\v2\x1e.multisig.MultisigSignatureSetH\x00R\x12multisigSignaturesB\x16\n" +
+	"\x13multisig_signatures\x18\x04 \x01(\v2\x1e.multisig.MultisigSignatureSetH\x00R\x12multisigSignatures\x12R\n" +
+	"\x13allowance_signature\x18\x05 \x01(\v2\x1f.spark_token.AllowanceSignatureH\x00R\x12allowanceSignatureB\x16\n" +
 	"\x14authority_signaturesB\f\n" +
 	"\n" +
 	"_signature\"\xb4\x01\n" +
@@ -4232,7 +4308,7 @@ func file_spark_token_proto_rawDescGZIP() []byte {
 }
 
 var file_spark_token_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_spark_token_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_spark_token_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_spark_token_proto_goTypes = []any{
 	(TokenOutputStatus)(0),                       // 0: spark_token.TokenOutputStatus
 	(TokenTransactionType)(0),                    // 1: spark_token.TokenTransactionType
@@ -4251,51 +4327,52 @@ var file_spark_token_proto_goTypes = []any{
 	(*PartialTokenTransaction)(nil),              // 14: spark_token.PartialTokenTransaction
 	(*FinalTokenTransaction)(nil),                // 15: spark_token.FinalTokenTransaction
 	(*InvoiceAttachment)(nil),                    // 16: spark_token.InvoiceAttachment
-	(*SignatureWithIndex)(nil),                   // 17: spark_token.SignatureWithIndex
-	(*InputTtxoSignaturesPerOperator)(nil),       // 18: spark_token.InputTtxoSignaturesPerOperator
-	(*StartTransactionRequest)(nil),              // 19: spark_token.StartTransactionRequest
-	(*StartTransactionResponse)(nil),             // 20: spark_token.StartTransactionResponse
-	(*CommitTransactionRequest)(nil),             // 21: spark_token.CommitTransactionRequest
-	(*CommitProgress)(nil),                       // 22: spark_token.CommitProgress
-	(*CommitTransactionResponse)(nil),            // 23: spark_token.CommitTransactionResponse
-	(*BroadcastTransactionRequest)(nil),          // 24: spark_token.BroadcastTransactionRequest
-	(*BroadcastTransactionResponse)(nil),         // 25: spark_token.BroadcastTransactionResponse
-	(*QueryTokenMetadataRequest)(nil),            // 26: spark_token.QueryTokenMetadataRequest
-	(*TokenMetadata)(nil),                        // 27: spark_token.TokenMetadata
-	(*QueryTokenMetadataResponse)(nil),           // 28: spark_token.QueryTokenMetadataResponse
-	(*QueryTokenOutputsRequest)(nil),             // 29: spark_token.QueryTokenOutputsRequest
-	(*QueryTokenTransactionsRequest)(nil),        // 30: spark_token.QueryTokenTransactionsRequest
-	(*QueryTokenTransactionsByTxHash)(nil),       // 31: spark_token.QueryTokenTransactionsByTxHash
-	(*QueryTokenTransactionsByFilters)(nil),      // 32: spark_token.QueryTokenTransactionsByFilters
-	(*QueryTokenTransactionsResponse)(nil),       // 33: spark_token.QueryTokenTransactionsResponse
-	(*OutputWithPreviousTransactionData)(nil),    // 34: spark_token.OutputWithPreviousTransactionData
-	(*QueryTokenOutputsResponse)(nil),            // 35: spark_token.QueryTokenOutputsResponse
-	(*SpentTokenOutputMetadata)(nil),             // 36: spark_token.SpentTokenOutputMetadata
-	(*TokenTransactionConfirmationMetadata)(nil), // 37: spark_token.TokenTransactionConfirmationMetadata
-	(*TokenTransactionWithStatus)(nil),           // 38: spark_token.TokenTransactionWithStatus
-	(*FreezeTokensPayload)(nil),                  // 39: spark_token.FreezeTokensPayload
-	(*FreezeTokensRequest)(nil),                  // 40: spark_token.FreezeTokensRequest
-	(*TokenOutputRef)(nil),                       // 41: spark_token.TokenOutputRef
-	(*FreezeProgress)(nil),                       // 42: spark_token.FreezeProgress
-	(*FreezeTokensResponse)(nil),                 // 43: spark_token.FreezeTokensResponse
-	(*TokenAllowancePayload)(nil),                // 44: spark_token.TokenAllowancePayload
-	(*CreateTokenAllowanceRequest)(nil),          // 45: spark_token.CreateTokenAllowanceRequest
-	(*AllowanceProgress)(nil),                    // 46: spark_token.AllowanceProgress
-	(*CreateTokenAllowanceResponse)(nil),         // 47: spark_token.CreateTokenAllowanceResponse
-	(*RevokeTokenAllowancePayload)(nil),          // 48: spark_token.RevokeTokenAllowancePayload
-	(*RevokeTokenAllowanceRequest)(nil),          // 49: spark_token.RevokeTokenAllowanceRequest
-	(*RevokeTokenAllowanceResponse)(nil),         // 50: spark_token.RevokeTokenAllowanceResponse
-	(*TokenAllowanceInfo)(nil),                   // 51: spark_token.TokenAllowanceInfo
-	(*QueryTokenAllowancesRequest)(nil),          // 52: spark_token.QueryTokenAllowancesRequest
-	(*QueryTokenAllowancesResponse)(nil),         // 53: spark_token.QueryTokenAllowancesResponse
-	(*timestamppb.Timestamp)(nil),                // 54: google.protobuf.Timestamp
-	(spark.Network)(0),                           // 55: spark.Network
-	(*multisig.KeyedSignature)(nil),              // 56: multisig.KeyedSignature
-	(*multisig.MultisigSignatureSet)(nil),        // 57: multisig.MultisigSignatureSet
-	(*spark.SigningKeyshare)(nil),                // 58: spark.SigningKeyshare
-	(*spark.PageRequest)(nil),                    // 59: spark.PageRequest
-	(spark.Order)(0),                             // 60: spark.Order
-	(*spark.PageResponse)(nil),                   // 61: spark.PageResponse
+	(*AllowanceSignature)(nil),                   // 17: spark_token.AllowanceSignature
+	(*SignatureWithIndex)(nil),                   // 18: spark_token.SignatureWithIndex
+	(*InputTtxoSignaturesPerOperator)(nil),       // 19: spark_token.InputTtxoSignaturesPerOperator
+	(*StartTransactionRequest)(nil),              // 20: spark_token.StartTransactionRequest
+	(*StartTransactionResponse)(nil),             // 21: spark_token.StartTransactionResponse
+	(*CommitTransactionRequest)(nil),             // 22: spark_token.CommitTransactionRequest
+	(*CommitProgress)(nil),                       // 23: spark_token.CommitProgress
+	(*CommitTransactionResponse)(nil),            // 24: spark_token.CommitTransactionResponse
+	(*BroadcastTransactionRequest)(nil),          // 25: spark_token.BroadcastTransactionRequest
+	(*BroadcastTransactionResponse)(nil),         // 26: spark_token.BroadcastTransactionResponse
+	(*QueryTokenMetadataRequest)(nil),            // 27: spark_token.QueryTokenMetadataRequest
+	(*TokenMetadata)(nil),                        // 28: spark_token.TokenMetadata
+	(*QueryTokenMetadataResponse)(nil),           // 29: spark_token.QueryTokenMetadataResponse
+	(*QueryTokenOutputsRequest)(nil),             // 30: spark_token.QueryTokenOutputsRequest
+	(*QueryTokenTransactionsRequest)(nil),        // 31: spark_token.QueryTokenTransactionsRequest
+	(*QueryTokenTransactionsByTxHash)(nil),       // 32: spark_token.QueryTokenTransactionsByTxHash
+	(*QueryTokenTransactionsByFilters)(nil),      // 33: spark_token.QueryTokenTransactionsByFilters
+	(*QueryTokenTransactionsResponse)(nil),       // 34: spark_token.QueryTokenTransactionsResponse
+	(*OutputWithPreviousTransactionData)(nil),    // 35: spark_token.OutputWithPreviousTransactionData
+	(*QueryTokenOutputsResponse)(nil),            // 36: spark_token.QueryTokenOutputsResponse
+	(*SpentTokenOutputMetadata)(nil),             // 37: spark_token.SpentTokenOutputMetadata
+	(*TokenTransactionConfirmationMetadata)(nil), // 38: spark_token.TokenTransactionConfirmationMetadata
+	(*TokenTransactionWithStatus)(nil),           // 39: spark_token.TokenTransactionWithStatus
+	(*FreezeTokensPayload)(nil),                  // 40: spark_token.FreezeTokensPayload
+	(*FreezeTokensRequest)(nil),                  // 41: spark_token.FreezeTokensRequest
+	(*TokenOutputRef)(nil),                       // 42: spark_token.TokenOutputRef
+	(*FreezeProgress)(nil),                       // 43: spark_token.FreezeProgress
+	(*FreezeTokensResponse)(nil),                 // 44: spark_token.FreezeTokensResponse
+	(*TokenAllowancePayload)(nil),                // 45: spark_token.TokenAllowancePayload
+	(*CreateTokenAllowanceRequest)(nil),          // 46: spark_token.CreateTokenAllowanceRequest
+	(*AllowanceProgress)(nil),                    // 47: spark_token.AllowanceProgress
+	(*CreateTokenAllowanceResponse)(nil),         // 48: spark_token.CreateTokenAllowanceResponse
+	(*RevokeTokenAllowancePayload)(nil),          // 49: spark_token.RevokeTokenAllowancePayload
+	(*RevokeTokenAllowanceRequest)(nil),          // 50: spark_token.RevokeTokenAllowanceRequest
+	(*RevokeTokenAllowanceResponse)(nil),         // 51: spark_token.RevokeTokenAllowanceResponse
+	(*TokenAllowanceInfo)(nil),                   // 52: spark_token.TokenAllowanceInfo
+	(*QueryTokenAllowancesRequest)(nil),          // 53: spark_token.QueryTokenAllowancesRequest
+	(*QueryTokenAllowancesResponse)(nil),         // 54: spark_token.QueryTokenAllowancesResponse
+	(*timestamppb.Timestamp)(nil),                // 55: google.protobuf.Timestamp
+	(spark.Network)(0),                           // 56: spark.Network
+	(*multisig.KeyedSignature)(nil),              // 57: multisig.KeyedSignature
+	(*multisig.MultisigSignatureSet)(nil),        // 58: multisig.MultisigSignatureSet
+	(*spark.SigningKeyshare)(nil),                // 59: spark.SigningKeyshare
+	(*spark.PageRequest)(nil),                    // 60: spark.PageRequest
+	(spark.Order)(0),                             // 61: spark.Order
+	(*spark.PageResponse)(nil),                   // 62: spark.PageResponse
 }
 var file_spark_token_proto_depIdxs = []int32{
 	5,  // 0: spark_token.TokenTransferInput.outputs_to_spend:type_name -> spark_token.TokenOutputToSpend
@@ -4305,95 +4382,97 @@ var file_spark_token_proto_depIdxs = []int32{
 	6,  // 4: spark_token.TokenTransaction.transfer_input:type_name -> spark_token.TokenTransferInput
 	8,  // 5: spark_token.TokenTransaction.create_input:type_name -> spark_token.TokenCreateInput
 	9,  // 6: spark_token.TokenTransaction.token_outputs:type_name -> spark_token.TokenOutput
-	54, // 7: spark_token.TokenTransaction.expiry_time:type_name -> google.protobuf.Timestamp
-	55, // 8: spark_token.TokenTransaction.network:type_name -> spark.Network
-	54, // 9: spark_token.TokenTransaction.client_created_timestamp:type_name -> google.protobuf.Timestamp
+	55, // 7: spark_token.TokenTransaction.expiry_time:type_name -> google.protobuf.Timestamp
+	56, // 8: spark_token.TokenTransaction.network:type_name -> spark.Network
+	55, // 9: spark_token.TokenTransaction.client_created_timestamp:type_name -> google.protobuf.Timestamp
 	16, // 10: spark_token.TokenTransaction.invoice_attachments:type_name -> spark_token.InvoiceAttachment
-	54, // 11: spark_token.TokenTransaction.execute_before:type_name -> google.protobuf.Timestamp
-	55, // 12: spark_token.TokenTransactionMetadata.network:type_name -> spark.Network
-	54, // 13: spark_token.TokenTransactionMetadata.client_created_timestamp:type_name -> google.protobuf.Timestamp
+	55, // 11: spark_token.TokenTransaction.execute_before:type_name -> google.protobuf.Timestamp
+	56, // 12: spark_token.TokenTransactionMetadata.network:type_name -> spark.Network
+	55, // 13: spark_token.TokenTransactionMetadata.client_created_timestamp:type_name -> google.protobuf.Timestamp
 	16, // 14: spark_token.TokenTransactionMetadata.invoice_attachments:type_name -> spark_token.InvoiceAttachment
 	13, // 15: spark_token.PartialTokenTransaction.token_transaction_metadata:type_name -> spark_token.TokenTransactionMetadata
 	7,  // 16: spark_token.PartialTokenTransaction.mint_input:type_name -> spark_token.TokenMintInput
 	6,  // 17: spark_token.PartialTokenTransaction.transfer_input:type_name -> spark_token.TokenTransferInput
 	8,  // 18: spark_token.PartialTokenTransaction.create_input:type_name -> spark_token.TokenCreateInput
 	10, // 19: spark_token.PartialTokenTransaction.partial_token_outputs:type_name -> spark_token.PartialTokenOutput
-	54, // 20: spark_token.PartialTokenTransaction.execute_before:type_name -> google.protobuf.Timestamp
+	55, // 20: spark_token.PartialTokenTransaction.execute_before:type_name -> google.protobuf.Timestamp
 	13, // 21: spark_token.FinalTokenTransaction.token_transaction_metadata:type_name -> spark_token.TokenTransactionMetadata
 	7,  // 22: spark_token.FinalTokenTransaction.mint_input:type_name -> spark_token.TokenMintInput
 	6,  // 23: spark_token.FinalTokenTransaction.transfer_input:type_name -> spark_token.TokenTransferInput
 	8,  // 24: spark_token.FinalTokenTransaction.create_input:type_name -> spark_token.TokenCreateInput
 	11, // 25: spark_token.FinalTokenTransaction.final_token_outputs:type_name -> spark_token.FinalTokenOutput
-	54, // 26: spark_token.FinalTokenTransaction.execute_before:type_name -> google.protobuf.Timestamp
-	56, // 27: spark_token.SignatureWithIndex.single_signature:type_name -> multisig.KeyedSignature
-	57, // 28: spark_token.SignatureWithIndex.multisig_signatures:type_name -> multisig.MultisigSignatureSet
-	17, // 29: spark_token.InputTtxoSignaturesPerOperator.ttxo_signatures:type_name -> spark_token.SignatureWithIndex
-	12, // 30: spark_token.StartTransactionRequest.partial_token_transaction:type_name -> spark_token.TokenTransaction
-	17, // 31: spark_token.StartTransactionRequest.partial_token_transaction_owner_signatures:type_name -> spark_token.SignatureWithIndex
-	12, // 32: spark_token.StartTransactionResponse.final_token_transaction:type_name -> spark_token.TokenTransaction
-	58, // 33: spark_token.StartTransactionResponse.keyshare_info:type_name -> spark.SigningKeyshare
-	12, // 34: spark_token.CommitTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	18, // 35: spark_token.CommitTransactionRequest.input_ttxo_signatures_per_operator:type_name -> spark_token.InputTtxoSignaturesPerOperator
-	2,  // 36: spark_token.CommitTransactionResponse.commit_status:type_name -> spark_token.CommitStatus
-	22, // 37: spark_token.CommitTransactionResponse.commit_progress:type_name -> spark_token.CommitProgress
-	14, // 38: spark_token.BroadcastTransactionRequest.partial_token_transaction:type_name -> spark_token.PartialTokenTransaction
-	17, // 39: spark_token.BroadcastTransactionRequest.token_transaction_owner_signatures:type_name -> spark_token.SignatureWithIndex
-	15, // 40: spark_token.BroadcastTransactionResponse.final_token_transaction:type_name -> spark_token.FinalTokenTransaction
-	2,  // 41: spark_token.BroadcastTransactionResponse.commit_status:type_name -> spark_token.CommitStatus
-	22, // 42: spark_token.BroadcastTransactionResponse.commit_progress:type_name -> spark_token.CommitProgress
-	27, // 43: spark_token.QueryTokenMetadataResponse.token_metadata:type_name -> spark_token.TokenMetadata
-	55, // 44: spark_token.QueryTokenOutputsRequest.network:type_name -> spark.Network
-	59, // 45: spark_token.QueryTokenOutputsRequest.page_request:type_name -> spark.PageRequest
-	31, // 46: spark_token.QueryTokenTransactionsRequest.by_tx_hash:type_name -> spark_token.QueryTokenTransactionsByTxHash
-	32, // 47: spark_token.QueryTokenTransactionsRequest.by_filters:type_name -> spark_token.QueryTokenTransactionsByFilters
-	60, // 48: spark_token.QueryTokenTransactionsRequest.order:type_name -> spark.Order
-	59, // 49: spark_token.QueryTokenTransactionsByFilters.page_request:type_name -> spark.PageRequest
-	38, // 50: spark_token.QueryTokenTransactionsResponse.token_transactions_with_status:type_name -> spark_token.TokenTransactionWithStatus
-	61, // 51: spark_token.QueryTokenTransactionsResponse.page_response:type_name -> spark.PageResponse
-	9,  // 52: spark_token.OutputWithPreviousTransactionData.output:type_name -> spark_token.TokenOutput
-	34, // 53: spark_token.QueryTokenOutputsResponse.outputs_with_previous_transaction_data:type_name -> spark_token.OutputWithPreviousTransactionData
-	61, // 54: spark_token.QueryTokenOutputsResponse.page_response:type_name -> spark.PageResponse
-	36, // 55: spark_token.TokenTransactionConfirmationMetadata.spent_token_outputs_metadata:type_name -> spark_token.SpentTokenOutputMetadata
-	12, // 56: spark_token.TokenTransactionWithStatus.token_transaction:type_name -> spark_token.TokenTransaction
-	3,  // 57: spark_token.TokenTransactionWithStatus.status:type_name -> spark_token.TokenTransactionStatus
-	37, // 58: spark_token.TokenTransactionWithStatus.confirmation_metadata:type_name -> spark_token.TokenTransactionConfirmationMetadata
-	39, // 59: spark_token.FreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
-	41, // 60: spark_token.FreezeTokensResponse.impacted_token_outputs:type_name -> spark_token.TokenOutputRef
-	42, // 61: spark_token.FreezeTokensResponse.freeze_progress:type_name -> spark_token.FreezeProgress
-	54, // 62: spark_token.TokenAllowancePayload.expiry_time:type_name -> google.protobuf.Timestamp
-	55, // 63: spark_token.TokenAllowancePayload.network:type_name -> spark.Network
-	44, // 64: spark_token.CreateTokenAllowanceRequest.allowance_payload:type_name -> spark_token.TokenAllowancePayload
-	51, // 65: spark_token.CreateTokenAllowanceResponse.allowance:type_name -> spark_token.TokenAllowanceInfo
-	48, // 66: spark_token.RevokeTokenAllowanceRequest.revoke_allowance_payload:type_name -> spark_token.RevokeTokenAllowancePayload
-	46, // 67: spark_token.RevokeTokenAllowanceResponse.allowance_progress:type_name -> spark_token.AllowanceProgress
-	44, // 68: spark_token.TokenAllowanceInfo.allowance_payload:type_name -> spark_token.TokenAllowancePayload
-	4,  // 69: spark_token.TokenAllowanceInfo.status:type_name -> spark_token.TokenAllowanceStatus
-	51, // 70: spark_token.QueryTokenAllowancesResponse.allowances:type_name -> spark_token.TokenAllowanceInfo
-	19, // 71: spark_token.SparkTokenService.start_transaction:input_type -> spark_token.StartTransactionRequest
-	21, // 72: spark_token.SparkTokenService.commit_transaction:input_type -> spark_token.CommitTransactionRequest
-	26, // 73: spark_token.SparkTokenService.query_token_metadata:input_type -> spark_token.QueryTokenMetadataRequest
-	30, // 74: spark_token.SparkTokenService.query_token_transactions:input_type -> spark_token.QueryTokenTransactionsRequest
-	29, // 75: spark_token.SparkTokenService.query_token_outputs:input_type -> spark_token.QueryTokenOutputsRequest
-	40, // 76: spark_token.SparkTokenService.freeze_tokens:input_type -> spark_token.FreezeTokensRequest
-	24, // 77: spark_token.SparkTokenService.broadcast_transaction:input_type -> spark_token.BroadcastTransactionRequest
-	45, // 78: spark_token.SparkTokenService.create_token_allowance:input_type -> spark_token.CreateTokenAllowanceRequest
-	49, // 79: spark_token.SparkTokenService.revoke_token_allowance:input_type -> spark_token.RevokeTokenAllowanceRequest
-	52, // 80: spark_token.SparkTokenService.query_token_allowances:input_type -> spark_token.QueryTokenAllowancesRequest
-	20, // 81: spark_token.SparkTokenService.start_transaction:output_type -> spark_token.StartTransactionResponse
-	23, // 82: spark_token.SparkTokenService.commit_transaction:output_type -> spark_token.CommitTransactionResponse
-	28, // 83: spark_token.SparkTokenService.query_token_metadata:output_type -> spark_token.QueryTokenMetadataResponse
-	33, // 84: spark_token.SparkTokenService.query_token_transactions:output_type -> spark_token.QueryTokenTransactionsResponse
-	35, // 85: spark_token.SparkTokenService.query_token_outputs:output_type -> spark_token.QueryTokenOutputsResponse
-	43, // 86: spark_token.SparkTokenService.freeze_tokens:output_type -> spark_token.FreezeTokensResponse
-	25, // 87: spark_token.SparkTokenService.broadcast_transaction:output_type -> spark_token.BroadcastTransactionResponse
-	47, // 88: spark_token.SparkTokenService.create_token_allowance:output_type -> spark_token.CreateTokenAllowanceResponse
-	50, // 89: spark_token.SparkTokenService.revoke_token_allowance:output_type -> spark_token.RevokeTokenAllowanceResponse
-	53, // 90: spark_token.SparkTokenService.query_token_allowances:output_type -> spark_token.QueryTokenAllowancesResponse
-	81, // [81:91] is the sub-list for method output_type
-	71, // [71:81] is the sub-list for method input_type
-	71, // [71:71] is the sub-list for extension type_name
-	71, // [71:71] is the sub-list for extension extendee
-	0,  // [0:71] is the sub-list for field type_name
+	55, // 26: spark_token.FinalTokenTransaction.execute_before:type_name -> google.protobuf.Timestamp
+	57, // 27: spark_token.AllowanceSignature.spender_signature:type_name -> multisig.KeyedSignature
+	57, // 28: spark_token.SignatureWithIndex.single_signature:type_name -> multisig.KeyedSignature
+	58, // 29: spark_token.SignatureWithIndex.multisig_signatures:type_name -> multisig.MultisigSignatureSet
+	17, // 30: spark_token.SignatureWithIndex.allowance_signature:type_name -> spark_token.AllowanceSignature
+	18, // 31: spark_token.InputTtxoSignaturesPerOperator.ttxo_signatures:type_name -> spark_token.SignatureWithIndex
+	12, // 32: spark_token.StartTransactionRequest.partial_token_transaction:type_name -> spark_token.TokenTransaction
+	18, // 33: spark_token.StartTransactionRequest.partial_token_transaction_owner_signatures:type_name -> spark_token.SignatureWithIndex
+	12, // 34: spark_token.StartTransactionResponse.final_token_transaction:type_name -> spark_token.TokenTransaction
+	59, // 35: spark_token.StartTransactionResponse.keyshare_info:type_name -> spark.SigningKeyshare
+	12, // 36: spark_token.CommitTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	19, // 37: spark_token.CommitTransactionRequest.input_ttxo_signatures_per_operator:type_name -> spark_token.InputTtxoSignaturesPerOperator
+	2,  // 38: spark_token.CommitTransactionResponse.commit_status:type_name -> spark_token.CommitStatus
+	23, // 39: spark_token.CommitTransactionResponse.commit_progress:type_name -> spark_token.CommitProgress
+	14, // 40: spark_token.BroadcastTransactionRequest.partial_token_transaction:type_name -> spark_token.PartialTokenTransaction
+	18, // 41: spark_token.BroadcastTransactionRequest.token_transaction_owner_signatures:type_name -> spark_token.SignatureWithIndex
+	15, // 42: spark_token.BroadcastTransactionResponse.final_token_transaction:type_name -> spark_token.FinalTokenTransaction
+	2,  // 43: spark_token.BroadcastTransactionResponse.commit_status:type_name -> spark_token.CommitStatus
+	23, // 44: spark_token.BroadcastTransactionResponse.commit_progress:type_name -> spark_token.CommitProgress
+	28, // 45: spark_token.QueryTokenMetadataResponse.token_metadata:type_name -> spark_token.TokenMetadata
+	56, // 46: spark_token.QueryTokenOutputsRequest.network:type_name -> spark.Network
+	60, // 47: spark_token.QueryTokenOutputsRequest.page_request:type_name -> spark.PageRequest
+	32, // 48: spark_token.QueryTokenTransactionsRequest.by_tx_hash:type_name -> spark_token.QueryTokenTransactionsByTxHash
+	33, // 49: spark_token.QueryTokenTransactionsRequest.by_filters:type_name -> spark_token.QueryTokenTransactionsByFilters
+	61, // 50: spark_token.QueryTokenTransactionsRequest.order:type_name -> spark.Order
+	60, // 51: spark_token.QueryTokenTransactionsByFilters.page_request:type_name -> spark.PageRequest
+	39, // 52: spark_token.QueryTokenTransactionsResponse.token_transactions_with_status:type_name -> spark_token.TokenTransactionWithStatus
+	62, // 53: spark_token.QueryTokenTransactionsResponse.page_response:type_name -> spark.PageResponse
+	9,  // 54: spark_token.OutputWithPreviousTransactionData.output:type_name -> spark_token.TokenOutput
+	35, // 55: spark_token.QueryTokenOutputsResponse.outputs_with_previous_transaction_data:type_name -> spark_token.OutputWithPreviousTransactionData
+	62, // 56: spark_token.QueryTokenOutputsResponse.page_response:type_name -> spark.PageResponse
+	37, // 57: spark_token.TokenTransactionConfirmationMetadata.spent_token_outputs_metadata:type_name -> spark_token.SpentTokenOutputMetadata
+	12, // 58: spark_token.TokenTransactionWithStatus.token_transaction:type_name -> spark_token.TokenTransaction
+	3,  // 59: spark_token.TokenTransactionWithStatus.status:type_name -> spark_token.TokenTransactionStatus
+	38, // 60: spark_token.TokenTransactionWithStatus.confirmation_metadata:type_name -> spark_token.TokenTransactionConfirmationMetadata
+	40, // 61: spark_token.FreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
+	42, // 62: spark_token.FreezeTokensResponse.impacted_token_outputs:type_name -> spark_token.TokenOutputRef
+	43, // 63: spark_token.FreezeTokensResponse.freeze_progress:type_name -> spark_token.FreezeProgress
+	55, // 64: spark_token.TokenAllowancePayload.expiry_time:type_name -> google.protobuf.Timestamp
+	56, // 65: spark_token.TokenAllowancePayload.network:type_name -> spark.Network
+	45, // 66: spark_token.CreateTokenAllowanceRequest.allowance_payload:type_name -> spark_token.TokenAllowancePayload
+	52, // 67: spark_token.CreateTokenAllowanceResponse.allowance:type_name -> spark_token.TokenAllowanceInfo
+	49, // 68: spark_token.RevokeTokenAllowanceRequest.revoke_allowance_payload:type_name -> spark_token.RevokeTokenAllowancePayload
+	47, // 69: spark_token.RevokeTokenAllowanceResponse.allowance_progress:type_name -> spark_token.AllowanceProgress
+	45, // 70: spark_token.TokenAllowanceInfo.allowance_payload:type_name -> spark_token.TokenAllowancePayload
+	4,  // 71: spark_token.TokenAllowanceInfo.status:type_name -> spark_token.TokenAllowanceStatus
+	52, // 72: spark_token.QueryTokenAllowancesResponse.allowances:type_name -> spark_token.TokenAllowanceInfo
+	20, // 73: spark_token.SparkTokenService.start_transaction:input_type -> spark_token.StartTransactionRequest
+	22, // 74: spark_token.SparkTokenService.commit_transaction:input_type -> spark_token.CommitTransactionRequest
+	27, // 75: spark_token.SparkTokenService.query_token_metadata:input_type -> spark_token.QueryTokenMetadataRequest
+	31, // 76: spark_token.SparkTokenService.query_token_transactions:input_type -> spark_token.QueryTokenTransactionsRequest
+	30, // 77: spark_token.SparkTokenService.query_token_outputs:input_type -> spark_token.QueryTokenOutputsRequest
+	41, // 78: spark_token.SparkTokenService.freeze_tokens:input_type -> spark_token.FreezeTokensRequest
+	25, // 79: spark_token.SparkTokenService.broadcast_transaction:input_type -> spark_token.BroadcastTransactionRequest
+	46, // 80: spark_token.SparkTokenService.create_token_allowance:input_type -> spark_token.CreateTokenAllowanceRequest
+	50, // 81: spark_token.SparkTokenService.revoke_token_allowance:input_type -> spark_token.RevokeTokenAllowanceRequest
+	53, // 82: spark_token.SparkTokenService.query_token_allowances:input_type -> spark_token.QueryTokenAllowancesRequest
+	21, // 83: spark_token.SparkTokenService.start_transaction:output_type -> spark_token.StartTransactionResponse
+	24, // 84: spark_token.SparkTokenService.commit_transaction:output_type -> spark_token.CommitTransactionResponse
+	29, // 85: spark_token.SparkTokenService.query_token_metadata:output_type -> spark_token.QueryTokenMetadataResponse
+	34, // 86: spark_token.SparkTokenService.query_token_transactions:output_type -> spark_token.QueryTokenTransactionsResponse
+	36, // 87: spark_token.SparkTokenService.query_token_outputs:output_type -> spark_token.QueryTokenOutputsResponse
+	44, // 88: spark_token.SparkTokenService.freeze_tokens:output_type -> spark_token.FreezeTokensResponse
+	26, // 89: spark_token.SparkTokenService.broadcast_transaction:output_type -> spark_token.BroadcastTransactionResponse
+	48, // 90: spark_token.SparkTokenService.create_token_allowance:output_type -> spark_token.CreateTokenAllowanceResponse
+	51, // 91: spark_token.SparkTokenService.revoke_token_allowance:output_type -> spark_token.RevokeTokenAllowanceResponse
+	54, // 92: spark_token.SparkTokenService.query_token_allowances:output_type -> spark_token.QueryTokenAllowancesResponse
+	83, // [83:93] is the sub-list for method output_type
+	73, // [73:83] is the sub-list for method input_type
+	73, // [73:73] is the sub-list for extension type_name
+	73, // [73:73] is the sub-list for extension extendee
+	0,  // [0:73] is the sub-list for field type_name
 }
 
 func init() { file_spark_token_proto_init() }
@@ -4419,26 +4498,27 @@ func file_spark_token_proto_init() {
 		(*FinalTokenTransaction_TransferInput)(nil),
 		(*FinalTokenTransaction_CreateInput)(nil),
 	}
-	file_spark_token_proto_msgTypes[12].OneofWrappers = []any{
+	file_spark_token_proto_msgTypes[13].OneofWrappers = []any{
 		(*SignatureWithIndex_SingleSignature)(nil),
 		(*SignatureWithIndex_MultisigSignatures)(nil),
+		(*SignatureWithIndex_AllowanceSignature)(nil),
 	}
-	file_spark_token_proto_msgTypes[18].OneofWrappers = []any{}
-	file_spark_token_proto_msgTypes[20].OneofWrappers = []any{}
-	file_spark_token_proto_msgTypes[22].OneofWrappers = []any{}
-	file_spark_token_proto_msgTypes[25].OneofWrappers = []any{
+	file_spark_token_proto_msgTypes[19].OneofWrappers = []any{}
+	file_spark_token_proto_msgTypes[21].OneofWrappers = []any{}
+	file_spark_token_proto_msgTypes[23].OneofWrappers = []any{}
+	file_spark_token_proto_msgTypes[26].OneofWrappers = []any{
 		(*QueryTokenTransactionsRequest_ByTxHash)(nil),
 		(*QueryTokenTransactionsRequest_ByFilters)(nil),
 	}
-	file_spark_token_proto_msgTypes[34].OneofWrappers = []any{}
-	file_spark_token_proto_msgTypes[47].OneofWrappers = []any{}
+	file_spark_token_proto_msgTypes[35].OneofWrappers = []any{}
+	file_spark_token_proto_msgTypes[48].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spark_token_proto_rawDesc), len(file_spark_token_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   49,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
