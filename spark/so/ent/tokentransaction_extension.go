@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
@@ -174,6 +175,12 @@ func createTransactionEntities(
 			SetTokenIdentifier(computedTokenIdentifier).
 			Save(ctx)
 		if err != nil {
+			// A unique-constraint hit here is the concurrent-duplicate race:
+			// another attempt inserted the same token_identifier between the
+			// duplicate pre-check and this write.
+			if sqlgraph.IsUniqueConstraintError(err) {
+				return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("token create already exists: %w", err))
+			}
 			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create token create ent, likely due to attempting to restart a create transaction with a different operator: %w", err))
 		}
 		txBuilder := db.TokenTransaction.Create().
@@ -192,6 +199,10 @@ func createTransactionEntities(
 		}
 		tokenTransactionEnt, err = txBuilder.Save(ctx)
 		if err != nil {
+			// Same race on the unique finalized transaction hash.
+			if sqlgraph.IsUniqueConstraintError(err) {
+				return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("token transaction already exists: %w", err))
+			}
 			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create create token transaction: %w", err))
 		}
 	case utils.TokenTransactionTypeMint:

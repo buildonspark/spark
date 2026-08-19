@@ -6,6 +6,7 @@ import (
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/handler/tokens"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -72,4 +73,16 @@ func TestDispatchPrepare_BoundEmptyFlowIDRejected(t *testing.T) {
 		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_SEND_TRANSFER,
 		op, "", uint(cfg.Index)+1)
 	require.ErrorContains(t, err, "requires a flow_execution_id")
+}
+
+// TestConsensusFlowHandler_RoutesTokenTransaction pins the dispatch registry
+// entry for the token op type: prepare/commit/rollback dispatch all resolve
+// their handler through consensusFlowHandler, so a missing case would fail
+// every leg of the flow at runtime.
+func TestConsensusFlowHandler_RoutesTokenTransaction(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+
+	h, err := consensusFlowHandler(cfg, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION)
+	require.NoError(t, err)
+	require.IsType(t, &tokens.TokenTransactionFlowHandler{}, h)
 }
