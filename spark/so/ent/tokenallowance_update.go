@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
@@ -53,6 +54,26 @@ func (tau *TokenAllowanceUpdate) SetNillableStatus(sas *schematype.TokenAllowanc
 // SetSpentAmount sets the "spent_amount" field.
 func (tau *TokenAllowanceUpdate) SetSpentAmount(b []byte) *TokenAllowanceUpdate {
 	tau.mutation.SetSpentAmount(b)
+	return tau
+}
+
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (tau *TokenAllowanceUpdate) SetFlowExecutionID(u uuid.UUID) *TokenAllowanceUpdate {
+	tau.mutation.SetFlowExecutionID(u)
+	return tau
+}
+
+// SetNillableFlowExecutionID sets the "flow_execution_id" field if the given value is not nil.
+func (tau *TokenAllowanceUpdate) SetNillableFlowExecutionID(u *uuid.UUID) *TokenAllowanceUpdate {
+	if u != nil {
+		tau.SetFlowExecutionID(*u)
+	}
+	return tau
+}
+
+// ClearFlowExecutionID clears the value of the "flow_execution_id" field.
+func (tau *TokenAllowanceUpdate) ClearFlowExecutionID() *TokenAllowanceUpdate {
+	tau.mutation.ClearFlowExecutionID()
 	return tau
 }
 
@@ -179,6 +200,12 @@ func (tau *TokenAllowanceUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if tau.mutation.RecipientAllowlistCleared() {
 		_spec.ClearField(tokenallowance.FieldRecipientAllowlist, field.TypeJSON)
 	}
+	if value, ok := tau.mutation.FlowExecutionID(); ok {
+		_spec.SetField(tokenallowance.FieldFlowExecutionID, field.TypeUUID, value)
+	}
+	if tau.mutation.FlowExecutionIDCleared() {
+		_spec.ClearField(tokenallowance.FieldFlowExecutionID, field.TypeUUID)
+	}
 	if value, ok := tau.mutation.OwnerProvidedRevokeTimestamp(); ok {
 		_spec.SetField(tokenallowance.FieldOwnerProvidedRevokeTimestamp, field.TypeUint64, value)
 	}
@@ -239,6 +266,26 @@ func (tauo *TokenAllowanceUpdateOne) SetNillableStatus(sas *schematype.TokenAllo
 // SetSpentAmount sets the "spent_amount" field.
 func (tauo *TokenAllowanceUpdateOne) SetSpentAmount(b []byte) *TokenAllowanceUpdateOne {
 	tauo.mutation.SetSpentAmount(b)
+	return tauo
+}
+
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (tauo *TokenAllowanceUpdateOne) SetFlowExecutionID(u uuid.UUID) *TokenAllowanceUpdateOne {
+	tauo.mutation.SetFlowExecutionID(u)
+	return tauo
+}
+
+// SetNillableFlowExecutionID sets the "flow_execution_id" field if the given value is not nil.
+func (tauo *TokenAllowanceUpdateOne) SetNillableFlowExecutionID(u *uuid.UUID) *TokenAllowanceUpdateOne {
+	if u != nil {
+		tauo.SetFlowExecutionID(*u)
+	}
+	return tauo
+}
+
+// ClearFlowExecutionID clears the value of the "flow_execution_id" field.
+func (tauo *TokenAllowanceUpdateOne) ClearFlowExecutionID() *TokenAllowanceUpdateOne {
+	tauo.mutation.ClearFlowExecutionID()
 	return tauo
 }
 
@@ -394,6 +441,12 @@ func (tauo *TokenAllowanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenA
 	}
 	if tauo.mutation.RecipientAllowlistCleared() {
 		_spec.ClearField(tokenallowance.FieldRecipientAllowlist, field.TypeJSON)
+	}
+	if value, ok := tauo.mutation.FlowExecutionID(); ok {
+		_spec.SetField(tokenallowance.FieldFlowExecutionID, field.TypeUUID, value)
+	}
+	if tauo.mutation.FlowExecutionIDCleared() {
+		_spec.ClearField(tokenallowance.FieldFlowExecutionID, field.TypeUUID)
 	}
 	if value, ok := tauo.mutation.OwnerProvidedRevokeTimestamp(); ok {
 		_spec.SetField(tokenallowance.FieldOwnerProvidedRevokeTimestamp, field.TypeUint64, value)

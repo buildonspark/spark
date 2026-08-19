@@ -54,6 +54,8 @@ const (
 	FieldVersion = "version"
 	// FieldOwnerProvidedTimestamp holds the string denoting the owner_provided_timestamp field in the database.
 	FieldOwnerProvidedTimestamp = "owner_provided_timestamp"
+	// FieldFlowExecutionID holds the string denoting the flow_execution_id field in the database.
+	FieldFlowExecutionID = "flow_execution_id"
 	// FieldOwnerProvidedRevokeTimestamp holds the string denoting the owner_provided_revoke_timestamp field in the database.
 	FieldOwnerProvidedRevokeTimestamp = "owner_provided_revoke_timestamp"
 	// FieldRevokeSignature holds the string denoting the revoke_signature field in the database.
@@ -92,6 +94,7 @@ var Columns = []string{
 	FieldStatementHash,
 	FieldVersion,
 	FieldOwnerProvidedTimestamp,
+	FieldFlowExecutionID,
 	FieldOwnerProvidedRevokeTimestamp,
 	FieldRevokeSignature,
 }
@@ -194,6 +197,11 @@ func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByOwnerProvidedTimestamp orders the results by the owner_provided_timestamp field.
 func ByOwnerProvidedTimestamp(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOwnerProvidedTimestamp, opts...).ToFunc()
+}
+
+// ByFlowExecutionID orders the results by the flow_execution_id field.
+func ByFlowExecutionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFlowExecutionID, opts...).ToFunc()
 }
 
 // ByOwnerProvidedRevokeTimestamp orders the results by the owner_provided_revoke_timestamp field.

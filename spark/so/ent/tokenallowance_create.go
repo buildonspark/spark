@@ -160,6 +160,20 @@ func (tac *TokenAllowanceCreate) SetOwnerProvidedTimestamp(u uint64) *TokenAllow
 	return tac
 }
 
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (tac *TokenAllowanceCreate) SetFlowExecutionID(u uuid.UUID) *TokenAllowanceCreate {
+	tac.mutation.SetFlowExecutionID(u)
+	return tac
+}
+
+// SetNillableFlowExecutionID sets the "flow_execution_id" field if the given value is not nil.
+func (tac *TokenAllowanceCreate) SetNillableFlowExecutionID(u *uuid.UUID) *TokenAllowanceCreate {
+	if u != nil {
+		tac.SetFlowExecutionID(*u)
+	}
+	return tac
+}
+
 // SetOwnerProvidedRevokeTimestamp sets the "owner_provided_revoke_timestamp" field.
 func (tac *TokenAllowanceCreate) SetOwnerProvidedRevokeTimestamp(u uint64) *TokenAllowanceCreate {
 	tac.mutation.SetOwnerProvidedRevokeTimestamp(u)
@@ -431,6 +445,10 @@ func (tac *TokenAllowanceCreate) createSpec() (*TokenAllowance, *sqlgraph.Create
 		_spec.SetField(tokenallowance.FieldOwnerProvidedTimestamp, field.TypeUint64, value)
 		_node.OwnerProvidedTimestamp = value
 	}
+	if value, ok := tac.mutation.FlowExecutionID(); ok {
+		_spec.SetField(tokenallowance.FieldFlowExecutionID, field.TypeUUID, value)
+		_node.FlowExecutionID = &value
+	}
 	if value, ok := tac.mutation.OwnerProvidedRevokeTimestamp(); ok {
 		_spec.SetField(tokenallowance.FieldOwnerProvidedRevokeTimestamp, field.TypeUint64, value)
 		_node.OwnerProvidedRevokeTimestamp = value
@@ -541,6 +559,24 @@ func (u *TokenAllowanceUpsert) SetSpentAmount(v []byte) *TokenAllowanceUpsert {
 // UpdateSpentAmount sets the "spent_amount" field to the value that was provided on create.
 func (u *TokenAllowanceUpsert) UpdateSpentAmount() *TokenAllowanceUpsert {
 	u.SetExcluded(tokenallowance.FieldSpentAmount)
+	return u
+}
+
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (u *TokenAllowanceUpsert) SetFlowExecutionID(v uuid.UUID) *TokenAllowanceUpsert {
+	u.Set(tokenallowance.FieldFlowExecutionID, v)
+	return u
+}
+
+// UpdateFlowExecutionID sets the "flow_execution_id" field to the value that was provided on create.
+func (u *TokenAllowanceUpsert) UpdateFlowExecutionID() *TokenAllowanceUpsert {
+	u.SetExcluded(tokenallowance.FieldFlowExecutionID)
+	return u
+}
+
+// ClearFlowExecutionID clears the value of the "flow_execution_id" field.
+func (u *TokenAllowanceUpsert) ClearFlowExecutionID() *TokenAllowanceUpsert {
+	u.SetNull(tokenallowance.FieldFlowExecutionID)
 	return u
 }
 
@@ -718,6 +754,27 @@ func (u *TokenAllowanceUpsertOne) SetSpentAmount(v []byte) *TokenAllowanceUpsert
 func (u *TokenAllowanceUpsertOne) UpdateSpentAmount() *TokenAllowanceUpsertOne {
 	return u.Update(func(s *TokenAllowanceUpsert) {
 		s.UpdateSpentAmount()
+	})
+}
+
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (u *TokenAllowanceUpsertOne) SetFlowExecutionID(v uuid.UUID) *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.SetFlowExecutionID(v)
+	})
+}
+
+// UpdateFlowExecutionID sets the "flow_execution_id" field to the value that was provided on create.
+func (u *TokenAllowanceUpsertOne) UpdateFlowExecutionID() *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.UpdateFlowExecutionID()
+	})
+}
+
+// ClearFlowExecutionID clears the value of the "flow_execution_id" field.
+func (u *TokenAllowanceUpsertOne) ClearFlowExecutionID() *TokenAllowanceUpsertOne {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.ClearFlowExecutionID()
 	})
 }
 
@@ -1069,6 +1126,27 @@ func (u *TokenAllowanceUpsertBulk) SetSpentAmount(v []byte) *TokenAllowanceUpser
 func (u *TokenAllowanceUpsertBulk) UpdateSpentAmount() *TokenAllowanceUpsertBulk {
 	return u.Update(func(s *TokenAllowanceUpsert) {
 		s.UpdateSpentAmount()
+	})
+}
+
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (u *TokenAllowanceUpsertBulk) SetFlowExecutionID(v uuid.UUID) *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.SetFlowExecutionID(v)
+	})
+}
+
+// UpdateFlowExecutionID sets the "flow_execution_id" field to the value that was provided on create.
+func (u *TokenAllowanceUpsertBulk) UpdateFlowExecutionID() *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.UpdateFlowExecutionID()
+	})
+}
+
+// ClearFlowExecutionID clears the value of the "flow_execution_id" field.
+func (u *TokenAllowanceUpsertBulk) ClearFlowExecutionID() *TokenAllowanceUpsertBulk {
+	return u.Update(func(s *TokenAllowanceUpsert) {
+		s.ClearFlowExecutionID()
 	})
 }
 

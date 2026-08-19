@@ -18084,6 +18084,7 @@ type TokenAllowanceMutation struct {
 	addversion                         *int64
 	owner_provided_timestamp           *uint64
 	addowner_provided_timestamp        *int64
+	flow_execution_id                  *uuid.UUID
 	owner_provided_revoke_timestamp    *uint64
 	addowner_provided_revoke_timestamp *int64
 	revoke_signature                   *[]byte
@@ -18916,6 +18917,55 @@ func (m *TokenAllowanceMutation) ResetOwnerProvidedTimestamp() {
 	m.addowner_provided_timestamp = nil
 }
 
+// SetFlowExecutionID sets the "flow_execution_id" field.
+func (m *TokenAllowanceMutation) SetFlowExecutionID(u uuid.UUID) {
+	m.flow_execution_id = &u
+}
+
+// FlowExecutionID returns the value of the "flow_execution_id" field in the mutation.
+func (m *TokenAllowanceMutation) FlowExecutionID() (r uuid.UUID, exists bool) {
+	v := m.flow_execution_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFlowExecutionID returns the old "flow_execution_id" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldFlowExecutionID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFlowExecutionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFlowExecutionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFlowExecutionID: %w", err)
+	}
+	return oldValue.FlowExecutionID, nil
+}
+
+// ClearFlowExecutionID clears the value of the "flow_execution_id" field.
+func (m *TokenAllowanceMutation) ClearFlowExecutionID() {
+	m.flow_execution_id = nil
+	m.clearedFields[tokenallowance.FieldFlowExecutionID] = struct{}{}
+}
+
+// FlowExecutionIDCleared returns if the "flow_execution_id" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) FlowExecutionIDCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldFlowExecutionID]
+	return ok
+}
+
+// ResetFlowExecutionID resets all changes to the "flow_execution_id" field.
+func (m *TokenAllowanceMutation) ResetFlowExecutionID() {
+	m.flow_execution_id = nil
+	delete(m.clearedFields, tokenallowance.FieldFlowExecutionID)
+}
+
 // SetOwnerProvidedRevokeTimestamp sets the "owner_provided_revoke_timestamp" field.
 func (m *TokenAllowanceMutation) SetOwnerProvidedRevokeTimestamp(u uint64) {
 	m.owner_provided_revoke_timestamp = &u
@@ -19096,7 +19146,7 @@ func (m *TokenAllowanceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenAllowanceMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 21)
 	if m.create_time != nil {
 		fields = append(fields, tokenallowance.FieldCreateTime)
 	}
@@ -19151,6 +19201,9 @@ func (m *TokenAllowanceMutation) Fields() []string {
 	if m.owner_provided_timestamp != nil {
 		fields = append(fields, tokenallowance.FieldOwnerProvidedTimestamp)
 	}
+	if m.flow_execution_id != nil {
+		fields = append(fields, tokenallowance.FieldFlowExecutionID)
+	}
 	if m.owner_provided_revoke_timestamp != nil {
 		fields = append(fields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
 	}
@@ -19201,6 +19254,8 @@ func (m *TokenAllowanceMutation) Field(name string) (ent.Value, bool) {
 		return m.Version()
 	case tokenallowance.FieldOwnerProvidedTimestamp:
 		return m.OwnerProvidedTimestamp()
+	case tokenallowance.FieldFlowExecutionID:
+		return m.FlowExecutionID()
 	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 		return m.OwnerProvidedRevokeTimestamp()
 	case tokenallowance.FieldRevokeSignature:
@@ -19250,6 +19305,8 @@ func (m *TokenAllowanceMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldVersion(ctx)
 	case tokenallowance.FieldOwnerProvidedTimestamp:
 		return m.OldOwnerProvidedTimestamp(ctx)
+	case tokenallowance.FieldFlowExecutionID:
+		return m.OldFlowExecutionID(ctx)
 	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 		return m.OldOwnerProvidedRevokeTimestamp(ctx)
 	case tokenallowance.FieldRevokeSignature:
@@ -19389,6 +19446,13 @@ func (m *TokenAllowanceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetOwnerProvidedTimestamp(v)
 		return nil
+	case tokenallowance.FieldFlowExecutionID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFlowExecutionID(v)
+		return nil
 	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 		v, ok := value.(uint64)
 		if !ok {
@@ -19475,6 +19539,9 @@ func (m *TokenAllowanceMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenallowance.FieldRecipientAllowlist) {
 		fields = append(fields, tokenallowance.FieldRecipientAllowlist)
 	}
+	if m.FieldCleared(tokenallowance.FieldFlowExecutionID) {
+		fields = append(fields, tokenallowance.FieldFlowExecutionID)
+	}
 	if m.FieldCleared(tokenallowance.FieldOwnerProvidedRevokeTimestamp) {
 		fields = append(fields, tokenallowance.FieldOwnerProvidedRevokeTimestamp)
 	}
@@ -19497,6 +19564,9 @@ func (m *TokenAllowanceMutation) ClearField(name string) error {
 	switch name {
 	case tokenallowance.FieldRecipientAllowlist:
 		m.ClearRecipientAllowlist()
+		return nil
+	case tokenallowance.FieldFlowExecutionID:
+		m.ClearFlowExecutionID()
 		return nil
 	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 		m.ClearOwnerProvidedRevokeTimestamp()
@@ -19565,6 +19635,9 @@ func (m *TokenAllowanceMutation) ResetField(name string) error {
 		return nil
 	case tokenallowance.FieldOwnerProvidedTimestamp:
 		m.ResetOwnerProvidedTimestamp()
+		return nil
+	case tokenallowance.FieldFlowExecutionID:
+		m.ResetFlowExecutionID()
 		return nil
 	case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 		m.ResetOwnerProvidedRevokeTimestamp()

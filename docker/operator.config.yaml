@@ -73,7 +73,7 @@ knobs:
     spark.so.reconcile_signing_keyshare_secret_pointers_batch_size: 1000
     spark.so.reconcile_signing_keyshare_secret_pointers_max_scan_count: 100000
     spark.so.tokens.allow_extra_metadata_on_mainnet: 0
-    spark.so.tokens.allowances_enabled: 100
+    spark.so.tokens.allowances_enabled: 1
     spark.so.tokens.backfill_create_mint_finalized_status_enabled: 0
     spark.so.tokens.coordinated_freeze_enabled: 0
     spark.so.tokens.enable_justice_transactions: 1

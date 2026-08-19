@@ -494,7 +494,7 @@ message AllowanceProgress {
 }
 
 message CreateTokenAllowanceResponse {
-    AllowanceProgress allowance_progress = 1;
+    TokenAllowanceInfo allowance = 1;
 }
 
 enum TokenAllowanceStatus {

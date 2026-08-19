@@ -134,6 +134,11 @@ func OwnerProvidedTimestamp(v uint64) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldEQ(FieldOwnerProvidedTimestamp, v))
 }
 
+// FlowExecutionID applies equality check predicate on the "flow_execution_id" field. It's identical to FlowExecutionIDEQ.
+func FlowExecutionID(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldFlowExecutionID, v))
+}
+
 // OwnerProvidedRevokeTimestamp applies equality check predicate on the "owner_provided_revoke_timestamp" field. It's identical to OwnerProvidedRevokeTimestampEQ.
 func OwnerProvidedRevokeTimestamp(v uint64) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldEQ(FieldOwnerProvidedRevokeTimestamp, v))
@@ -782,6 +787,56 @@ func OwnerProvidedTimestampLT(v uint64) predicate.TokenAllowance {
 // OwnerProvidedTimestampLTE applies the LTE predicate on the "owner_provided_timestamp" field.
 func OwnerProvidedTimestampLTE(v uint64) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldLTE(FieldOwnerProvidedTimestamp, v))
+}
+
+// FlowExecutionIDEQ applies the EQ predicate on the "flow_execution_id" field.
+func FlowExecutionIDEQ(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldFlowExecutionID, v))
+}
+
+// FlowExecutionIDNEQ applies the NEQ predicate on the "flow_execution_id" field.
+func FlowExecutionIDNEQ(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNEQ(FieldFlowExecutionID, v))
+}
+
+// FlowExecutionIDIn applies the In predicate on the "flow_execution_id" field.
+func FlowExecutionIDIn(vs ...uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldIn(FieldFlowExecutionID, vs...))
+}
+
+// FlowExecutionIDNotIn applies the NotIn predicate on the "flow_execution_id" field.
+func FlowExecutionIDNotIn(vs ...uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNotIn(FieldFlowExecutionID, vs...))
+}
+
+// FlowExecutionIDGT applies the GT predicate on the "flow_execution_id" field.
+func FlowExecutionIDGT(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldGT(FieldFlowExecutionID, v))
+}
+
+// FlowExecutionIDGTE applies the GTE predicate on the "flow_execution_id" field.
+func FlowExecutionIDGTE(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldGTE(FieldFlowExecutionID, v))
+}
+
+// FlowExecutionIDLT applies the LT predicate on the "flow_execution_id" field.
+func FlowExecutionIDLT(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldLT(FieldFlowExecutionID, v))
+}
+
+// FlowExecutionIDLTE applies the LTE predicate on the "flow_execution_id" field.
+func FlowExecutionIDLTE(v uuid.UUID) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldLTE(FieldFlowExecutionID, v))
+}
+
+// FlowExecutionIDIsNil applies the IsNil predicate on the "flow_execution_id" field.
+func FlowExecutionIDIsNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldIsNull(FieldFlowExecutionID))
+}
+
+// FlowExecutionIDNotNil applies the NotNil predicate on the "flow_execution_id" field.
+func FlowExecutionIDNotNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNotNull(FieldFlowExecutionID))
 }
 
 // OwnerProvidedRevokeTimestampEQ applies the EQ predicate on the "owner_provided_revoke_timestamp" field.

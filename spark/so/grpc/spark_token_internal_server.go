@@ -82,8 +82,3 @@ func (s *SparkTokenInternalServer) InternalFreezeTokens(ctx context.Context, req
 	internalFreezeHandler := tokens.NewInternalFreezeTokenHandler(s.soConfig)
 	return internalFreezeHandler.InternalFreezeTokens(ctx, req)
 }
-
-func (s *SparkTokenInternalServer) InternalCreateTokenAllowance(ctx context.Context, req *tokeninternalpb.InternalCreateTokenAllowanceRequest) (*tokeninternalpb.InternalCreateTokenAllowanceResponse, error) {
-	internalAllowanceHandler := tokens.NewInternalAllowanceHandler(s.soConfig)
-	return internalAllowanceHandler.InternalCreateTokenAllowance(ctx, req)
-}

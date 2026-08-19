@@ -135,7 +135,7 @@ const (
 	// (create/revoke/query). When disabled (0), the public and internal allowance
 	// methods return UnimplementedMethodDisabled; when enabled they apply locally,
 	// commit, and fan the grant out to every other operator. Binary killswitch:
-	// 0 = off, 100 = on.
+	// 0 = off, any non-zero value = on.
 	KnobTokenAllowancesEnabled = "spark.so.tokens.allowances_enabled"
 	// KnobTokenMaxActiveAllowancesPerOwner caps the number of ACTIVE token
 	// allowances a single owner may hold across all spenders and tokens. The

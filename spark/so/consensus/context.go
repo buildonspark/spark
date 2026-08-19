@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 )
 
@@ -53,4 +54,19 @@ func WithCoordinatorIdentity(ctx context.Context, identityPublicKey keys.Public)
 func CoordinatorIdentityFromContext(ctx context.Context) (keys.Public, bool) {
 	identityPublicKey, ok := ctx.Value(coordinatorIdentityCtxKey{}).(keys.Public)
 	return identityPublicKey, ok
+}
+
+type flowExecutionIDCtxKey struct{}
+
+// ContextWithFlowExecutionID attaches the durable execution identifier for the
+// consensus phase being dispatched.
+func ContextWithFlowExecutionID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, flowExecutionIDCtxKey{}, id)
+}
+
+// FlowExecutionIDFromContext returns the execution identifier attached by a
+// consensus dispatch site.
+func FlowExecutionIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(flowExecutionIDCtxKey{}).(uuid.UUID)
+	return id, ok
 }

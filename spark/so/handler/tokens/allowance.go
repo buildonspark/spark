@@ -12,7 +12,9 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/errors"
@@ -27,20 +29,112 @@ const spentAmountByteLen = 16
 // when the knob is unset.
 const defaultMaxActiveAllowancesPerOwner = 100
 
+// validateAllowanceCreatePreflight rejects invalid public requests before 2PC
+// without taking locks. BuildCommitPayload repeats the state-dependent checks
+// with locks so concurrent changes are still enforced authoritatively.
+func validateAllowanceCreatePreflight(
+	ctx context.Context,
+	config *so.Config,
+	ownerPublicKey keys.Public,
+	payload *tokenpb.TokenAllowancePayload,
+	ownerSignature []byte,
+) error {
+	if err := utils.ValidateTokenAllowancePayload(payload, config.SupportedNetworks); err != nil {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("token allowance payload validation failed: %w", err))
+	}
+
+	statementHash, err := utils.HashCreateTokenAllowancePayload(payload)
+	if err != nil {
+		return errors.InternalUnhandledError(fmt.Errorf("failed to hash create token allowance payload: %w", err))
+	}
+	if err := utils.ValidateOwnershipSignature(ownerSignature, statementHash, ownerPublicKey); err != nil {
+		return errors.FailedPreconditionBadSignature(fmt.Errorf("invalid owner signature for token allowance %x: %w", payload.GetAllowanceId(), err))
+	}
+
+	tokenCreateEnt, err := ent.GetTokenCreateByIdentifier(ctx, payload.GetTokenIdentifier())
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.NotFoundMissingEntity(fmt.Errorf("no token exists for allowance request: %w", err))
+		}
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to get token for allowance request: %w", err))
+	}
+	payloadNetwork, err := btcnetwork.FromProtoNetwork(payload.GetNetwork())
+	if err != nil {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert allowance network: %w", err))
+	}
+	if payloadNetwork != tokenCreateEnt.Network {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("allowance network %s does not match token network %s", payloadNetwork, tokenCreateEnt.Network))
+	}
+
+	allowanceID, err := uuid.FromBytes(payload.GetAllowanceId())
+	if err != nil {
+		return errors.InvalidArgumentMalformedField(fmt.Errorf("invalid allowance_id: %w", err))
+	}
+	existing, err := ent.GetAllowanceByAllowanceID(ctx, allowanceID)
+	if err != nil && !ent.IsNotFound(err) {
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to look up existing allowance %s: %w", allowanceID, err))
+	}
+	if existing != nil {
+		if existing.Status == st.TokenAllowanceStatusRevoked {
+			return errors.FailedPreconditionInvalidState(fmt.Errorf("allowance %s was revoked and cannot be recreated", allowanceID))
+		}
+		if bytes.Equal(existing.StatementHash, statementHash) {
+			return nil
+		}
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("allowance %s already exists with a different statement hash", allowanceID))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	spenderPublicKey, err := keys.ParsePublicKey(payload.GetSpenderPublicKey())
+	if err != nil {
+		return errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse spender public key: %w", err))
+	}
+	activeGrantExists, err := db.TokenAllowance.Query().
+		Where(
+			tokenallowance.OwnerPublicKey(ownerPublicKey),
+			tokenallowance.SpenderPublicKey(spenderPublicKey),
+			tokenallowance.TokenCreateID(tokenCreateEnt.ID),
+			tokenallowance.StatusEQ(st.TokenAllowanceStatusActive),
+		).
+		Exist(ctx)
+	if err != nil {
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to check for an existing active allowance: %w", err))
+	}
+	if activeGrantExists {
+		return errors.AlreadyExistsDuplicateOperation(fmt.Errorf("an active allowance already exists for this owner, spender, and token"))
+	}
+	activeCount, err := db.TokenAllowance.Query().
+		Where(
+			tokenallowance.OwnerPublicKey(ownerPublicKey),
+			tokenallowance.StatusEQ(st.TokenAllowanceStatusActive),
+		).
+		Count(ctx)
+	if err != nil {
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to count owner allowances for quota preflight: %w", err))
+	}
+	maxAllowances := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobTokenMaxActiveAllowancesPerOwner, defaultMaxActiveAllowancesPerOwner))
+	if activeCount >= maxAllowances {
+		return errors.ResourceExhaustedQuotaExceeded(fmt.Errorf("owner already has %d ACTIVE token allowances, the per-owner cap is %d; revoke an existing allowance first", activeCount, maxAllowances))
+	}
+	return nil
+}
+
 // EnforceAllowanceCreateQuota rejects a create that would push the owner over
 // its ACTIVE-allowance quota. Like the timestamp-freshness check it is enforced
-// ONLY at the public coordinator edge, never on the internal replication path:
-// replication converges operators on an already-admitted grant, and re-policing
-// a count-based quota there could leave the fleet divergent (some peers accept,
-// some reject, depending on replication order). Every user-reachable create
-// goes through a public edge that runs this check.
+// ONLY as coordinator admission, never on participant Prepare: participants
+// converge on an already-admitted grant, and re-policing a count-based quota
+// there could make votes depend on each operator's replication history. Every
+// user-reachable create runs this check before the coordinator writes its row.
 //
 // Concurrency: the owner's existing ACTIVE rows are locked FOR UPDATE (in
 // allowance_id order, matching the release path's lock order) before counting,
-// which bounds steady-state growth near the cap. An owner with no ACTIVE rows
-// has nothing to lock, so concurrent first creates for distinct spender/token
-// pairs can all pass and transiently exceed the cap. This is a soft DoS bound,
-// not an invariant.
+// and the coordinator inserts in that same transaction. An owner with no ACTIVE
+// rows has nothing to lock, so concurrent first creates for distinct
+// spender/token pairs can all pass and transiently exceed the cap. This is a
+// soft DoS bound, not an invariant.
 func EnforceAllowanceCreateQuota(ctx context.Context, ownerPublicKey keys.Public, payload *tokenpb.TokenAllowancePayload) error {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -82,6 +176,8 @@ func EnforceAllowanceCreateQuota(ctx context.Context, ownerPublicKey keys.Public
 	return nil
 }
 
+// isIdenticalAllowanceCreate reports whether the allowance ID already stores
+// the exact owner-signed statement in payload.
 func isIdenticalAllowanceCreate(ctx context.Context, payload *tokenpb.TokenAllowancePayload) (bool, error) {
 	statementHash, err := utils.HashCreateTokenAllowancePayload(payload)
 	if err != nil {
@@ -102,12 +198,11 @@ func isIdenticalAllowanceCreate(ctx context.Context, payload *tokenpb.TokenAllow
 }
 
 // ValidateAndApplyCreateAllowance validates an owner-signed allowance grant and installs it on
-// this SO. It is shared between the coordinator (AllowanceTokenHandler) and the peer entry point
-// (InternalCreateTokenAllowance); every operator runs the full validation independently and does
-// not trust the coordinator's decision.
+// this SO. It is shared by coordinator-local and participant Prepare work; every operator runs
+// the full validation independently and does not trust the coordinator's decision.
 //
 // Timestamp freshness is deliberately NOT enforced here. It is enforced only at the public
-// coordinator edge: replication recovery replays the identical signed payload, and a peer that
+// coordinator edge: participant recovery replays the identical signed payload, and a peer that
 // was down longer than the freshness window would otherwise reject the original timestamp
 // forever, permanently stranding a partially-replicated grant. Replay is blocked structurally
 // instead (unique allowance_id, statement-hash idempotency, permanent tombstones, monotonic
@@ -173,7 +268,7 @@ func ValidateAndApplyCreateAllowance(
 		}
 		// Idempotent replay of the identical signed grant.
 		if bytes.Equal(existing.StatementHash, statementHash) {
-			return nil
+			return validateAllowanceCreateAdoption(ctx, allowanceID, existing.FlowExecutionID)
 		}
 		return errors.FailedPreconditionInvalidState(fmt.Errorf("allowance %s already exists with a different statement hash", allowanceID))
 	}
@@ -201,6 +296,9 @@ func ValidateAndApplyCreateAllowance(
 		SetStatementHash(statementHash).
 		SetVersion(uint64(payload.GetVersion())).
 		SetOwnerProvidedTimestamp(payload.GetOwnerProvidedTimestamp())
+	if flowExecutionID, ok := consensus.FlowExecutionIDFromContext(ctx); ok {
+		create.SetFlowExecutionID(flowExecutionID)
+	}
 
 	if _, err := create.Save(ctx); err != nil {
 		// The partial-unique index (one ACTIVE grant per owner/spender/token) and the unique
@@ -212,6 +310,49 @@ func ValidateAndApplyCreateAllowance(
 	}
 
 	return nil
+}
+
+// validateAllowanceCreateAdoption prevents one consensus flow from claiming a
+// row that a different in-flight flow may still roll back.
+func validateAllowanceCreateAdoption(ctx context.Context, allowanceID uuid.UUID, ownerFlowID *uuid.UUID) error {
+	if ownerFlowID == nil {
+		return nil
+	}
+	if currentFlowID, ok := consensus.FlowExecutionIDFromContext(ctx); ok && currentFlowID == *ownerFlowID {
+		return nil
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	ownerFlow, err := db.FlowExecution.Query().
+		Where(flowexecution.ID(*ownerFlowID)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		// Participant flow rows are purged only after reaching a terminal state.
+		// A surviving allowance therefore cannot still be removed by its owner.
+		return nil
+	}
+	if err != nil {
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to inspect owning flow %s for allowance %s: %w", ownerFlowID, allowanceID, err))
+	}
+	switch ownerFlow.Status {
+	case st.FlowExecutionStatusCommitted:
+		return nil
+	case st.FlowExecutionStatusRolledBack:
+		// Rollback deletes the allowance before the flow becomes terminal. A
+		// surviving row indicates inconsistent state and must not be adopted as
+		// though the grant had committed.
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("allowance %s is owned by rolled-back consensus flow %s", allowanceID, ownerFlowID))
+	case st.FlowExecutionStatusInFlight:
+		// Flow status is monotonic, so a concurrent terminal transition can only
+		// turn this rejection into a safe retry. Avoiding a row lock here also
+		// preserves rollback's flow-row-before-allowance-row lock order.
+		return errors.AbortedLockConflict(fmt.Errorf("allowance %s is still owned by consensus flow %s", allowanceID, ownerFlowID))
+	default:
+		return errors.InternalUnhandledError(fmt.Errorf("allowance %s is owned by consensus flow %s with unknown status %q", allowanceID, ownerFlowID, ownerFlow.Status))
+	}
 }
 
 func duplicateAllowanceCreateError(allowanceID uuid.UUID, err error) error {

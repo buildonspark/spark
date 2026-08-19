@@ -6,7 +6,6 @@ import (
 	stderrors "errors"
 	"math/big"
 	mathrand "math/rand/v2"
-	"net"
 	"testing"
 	"time"
 
@@ -14,13 +13,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/entexample"
+	"github.com/lightsparkdev/spark/so/ent/flowexecution"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/entfixtures"
@@ -29,7 +31,6 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -83,8 +84,31 @@ func signCreateAllowance(t *testing.T, payload *tokenpb.TokenAllowancePayload, k
 	return ecdsa.Sign(key.ToBTCEC(), hash).Serialize()
 }
 
-// setupAllowanceTest returns a handler with allowances enabled and a single-operator map so
-// create/revoke apply locally without attempting to fan out to operators that aren't running.
+type discardAllowanceGossipSender struct{}
+
+func (s *discardAllowanceGossipSender) CreateCommitAndSendGossipMessage(
+	_ context.Context,
+	_ *pbgossip.GossipMessage,
+	_ []string,
+) (*ent.Gossip, error) {
+	return nil, nil
+}
+
+type cancelingAllowanceGossipSender struct {
+	cancel context.CancelFunc
+}
+
+func (s *cancelingAllowanceGossipSender) CreateCommitAndSendGossipMessage(
+	_ context.Context,
+	_ *pbgossip.GossipMessage,
+	_ []string,
+) (*ent.Gossip, error) {
+	s.cancel()
+	return nil, nil
+}
+
+// setupAllowanceTest returns a handler with allowances enabled and a
+// single-operator consensus engine.
 func setupAllowanceTest(t *testing.T) (context.Context, *db.TestContext, *so.Config, *AllowanceTokenHandler) {
 	t.Helper()
 	ctx, tc := db.ConnectToTestPostgres(t)
@@ -96,70 +120,9 @@ func setupAllowanceTest(t *testing.T) (context.Context, *db.TestContext, *so.Con
 	cfg.SigningOperatorMap = map[string]*so.SigningOperator{
 		self: {Identifier: self, IdentityPublicKey: cfg.IdentityPublicKey()},
 	}
+	engine := consensus.NewTwoPCEngine(cfg, &discardAllowanceGossipSender{}, db.NewDefaultSessionFactory(tc.Client))
+	ctx = consensus.InjectEngine(ctx, engine)
 	return ctx, tc, cfg, NewAllowanceTokenHandler(cfg)
-}
-
-// --- Mocked internal server for fan-out tests (mirrors the freeze fan-out harness). ---
-
-type mockAllowanceInternalServer struct {
-	tokeninternalpb.UnimplementedSparkTokenInternalServiceServer
-	createErr error
-}
-
-func (s *mockAllowanceInternalServer) InternalCreateTokenAllowance(
-	_ context.Context,
-	_ *tokeninternalpb.InternalCreateTokenAllowanceRequest,
-) (*tokeninternalpb.InternalCreateTokenAllowanceResponse, error) {
-	if s.createErr != nil {
-		return nil, s.createErr
-	}
-	return &tokeninternalpb.InternalCreateTokenAllowanceResponse{}, nil
-}
-
-func startMockAllowanceGRPCServer(t *testing.T, mockServer *mockAllowanceInternalServer) string {
-	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	addr := l.Addr().String()
-	t.Cleanup(func() { _ = l.Close() })
-
-	server := grpc.NewServer()
-	tokeninternalpb.RegisterSparkTokenInternalServiceServer(server, mockServer)
-	go func() {
-		if err := server.Serve(l); err != nil {
-			t.Logf("mock allowance gRPC server error: %v", err)
-		}
-	}()
-	t.Cleanup(server.Stop)
-	return addr
-}
-
-func setupAllowanceFanOutTest(t *testing.T, mockCreateErrors []error) (context.Context, *so.Config, *AllowanceTokenHandler, *ent.TokenCreate) {
-	t.Helper()
-	ctx, tc := db.ConnectToTestPostgres(t)
-	cfg := sparktesting.TestConfig(t)
-	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobTokenAllowancesEnabled: 1.0,
-	}))
-
-	self := cfg.Identifier
-	cfg.SigningOperatorMap = map[string]*so.SigningOperator{
-		self: {Identifier: self, IdentityPublicKey: cfg.IdentityPublicKey()},
-	}
-	for i, createErr := range mockCreateErrors {
-		mockServer := &mockAllowanceInternalServer{createErr: createErr}
-		addr := startMockAllowanceGRPCServer(t, mockServer)
-		id := so.IndexToIdentifier(uint32(i + 1))
-		cfg.SigningOperatorMap[id] = &so.SigningOperator{
-			Identifier:                id,
-			IdentityPublicKey:         keys.GeneratePrivateKey().Public(),
-			AddressRpc:                addr,
-			OperatorConnectionFactory: &sparktesting.DangerousTestOperatorConnectionFactoryNoTLS{},
-		}
-	}
-
-	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
-	return ctx, cfg, NewAllowanceTokenHandler(cfg), tokenCreate
 }
 
 // --- Create tests ---
@@ -178,8 +141,9 @@ func TestCreateTokenAllowance_Success(t *testing.T) {
 	resp, err := handler.CreateTokenAllowance(ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, resp.GetAllowanceProgress())
-	assert.Len(t, resp.GetAllowanceProgress().GetAppliedOperatorPublicKeys(), 1)
+	require.NotNil(t, resp.GetAllowance())
+	assert.Equal(t, tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_ACTIVE, resp.GetAllowance().GetStatus())
+	assert.Equal(t, make([]byte, 16), resp.GetAllowance().GetSpentAmount())
 
 	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
 	require.NoError(t, err)
@@ -188,6 +152,28 @@ func TestCreateTokenAllowance_Success(t *testing.T) {
 	assert.True(t, allowanceOwnerKey.Public().Equals(row.OwnerPublicKey))
 	assert.True(t, allowanceSpenderKey.Public().Equals(row.SpenderPublicKey))
 	assert.Equal(t, tokenCreate.ID, row.TokenCreateID)
+}
+
+func TestCreateTokenAllowance_ReadBackFailureReturnsCommittedSuccess(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+	requestCtx, cancel := context.WithCancel(ctx)
+	engine := consensus.NewTwoPCEngine(cfg, &cancelingAllowanceGossipSender{cancel: cancel}, db.NewDefaultSessionFactory(tc.Client))
+	requestCtx = consensus.InjectEngine(requestCtx, engine)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+	resp, err := NewAllowanceTokenHandler(cfg).CreateTokenAllowance(requestCtx, &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: payload,
+		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Nil(t, resp.GetAllowance())
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, row.Status)
 }
 
 func TestCreateTokenAllowance_TruncatesExpiryToSignedSeconds(t *testing.T) {
@@ -203,8 +189,12 @@ func TestCreateTokenAllowance_TruncatesExpiryToSignedSeconds(t *testing.T) {
 		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
 	}
 
-	_, err := handler.CreateTokenAllowance(ctx, req)
+	resp, err := handler.CreateTokenAllowance(ctx, req)
 	require.NoError(t, err)
+	require.NotNil(t, resp.GetAllowance())
+	assert.Equal(t, tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_ACTIVE, resp.GetAllowance().GetStatus())
+	servedExpiry := resp.GetAllowance().GetAllowancePayload().GetExpiryTime().AsTime()
+	assert.True(t, expectedExpiry.Equal(servedExpiry), "served expiry %s must equal signed expiry %s", servedExpiry, expectedExpiry)
 
 	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
 	require.NoError(t, err)
@@ -212,13 +202,13 @@ func TestCreateTokenAllowance_TruncatesExpiryToSignedSeconds(t *testing.T) {
 	// the driver returns UTC while time.Unix builds a Local-zone value.
 	assert.True(t, expectedExpiry.Equal(row.ExpiryTime), "stored expiry %s must equal signed expiry %s", row.ExpiryTime, expectedExpiry)
 
-	resp, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+	queryResp, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
 		OwnerPublicKey: allowanceOwnerKey.Public().Serialize(),
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.GetAllowances(), 1)
-	servedExpiry := resp.GetAllowances()[0].GetAllowancePayload().GetExpiryTime().AsTime()
-	assert.True(t, expectedExpiry.Equal(servedExpiry), "served expiry %s must equal signed expiry %s", servedExpiry, expectedExpiry)
+	require.Len(t, queryResp.GetAllowances(), 1)
+	queriedExpiry := queryResp.GetAllowances()[0].GetAllowancePayload().GetExpiryTime().AsTime()
+	assert.True(t, expectedExpiry.Equal(queriedExpiry), "queried expiry %s must equal signed expiry %s", queriedExpiry, expectedExpiry)
 }
 
 func TestCreateTokenAllowance_RejectsInvalidOwnerSignature(t *testing.T) {
@@ -238,6 +228,14 @@ func TestCreateTokenAllowance_RejectsInvalidOwnerSignature(t *testing.T) {
 	require.Nil(t, resp)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	assert.Contains(t, err.Error(), "invalid owner signature")
+	flowCount, err := tc.Client.FlowExecution.Query().
+		Where(
+			flowexecution.RoleEQ(schematype.FlowExecutionRoleCoordinator),
+			flowexecution.OpTypeEQ(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CREATE_TOKEN_ALLOWANCE)),
+		).
+		Count(t.Context())
+	require.NoError(t, err)
+	assert.Zero(t, flowCount)
 }
 
 // TestCreateTokenAllowance_RejectsStaleTimestampAtPublicEdge verifies freshness is still enforced
@@ -293,10 +291,21 @@ func TestCreateTokenAllowance_IdempotentSamePayload(t *testing.T) {
 	_, err := handler.CreateTokenAllowance(ctx, req)
 	require.NoError(t, err)
 
-	// Replaying the identical signed grant is a no-op success.
+	currentSpentAmount := u128(42_000)
+	_, err = tc.Client.TokenAllowance.Update().
+		Where(tokenallowance.AllowanceID(allowanceID)).
+		SetSpentAmount(currentSpentAmount).
+		SetStatus(schematype.TokenAllowanceStatusExhausted).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	// Replaying the identical signed grant is a no-op success that returns the current row.
 	resp, err := handler.CreateTokenAllowance(ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+	require.NotNil(t, resp.GetAllowance())
+	assert.Equal(t, tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_EXHAUSTED, resp.GetAllowance().GetStatus())
+	assert.Equal(t, currentSpentAmount, resp.GetAllowance().GetSpentAmount())
 
 	count, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Count(t.Context())
 	require.NoError(t, err)
@@ -328,6 +337,80 @@ func TestCreateTokenAllowance_RejectsSecondActiveForSameOwnerSpenderToken(t *tes
 	require.Nil(t, resp)
 	assert.Equal(t, codes.AlreadyExists, status.Code(err))
 	assert.Contains(t, err.Error(), "an active allowance already exists for this owner, spender, and token")
+}
+
+func TestCreateTokenAllowance_PreflightRejectsKnownConflictsWithoutCoordinatorFlow(t *testing.T) {
+	assertRejectedWithoutCoordinatorFlow := func(
+		t *testing.T,
+		ctx context.Context,
+		req *tokenpb.CreateTokenAllowanceRequest,
+		handler *AllowanceTokenHandler,
+		expectedCode codes.Code,
+	) {
+		t.Helper()
+		resp, err := handler.CreateTokenAllowance(ctx, req)
+		require.Error(t, err)
+		require.Nil(t, resp)
+		assert.Equal(t, expectedCode, status.Code(err))
+
+		client, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		flowCount, err := client.FlowExecution.Query().
+			Where(
+				flowexecution.RoleEQ(schematype.FlowExecutionRoleCoordinator),
+				flowexecution.OpTypeEQ(int32(pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CREATE_TOKEN_ALLOWANCE)),
+			).
+			Count(ctx)
+		require.NoError(t, err)
+		assert.Zero(t, flowCount)
+	}
+
+	t.Run("allowance ID has a different statement", func(t *testing.T) {
+		ctx, tc, cfg, handler := setupAllowanceTest(t)
+		tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+		allowanceID := uuid.New()
+		original := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+		require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, original, signCreateAllowance(t, original, allowanceOwnerKey)))
+
+		conflicting := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceWrongKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+		assertRejectedWithoutCoordinatorFlow(t, ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: conflicting,
+			OwnerSignature:   signCreateAllowance(t, conflicting, allowanceOwnerKey),
+		}, handler, codes.FailedPrecondition)
+	})
+
+	t.Run("allowance ID is revoked", func(t *testing.T) {
+		ctx, tc, cfg, handler := setupAllowanceTest(t)
+		tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+		allowanceID := uuid.New()
+		payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+		require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, payload, signCreateAllowance(t, payload, allowanceOwnerKey)))
+		client, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		_, err = client.TokenAllowance.Update().
+			Where(tokenallowance.AllowanceID(allowanceID)).
+			SetStatus(schematype.TokenAllowanceStatusRevoked).
+			Save(ctx)
+		require.NoError(t, err)
+
+		assertRejectedWithoutCoordinatorFlow(t, ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: payload,
+			OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+		}, handler, codes.FailedPrecondition)
+	})
+
+	t.Run("active owner spender token tuple exists", func(t *testing.T) {
+		ctx, tc, cfg, handler := setupAllowanceTest(t)
+		tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+		original := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), uuid.New(), recentTimestamp(20*time.Second))
+		require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, original, signCreateAllowance(t, original, allowanceOwnerKey)))
+
+		conflicting := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), uuid.New(), recentTimestamp(10*time.Second))
+		assertRejectedWithoutCoordinatorFlow(t, ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: conflicting,
+			OwnerSignature:   signCreateAllowance(t, conflicting, allowanceOwnerKey),
+		}, handler, codes.AlreadyExists)
+	})
 }
 
 func TestAllowanceCreateConstraintErrorMessages(t *testing.T) {
@@ -414,44 +497,45 @@ func TestCreateTokenAllowance_RejectsOverOwnerQuota(t *testing.T) {
 	token1 := createAllowanceTestTokenCreate(t, ctx, tc.Client)
 	token2 := createAllowanceTestTokenCreate(t, ctx, tc.Client)
 
-	create := func(tokenCreate *ent.TokenCreate, allowanceID uuid.UUID, ageAgo time.Duration) error {
+	createRequest := func(tokenCreate *ent.TokenCreate, allowanceID uuid.UUID, ageAgo time.Duration) *tokenpb.CreateTokenAllowanceRequest {
 		payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(ageAgo))
-		_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+		return &tokenpb.CreateTokenAllowanceRequest{
 			AllowancePayload: payload,
 			OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
-		})
+		}
+	}
+	create := func(req *tokenpb.CreateTokenAllowanceRequest) error {
+		_, err := handler.CreateTokenAllowance(ctx, req)
 		return err
 	}
 
 	firstID := uuid.New()
-	require.NoError(t, create(token1, firstID, 20*time.Second))
+	firstRequest := createRequest(token1, firstID, 20*time.Second)
+	require.NoError(t, create(firstRequest))
+	require.NoError(t, create(firstRequest), "an identical retry must not consume another quota slot")
 
 	// A second ACTIVE allowance (different token, so no uniqueness collision)
 	// exceeds the per-owner quota.
-	err := create(token2, uuid.New(), 15*time.Second)
+	err := create(createRequest(token2, uuid.New(), 15*time.Second))
 	require.Error(t, err)
 	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
 	assert.Contains(t, err.Error(), "per-owner cap")
 }
 
-func TestCreateTokenAllowance_FanOutReportsPartialSuccess(t *testing.T) {
-	ctx, _, handler, tokenCreate := setupAllowanceFanOutTest(t, []error{nil, stderrors.New("operator 2 unavailable")})
-
-	allowanceID := uuid.New()
-	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
-	req := &tokenpb.CreateTokenAllowanceRequest{
-		AllowancePayload: payload,
-		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
-	}
-
-	resp, err := handler.CreateTokenAllowance(ctx, req)
-	require.NoError(t, err)
-	require.NotNil(t, resp.GetAllowanceProgress())
-	// Self + the one mock operator that succeeded.
-	assert.Len(t, resp.GetAllowanceProgress().GetAppliedOperatorPublicKeys(), 2)
-}
-
 // --- Query tests ---
+
+func TestQueryTokenAllowancesGeneratedFixtureDefaultsToCommitted(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	allowance := entexample.NewTokenAllowanceExample(t, tc.Client).MustExec(ctx)
+	require.Nil(t, allowance.FlowExecutionID)
+
+	resp, err := handler.QueryTokenAllowances(ctx, &tokenpb.QueryTokenAllowancesRequest{
+		OwnerPublicKey: allowance.OwnerPublicKey.Serialize(),
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.GetAllowances(), 1)
+	assert.Equal(t, allowance.AllowanceID[:], resp.GetAllowances()[0].GetAllowancePayload().GetAllowanceId())
+}
 
 func TestQueryTokenAllowances_FiltersByOwnerSpenderToken(t *testing.T) {
 	ctx, tc, cfg, handler := setupAllowanceTest(t)

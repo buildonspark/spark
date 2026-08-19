@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	tokenhandler "github.com/lightsparkdev/spark/so/handler/tokens"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -66,6 +67,8 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 		return NewAggregateLeavesFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RECOVER_WATCHTOWER_EXITED_LEAF:
 		return NewRecoverWatchtowerExitedLeafFlowHandler(config), nil
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CREATE_TOKEN_ALLOWANCE:
+		return tokenhandler.NewCreateTokenAllowanceFlowHandler(config), nil
 	default:
 		return nil, fmt.Errorf("unknown consensus operation type: %d", opType)
 	}
@@ -143,7 +146,7 @@ func (h *ConsensusHandler) DispatchPrepare(
 		return nil, fmt.Errorf("consensus prepare for bound op type %d requires a flow_execution_id; refusing to prepare a bound flow with no row to commit/rollback/reconcile against", opType)
 	}
 
-	result, err := handler.Prepare(ctx, msg)
+	result, err := handler.Prepare(consensusDispatchContext(ctx, flowExecutionID), msg)
 	if err != nil {
 		return nil, err
 	}

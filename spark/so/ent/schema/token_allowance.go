@@ -110,6 +110,10 @@ func (TokenAllowance) Fields() []ent.Field {
 			Immutable().
 			Comment("Wallet-provided timestamp when the allowance was created, in milliseconds.").
 			Annotations(entexample.Default(1747337980820)),
+		field.UUID("flow_execution_id", uuid.UUID{}).
+			Optional().
+			Nillable().
+			Comment("Consensus flow that prepared this allowance. Commit clears the stamp; rollback is scoped to it so one execution cannot delete another's grant."),
 		field.Uint64("owner_provided_revoke_timestamp").
 			Optional().
 			Comment("Wallet-provided timestamp when the allowance was revoked, in milliseconds."),
