@@ -8,6 +8,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "spark.proto";
+import "spark_token.proto";
 import "validate/validate.proto";
 
 option go_package = "github.com/lightsparkdev/spark/proto/spark_internal";
@@ -1047,6 +1048,25 @@ message DepositTreePrepareRequest {
 // during Prepare. Commit and Rollback are no-ops.
 message StorePreimageSharePrepareRequest {
     spark.StorePreimageShareV2Request original_request = 1;
+}
+
+// CreateTokenAllowancePrepareRequest is the 2PC prepare payload for token
+// allowance creation. Every SO independently validates the owner-signed public
+// request and writes the allowance during Prepare.
+message CreateTokenAllowancePrepareRequest {
+    spark_token.CreateTokenAllowanceRequest original_request = 1;
+}
+
+// CreateTokenAllowanceCommitRequest identifies the allowance whose row was
+// written during Prepare. Commit itself is a no-op.
+message CreateTokenAllowanceCommitRequest {
+    bytes allowance_id = 1 [(validate.rules).bytes.len = 16];
+}
+
+// CreateTokenAllowanceRollbackRequest identifies the allowance to remove when
+// this consensus flow inserted it during Prepare.
+message CreateTokenAllowanceRollbackRequest {
+    bytes allowance_id = 1 [(validate.rules).bytes.len = 16];
 }
 
 // SendTransferPrepareRequest is the 2PC prepare payload for consensus

@@ -3537,6 +3537,7 @@ type TokenAllowanceExample struct {
 	StatementHash                *[]byte
 	Version                      *uint64
 	OwnerProvidedTimestamp       *uint64
+	FlowExecutionID              *uuid.UUID
 	OwnerProvidedRevokeTimestamp *uint64
 	RevokeSignature              *[]byte
 
@@ -3633,6 +3634,12 @@ func (ta *TokenAllowanceExample) SetVersion(v uint64) *TokenAllowanceExample {
 // SetOwnerProvidedTimestamp sets the owner_provided_timestamp field.
 func (ta *TokenAllowanceExample) SetOwnerProvidedTimestamp(v uint64) *TokenAllowanceExample {
 	ta.OwnerProvidedTimestamp = &v
+	return ta
+}
+
+// SetFlowExecutionID sets the flow_execution_id field.
+func (ta *TokenAllowanceExample) SetFlowExecutionID(v uuid.UUID) *TokenAllowanceExample {
+	ta.FlowExecutionID = &v
 	return ta
 }
 
@@ -3750,6 +3757,10 @@ func (ta *TokenAllowanceExample) MustExec(ctx context.Context) *ent.TokenAllowan
 	} else {
 		// Use default from annotation
 		create.SetOwnerProvidedTimestamp(uint64(1747337980820))
+	}
+	if ta.FlowExecutionID != nil {
+		create.SetFlowExecutionID(*ta.FlowExecutionID)
+	} else {
 	}
 	if ta.OwnerProvidedRevokeTimestamp != nil {
 		create.SetOwnerProvidedRevokeTimestamp(*ta.OwnerProvidedRevokeTimestamp)
@@ -3875,6 +3886,10 @@ func (ta *TokenAllowanceExample) Exec(ctx context.Context) (*ent.TokenAllowance,
 	} else {
 		// Use default from annotation
 		create.SetOwnerProvidedTimestamp(uint64(1747337980820))
+	}
+	if ta.FlowExecutionID != nil {
+		create.SetFlowExecutionID(*ta.FlowExecutionID)
+	} else {
 	}
 	if ta.OwnerProvidedRevokeTimestamp != nil {
 		create.SetOwnerProvidedRevokeTimestamp(*ta.OwnerProvidedRevokeTimestamp)

@@ -1031,6 +1031,14 @@ func validateDecisionAgainstPreparedOp(ctx context.Context, handler consensus.Fl
 	return true
 }
 
+func consensusDispatchContext(ctx context.Context, flowExecutionID string) context.Context {
+	id, err := uuid.Parse(flowExecutionID)
+	if err != nil {
+		return ctx
+	}
+	return consensus.ContextWithFlowExecutionID(ctx, id)
+}
+
 // runConsensusCommit centralizes the post-handler logic so the
 // AlreadyExists-as-success rule is testable independently of the
 // production opType→handler mapping. handler is supplied by the caller.
@@ -1058,6 +1066,7 @@ func runConsensusCommit(ctx context.Context, handler consensus.FlowHandler, opTy
 	default:
 		return fmt.Errorf("unexpected consensus op disposition %d for flow %s", disposition, flowExecutionID)
 	}
+	ctx = consensusDispatchContext(ctx, flowExecutionID)
 	if !validateDecisionAgainstPreparedOp(ctx, handler, row, op, "commit") {
 		// Fenced (mismatch / missing / corrupt prepare payload): skip without
 		// erroring so gossip redelivery doesn't loop; the row stays IN_FLIGHT.
@@ -1154,6 +1163,7 @@ func runConsensusRollback(ctx context.Context, handler consensus.FlowHandler, op
 	default:
 		return fmt.Errorf("unexpected consensus op disposition %d for flow %s", disposition, flowExecutionID)
 	}
+	ctx = consensusDispatchContext(ctx, flowExecutionID)
 	if !validateDecisionAgainstPreparedOp(ctx, handler, row, op, "rollback") {
 		// Fenced (mismatch / missing / corrupt prepare payload): skip without
 		// erroring so gossip redelivery doesn't loop; the row stays IN_FLIGHT.

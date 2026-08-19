@@ -160,7 +160,7 @@ func (e *TwoPCEngine) Execute(
 		var result proto.Message
 		var err error
 		if operator.Identifier == e.config.Identifier {
-			result, err = flow.Prepare(ctx, flow.PrepareOp())
+			result, err = flow.Prepare(ContextWithFlowExecutionID(ctx, row.ID), flow.PrepareOp())
 		} else {
 			result, err = DefaultPrepareTask(ctx, operator, opType, flow.PrepareOp(), executionID, uint32(row.CoordinatorIndex))
 		}

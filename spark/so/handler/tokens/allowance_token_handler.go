@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
@@ -36,18 +38,21 @@ func NewAllowanceTokenHandler(config *so.Config) *AllowanceTokenHandler {
 // allowancesEnabled reports whether the token allowance lifecycle RPCs are turned on for this SO.
 func allowancesEnabled(ctx context.Context) bool {
 	knobService := knobs.GetKnobsService(ctx)
-	return knobService != nil && knobService.RolloutRandom(knobs.KnobTokenAllowancesEnabled, 0)
+	return knobService != nil && knobService.GetValue(knobs.KnobTokenAllowancesEnabled, 0) != 0
 }
 
-// CreateTokenAllowance installs an owner-signed spending allowance. It acts as coordinator:
-// validating and applying the grant locally, committing before any network call, then fanning the
-// grant out to every other operator. Each operator re-validates independently.
+// CreateTokenAllowance installs an owner-signed spending allowance through the
+// consensus engine so every operator validates and writes the grant atomically.
 func (h *AllowanceTokenHandler) CreateTokenAllowance(ctx context.Context, req *tokenpb.CreateTokenAllowanceRequest) (*tokenpb.CreateTokenAllowanceResponse, error) {
 	if !allowancesEnabled(ctx) {
 		return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("token allowances are not enabled"))
 	}
 
 	payload := req.GetAllowancePayload()
+	allowanceID, err := uuid.FromBytes(payload.GetAllowanceId())
+	if err != nil {
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid allowance_id: %w", err))
+	}
 	ownerPublicKey, err := keys.ParsePublicKey(payload.GetOwnerPublicKey())
 	if err != nil {
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner public key: %w", err))
@@ -64,30 +69,43 @@ func (h *AllowanceTokenHandler) CreateTokenAllowance(ctx context.Context, req *t
 	if err := ValidateTimestampMillis(payload.GetOwnerProvidedTimestamp()); err != nil {
 		return nil, err
 	}
-
-	// Like freshness, the per-owner quota is a public-edge admission control:
-	// replication must converge operators on an admitted grant, never re-vote it.
-	if err := EnforceAllowanceCreateQuota(ctx, ownerPublicKey, payload); err != nil {
+	if err := validateAllowanceCreatePreflight(ctx, h.config, ownerPublicKey, payload, req.GetOwnerSignature()); err != nil {
 		return nil, err
 	}
 
-	if err := ValidateAndApplyCreateAllowance(ctx, h.config, payload, req.GetOwnerSignature()); err != nil {
+	engine, err := consensus.GetEngine(ctx)
+	if err != nil {
 		return nil, err
 	}
-
-	// Commit locally before fanning out so we don't hold row locks during network calls
-	// (durable-before-fanout, matching coordinated freeze).
-	if err := ent.DbCommit(ctx); err != nil {
-		return nil, errors.InternalDatabaseWriteError(fmt.Errorf("failed to commit token allowance transaction: %w", err))
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	flow := newCreateTokenAllowanceCoordinatorFlow(h.config, req, ownerPublicKey)
+	if _, err := engine.Execute(
+		ctx,
+		pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CREATE_TOKEN_ALLOWANCE,
+		&selection,
+		flow,
+	); err != nil {
+		return nil, errors.WrapErrorWithMessage(err, "consensus token allowance creation failed")
 	}
 
-	progress := h.fanOutCreateAllowanceToOtherOperators(ctx, req)
-	progress.AppliedOperatorPublicKeys = append(
-		progress.AppliedOperatorPublicKeys,
-		h.config.IdentityPublicKey().Serialize(),
-	)
-
-	return &tokenpb.CreateTokenAllowanceResponse{AllowanceProgress: progress}, nil
+	// Execute commits and clears the request transaction, so this query starts a fresh
+	// transaction and observes the durable row, including state from an idempotent replay.
+	row, err := ent.GetAllowanceByAllowanceID(ctx, allowanceID)
+	if err != nil {
+		logging.GetLoggerFromContext(ctx).With(zap.Error(err)).Sugar().Warnf(
+			"token allowance %s committed but response read-back failed; returning success without allowance details", allowanceID)
+		return &tokenpb.CreateTokenAllowanceResponse{}, nil
+	}
+	allowance, err := allowanceRowToInfo(row)
+	if err != nil {
+		// Consensus is already durable, so response enrichment cannot turn the
+		// create into an apparent failure. Omitting details is safer than
+		// fabricating current metering state for an idempotent replay.
+		logging.GetLoggerFromContext(ctx).With(zap.Error(err)).Sugar().Warnf(
+			"token allowance %s committed but response conversion failed; returning success without allowance details", allowanceID)
+		return &tokenpb.CreateTokenAllowanceResponse{}, nil
+	}
+	return &tokenpb.CreateTokenAllowanceResponse{Allowance: allowance}, nil
 }
 
 // allowanceQueryPageSize is the default and maximum page size for
@@ -141,7 +159,7 @@ func (h *AllowanceTokenHandler) QueryTokenAllowances(ctx context.Context, req *t
 		return nil, err
 	}
 
-	query := db.TokenAllowance.Query()
+	query := db.TokenAllowance.Query().Where(tokenallowance.FlowExecutionIDIsNil())
 	if ownerFilter != nil {
 		query = query.Where(tokenallowance.OwnerPublicKey(*ownerFilter))
 	}
@@ -248,59 +266,4 @@ func allowanceStatusToProto(status schematype.TokenAllowanceStatus) tokenpb.Toke
 	default:
 		return tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_UNSPECIFIED
 	}
-}
-
-// fanOutCreateAllowanceToOtherOperators replicates the grant to every other operator and reports
-// which ones applied it. Fan-out failures are logged, not fatal: progress reflects partial success.
-func (h *AllowanceTokenHandler) fanOutCreateAllowanceToOtherOperators(ctx context.Context, req *tokenpb.CreateTokenAllowanceRequest) *tokenpb.AllowanceProgress {
-	logger := logging.GetLoggerFromContext(ctx)
-
-	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	results, err := helper.ExecuteTaskWithAllOperatorsWithAllResponses(ctx, h.config, &excludeSelf,
-		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.InternalCreateTokenAllowanceResponse, error) {
-			conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
-			if err != nil {
-				return nil, err
-			}
-			defer conn.Close()
-
-			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
-			return client.InternalCreateTokenAllowance(ctx, &tokeninternalpb.InternalCreateTokenAllowanceRequest{
-				AllowancePayload: req.GetAllowancePayload(),
-				OwnerSignature:   req.GetOwnerSignature(),
-			})
-		},
-	)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Warnf("token allowance create fan-out setup failed for allowance %x", req.GetAllowancePayload().GetAllowanceId())
-		results = emptyCreateResults()
-	} else if results.HasErrors() {
-		for opID, opErr := range results.Errors {
-			logger.With(zap.Error(opErr)).Sugar().Warnf("token allowance create failed for operator %s (allowance %x)", opID, req.GetAllowancePayload().GetAllowanceId())
-		}
-	}
-
-	return buildAllowanceProgress(h.config, results)
-}
-
-func emptyCreateResults() *helper.PartialResults[*tokeninternalpb.InternalCreateTokenAllowanceResponse] {
-	return &helper.PartialResults[*tokeninternalpb.InternalCreateTokenAllowanceResponse]{
-		Successes: make(map[string]*tokeninternalpb.InternalCreateTokenAllowanceResponse),
-		Errors:    make(map[string]error),
-	}
-}
-
-// buildAllowanceProgress maps the set of operators that applied the operation to their identity
-// public keys. Self is appended by the caller.
-func buildAllowanceProgress[V any](config *so.Config, results *helper.PartialResults[V]) *tokenpb.AllowanceProgress {
-	var applied [][]byte
-	for identifier, operator := range config.SigningOperatorMap {
-		if identifier == config.Identifier {
-			continue
-		}
-		if _, ok := results.Successes[identifier]; ok {
-			applied = append(applied, operator.IdentityPublicKey.Serialize())
-		}
-	}
-	return &tokenpb.AllowanceProgress{AppliedOperatorPublicKeys: applied}
 }

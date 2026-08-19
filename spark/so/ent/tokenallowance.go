@@ -59,6 +59,8 @@ type TokenAllowance struct {
 	Version uint64 `json:"version,omitempty"`
 	// Wallet-provided timestamp when the allowance was created, in milliseconds.
 	OwnerProvidedTimestamp uint64 `json:"owner_provided_timestamp,omitempty"`
+	// Consensus flow that prepared this allowance. Commit clears the stamp; rollback is scoped to it so one execution cannot delete another's grant.
+	FlowExecutionID *uuid.UUID `json:"flow_execution_id,omitempty"`
 	// Wallet-provided timestamp when the allowance was revoked, in milliseconds.
 	OwnerProvidedRevokeTimestamp uint64 `json:"owner_provided_revoke_timestamp,omitempty"`
 	// The owner's signature over the revoke statement hash, present once revoked.
@@ -94,6 +96,8 @@ func (*TokenAllowance) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case tokenallowance.FieldFlowExecutionID:
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case tokenallowance.FieldTokenIdentifier, tokenallowance.FieldPerTransactionCap, tokenallowance.FieldTotalLimit, tokenallowance.FieldSpentAmount, tokenallowance.FieldRecipientAllowlist, tokenallowance.FieldOwnerSignature, tokenallowance.FieldStatementHash, tokenallowance.FieldRevokeSignature:
 			values[i] = new([]byte)
 		case tokenallowance.FieldNetwork:
@@ -239,6 +243,13 @@ func (ta *TokenAllowance) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				ta.OwnerProvidedTimestamp = uint64(value.Int64)
 			}
+		case tokenallowance.FieldFlowExecutionID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field flow_execution_id", values[i])
+			} else if value.Valid {
+				ta.FlowExecutionID = new(uuid.UUID)
+				*ta.FlowExecutionID = *value.S.(*uuid.UUID)
+			}
 		case tokenallowance.FieldOwnerProvidedRevokeTimestamp:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_provided_revoke_timestamp", values[i])
@@ -345,6 +356,11 @@ func (ta *TokenAllowance) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("owner_provided_timestamp=")
 	builder.WriteString(fmt.Sprintf("%v", ta.OwnerProvidedTimestamp))
+	builder.WriteString(", ")
+	if v := ta.FlowExecutionID; v != nil {
+		builder.WriteString("flow_execution_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("owner_provided_revoke_timestamp=")
 	builder.WriteString(fmt.Sprintf("%v", ta.OwnerProvidedRevokeTimestamp))

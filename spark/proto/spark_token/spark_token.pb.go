@@ -3425,10 +3425,10 @@ func (x *AllowanceProgress) GetAppliedOperatorPublicKeys() [][]byte {
 }
 
 type CreateTokenAllowanceResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	AllowanceProgress *AllowanceProgress     `protobuf:"bytes,1,opt,name=allowance_progress,json=allowanceProgress,proto3" json:"allowance_progress,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowance     *TokenAllowanceInfo    `protobuf:"bytes,1,opt,name=allowance,proto3" json:"allowance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateTokenAllowanceResponse) Reset() {
@@ -3461,9 +3461,9 @@ func (*CreateTokenAllowanceResponse) Descriptor() ([]byte, []int) {
 	return file_spark_token_proto_rawDescGZIP(), []int{42}
 }
 
-func (x *CreateTokenAllowanceResponse) GetAllowanceProgress() *AllowanceProgress {
+func (x *CreateTokenAllowanceResponse) GetAllowance() *TokenAllowanceInfo {
 	if x != nil {
-		return x.AllowanceProgress
+		return x.Allowance
 	}
 	return nil
 }
@@ -3947,9 +3947,9 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x11allowance_payload\x18\x01 \x01(\v2\".spark_token.TokenAllowancePayloadR\x10allowancePayload\x122\n" +
 	"\x0fowner_signature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x0eownerSignature\"b\n" +
 	"\x11AllowanceProgress\x12M\n" +
-	"\x1capplied_operator_public_keys\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x19appliedOperatorPublicKeys\"m\n" +
-	"\x1cCreateTokenAllowanceResponse\x12M\n" +
-	"\x12allowance_progress\x18\x01 \x01(\v2\x1e.spark_token.AllowanceProgressR\x11allowanceProgress\"\xec\x01\n" +
+	"\x1capplied_operator_public_keys\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x19appliedOperatorPublicKeys\"]\n" +
+	"\x1cCreateTokenAllowanceResponse\x12=\n" +
+	"\tallowance\x18\x01 \x01(\v2\x1f.spark_token.TokenAllowanceInfoR\tallowance\"\xec\x01\n" +
 	"\x12TokenAllowanceInfo\x12O\n" +
 	"\x11allowance_payload\x18\x01 \x01(\v2\".spark_token.TokenAllowancePayloadR\x10allowancePayload\x12!\n" +
 	"\fspent_amount\x18\x02 \x01(\fR\vspentAmount\x129\n" +
@@ -4149,7 +4149,7 @@ var file_spark_token_proto_depIdxs = []int32{
 	51, // 62: spark_token.TokenAllowancePayload.expiry_time:type_name -> google.protobuf.Timestamp
 	52, // 63: spark_token.TokenAllowancePayload.network:type_name -> spark.Network
 	44, // 64: spark_token.CreateTokenAllowanceRequest.allowance_payload:type_name -> spark_token.TokenAllowancePayload
-	46, // 65: spark_token.CreateTokenAllowanceResponse.allowance_progress:type_name -> spark_token.AllowanceProgress
+	48, // 65: spark_token.CreateTokenAllowanceResponse.allowance:type_name -> spark_token.TokenAllowanceInfo
 	44, // 66: spark_token.TokenAllowanceInfo.allowance_payload:type_name -> spark_token.TokenAllowancePayload
 	4,  // 67: spark_token.TokenAllowanceInfo.status:type_name -> spark_token.TokenAllowanceStatus
 	48, // 68: spark_token.QueryTokenAllowancesResponse.allowances:type_name -> spark_token.TokenAllowanceInfo

@@ -7448,11 +7448,11 @@ func (m *CreateTokenAllowanceResponse) validate(all bool) error {
 	var errors []error
 
 	if all {
-		switch v := interface{}(m.GetAllowanceProgress()).(type) {
+		switch v := interface{}(m.GetAllowance()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
 				errors = append(errors, CreateTokenAllowanceResponseValidationError{
-					field:  "AllowanceProgress",
+					field:  "Allowance",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
@@ -7460,16 +7460,16 @@ func (m *CreateTokenAllowanceResponse) validate(all bool) error {
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
 				errors = append(errors, CreateTokenAllowanceResponseValidationError{
-					field:  "AllowanceProgress",
+					field:  "Allowance",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
 			}
 		}
-	} else if v, ok := interface{}(m.GetAllowanceProgress()).(interface{ Validate() error }); ok {
+	} else if v, ok := interface{}(m.GetAllowance()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
 			return CreateTokenAllowanceResponseValidationError{
-				field:  "AllowanceProgress",
+				field:  "Allowance",
 				reason: "embedded message failed validation",
 				cause:  err,
 			}

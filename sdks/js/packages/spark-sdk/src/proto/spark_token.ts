@@ -744,7 +744,7 @@ export interface AllowanceProgress {
 }
 
 export interface CreateTokenAllowanceResponse {
-  allowanceProgress: AllowanceProgress | undefined;
+  allowance: TokenAllowanceInfo | undefined;
 }
 
 export interface TokenAllowanceInfo {
@@ -5818,13 +5818,13 @@ export const AllowanceProgress: MessageFns<AllowanceProgress> = {
 };
 
 function createBaseCreateTokenAllowanceResponse(): CreateTokenAllowanceResponse {
-  return { allowanceProgress: undefined };
+  return { allowance: undefined };
 }
 
 export const CreateTokenAllowanceResponse: MessageFns<CreateTokenAllowanceResponse> = {
   encode(message: CreateTokenAllowanceResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.allowanceProgress !== undefined) {
-      AllowanceProgress.encode(message.allowanceProgress, writer.uint32(10).fork()).join();
+    if (message.allowance !== undefined) {
+      TokenAllowanceInfo.encode(message.allowance, writer.uint32(10).fork()).join();
     }
     return writer;
   },
@@ -5841,7 +5841,7 @@ export const CreateTokenAllowanceResponse: MessageFns<CreateTokenAllowanceRespon
             break;
           }
 
-          message.allowanceProgress = AllowanceProgress.decode(reader, reader.uint32());
+          message.allowance = TokenAllowanceInfo.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -5854,17 +5854,13 @@ export const CreateTokenAllowanceResponse: MessageFns<CreateTokenAllowanceRespon
   },
 
   fromJSON(object: any): CreateTokenAllowanceResponse {
-    return {
-      allowanceProgress: isSet(object.allowanceProgress)
-        ? AllowanceProgress.fromJSON(object.allowanceProgress)
-        : undefined,
-    };
+    return { allowance: isSet(object.allowance) ? TokenAllowanceInfo.fromJSON(object.allowance) : undefined };
   },
 
   toJSON(message: CreateTokenAllowanceResponse): unknown {
     const obj: any = {};
-    if (message.allowanceProgress !== undefined) {
-      obj.allowanceProgress = AllowanceProgress.toJSON(message.allowanceProgress);
+    if (message.allowance !== undefined) {
+      obj.allowance = TokenAllowanceInfo.toJSON(message.allowance);
     }
     return obj;
   },
@@ -5874,8 +5870,8 @@ export const CreateTokenAllowanceResponse: MessageFns<CreateTokenAllowanceRespon
   },
   fromPartial(object: DeepPartial<CreateTokenAllowanceResponse>): CreateTokenAllowanceResponse {
     const message = createBaseCreateTokenAllowanceResponse();
-    message.allowanceProgress = (object.allowanceProgress !== undefined && object.allowanceProgress !== null)
-      ? AllowanceProgress.fromPartial(object.allowanceProgress)
+    message.allowance = (object.allowance !== undefined && object.allowance !== null)
+      ? TokenAllowanceInfo.fromPartial(object.allowance)
       : undefined;
     return message;
   },

@@ -13207,6 +13207,372 @@ var _ interface {
 	ErrorName() string
 } = StorePreimageSharePrepareRequestValidationError{}
 
+// Validate checks the field values on CreateTokenAllowancePrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *CreateTokenAllowancePrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateTokenAllowancePrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// CreateTokenAllowancePrepareRequestMultiError, or nil if none found.
+func (m *CreateTokenAllowancePrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateTokenAllowancePrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateTokenAllowancePrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateTokenAllowancePrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateTokenAllowancePrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateTokenAllowancePrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateTokenAllowancePrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// CreateTokenAllowancePrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateTokenAllowancePrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateTokenAllowancePrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateTokenAllowancePrepareRequestMultiError) AllErrors() []error { return m }
+
+// CreateTokenAllowancePrepareRequestValidationError is the validation error
+// returned by CreateTokenAllowancePrepareRequest.Validate if the designated
+// constraints aren't met.
+type CreateTokenAllowancePrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateTokenAllowancePrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateTokenAllowancePrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateTokenAllowancePrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateTokenAllowancePrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateTokenAllowancePrepareRequestValidationError) ErrorName() string {
+	return "CreateTokenAllowancePrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateTokenAllowancePrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateTokenAllowancePrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateTokenAllowancePrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateTokenAllowancePrepareRequestValidationError{}
+
+// Validate checks the field values on CreateTokenAllowanceCommitRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *CreateTokenAllowanceCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateTokenAllowanceCommitRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// CreateTokenAllowanceCommitRequestMultiError, or nil if none found.
+func (m *CreateTokenAllowanceCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateTokenAllowanceCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetAllowanceId()) != 16 {
+		err := CreateTokenAllowanceCommitRequestValidationError{
+			field:  "AllowanceId",
+			reason: "value length must be 16 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return CreateTokenAllowanceCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateTokenAllowanceCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// CreateTokenAllowanceCommitRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateTokenAllowanceCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateTokenAllowanceCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateTokenAllowanceCommitRequestMultiError) AllErrors() []error { return m }
+
+// CreateTokenAllowanceCommitRequestValidationError is the validation error
+// returned by CreateTokenAllowanceCommitRequest.Validate if the designated
+// constraints aren't met.
+type CreateTokenAllowanceCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateTokenAllowanceCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateTokenAllowanceCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateTokenAllowanceCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateTokenAllowanceCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateTokenAllowanceCommitRequestValidationError) ErrorName() string {
+	return "CreateTokenAllowanceCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateTokenAllowanceCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateTokenAllowanceCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateTokenAllowanceCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateTokenAllowanceCommitRequestValidationError{}
+
+// Validate checks the field values on CreateTokenAllowanceRollbackRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *CreateTokenAllowanceRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateTokenAllowanceRollbackRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// CreateTokenAllowanceRollbackRequestMultiError, or nil if none found.
+func (m *CreateTokenAllowanceRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateTokenAllowanceRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetAllowanceId()) != 16 {
+		err := CreateTokenAllowanceRollbackRequestValidationError{
+			field:  "AllowanceId",
+			reason: "value length must be 16 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return CreateTokenAllowanceRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateTokenAllowanceRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// CreateTokenAllowanceRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateTokenAllowanceRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateTokenAllowanceRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateTokenAllowanceRollbackRequestMultiError) AllErrors() []error { return m }
+
+// CreateTokenAllowanceRollbackRequestValidationError is the validation error
+// returned by CreateTokenAllowanceRollbackRequest.Validate if the designated
+// constraints aren't met.
+type CreateTokenAllowanceRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateTokenAllowanceRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateTokenAllowanceRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateTokenAllowanceRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateTokenAllowanceRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateTokenAllowanceRollbackRequestValidationError) ErrorName() string {
+	return "CreateTokenAllowanceRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateTokenAllowanceRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateTokenAllowanceRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateTokenAllowanceRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateTokenAllowanceRollbackRequestValidationError{}
+
 // Validate checks the field values on SendTransferPrepareRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
