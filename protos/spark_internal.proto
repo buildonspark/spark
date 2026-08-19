@@ -1247,6 +1247,82 @@ message CoopExitRollbackRequest {
     string transfer_id = 1;
 }
 
+// TokenTransactionPrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION 2PC flow. It carries the
+// SO-constructed final token transaction (legacy V2 wire shape — the same
+// shape the sign_token_transaction fanout sends today) plus the issuer/owner
+// signatures over the partial transaction, mirroring the fields of
+// spark_token.SignTokenTransactionRequest that a CREATE uses.
+//
+// The coordinator public key is deliberately NOT carried here: each SO
+// derives the coordinator identity from the engine's coordinator_index
+// (ConsensusPrepareRequest), resolved against the static operator config, so
+// the coordinator recorded on durable state is always a real signing
+// operator's key rather than a self-declared payload value.
+//
+// The transaction type is discriminated by the token_inputs oneof on
+// final_token_transaction. CREATE is the first (and currently only) branch
+// the flow handler implements; Prepare fails closed on mint/transfer.
+message TokenTransactionPrepareRequest {
+    spark_token.TokenTransaction final_token_transaction = 1;
+    // Issuer/owner signatures over the partial transaction hash.
+    repeated spark_token.SignatureWithIndex token_transaction_signatures = 2;
+    // Field 3 is reserved for the future mint/transfer branches' revocation
+    // keyshare id list (CREATE has zero outputs and none).
+    reserved 3;
+    // Optional client-specified deadline, forwarded from
+    // PartialTokenTransaction.execute_before. Set on the transaction before
+    // hashing/validation, exactly like the legacy sign fanout.
+    optional google.protobuf.Timestamp execute_before = 4;
+}
+
+// TokenTransactionPrepareResponse is each SO's Prepare result: its ECDSA
+// identity-key signature over the final token transaction hash — the same
+// signature sign_token_transaction returns today. The coordinator verifies
+// every signature against the operator config and aggregates them into the
+// commit payload in BuildCommitPayload.
+message TokenTransactionPrepareResponse {
+    bytes spark_operator_signature = 1 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+// TokenTransactionOperatorSignature is one operator's ECDSA identity-key
+// signature over the final token transaction hash. Mirror of
+// spark_token.OperatorTransactionSignature (spark_token_internal.proto):
+// consensus payloads stay self-contained rather than importing another
+// internal service's proto.
+message TokenTransactionOperatorSignature {
+    bytes operator_identity_public_key = 1 [(validate.rules).bytes.len = 33];
+    bytes signature = 2 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+// TokenTransactionCommitRequest is the 2PC commit payload the coordinator
+// builds in BuildCommitPayload after verifying every operator's signature and
+// the required participation threshold. Each SO re-verifies the signatures,
+// persists the peer signatures, and finalizes the transaction
+// (SIGNED -> FINALIZED) during Commit — replacing the legacy empty-share
+// exchange_revocation_secrets_shares finalize fanout and the 30s retry cron
+// for CREATE.
+message TokenTransactionCommitRequest {
+    bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    repeated TokenTransactionOperatorSignature operator_transaction_signatures = 2;
+}
+
+// TokenTransactionRollbackRequest is the 2PC rollback payload. Each SO
+// deletes the token transaction entities it wrote in Prepare (for CREATE: the
+// TokenTransaction row and its TokenCreate row, freeing the unique
+// token_identifier so the issuer can retry). Idempotent: a never-created or
+// already-deleted transaction is a no-op, and a FINALIZED transaction absorbs
+// a stray rollback as a no-op.
+message TokenTransactionRollbackRequest {
+    bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).
