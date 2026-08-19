@@ -10,7 +10,10 @@ import { sha256 } from "@noble/hashes/sha2";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { type TransactionInput } from "@scure/btc-signer/psbt";
+import {
+  type TransactionInput,
+  type TransactionOutput,
+} from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { EventEmitter } from "eventemitter3";
 import { uuidv7, uuidv7obj } from "uuidv7";
@@ -67,6 +70,7 @@ import {
   TransferStatus,
   TransferType,
   type TreeNode,
+  TreeNodeStatus,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import {
@@ -197,6 +201,7 @@ import type {
   TransferWithInvoiceOutcome,
   TransferWithInvoiceParams,
   UserTokenMetadata,
+  WatchtowerExitedLeaf,
   WithdrawParams,
 } from "./types.js";
 import {
@@ -2435,9 +2440,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * every recovery spends the same output, so at most one can confirm.
    *
    * @param {Object} params - The recovery parameters
-   * @param {string} params.leafId - The watchtower-exited leaf to recover
-   * @param {string} params.recoveryTxid - Txid of the confirmed ancestor
-   *   transaction holding the output. Must be one of the leaf's ancestors.
+   * @param {string} params.leafId - The watchtower-exited leaf to recover.
+   *   {@link getWatchtowerExitedLeaves} lists the candidates.
+   * @param {string} [params.recoveryTxid] - Txid of the confirmed ancestor
+   *   transaction holding the output. Defaults to the ancestor the SE recorded
+   *   as confirmed, which is the one it will accept.
    * @param {number} [params.outputIndex] - Which output of that transaction.
    *   Defaults to the one paying the leaf's key.
    * @param {string} params.destinationAddress - Where the recovered funds go
@@ -2452,7 +2459,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     satsPerVbyteFee,
   }: {
     leafId: string;
-    recoveryTxid: string;
+    recoveryTxid?: string;
     outputIndex?: number;
     destinationAddress: string;
     satsPerVbyteFee: number;
@@ -2490,42 +2497,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
 
-    const sourceTx = Object.values(nodesResponse.nodes)
-      .map((node) => node.directTx)
-      .filter((directTx) => directTx.length > 0)
-      .map((directTx) => getTxFromRawTxBytes(directTx))
-      // getTxId rather than tx.id: .id refuses to compute on the operator's
-      // stored unsigned transactions, though a txid does not commit to witness.
-      .find((tx) => getTxId(tx) === recoveryTxid);
-    if (!sourceTx) {
-      throw new SparkValidationError(
-        "recoveryTxid is not an ancestor transaction of this leaf",
-        { field: "recoveryTxid", value: recoveryTxid },
-      );
-    }
-
-    // The output the leaf can spend is the one paying its verifying key: the
-    // combined user + SE key, which renewal copies forward unchanged.
-    const leafScript = getP2TRScriptFromPublicKey(
-      leaf.verifyingPublicKey,
+    const recoverable = resolveRecoverableOutput(
+      leaf,
+      Object.values(nodesResponse.nodes),
       network,
+      recoveryTxid,
+      outputIndex,
     );
-    outputIndex ??= findOutputPayingScript(sourceTx, leafScript);
-    if (outputIndex === undefined) {
+    if (!recoverable) {
       throw new SparkValidationError(
-        "No output of that transaction pays this leaf's key",
+        recoveryTxid === undefined
+          ? "No confirmed ancestor transaction of this leaf holds a recoverable output"
+          : "recoveryTxid is not an ancestor transaction of this leaf paying its key",
         { field: "recoveryTxid", value: recoveryTxid },
       );
     }
-
-    const prevOut = sourceTx.getOutput(outputIndex);
-    const prevOutAmount = prevOut.amount;
-    if (prevOutAmount === undefined) {
-      throw new SparkValidationError("Recoverable output has no amount", {
-        field: "outputIndex",
-        value: outputIndex,
-      });
-    }
+    const { prevOut } = recoverable;
 
     // Rounded up rather than rejecting a fractional rate, which is a normal
     // thing to ask for: a fractional fee leaves recoveredAmount fractional, and
@@ -2542,7 +2529,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         { field: "fee", value: fee },
       );
     }
-    const recoveredAmount = Number(prevOutAmount) - fee;
+    const recoveredAmount = recoverable.valueSats - fee;
     if (recoveredAmount <= 0) {
       throw new SparkValidationError(
         "Fee too large. Recovered amount must be greater than 0",
@@ -2552,8 +2539,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     const tx = new Transaction({ version: 3 });
     tx.addInput({
-      txid: recoveryTxid,
-      index: outputIndex,
+      txid: recoverable.txid,
+      index: recoverable.outputIndex,
       witnessScript: new Uint8Array(),
     });
     tx.addOutput({
@@ -2632,7 +2619,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    */
   public async recoverAndBroadcastWatchtowerExitedLeaf(params: {
     leafId: string;
-    recoveryTxid: string;
+    recoveryTxid?: string;
     outputIndex?: number;
     destinationAddress: string;
     satsPerVbyteFee: number;
@@ -2640,6 +2627,59 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return await this.broadcastTx(
       await this.recoverWatchtowerExitedLeaf(params),
     );
+  }
+
+  /**
+   * Lists the leaves a watchtower exit cut off from their exit path.
+   *
+   * These do not appear in the balance or in getLeaves: they stop being
+   * AVAILABLE the moment an ancestor's watchtower transaction confirms, so
+   * without this there is no way to learn a leaf needs recovering. The value is
+   * not lost — it sits in an on-chain output only your key and the SE's together
+   * can spend — and `recovery` names that output, ready to hand to
+   * {@link recoverWatchtowerExitedLeaf}.
+   *
+   * Already-recovered leaves are listed too, and stay listed: the SE never sees
+   * the broadcast, so nothing retires an entry once its transaction confirms.
+   * Check the chain, not this list, to know whether a recovery landed.
+   *
+   * @returns {Promise<WatchtowerExitedLeaf[]>} One entry per stranded leaf
+   */
+  public async getWatchtowerExitedLeaves(): Promise<WatchtowerExitedLeaf[]> {
+    const network = this.config.getNetwork();
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    const nodes = await this.leafManager.queryWatchtowerExitedNodes();
+
+    // The response mixes the wallet's own nodes with the ancestors fetched for
+    // them. Both conditions are needed: only a leaf carries a refund tx (the
+    // test gossip_handler.go:791 uses), which excludes the renewal split nodes
+    // that keep a stale owner key; and a deposit root does carry one, but comes
+    // back with its owner masked to a NUMS point.
+    const leaves = nodes.filter(
+      (node) =>
+        node.refundTx.length > 0 &&
+        equalBytes(node.ownerIdentityPublicKey, identityPublicKey),
+    );
+
+    return leaves.map((leaf) => {
+      const recoverable = resolveRecoverableOutput(leaf, nodes, network);
+      return {
+        leafId: leaf.id,
+        status:
+          leaf.treenodeStatus ===
+          TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED
+            ? "WATCHTOWER_EXIT_RECOVERED"
+            : "WATCHTOWER_EXITED",
+        valueSats: leaf.value,
+        recovery: recoverable
+          ? {
+              txid: recoverable.txid,
+              outputIndex: recoverable.outputIndex,
+              valueSats: recoverable.valueSats,
+            }
+          : undefined,
+      };
+    });
   }
 
   /**
@@ -7008,6 +7048,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "getUtxosForDepositAddress",
   "getUtxosForIdentity",
   "getWalletSettings",
+  "getWatchtowerExitedLeaves",
   "getWithdrawalFeeQuote",
   "isOptimizationInProgress",
   "isTokenOptimizationInProgress",
@@ -7085,6 +7126,102 @@ function findOutputPayingScript(
   for (let i = 0; i < tx.outputsLength; i++) {
     const outputScript = tx.getOutput(i).script;
     if (outputScript && equalBytes(outputScript, script)) return i;
+  }
+  return undefined;
+}
+
+export interface RecoverableOutput {
+  txid: string;
+  outputIndex: number;
+  valueSats: number;
+  prevOut: TransactionOutput;
+}
+
+// The leaf and its ancestors, nearest generation first. Order is load bearing:
+// each renewal generation's direct tx spends the one above and pays the same
+// key, so successive watchtower broadcasts leave several of them ON_CHAIN at
+// once with only the nearest one's output still unspent. The SE signs against
+// any of them (see findRecoverySourceNode), so a spent generation is caught
+// nowhere but here.
+function generationsFromLeaf(leaf: TreeNode, nodes: TreeNode[]): TreeNode[] {
+  // Consumed as visited, so a parent cycle cannot spin.
+  const remaining = new Map(nodes.map((node) => [node.id, node]));
+  const generations: TreeNode[] = [];
+  for (let node: TreeNode | undefined = leaf; node; ) {
+    generations.push(node);
+    remaining.delete(node.id);
+    node = node.parentNodeId ? remaining.get(node.parentNodeId) : undefined;
+  }
+  return generations;
+}
+
+/**
+ * Finds the confirmed on-chain output a watchtower-exited leaf can still spend.
+ *
+ * `nodes` is the leaf and its ancestor chain, as returned by query_nodes with
+ * includeParents. The output is the one paying P2TR(leaf.verifyingPublicKey) —
+ * the combined user + SE key, which renewal copies forward unchanged, so an
+ * older generation's transaction pays the same script while a sibling subtree's
+ * never does.
+ *
+ * Without `recoveryTxid` the source is chosen by ON_CHAIN status, matching the
+ * gate the SE applies in findRecoverySourceNode, so the SDK cannot pick a
+ * transaction the SE would then refuse. That also excludes the leaf's own direct
+ * tx, which conflict-spends the very output being recovered.
+ *
+ * Returns undefined rather than throwing, since a leaf whose output cannot be
+ * resolved is still worth listing.
+ */
+export function resolveRecoverableOutput(
+  leaf: TreeNode,
+  nodes: TreeNode[],
+  network: Network,
+  recoveryTxid?: string,
+  outputIndexOverride?: number,
+): RecoverableOutput | undefined {
+  const leafScript = getP2TRScriptFromPublicKey(
+    leaf.verifyingPublicKey,
+    network,
+  );
+
+  for (const node of generationsFromLeaf(leaf, nodes)) {
+    if (node.directTx.length === 0) continue;
+    // An explicitly named transaction is taken at its word: the SE re-checks the
+    // status itself, and trusting the caller here keeps a stale local view of
+    // the chain from blocking a recovery.
+    if (
+      recoveryTxid === undefined &&
+      node.treenodeStatus !== TreeNodeStatus.TREE_NODE_STATUS_ON_CHAIN
+    ) {
+      continue;
+    }
+    const tx = getTxFromRawTxBytes(node.directTx);
+    // getTxId rather than tx.id: .id refuses to compute on the operator's
+    // stored unsigned transactions, though a txid does not commit to witness.
+    const txid = getTxId(tx);
+    if (recoveryTxid !== undefined && txid !== recoveryTxid) continue;
+
+    const outputIndex =
+      outputIndexOverride ?? findOutputPayingScript(tx, leafScript);
+    // Fully bounded rather than checked against outputsLength alone, so a
+    // negative or fractional override lands on this method's own error instead
+    // of a bare throw from inside getOutput.
+    if (
+      outputIndex === undefined ||
+      !Number.isSafeInteger(outputIndex) ||
+      outputIndex < 0 ||
+      outputIndex >= tx.outputsLength
+    ) {
+      continue;
+    }
+    const prevOut = tx.getOutput(outputIndex);
+    if (prevOut.amount === undefined) continue;
+    // Re-checked rather than trusted from the search above, because an explicit
+    // outputIndex skips that search entirely. The operator makes the same
+    // comparison, so without this an override just buys a remote rejection.
+    if (!prevOut.script || !equalBytes(prevOut.script, leafScript)) continue;
+
+    return { txid, outputIndex, valueSats: Number(prevOut.amount), prevOut };
   }
   return undefined;
 }
