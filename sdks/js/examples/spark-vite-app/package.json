@@ -10,7 +10,9 @@
     "format": "prettier . --check",
     "lint:fix": "eslint --fix .",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:integration": "playwright test --grep-invert @ssp",
+    "test:integration:ssp": "playwright install --with-deps chromium && cross-env HERMETIC_TEST=true VITE_SPARK_TARGET=LOCAL playwright test --grep @ssp"
   },
   "dependencies": {
     "@buildonspark/spark-sdk": "0.9.0",
@@ -18,7 +20,9 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@buildonspark/issuer-sdk": "0.1.45",
     "@lightsparkdev/eslint-config": "^0.0.1",
+    "@playwright/test": "1.60.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.3.4",

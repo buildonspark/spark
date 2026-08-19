@@ -65,6 +65,33 @@ export function getLocalBitcoinRpcProxyPath(): string {
   return "/bitcoin-rpc";
 }
 
+export function configureBrowserBitcoinRpcProxy(browserOrigin: string): void {
+  const globalScope = globalThis as typeof globalThis & {
+    process?: unknown;
+  };
+  const processShim = globalScope.process as
+    | {
+        env?: Record<string, string | undefined>;
+      }
+    | undefined;
+
+  if (!processShim) {
+    (globalScope as { process?: unknown }).process = { env: {} };
+  } else if (!processShim.env) {
+    processShim.env = {};
+  }
+
+  const env = (
+    globalScope.process as { env: Record<string, string | undefined> }
+  ).env;
+  env.BITCOIN_RPC_URL = new URL(
+    getLocalBitcoinRpcProxyPath(),
+    browserOrigin,
+  ).toString();
+  env.BITCOIN_RPC_USER ??= "testutil";
+  env.BITCOIN_RPC_PASSWORD ??= "testutilpassword";
+}
+
 export function getExampleWalletOptions(
   env: Record<string, string | undefined>,
   network: NetworkType,

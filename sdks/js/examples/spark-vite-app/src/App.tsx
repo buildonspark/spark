@@ -8,6 +8,7 @@ import {
 } from "@buildonspark/spark-sdk";
 import { useState } from "react";
 import {
+  configureBrowserBitcoinRpcProxy,
   getExampleSparkNetwork,
   getLocalBitcoinRpcProxyPath,
   getExampleWalletOptions,
@@ -45,33 +46,6 @@ const HAS_PRIVATE_DEV_CONFIGS = PUBLIC_NETWORKS.some(
 const DEFAULT_NETWORK = getDefaultNetwork();
 const DEFAULT_TARGET = getDefaultTarget();
 const BITCOIN_RPC_PROXY_PATH = getLocalBitcoinRpcProxyPath();
-
-function configureBrowserBitcoinRpcProxy() {
-  const globalScope = globalThis as typeof globalThis & {
-    process?: unknown;
-  };
-  const processShim = globalScope.process as
-    | {
-        env?: Record<string, string | undefined>;
-      }
-    | undefined;
-
-  if (!processShim) {
-    (globalScope as { process?: unknown }).process = { env: {} };
-  } else if (!processShim.env) {
-    processShim.env = {};
-  }
-
-  const env = (
-    globalScope.process as { env: Record<string, string | undefined> }
-  ).env;
-  env.BITCOIN_RPC_URL = new URL(
-    BITCOIN_RPC_PROXY_PATH,
-    window.location.origin,
-  ).toString();
-  env.BITCOIN_RPC_USER ??= "testutil";
-  env.BITCOIN_RPC_PASSWORD ??= "testutilpassword";
-}
 
 function getPrivateDevConfigs(): PrivateConfigMap {
   return typeof __SPARK_PRIVATE_CONFIGS__ === "object" &&
@@ -138,7 +112,7 @@ function getInitialNetwork(target: Target): Network {
 
 function getWalletOptions(target: Target, network: Network): ConfigOptions {
   if (target === "LOCAL") {
-    configureBrowserBitcoinRpcProxy();
+    configureBrowserBitcoinRpcProxy(window.location.origin);
     return {
       ...getExampleWalletOptions(
         import.meta.env,
@@ -418,17 +392,22 @@ function App() {
     }
   };
 
-  const refreshBalance = async () => {
+  const refreshBalance = async (completedAction?: string) => {
     if (!wallet) return;
-    setStatus({ type: "info", message: "Fetching balance..." });
+    if (!completedAction) {
+      setStatus({ type: "info", message: "Fetching balance..." });
+    }
     try {
       const { balance: b } = await wallet.getBalance();
       setBalance(b.toString());
-      setStatus({ type: "success", message: `Balance: ${b} sats` });
+      setStatus({
+        type: "success",
+        message: completedAction ?? `Balance: ${b} sats`,
+      });
     } catch (err) {
       setStatus({
-        type: "error",
-        message: `Error: ${getErrorMessage(err)}`,
+        type: completedAction ? "success" : "error",
+        message: completedAction ?? `Error: ${getErrorMessage(err)}`,
       });
     }
   };
@@ -601,6 +580,7 @@ function App() {
 
     setStatus({ type: "info", message: "Sending..." });
     try {
+      let completedAction: string;
       if (sendType === "lightning") {
         const fee = parseInt(maxFeeSats, 10) || 100;
         const result = await wallet.payLightningInvoice({
@@ -608,7 +588,7 @@ function App() {
           maxFeeSats: fee,
         });
         const resultId = "id" in result ? result.id : "unknown";
-        setStatus({ type: "success", message: `Paid! ID: ${resultId}` });
+        completedAction = `Paid! ID: ${resultId}`;
       } else {
         const amount = parseInt(sendAmount, 10);
         if (isNaN(amount) || amount <= 0) {
@@ -619,9 +599,9 @@ function App() {
           receiverSparkAddress: recipientAddress.trim(),
           amountSats: amount,
         });
-        setStatus({ type: "success", message: `Sent! ID: ${result.id}` });
+        completedAction = `Sent! ID: ${result.id}`;
       }
-      void refreshBalance();
+      await refreshBalance(completedAction);
     } catch (err) {
       setStatus({
         type: "error",

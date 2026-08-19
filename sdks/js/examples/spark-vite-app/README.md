@@ -64,6 +64,38 @@ The app is served through the generic `/app/<app>/` SPA route on
 `dev.dev.sparkinfra.net`, so deep links under `/app/spark-vite-app/` route back
 to this app's `index.html`.
 
+## Browser integration tests
+
+From `sdks/js`, run the browser suite against the local Spark cluster with:
+
+```bash
+yarn turbo run test:integration --filter=@buildonspark/spark-vite-app
+```
+
+The suite uses the Vite browser bundle and public SDK APIs. Its UI journeys
+exercise every operation exposed by the app: target and network selection,
+WASM signing, wallet generation and recovery, clipboard copy, balance refresh,
+deposit-address creation, manual deposit claim, local funding, Spark transfer,
+Lightning invoice creation, and Lightning payment. The Spark operations run in
+the Spark hermetic environment. The Lightning journey runs as part of
+`yarn test:integration:ssp`, where the SSP is also available.
+
+The suite separately covers every FROST binding method, token manifest signing,
+wallet recovery and identity signing, a funded Spark transfer, and a token
+create/mint/invoice/transfer lifecycle. The binding-only checks for FROST and
+token primitives do not require the local cluster:
+
+```bash
+yarn turbo run test:integration --filter=@buildonspark/spark-vite-app -- --grep @bindings
+```
+
+Playwright records the SHA-256 of each WASM module instantiated by Chromium and
+compares it with the binding file on disk. The UI journeys also record the
+specific FROST methods reached through app controls. In binding CI, the WASM
+files are first replaced with artifacts produced by the current workflow run.
+CI records video for every browser test. Spark hermetic uploads them under
+`output/playwright`; SSP hermetic includes them under `logs/playwright`.
+
 ## Notes
 
 - The `Deposit` section includes a `Fund Locally` button when `LOCAL` is
