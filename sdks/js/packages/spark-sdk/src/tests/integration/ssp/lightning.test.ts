@@ -336,7 +336,9 @@ async function withSspAuthorization<T>(
   if (authorization) {
     return await fn({ Authorization: authorization });
   }
-  if (process.env.HERMETIC_TEST === "true") {
+  // The dev-cli hermetic variant reaches the SSP via SPARKCORE_BASE_URL and
+  // never sets HERMETIC_TEST; both stacks can mint the throwaway token.
+  if (process.env.HERMETIC_TEST === "true" || process.env.SPARKCORE_BASE_URL) {
     const hermeticAuthorization = await hermeticSspAuthorization(invoiceId);
     try {
       return await fn({ Authorization: hermeticAuthorization.authorization });
