@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -15,18 +16,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 )
 
 // TokenAllowanceQuery is the builder for querying TokenAllowance entities.
 type TokenAllowanceQuery struct {
 	config
-	ctx             *QueryContext
-	order           []tokenallowance.OrderOption
-	inters          []Interceptor
-	predicates      []predicate.TokenAllowance
-	withTokenCreate *TokenCreateQuery
-	modifiers       []func(*sql.Selector)
+	ctx                     *QueryContext
+	order                   []tokenallowance.OrderOption
+	inters                  []Interceptor
+	predicates              []predicate.TokenAllowance
+	withTokenCreate         *TokenCreateQuery
+	withTokenAllowanceSpend *TokenAllowanceSpendQuery
+	modifiers               []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -78,6 +81,28 @@ func (taq *TokenAllowanceQuery) QueryTokenCreate() *TokenCreateQuery {
 			sqlgraph.From(tokenallowance.Table, tokenallowance.FieldID, selector),
 			sqlgraph.To(tokencreate.Table, tokencreate.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, tokenallowance.TokenCreateTable, tokenallowance.TokenCreateColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(taq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTokenAllowanceSpend chains the current query on the "token_allowance_spend" edge.
+func (taq *TokenAllowanceQuery) QueryTokenAllowanceSpend() *TokenAllowanceSpendQuery {
+	query := (&TokenAllowanceSpendClient{config: taq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := taq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := taq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenallowance.Table, tokenallowance.FieldID, selector),
+			sqlgraph.To(tokenallowancespend.Table, tokenallowancespend.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, tokenallowance.TokenAllowanceSpendTable, tokenallowance.TokenAllowanceSpendColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(taq.driver.Dialect(), step)
 		return fromU, nil
@@ -272,12 +297,13 @@ func (taq *TokenAllowanceQuery) Clone() *TokenAllowanceQuery {
 		return nil
 	}
 	return &TokenAllowanceQuery{
-		config:          taq.config,
-		ctx:             taq.ctx.Clone(),
-		order:           append([]tokenallowance.OrderOption{}, taq.order...),
-		inters:          append([]Interceptor{}, taq.inters...),
-		predicates:      append([]predicate.TokenAllowance{}, taq.predicates...),
-		withTokenCreate: taq.withTokenCreate.Clone(),
+		config:                  taq.config,
+		ctx:                     taq.ctx.Clone(),
+		order:                   append([]tokenallowance.OrderOption{}, taq.order...),
+		inters:                  append([]Interceptor{}, taq.inters...),
+		predicates:              append([]predicate.TokenAllowance{}, taq.predicates...),
+		withTokenCreate:         taq.withTokenCreate.Clone(),
+		withTokenAllowanceSpend: taq.withTokenAllowanceSpend.Clone(),
 		// clone intermediate query.
 		sql:       taq.sql.Clone(),
 		path:      taq.path,
@@ -293,6 +319,17 @@ func (taq *TokenAllowanceQuery) WithTokenCreate(opts ...func(*TokenCreateQuery))
 		opt(query)
 	}
 	taq.withTokenCreate = query
+	return taq
+}
+
+// WithTokenAllowanceSpend tells the query-builder to eager-load the nodes that are connected to
+// the "token_allowance_spend" edge. The optional arguments are used to configure the query builder of the edge.
+func (taq *TokenAllowanceQuery) WithTokenAllowanceSpend(opts ...func(*TokenAllowanceSpendQuery)) *TokenAllowanceQuery {
+	query := (&TokenAllowanceSpendClient{config: taq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	taq.withTokenAllowanceSpend = query
 	return taq
 }
 
@@ -374,8 +411,9 @@ func (taq *TokenAllowanceQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	var (
 		nodes       = []*TokenAllowance{}
 		_spec       = taq.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			taq.withTokenCreate != nil,
+			taq.withTokenAllowanceSpend != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -402,6 +440,15 @@ func (taq *TokenAllowanceQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	if query := taq.withTokenCreate; query != nil {
 		if err := taq.loadTokenCreate(ctx, query, nodes, nil,
 			func(n *TokenAllowance, e *TokenCreate) { n.Edges.TokenCreate = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := taq.withTokenAllowanceSpend; query != nil {
+		if err := taq.loadTokenAllowanceSpend(ctx, query, nodes,
+			func(n *TokenAllowance) { n.Edges.TokenAllowanceSpend = []*TokenAllowanceSpend{} },
+			func(n *TokenAllowance, e *TokenAllowanceSpend) {
+				n.Edges.TokenAllowanceSpend = append(n.Edges.TokenAllowanceSpend, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -434,6 +481,37 @@ func (taq *TokenAllowanceQuery) loadTokenCreate(ctx context.Context, query *Toke
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (taq *TokenAllowanceQuery) loadTokenAllowanceSpend(ctx context.Context, query *TokenAllowanceSpendQuery, nodes []*TokenAllowance, init func(*TokenAllowance), assign func(*TokenAllowance, *TokenAllowanceSpend)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*TokenAllowance)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(tokenallowancespend.FieldTokenAllowanceID)
+	}
+	query.Where(predicate.TokenAllowanceSpend(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(tokenallowance.TokenAllowanceSpendColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.TokenAllowanceID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "token_allowance_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

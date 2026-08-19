@@ -159,6 +159,14 @@ func validateTokenTransactionForSigning(
 		if err := validateNoActiveFreezesForOutputs(ctx, tokenTransactionEnt.Edges.SpentOutput); err != nil {
 			return err
 		}
+
+		// Authoritative allowance gate: locks the spend row so the not-expired + RESERVED
+		// decision and the subsequent sign/finalize commit atomically with respect to the
+		// prepare-time lazy release of expired reservations. Callers run under
+		// FetchAndLockTokenTransactionData*, satisfying the lock order.
+		if err := validateAllowanceSpendReservedForSigning(ctx, tokenTransactionEnt); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("token transaction type unknown")
 	}

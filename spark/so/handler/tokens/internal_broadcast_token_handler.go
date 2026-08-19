@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -132,7 +133,7 @@ func (h *SignTokenTransactionHandler) createSignedTokenTransactionEntitiesAndSig
 	}
 
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash).Serialize()
-	_, err = ent.CreateSignedTransactionEntities(
+	tokenTxEnt, err := ent.CreateSignedTransactionEntities(
 		ctx,
 		finalTokenTransaction,
 		ownerSignatures,
@@ -143,6 +144,13 @@ func (h *SignTokenTransactionHandler) createSignedTokenTransactionEntitiesAndSig
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Single-phase V3 path: the SIGNED entities were just created, so meter the delegated spend
+	// in the same database transaction, mirroring the two-phase prepare hook. A metering failure
+	// rolls back the entities and the operator signature is never returned.
+	if err := meterAllowanceSpendIfDelegated(ctx, h.config, finalTokenTransaction, ownerSignatures, tokenTxEnt, orderedOutputToSpendEnts); err != nil {
+		return nil, tokens.FormatErrorWithTransactionProto("failed to meter allowance spend", finalTokenTransaction, err)
 	}
 
 	return operatorSignature, nil

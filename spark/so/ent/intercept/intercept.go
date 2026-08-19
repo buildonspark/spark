@@ -35,6 +35,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -813,6 +814,33 @@ func (f TraverseTokenAllowance) Traverse(ctx context.Context, q ent.Query) error
 	return fmt.Errorf("unexpected query type %T. expect *ent.TokenAllowanceQuery", q)
 }
 
+// The TokenAllowanceSpendFunc type is an adapter to allow the use of ordinary function as a Querier.
+type TokenAllowanceSpendFunc func(context.Context, *ent.TokenAllowanceSpendQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f TokenAllowanceSpendFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.TokenAllowanceSpendQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.TokenAllowanceSpendQuery", q)
+}
+
+// The TraverseTokenAllowanceSpend type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseTokenAllowanceSpend func(context.Context, *ent.TokenAllowanceSpendQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseTokenAllowanceSpend) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseTokenAllowanceSpend) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.TokenAllowanceSpendQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.TokenAllowanceSpendQuery", q)
+}
+
 // The TokenCreateFunc type is an adapter to allow the use of ordinary function as a Querier.
 type TokenCreateFunc func(context.Context, *ent.TokenCreateQuery) (ent.Value, error)
 
@@ -1354,6 +1382,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.SparkInvoiceQuery, predicate.SparkInvoice, sparkinvoice.OrderOption]{typ: ent.TypeSparkInvoice, tq: q}, nil
 	case *ent.TokenAllowanceQuery:
 		return &query[*ent.TokenAllowanceQuery, predicate.TokenAllowance, tokenallowance.OrderOption]{typ: ent.TypeTokenAllowance, tq: q}, nil
+	case *ent.TokenAllowanceSpendQuery:
+		return &query[*ent.TokenAllowanceSpendQuery, predicate.TokenAllowanceSpend, tokenallowancespend.OrderOption]{typ: ent.TypeTokenAllowanceSpend, tq: q}, nil
 	case *ent.TokenCreateQuery:
 		return &query[*ent.TokenCreateQuery, predicate.TokenCreate, tokencreate.OrderOption]{typ: ent.TypeTokenCreate, tq: q}, nil
 	case *ent.TokenFreezeQuery:

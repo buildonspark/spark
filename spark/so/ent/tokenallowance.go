@@ -77,9 +77,11 @@ type TokenAllowance struct {
 type TokenAllowanceEdges struct {
 	// Token create contains the token metadata associated with this allowance.
 	TokenCreate *TokenCreate `json:"token_create,omitempty"`
+	// Metered spends recorded against this allowance.
+	TokenAllowanceSpend []*TokenAllowanceSpend `json:"token_allowance_spend,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // TokenCreateOrErr returns the TokenCreate value or an error if the edge
@@ -91,6 +93,15 @@ func (e TokenAllowanceEdges) TokenCreateOrErr() (*TokenCreate, error) {
 		return nil, &NotFoundError{label: tokencreate.Label}
 	}
 	return nil, &NotLoadedError{edge: "token_create"}
+}
+
+// TokenAllowanceSpendOrErr returns the TokenAllowanceSpend value or an error if the edge
+// was not loaded in eager-loading.
+func (e TokenAllowanceEdges) TokenAllowanceSpendOrErr() ([]*TokenAllowanceSpend, error) {
+	if e.loadedTypes[1] {
+		return e.TokenAllowanceSpend, nil
+	}
+	return nil, &NotLoadedError{edge: "token_allowance_spend"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -286,6 +297,11 @@ func (ta *TokenAllowance) Value(name string) (ent.Value, error) {
 // QueryTokenCreate queries the "token_create" edge of the TokenAllowance entity.
 func (ta *TokenAllowance) QueryTokenCreate() *TokenCreateQuery {
 	return NewTokenAllowanceClient(ta.config).QueryTokenCreate(ta)
+}
+
+// QueryTokenAllowanceSpend queries the "token_allowance_spend" edge of the TokenAllowance entity.
+func (ta *TokenAllowance) QueryTokenAllowanceSpend() *TokenAllowanceSpendQuery {
+	return NewTokenAllowanceClient(ta.config).QueryTokenAllowanceSpend(ta)
 }
 
 // Update returns a builder for updating this TokenAllowance.

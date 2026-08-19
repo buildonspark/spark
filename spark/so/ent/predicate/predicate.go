@@ -84,6 +84,9 @@ type SparkInvoice func(*sql.Selector)
 // TokenAllowance is the predicate function for tokenallowance builders.
 type TokenAllowance func(*sql.Selector)
 
+// TokenAllowanceSpend is the predicate function for tokenallowancespend builders.
+type TokenAllowanceSpend func(*sql.Selector)
+
 // TokenCreate is the predicate function for tokencreate builders.
 type TokenCreate func(*sql.Selector)
 

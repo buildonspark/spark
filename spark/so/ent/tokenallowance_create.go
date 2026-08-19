@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 )
 
@@ -225,6 +226,21 @@ func (tac *TokenAllowanceCreate) SetNillableID(u *uuid.UUID) *TokenAllowanceCrea
 // SetTokenCreate sets the "token_create" edge to the TokenCreate entity.
 func (tac *TokenAllowanceCreate) SetTokenCreate(t *TokenCreate) *TokenAllowanceCreate {
 	return tac.SetTokenCreateID(t.ID)
+}
+
+// AddTokenAllowanceSpendIDs adds the "token_allowance_spend" edge to the TokenAllowanceSpend entity by IDs.
+func (tac *TokenAllowanceCreate) AddTokenAllowanceSpendIDs(ids ...uuid.UUID) *TokenAllowanceCreate {
+	tac.mutation.AddTokenAllowanceSpendIDs(ids...)
+	return tac
+}
+
+// AddTokenAllowanceSpend adds the "token_allowance_spend" edges to the TokenAllowanceSpend entity.
+func (tac *TokenAllowanceCreate) AddTokenAllowanceSpend(t ...*TokenAllowanceSpend) *TokenAllowanceCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tac.AddTokenAllowanceSpendIDs(ids...)
 }
 
 // Mutation returns the TokenAllowanceMutation object of the builder.
@@ -490,6 +506,22 @@ func (tac *TokenAllowanceCreate) createSpec() (*TokenAllowance, *sqlgraph.Create
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.TokenCreateID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tac.mutation.TokenAllowanceSpendIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

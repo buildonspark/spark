@@ -189,7 +189,9 @@ func ValidateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload, suppo
 	if expiry == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("expiry_time is required"))
 	}
-	if !expiry.AsTime().After(time.Now()) {
+	// Validate the whole-second value that is actually signed (the statement hash covers Unix
+	// seconds) and enforced (the SO truncates the stored expiry to whole seconds).
+	if !expiry.AsTime().Truncate(time.Second).After(time.Now()) {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("expiry_time must be in the future"))
 	}
 

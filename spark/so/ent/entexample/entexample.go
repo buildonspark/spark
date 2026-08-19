@@ -3543,7 +3543,8 @@ type TokenAllowanceExample struct {
 	RevokeVersion                *uint64
 
 	// Edges - if set, use the provided entity; if nil, create a default one
-	TokenCreate *ent.TokenCreate
+	TokenCreate         *ent.TokenCreate
+	TokenAllowanceSpend []*ent.TokenAllowanceSpend
 }
 
 // NewTokenAllowanceExample creates a new TokenAllowanceExample for testing.
@@ -3665,6 +3666,18 @@ func (ta *TokenAllowanceExample) SetRevokeVersion(v uint64) *TokenAllowanceExamp
 // SetTokenCreate sets the token_create edge.
 func (ta *TokenAllowanceExample) SetTokenCreate(v *ent.TokenCreate) *TokenAllowanceExample {
 	ta.TokenCreate = v
+	return ta
+}
+
+// AddTokenAllowanceSpend adds a TokenAllowanceSpend to the token_allowance_spend edge.
+func (ta *TokenAllowanceExample) AddTokenAllowanceSpend(v *ent.TokenAllowanceSpend) *TokenAllowanceExample {
+	ta.TokenAllowanceSpend = append(ta.TokenAllowanceSpend, v)
+	return ta
+}
+
+// SetTokenAllowanceSpend sets the token_allowance_spend edge.
+func (ta *TokenAllowanceExample) SetTokenAllowanceSpend(v []*ent.TokenAllowanceSpend) *TokenAllowanceExample {
+	ta.TokenAllowanceSpend = v
 	return ta
 }
 
@@ -3790,6 +3803,9 @@ func (ta *TokenAllowanceExample) MustExec(ctx context.Context) *ent.TokenAllowan
 		ta.t.Helper()
 		ta.TokenCreate = NewTokenCreateExample(ta.t, ta.client).MustExec(ctx)
 		create.SetTokenCreate(ta.TokenCreate)
+	}
+	if len(ta.TokenAllowanceSpend) > 0 {
+		create.AddTokenAllowanceSpend(ta.TokenAllowanceSpend...)
 	}
 
 	entity, err := create.Save(ctx)
@@ -3926,6 +3942,147 @@ func (ta *TokenAllowanceExample) Exec(ctx context.Context) (*ent.TokenAllowance,
 			return nil, fmt.Errorf("failed to create token_create: %w", err)
 		}
 		create.SetTokenCreate(ta.TokenCreate)
+	}
+	if len(ta.TokenAllowanceSpend) > 0 {
+		create.AddTokenAllowanceSpend(ta.TokenAllowanceSpend...)
+	}
+
+	return create.Save(ctx)
+}
+
+// TokenAllowanceSpendExample is a test fixture builder for TokenAllowanceSpend.
+type TokenAllowanceSpendExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	TokenAllowanceID *uuid.UUID
+	MeteredAmount    *[]byte
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	TokenAllowance   *ent.TokenAllowance
+	TokenTransaction *ent.TokenTransaction
+}
+
+// NewTokenAllowanceSpendExample creates a new TokenAllowanceSpendExample for testing.
+func NewTokenAllowanceSpendExample(t *testing.T, client *ent.Client) *TokenAllowanceSpendExample {
+	return &TokenAllowanceSpendExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetTokenAllowanceID sets the token_allowance_id field.
+func (tas *TokenAllowanceSpendExample) SetTokenAllowanceID(v uuid.UUID) *TokenAllowanceSpendExample {
+	tas.TokenAllowanceID = &v
+	return tas
+}
+
+// SetMeteredAmount sets the metered_amount field.
+func (tas *TokenAllowanceSpendExample) SetMeteredAmount(v []byte) *TokenAllowanceSpendExample {
+	tas.MeteredAmount = &v
+	return tas
+}
+
+// SetTokenAllowance sets the token_allowance edge.
+func (tas *TokenAllowanceSpendExample) SetTokenAllowance(v *ent.TokenAllowance) *TokenAllowanceSpendExample {
+	tas.TokenAllowance = v
+	return tas
+}
+
+// SetTokenTransaction sets the token_transaction edge.
+func (tas *TokenAllowanceSpendExample) SetTokenTransaction(v *ent.TokenTransaction) *TokenAllowanceSpendExample {
+	tas.TokenTransaction = v
+	return tas
+}
+
+// MustExec builds and saves the TokenAllowanceSpend entity to the database.
+// It panics if the save fails.
+func (tas *TokenAllowanceSpendExample) MustExec(ctx context.Context) *ent.TokenAllowanceSpend {
+	create := tas.client.TokenAllowanceSpend.Create()
+
+	// Set fields
+	if tas.TokenAllowanceID != nil {
+		create.SetTokenAllowanceID(*tas.TokenAllowanceID)
+	} else {
+		// Use default from annotation
+		create.SetTokenAllowanceID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
+	}
+	if tas.MeteredAmount != nil {
+		create.SetMeteredAmount(*tas.MeteredAmount)
+	} else {
+		// Use default from annotation
+		create.SetMeteredAmount(func() []byte { b, _ := hex.DecodeString("00000000000000000000000000002710"); return b }())
+	}
+
+	// Handle edges
+	if tas.TokenAllowance != nil {
+		create.SetTokenAllowance(tas.TokenAllowance)
+	} else {
+		// Auto-create required edge
+		tas.t.Helper()
+		tas.TokenAllowance = NewTokenAllowanceExample(tas.t, tas.client).MustExec(ctx)
+		create.SetTokenAllowance(tas.TokenAllowance)
+	}
+	if tas.TokenTransaction != nil {
+		create.SetTokenTransaction(tas.TokenTransaction)
+	} else {
+		// Auto-create required edge
+		tas.t.Helper()
+		tas.TokenTransaction = NewTokenTransactionExample(tas.t, tas.client).MustExec(ctx)
+		create.SetTokenTransaction(tas.TokenTransaction)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		tas.t.Helper()
+		tas.t.Fatalf("failed to create TokenAllowanceSpend: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the TokenAllowanceSpend entity to the database.
+// It returns an error if the save fails.
+func (tas *TokenAllowanceSpendExample) Exec(ctx context.Context) (*ent.TokenAllowanceSpend, error) {
+	create := tas.client.TokenAllowanceSpend.Create()
+
+	// Set fields
+	if tas.TokenAllowanceID != nil {
+		create.SetTokenAllowanceID(*tas.TokenAllowanceID)
+	} else {
+		// Use default from annotation
+		create.SetTokenAllowanceID(uuid.MustParse("019a0ef8-5794-7677-af5f-d3948d691114"))
+	}
+	if tas.MeteredAmount != nil {
+		create.SetMeteredAmount(*tas.MeteredAmount)
+	} else {
+		// Use default from annotation
+		create.SetMeteredAmount(func() []byte { b, _ := hex.DecodeString("00000000000000000000000000002710"); return b }())
+	}
+
+	// Handle edges
+	if tas.TokenAllowance != nil {
+		create.SetTokenAllowance(tas.TokenAllowance)
+	} else {
+		// Auto-create required edge
+		var err error
+		tas.TokenAllowance, err = NewTokenAllowanceExample(tas.t, tas.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create token_allowance: %w", err)
+		}
+		create.SetTokenAllowance(tas.TokenAllowance)
+	}
+	if tas.TokenTransaction != nil {
+		create.SetTokenTransaction(tas.TokenTransaction)
+	} else {
+		// Auto-create required edge
+		var err error
+		tas.TokenTransaction, err = NewTokenTransactionExample(tas.t, tas.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create token_transaction: %w", err)
+		}
+		create.SetTokenTransaction(tas.TokenTransaction)
 	}
 
 	return create.Save(ctx)

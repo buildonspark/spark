@@ -214,6 +214,15 @@ message InvoiceAttachment {
     string spark_invoice = 1;
 }
 
+// A spender's authorization to spend an input TTXO under a delegated
+// allowance. Cited in place of the owner's own signature; the SO validates
+// spender_signature against the spender key recorded in the referenced
+// allowance rather than against the TTXO owner key.
+message AllowanceSignature {
+    bytes allowance_id = 1 [(validate.rules).bytes.len = 16];
+    multisig.KeyedSignature spender_signature = 2 [(validate.rules).message.required = true];
+}
+
 message SignatureWithIndex {
     // Deprecated: use authority_signatures instead.
     optional bytes signature = 1 [
@@ -223,10 +232,11 @@ message SignatureWithIndex {
     ];
     // The index of the TTXO associated with this signature.
     uint32 input_index = 2;
-    // Supports single-key or multisig signatures.
+    // Supports single-key, multisig, or delegated allowance signatures.
     oneof authority_signatures {
         multisig.KeyedSignature single_signature = 3;
         multisig.MultisigSignatureSet multisig_signatures = 4;
+        AllowanceSignature allowance_signature = 5;
     }
 }
 

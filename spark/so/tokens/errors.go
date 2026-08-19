@@ -88,6 +88,14 @@ const (
 	ErrInvalidSparkInvoice                = "invalid spark invoice"
 	ErrSparkInvoiceExpired                = "spark invoice expired"
 	ErrTransactionPreempted               = "transaction preempted"
+	ErrAllowanceNotFound                  = "token allowance not found"
+	ErrAllowanceRevoked                   = "token allowance has been revoked"
+	ErrAllowanceExpired                   = "token allowance has expired"
+	ErrAllowanceNotSpendable              = "token allowance is not in a spendable state"
+	ErrAllowanceExceedsPerTxCap           = "metered amount exceeds the allowance per-transaction cap"
+	ErrAllowanceBudgetExhausted           = "metered amount exceeds the allowance remaining budget"
+	ErrAllowanceRecipientNotAllowed       = "output recipient is not in the allowance recipient allowlist"
+	ErrAllowanceMixedAuthorization        = "transaction mixes allowance-authorized and owner-signed inputs"
 )
 
 func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransaction, err error) error {

@@ -801,6 +801,48 @@ var (
 			},
 		},
 	}
+	// TokenAllowanceSpendsColumns holds the columns for the "token_allowance_spends" table.
+	TokenAllowanceSpendsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "metered_amount", Type: field.TypeBytes},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"RESERVED", "RELEASED"}, Default: "RESERVED"},
+		{Name: "token_allowance_id", Type: field.TypeUUID},
+		{Name: "token_allowance_spend_token_transaction", Type: field.TypeUUID},
+	}
+	// TokenAllowanceSpendsTable holds the schema information for the "token_allowance_spends" table.
+	TokenAllowanceSpendsTable = &schema.Table{
+		Name:       "token_allowance_spends",
+		Columns:    TokenAllowanceSpendsColumns,
+		PrimaryKey: []*schema.Column{TokenAllowanceSpendsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_allowance_spends_token_allowances_token_allowance_spend",
+				Columns:    []*schema.Column{TokenAllowanceSpendsColumns[5]},
+				RefColumns: []*schema.Column{TokenAllowancesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "token_allowance_spends_token_transactions_token_transaction",
+				Columns:    []*schema.Column{TokenAllowanceSpendsColumns[6]},
+				RefColumns: []*schema.Column{TokenTransactionsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokenallowancespend_unique_token_transaction",
+				Unique:  true,
+				Columns: []*schema.Column{TokenAllowanceSpendsColumns[6]},
+			},
+			{
+				Name:    "tokenallowancespend_token_allowance_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{TokenAllowanceSpendsColumns[5], TokenAllowanceSpendsColumns[4]},
+			},
+		},
+	}
 	// TokenCreatesColumns holds the columns for the "token_creates" table.
 	TokenCreatesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -2203,6 +2245,7 @@ var (
 		SigningNoncesTable,
 		SparkInvoicesTable,
 		TokenAllowancesTable,
+		TokenAllowanceSpendsTable,
 		TokenCreatesTable,
 		TokenFreezesTable,
 		TokenMintsTable,
@@ -2242,6 +2285,8 @@ func init() {
 	PreimageSharePartnersTable.ForeignKeys[0].RefTable = PartnersTable
 	PreimageSharePartnersTable.ForeignKeys[1].RefTable = PreimageSharesTable
 	TokenAllowancesTable.ForeignKeys[0].RefTable = TokenCreatesTable
+	TokenAllowanceSpendsTable.ForeignKeys[0].RefTable = TokenAllowancesTable
+	TokenAllowanceSpendsTable.ForeignKeys[1].RefTable = TokenTransactionsTable
 	TokenCreatesTable.ForeignKeys[0].RefTable = L1tokenCreatesTable
 	TokenFreezesTable.ForeignKeys[0].RefTable = TokenCreatesTable
 	TokenOutputsTable.ForeignKeys[0].RefTable = TokenCreatesTable

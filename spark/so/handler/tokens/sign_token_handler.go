@@ -389,6 +389,12 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 		if err := validateNoActiveFreezesForOutputs(ctx, spentOutputs); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("frozen transfer cannot exchange revocation secrets", tokenTransaction, err)
 		}
+		// Pre-reveal allowance checkpoint, same enforcement window as freeze: once REVEALED or
+		// FINALIZED the exchange must complete, but before that an allowance that can no longer
+		// authorize the spend blocks it.
+		if err := validateAllowanceNotRevokedForTransactionHash(ctx, tokenTransactionHash); err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto(allowanceExchangeBlockedMessage(err), tokenTransaction, err)
+		}
 	}
 
 	revocationSecretShares, err := h.prepareRevocationSecretSharesForExchange(ctx, tokenTransaction)

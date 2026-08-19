@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -740,6 +741,25 @@ func init() {
 	tokenallowanceDescID := tokenallowanceMixinFields0[0].Descriptor()
 	// tokenallowance.DefaultID holds the default value on creation for the id field.
 	tokenallowance.DefaultID = tokenallowanceDescID.Default.(func() uuid.UUID)
+	tokenallowancespendMixin := schema.TokenAllowanceSpend{}.Mixin()
+	tokenallowancespendMixinFields0 := tokenallowancespendMixin[0].Fields()
+	_ = tokenallowancespendMixinFields0
+	tokenallowancespendFields := schema.TokenAllowanceSpend{}.Fields()
+	_ = tokenallowancespendFields
+	// tokenallowancespendDescCreateTime is the schema descriptor for create_time field.
+	tokenallowancespendDescCreateTime := tokenallowancespendMixinFields0[1].Descriptor()
+	// tokenallowancespend.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokenallowancespend.DefaultCreateTime = tokenallowancespendDescCreateTime.Default.(func() time.Time)
+	// tokenallowancespendDescUpdateTime is the schema descriptor for update_time field.
+	tokenallowancespendDescUpdateTime := tokenallowancespendMixinFields0[2].Descriptor()
+	// tokenallowancespend.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokenallowancespend.DefaultUpdateTime = tokenallowancespendDescUpdateTime.Default.(func() time.Time)
+	// tokenallowancespend.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokenallowancespend.UpdateDefaultUpdateTime = tokenallowancespendDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenallowancespendDescID is the schema descriptor for id field.
+	tokenallowancespendDescID := tokenallowancespendMixinFields0[0].Descriptor()
+	// tokenallowancespend.DefaultID holds the default value on creation for the id field.
+	tokenallowancespend.DefaultID = tokenallowancespendDescID.Default.(func() uuid.UUID)
 	tokencreateMixin := schema.TokenCreate{}.Mixin()
 	tokencreateMixinFields0 := tokencreateMixin[0].Fields()
 	_ = tokencreateMixinFields0

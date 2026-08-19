@@ -38,6 +38,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -142,6 +143,7 @@ func checkColumn(table, column string) error {
 			signingnonce.Table:                      signingnonce.ValidColumn,
 			sparkinvoice.Table:                      sparkinvoice.ValidColumn,
 			tokenallowance.Table:                    tokenallowance.ValidColumn,
+			tokenallowancespend.Table:               tokenallowancespend.ValidColumn,
 			tokencreate.Table:                       tokencreate.ValidColumn,
 			tokenfreeze.Table:                       tokenfreeze.ValidColumn,
 			tokenmint.Table:                         tokenmint.ValidColumn,

@@ -42,6 +42,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -121,6 +122,8 @@ type Client struct {
 	SparkInvoice *SparkInvoiceClient
 	// TokenAllowance is the client for interacting with the TokenAllowance builders.
 	TokenAllowance *TokenAllowanceClient
+	// TokenAllowanceSpend is the client for interacting with the TokenAllowanceSpend builders.
+	TokenAllowanceSpend *TokenAllowanceSpendClient
 	// TokenCreate is the client for interacting with the TokenCreate builders.
 	TokenCreate *TokenCreateClient
 	// TokenFreeze is the client for interacting with the TokenFreeze builders.
@@ -194,6 +197,7 @@ func (c *Client) init() {
 	c.SigningNonce = NewSigningNonceClient(c.config)
 	c.SparkInvoice = NewSparkInvoiceClient(c.config)
 	c.TokenAllowance = NewTokenAllowanceClient(c.config)
+	c.TokenAllowanceSpend = NewTokenAllowanceSpendClient(c.config)
 	c.TokenCreate = NewTokenCreateClient(c.config)
 	c.TokenFreeze = NewTokenFreezeClient(c.config)
 	c.TokenMint = NewTokenMintClient(c.config)
@@ -330,6 +334,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		SigningNonce:                      NewSigningNonceClient(cfg),
 		SparkInvoice:                      NewSparkInvoiceClient(cfg),
 		TokenAllowance:                    NewTokenAllowanceClient(cfg),
+		TokenAllowanceSpend:               NewTokenAllowanceSpendClient(cfg),
 		TokenCreate:                       NewTokenCreateClient(cfg),
 		TokenFreeze:                       NewTokenFreezeClient(cfg),
 		TokenMint:                         NewTokenMintClient(cfg),
@@ -393,6 +398,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		SigningNonce:                      NewSigningNonceClient(cfg),
 		SparkInvoice:                      NewSparkInvoiceClient(cfg),
 		TokenAllowance:                    NewTokenAllowanceClient(cfg),
+		TokenAllowanceSpend:               NewTokenAllowanceSpendClient(cfg),
 		TokenCreate:                       NewTokenCreateClient(cfg),
 		TokenFreeze:                       NewTokenFreezeClient(cfg),
 		TokenMint:                         NewTokenMintClient(cfg),
@@ -447,8 +453,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
 		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
 		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenAllowance,
-		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
-		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
+		c.TokenAllowanceSpend, c.TokenCreate, c.TokenFreeze, c.TokenMint,
+		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
 		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
@@ -468,8 +474,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
 		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
 		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenAllowance,
-		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
-		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
+		c.TokenAllowanceSpend, c.TokenCreate, c.TokenFreeze, c.TokenMint,
+		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
 		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
 		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
@@ -533,6 +539,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SparkInvoice.mutate(ctx, m)
 	case *TokenAllowanceMutation:
 		return c.TokenAllowance.mutate(ctx, m)
+	case *TokenAllowanceSpendMutation:
+		return c.TokenAllowanceSpend.mutate(ctx, m)
 	case *TokenCreateMutation:
 		return c.TokenCreate.mutate(ctx, m)
 	case *TokenFreezeMutation:
@@ -4460,6 +4468,22 @@ func (c *TokenAllowanceClient) QueryTokenCreate(ta *TokenAllowance) *TokenCreate
 	return query
 }
 
+// QueryTokenAllowanceSpend queries the token_allowance_spend edge of a TokenAllowance.
+func (c *TokenAllowanceClient) QueryTokenAllowanceSpend(ta *TokenAllowance) *TokenAllowanceSpendQuery {
+	query := (&TokenAllowanceSpendClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ta.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenallowance.Table, tokenallowance.FieldID, id),
+			sqlgraph.To(tokenallowancespend.Table, tokenallowancespend.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, tokenallowance.TokenAllowanceSpendTable, tokenallowance.TokenAllowanceSpendColumn),
+		)
+		fromV = sqlgraph.Neighbors(ta.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *TokenAllowanceClient) Hooks() []Hook {
 	return c.hooks.TokenAllowance
@@ -4482,6 +4506,171 @@ func (c *TokenAllowanceClient) mutate(ctx context.Context, m *TokenAllowanceMuta
 		return (&TokenAllowanceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown TokenAllowance mutation op: %q", m.Op())
+	}
+}
+
+// TokenAllowanceSpendClient is a client for the TokenAllowanceSpend schema.
+type TokenAllowanceSpendClient struct {
+	config
+}
+
+// NewTokenAllowanceSpendClient returns a client for the TokenAllowanceSpend from the given config.
+func NewTokenAllowanceSpendClient(c config) *TokenAllowanceSpendClient {
+	return &TokenAllowanceSpendClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tokenallowancespend.Hooks(f(g(h())))`.
+func (c *TokenAllowanceSpendClient) Use(hooks ...Hook) {
+	c.hooks.TokenAllowanceSpend = append(c.hooks.TokenAllowanceSpend, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tokenallowancespend.Intercept(f(g(h())))`.
+func (c *TokenAllowanceSpendClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TokenAllowanceSpend = append(c.inters.TokenAllowanceSpend, interceptors...)
+}
+
+// Create returns a builder for creating a TokenAllowanceSpend entity.
+func (c *TokenAllowanceSpendClient) Create() *TokenAllowanceSpendCreate {
+	mutation := newTokenAllowanceSpendMutation(c.config, OpCreate)
+	return &TokenAllowanceSpendCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TokenAllowanceSpend entities.
+func (c *TokenAllowanceSpendClient) CreateBulk(builders ...*TokenAllowanceSpendCreate) *TokenAllowanceSpendCreateBulk {
+	return &TokenAllowanceSpendCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TokenAllowanceSpendClient) MapCreateBulk(slice any, setFunc func(*TokenAllowanceSpendCreate, int)) *TokenAllowanceSpendCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TokenAllowanceSpendCreateBulk{err: fmt.Errorf("calling to TokenAllowanceSpendClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TokenAllowanceSpendCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TokenAllowanceSpendCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TokenAllowanceSpend.
+func (c *TokenAllowanceSpendClient) Update() *TokenAllowanceSpendUpdate {
+	mutation := newTokenAllowanceSpendMutation(c.config, OpUpdate)
+	return &TokenAllowanceSpendUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TokenAllowanceSpendClient) UpdateOne(tas *TokenAllowanceSpend) *TokenAllowanceSpendUpdateOne {
+	mutation := newTokenAllowanceSpendMutation(c.config, OpUpdateOne, withTokenAllowanceSpend(tas))
+	return &TokenAllowanceSpendUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TokenAllowanceSpendClient) UpdateOneID(id uuid.UUID) *TokenAllowanceSpendUpdateOne {
+	mutation := newTokenAllowanceSpendMutation(c.config, OpUpdateOne, withTokenAllowanceSpendID(id))
+	return &TokenAllowanceSpendUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TokenAllowanceSpend.
+func (c *TokenAllowanceSpendClient) Delete() *TokenAllowanceSpendDelete {
+	mutation := newTokenAllowanceSpendMutation(c.config, OpDelete)
+	return &TokenAllowanceSpendDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TokenAllowanceSpendClient) DeleteOne(tas *TokenAllowanceSpend) *TokenAllowanceSpendDeleteOne {
+	return c.DeleteOneID(tas.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TokenAllowanceSpendClient) DeleteOneID(id uuid.UUID) *TokenAllowanceSpendDeleteOne {
+	builder := c.Delete().Where(tokenallowancespend.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TokenAllowanceSpendDeleteOne{builder}
+}
+
+// Query returns a query builder for TokenAllowanceSpend.
+func (c *TokenAllowanceSpendClient) Query() *TokenAllowanceSpendQuery {
+	return &TokenAllowanceSpendQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTokenAllowanceSpend},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TokenAllowanceSpend entity by its id.
+func (c *TokenAllowanceSpendClient) Get(ctx context.Context, id uuid.UUID) (*TokenAllowanceSpend, error) {
+	return c.Query().Where(tokenallowancespend.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TokenAllowanceSpendClient) GetX(ctx context.Context, id uuid.UUID) *TokenAllowanceSpend {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTokenAllowance queries the token_allowance edge of a TokenAllowanceSpend.
+func (c *TokenAllowanceSpendClient) QueryTokenAllowance(tas *TokenAllowanceSpend) *TokenAllowanceQuery {
+	query := (&TokenAllowanceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tas.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenallowancespend.Table, tokenallowancespend.FieldID, id),
+			sqlgraph.To(tokenallowance.Table, tokenallowance.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, tokenallowancespend.TokenAllowanceTable, tokenallowancespend.TokenAllowanceColumn),
+		)
+		fromV = sqlgraph.Neighbors(tas.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTokenTransaction queries the token_transaction edge of a TokenAllowanceSpend.
+func (c *TokenAllowanceSpendClient) QueryTokenTransaction(tas *TokenAllowanceSpend) *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tas.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenallowancespend.Table, tokenallowancespend.FieldID, id),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokenallowancespend.TokenTransactionTable, tokenallowancespend.TokenTransactionColumn),
+		)
+		fromV = sqlgraph.Neighbors(tas.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TokenAllowanceSpendClient) Hooks() []Hook {
+	return c.hooks.TokenAllowanceSpend
+}
+
+// Interceptors returns the client interceptors.
+func (c *TokenAllowanceSpendClient) Interceptors() []Interceptor {
+	return c.inters.TokenAllowanceSpend
+}
+
+func (c *TokenAllowanceSpendClient) mutate(ctx context.Context, m *TokenAllowanceSpendMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TokenAllowanceSpendCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TokenAllowanceSpendUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TokenAllowanceSpendUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TokenAllowanceSpendDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TokenAllowanceSpend mutation op: %q", m.Op())
 	}
 }
 
@@ -7791,7 +7980,7 @@ type (
 		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
 		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
 		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenAllowance,
-		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenAllowanceSpend, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
 		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,
@@ -7804,7 +7993,7 @@ type (
 		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
 		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
 		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenAllowance,
-		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenAllowanceSpend, TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, TransferPartner,
 		TransferReceiver, TransferSender, Tree, TreeNode, UserSignedTransaction, Utxo,

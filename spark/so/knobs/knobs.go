@@ -131,11 +131,16 @@ const (
 	// transactions on behalf of any identity, bypassing the sender identity check.
 	// Use as a per-pubkey target: spark.so.tokens.broadcast_allowed_pubkeys@<identityPubKeyHex> = 1
 	KnobTokenBroadcastAllowedPubkeys = "spark.so.tokens.broadcast_allowed_pubkeys"
-	// KnobTokenAllowancesEnabled gates the token spending allowance lifecycle RPCs
-	// (create/revoke/query). When disabled (0), the public and internal allowance
-	// methods return UnimplementedMethodDisabled; when enabled they apply locally,
-	// commit, and fan the grant out to every other operator. Binary killswitch:
-	// 0 = off, any non-zero value = on.
+	// KnobTokenAllowancesEnabled gates token spending allowance creation and query
+	// plus delegated spends. When disabled (0), those methods return
+	// UnimplementedMethodDisabled. Binary killswitch evaluated deterministically:
+	// any non-zero value enables. Never a percentage rollout - operators must agree
+	// on the gate for every call in a flow. Revocation is deliberately NOT gated:
+	// disabling the feature must block new allowances and delegated spends without
+	// ever stranding an owner who needs to revoke an existing allowance. The gate is
+	// applied when a spend is metered, so disabling it blocks new delegated spends
+	// while already-metered ones drain to a terminal state rather than stranding
+	// reserved budget.
 	KnobTokenAllowancesEnabled = "spark.so.tokens.allowances_enabled"
 	// KnobTokenMaxActiveAllowancesPerOwner caps the number of ACTIVE token
 	// allowances a single owner may hold across all spenders and tokens. The

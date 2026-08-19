@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/common/multisig"
 	multisigpb "github.com/lightsparkdev/spark/proto/multisig"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	"github.com/lightsparkdev/spark/so/ent"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -20,7 +21,9 @@ func validateDeprecatedSignatureConsistency(sig *tokenpb.SignatureWithIndex) err
 		return nil
 	}
 	switch sig.GetAuthoritySignatures().(type) {
-	case *tokenpb.SignatureWithIndex_MultisigSignatures, *tokenpb.SignatureWithIndex_SingleSignature:
+	case *tokenpb.SignatureWithIndex_MultisigSignatures,
+		*tokenpb.SignatureWithIndex_SingleSignature,
+		*tokenpb.SignatureWithIndex_AllowanceSignature:
 		return sparkerrors.InvalidArgumentMalformedField(
 			fmt.Errorf("deprecated signature field must not be set when authority_signatures oneof is populated"))
 	}
@@ -65,6 +68,13 @@ func ValidateOwnershipSignatureFromAuthority(
 			return err
 		}
 		return validateMultisigIncludesOwnerSignature(v.MultisigSignatures, ownerPublicKey)
+	case *tokenpb.SignatureWithIndex_AllowanceSignature:
+		// Default-reject: delegated allowance signatures are only meaningful for transfer
+		// inputs, and only via ValidateOwnershipOrAllowanceSignature with a loaded allowance.
+		// Every other caller (mint, create, freeze, issuer flows) must never accept this arm
+		// as a substitute for the owner/issuer key.
+		return sparkerrors.FailedPreconditionBadSignature(
+			fmt.Errorf("allowance signatures are not valid in this context"))
 	default:
 		// Backwards compat: fall back to deprecated signature field.
 		if len(sig.GetSignature()) > 0 {
@@ -72,6 +82,32 @@ func ValidateOwnershipSignatureFromAuthority(
 		}
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signature provided in SignatureWithIndex"))
 	}
+}
+
+// ValidateOwnershipOrAllowanceSignature validates a transfer-input signature that may be either
+// an owner signature or a delegated allowance signature. Owner arms (single, multisig, deprecated
+// field) delegate to ValidateOwnershipSignatureFromAuthority against ownerPublicKey. The allowance
+// arm requires a non-nil allowance and validates the spender signature against the spender key
+// recorded on the grant. Callers are responsible for policy checks on the allowance itself
+// (status, expiry, metering); this function only establishes who signed.
+func ValidateOwnershipOrAllowanceSignature(
+	ctx context.Context,
+	sig *tokenpb.SignatureWithIndex,
+	hash []byte,
+	ownerPublicKey keys.Public,
+	allowance *ent.TokenAllowance,
+) error {
+	if allowanceSig, ok := sig.GetAuthoritySignatures().(*tokenpb.SignatureWithIndex_AllowanceSignature); ok {
+		if err := validateDeprecatedSignatureConsistency(sig); err != nil {
+			return err
+		}
+		if allowance == nil {
+			return sparkerrors.FailedPreconditionBadSignature(
+				fmt.Errorf("allowance signature provided but no allowance is loaded for this transaction"))
+		}
+		return validateAllowanceSignature(ctx, allowanceSig.AllowanceSignature, hash, allowance)
+	}
+	return ValidateOwnershipSignatureFromAuthority(ctx, sig, hash, ownerPublicKey)
 }
 
 // validateMultisigFromProvidedConfig validates multisig signatures using

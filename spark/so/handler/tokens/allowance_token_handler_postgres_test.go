@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -292,6 +293,39 @@ func TestCreateTokenAllowance_TruncatesExpiryToSignedSeconds(t *testing.T) {
 	require.Len(t, queryResp.GetAllowances(), 1)
 	queriedExpiry := queryResp.GetAllowances()[0].GetAllowancePayload().GetExpiryTime().AsTime()
 	assert.True(t, expectedExpiry.Equal(queriedExpiry), "queried expiry %s must equal signed expiry %s", queriedExpiry, expectedExpiry)
+}
+
+// The signed statement hash covers the expiry as whole Unix seconds, so an intermediary can
+// alter the sub-second component without invalidating the owner signature. The SO must never
+// persist or enforce more expiry precision than the owner actually signed.
+func TestCreateTokenAllowance_ExpiryNanosecondsCannotDivergeFromSignedValue(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+	signedExpiry := time.Now().Add(24 * time.Hour).Truncate(time.Second)
+	payload.ExpiryTime = timestamppb.New(signedExpiry)
+	ownerSignature := signCreateAllowance(t, payload, allowanceOwnerKey)
+
+	// An intermediary bumps the sub-second component of the expiry; the hash - and thus the
+	// owner signature - still verifies over the tampered payload.
+	tampered := proto.CloneOf(payload)
+	tampered.ExpiryTime = timestamppb.New(signedExpiry.Add(400 * time.Millisecond))
+	originalHash, err := utils.HashCreateTokenAllowancePayload(payload)
+	require.NoError(t, err)
+	tamperedHash, err := utils.HashCreateTokenAllowancePayload(tampered)
+	require.NoError(t, err)
+	require.Equal(t, originalHash, tamperedHash, "sub-second expiry changes are invisible to the signature")
+
+	require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, tampered, ownerSignature))
+
+	dbtx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := dbtx.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(ctx)
+	require.NoError(t, err)
+	assert.True(t, row.ExpiryTime.Equal(signedExpiry),
+		"enforced expiry %s must be exactly the signed whole-second value %s", row.ExpiryTime, signedExpiry)
 }
 
 func TestCreateTokenAllowance_RejectsInvalidOwnerSignature(t *testing.T) {
@@ -751,17 +785,26 @@ func TestRevokeTokenAllowance_SucceedsWhenKnobDisabled(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	knobOffCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobTokenAllowancesEnabled: 0.0,
+	disabledCtx := knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenAllowancesEnabled: 0,
 	}))
-	revokeTimestamp := recentTimestamp(10 * time.Second)
-	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), revokeTimestamp)
-	resp, err := handler.RevokeTokenAllowance(knobOffCtx, &tokenpb.RevokeTokenAllowanceRequest{
+
+	// Creating a second allowance is blocked while disabled...
+	blockedID := uuid.New()
+	blockedPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), blockedID, recentTimestamp(10*time.Second))
+	_, err = handler.CreateTokenAllowance(disabledCtx, &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: blockedPayload,
+		OwnerSignature:   signCreateAllowance(t, blockedPayload, allowanceOwnerKey),
+	})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+
+	// ...but revoking the existing one still lands and tombstones it.
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), recentTimestamp(10*time.Second))
+	_, err = handler.RevokeTokenAllowance(disabledCtx, &tokenpb.RevokeTokenAllowanceRequest{
 		RevokeAllowancePayload: revokePayload,
 		OwnerSignature:         signRevokeAllowance(t, revokePayload, allowanceOwnerKey),
 	})
 	require.NoError(t, err)
-	require.NotNil(t, resp.GetAllowanceProgress())
 
 	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
 	require.NoError(t, err)

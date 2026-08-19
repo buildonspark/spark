@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
+	"github.com/lightsparkdev/spark/so/ent/tokenallowancespend"
 )
 
 // TokenAllowanceUpdate is the builder for updating TokenAllowance entities.
@@ -143,9 +144,45 @@ func (tau *TokenAllowanceUpdate) ClearRevokeVersion() *TokenAllowanceUpdate {
 	return tau
 }
 
+// AddTokenAllowanceSpendIDs adds the "token_allowance_spend" edge to the TokenAllowanceSpend entity by IDs.
+func (tau *TokenAllowanceUpdate) AddTokenAllowanceSpendIDs(ids ...uuid.UUID) *TokenAllowanceUpdate {
+	tau.mutation.AddTokenAllowanceSpendIDs(ids...)
+	return tau
+}
+
+// AddTokenAllowanceSpend adds the "token_allowance_spend" edges to the TokenAllowanceSpend entity.
+func (tau *TokenAllowanceUpdate) AddTokenAllowanceSpend(t ...*TokenAllowanceSpend) *TokenAllowanceUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tau.AddTokenAllowanceSpendIDs(ids...)
+}
+
 // Mutation returns the TokenAllowanceMutation object of the builder.
 func (tau *TokenAllowanceUpdate) Mutation() *TokenAllowanceMutation {
 	return tau.mutation
+}
+
+// ClearTokenAllowanceSpend clears all "token_allowance_spend" edges to the TokenAllowanceSpend entity.
+func (tau *TokenAllowanceUpdate) ClearTokenAllowanceSpend() *TokenAllowanceUpdate {
+	tau.mutation.ClearTokenAllowanceSpend()
+	return tau
+}
+
+// RemoveTokenAllowanceSpendIDs removes the "token_allowance_spend" edge to TokenAllowanceSpend entities by IDs.
+func (tau *TokenAllowanceUpdate) RemoveTokenAllowanceSpendIDs(ids ...uuid.UUID) *TokenAllowanceUpdate {
+	tau.mutation.RemoveTokenAllowanceSpendIDs(ids...)
+	return tau
+}
+
+// RemoveTokenAllowanceSpend removes "token_allowance_spend" edges to TokenAllowanceSpend entities.
+func (tau *TokenAllowanceUpdate) RemoveTokenAllowanceSpend(t ...*TokenAllowanceSpend) *TokenAllowanceUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tau.RemoveTokenAllowanceSpendIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -256,6 +293,51 @@ func (tau *TokenAllowanceUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if tau.mutation.RevokeVersionCleared() {
 		_spec.ClearField(tokenallowance.FieldRevokeVersion, field.TypeUint64)
+	}
+	if tau.mutation.TokenAllowanceSpendCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tau.mutation.RemovedTokenAllowanceSpendIDs(); len(nodes) > 0 && !tau.mutation.TokenAllowanceSpendCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tau.mutation.TokenAllowanceSpendIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(tau.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tau.driver, _spec); err != nil {
@@ -391,9 +473,45 @@ func (tauo *TokenAllowanceUpdateOne) ClearRevokeVersion() *TokenAllowanceUpdateO
 	return tauo
 }
 
+// AddTokenAllowanceSpendIDs adds the "token_allowance_spend" edge to the TokenAllowanceSpend entity by IDs.
+func (tauo *TokenAllowanceUpdateOne) AddTokenAllowanceSpendIDs(ids ...uuid.UUID) *TokenAllowanceUpdateOne {
+	tauo.mutation.AddTokenAllowanceSpendIDs(ids...)
+	return tauo
+}
+
+// AddTokenAllowanceSpend adds the "token_allowance_spend" edges to the TokenAllowanceSpend entity.
+func (tauo *TokenAllowanceUpdateOne) AddTokenAllowanceSpend(t ...*TokenAllowanceSpend) *TokenAllowanceUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tauo.AddTokenAllowanceSpendIDs(ids...)
+}
+
 // Mutation returns the TokenAllowanceMutation object of the builder.
 func (tauo *TokenAllowanceUpdateOne) Mutation() *TokenAllowanceMutation {
 	return tauo.mutation
+}
+
+// ClearTokenAllowanceSpend clears all "token_allowance_spend" edges to the TokenAllowanceSpend entity.
+func (tauo *TokenAllowanceUpdateOne) ClearTokenAllowanceSpend() *TokenAllowanceUpdateOne {
+	tauo.mutation.ClearTokenAllowanceSpend()
+	return tauo
+}
+
+// RemoveTokenAllowanceSpendIDs removes the "token_allowance_spend" edge to TokenAllowanceSpend entities by IDs.
+func (tauo *TokenAllowanceUpdateOne) RemoveTokenAllowanceSpendIDs(ids ...uuid.UUID) *TokenAllowanceUpdateOne {
+	tauo.mutation.RemoveTokenAllowanceSpendIDs(ids...)
+	return tauo
+}
+
+// RemoveTokenAllowanceSpend removes "token_allowance_spend" edges to TokenAllowanceSpend entities.
+func (tauo *TokenAllowanceUpdateOne) RemoveTokenAllowanceSpend(t ...*TokenAllowanceSpend) *TokenAllowanceUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tauo.RemoveTokenAllowanceSpendIDs(ids...)
 }
 
 // Where appends a list predicates to the TokenAllowanceUpdate builder.
@@ -534,6 +652,51 @@ func (tauo *TokenAllowanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenA
 	}
 	if tauo.mutation.RevokeVersionCleared() {
 		_spec.ClearField(tokenallowance.FieldRevokeVersion, field.TypeUint64)
+	}
+	if tauo.mutation.TokenAllowanceSpendCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tauo.mutation.RemovedTokenAllowanceSpendIDs(); len(nodes) > 0 && !tauo.mutation.TokenAllowanceSpendCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tauo.mutation.TokenAllowanceSpendIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   tokenallowance.TokenAllowanceSpendTable,
+			Columns: []string{tokenallowance.TokenAllowanceSpendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenallowancespend.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(tauo.modifiers...)
 	_node = &TokenAllowance{config: tauo.config}

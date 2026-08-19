@@ -1017,6 +1017,29 @@ func HasTokenCreateWith(preds ...predicate.TokenCreate) predicate.TokenAllowance
 	})
 }
 
+// HasTokenAllowanceSpend applies the HasEdge predicate on the "token_allowance_spend" edge.
+func HasTokenAllowanceSpend() predicate.TokenAllowance {
+	return predicate.TokenAllowance(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, TokenAllowanceSpendTable, TokenAllowanceSpendColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTokenAllowanceSpendWith applies the HasEdge predicate on the "token_allowance_spend" edge with a given conditions (other predicates).
+func HasTokenAllowanceSpendWith(preds ...predicate.TokenAllowanceSpend) predicate.TokenAllowance {
+	return predicate.TokenAllowance(func(s *sql.Selector) {
+		step := newTokenAllowanceSpendStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.TokenAllowance) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.AndPredicates(predicates...))
