@@ -11,9 +11,11 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/protohash"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/consensus"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -73,10 +75,151 @@ func (h *BroadcastTokenHandler) BroadcastTokenTransaction(
 		return nil, err
 	}
 
+	// Route CREATE through the 2PC consensus engine when enabled; mint and
+	// transfer stay on the legacy pipeline regardless of the knob.
+	if partial.GetCreateInput() != nil && knobService != nil && knobService.GetValue(knobs.KnobUseConsensusTokenCreate, 0) > 0 {
+		return h.broadcastCreateTokenTransactionConsensus(ctx, req)
+	}
+
 	if knobService != nil && knobService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2Enabled, 0) {
 		return h.broadcastTokenTransactionPhase2(ctx, req)
 	}
 	return h.broadcastTokenTransactionPhase1(ctx, req)
+}
+
+// validateBroadcastedPartialTransaction runs the coordinator-side validation
+// shared by the legacy phase-2 path and the consensus create path: broadcast
+// policy + kill switch for the declared identity, partial-transaction
+// validation against this SO's operator list and network config (mirrors
+// StartTokenTransaction), and the execute_before window check. Returns the
+// partial converted to the legacy V2 wire shape for the shared downstream
+// validation/persistence helpers.
+// TODO(SPARK-334): After the switch to require V3+ transactions, stop
+// converting to V2 shape and just use the partial directly for all logic.
+func (h *BroadcastTokenHandler) validateBroadcastedPartialTransaction(
+	ctx context.Context,
+	req *tokenpb.BroadcastTransactionRequest,
+) (*tokenpb.TokenTransaction, error) {
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
+	}
+	if err := enforceBroadcastPolicy(ctx, h.config, idPubKey); err != nil {
+		return nil, err
+	}
+
+	partial := req.GetPartialTokenTransaction()
+	metadata := partial.GetTokenTransactionMetadata()
+	// Defensive: BroadcastTokenTransaction already rejected nil metadata
+	// before routing here.
+	if metadata == nil {
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction metadata is required"))
+	}
+
+	partialTxV2Shape, err := protoconverter.ConvertPartialToV2TxShape(partial)
+	if err != nil {
+		return nil, err
+	}
+
+	network, err := btcnetwork.FromProtoNetwork(metadata.GetNetwork())
+	if err != nil {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err))
+	}
+	lrc20Config := h.config.Lrc20Configs[strings.ToLower(network.String())]
+	if err := utils.ValidatePartialTokenTransaction(
+		ctx,
+		partialTxV2Shape,
+		req.GetTokenTransactionOwnerSignatures(),
+		h.config.GetSigningOperatorList(),
+		h.config.SupportedNetworks,
+		lrc20Config.WithdrawBondSats,
+		lrc20Config.WithdrawRelativeBlockLocktime,
+	); err != nil {
+		return nil, err
+	}
+
+	if partial.GetExecuteBefore() != nil {
+		clientCreatedTs := metadata.GetClientCreatedTimestamp().AsTime()
+		if err := utils.ValidateExecuteBefore(new(partial.GetExecuteBefore().AsTime()), clientCreatedTs, spark.TokenMaxExecuteBeforeWindow); err != nil {
+			return nil, err
+		}
+	}
+	return partialTxV2Shape, nil
+}
+
+// broadcastCreateTokenTransactionConsensus routes a CREATE broadcast through
+// the 2PC consensus engine (KnobUseConsensusTokenCreate). Coordinator-only
+// work that needs the user session stays here — broadcast policy + kill
+// switch, partial validation, idempotency by partial hash, final transaction
+// construction — mirroring broadcastTokenTransactionPhase2 up to its local
+// sign step; the engine then drives Prepare on every SO (each independently
+// re-validating and signing), the atomic commit decision, and gossip
+// settlement, replacing the sign fanout, the empty-share finalize fanout, and
+// the 30s retry cron.
+func (h *BroadcastTokenHandler) broadcastCreateTokenTransactionConsensus(
+	ctx context.Context,
+	req *tokenpb.BroadcastTransactionRequest,
+) (*tokenpb.BroadcastTransactionResponse, error) {
+	if _, err := h.validateBroadcastedPartialTransaction(ctx, req); err != nil {
+		return nil, err
+	}
+	partial := req.GetPartialTokenTransaction()
+
+	// The partial hash must be computed before constructFinalTokenTransaction:
+	// that call fills CreationEntityPublicKey on the request's own CreateInput
+	// submessage (the final tx aliases it), and the partial the client signed
+	// has that field empty. Same ordering discipline as phase 2.
+	partialHash, err := protohash.Hash(partial)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash partial token transaction: %w", err)
+	}
+	existingPartialTx, err := ent.FetchPartialTokenTransactionData(ctx, partialHash)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to fetch partial token transaction: %w", err)
+	}
+	if existingPartialTx != nil {
+		// CREATEs are never resubmittable under the same partial hash
+		// (isExistingPartialTransactionResubmittable applies to transfers
+		// only): report the existing transaction's status instead.
+		return h.handleExistingTransaction(ctx, existingPartialTx)
+	}
+
+	finalTx, _, err := h.constructFinalTokenTransaction(ctx, partial)
+	if err != nil {
+		return nil, err
+	}
+	legacyTokenTx, err := protoconverter.ConvertFinalToV2TxShape(finalTx)
+	if err != nil {
+		return nil, err
+	}
+	// execute_before is already carried through constructFinalTokenTransaction
+	// and the converter, so the hash below includes it — matching what every
+	// SO hashes after the sign leg re-applies it from the prepare op.
+	finalTokenTxHash, err := utils.HashTokenTransaction(legacyTokenTx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
+	}
+
+	flow := newTokenTransactionCoordinatorFlow(
+		h.config,
+		legacyTokenTx,
+		finalTokenTxHash,
+		req.GetTokenTransactionOwnerSignatures(),
+		partial.GetExecuteBefore(),
+		finalTx,
+	)
+	engine, err := consensus.GetEngine(ctx)
+	if err != nil {
+		return nil, err
+	}
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	if _, err := engine.Execute(ctx, pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION, &selection, flow); err != nil {
+		return nil, fmt.Errorf("consensus token create failed: %w", err)
+	}
+	if flow.response == nil {
+		return nil, fmt.Errorf("token create consensus completed without building a response")
+	}
+	return flow.response, nil
 }
 
 // broadcastTokenTransactionPhase1 uses the existing two-step flow: StartTokenTransaction prepares
@@ -139,55 +282,14 @@ func (h *BroadcastTokenHandler) broadcastTokenTransactionPhase2(
 	ctx context.Context,
 	req *tokenpb.BroadcastTransactionRequest,
 ) (*tokenpb.BroadcastTransactionResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	partialTxV2Shape, err := h.validateBroadcastedPartialTransaction(ctx, req)
 	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
-	}
-	if err := enforceBroadcastPolicy(ctx, h.config, idPubKey); err != nil {
 		return nil, err
 	}
-
 	partial := req.GetPartialTokenTransaction()
-	metadata := partial.GetTokenTransactionMetadata()
-	if metadata == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction metadata is required"))
-	}
-
-	// Validate the partial transaction up-front (mirrors StartTokenTransaction).
-	// Convert to V2 shape to allow us to share all of the same validation logic with StartTokenTransaction.
-	// TODO(SPARK-334): After the switch to require V3+ transactions, stop converting to V2 shape and just use the partial directly for all logic.
-	partialTxV2Shape, err := protoconverter.ConvertPartialToV2TxShape(partial)
-	if err != nil {
-		return nil, err
-	}
-
-	network, err := btcnetwork.FromProtoNetwork(metadata.GetNetwork())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err))
-	}
-	expectedBondSats := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawBondSats
-	expectedRelativeBlockLocktime := h.config.Lrc20Configs[strings.ToLower(network.String())].WithdrawRelativeBlockLocktime
-	if err := utils.ValidatePartialTokenTransaction(
-		ctx,
-		partialTxV2Shape,
-		req.GetTokenTransactionOwnerSignatures(),
-		h.config.GetSigningOperatorList(),
-		h.config.SupportedNetworks,
-		expectedBondSats,
-		expectedRelativeBlockLocktime,
-	); err != nil {
-		return nil, err
-	}
 	txType, err := utils.InferTokenTransactionType(partialTxV2Shape)
 	if err != nil {
 		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
-	}
-
-	if partial.GetExecuteBefore() != nil {
-		clientCreatedTs := metadata.GetClientCreatedTimestamp().AsTime()
-		if err := utils.ValidateExecuteBefore(new(partial.GetExecuteBefore().AsTime()), clientCreatedTs, spark.TokenMaxExecuteBeforeWindow); err != nil {
-			return nil, err
-		}
 	}
 
 	partialHash, err := protohash.Hash(partial)
@@ -564,10 +666,17 @@ func (h *BroadcastTokenHandler) handleExistingTransaction(
 	}
 
 	if existingTx.Status == st.TokenTransactionStatusFinalized {
+		// Mirror the fresh-create response shape: a replayed finalized CREATE
+		// carries its token identifier so the client need not query for it.
+		var tokenIdentifier []byte
+		if existingTx.Edges.Create != nil {
+			tokenIdentifier = existingTx.Edges.Create.TokenIdentifier
+		}
 		return &tokenpb.BroadcastTransactionResponse{
 			FinalTokenTransaction: finalTx,
 			CommitStatus:          tokenpb.CommitStatus_COMMIT_FINALIZED,
 			CommitProgress:        nil,
+			TokenIdentifier:       tokenIdentifier,
 		}, nil
 	}
 
