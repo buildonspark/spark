@@ -151,39 +151,54 @@ func derInteger(value []byte) []byte {
 }
 
 // Every case here is refused before any database work, so none of them need a fixture.
-func TestInitiatePreimageSwapV4PrepareVerifiesCounterpartyManifestSignature(t *testing.T) {
+func TestInitiatePreimageSwapV4PrepareVerifiesAttestorSignature(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{65})
 	senderKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	counterpartyKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	attestorKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	payeeKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	impostorKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	transferID := uuid.New().String()
 	const leafID = "leaf-a"
 	const edgeSats = 1000
 
-	manifest := func(sats uint64) *pb.TransferManifest {
+	manifestPaying := func(receiver keys.Public, sats uint64) *pb.TransferManifest {
 		return &pb.TransferManifest{
 			Version:    1,
 			TransferId: transferID,
 			Network:    pb.Network_REGTEST,
 			Edges: []*pb.ManifestEdge{{
 				SenderIdentityPublicKey:   senderKey.Public().Serialize(),
-				ReceiverIdentityPublicKey: counterpartyKey.Public().Serialize(),
+				ReceiverIdentityPublicKey: receiver.Serialize(),
 				Amount:                    &pb.ManifestAmount{Amount: &pb.ManifestAmount_Sats{Sats: sats}},
 			}},
 		}
 	}
-	sign := func(signer keys.Private, signed *pb.TransferManifest) []byte {
+	manifest := func(sats uint64) *pb.TransferManifest {
+		return manifestPaying(attestorKey.Public(), sats)
+	}
+	manifestHash := func(signed *pb.TransferManifest) []byte {
 		hash, err := common.HashTransferManifest(signed)
 		require.NoError(t, err)
-		return ecdsa.Sign(signer.ToBTCEC(), hash).Serialize()
+		return hash
 	}
-	prepareOp := func(carried *pb.TransferManifest, signature []byte) *pbinternal.InitiatePreimageSwapV4PrepareRequest {
+	sign := func(signer keys.Private, signed *pb.TransferManifest) []byte {
+		target, err := common.ReceiveAttestorTarget(make([]byte, 32))
+		require.NoError(t, err)
+		digest, err := common.QuoteEnvelopeDigest(signed.GetNetwork(), manifestHash(signed),
+			common.QuoteReasonReceive, common.QuoteRoleAttestor, target)
+		require.NoError(t, err)
+		return ecdsa.Sign(signer.ToBTCEC(), digest).Serialize()
+	}
+	signBareManifestHash := func(signer keys.Private, signed *pb.TransferManifest) []byte {
+		return ecdsa.Sign(signer.ToBTCEC(), manifestHash(signed)).Serialize()
+	}
+	prepareOpRouting := func(carried *pb.TransferManifest, signature []byte, leafReceiver keys.Public) *pbinternal.InitiatePreimageSwapV4PrepareRequest {
 		return &pbinternal.InitiatePreimageSwapV4PrepareRequest{
 			OriginalRequest: &pb.InitiatePreimageSwapV4Request{
-				Reason:                        pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
-				PaymentHash:                   make([]byte, 32),
-				CounterpartyIdentityPublicKey: counterpartyKey.Public().Serialize(),
-				CounterpartyManifestSignature: signature,
+				Reason:                    pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+				PaymentHash:               make([]byte, 32),
+				AttestorIdentityPublicKey: attestorKey.Public().Serialize(),
+				AttestorSignature:         signature,
 				TransferV3Request: &pb.StartTransferV3Request{
 					TransferId: transferID,
 					SenderPackages: []*pb.SenderTransferPackage{{
@@ -192,13 +207,17 @@ func TestInitiatePreimageSwapV4PrepareVerifiesCounterpartyManifestSignature(t *t
 							KeyTweakPackage: map[string][]byte{"0000000000000000000000000000000000000000000000000000000000000001": {0x01}},
 							UserSignature:   []byte{0x01},
 						},
-						ReceiverIdentityPublicKeys: map[string][]byte{leafID: counterpartyKey.Public().Serialize()},
+						ReceiverIdentityPublicKeys: map[string][]byte{leafID: leafReceiver.Serialize()},
 					}},
 					TransferManifest: carried,
 				},
 			},
 		}
 	}
+	prepareOp := func(carried *pb.TransferManifest, signature []byte) *pbinternal.InitiatePreimageSwapV4PrepareRequest {
+		return prepareOpRouting(carried, signature, attestorKey.Public())
+	}
+	delegated := manifestPaying(payeeKey.Public(), edgeSats)
 
 	handler := NewInitiatePreimageSwapV4FlowHandler(sparktesting.TestConfig(t))
 
@@ -209,33 +228,43 @@ func TestInitiatePreimageSwapV4PrepareVerifiesCounterpartyManifestSignature(t *t
 	}{
 		{
 			"a valid signature passes the check and fails later for want of a database",
-			prepareOp(manifest(edgeSats), sign(counterpartyKey, manifest(edgeSats))),
+			prepareOp(manifest(edgeSats), sign(attestorKey, manifest(edgeSats))),
 			"",
 		},
 		{
 			"a missing signature on a receive is refused",
 			prepareOp(manifest(edgeSats), nil),
-			"counterparty_manifest_signature is required",
+			"attestor_signature is required",
 		},
 		{
 			"a signature by another key is refused",
 			prepareOp(manifest(edgeSats), sign(impostorKey, manifest(edgeSats))),
-			"manifest signature is invalid",
+			"signature is invalid",
 		},
 		{
 			"a signature over another manifest is refused",
-			prepareOp(manifest(edgeSats), sign(counterpartyKey, manifest(edgeSats+1))),
-			"manifest signature is invalid",
+			prepareOp(manifest(edgeSats), sign(attestorKey, manifest(edgeSats+1))),
+			"signature is invalid",
 		},
 		{
 			"a malleated high-S signature is refused",
-			prepareOp(manifest(edgeSats), malleateToHighS(t, sign(counterpartyKey, manifest(edgeSats)))),
-			"manifest signature is invalid",
+			prepareOp(manifest(edgeSats), malleateToHighS(t, sign(attestorKey, manifest(edgeSats)))),
+			"signature is invalid",
+		},
+		{
+			"a signature over the bare manifest hash is refused",
+			prepareOp(manifest(edgeSats), signBareManifestHash(attestorKey, manifest(edgeSats))),
+			"signature is invalid",
+		},
+		{
+			"an attestor paid nothing by the manifest still passes the check",
+			prepareOpRouting(delegated, sign(attestorKey, delegated), payeeKey.Public()),
+			"",
 		},
 		{
 			"a signature with no manifest is refused",
-			prepareOp(nil, sign(counterpartyKey, manifest(edgeSats))),
-			"counterparty_manifest_signature set without a transfer_manifest",
+			prepareOp(nil, sign(attestorKey, manifest(edgeSats))),
+			"attestor_signature set without a transfer_manifest",
 		},
 	}
 	for _, tc := range tests {
@@ -244,8 +273,8 @@ func TestInitiatePreimageSwapV4PrepareVerifiesCounterpartyManifestSignature(t *t
 
 			require.Error(t, err)
 			if tc.expectedError == "" {
-				assert.NotContains(t, err.Error(), "counterparty_manifest_signature")
-				assert.NotContains(t, err.Error(), "manifest signature is invalid")
+				assert.NotContains(t, err.Error(), "attestor_signature")
+				assert.NotContains(t, err.Error(), "signature is invalid")
 				assert.ErrorContains(t, err, "failed to get current tx for request")
 				return
 			}
@@ -299,4 +328,93 @@ func TestInitiatePreimageSwapV4FlowHandler_Rollback_RejectsUnusableOps(t *testin
 	require.ErrorContains(t, handler.Rollback(t.Context(), &pbinternal.InitiatePreimageSwapCommitRequest{}), "unexpected operation type")
 	require.ErrorContains(t, handler.Rollback(t.Context(), &pbinternal.InitiatePreimageSwapV4PrepareRequest{}), "transfer_id is required")
 	require.ErrorContains(t, handler.Rollback(t.Context(), &pbinternal.InitiatePreimageSwapRollbackRequest{}), "transfer_id is required")
+}
+
+// A valid envelope proves consent to a split, not authority over an invoice — the share-owner check
+// is the only thing supplying the second.
+func TestInitiatePreimageSwapV4PrepareBindsAttestorToPreimageShareOwner(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{67})
+	attestorKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	shareOwnerKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	payee := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	transferID := uuid.New().String()
+	const leafID = "leaf-a"
+	paymentHash := make([]byte, 32)
+	paymentHash[0] = 0x5a
+
+	manifest := &pb.TransferManifest{
+		Version:    common.SupportedTransferManifestVersion,
+		TransferId: transferID,
+		Network:    pb.Network_REGTEST,
+		Edges: []*pb.ManifestEdge{{
+			SenderIdentityPublicKey:   senderKey.Public().Serialize(),
+			ReceiverIdentityPublicKey: payee.Serialize(),
+			Amount:                    &pb.ManifestAmount{Amount: &pb.ManifestAmount_Sats{Sats: 1000}},
+		}},
+	}
+	manifestHash, err := common.HashTransferManifest(manifest)
+	require.NoError(t, err)
+	target, err := common.ReceiveAttestorTarget(paymentHash)
+	require.NoError(t, err)
+	digest, err := common.QuoteEnvelopeDigest(manifest.GetNetwork(), manifestHash,
+		common.QuoteReasonReceive, common.QuoteRoleAttestor, target)
+	require.NoError(t, err)
+
+	prepareOp := &pbinternal.InitiatePreimageSwapV4PrepareRequest{
+		OriginalRequest: &pb.InitiatePreimageSwapV4Request{
+			Reason:                    pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+			PaymentHash:               paymentHash,
+			AttestorIdentityPublicKey: attestorKey.Public().Serialize(),
+			AttestorSignature:         ecdsa.Sign(attestorKey.ToBTCEC(), digest).Serialize(),
+			TransferV3Request: &pb.StartTransferV3Request{
+				TransferId: transferID,
+				SenderPackages: []*pb.SenderTransferPackage{{
+					OwnerIdentityPublicKey: senderKey.Public().Serialize(),
+					TransferPackage: &pb.TransferPackage{
+						KeyTweakPackage: map[string][]byte{"0000000000000000000000000000000000000000000000000000000000000001": {0x01}},
+						UserSignature:   []byte{0x01},
+					},
+					ReceiverIdentityPublicKeys: map[string][]byte{leafID: payee.Serialize()},
+				}},
+				TransferManifest: manifest,
+			},
+		},
+	}
+	handler := NewInitiatePreimageSwapV4FlowHandler(sparktesting.TestConfig(t))
+
+	t.Run("an attestor that does not own the preimage share is refused", func(t *testing.T) {
+		ctx, _ := db.ConnectToTestPostgres(t)
+		tx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+		_, err = tx.PreimageShare.Create().
+			SetPaymentHash(paymentHash).
+			SetPreimageShare(make([]byte, 32)).
+			SetThreshold(1).
+			SetInvoiceString("lnbcrt1").
+			SetOwnerIdentityPubkey(shareOwnerKey.Public()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		_, err = handler.Prepare(ctx, prepareOp)
+
+		require.ErrorContains(t, err, "preimage share owner identity public key mismatch")
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	// A HODL invoice has no share to compare, so nothing here ties the attestor to the invoice. The
+	// v4 HODL path is unbuilt; this records that state rather than asserting it is safe.
+	t.Run("no preimage share leaves the attestor unbound", func(t *testing.T) {
+		ctx, _ := db.ConnectToTestPostgres(t)
+
+		_, err := handler.Prepare(ctx, prepareOp)
+
+		// Asserting the downstream refusal is what proves control reached it: an earlier gate
+		// refusing everything would otherwise satisfy a bare "some error occurred".
+		require.ErrorContains(t, err, "unable to validate request for payment hash")
+		assert.NotContains(t, err.Error(), "preimage share owner identity public key mismatch")
+		assert.NotContains(t, err.Error(), "attestor_signature")
+		assert.NotContains(t, err.Error(), "signature is invalid")
+	})
 }

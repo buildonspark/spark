@@ -2222,15 +2222,15 @@ export interface InitiatePreimageSwapV4Request {
   invoiceAmount: InvoiceAmount | undefined;
   reason: InitiatePreimageSwapRequest_Reason;
   /**
-   * The party opposite the sender: the lightning service on REASON_SEND, the
-   * invoice owner on REASON_RECEIVE. Keys the preimage request.
+   * Owns this invoice's preimage share and attests to the quoted terms. Not necessarily a
+   * payee: a delegated receive pays a wallet that never signed anything.
    */
-  counterpartyIdentityPublicKey: Uint8Array;
+  attestorIdentityPublicKey: Uint8Array;
   /**
-   * The counterparty's signature over the manifest hash, made with the key above:
-   * attests that the invoice owner agreed to this edge set.
+   * The attestor's signature over the quote envelope under QuoteRole.ATTESTOR, whose target
+   * binds payment_hash. Required on REASON_RECEIVE, unset on REASON_SEND.
    */
-  counterpartyManifestSignature: Uint8Array;
+  attestorSignature: Uint8Array;
   transferV3Request: StartTransferV3Request | undefined;
 }
 
@@ -15342,8 +15342,8 @@ function createBaseInitiatePreimageSwapV4Request(): InitiatePreimageSwapV4Reques
     paymentHash: new Uint8Array(0),
     invoiceAmount: undefined,
     reason: 0,
-    counterpartyIdentityPublicKey: new Uint8Array(0),
-    counterpartyManifestSignature: new Uint8Array(0),
+    attestorIdentityPublicKey: new Uint8Array(0),
+    attestorSignature: new Uint8Array(0),
     transferV3Request: undefined,
   };
 }
@@ -15359,11 +15359,11 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
     if (message.reason !== 0) {
       writer.uint32(24).int32(message.reason);
     }
-    if (message.counterpartyIdentityPublicKey.length !== 0) {
-      writer.uint32(34).bytes(message.counterpartyIdentityPublicKey);
+    if (message.attestorIdentityPublicKey.length !== 0) {
+      writer.uint32(34).bytes(message.attestorIdentityPublicKey);
     }
-    if (message.counterpartyManifestSignature.length !== 0) {
-      writer.uint32(42).bytes(message.counterpartyManifestSignature);
+    if (message.attestorSignature.length !== 0) {
+      writer.uint32(42).bytes(message.attestorSignature);
     }
     if (message.transferV3Request !== undefined) {
       StartTransferV3Request.encode(message.transferV3Request, writer.uint32(50).fork()).join();
@@ -15407,7 +15407,7 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
             break;
           }
 
-          message.counterpartyIdentityPublicKey = reader.bytes();
+          message.attestorIdentityPublicKey = reader.bytes();
           continue;
         }
         case 5: {
@@ -15415,7 +15415,7 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
             break;
           }
 
-          message.counterpartyManifestSignature = reader.bytes();
+          message.attestorSignature = reader.bytes();
           continue;
         }
         case 6: {
@@ -15440,11 +15440,11 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
       paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
       invoiceAmount: isSet(object.invoiceAmount) ? InvoiceAmount.fromJSON(object.invoiceAmount) : undefined,
       reason: isSet(object.reason) ? initiatePreimageSwapRequest_ReasonFromJSON(object.reason) : 0,
-      counterpartyIdentityPublicKey: isSet(object.counterpartyIdentityPublicKey)
-        ? bytesFromBase64(object.counterpartyIdentityPublicKey)
+      attestorIdentityPublicKey: isSet(object.attestorIdentityPublicKey)
+        ? bytesFromBase64(object.attestorIdentityPublicKey)
         : new Uint8Array(0),
-      counterpartyManifestSignature: isSet(object.counterpartyManifestSignature)
-        ? bytesFromBase64(object.counterpartyManifestSignature)
+      attestorSignature: isSet(object.attestorSignature)
+        ? bytesFromBase64(object.attestorSignature)
         : new Uint8Array(0),
       transferV3Request: isSet(object.transferV3Request)
         ? StartTransferV3Request.fromJSON(object.transferV3Request)
@@ -15463,11 +15463,11 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
     if (message.reason !== 0) {
       obj.reason = initiatePreimageSwapRequest_ReasonToJSON(message.reason);
     }
-    if (message.counterpartyIdentityPublicKey.length !== 0) {
-      obj.counterpartyIdentityPublicKey = base64FromBytes(message.counterpartyIdentityPublicKey);
+    if (message.attestorIdentityPublicKey.length !== 0) {
+      obj.attestorIdentityPublicKey = base64FromBytes(message.attestorIdentityPublicKey);
     }
-    if (message.counterpartyManifestSignature.length !== 0) {
-      obj.counterpartyManifestSignature = base64FromBytes(message.counterpartyManifestSignature);
+    if (message.attestorSignature.length !== 0) {
+      obj.attestorSignature = base64FromBytes(message.attestorSignature);
     }
     if (message.transferV3Request !== undefined) {
       obj.transferV3Request = StartTransferV3Request.toJSON(message.transferV3Request);
@@ -15485,8 +15485,8 @@ export const InitiatePreimageSwapV4Request: MessageFns<InitiatePreimageSwapV4Req
       ? InvoiceAmount.fromPartial(object.invoiceAmount)
       : undefined;
     message.reason = object.reason ?? 0;
-    message.counterpartyIdentityPublicKey = object.counterpartyIdentityPublicKey ?? new Uint8Array(0);
-    message.counterpartyManifestSignature = object.counterpartyManifestSignature ?? new Uint8Array(0);
+    message.attestorIdentityPublicKey = object.attestorIdentityPublicKey ?? new Uint8Array(0);
+    message.attestorSignature = object.attestorSignature ?? new Uint8Array(0);
     message.transferV3Request = (object.transferV3Request !== undefined && object.transferV3Request !== null)
       ? StartTransferV3Request.fromPartial(object.transferV3Request)
       : undefined;

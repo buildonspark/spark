@@ -32,8 +32,8 @@ func TestSparkServerInitiatePreimageSwapV4IsFeatureIncomplete(t *testing.T) {
 	const transferID = "11111111-1111-1111-1111-111111111111"
 
 	req := &pb.InitiatePreimageSwapV4Request{
-		PaymentHash:                   make([]byte, 32),
-		CounterpartyIdentityPublicKey: receiver.Serialize(),
+		PaymentHash:               make([]byte, 32),
+		AttestorIdentityPublicKey: receiver.Serialize(),
 		TransferV3Request: &pb.StartTransferV3Request{
 			TransferId: transferID,
 			SenderPackages: []*pb.SenderTransferPackage{{

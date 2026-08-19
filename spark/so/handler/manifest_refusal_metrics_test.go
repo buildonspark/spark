@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	transferpkg "github.com/lightsparkdev/spark/so/transfer"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -112,28 +113,61 @@ func TestManifestBindEndpointForTransferType(t *testing.T) {
 	}
 }
 
-// The counterparty-signature gate reads the manifest, so it refuses a v4 request carrying none
+// The attestor-signature gate reads the manifest, so it refuses a v4 request carrying none
 // before the bind gate's own required-manifest check runs.
-func TestCounterpartySignatureRefusalKind(t *testing.T) {
+func TestAttestorSignatureRefusalKind(t *testing.T) {
 	t.Run("no manifest is a missing manifest, not a bad signature", func(t *testing.T) {
 		require.Equal(t, manifestRefusalMissingManifest,
-			counterpartySignatureRefusalKind(&pb.StartTransferV3Request{}, []byte{0x01}))
+			attestorSignatureRefusalKind(&pb.StartTransferV3Request{}, []byte{0x01}))
 	})
 
 	t.Run("a manifest present with a signature means the signature itself was refused", func(t *testing.T) {
-		require.Equal(t, manifestRefusalCounterpartySignature,
-			counterpartySignatureRefusalKind(&pb.StartTransferV3Request{
+		require.Equal(t, manifestRefusalAttestorSignature,
+			attestorSignatureRefusalKind(&pb.StartTransferV3Request{
 				TransferManifest: &pb.TransferManifest{},
 			}, []byte{0x01}))
 	})
 
-	// A caller that has not shipped the field yet is a rollout gap, not the invoice owner objecting.
+	// A caller that has not shipped the field yet is a rollout gap, not the attestor objecting.
 	t.Run("a manifest present with no signature is a missing signature, not a refused one", func(t *testing.T) {
-		require.Equal(t, manifestRefusalMissingCounterpartySig,
-			counterpartySignatureRefusalKind(&pb.StartTransferV3Request{
+		require.Equal(t, manifestRefusalMissingAttestorSig,
+			attestorSignatureRefusalKind(&pb.StartTransferV3Request{
 				TransferManifest: &pb.TransferManifest{},
 			}, nil))
 	})
+}
+
+// The label string is what a dashboard query and its runbook are written against, while every other
+// assertion here compares Go constants — so a rename is otherwise invisible to this suite.
+func TestManifestRefusalKindLabelStrings(t *testing.T) {
+	labels := map[manifestRefusalKind]string{
+		manifestRefusalEdgeCover:          "edge_cover",
+		manifestRefusalAmountOverflow:     "amount_overflow",
+		manifestRefusalDuplicate:          "duplicate",
+		manifestRefusalExpiry:             "expiry",
+		manifestRefusalNetwork:            "network",
+		manifestRefusalSizeCap:            "size_cap",
+		manifestRefusalSignature:          "signature",
+		manifestRefusalStraySignature:     "stray_signature",
+		manifestRefusalSenderKey:          "sender_key",
+		manifestRefusalReceiverKey:        "receiver_key",
+		manifestRefusalLeafOwner:          "leaf_owner",
+		manifestRefusalTransferID:         "transfer_id",
+		manifestRefusalUnknownLeaf:        "unknown_leaf",
+		manifestRefusalMissingManifest:    "missing_manifest",
+		manifestRefusalAttestorSignature:  "attestor_signature",
+		manifestRefusalMissingAttestorSig: "missing_attestor_signature",
+		manifestRefusalReason:             "reason",
+		manifestRefusalOther:              "other",
+	}
+
+	require.Len(t, labels, len(allManifestRefusalKinds),
+		"every refusal kind needs its scraped label stated here")
+	for _, kind := range allManifestRefusalKinds {
+		scrapedLabel, pinned := labels[kind]
+		require.True(t, pinned, "refusal kind %q has no pinned label", string(kind))
+		assert.Equal(t, scrapedLabel, string(kind))
+	}
 }
 
 type manifestRefusalLabels struct {
@@ -148,15 +182,6 @@ func TestManifestRefusalCounterAttributesRefusalsToTheRefusingGate(t *testing.T)
 	reader := installManifestRefusalTestMeter(t)
 	ctx := t.Context()
 
-	rng := rand.NewChaCha8([32]byte{7})
-	counterparty := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	elsewhere := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	routedLeaf := uuid.New().String()
-	unroutedLeaf := uuid.New().String()
-
-	paidElsewhere, err := perLeafDestinations(map[string]keys.Public{routedLeaf: elsewhere})
-	require.NoError(t, err)
-
 	require.Error(t, rejectStrayManifestSignature(ctx, manifestEndpointStartTransferV3,
 		&pb.StartTransferV3Request{
 			SenderPackages: []*pb.SenderTransferPackage{{ManifestHashSignature: []byte{0x01}}},
@@ -165,19 +190,9 @@ func TestManifestRefusalCounterAttributesRefusalsToTheRefusingGate(t *testing.T)
 	require.Error(t, requireAndBindManifest(ctx, manifestEndpointInitiatePreimageSwapV4,
 		&pb.StartTransferV3Request{}, btcnetwork.Regtest, nil))
 
-	require.Error(t, assertCounterpartyIsPaid(ctx, counterparty,
-		map[string]*ent.TreeNode{routedLeaf: {Value: 1000}}, paidElsewhere,
-		pb.InitiatePreimageSwapRequest_REASON_RECEIVE))
-
-	require.Error(t, assertCounterpartyIsPaid(ctx, counterparty,
-		map[string]*ent.TreeNode{unroutedLeaf: {Value: 1000}}, paidElsewhere,
-		pb.InitiatePreimageSwapRequest_REASON_RECEIVE))
-
 	require.Equal(t, map[manifestRefusalLabels]int64{
-		{kind: manifestRefusalStraySignature, endpoint: manifestEndpointStartTransferV3}:            1,
-		{kind: manifestRefusalMissingManifest, endpoint: manifestEndpointInitiatePreimageSwapV4}:    1,
-		{kind: manifestRefusalCounterpartyUnpaid, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
-		{kind: manifestRefusalLeafDestination, endpoint: manifestEndpointInitiatePreimageSwapV4}:    1,
+		{kind: manifestRefusalStraySignature, endpoint: manifestEndpointStartTransferV3}:         1,
+		{kind: manifestRefusalMissingManifest, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
 	}, collectManifestRefusalCounts(ctx, t, reader))
 }
 
@@ -359,29 +374,36 @@ func TestManifestRefusalCounterCountsRealBindRefusals(t *testing.T) {
 	})
 }
 
-func TestManifestRefusalCounterCountsTheCounterpartySignatureGate(t *testing.T) {
+func TestManifestRefusalCounterCountsTheAttestorSignatureGate(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{21})
-	counterpartyKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	attestorKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	signedV4 := func(t *testing.T, manifest *pb.TransferManifest, signWith keys.Private) *pb.InitiatePreimageSwapV4Request {
+	attestedV4 := func(t *testing.T, manifest *pb.TransferManifest, signWith keys.Private) *pb.InitiatePreimageSwapV4Request {
 		t.Helper()
+		paymentHash := make([]byte, 32)
 		hash, err := common.HashTransferManifest(manifest)
 		require.NoError(t, err)
+		target, err := common.ReceiveAttestorTarget(paymentHash)
+		require.NoError(t, err)
+		digest, err := common.QuoteEnvelopeDigest(
+			manifest.GetNetwork(), hash, common.QuoteReasonReceive, common.QuoteRoleAttestor, target)
+		require.NoError(t, err)
 		return &pb.InitiatePreimageSwapV4Request{
-			Reason:                        pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
-			CounterpartyManifestSignature: ecdsa.Sign(signWith.ToBTCEC(), hash).Serialize(),
-			TransferV3Request:             &pb.StartTransferV3Request{TransferManifest: manifest},
+			Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+			PaymentHash:       paymentHash,
+			AttestorSignature: ecdsa.Sign(signWith.ToBTCEC(), digest).Serialize(),
+			TransferV3Request: &pb.StartTransferV3Request{TransferManifest: manifest},
 		}
 	}
 
 	t.Run("a signature with no manifest is a missing_manifest refusal", func(t *testing.T) {
 		reader := installManifestRefusalTestMeter(t)
 
-		require.Error(t, verifyCounterpartyManifestSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
-			Reason:                        pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
-			CounterpartyManifestSignature: []byte{0x01},
-			TransferV3Request:             &pb.StartTransferV3Request{},
-		}, counterpartyKey.Public()))
+		require.Error(t, verifyAttestorSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
+			Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+			AttestorSignature: []byte{0x01},
+			TransferV3Request: &pb.StartTransferV3Request{},
+		}, attestorKey.Public()))
 
 		require.Equal(t, map[manifestRefusalLabels]int64{
 			{kind: manifestRefusalMissingManifest, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
@@ -391,66 +413,116 @@ func TestManifestRefusalCounterCountsTheCounterpartySignatureGate(t *testing.T) 
 	t.Run("no signature at all on a receive is a missing_manifest refusal without a manifest", func(t *testing.T) {
 		reader := installManifestRefusalTestMeter(t)
 
-		require.Error(t, verifyCounterpartyManifestSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
+		require.Error(t, verifyAttestorSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
 			Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
 			TransferV3Request: &pb.StartTransferV3Request{},
-		}, counterpartyKey.Public()))
+		}, attestorKey.Public()))
 
 		require.Equal(t, map[manifestRefusalLabels]int64{
 			{kind: manifestRefusalMissingManifest, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
 		}, collectManifestRefusalCounts(t.Context(), t, reader))
 	})
 
-	t.Run("no signature with a manifest present is a missing_counterparty_signature refusal", func(t *testing.T) {
+	t.Run("no signature with a manifest present is a missing_attestor_signature refusal", func(t *testing.T) {
 		reader := installManifestRefusalTestMeter(t)
 
-		require.Error(t, verifyCounterpartyManifestSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
+		require.Error(t, verifyAttestorSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
 			Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
 			TransferV3Request: &pb.StartTransferV3Request{TransferManifest: hashableManifest()},
-		}, counterpartyKey.Public()))
+		}, attestorKey.Public()))
 
 		require.Equal(t, map[manifestRefusalLabels]int64{
-			{kind: manifestRefusalMissingCounterpartySig, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
+			{kind: manifestRefusalMissingAttestorSig, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
 		}, collectManifestRefusalCounts(t.Context(), t, reader))
 	})
 
-	t.Run("a wrong signer over a real manifest is a counterparty_signature refusal", func(t *testing.T) {
+	t.Run("a wrong signer over a real manifest is an attestor_signature refusal", func(t *testing.T) {
 		reader := installManifestRefusalTestMeter(t)
 		impostor := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{22}))
 
-		require.Error(t, verifyCounterpartyManifestSignature(t.Context(),
-			signedV4(t, hashableManifest(), impostor),
-			counterpartyKey.Public()))
+		require.Error(t, verifyAttestorSignature(t.Context(),
+			attestedV4(t, hashableManifest(), impostor),
+			attestorKey.Public()))
 
 		require.Equal(t, map[manifestRefusalLabels]int64{
-			{kind: manifestRefusalCounterpartySignature, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
+			{kind: manifestRefusalAttestorSignature, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
 		}, collectManifestRefusalCounts(t.Context(), t, reader))
 	})
 
 	// Hashing is a precondition of verifying, so a manifest that will not hash is a malformed
-	// manifest, not evidence about the counterparty's signature.
-	t.Run("a manifest that will not hash is a signature refusal, not a counterparty one", func(t *testing.T) {
+	// manifest, not evidence about the attestor's signature.
+	t.Run("a manifest that will not hash is a signature refusal, not an attestor one", func(t *testing.T) {
 		reader := installManifestRefusalTestMeter(t)
 
 		unhashable := &pb.TransferManifest{Version: 1, Network: pb.Network_REGTEST}
 
-		require.Error(t, verifyCounterpartyManifestSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
-			Reason:                        pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
-			CounterpartyManifestSignature: []byte{0x01},
-			TransferV3Request:             &pb.StartTransferV3Request{TransferManifest: unhashable},
-		}, counterpartyKey.Public()))
+		require.Error(t, verifyAttestorSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
+			Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+			AttestorSignature: []byte{0x01},
+			TransferV3Request: &pb.StartTransferV3Request{TransferManifest: unhashable},
+		}, attestorKey.Public()))
 
 		require.Equal(t, map[manifestRefusalLabels]int64{
 			{kind: manifestRefusalSignature, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
 		}, collectManifestRefusalCounts(t.Context(), t, reader))
 	})
 
-	t.Run("the counterparty's own signature is not counted", func(t *testing.T) {
+	// The digest carries the network, so without an explicit check the same unknown network refuses
+	// here as a signature rather than joining the network series it belongs to.
+	t.Run("an unknown manifest network is a network refusal, not a signature one", func(t *testing.T) {
 		reader := installManifestRefusalTestMeter(t)
 
-		require.NoError(t, verifyCounterpartyManifestSignature(t.Context(),
-			signedV4(t, hashableManifest(), counterpartyKey),
-			counterpartyKey.Public()))
+		unnetworked := hashableManifest()
+		unnetworked.Network = pb.Network_UNSPECIFIED
+
+		// Signed bytes are arbitrary here: an unsignable network has no envelope digest to sign, which
+		// is the whole reason this refuses before verification.
+		require.Error(t, verifyAttestorSignature(t.Context(), &pb.InitiatePreimageSwapV4Request{
+			Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+			PaymentHash:       make([]byte, 32),
+			AttestorSignature: []byte{0x01},
+			TransferV3Request: &pb.StartTransferV3Request{TransferManifest: unnetworked},
+		}, attestorKey.Public()))
+
+		require.Equal(t, map[manifestRefusalLabels]int64{
+			{kind: manifestRefusalNetwork, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
+		}, collectManifestRefusalCounts(t.Context(), t, reader))
+	})
+
+	// v4 refuses a non-RECEIVE request upstream, so this gate treats the reason as a precondition;
+	// verifying a SEND signature against the RECEIVE digest would be a cross-flow replay.
+	t.Run("a non-receive reason is refused rather than verified", func(t *testing.T) {
+		reader := installManifestRefusalTestMeter(t)
+
+		sendReq := attestedV4(t, hashableManifest(), attestorKey)
+		sendReq.Reason = pb.InitiatePreimageSwapRequest_REASON_SEND
+
+		require.Error(t, verifyAttestorSignature(t.Context(), sendReq, attestorKey.Public()))
+
+		require.Equal(t, map[manifestRefusalLabels]int64{
+			{kind: manifestRefusalReason, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
+		}, collectManifestRefusalCounts(t.Context(), t, reader))
+	})
+
+	t.Run("a payment hash with no derivable target is a signature refusal", func(t *testing.T) {
+		reader := installManifestRefusalTestMeter(t)
+
+		shortHash := attestedV4(t, hashableManifest(), attestorKey)
+		shortHash.PaymentHash = make([]byte, 31)
+
+		require.Error(t, verifyAttestorSignature(t.Context(), shortHash, attestorKey.Public()))
+
+		require.Equal(t, map[manifestRefusalLabels]int64{
+			{kind: manifestRefusalSignature, endpoint: manifestEndpointInitiatePreimageSwapV4}: 1,
+		}, collectManifestRefusalCounts(t.Context(), t, reader))
+	})
+
+	t.Run("the attestor's own signature is not counted", func(t *testing.T) {
+		reader := installManifestRefusalTestMeter(t)
+
+		require.NoError(t, verifyAttestorSignature(t.Context(),
+			attestedV4(t, hashableManifest(), attestorKey),
+			attestorKey.Public()))
 
 		require.Empty(t, collectManifestRefusalCounts(t.Context(), t, reader))
 	})
@@ -487,7 +559,7 @@ func TestManifestRefusalCounterCountsDuplicateLeafDestinations(t *testing.T) {
 	})
 }
 
-// The counterparty-signature gate only hashes and verifies, so any well-formed edge suffices.
+// The attestor-signature gate only hashes and verifies, so any well-formed edge suffices.
 func hashableManifest() *pb.TransferManifest {
 	rng := rand.NewChaCha8([32]byte{51})
 	sender := keys.MustGeneratePrivateKeyFromRand(rng).Public()

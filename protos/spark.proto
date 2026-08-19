@@ -1317,12 +1317,12 @@ message InitiatePreimageSwapV4Request {
     bytes payment_hash = 1 [(validate.rules).bytes.len = 32];
     InvoiceAmount invoice_amount = 2;
     InitiatePreimageSwapRequest.Reason reason = 3;
-    // The party opposite the sender: the lightning service on REASON_SEND, the
-    // invoice owner on REASON_RECEIVE. Keys the preimage request.
-    bytes counterparty_identity_public_key = 4 [(validate.rules).bytes.len = 33];
-    // The counterparty's signature over the manifest hash, made with the key above:
-    // attests that the invoice owner agreed to this edge set.
-    bytes counterparty_manifest_signature = 5;
+    // Owns this invoice's preimage share and attests to the quoted terms. Not necessarily a
+    // payee: a delegated receive pays a wallet that never signed anything.
+    bytes attestor_identity_public_key = 4 [(validate.rules).bytes.len = 33];
+    // The attestor's signature over the quote envelope under QuoteRole.ATTESTOR, whose target
+    // binds payment_hash. Required on REASON_RECEIVE, unset on REASON_SEND.
+    bytes attestor_signature = 5;
     StartTransferV3Request transfer_v3_request = 6 [(validate.rules).message.required = true];
 }
 
