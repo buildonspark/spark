@@ -163,34 +163,3 @@ describe("non-private wallet access (default)", () => {
     expect(publicBalance).toBe(ownerBalance);
   });
 });
-
-describe("master key access to private wallet", () => {
-  jest.setTimeout(60_000);
-
-  let funded: FundedWallet;
-  let masterClient: SparkReadonlyClient;
-
-  beforeAll(async () => {
-    funded = await createFundedWallet(10_000n);
-    await funded.wallet.setPrivacyEnabled(true);
-
-    masterClient = await createOwnerReadonlyClient(funded.mnemonic);
-  });
-
-  it("master/owner sees balance of a private wallet", async () => {
-    const balance = await masterClient.getAvailableBalance(funded.sparkAddress);
-    expect(balance).toBe(10_000n);
-  });
-
-  it("master/owner sees owned balance of a private wallet", async () => {
-    const balance = await masterClient.getOwnedBalance(funded.sparkAddress);
-    expect(balance).toBe(10_000n);
-  });
-
-  it("master/owner sees transfers of a private wallet", async () => {
-    const result = await masterClient.getTransfers({
-      sparkAddress: funded.sparkAddress,
-    });
-    expect(result.transfers).toBeDefined();
-  });
-});

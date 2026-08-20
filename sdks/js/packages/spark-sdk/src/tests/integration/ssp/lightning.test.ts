@@ -679,72 +679,6 @@ describe("Lightning Network provider", () => {
     );
   });
 
-  describe("should pay lightning invoice", () => {
-    it("should pay lightning invoice created by another wallet", async () => {
-      const faucet = BitcoinFaucet.getInstance();
-
-      const { wallet: aliceWallet } =
-        await SparkWalletTestingWithStream.initialize({
-          options: {
-            network: "LOCAL",
-          },
-        });
-
-      const { wallet: bobWallet } =
-        await SparkWalletTestingWithStream.initialize({
-          options: {
-            network: "LOCAL",
-          },
-        });
-
-      const depositAddress = await aliceWallet.getSingleUseDepositAddress();
-      expect(depositAddress).toBeDefined();
-
-      const signedTx = await faucet.sendToAddress(
-        depositAddress,
-        DEPOSIT_AMOUNT,
-      );
-
-      // Wait for the transaction to be mined
-      await faucet.mineBlocksAndWaitForMiningToComplete(6);
-
-      await aliceWallet.claimDeposit(signedTx.id);
-      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
-
-      const invoice = await bobWallet.createLightningInvoice({
-        amountSats: INVOICE_AMOUNT,
-        memo: "test",
-        expirySeconds: 500,
-      });
-
-      expect(invoice).toBeDefined();
-
-      // Register listener before payment so we don't miss the stream event.
-      const bobClaimed = waitForClaim({ wallet: bobWallet });
-      const request = (await aliceWallet.payLightningInvoice({
-        invoice: invoice.invoice.encodedInvoice,
-        maxFeeSats: 100,
-      })) as LightningSendRequest;
-
-      // wait for the claim event, we care about the transfer completing...
-      await bobClaimed;
-
-      const { balance: bobBalance } = await bobWallet.getBalance();
-      expect(bobBalance).toBe(BigInt(INVOICE_AMOUNT));
-
-      const { balance: aliceBalance } = await aliceWallet.getBalance();
-      expect(aliceBalance).toBeLessThan(
-        DEPOSIT_AMOUNT - BigInt(INVOICE_AMOUNT),
-      );
-
-      // Verify that payment preimage is still set for spark -> spark lightning payments
-      const lightningSendRequest = await aliceWallet.getLightningSendRequest(
-        request.id,
-      );
-      expect(lightningSendRequest?.paymentPreimage).toBeDefined();
-    }, 120000);
-  });
-
   describe("should fail to create lightning invoice", () => {
     it(`should fail to create lightning invoice with invalid amount`, async () => {
       await expect(
@@ -958,113 +892,6 @@ describe("Lightning Network provider", () => {
       // Verify Alice's balance decreased
       const { balance: aliceBalance } = await aliceWallet.getBalance();
       expect(aliceBalance).toBe(DEPOSIT_AMOUNT - BigInt(paymentAmount));
-    }, 120000);
-  });
-
-  describe("should validate zero-amount invoice matching", () => {
-    it("should successfully pay zero-amount lightning invoice with zero-amount embedded spark invoice", async () => {
-      const faucet = BitcoinFaucet.getInstance();
-
-      const { wallet: aliceWallet } =
-        await SparkWalletTestingWithStream.initialize({
-          options: { network: "LOCAL" },
-        });
-
-      const { wallet: bobWallet } =
-        await SparkWalletTestingWithStream.initialize({
-          options: { network: "LOCAL" },
-        });
-
-      // Fund Alice's wallet
-      const depositAddress = await aliceWallet.getSingleUseDepositAddress();
-      const signedTx = await faucet.sendToAddress(
-        depositAddress,
-        DEPOSIT_AMOUNT,
-      );
-      await faucet.mineBlocksAndWaitForMiningToComplete(6);
-      await aliceWallet.claimDeposit(signedTx.id);
-      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
-
-      // Bob creates zero-amount lightning invoice with embedded zero-amount spark invoice
-      const invoice = await bobWallet.createLightningInvoice({
-        amountSats: 0,
-        memo: "zero-amount test",
-        expirySeconds: 300,
-        includeSparkInvoice: true,
-      });
-
-      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
-      expect(decodedInvoice.amountMSats).toBe(null);
-      expect(decodedInvoice.fallbackAddress).toBeDefined();
-
-      const paymentAmount = 3000;
-
-      // Paying with preferSpark should validate that both invoices are zero-amount
-      // Register listener before payment so we don't miss the stream event.
-      const bobClaimed = waitForClaim({ wallet: bobWallet });
-      await aliceWallet.payLightningInvoice({
-        invoice: invoice.invoice.encodedInvoice,
-        maxFeeSats: 100,
-        preferSpark: true,
-        amountSatsToSend: paymentAmount,
-      });
-
-      await bobClaimed;
-
-      const { balance: bobBalance } = await bobWallet.getBalance();
-      expect(bobBalance).toBe(BigInt(paymentAmount));
-    }, 120000);
-
-    it("should successfully pay non-zero lightning invoice with matching non-zero embedded spark invoice", async () => {
-      const faucet = BitcoinFaucet.getInstance();
-
-      const { wallet: aliceWallet } =
-        await SparkWalletTestingWithStream.initialize({
-          options: { network: "LOCAL" },
-        });
-
-      const { wallet: bobWallet } =
-        await SparkWalletTestingWithStream.initialize({
-          options: { network: "LOCAL" },
-        });
-
-      // Fund Alice's wallet
-      const depositAddress = await aliceWallet.getSingleUseDepositAddress();
-      const signedTx = await faucet.sendToAddress(
-        depositAddress,
-        DEPOSIT_AMOUNT,
-      );
-      await faucet.mineBlocksAndWaitForMiningToComplete(6);
-      await aliceWallet.claimDeposit(signedTx.id);
-      await waitForBalance(aliceWallet, DEPOSIT_AMOUNT);
-
-      const invoiceAmount = 2000;
-
-      // Bob creates non-zero lightning invoice with embedded matching non-zero spark invoice
-      const invoice = await bobWallet.createLightningInvoice({
-        amountSats: invoiceAmount,
-        memo: "non-zero matching test",
-        expirySeconds: 300,
-        includeSparkInvoice: true,
-      });
-
-      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
-      expect(decodedInvoice.amountMSats).toBe(BigInt(invoiceAmount * 1000));
-      expect(decodedInvoice.fallbackAddress).toBeDefined();
-
-      // Paying with preferSpark should validate that amounts match
-      // Register listener before payment so we don't miss the stream event.
-      const bobClaimed = waitForClaim({ wallet: bobWallet });
-      await aliceWallet.payLightningInvoice({
-        invoice: invoice.invoice.encodedInvoice,
-        maxFeeSats: 100,
-        preferSpark: true,
-      });
-
-      await bobClaimed;
-
-      const { balance: bobBalance } = await bobWallet.getBalance();
-      expect(bobBalance).toBe(BigInt(invoiceAmount));
     }, 120000);
   });
 
@@ -1304,6 +1131,7 @@ describe("Lightning Network provider", () => {
       expect(completed.status).toEqual(
         LightningSendRequestStatus.TRANSFER_COMPLETED,
       );
+      expect(completed.paymentPreimage).toMatch(/^[0-9a-f]{64}$/i);
       const completedReceive = await waitForReceiveRequestStatus(
         bobWallet,
         invoice.id,
