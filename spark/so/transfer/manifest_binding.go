@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/lightsparkdev/spark/common"
@@ -22,42 +23,49 @@ const (
 	MaxManifestEdges          = 512
 	MaxManifestRoutedLeaves   = 16384
 	MaxManifestFees           = 256
+
+	bpsDenominator = 10_000
 )
 
 var (
-	ErrManifestAmountMismatch     = fmt.Errorf("manifest edge amount does not match executed leaves")
-	ErrManifestDuplicateEdge      = fmt.Errorf("manifest declares more than one edge for a sender/receiver pair")
-	ErrManifestDuplicateSender    = fmt.Errorf("duplicate sender in sender packages")
-	ErrManifestEdgeNotRealized    = fmt.Errorf("manifest edge has no executed leaves")
-	ErrManifestExpiryMismatch     = fmt.Errorf("request expiry time does not match manifest")
-	ErrManifestExpiryUnsigned     = fmt.Errorf("multi-sender manifest must commit to a transfer expiry")
-	ErrManifestInvalidReceiver    = fmt.Errorf("invalid receiver identity public key")
-	ErrManifestInvalidSender      = fmt.Errorf("invalid sender identity public key")
-	ErrManifestInvalidSignature   = fmt.Errorf("invalid manifest hash signature")
-	ErrManifestLeafNotRouted      = fmt.Errorf("leaf has no receiver in any sender package")
-	ErrManifestLeafOwnerMismatch  = fmt.Errorf("leaf is not owned by the sender package routing it")
-	ErrManifestMissing            = fmt.Errorf("transfer manifest is missing")
-	ErrManifestMissingSignature   = fmt.Errorf("missing manifest hash signature")
-	ErrManifestNetworkMismatch    = fmt.Errorf("manifest network does not match the transfer")
-	ErrManifestUnknownNetwork     = fmt.Errorf("manifest network is unspecified or unknown")
-	ErrManifestNonSatsEdge        = fmt.Errorf("manifest edge amount must be denominated in sats")
-	ErrManifestNotHashable        = fmt.Errorf("transfer manifest is not hashable")
-	ErrManifestTotalOverflow      = fmt.Errorf("manifest amount total overflows")
-	ErrManifestTooLarge           = fmt.Errorf("transfer manifest exceeds size limits")
-	ErrManifestTransferIDMismatch = fmt.Errorf("request transfer id does not match manifest")
-	ErrManifestUnknownLeaf        = fmt.Errorf("routed leaf has no server-side record")
-	ErrManifestUnlistedTransfer   = fmt.Errorf("executed leaves have no matching manifest edge")
+	ErrManifestAmountMismatch      = fmt.Errorf("manifest edge amount does not match executed leaves")
+	ErrManifestBpsSumInvalid       = fmt.Errorf("manifest bps edges must sum to 10000")
+	ErrManifestDuplicateEdge       = fmt.Errorf("manifest declares more than one edge for a sender/receiver pair")
+	ErrManifestDuplicateSender     = fmt.Errorf("duplicate sender in sender packages")
+	ErrManifestEdgeNotRealized     = fmt.Errorf("manifest edge has no executed leaves")
+	ErrManifestEdgeOutsideWindow   = fmt.Errorf("executed leaves fall outside the manifest edge's resolved window")
+	ErrManifestExpiryMismatch      = fmt.Errorf("request expiry time does not match manifest")
+	ErrManifestExpiryUnsigned      = fmt.Errorf("multi-sender manifest must commit to a transfer expiry")
+	ErrManifestFlatFeesExceedGross = fmt.Errorf("manifest sats edges leave nothing for the bps edges to divide")
+	ErrManifestInvalidReceiver     = fmt.Errorf("invalid receiver identity public key")
+	ErrManifestInvalidSender       = fmt.Errorf("invalid sender identity public key")
+	ErrManifestInvalidSignature    = fmt.Errorf("invalid manifest hash signature")
+	ErrManifestLeafNotRouted       = fmt.Errorf("leaf has no receiver in any sender package")
+	ErrManifestLeafOwnerMismatch   = fmt.Errorf("leaf is not owned by the sender package routing it")
+	ErrManifestMissing             = fmt.Errorf("transfer manifest is missing")
+	ErrManifestMissingSignature    = fmt.Errorf("missing manifest hash signature")
+	ErrManifestNetworkMismatch     = fmt.Errorf("manifest network does not match the transfer")
+	ErrManifestUnknownNetwork      = fmt.Errorf("manifest network is unspecified or unknown")
+	ErrManifestNotHashable         = fmt.Errorf("transfer manifest is not hashable")
+	ErrManifestTotalOverflow       = fmt.Errorf("manifest amount total overflows")
+	ErrManifestTooLarge            = fmt.Errorf("transfer manifest exceeds size limits")
+	ErrManifestTransferIDMismatch  = fmt.Errorf("request transfer id does not match manifest")
+	ErrManifestUnknownLeaf         = fmt.Errorf("routed leaf has no server-side record")
+	ErrManifestUnlistedTransfer    = fmt.Errorf("executed leaves have no matching manifest edge")
 )
 
 // AllManifestRefusals enumerates BindManifest's refusals for callers that bucket them. A new
 // ErrManifest sentinel in this file must be appended here; a test in this package fails when not.
 var AllManifestRefusals = []error{
 	ErrManifestAmountMismatch,
+	ErrManifestBpsSumInvalid,
 	ErrManifestDuplicateEdge,
 	ErrManifestDuplicateSender,
 	ErrManifestEdgeNotRealized,
+	ErrManifestEdgeOutsideWindow,
 	ErrManifestExpiryMismatch,
 	ErrManifestExpiryUnsigned,
+	ErrManifestFlatFeesExceedGross,
 	ErrManifestInvalidReceiver,
 	ErrManifestInvalidSender,
 	ErrManifestInvalidSignature,
@@ -67,7 +75,6 @@ var AllManifestRefusals = []error{
 	ErrManifestMissingSignature,
 	ErrManifestNetworkMismatch,
 	ErrManifestUnknownNetwork,
-	ErrManifestNonSatsEdge,
 	ErrManifestNotHashable,
 	ErrManifestTotalOverflow,
 	ErrManifestTooLarge,
@@ -106,6 +113,10 @@ type ExecutedLeaf struct {
 //
 // Only edges[] is read. fees[] and quote_expiry_time describe how the SSP priced the transfer,
 // which the operator neither enforces nor understands.
+//
+// A bps edge binds a proportion, not a quantity: it is resolved against a gross the operator
+// observes but cannot certify, since the senders choose what to fund. Callers wanting a signed
+// amount must declare it in sats.
 func BindManifest(req *spark.StartTransferV3Request, network btcnetwork.Network, leaves map[string]ExecutedLeaf) error {
 	manifest := req.GetTransferManifest()
 	if manifest == nil {
@@ -252,50 +263,116 @@ type manifestEdgeKey struct {
 	receiver keys.Public
 }
 
-// bindManifestEdges requires an exact cover between the manifest's declared edges and the value
-// the request actually moves: every edge realized, no unlisted (sender, receiver) pair executed,
-// no leaf left unrouted. Anything less lets a caller move value the manifest never described.
+// bindManifestEdges requires a cover between the manifest's declared edges and the value the
+// request actually moves: every edge realized, no unlisted (sender, receiver) pair executed, no
+// leaf left unrouted. Anything less lets a caller move value the manifest never described. Sats
+// edges bind exactly; a bps edge binds to its resolved window, so the rounding dust may land on
+// any of the parties the manifest already names.
 func bindManifestEdges(
 	edges []*spark.ManifestEdge,
 	signed []signedSenderPackage,
 	leaves map[string]ExecutedLeaf,
 ) error {
-	declared, err := declaredEdgeTotals(edges)
-	if err != nil {
-		return err
-	}
-
 	executed, err := executedEdgeTotals(signed, leaves)
 	if err != nil {
 		return err
 	}
 
-	for key, declaredSats := range declared {
-		executedSats, ok := executed[key]
-		if !ok {
-			return fmt.Errorf("%w: %x -> %x for %d sats", ErrManifestEdgeNotRealized, key.sender.Serialize(), key.receiver.Serialize(), declaredSats)
-		}
-		if executedSats != declaredSats {
-			return fmt.Errorf("%w: %x -> %x declared %d sats, executed %d sats", ErrManifestAmountMismatch, key.sender.Serialize(), key.receiver.Serialize(), declaredSats, executedSats)
+	parsed, err := declaredEdgeKeys(edges)
+	if err != nil {
+		return err
+	}
+	declaredPairs := make(map[manifestEdgeKey]struct{}, len(parsed))
+	for _, key := range parsed {
+		declaredPairs[key] = struct{}{}
+	}
+
+	// Ahead of the gross: value routed to a pair no edge names would otherwise inflate what every
+	// bps edge divides, and the refusal would name whichever check that skew tripped first.
+	for key, executedSats := range executed {
+		if _, ok := declaredPairs[key]; !ok {
+			return fmt.Errorf("%w: %x -> %x for %d sats", ErrManifestUnlistedTransfer, key.sender.Serialize(), key.receiver.Serialize(), executedSats)
 		}
 	}
 
-	for key, executedSats := range executed {
-		if _, ok := declared[key]; !ok {
-			return fmt.Errorf("%w: %x -> %x for %d sats", ErrManifestUnlistedTransfer, key.sender.Serialize(), key.receiver.Serialize(), executedSats)
+	// The remainder is derived from the DECLARED flat total, so a short flat edge left for later
+	// moves every bps edge's window and is refused as one of theirs.
+	for i, edge := range edges {
+		amount, isSats := edge.GetAmount().GetAmount().(*spark.ManifestAmount_Sats)
+		if !isSats {
+			continue
+		}
+		executedSats, realized := executed[parsed[i]]
+		if !realized {
+			return fmt.Errorf("%w: %x -> %x for %d sats", ErrManifestEdgeNotRealized, parsed[i].sender.Serialize(), parsed[i].receiver.Serialize(), amount.Sats)
+		}
+		if executedSats != amount.Sats {
+			return fmt.Errorf("%w: %x -> %x declared %d sats, executed %d sats", ErrManifestAmountMismatch, parsed[i].sender.Serialize(), parsed[i].receiver.Serialize(), amount.Sats, executedSats)
+		}
+	}
+
+	var gross uint64
+	for _, executedSats := range executed {
+		total, err := addSats(gross, executedSats)
+		if err != nil {
+			return fmt.Errorf("executed gross: %w", err)
+		}
+		gross = total
+	}
+
+	declared, err := declaredEdgeTotals(edges, parsed, gross)
+	if err != nil {
+		return err
+	}
+
+	// An edge nobody funded shrinks the gross every other edge resolved against, so its absence
+	// pushes them out of their windows too. Naming it first keeps the cause ahead of its effects.
+	for key, resolved := range declared {
+		if _, realized := executed[key]; realized {
+			continue
+		}
+		// A bps edge flooring to zero is not levied, so nothing realizes it.
+		if resolved.sats == 0 {
+			continue
+		}
+		return fmt.Errorf("%w: %x -> %x for %d sats", ErrManifestEdgeNotRealized, key.sender.Serialize(), key.receiver.Serialize(), resolved.sats)
+	}
+
+	for key, resolved := range declared {
+		executedSats, ok := executed[key]
+		if !ok {
+			continue
+		}
+		if executedSats < resolved.sats || executedSats > resolved.allowed {
+			if resolved.allowed == resolved.sats {
+				return fmt.Errorf("%w: %x -> %x declared %d sats, executed %d sats", ErrManifestAmountMismatch, key.sender.Serialize(), key.receiver.Serialize(), resolved.sats, executedSats)
+			}
+			return fmt.Errorf("%w: %x -> %x resolved %d sats, executed %d sats", ErrManifestEdgeOutsideWindow, key.sender.Serialize(), key.receiver.Serialize(), resolved.sats, executedSats)
 		}
 	}
 
 	return nil
 }
 
+// allowed exceeds sats by one for a bps edge: independent flooring leaves the total short of the
+// gross, and edges[] names no payee, so the operator cannot say which party absorbs that dust.
+// An edge flooring to zero keeps that allowance: at a small gross the deficit can exceed the edges
+// that floored above zero, leaving no split that binds at all.
+type resolvedEdge struct {
+	sats    uint64
+	allowed uint64
+}
+
 // edges[] carries at most one entry per (sender, receiver): a key that is both a destination and
 // a fee receiver gets a single edge for its total, with fees[] annotating the slice. Summing
 // duplicates instead would let one movement have several valid signed forms, since the digest
 // covers the list as written.
-func declaredEdgeTotals(edges []*spark.ManifestEdge) (map[manifestEdgeKey]uint64, error) {
-	totals := make(map[manifestEdgeKey]uint64, len(edges))
-
+//
+// Refusing a repeat here, ahead of every sum, is what keeps a duplicate named for repeating rather
+// than for the rate table it corrupts.
+func declaredEdgeKeys(edges []*spark.ManifestEdge) ([]manifestEdgeKey, error) {
+	parsed := make([]manifestEdgeKey, len(edges))
+	seen := make(map[manifestEdgeKey]struct{}, len(edges))
 	for i, edge := range edges {
 		sender, err := keys.ParsePublicKey(edge.GetSenderIdentityPublicKey())
 		if err != nil {
@@ -306,18 +383,69 @@ func declaredEdgeTotals(edges []*spark.ManifestEdge) (map[manifestEdgeKey]uint64
 			return nil, fmt.Errorf("%w: edges[%d] receiver: %w", ErrManifestInvalidReceiver, i, err)
 		}
 
-		// The operator binds absolute sats only; a quoted bps edge must be resolved before it
-		// reaches here.
-		sats, ok := edge.GetAmount().GetAmount().(*spark.ManifestAmount_Sats)
-		if !ok {
-			return nil, fmt.Errorf("%w: edges[%d]", ErrManifestNonSatsEdge, i)
-		}
-
 		key := manifestEdgeKey{sender: sender, receiver: receiver}
-		if _, dup := totals[key]; dup {
+		if _, dup := seen[key]; dup {
 			return nil, fmt.Errorf("%w: edges[%d]: %x -> %x", ErrManifestDuplicateEdge, i, sender.Serialize(), receiver.Serialize())
 		}
-		totals[key] = sats.Sats
+		seen[key] = struct{}{}
+		parsed[i] = key
+	}
+	return parsed, nil
+}
+
+// Sats edges are flat charges and come off the top, so a bps rate means "of the amount being
+// split" rather than of the gross once a flat fee exists.
+//
+// gross pools every sender's leaves, so a rate is of the whole transfer rather than of the
+// signer's own contribution. Every sender signs the same manifest, so all of them commit to that
+// reading.
+func declaredEdgeTotals(edges []*spark.ManifestEdge, parsed []manifestEdgeKey, gross uint64) (map[manifestEdgeKey]resolvedEdge, error) {
+	var flatSats uint64
+	var bpsTotal uint64
+	anyBps := false
+	for i, edge := range edges {
+		switch amount := edge.GetAmount().GetAmount().(type) {
+		case *spark.ManifestAmount_Sats:
+			total, err := addSats(flatSats, amount.Sats)
+			if err != nil {
+				return nil, fmt.Errorf("edges[%d]: %w", i, err)
+			}
+			flatSats = total
+		case *spark.ManifestAmount_Bps:
+			anyBps = true
+			bpsTotal += uint64(amount.Bps)
+		default:
+			return nil, fmt.Errorf("%w: edges[%d]", ErrManifestNotHashable, i)
+		}
+	}
+
+	remainder := gross
+	if anyBps {
+		// Rates that do not partition the remainder leave the windows wide enough to admit a
+		// manifest declaring only part of the gross.
+		if bpsTotal != bpsDenominator {
+			return nil, fmt.Errorf("%w: edges sum to %d", ErrManifestBpsSumInvalid, bpsTotal)
+		}
+		if gross == 0 {
+			return nil, fmt.Errorf("%w: no executed value to divide", ErrManifestFlatFeesExceedGross)
+		}
+		if flatSats >= gross {
+			return nil, fmt.Errorf("%w: %d sats of %d", ErrManifestFlatFeesExceedGross, flatSats, gross)
+		}
+		remainder = gross - flatSats
+	}
+
+	totals := make(map[manifestEdgeKey]resolvedEdge, len(edges))
+	for i, edge := range edges {
+		switch amount := edge.GetAmount().GetAmount().(type) {
+		case *spark.ManifestAmount_Sats:
+			totals[parsed[i]] = resolvedEdge{sats: amount.Sats, allowed: amount.Sats}
+		case *spark.ManifestAmount_Bps:
+			// big.Int because remainder*bpsDenominator overflows uint64 near the total bitcoin supply.
+			product := new(big.Int).Mul(new(big.Int).SetUint64(remainder), new(big.Int).SetUint64(uint64(amount.Bps)))
+			resolved := product.Div(product, big.NewInt(bpsDenominator)).Uint64()
+			totals[parsed[i]] = resolvedEdge{sats: resolved, allowed: resolved + 1}
+		}
 	}
 
 	return totals, nil

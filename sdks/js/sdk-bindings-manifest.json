@@ -69,49 +69,49 @@
     "token-android": {
       "artifacts": {
         "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/uniffi/spark_token_primitives/spark_token_primitives.kt": "40fbc8221c9b1b94583993f8b4dfd72e603256ac305bb52ee72570648fd6435e",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_token_primitives.so": "54e33854ad4884465b8f02361fa5bbb71184f9e6e606f05b4a7158b65df870dc",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_token_primitives.so": "679bb391ad29bb5dff5f5490e484488a47a390ff96958ee58e30abb25bb555f1",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_token_primitives.so": "867130ce095fb929291e2855f2c0b7ca14d6fd704f727d8027f93c13c82d48a2",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so": "4292f95e0c8cb00ae6ba1c30e6e59379cc09ce9870b1872c94d45909e1ac5c74"
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_token_primitives.so": "c32f648c14c5d383c98c56570b2346eb37346c5358b493dbded9801e501fc368",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_token_primitives.so": "cc2b0df362eef5a18f1ac74619abc307a1c79f51f0c4d8c5e1c55314a3185999",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_token_primitives.so": "51f4741e2574d635fe7c729ed52e6343909667d619ee13d3a5119bf3b1dbc674",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so": "685ddc920a183c03cfa22ac29070f2dc197aaf52d323d6f4c5ed30516ebe2ab9"
       },
       "input_file_count": 40,
-      "input_sha256": "8e28975aea9896958f4dfcea190c87010018682268a92d20e052f6090874a642"
+      "input_sha256": "85d8f3d740f94d46adafa57360ab41d276a5fad64010947589b08a20c5e58612"
     },
     "token-ios": {
       "artifacts": {
         "sdks/js/packages/spark-sdk/ios/spark_token_primitives.swift": "a0d1c4fd679ef8116ba0113bd1d7aa19e58a8fd5b13507d49d10cd19e3664ddc",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/Info.plist": "077e9cf1f419bbaefcda01f35a6eb813b158f3c5692db634c6b07ce50de8bf37",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/SparkTokenPrimitives": "e3c48921158d7ebb4738f31d6de8857a3bd56870e2b6da4c717efcd02fa8b75b",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/SparkTokenPrimitives": "8b4cd502501ac35bfc7eedfd0ab4c0464802a6d411417fdb52795e4871de2974",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h": "a2c837a445a87bbe5722c3ff4613937b5d0c34647654419c0ac9d0d48de787f6",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h": "33eee021c0cf71a115ec2ca088769a94db492e946adcaf33b240d9e6a7947e46",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/Modules/module.modulemap": "ddab14b9c53a9102359432d4d13bb2e91c29befe1a9b9495b3c7f62276ab4142",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "e3c48921158d7ebb4738f31d6de8857a3bd56870e2b6da4c717efcd02fa8b75b",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/SparkTokenPrimitives": "2f5304d6f1551658eec0f429e97242c07d3a893d5fe7a8cef0ea6a47cd3cb0c5",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "8b4cd502501ac35bfc7eedfd0ab4c0464802a6d411417fdb52795e4871de2974",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/SparkTokenPrimitives": "7b001d87e83a32035e3d7c6e143fbad3bd48155a8e91bcbfdcb96339d70fa768",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h": "a2c837a445a87bbe5722c3ff4613937b5d0c34647654419c0ac9d0d48de787f6",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h": "33eee021c0cf71a115ec2ca088769a94db492e946adcaf33b240d9e6a7947e46",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/Modules/module.modulemap": "ddab14b9c53a9102359432d4d13bb2e91c29befe1a9b9495b3c7f62276ab4142",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "2f5304d6f1551658eec0f429e97242c07d3a893d5fe7a8cef0ea6a47cd3cb0c5",
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/ios-arm64_x86_64-simulator/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "7b001d87e83a32035e3d7c6e143fbad3bd48155a8e91bcbfdcb96339d70fa768",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h": "a2c837a445a87bbe5722c3ff4613937b5d0c34647654419c0ac9d0d48de787f6",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h": "33eee021c0cf71a115ec2ca088769a94db492e946adcaf33b240d9e6a7947e46",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Modules/module.modulemap": "ddab14b9c53a9102359432d4d13bb2e91c29befe1a9b9495b3c7f62276ab4142",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "534b7c4b4d1c5b35baa622fa9b3fed31219e86d519375815f9a44931369ccd7a"
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "5c4f2247c7bdba39744b391ab79dcd32c019527d50723fed3db5516bba93ced8"
       },
       "input_file_count": 45,
-      "input_sha256": "d00531a0a69c9fd234e42bcc4b81583fd569405c72514dc5c105e54a7cc8cd45"
+      "input_sha256": "4409c2cca0d6e867f43a6253fdd3f84a338d90e86348c5673648e1043a5b15e3"
     },
     "token-wasm": {
       "artifacts": {
-        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser-bg.wasm": "d7fecf615fc4469395afac1f1a2b20328eedcf1d7c9ed829374ae2d56bf09bec",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser-bg.wasm": "5adc81948d8624e16124d144a06d19fb6ad78142e81626e71f2f839b1c72682e",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser-bg.wasm.d.ts": "3d39f8be7b22fd6eee5ff799498cad6608532e590b96ce60768d709491c4e547",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser.d.ts": "c64dc2430e49382c0db403eca191d96a7c85429edb7f5c55b1cd71de6b9034c1",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser.js": "541a1ed3832c7aa1321bf5c0a3458921542f7e69f373de780976bc24256487d7",
-        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm": "cfe1a916fc29970fee54e779f086f80d1883c4b4763ac3940ee45093965d9b2d",
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm": "c2460547d28ff3a67da38891dafeef962b0a396af594a6260a9f7c17716b508d",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm.d.ts": "3d39f8be7b22fd6eee5ff799498cad6608532e590b96ce60768d709491c4e547",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.d.ts": "8d930a554a37eae280b3f3bfedd0b1cfa16e96708fcc92e6264f3fb524e6e3cc",
-        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js": "09f33b5d891062709281b0294f29e11906736087735157a70050fd6ba5862ae7"
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js": "eb6e01f3d100d00425b28cfd22f740819ffeda35365d9b68fcc85f29155ccde7"
       },
       "input_file_count": 40,
-      "input_sha256": "c56ca567690c8e1b789c37e58a20998f8c1033f23c35114a9e5515c3de26cac3"
+      "input_sha256": "b3a44e177ddd2ddcc6000e79d4dbfddc4b6cfaf0bcfc9d605cdbe9006b4f717c"
     }
   },
   "schema_version": 2

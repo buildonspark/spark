@@ -35,7 +35,9 @@ func TestClassifyManifestRefusalMapsEverySentinel(t *testing.T) {
 		{transferpkg.ErrManifestEdgeNotRealized, manifestRefusalEdgeCover},
 		{transferpkg.ErrManifestLeafNotRouted, manifestRefusalEdgeCover},
 		{transferpkg.ErrManifestUnlistedTransfer, manifestRefusalEdgeCover},
-		{transferpkg.ErrManifestNonSatsEdge, manifestRefusalEdgeCover},
+		{transferpkg.ErrManifestBpsSumInvalid, manifestRefusalBpsSum},
+		{transferpkg.ErrManifestEdgeOutsideWindow, manifestRefusalEdgeWindow},
+		{transferpkg.ErrManifestFlatFeesExceedGross, manifestRefusalFlatFeeBase},
 		{transferpkg.ErrManifestTotalOverflow, manifestRefusalAmountOverflow},
 		{transferpkg.ErrManifestDuplicateEdge, manifestRefusalDuplicate},
 		{transferpkg.ErrManifestDuplicateSender, manifestRefusalDuplicate},
@@ -142,6 +144,9 @@ func TestAttestorSignatureRefusalKind(t *testing.T) {
 func TestManifestRefusalKindLabelStrings(t *testing.T) {
 	labels := map[manifestRefusalKind]string{
 		manifestRefusalEdgeCover:          "edge_cover",
+		manifestRefusalBpsSum:             "bps_sum",
+		manifestRefusalFlatFeeBase:        "flat_fee_base",
+		manifestRefusalEdgeWindow:         "edge_window",
 		manifestRefusalAmountOverflow:     "amount_overflow",
 		manifestRefusalDuplicate:          "duplicate",
 		manifestRefusalExpiry:             "expiry",

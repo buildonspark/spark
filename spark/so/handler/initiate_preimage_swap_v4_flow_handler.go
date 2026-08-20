@@ -357,9 +357,10 @@ func (h *InitiatePreimageSwapV4FlowHandler) Prepare(ctx context.Context, op prot
 //
 // Trust in that map comes from being pinned from two directions, both on every operator:
 // validateGetPreimageRequest proves each leaf's refund output pays the receiver the map names,
-// and requireAndBindManifest's exact cover proves those receivers aggregate exactly to the
-// sender-signed edges. Neither alone suffices — the first attests to routing nobody signed,
-// the second to an aggregate whose refunds may pay someone else.
+// and requireAndBindManifest's cover proves those receivers aggregate to the sender-signed edges,
+// exactly for a sats edge and within a satoshi of its resolved share for a bps one. Neither alone
+// suffices — the first attests to routing nobody signed, the second to an aggregate whose refunds
+// may pay someone else.
 func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, req *pbspark.InitiatePreimageSwapV4Request, senderKeyTweakProofs map[string]*pbspark.SecretProof) (*preimageSwapPreparedState, error) {
 	// v4 SEND needs an HTLC-refund validator for the per-leaf shape that does not exist yet, and
 	// send's fee cut rides the real user→SSP edge rather than separate fee legs, so it is a
