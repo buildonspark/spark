@@ -347,6 +347,11 @@ func TestQueryNodes_StatusField(t *testing.T) {
 			shouldBeFound: false,
 		},
 		{
+			name:          "Creation abandoned status - should be filtered out",
+			status:        st.TreeNodeStatusCreationAbandoned,
+			shouldBeFound: false,
+		},
+		{
 			name:          "Renew locked status",
 			status:        st.TreeNodeStatusRenewLocked,
 			shouldBeFound: true,

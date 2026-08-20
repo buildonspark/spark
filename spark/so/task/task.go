@@ -35,8 +35,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
-	"github.com/lightsparkdev/spark/so/ent/tree"
-	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/entephemeral"
 	"github.com/lightsparkdev/spark/so/handler"
@@ -51,7 +49,7 @@ var (
 	confirmPendingDKGKeysCutoffAge     = 15 * time.Minute
 	defaultTaskTimeout                 = 1 * time.Minute
 	dkgTaskTimeout                     = 3 * time.Minute
-	deleteStaleTreeNodesTaskTimeout    = 10 * time.Minute
+	retireAbandonedPendingTreesTimeout = 10 * time.Minute
 	purgeSigningNoncePartitionsTimeout = 10 * time.Minute
 
 	// Timeout stays under the 5-minute execution interval so runs don't overlap.
@@ -396,68 +394,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 		{
 			ExecutionInterval: 1 * time.Hour,
 			BaseTaskSpec: BaseTaskSpec{
-				Name:         "delete_stale_pending_trees",
-				Timeout:      &deleteStaleTreeNodesTaskTimeout,
+				Name:         "retire_abandoned_pending_trees",
+				Timeout:      &retireAbandonedPendingTreesTimeout,
 				RunInTestEnv: false,
-				// TODO(LIG-7896): This task keeps on getting stuck on
-				// very large trees. Disabling for now as we investigate
-				Disabled: true,
-				Task: func(ctx context.Context, _ *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx).Sugar()
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-
-					// Find tree nodes that are:
-					// 1. Older than 5 days
-					// 2. Have status "CREATING"
-					// 3. Belong to trees with status "PENDING"
-					query := tx.TreeNode.Query().Where(
-						treenode.StatusEQ(st.TreeNodeStatusCreating),
-						treenode.CreateTimeLTE(time.Now().Add(-5*24*time.Hour)),
-						treenode.HasTreeWith(tree.StatusEQ(st.TreeStatusPending)),
-					).WithTree()
-
-					treeNodes, err := query.All(ctx)
-					if err != nil {
-						logger.Error("Failed to query tree nodes", zap.Error(err))
-						return err
-					}
-
-					if len(treeNodes) == 0 {
-						logger.Info("Found no stale tree nodes.")
-						return nil
-					}
-
-					treeToTreeNodes := make(map[uuid.UUID][]uuid.UUID)
-					for _, node := range treeNodes {
-						treeID := node.Edges.Tree.ID
-						treeToTreeNodes[treeID] = append(treeToTreeNodes[treeID], node.ID)
-					}
-
-					for treeID, treeNodeIDs := range treeToTreeNodes {
-						logger.Infof("Deleting stale tree %s along with associated tree nodes (%d in total).", treeID, len(treeNodeIDs))
-
-						numDeleted, err := tx.TreeNode.Delete().Where(treenode.IDIn(treeNodeIDs...)).Exec(ctx)
-						if err != nil {
-							logger.With(zap.Error(err)).Errorf("Failed to delete tree nodes for tree %s", treeID)
-							return err
-						}
-
-						logger.Infof("Deleted %d tree nodes.", numDeleted)
-
-						// Delete the associated trees
-						_, err = tx.Tree.Delete().Where(tree.IDEQ(treeID)).Exec(ctx)
-						if err != nil {
-							logger.With(zap.Error(err)).Errorf("Failed to delete tree %s", treeID)
-							return err
-						}
-
-						logger.Infof("Deleted tree %s", treeID)
-					}
-
-					return nil
+				Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+					return retireAbandonedPendingTrees(ctx)
 				},
 			},
 		},

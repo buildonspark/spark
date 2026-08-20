@@ -14,6 +14,7 @@ func TestTreeNodeStatusIsTerminal(t *testing.T) {
 		TreeNodeStatusReimbursed:              true,
 		TreeNodeStatusWatchtowerExited:        true,
 		TreeNodeStatusWatchtowerExitRecovered: true,
+		TreeNodeStatusCreationAbandoned:       true,
 	}
 	for _, v := range (TreeNodeStatus("")).Values() {
 		s := TreeNodeStatus(v)
@@ -179,9 +180,21 @@ func TestTreeNodeStatusWatchtowerExitRecovered(t *testing.T) {
 	assert.Contains(t, WatchtowerExitSweepExcludedStatuses(), TreeNodeStatusWatchtowerExitRecovered)
 }
 
+func TestTreeNodeStatusCreationAbandoned(t *testing.T) {
+	// The funding tx never confirmed and the creation flow is dead, so nothing
+	// in the tree can ever reach the chain: never revivable, invisible to
+	// occupancy, no watchtower work, and never overwritten by an exit sweep.
+	assert.True(t, TreeNodeStatusCreationAbandoned.IsTerminal())
+	assert.False(t, TreeNodeStatusCreationAbandoned.CanBecomeAvailable())
+	assert.False(t, TreeNodeStatusCreationAbandoned.CountsForOccupancy())
+	assert.False(t, TreeNodeStatusCreationAbandoned.IsExitedToL1())
+	assert.Contains(t, ParentExitSweepExcludedStatuses(), TreeNodeStatusCreationAbandoned)
+	assert.Contains(t, WatchtowerExitSweepExcludedStatuses(), TreeNodeStatusCreationAbandoned)
+}
+
 func TestOccupancyTreeNodeStatuses_ExcludesTerminalAndAvailable(t *testing.T) {
 	occupancy := OccupancyTreeNodeStatuses()
-	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-9)
+	assert.Len(t, occupancy, len((TreeNodeStatus("")).Values())-10)
 	for _, s := range occupancy {
 		assert.True(t, s.CountsForOccupancy())
 		assert.False(t, s.IsTerminal())
