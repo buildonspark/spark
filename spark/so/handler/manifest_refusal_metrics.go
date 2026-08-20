@@ -19,6 +19,9 @@ type manifestRefusalKind string
 
 const (
 	manifestRefusalEdgeCover          manifestRefusalKind = "edge_cover"
+	manifestRefusalBpsSum             manifestRefusalKind = "bps_sum"
+	manifestRefusalFlatFeeBase        manifestRefusalKind = "flat_fee_base"
+	manifestRefusalEdgeWindow         manifestRefusalKind = "edge_window"
 	manifestRefusalAmountOverflow     manifestRefusalKind = "amount_overflow"
 	manifestRefusalDuplicate          manifestRefusalKind = "duplicate"
 	manifestRefusalExpiry             manifestRefusalKind = "expiry"
@@ -42,6 +45,9 @@ const (
 // new kind fails the suite until its label string is stated.
 var allManifestRefusalKinds = []manifestRefusalKind{
 	manifestRefusalEdgeCover,
+	manifestRefusalBpsSum,
+	manifestRefusalFlatFeeBase,
+	manifestRefusalEdgeWindow,
 	manifestRefusalAmountOverflow,
 	manifestRefusalDuplicate,
 	manifestRefusalExpiry,
@@ -82,7 +88,9 @@ var manifestRefusalKindsBySentinel = []struct {
 	{transferpkg.ErrManifestEdgeNotRealized, manifestRefusalEdgeCover},
 	{transferpkg.ErrManifestLeafNotRouted, manifestRefusalEdgeCover},
 	{transferpkg.ErrManifestUnlistedTransfer, manifestRefusalEdgeCover},
-	{transferpkg.ErrManifestNonSatsEdge, manifestRefusalEdgeCover},
+	{transferpkg.ErrManifestBpsSumInvalid, manifestRefusalBpsSum},
+	{transferpkg.ErrManifestEdgeOutsideWindow, manifestRefusalEdgeWindow},
+	{transferpkg.ErrManifestFlatFeesExceedGross, manifestRefusalFlatFeeBase},
 	{transferpkg.ErrManifestTotalOverflow, manifestRefusalAmountOverflow},
 	{transferpkg.ErrManifestDuplicateEdge, manifestRefusalDuplicate},
 	{transferpkg.ErrManifestDuplicateSender, manifestRefusalDuplicate},

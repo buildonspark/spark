@@ -1972,10 +1972,10 @@ export interface TransferManifest {
   quoteExpiryTime: Date | undefined;
 }
 
-/** An amount as absolute sats or basis points of gross. */
+/** An amount as absolute sats, or as basis points of what the sats amounts leave behind. */
 export interface ManifestAmount {
   amount?: { $case: "sats"; sats: number } | //
-  /** basis points of gross */
+  /** Basis points of the gross less every sats-denominated edge. */
   { $case: "bps"; bps: number } | undefined;
 }
 

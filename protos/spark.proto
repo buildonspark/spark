@@ -1107,11 +1107,12 @@ message TransferManifest {
     google.protobuf.Timestamp quote_expiry_time = 7;
 }
 
-// An amount as absolute sats or basis points of gross.
+// An amount as absolute sats, or as basis points of what the sats amounts leave behind.
 message ManifestAmount {
     oneof amount {
         uint64 sats = 1;
-        uint32 bps = 2;  // basis points of gross
+        // Basis points of the gross less every sats-denominated edge.
+        uint32 bps = 2;
     }
 }
 

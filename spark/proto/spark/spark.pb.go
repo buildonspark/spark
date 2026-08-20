@@ -6488,7 +6488,7 @@ func (x *TransferManifest) GetQuoteExpiryTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// An amount as absolute sats or basis points of gross.
+// An amount as absolute sats, or as basis points of what the sats amounts leave behind.
 type ManifestAmount struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Amount:
@@ -6564,7 +6564,8 @@ type ManifestAmount_Sats struct {
 }
 
 type ManifestAmount_Bps struct {
-	Bps uint32 `protobuf:"varint,2,opt,name=bps,proto3,oneof"` // basis points of gross
+	// Basis points of the gross less every sats-denominated edge.
+	Bps uint32 `protobuf:"varint,2,opt,name=bps,proto3,oneof"`
 }
 
 func (*ManifestAmount_Sats) isManifestAmount_Amount() {}

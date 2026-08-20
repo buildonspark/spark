@@ -319,12 +319,6 @@ func TestBindManifestExactCoverViolations(t *testing.T) {
 			mutate:      func(f *bindingFixture) { f.dropLeafSats["leaf-b"] = true },
 			expectedErr: ErrManifestUnknownLeaf,
 		},
-		"edge denominated in bps": {
-			mutate: func(f *bindingFixture) {
-				f.manifest.Edges[0].Amount = &spark.ManifestAmount{Amount: &spark.ManifestAmount_Bps{Bps: 100}}
-			},
-			expectedErr: ErrManifestNonSatsEdge,
-		},
 	}
 
 	for name, test := range tests {
@@ -713,4 +707,438 @@ func TestBindManifestRejectsAnUnhashableManifest(t *testing.T) {
 	req.TransferManifest.Version = 99
 
 	require.ErrorIs(t, BindManifest(req, f.network, f.leafRecords()), ErrManifestNotHashable)
+}
+
+func bpsOf(bps uint32) *spark.ManifestAmount {
+	return &spark.ManifestAmount{Amount: &spark.ManifestAmount_Bps{Bps: bps}}
+}
+
+func bpsEdge(sender, receiver keys.Public, bps uint32) *spark.ManifestEdge {
+	return &spark.ManifestEdge{
+		SenderIdentityPublicKey:   sender.Serialize(),
+		ReceiverIdentityPublicKey: receiver.Serialize(),
+		Amount:                    bpsOf(bps),
+	}
+}
+
+func bpsFixture(t *testing.T) *bindingFixture {
+	t.Helper()
+	f := newBindingFixture(t)
+	f.manifest.Edges[0].Amount = bpsOf(6000)
+	f.manifest.Edges[1].Amount = bpsOf(4000)
+	return f
+}
+
+func TestBindManifestResolvesBpsAgainstTheExecutedGross(t *testing.T) {
+	require.NoError(t, bpsFixture(t).bind())
+}
+
+// 999 at 6000/4000 floors to 599 + 399, one short of the gross; the SSP places that sat.
+func TestBindManifestAdmitsTheRoundingRemainderOnEitherEdge(t *testing.T) {
+	for name, leaves := range map[string][]leafSpec{
+		"remainder on the first edge":  {{id: "leaf-a", sats: 600}, {id: "leaf-b", sats: 399}},
+		"remainder on the second edge": {{id: "leaf-a", sats: 599}, {id: "leaf-b", sats: 400}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := bpsFixture(t)
+			for i := range leaves {
+				leaves[i].receiver = f.senders[0].leafs[i].receiver
+			}
+			f.senders[0].leafs = leaves
+			require.NoError(t, f.bind())
+		})
+	}
+}
+
+func TestBindManifestRejectsAnEdgeTwoAboveItsFloor(t *testing.T) {
+	f := bpsFixture(t)
+	f.senders[0].leafs = []leafSpec{
+		{id: "leaf-a", receiver: f.senders[0].leafs[0].receiver, sats: 601},
+		{id: "leaf-b", receiver: f.senders[0].leafs[1].receiver, sats: 398},
+	}
+	require.ErrorIs(t, f.bind(), ErrManifestEdgeOutsideWindow)
+}
+
+func TestBindManifestTakesFlatSatsOffTheTopBeforeResolvingBps(t *testing.T) {
+	f := newBindingFixture(t)
+	flatFeeKey := keys.GeneratePrivateKey().Public()
+	sender := f.senders[0].key.Public()
+	f.manifest.Edges = []*spark.ManifestEdge{
+		bpsEdge(sender, f.senders[0].leafs[0].receiver, 6000),
+		bpsEdge(sender, f.senders[0].leafs[1].receiver, 4000),
+		edge(sender, flatFeeKey, 100),
+	}
+	// R = 1000 - 100 = 900 -> 540 / 360.
+	f.senders[0].leafs = []leafSpec{
+		{id: "leaf-a", receiver: f.senders[0].leafs[0].receiver, sats: 540},
+		{id: "leaf-b", receiver: f.senders[0].leafs[1].receiver, sats: 360},
+		{id: "leaf-c", receiver: flatFeeKey, sats: 100},
+	}
+	require.NoError(t, f.bind())
+}
+
+func TestBindManifestDropsABpsEdgeThatFloorsToZero(t *testing.T) {
+	f := newBindingFixture(t)
+	sender := f.senders[0].key.Public()
+	dust := keys.GeneratePrivateKey().Public()
+	f.manifest.Edges = []*spark.ManifestEdge{
+		bpsEdge(sender, f.senders[0].leafs[0].receiver, 9999),
+		bpsEdge(sender, dust, 1),
+	}
+	f.senders[0].leafs = []leafSpec{{id: "leaf-a", receiver: f.senders[0].leafs[0].receiver, sats: 40}}
+	require.NoError(t, f.bind())
+}
+
+func TestBindManifestBpsRefusals(t *testing.T) {
+	tests := map[string]struct {
+		mutate      func(*bindingFixture)
+		expectedErr error
+	}{
+		// Without the sum check the window is a slack budget that swallows this at small grosses.
+		"bps under-declaring the gross": {
+			mutate: func(f *bindingFixture) {
+				f.manifest.Edges[0].Amount = bpsOf(3000)
+				f.manifest.Edges[1].Amount = bpsOf(2000)
+			},
+			expectedErr: ErrManifestBpsSumInvalid,
+		},
+		"bps over-declaring the gross": {
+			mutate: func(f *bindingFixture) {
+				f.manifest.Edges[0].Amount = bpsOf(7000)
+				f.manifest.Edges[1].Amount = bpsOf(4000)
+			},
+			expectedErr: ErrManifestBpsSumInvalid,
+		},
+		"flat sats exceeding the gross": {
+			mutate: func(f *bindingFixture) {
+				f.manifest.Edges[0].Amount = satsOf(1001)
+				f.manifest.Edges[1].Amount = bpsOf(10000)
+				f.senders[0].leafs[0].sats = 1001
+				f.senders[0].leafs[1].sats = 0
+			},
+			expectedErr: ErrManifestFlatFeesExceedGross,
+		},
+		"flat sats consuming the whole gross": {
+			mutate: func(f *bindingFixture) {
+				f.manifest.Edges[0].Amount = satsOf(1000)
+				f.manifest.Edges[1].Amount = bpsOf(10000)
+				f.senders[0].leafs[0].sats = 1000
+				f.senders[0].leafs[1].sats = 0
+			},
+			expectedErr: ErrManifestFlatFeesExceedGross,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := bpsFixture(t)
+			test.mutate(f)
+			require.ErrorIs(t, f.bind(), test.expectedErr)
+		})
+	}
+}
+
+func TestBindManifestKeepsExactEqualityWithNoBpsEdge(t *testing.T) {
+	f := newBindingFixture(t)
+	f.senders[0].leafs[0].sats = 601
+	f.senders[0].leafs[1].sats = 399
+	require.ErrorIs(t, f.bind(), ErrManifestAmountMismatch)
+}
+
+// One edge over its ceiling, the rest inside their windows, so only the upper bound can refuse it.
+func TestBindManifestRejectsAnEdgeAboveItsCeilingAlone(t *testing.T) {
+	f := newBindingFixture(t)
+	sender := f.senders[0].key.Public()
+	third := keys.GeneratePrivateKey().Public()
+	f.manifest.Edges = []*spark.ManifestEdge{
+		bpsEdge(sender, f.senders[0].leafs[0].receiver, 6000),
+		bpsEdge(sender, f.senders[0].leafs[1].receiver, 3000),
+		bpsEdge(sender, third, 1000),
+	}
+	f.senders[0].leafs = []leafSpec{
+		{id: "leaf-a", receiver: f.senders[0].leafs[0].receiver, sats: 601},
+		{id: "leaf-b", receiver: f.senders[0].leafs[1].receiver, sats: 299},
+		{id: "leaf-c", receiver: third, sats: 99},
+	}
+	require.ErrorIs(t, f.bind(), ErrManifestEdgeOutsideWindow)
+}
+
+// Rates divide the gross pooled across senders, not each sender's own contribution.
+func TestBindManifestResolvesBpsAgainstTheGrossPooledAcrossSenders(t *testing.T) {
+	pooled := func(t *testing.T, rateA, rateB uint32) *bindingFixture {
+		t.Helper()
+		f := newBindingFixture(t)
+		senderA := f.senders[0].key
+		senderB := keys.GeneratePrivateKey()
+		receiverA := f.senders[0].leafs[0].receiver
+		receiverC := keys.GeneratePrivateKey().Public()
+
+		f.senders = []senderSpec{
+			{key: senderA, leafs: []leafSpec{{id: "leaf-a", receiver: receiverA, sats: 600}}},
+			{key: senderB, leafs: []leafSpec{{id: "leaf-c", receiver: receiverC, sats: 400}}},
+		}
+		f.manifest.Edges = []*spark.ManifestEdge{
+			bpsEdge(senderA.Public(), receiverA, rateA),
+			bpsEdge(senderB.Public(), receiverC, rateB),
+		}
+		return f
+	}
+
+	t.Run("rates summing to the denominator across senders", func(t *testing.T) {
+		require.NoError(t, pooled(t, 6000, 4000).bind())
+	})
+
+	t.Run("rates normalized per sender", func(t *testing.T) {
+		require.ErrorIs(t, pooled(t, 10000, 10000).bind(), ErrManifestBpsSumInvalid)
+	})
+}
+
+// Shifting a satoshi between two flat edges holds the gross still, so only exactness can refuse it.
+func TestBindManifestKeepsFlatSatsExactBesideBpsEdges(t *testing.T) {
+	for name, firstFlatSats := range map[string]uint64{
+		"flat edge over-collecting":  101,
+		"flat edge under-collecting": 99,
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newBindingFixture(t)
+			sender := f.senders[0].key.Public()
+			flatFeeKey := keys.GeneratePrivateKey().Public()
+			secondFlatKey := keys.GeneratePrivateKey().Public()
+			f.manifest.Edges = []*spark.ManifestEdge{
+				bpsEdge(sender, f.senders[0].leafs[0].receiver, 10000),
+				edge(sender, flatFeeKey, 100),
+				edge(sender, secondFlatKey, 100),
+			}
+			f.senders[0].leafs = []leafSpec{
+				{id: "leaf-a", receiver: f.senders[0].leafs[0].receiver, sats: 800},
+				{id: "leaf-c", receiver: flatFeeKey, sats: firstFlatSats},
+				{id: "leaf-d", receiver: secondFlatKey, sats: 200 - firstFlatSats},
+			}
+			require.ErrorIs(t, f.bind(), ErrManifestAmountMismatch)
+		})
+	}
+}
+
+// Distinct receivers keep each per-edge total unwrapped, so the overflow can only be caught while
+// summing the gross across edges.
+func TestBindManifestRejectsAGrossOverflowingAcrossEdges(t *testing.T) {
+	f := newBindingFixture(t)
+	sender := f.senders[0].key.Public()
+	f.manifest.Edges = []*spark.ManifestEdge{
+		bpsEdge(sender, f.senders[0].leafs[0].receiver, 5000),
+		bpsEdge(sender, f.senders[0].leafs[1].receiver, 5000),
+	}
+	f.senders[0].leafs = []leafSpec{
+		{id: "leaf-a", receiver: f.senders[0].leafs[0].receiver, sats: 1 << 63},
+		{id: "leaf-b", receiver: f.senders[0].leafs[1].receiver, sats: 1 << 63},
+	}
+	require.ErrorIs(t, f.bind(), ErrManifestTotalOverflow)
+}
+
+// gross*10000 exceeds uint64 here, so a resolver that does not widen wraps and refuses.
+func TestBindManifestResolvesBpsAtTheTotalSatoshiSupply(t *testing.T) {
+	const maxSatoshi = 2_100_000_000_000_000
+	f := newBindingFixture(t)
+	sender := f.senders[0].key.Public()
+	receiver := f.senders[0].leafs[0].receiver
+	f.manifest.Edges = []*spark.ManifestEdge{bpsEdge(sender, receiver, 10000)}
+	f.senders[0].leafs = []leafSpec{{id: "leaf-a", receiver: receiver, sats: maxSatoshi}}
+
+	require.NoError(t, f.bind())
+}
+
+// Refused before the flat-fee comparison, which would name fees this manifest does not carry.
+func TestBindManifestRejectsABpsManifestAgainstAZeroGross(t *testing.T) {
+	f := newBindingFixture(t)
+	sender := f.senders[0].key.Public()
+	receiver := f.senders[0].leafs[0].receiver
+	f.manifest.Edges = []*spark.ManifestEdge{bpsEdge(sender, receiver, 10000)}
+	f.senders[0].leafs = []leafSpec{{id: "leaf-a", receiver: receiver, sats: 0}}
+
+	require.ErrorIs(t, f.bind(), ErrManifestFlatFeesExceedGross)
+}
+
+// A stray leaf inflates the gross every bps edge resolves against, so without an early unlisted
+// check the refusal names a window miss on an edge that did nothing wrong.
+func TestBindManifestNamesTheUnlistedPairEvenWhenItSkewsTheGross(t *testing.T) {
+	f := bpsFixture(t)
+	stray := keys.GeneratePrivateKey().Public()
+	f.senders[0].leafs = append(f.senders[0].leafs, leafSpec{id: "leaf-stray", receiver: stray, sats: 1000})
+
+	require.ErrorIs(t, f.bind(), ErrManifestUnlistedTransfer)
+}
+
+// A quoted receive whose fee edges all floor to zero still has a binding split: at these grosses
+// the only edges left to carry the deficit are the ones that floored to nothing.
+func TestBindManifestBindsASmallGrossWhoseFeeEdgesFloorToZero(t *testing.T) {
+	for _, gross := range []uint64{101, 150, 333} {
+		t.Run(fmt.Sprintf("gross %d", gross), func(t *testing.T) {
+			f := newBindingFixture(t)
+			sender := f.senders[0].key.Public()
+			payee := f.senders[0].leafs[0].receiver
+			feeReceivers := []keys.Public{
+				keys.GeneratePrivateKey().Public(),
+				keys.GeneratePrivateKey().Public(),
+				keys.GeneratePrivateKey().Public(),
+			}
+			f.manifest.Edges = []*spark.ManifestEdge{
+				bpsEdge(sender, payee, 9900),
+				bpsEdge(sender, feeReceivers[0], 50),
+				bpsEdge(sender, feeReceivers[1], 30),
+				bpsEdge(sender, feeReceivers[2], 20),
+			}
+
+			// The payee absorbs whatever the three fee edges cannot, so the leaves always sum to
+			// the gross the case is named for.
+			deficit := gross - gross*9900/bpsDenominator
+			onFees := min(deficit, uint64(len(feeReceivers)))
+			leaves := []leafSpec{{id: "leaf-a", receiver: payee, sats: gross - onFees}}
+			for i, feeReceiver := range feeReceivers {
+				sats := uint64(0)
+				if uint64(i) < onFees {
+					sats = 1
+				}
+				leaves = append(leaves, leafSpec{id: fmt.Sprintf("leaf-fee-%d", i), receiver: feeReceiver, sats: sats})
+			}
+			f.senders[0].leafs = leaves
+
+			var total uint64
+			for _, leaf := range leaves {
+				total += leaf.sats
+			}
+			require.Equal(t, gross, total, "fixture must execute the gross it names")
+			require.NoError(t, f.bind())
+		})
+	}
+}
+
+// The dust an SSP may move between edges is the flooring deficit, so one edge cannot take a second
+// sat by shorting another even when many edges give it room.
+func TestBindManifestBoundsMisallocationByTheFlooringDeficit(t *testing.T) {
+	const edgeCount = 16
+	f := newBindingFixture(t)
+	sender := f.senders[0].key.Public()
+
+	rate := uint32(bpsDenominator / edgeCount)
+	edges := make([]*spark.ManifestEdge, 0, edgeCount)
+	receivers := make([]keys.Public, 0, edgeCount)
+	for i := range edgeCount {
+		receiver := keys.GeneratePrivateKey().Public()
+		receivers = append(receivers, receiver)
+		thisRate := rate
+		if i == 0 {
+			thisRate = uint32(bpsDenominator) - rate*uint32(edgeCount-1)
+		}
+		edges = append(edges, bpsEdge(sender, receiver, thisRate))
+	}
+	f.manifest.Edges = edges
+
+	// 1000 over 16 equal edges floors to 62 each with 8 sats of deficit. The first edge takes two
+	// of them; every later edge can give up at most its own single sat, so no split of the rest
+	// keeps them all inside their windows.
+	leaves := make([]leafSpec, 0, edgeCount)
+	leaves = append(leaves, leafSpec{id: "leaf-0", receiver: receivers[0], sats: 64})
+	for i := 1; i < edgeCount; i++ {
+		sats := uint64(62)
+		if i <= 6 {
+			sats = 63
+		}
+		leaves = append(leaves, leafSpec{id: fmt.Sprintf("leaf-%d", i), receiver: receivers[i], sats: sats})
+	}
+	f.senders[0].leafs = leaves
+
+	require.ErrorIs(t, f.bind(), ErrManifestEdgeOutsideWindow)
+}
+
+// Each of these skews the gross or the rate table, so a later check would fire first and name a
+// consequence instead of the manifest's actual defect.
+func TestBindManifestNamesTheDefectRatherThanWhatItSkewed(t *testing.T) {
+	tests := map[string]struct {
+		mutate      func(*bindingFixture)
+		expectedErr error
+	}{
+		"unlisted pair driving the flat fee past the gross": {
+			mutate: func(f *bindingFixture) {
+				sender := f.senders[0].key.Public()
+				stray := keys.GeneratePrivateKey().Public()
+				f.manifest.Edges = []*spark.ManifestEdge{
+					edge(sender, f.senders[0].leafs[0].receiver, 1000),
+					bpsEdge(sender, f.senders[0].leafs[1].receiver, 10000),
+				}
+				f.senders[0].leafs = []leafSpec{{id: "leaf-x", receiver: stray, sats: 500}}
+			},
+			expectedErr: ErrManifestUnlistedTransfer,
+		},
+		"duplicate edges doubling the declared rate": {
+			mutate: func(f *bindingFixture) {
+				sender := f.senders[0].key.Public()
+				receiver := f.senders[0].leafs[0].receiver
+				f.manifest.Edges = []*spark.ManifestEdge{
+					bpsEdge(sender, receiver, 6000),
+					bpsEdge(sender, receiver, 6000),
+				}
+				f.senders[0].leafs = []leafSpec{{id: "leaf-a", receiver: receiver, sats: 1000}}
+			},
+			expectedErr: ErrManifestDuplicateEdge,
+		},
+		"flat edge executing less than it declares": {
+			mutate: func(f *bindingFixture) {
+				sender := f.senders[0].key.Public()
+				payee := f.senders[0].leafs[0].receiver
+				flat := keys.GeneratePrivateKey().Public()
+				f.manifest.Edges = []*spark.ManifestEdge{
+					bpsEdge(sender, payee, 10000),
+					edge(sender, flat, 100),
+				}
+				f.senders[0].leafs = []leafSpec{
+					{id: "leaf-a", receiver: payee, sats: 950},
+					{id: "leaf-f", receiver: flat, sats: 50},
+				}
+			},
+			expectedErr: ErrManifestAmountMismatch,
+		},
+		"flat edge executing nothing at all": {
+			mutate: func(f *bindingFixture) {
+				sender := f.senders[0].key.Public()
+				payee := f.senders[0].leafs[0].receiver
+				flat := keys.GeneratePrivateKey().Public()
+				f.manifest.Edges = []*spark.ManifestEdge{
+					bpsEdge(sender, payee, 10000),
+					edge(sender, flat, 100),
+				}
+				f.senders[0].leafs = []leafSpec{{id: "leaf-a", receiver: payee, sats: 1000}}
+			},
+			expectedErr: ErrManifestEdgeNotRealized,
+		},
+		"bps edge nobody funded": {
+			mutate: func(f *bindingFixture) {
+				sender := f.senders[0].key.Public()
+				a := f.senders[0].leafs[0].receiver
+				b := f.senders[0].leafs[1].receiver
+				ghost := keys.GeneratePrivateKey().Public()
+				f.manifest.Edges = []*spark.ManifestEdge{
+					bpsEdge(sender, a, 5000),
+					bpsEdge(sender, b, 4000),
+					bpsEdge(sender, ghost, 1000),
+				}
+				f.senders[0].leafs = []leafSpec{
+					{id: "leaf-a", receiver: a, sats: 500},
+					{id: "leaf-b", receiver: b, sats: 400},
+				}
+			},
+			expectedErr: ErrManifestEdgeNotRealized,
+		},
+		"unparseable sender on a bps edge": {
+			mutate:      func(f *bindingFixture) { f.manifest.Edges[0].SenderIdentityPublicKey = []byte{0x02, 0x00} },
+			expectedErr: ErrManifestInvalidSender,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := bpsFixture(t)
+			test.mutate(f)
+			require.ErrorIs(t, f.bind(), test.expectedErr)
+		})
+	}
 }
