@@ -72,6 +72,7 @@ lefthook-local.yml
 
 # Playwright
 /output/playwright/
+/output/playwright-report/
 
 signer/spark-token-primitives-uniffi/spark-token-primitives-python/spark_token_primitives_python.egg-info/
 signer/spark-token-primitives-uniffi/spark-token-primitives-python/src/spark_token_primitives/__pycache__/

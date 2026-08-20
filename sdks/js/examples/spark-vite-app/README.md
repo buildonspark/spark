@@ -93,8 +93,10 @@ Playwright records the SHA-256 of each WASM module instantiated by Chromium and
 compares it with the binding file on disk. The UI journeys also record the
 specific FROST methods reached through app controls. In binding CI, the WASM
 files are first replaced with artifacts produced by the current workflow run.
-CI records video for every browser test. Spark hermetic uploads them under
-`output/playwright`; SSP hermetic includes them under `logs/playwright`.
+CI records video for every browser test and produces an HTML report containing
+the complete test list and results. Spark hermetic uploads the videos, traces,
+and HTML report in a dedicated `playwright-*` artifact. SSP hermetic includes
+them under `logs/playwright` and `logs/playwright-report` in its logs artifact.
 
 ## Notes
 

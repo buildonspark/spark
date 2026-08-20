@@ -543,7 +543,17 @@ function App() {
 
   const createInvoice = async () => {
     if (!wallet) return;
-    const amount = parseInt(invoiceAmount, 10) || 0;
+    const normalizedAmount = invoiceAmount.trim();
+    const amount = Number(normalizedAmount);
+    if (
+      !/^\d+$/.test(normalizedAmount) ||
+      !Number.isSafeInteger(amount) ||
+      amount <= 0
+    ) {
+      setStatus({ type: "error", message: "Enter a valid invoice amount" });
+      return;
+    }
+
     setStatus({ type: "info", message: "Creating invoice..." });
     try {
       const result = await wallet.createLightningInvoice({
