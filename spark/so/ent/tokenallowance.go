@@ -43,6 +43,10 @@ type TokenAllowance struct {
 	PerTransactionCap []byte `json:"per_transaction_cap,omitempty"`
 	// Cumulative value the spender may move over the allowance lifetime, as a uint128 big-endian.
 	TotalLimit []byte `json:"total_limit,omitempty"`
+	// Owner-signed waiver of the per-transaction ceiling (payload v2+). NULL/false means bounded (fail-closed).
+	PerTransactionUnlimited bool `json:"per_transaction_unlimited,omitempty"`
+	// Owner-signed waiver of the lifetime total ceiling (payload v2+); spent_amount still meters. NULL/false means bounded (fail-closed).
+	TotalUnlimited bool `json:"total_unlimited,omitempty"`
 	// Value already spent against this allowance, as a uint128 big-endian.
 	SpentAmount []byte `json:"spent_amount,omitempty"`
 	// Recipient public keys the spender may pay; empty permits any recipient.
@@ -117,6 +121,8 @@ func (*TokenAllowance) scanValues(columns []string) ([]any, error) {
 			values[i] = new(btcnetwork.Network)
 		case tokenallowance.FieldOwnerPublicKey, tokenallowance.FieldSpenderPublicKey:
 			values[i] = new(keys.Public)
+		case tokenallowance.FieldPerTransactionUnlimited, tokenallowance.FieldTotalUnlimited:
+			values[i] = new(sql.NullBool)
 		case tokenallowance.FieldVersion, tokenallowance.FieldOwnerProvidedTimestamp, tokenallowance.FieldOwnerProvidedRevokeTimestamp, tokenallowance.FieldRevokeVersion:
 			values[i] = new(sql.NullInt64)
 		case tokenallowance.FieldStatus:
@@ -205,6 +211,18 @@ func (ta *TokenAllowance) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field total_limit", values[i])
 			} else if value != nil {
 				ta.TotalLimit = *value
+			}
+		case tokenallowance.FieldPerTransactionUnlimited:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field per_transaction_unlimited", values[i])
+			} else if value.Valid {
+				ta.PerTransactionUnlimited = value.Bool
+			}
+		case tokenallowance.FieldTotalUnlimited:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field total_unlimited", values[i])
+			} else if value.Valid {
+				ta.TotalUnlimited = value.Bool
 			}
 		case tokenallowance.FieldSpentAmount:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -356,6 +374,12 @@ func (ta *TokenAllowance) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("total_limit=")
 	builder.WriteString(fmt.Sprintf("%v", ta.TotalLimit))
+	builder.WriteString(", ")
+	builder.WriteString("per_transaction_unlimited=")
+	builder.WriteString(fmt.Sprintf("%v", ta.PerTransactionUnlimited))
+	builder.WriteString(", ")
+	builder.WriteString("total_unlimited=")
+	builder.WriteString(fmt.Sprintf("%v", ta.TotalUnlimited))
 	builder.WriteString(", ")
 	builder.WriteString("spent_amount=")
 	builder.WriteString(fmt.Sprintf("%v", ta.SpentAmount))

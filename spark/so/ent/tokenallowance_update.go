@@ -258,6 +258,12 @@ func (tau *TokenAllowanceUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if value, ok := tau.mutation.Status(); ok {
 		_spec.SetField(tokenallowance.FieldStatus, field.TypeEnum, value)
 	}
+	if tau.mutation.PerTransactionUnlimitedCleared() {
+		_spec.ClearField(tokenallowance.FieldPerTransactionUnlimited, field.TypeBool)
+	}
+	if tau.mutation.TotalUnlimitedCleared() {
+		_spec.ClearField(tokenallowance.FieldTotalUnlimited, field.TypeBool)
+	}
 	if value, ok := tau.mutation.SpentAmount(); ok {
 		_spec.SetField(tokenallowance.FieldSpentAmount, field.TypeBytes, value)
 	}
@@ -616,6 +622,12 @@ func (tauo *TokenAllowanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenA
 	}
 	if value, ok := tauo.mutation.Status(); ok {
 		_spec.SetField(tokenallowance.FieldStatus, field.TypeEnum, value)
+	}
+	if tauo.mutation.PerTransactionUnlimitedCleared() {
+		_spec.ClearField(tokenallowance.FieldPerTransactionUnlimited, field.TypeBool)
+	}
+	if tauo.mutation.TotalUnlimitedCleared() {
+		_spec.ClearField(tokenallowance.FieldTotalUnlimited, field.TypeBool)
 	}
 	if value, ok := tauo.mutation.SpentAmount(); ok {
 		_spec.SetField(tokenallowance.FieldSpentAmount, field.TypeBytes, value)

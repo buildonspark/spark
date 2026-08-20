@@ -69,6 +69,18 @@ func validCreatePayload(t *testing.T) *tokenpb.TokenAllowancePayload {
 	return payload
 }
 
+// deterministicCreatePayloadUnlimited waives both ceilings: flags true, caps all-zero (the
+// canonical unlimited encoding).
+func deterministicCreatePayloadUnlimited(t *testing.T) *tokenpb.TokenAllowancePayload {
+	t.Helper()
+	payload := deterministicCreatePayload(t)
+	payload.PerTransactionUnlimited = true
+	payload.TotalUnlimited = true
+	payload.PerTransactionCap = mustHex(t, allowanceZeroUint128Hex)
+	payload.TotalLimit = mustHex(t, allowanceZeroUint128Hex)
+	return payload
+}
+
 func deterministicRevokePayload(t *testing.T) *tokenpb.RevokeTokenAllowancePayload {
 	t.Helper()
 	return &tokenpb.RevokeTokenAllowancePayload{
@@ -284,15 +296,47 @@ func TestValidateTokenAllowancePayload_RejectsPolicyViolations(t *testing.T) {
 }
 
 // TestHashCreateTokenAllowancePayload_KnownVector pins the wire format of the create statement
-// hash. If this changes, the TypeScript SDK's implementation must be updated to match, and any
-// already-signed allowances would be invalidated. The vector was computed once from
+// hash. Changing it invalidates every already-signed allowance and requires every client that
+// signs allowances to move in lockstep. The vector was computed once from
 // deterministicCreatePayload; do not edit the expected value without a deliberate format change.
 func TestHashCreateTokenAllowancePayload_KnownVector(t *testing.T) {
-	const frozenHashHex = "1e0addb8b11fba061de99149900a1606fc9c314d9bbed8d65ccd81c10778f706"
+	const frozenHashHex = "df52577d7fd9feda71cdd93ba54f96f19cb4bc009ec56148e95de083f9381f58"
 
 	hash, err := HashCreateTokenAllowancePayload(deterministicCreatePayload(t))
 	require.NoError(t, err)
 	assert.Equal(t, frozenHashHex, hex.EncodeToString(hash))
+}
+
+// TestHashCreateTokenAllowancePayload_KnownVectorUnlimited pins the canonical unlimited
+// encoding (both flags set, caps all-zero). Editing it changes what owners sign, so any client
+// that signs allowances has to move in lockstep.
+func TestHashCreateTokenAllowancePayload_KnownVectorUnlimited(t *testing.T) {
+	const frozenUnlimitedHex = "373edc3c0929cf645992a07994b3cbafa6e8b5e97f847d1eca1a2491b13eec9a"
+
+	unlimited, err := HashCreateTokenAllowancePayload(deterministicCreatePayloadUnlimited(t))
+	require.NoError(t, err)
+	assert.Equal(t, frozenUnlimitedHex, hex.EncodeToString(unlimited))
+}
+
+// TestHashCreateTokenAllowancePayload_BindsUnlimitedFlags proves the hash binds each flag:
+// flipping either one (without touching the caps) changes the statement, so a flag altered in
+// flight fails owner-signature verification.
+func TestHashCreateTokenAllowancePayload_BindsUnlimitedFlags(t *testing.T) {
+	base, err := HashCreateTokenAllowancePayload(deterministicCreatePayload(t))
+	require.NoError(t, err)
+
+	perTx := deterministicCreatePayload(t)
+	perTx.PerTransactionUnlimited = true
+	perTxHash, err := HashCreateTokenAllowancePayload(perTx)
+	require.NoError(t, err)
+	assert.NotEqual(t, base, perTxHash)
+
+	total := deterministicCreatePayload(t)
+	total.TotalUnlimited = true
+	totalHash, err := HashCreateTokenAllowancePayload(total)
+	require.NoError(t, err)
+	assert.NotEqual(t, base, totalHash)
+	assert.NotEqual(t, perTxHash, totalHash)
 }
 
 // TestValidateTokenAllowancePayload_AllowlistSizeCap: the recipient allowlist
@@ -318,4 +362,92 @@ func TestValidateTokenAllowancePayload_AllowlistSizeCap(t *testing.T) {
 	err := ValidateTokenAllowancePayload(overCap, supportedNetworks)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "recipient_allowlist has 257 entries")
+}
+
+func TestValidateTokenAllowancePayload_UnlimitedFlags(t *testing.T) {
+	supportedNetworks := []btcnetwork.Network{btcnetwork.Regtest}
+
+	tests := []struct {
+		name          string
+		mutate        func(*tokenpb.TokenAllowancePayload)
+		expectedError string
+	}{
+		{
+			name: "bounded payload valid",
+		},
+		{
+			name: "both unlimited with zero caps valid",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.PerTransactionUnlimited = true
+				p.TotalUnlimited = true
+				p.PerTransactionCap = mustHex(t, allowanceZeroUint128Hex)
+				p.TotalLimit = mustHex(t, allowanceZeroUint128Hex)
+			},
+		},
+		{
+			name: "per-tx unlimited with bounded total valid",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.PerTransactionUnlimited = true
+				p.PerTransactionCap = mustHex(t, allowanceZeroUint128Hex)
+			},
+		},
+		{
+			name: "bounded per-tx with unlimited total valid",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.TotalUnlimited = true
+				p.TotalLimit = mustHex(t, allowanceZeroUint128Hex)
+			},
+		},
+		{
+			name: "unknown version rejected",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.Version = 2
+			},
+			expectedError: "unsupported token allowance version",
+		},
+		{
+			name: "bounded per-tx with zero cap rejected",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.PerTransactionCap = mustHex(t, allowanceZeroUint128Hex)
+			},
+			expectedError: "per_transaction_cap must be greater than 0",
+		},
+		{
+			name: "bounded total with zero limit rejected",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.TotalLimit = mustHex(t, allowanceZeroUint128Hex)
+			},
+			expectedError: "total_limit must be greater than 0",
+		},
+		{
+			name: "per-tx unlimited with nonzero cap rejected",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.PerTransactionUnlimited = true
+			},
+			expectedError: "per_transaction_cap must be 0 when per_transaction_unlimited is set",
+		},
+		{
+			name: "total unlimited with nonzero limit rejected",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.TotalUnlimited = true
+			},
+			expectedError: "total_limit must be 0 when total_unlimited is set",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := validCreatePayload(t)
+			if tt.mutate != nil {
+				tt.mutate(payload)
+			}
+			err := ValidateTokenAllowancePayload(payload, supportedNetworks)
+			if tt.expectedError == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tt.expectedError)
+		})
+	}
 }

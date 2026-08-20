@@ -72,6 +72,16 @@ func (TokenAllowance) Fields() []ent.Field {
 			Immutable().
 			Comment("Cumulative value the spender may move over the allowance lifetime, as a uint128 big-endian.").
 			Annotations(entexample.Default("000000000000000000000000000186a0")),
+		field.Bool("per_transaction_unlimited").
+			Optional().
+			Default(false).
+			Immutable().
+			Comment("Owner-signed waiver of the per-transaction ceiling (payload v2+). NULL/false means bounded (fail-closed)."),
+		field.Bool("total_unlimited").
+			Optional().
+			Default(false).
+			Immutable().
+			Comment("Owner-signed waiver of the lifetime total ceiling (payload v2+); spent_amount still meters. NULL/false means bounded (fail-closed)."),
 		field.Bytes("spent_amount").
 			Default(make([]byte, 16)).
 			Comment("Value already spent against this allowance, as a uint128 big-endian."),

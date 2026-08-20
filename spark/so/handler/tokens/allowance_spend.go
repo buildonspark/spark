@@ -24,6 +24,9 @@ import (
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
+// maxUint128 is the ceiling of the spent_amount meter column (uint128 big-endian).
+var maxUint128 = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 128), big.NewInt(1))
+
 // extractAllowanceAuthorization inspects a transfer's input signatures and returns the allowance
 // ID they cite, or nil when the transfer is owner-signed. V1 policy: a transaction is either
 // fully owner-signed or fully allowance-authorized under a single allowance; mixing modes or
@@ -184,21 +187,9 @@ func validateAndMeterAllowanceSpend(
 		return err
 	}
 
-	perTxCap := new(big.Int).SetBytes(allowance.PerTransactionCap)
-	if metered.Cmp(perTxCap) > 0 {
-		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf(
-			"%s: metered %s, cap %s", tokens.ErrAllowanceExceedsPerTxCap, metered, perTxCap))
-	}
-	totalLimit := new(big.Int).SetBytes(allowance.TotalLimit)
-	newSpent := new(big.Int).Add(spent, metered)
-	if newSpent.Cmp(totalLimit) > 0 {
-		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf(
-			"%s: spent %s + metered %s exceeds total limit %s", tokens.ErrAllowanceBudgetExhausted, spent, metered, totalLimit))
-	}
-
-	newStatus := st.TokenAllowanceStatusActive
-	if newSpent.Cmp(totalLimit) == 0 {
-		newStatus = st.TokenAllowanceStatusExhausted
+	newSpentBytes, newStatus, appliedBytes, err := applyAllowanceCeilings(allowance, spent, metered)
+	if err != nil {
+		return err
 	}
 	// An EXHAUSTED grant is spendable only on budget freed by lazy release, and an active
 	// replacement supersedes it regardless of the status this spend lands on.
@@ -219,7 +210,7 @@ func validateAndMeterAllowanceSpend(
 		return err
 	}
 	if _, err := db.TokenAllowance.UpdateOneID(allowance.ID).
-		SetSpentAmount(newSpent.FillBytes(make([]byte, spentAmountByteLen))).
+		SetSpentAmount(newSpentBytes).
 		SetStatus(newStatus).
 		Save(ctx); err != nil {
 		// The partial-unique index (one ACTIVE grant per owner/spender/token) rejects a
@@ -232,7 +223,7 @@ func validateAndMeterAllowanceSpend(
 	}
 	if _, err := db.TokenAllowanceSpend.Create().
 		SetStatus(st.TokenAllowanceSpendStatusReserved).
-		SetMeteredAmount(metered.FillBytes(make([]byte, spentAmountByteLen))).
+		SetMeteredAmount(appliedBytes).
 		SetTokenAllowanceID(allowance.ID).
 		SetTokenTransaction(tokenTxEnt).
 		Save(ctx); err != nil {
@@ -260,6 +251,59 @@ func hasConflictingActiveAllowance(ctx context.Context, allowance *ent.TokenAllo
 			"failed to check for an active allowance conflicting with %s: %w", allowance.AllowanceID, err))
 	}
 	return exists, nil
+}
+
+// applyAllowanceCeilings enforces the per-transaction and lifetime ceilings on
+// one metered delegated spend and returns the advanced meter, the resulting
+// allowance status, and the amount the meter actually advanced by — both
+// amounts encoded as the 16-byte big-endian value the uint128 columns store.
+// The applied amount is what the spend row records, so releasing that
+// reservation restores the meter to exactly its pre-spend value. It is a pure
+// function of its inputs so the security-critical arithmetic is directly
+// fuzzable (FuzzApplyAllowanceCeilings).
+//
+// An owner-signed unlimited flag waives its ceiling check but never the
+// metering: spent_amount still advances for observability. On the unlimited
+// path the meter saturates at the uint128 column ceiling (unreachable for any
+// realistic token volume), bounding the applied amount at the remaining
+// headroom. Inputs that cannot fit the 16-byte column at all (spent or metered
+// above 2^128-1, or negative) are state corruption — upstream input/output
+// balance validation bounds metered by the token supply — and fail closed
+// instead of panicking in FillBytes.
+func applyAllowanceCeilings(allowance *ent.TokenAllowance, spent, metered *big.Int) ([]byte, st.TokenAllowanceStatus, []byte, error) {
+	if spent.Sign() < 0 || metered.Sign() < 0 || spent.Cmp(maxUint128) > 0 || metered.Cmp(maxUint128) > 0 {
+		return nil, "", nil, sparkerrors.InternalDataInconsistency(fmt.Errorf(
+			"allowance meter out of uint128 range: spent %s, metered %s", spent, metered))
+	}
+	if !allowance.PerTransactionUnlimited {
+		perTxCap := new(big.Int).SetBytes(allowance.PerTransactionCap)
+		if metered.Cmp(perTxCap) > 0 {
+			return nil, "", nil, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf(
+				"%s: metered %s, cap %s", tokens.ErrAllowanceExceedsPerTxCap, metered, perTxCap))
+		}
+	}
+	newSpent := new(big.Int).Add(spent, metered)
+	newStatus := st.TokenAllowanceStatusActive
+	if allowance.TotalUnlimited {
+		// The uint128 meter column cannot hold more; saturate rather than fail a
+		// spend the owner explicitly exempted from the ceiling.
+		if newSpent.Cmp(maxUint128) > 0 {
+			newSpent.Set(maxUint128)
+		}
+	} else {
+		totalLimit := new(big.Int).SetBytes(allowance.TotalLimit)
+		if newSpent.Cmp(totalLimit) > 0 {
+			return nil, "", nil, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf(
+				"%s: spent %s + metered %s exceeds total limit %s", tokens.ErrAllowanceBudgetExhausted, spent, metered, totalLimit))
+		}
+		if newSpent.Cmp(totalLimit) == 0 {
+			newStatus = st.TokenAllowanceStatusExhausted
+		}
+	}
+	return newSpent.FillBytes(make([]byte, spentAmountByteLen)),
+		newStatus,
+		new(big.Int).Sub(newSpent, spent).FillBytes(make([]byte, spentAmountByteLen)),
+		nil
 }
 
 // meterAllowanceOutputs computes the value metered against the allowance for this transaction.

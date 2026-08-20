@@ -289,6 +289,8 @@ func ValidateAndApplyCreateAllowance(
 		SetTokenCreateID(tokenCreateEnt.ID).
 		SetPerTransactionCap(payload.GetPerTransactionCap()).
 		SetTotalLimit(payload.GetTotalLimit()).
+		SetPerTransactionUnlimited(payload.GetPerTransactionUnlimited()).
+		SetTotalUnlimited(payload.GetTotalUnlimited()).
 		SetSpentAmount(make([]byte, spentAmountByteLen)).
 		SetRecipientAllowlist(payload.GetRecipientAllowlist()).
 		SetExpiryTime(time.Unix(expirySeconds, 0)).

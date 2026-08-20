@@ -105,14 +105,18 @@ func (e *allowanceSpendEnv) createKeyshare() *ent.SigningKeyshare {
 }
 
 type allowanceSpendOpts struct {
-	perTxCap   uint64
-	totalLimit uint64
-	spent      uint64
-	status     st.TokenAllowanceStatus // defaults to ACTIVE
-	expiryTime time.Time               // defaults to now+24h
-	allowlist  [][]byte
-	owner      keys.Public // defaults to env owner
-	spender    keys.Public // defaults to env spender
+	perTxCap uint64
+	// perTxUnlimited waives the per-transaction ceiling (leave perTxCap 0).
+	perTxUnlimited bool
+	totalLimit     uint64
+	// totalUnlimited waives the lifetime ceiling (leave totalLimit 0).
+	totalUnlimited bool
+	spent          uint64
+	status         st.TokenAllowanceStatus // defaults to ACTIVE
+	expiryTime     time.Time               // defaults to now+24h
+	allowlist      [][]byte
+	owner          keys.Public // defaults to env owner
+	spender        keys.Public // defaults to env spender
 }
 
 func (e *allowanceSpendEnv) createAllowance(opts allowanceSpendOpts) *ent.TokenAllowance {
@@ -134,6 +138,7 @@ func (e *allowanceSpendEnv) createAllowance(opts allowanceSpendOpts) *ent.TokenA
 		spender = e.spenderKey.Public()
 	}
 
+	version := uint64(1)
 	create := e.client().TokenAllowance.Create().
 		SetAllowanceID(uuid.New()).
 		SetStatus(status).
@@ -143,12 +148,14 @@ func (e *allowanceSpendEnv) createAllowance(opts allowanceSpendOpts) *ent.TokenA
 		SetTokenCreateID(e.tokenCreate.ID).
 		SetPerTransactionCap(u128(opts.perTxCap)).
 		SetTotalLimit(u128(opts.totalLimit)).
+		SetPerTransactionUnlimited(opts.perTxUnlimited).
+		SetTotalUnlimited(opts.totalUnlimited).
 		SetSpentAmount(u128(opts.spent)).
 		SetExpiryTime(expiry).
 		SetNetwork(btcnetwork.Regtest).
 		SetOwnerSignature(e.fixtures.RandomBytes(64)).
 		SetStatementHash(e.fixtures.RandomBytes(32)).
-		SetVersion(1).
+		SetVersion(version).
 		SetOwnerProvidedTimestamp(uint64(time.Now().UnixMilli()))
 	if len(opts.allowlist) > 0 {
 		create = create.SetRecipientAllowlist(opts.allowlist)
@@ -374,6 +381,61 @@ func TestPrepareTransfer_AllowanceRejectsOverPerTxCap(t *testing.T) {
 
 	row := e.reloadAllowance(allowance)
 	assert.Equal(t, u128(0), row.SpentAmount)
+}
+
+// TestPrepareTransfer_AllowanceUnlimitedSkipsCeilingsButMeters: an allowance
+// with both owner-signed unlimited flags (caps zero, the canonical encoding)
+// authorizes a spend far above any bounded configuration, but spent_amount
+// still advances and the allowance never flips EXHAUSTED.
+func TestPrepareTransfer_AllowanceUnlimitedSkipsCeilingsButMeters(t *testing.T) {
+	t.Parallel()
+	e := newAllowanceSpendEnv(t, 0x51)
+	allowance := e.createAllowance(allowanceSpendOpts{perTxUnlimited: true, totalUnlimited: true})
+	inputs := e.mintInputs(e.ownerKey.Public(), 5_000_000)
+	recipient := e.fixtures.GeneratePrivateKey().Public()
+
+	txProto, keyshareIDs := e.buildTransferProto(inputs, []transferOut{{recipient, 5_000_000}})
+	sigs := e.allowanceSignatures(txProto, allowance.AllowanceID, e.spenderKey, e.spenderKey.Public(), 1)
+
+	require.NoError(t, e.prepare(txProto, sigs, keyshareIDs))
+
+	row := e.reloadAllowance(allowance)
+	assert.Equal(t, u128(5_000_000), row.SpentAmount, "unlimited allowance must still meter")
+	assert.Equal(t, st.TokenAllowanceStatusActive, row.Status, "unlimited allowance must never exhaust")
+}
+
+// TestPrepareTransfer_AllowancePerTxUnlimitedStillEnforcesTotal: waiving only
+// the per-transaction ceiling leaves the lifetime budget binding.
+func TestPrepareTransfer_AllowancePerTxUnlimitedStillEnforcesTotal(t *testing.T) {
+	t.Parallel()
+	e := newAllowanceSpendEnv(t, 0x52)
+	allowance := e.createAllowance(allowanceSpendOpts{perTxUnlimited: true, totalLimit: 100, spent: 80})
+	inputs := e.mintInputs(e.ownerKey.Public(), 50)
+	recipient := e.fixtures.GeneratePrivateKey().Public()
+
+	txProto, keyshareIDs := e.buildTransferProto(inputs, []transferOut{{recipient, 50}})
+	sigs := e.allowanceSignatures(txProto, allowance.AllowanceID, e.spenderKey, e.spenderKey.Public(), 1)
+
+	err := e.prepare(txProto, sigs, keyshareIDs)
+	require.ErrorContains(t, err, tokens.ErrAllowanceBudgetExhausted)
+	assert.Equal(t, u128(80), e.reloadAllowance(allowance).SpentAmount)
+}
+
+// TestPrepareTransfer_AllowanceTotalUnlimitedStillEnforcesPerTx: waiving only
+// the lifetime ceiling leaves the per-transaction cap binding.
+func TestPrepareTransfer_AllowanceTotalUnlimitedStillEnforcesPerTx(t *testing.T) {
+	t.Parallel()
+	e := newAllowanceSpendEnv(t, 0x53)
+	allowance := e.createAllowance(allowanceSpendOpts{perTxCap: 50, totalUnlimited: true})
+	inputs := e.mintInputs(e.ownerKey.Public(), 100)
+	recipient := e.fixtures.GeneratePrivateKey().Public()
+
+	txProto, keyshareIDs := e.buildTransferProto(inputs, []transferOut{{recipient, 100}})
+	sigs := e.allowanceSignatures(txProto, allowance.AllowanceID, e.spenderKey, e.spenderKey.Public(), 1)
+
+	err := e.prepare(txProto, sigs, keyshareIDs)
+	require.ErrorContains(t, err, tokens.ErrAllowanceExceedsPerTxCap)
+	assert.Equal(t, u128(0), e.reloadAllowance(allowance).SpentAmount)
 }
 
 func TestPrepareTransfer_AllowanceRejectsInsufficientBudget(t *testing.T) {

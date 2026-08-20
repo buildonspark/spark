@@ -113,6 +113,34 @@ func (tac *TokenAllowanceCreate) SetTotalLimit(b []byte) *TokenAllowanceCreate {
 	return tac
 }
 
+// SetPerTransactionUnlimited sets the "per_transaction_unlimited" field.
+func (tac *TokenAllowanceCreate) SetPerTransactionUnlimited(b bool) *TokenAllowanceCreate {
+	tac.mutation.SetPerTransactionUnlimited(b)
+	return tac
+}
+
+// SetNillablePerTransactionUnlimited sets the "per_transaction_unlimited" field if the given value is not nil.
+func (tac *TokenAllowanceCreate) SetNillablePerTransactionUnlimited(b *bool) *TokenAllowanceCreate {
+	if b != nil {
+		tac.SetPerTransactionUnlimited(*b)
+	}
+	return tac
+}
+
+// SetTotalUnlimited sets the "total_unlimited" field.
+func (tac *TokenAllowanceCreate) SetTotalUnlimited(b bool) *TokenAllowanceCreate {
+	tac.mutation.SetTotalUnlimited(b)
+	return tac
+}
+
+// SetNillableTotalUnlimited sets the "total_unlimited" field if the given value is not nil.
+func (tac *TokenAllowanceCreate) SetNillableTotalUnlimited(b *bool) *TokenAllowanceCreate {
+	if b != nil {
+		tac.SetTotalUnlimited(*b)
+	}
+	return tac
+}
+
 // SetSpentAmount sets the "spent_amount" field.
 func (tac *TokenAllowanceCreate) SetSpentAmount(b []byte) *TokenAllowanceCreate {
 	tac.mutation.SetSpentAmount(b)
@@ -290,6 +318,14 @@ func (tac *TokenAllowanceCreate) defaults() {
 		v := tokenallowance.DefaultStatus
 		tac.mutation.SetStatus(v)
 	}
+	if _, ok := tac.mutation.PerTransactionUnlimited(); !ok {
+		v := tokenallowance.DefaultPerTransactionUnlimited
+		tac.mutation.SetPerTransactionUnlimited(v)
+	}
+	if _, ok := tac.mutation.TotalUnlimited(); !ok {
+		v := tokenallowance.DefaultTotalUnlimited
+		tac.mutation.SetTotalUnlimited(v)
+	}
 	if _, ok := tac.mutation.SpentAmount(); !ok {
 		v := tokenallowance.DefaultSpentAmount
 		tac.mutation.SetSpentAmount(v)
@@ -442,6 +478,14 @@ func (tac *TokenAllowanceCreate) createSpec() (*TokenAllowance, *sqlgraph.Create
 	if value, ok := tac.mutation.TotalLimit(); ok {
 		_spec.SetField(tokenallowance.FieldTotalLimit, field.TypeBytes, value)
 		_node.TotalLimit = value
+	}
+	if value, ok := tac.mutation.PerTransactionUnlimited(); ok {
+		_spec.SetField(tokenallowance.FieldPerTransactionUnlimited, field.TypeBool, value)
+		_node.PerTransactionUnlimited = value
+	}
+	if value, ok := tac.mutation.TotalUnlimited(); ok {
+		_spec.SetField(tokenallowance.FieldTotalUnlimited, field.TypeBool, value)
+		_node.TotalUnlimited = value
 	}
 	if value, ok := tac.mutation.SpentAmount(); ok {
 		_spec.SetField(tokenallowance.FieldSpentAmount, field.TypeBytes, value)
@@ -736,6 +780,12 @@ func (u *TokenAllowanceUpsertOne) UpdateNewValues() *TokenAllowanceUpsertOne {
 		}
 		if _, exists := u.create.mutation.TotalLimit(); exists {
 			s.SetIgnore(tokenallowance.FieldTotalLimit)
+		}
+		if _, exists := u.create.mutation.PerTransactionUnlimited(); exists {
+			s.SetIgnore(tokenallowance.FieldPerTransactionUnlimited)
+		}
+		if _, exists := u.create.mutation.TotalUnlimited(); exists {
+			s.SetIgnore(tokenallowance.FieldTotalUnlimited)
 		}
 		if _, exists := u.create.mutation.RecipientAllowlist(); exists {
 			s.SetIgnore(tokenallowance.FieldRecipientAllowlist)
@@ -1135,6 +1185,12 @@ func (u *TokenAllowanceUpsertBulk) UpdateNewValues() *TokenAllowanceUpsertBulk {
 			}
 			if _, exists := b.mutation.TotalLimit(); exists {
 				s.SetIgnore(tokenallowance.FieldTotalLimit)
+			}
+			if _, exists := b.mutation.PerTransactionUnlimited(); exists {
+				s.SetIgnore(tokenallowance.FieldPerTransactionUnlimited)
+			}
+			if _, exists := b.mutation.TotalUnlimited(); exists {
+				s.SetIgnore(tokenallowance.FieldTotalUnlimited)
 			}
 			if _, exists := b.mutation.RecipientAllowlist(); exists {
 				s.SetIgnore(tokenallowance.FieldRecipientAllowlist)

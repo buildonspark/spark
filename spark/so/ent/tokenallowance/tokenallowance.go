@@ -38,6 +38,10 @@ const (
 	FieldPerTransactionCap = "per_transaction_cap"
 	// FieldTotalLimit holds the string denoting the total_limit field in the database.
 	FieldTotalLimit = "total_limit"
+	// FieldPerTransactionUnlimited holds the string denoting the per_transaction_unlimited field in the database.
+	FieldPerTransactionUnlimited = "per_transaction_unlimited"
+	// FieldTotalUnlimited holds the string denoting the total_unlimited field in the database.
+	FieldTotalUnlimited = "total_unlimited"
 	// FieldSpentAmount holds the string denoting the spent_amount field in the database.
 	FieldSpentAmount = "spent_amount"
 	// FieldRecipientAllowlist holds the string denoting the recipient_allowlist field in the database.
@@ -97,6 +101,8 @@ var Columns = []string{
 	FieldTokenCreateID,
 	FieldPerTransactionCap,
 	FieldTotalLimit,
+	FieldPerTransactionUnlimited,
+	FieldTotalUnlimited,
 	FieldSpentAmount,
 	FieldRecipientAllowlist,
 	FieldExpiryTime,
@@ -128,6 +134,10 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
+	// DefaultPerTransactionUnlimited holds the default value on creation for the "per_transaction_unlimited" field.
+	DefaultPerTransactionUnlimited bool
+	// DefaultTotalUnlimited holds the default value on creation for the "total_unlimited" field.
+	DefaultTotalUnlimited bool
 	// DefaultSpentAmount holds the default value on creation for the "spent_amount" field.
 	DefaultSpentAmount []byte
 	// OwnerSignatureValidator is a validator for the "owner_signature" field. It is called by the builders before save.
@@ -189,6 +199,16 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByTokenCreateID orders the results by the token_create_id field.
 func ByTokenCreateID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTokenCreateID, opts...).ToFunc()
+}
+
+// ByPerTransactionUnlimited orders the results by the per_transaction_unlimited field.
+func ByPerTransactionUnlimited(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPerTransactionUnlimited, opts...).ToFunc()
+}
+
+// ByTotalUnlimited orders the results by the total_unlimited field.
+func ByTotalUnlimited(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotalUnlimited, opts...).ToFunc()
 }
 
 // ByExpiryTime orders the results by the expiry_time field.

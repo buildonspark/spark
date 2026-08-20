@@ -3287,8 +3287,15 @@ type TokenAllowancePayload struct {
 	Network spark.Network `protobuf:"varint,13,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	// Wallet-provided creation timestamp in milliseconds, used to order updates.
 	OwnerProvidedTimestamp uint64 `protobuf:"varint,14,opt,name=owner_provided_timestamp,json=ownerProvidedTimestamp,proto3" json:"owner_provided_timestamp,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Waives the per-transaction ceiling. Requires a per_transaction_cap of all
+	// zero bytes; the statement hash always binds this flag. Absent/false always
+	// means bounded, so a stripped flag fails closed.
+	PerTransactionUnlimited bool `protobuf:"varint,15,opt,name=per_transaction_unlimited,json=perTransactionUnlimited,proto3" json:"per_transaction_unlimited,omitempty"`
+	// Waives the lifetime total ceiling. Same zero-cap rule as
+	// per_transaction_unlimited; spent_amount still accumulates for observability.
+	TotalUnlimited bool `protobuf:"varint,16,opt,name=total_unlimited,json=totalUnlimited,proto3" json:"total_unlimited,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TokenAllowancePayload) Reset() {
@@ -3396,6 +3403,20 @@ func (x *TokenAllowancePayload) GetOwnerProvidedTimestamp() uint64 {
 		return x.OwnerProvidedTimestamp
 	}
 	return 0
+}
+
+func (x *TokenAllowancePayload) GetPerTransactionUnlimited() bool {
+	if x != nil {
+		return x.PerTransactionUnlimited
+	}
+	return false
+}
+
+func (x *TokenAllowancePayload) GetTotalUnlimited() bool {
+	if x != nil {
+		return x.TotalUnlimited
+	}
+	return false
 }
 
 type CreateTokenAllowanceRequest struct {
@@ -4201,7 +4222,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01\x18\x01R\x11impactedOutputIds\x122\n" +
 	"\x15impacted_token_amount\x18\x02 \x01(\fR\x13impactedTokenAmount\x12Q\n" +
 	"\x16impacted_token_outputs\x18\x03 \x03(\v2\x1b.spark_token.TokenOutputRefR\x14impactedTokenOutputs\x12D\n" +
-	"\x0ffreeze_progress\x18\x04 \x01(\v2\x1b.spark_token.FreezeProgressR\x0efreezeProgress\"\xcb\x04\n" +
+	"\x0ffreeze_progress\x18\x04 \x01(\v2\x1b.spark_token.FreezeProgressR\x0efreezeProgress\"\xb0\x05\n" +
 	"\x15TokenAllowancePayload\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12*\n" +
 	"\fallowance_id\x18\x02 \x01(\fB\a\xfaB\x04z\x02h\x10R\vallowanceId\x121\n" +
@@ -4215,7 +4236,9 @@ const file_spark_token_proto_rawDesc = "" +
 	"\vexpiry_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x122\n" +
 	"\anetwork\x18\r \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x128\n" +
-	"\x18owner_provided_timestamp\x18\x0e \x01(\x04R\x16ownerProvidedTimestamp\"\xa2\x01\n" +
+	"\x18owner_provided_timestamp\x18\x0e \x01(\x04R\x16ownerProvidedTimestamp\x12:\n" +
+	"\x19per_transaction_unlimited\x18\x0f \x01(\bR\x17perTransactionUnlimited\x12'\n" +
+	"\x0ftotal_unlimited\x18\x10 \x01(\bR\x0etotalUnlimited\"\xa2\x01\n" +
 	"\x1bCreateTokenAllowanceRequest\x12O\n" +
 	"\x11allowance_payload\x18\x01 \x01(\v2\".spark_token.TokenAllowancePayloadR\x10allowancePayload\x122\n" +
 	"\x0fowner_signature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x0eownerSignature\"b\n" +

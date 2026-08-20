@@ -7274,6 +7274,10 @@ func (m *TokenAllowancePayload) validate(all bool) error {
 
 	// no validation rules for OwnerProvidedTimestamp
 
+	// no validation rules for PerTransactionUnlimited
+
+	// no validation rules for TotalUnlimited
+
 	if len(errors) > 0 {
 		return TokenAllowancePayloadMultiError(errors)
 	}

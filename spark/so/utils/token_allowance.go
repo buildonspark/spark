@@ -16,11 +16,13 @@ import (
 )
 
 const (
-	// tokenAllowancePayloadVersion is the only currently supported allowance payload version.
+	// tokenAllowancePayloadVersion is the only allowance payload version. The statement hash
+	// binds both unlimited flags unconditionally, so there is no layout in which a flag could
+	// waive a ceiling without the owner having signed it.
 	tokenAllowancePayloadVersion uint32 = 1
 	// maxRecipientAllowlistEntries bounds recipient_allowlist. 256 recipients is
 	// orders of magnitude beyond realistic merchant/payout sets while keeping the
-	// stored row (~8.4KB of keys) and the per-spend allowlist scan bounded — an
+	// stored row (~8.4KB of keys) and the per-spend allowlist scan bounded - an
 	// unbounded list would let one owner-signed payload amplify storage and
 	// validation cost on every SO. Mirrored by the proto max_items rule.
 	maxRecipientAllowlistEntries = 256
@@ -32,8 +34,10 @@ const (
 )
 
 // createTokenAllowanceHashTag domain-separates the statement hash so a signature over an
-// allowance creation can never be replayed as any other statement. Bump the version component
-// on any layout change: the hash is what the owner signs.
+// allowance creation can never be replayed as any other statement. The trailing version
+// component versions the statement TYPE, not the payload layout: payload.version is itself the
+// first value hashed, so two payload versions can never collide. Bumping this tag would change
+// the hash of existing v1 payloads and invalidate signatures already issued over them.
 var createTokenAllowanceHashTag = []string{"spark", "token", "create_token_allowance", "v1"}
 
 // revokeTokenAllowanceHashTag domain-separates the statement hash so a signature over an
@@ -43,12 +47,17 @@ var revokeTokenAllowanceHashTag = []string{"spark", "token", "revoke_token_allow
 
 // HashCreateTokenAllowancePayload returns the canonical statement hash the owner signs to
 // authorize a token allowance. Values are added, in order: version, the lowercase network name,
-// allowance_id, owner/spender public keys, token_identifier, per_transaction_cap, total_limit,
-// the allowlist entry count followed by each 33-byte key sorted ascending bytewise, the expiry
-// as Unix seconds (0 when unset), and owner_provided_timestamp.
+// allowance_id, owner/spender public keys, token_identifier, per_transaction_cap, the
+// per_transaction_unlimited flag, total_limit, the total_unlimited flag, the allowlist entry
+// count followed by each 33-byte key sorted ascending bytewise, the expiry as Unix seconds
+// (0 when unset), and owner_provided_timestamp.
+//
+// Both unlimited flags are bound unconditionally, so a flag can never waive a ceiling without
+// the owner having signed it.
 //
 // The layout is consumed cross-language: the TypeScript SDK MUST produce an identical hash. See
-// TestHashCreateTokenAllowancePayload_KnownVector for the frozen reference vector.
+// TestHashCreateTokenAllowancePayload_KnownVector and
+// TestHashCreateTokenAllowancePayload_KnownVectorV2 for the frozen reference vectors.
 func HashCreateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload) ([]byte, error) {
 	if payload == nil {
 		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token allowance payload cannot be nil"))
@@ -90,7 +99,9 @@ func HashCreateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload) ([]
 		AddBytes(payload.GetSpenderPublicKey()).
 		AddBytes(payload.GetTokenIdentifier()).
 		AddBytes(payload.GetPerTransactionCap()).
+		AddUint8(boolToFlagByte(payload.GetPerTransactionUnlimited())).
 		AddBytes(payload.GetTotalLimit()).
+		AddUint8(boolToFlagByte(payload.GetTotalUnlimited())).
 		AddUint32(uint32(len(sortedAllowlist)))
 	for _, key := range sortedAllowlist {
 		hasher.AddBytes(key)
@@ -148,8 +159,8 @@ func ValidateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload, suppo
 	if payload == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token allowance payload cannot be nil"))
 	}
-	if payload.GetVersion() != tokenAllowancePayloadVersion {
-		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token allowance version: %d", payload.GetVersion()))
+	if version := payload.GetVersion(); version != tokenAllowancePayloadVersion {
+		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token allowance version: %d", version))
 	}
 
 	network, err := btcnetwork.FromProtoNetwork(payload.GetNetwork())
@@ -173,15 +184,26 @@ func ValidateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload, suppo
 		return err
 	}
 
+	// Each cap has exactly one canonical encoding: bounded means a positive cap
+	// with the flag false, unlimited means the flag true with a zero cap. Any
+	// mix (flag with a nonzero cap, or no flag with a zero cap) is rejected.
 	perTransactionCap := new(big.Int).SetBytes(payload.GetPerTransactionCap())
 	totalLimit := new(big.Int).SetBytes(payload.GetTotalLimit())
-	if perTransactionCap.Sign() == 0 {
+	if payload.GetPerTransactionUnlimited() {
+		if perTransactionCap.Sign() != 0 {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("per_transaction_cap must be 0 when per_transaction_unlimited is set"))
+		}
+	} else if perTransactionCap.Sign() == 0 {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("per_transaction_cap must be greater than 0"))
 	}
-	if totalLimit.Sign() == 0 {
+	if payload.GetTotalUnlimited() {
+		if totalLimit.Sign() != 0 {
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("total_limit must be 0 when total_unlimited is set"))
+		}
+	} else if totalLimit.Sign() == 0 {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("total_limit must be greater than 0"))
 	}
-	if perTransactionCap.Cmp(totalLimit) > 0 {
+	if !payload.GetPerTransactionUnlimited() && !payload.GetTotalUnlimited() && perTransactionCap.Cmp(totalLimit) > 0 {
 		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("per_transaction_cap must not exceed total_limit"))
 	}
 
@@ -253,4 +275,11 @@ func requireByteLen(name string, value []byte, requiredLen int) error {
 		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s must be %d bytes, got %d", name, requiredLen, len(value)))
 	}
 	return nil
+}
+
+func boolToFlagByte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
 }
