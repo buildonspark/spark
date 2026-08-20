@@ -39,6 +39,21 @@ setFetch(sparkBareFetch, Headers);
 export * from "../errors/index.js";
 export { SparkWallet } from "../spark-wallet/spark-wallet.bare.js";
 export { getLatestDepositTxId } from "../utils/mempool.js";
+export {
+  type AllowancePullOutput,
+  type CommitAllowancePullResult,
+  type CreateTokenAllowanceParams,
+  type CreateTokenAllowanceResult,
+  type PreparedAllowancePull,
+  type QueryTokenAllowancesFilter,
+  type StartAllowancePullParams,
+  type TokenAllowanceResult,
+} from "../services/tokens/allowances.js";
+export {
+  hashCreateTokenAllowancePayload,
+  hashRevokeTokenAllowancePayload,
+} from "../utils/token-allowance-hashing.js";
+export { verifyAllowanceRecord } from "../utils/token-allowance-verification.js";
 export { decodeSparkAddress } from "../utils/address.js";
 export { Network, type NetworkType } from "../utils/network.js";
 export {

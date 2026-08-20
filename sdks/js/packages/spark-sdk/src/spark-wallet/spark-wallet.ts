@@ -76,6 +76,7 @@ import {
 import {
   type OutputWithPreviousTransactionData,
   type QueryTokenTransactionsResponse,
+  type TokenAllowanceInfo,
 } from "../proto/spark_token.js";
 import type { DecodedInvoice } from "../services/bolt11-spark.js";
 import {
@@ -91,6 +92,16 @@ import LeafManager from "../services/leaf-manager.js";
 import { LightningService } from "../services/lightning.js";
 import { SigningService } from "../services/signing.js";
 import SwapService from "../services/swap.js";
+import {
+  TokenAllowanceService,
+  type CommitAllowancePullResult,
+  type CreateTokenAllowanceParams,
+  type CreateTokenAllowanceResult,
+  type PreparedAllowancePull,
+  type QueryTokenAllowancesFilter,
+  type StartAllowancePullParams,
+  type TokenAllowanceResult,
+} from "../services/tokens/allowances.js";
 import { TokenOutputManager } from "../services/tokens/output-manager.js";
 import {
   MAX_TOKEN_OUTPUTS_TX,
@@ -276,6 +287,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private tokenOptimizationInProgress = false;
   private tokenOptimizationInterval: Interval | null = null;
   private tokenOutputManager: TokenOutputManager;
+  protected tokenAllowanceService: TokenAllowanceService;
   protected tokenMetadata: TokenMetadataMap = new Map();
 
   protected abstract buildConnectionManager(
@@ -315,6 +327,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.logging,
     );
     this.tokenTransactionService = new TokenTransactionService(
+      this.config,
+      this.connectionManager,
+      this.logging,
+    );
+    this.tokenAllowanceService = new TokenAllowanceService(
       this.config,
       this.connectionManager,
       this.logging,
@@ -6206,6 +6223,90 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   /**
+   * Creates a token allowance granting a spender bounded authority to pull
+   * this wallet's token outputs. The allowance is signed with this wallet's
+   * identity key (the token owner key) and replicated to every operator.
+   *
+   * @param params - Allowance policy: spender, token, caps, expiry, optional
+   *   allowlist
+   * @returns The allowance ID, the signed payload, and the operators that
+   *   applied it
+   */
+  public async createTokenAllowance(
+    params: CreateTokenAllowanceParams,
+  ): Promise<CreateTokenAllowanceResult> {
+    return await this.tokenAllowanceService.createTokenAllowance(params);
+  }
+
+  /**
+   * Revokes a token allowance owned by this wallet. Revocation is a permanent
+   * tombstone; the allowance ID can never be reused.
+   *
+   * @param allowanceId - Hex-encoded 16-byte allowance ID to revoke
+   * @returns The operators that applied the revocation
+   */
+  public async revokeTokenAllowance(
+    allowanceId: string,
+  ): Promise<TokenAllowanceResult> {
+    return await this.tokenAllowanceService.revokeTokenAllowance(allowanceId);
+  }
+
+  /**
+   * Queries token allowances. The operators privacy-scope results: this
+   * wallet must be the owner or the spender in the supplied filters.
+   *
+   * @param filter - Owner/spender/token filters; includeInactive to also
+   *   return revoked and exhausted allowances
+   * @returns Matching allowances with their spent amount and status
+   */
+  public async queryTokenAllowances(
+    filter: Partial<QueryTokenAllowancesFilter> = {},
+  ): Promise<TokenAllowanceInfo[]> {
+    // The operators authorize on owner or spender identity, so a filter naming neither is
+    // always refused. Default to this wallet as owner: it is always authorized, and it is the
+    // common case - the grants this wallet issued.
+    const scoped: QueryTokenAllowancesFilter =
+      filter.ownerPublicKey || filter.spenderPublicKey
+        ? (filter as QueryTokenAllowancesFilter)
+        : {
+            ...filter,
+            ownerPublicKey: bytesToHex(
+              await this.config.signer.getIdentityPublicKey(),
+            ),
+          };
+    return await this.tokenAllowanceService.queryTokenAllowances(scoped);
+  }
+
+  /**
+   * As the SPENDER of an allowance, builds and signs a delegated pull
+   * spending the owner's token outputs. This wallet's identity key must be
+   * the spender key recorded on the allowance. Change back to the owner is
+   * appended automatically; allowance policy is preflighted client-side with
+   * typed errors and enforced authoritatively by every operator.
+   *
+   * @param params - The allowance ID, owner, token, and settlement outputs
+   * @returns The prepared pull to pass to commitAllowancePull
+   */
+  public async startAllowancePull(
+    params: StartAllowancePullParams,
+  ): Promise<PreparedAllowancePull> {
+    return await this.tokenAllowanceService.startAllowancePull(params);
+  }
+
+  /**
+   * Submits a prepared allowance pull. No additional client signatures are
+   * required beyond the spender signatures attached at startAllowancePull.
+   *
+   * @param prepared - The prepared pull from startAllowancePull
+   * @returns The final transaction ID and broadcast response
+   */
+  public async commitAllowancePull(
+    prepared: PreparedAllowancePull,
+  ): Promise<CommitAllowancePullResult> {
+    return await this.tokenAllowanceService.commitAllowancePull(prepared);
+  }
+
+  /**
    * @deprecated Use queryTokenTransactionsWithFilters or queryTokenTransactionsByTxHashes instead
    * Retrieves token transaction history for specified tokens
    * Can optionally filter by specific transaction hashes.
@@ -7018,9 +7119,11 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "queryHTLC",
   "createHTLCSenderSpendTx",
   "createHTLCReceiverSpendTx",
+  "commitAllowancePull",
   "createLightningHodlInvoice",
   "createLightningInvoice",
   "createSatsInvoice",
+  "createTokenAllowance",
   "createTokensInvoice",
   "fulfillSparkInvoice",
   "getBalance",
@@ -7056,6 +7159,7 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "payLightningInvoice",
   "querySparkInvoices",
   "queryStaticDepositAddresses",
+  "queryTokenAllowances",
   "queryTokenTransactions",
   "queryTokenTransactionsByTxHashes",
   "queryTokenTransactionsWithFilters",
@@ -7063,9 +7167,11 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "recoverWatchtowerExitedLeaf",
   "refundAndBroadcastStaticDeposit",
   "refundStaticDeposit",
+  "revokeTokenAllowance",
   "setPrivacyEnabled",
   "signMessageWithIdentityKey",
   "signTransaction",
+  "startAllowancePull",
   "experimental_syncWallet",
   "transfer",
   "transferV2",
