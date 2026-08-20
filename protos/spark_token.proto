@@ -494,6 +494,13 @@ message TokenAllowancePayload {
     spark.Network network = 13 [(validate.rules).enum = { not_in: [ 0 ] }];
     // Wallet-provided creation timestamp in milliseconds, used to order updates.
     uint64 owner_provided_timestamp = 14;
+    // Waives the per-transaction ceiling. Requires a per_transaction_cap of all
+    // zero bytes; the statement hash always binds this flag. Absent/false always
+    // means bounded, so a stripped flag fails closed.
+    bool per_transaction_unlimited = 15;
+    // Waives the lifetime total ceiling. Same zero-cap rule as
+    // per_transaction_unlimited; spent_amount still accumulates for observability.
+    bool total_unlimited = 16;
 }
 
 message CreateTokenAllowanceRequest {

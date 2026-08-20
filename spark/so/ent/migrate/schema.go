@@ -753,6 +753,8 @@ var (
 		{Name: "token_identifier", Type: field.TypeBytes},
 		{Name: "per_transaction_cap", Type: field.TypeBytes},
 		{Name: "total_limit", Type: field.TypeBytes},
+		{Name: "per_transaction_unlimited", Type: field.TypeBool, Nullable: true, Default: false},
+		{Name: "total_unlimited", Type: field.TypeBool, Nullable: true, Default: false},
 		{Name: "spent_amount", Type: field.TypeBytes},
 		{Name: "recipient_allowlist", Type: field.TypeJSON, Nullable: true},
 		{Name: "expiry_time", Type: field.TypeTime},
@@ -775,7 +777,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_allowances_token_creates_token_allowance",
-				Columns:    []*schema.Column{TokenAllowancesColumns[22]},
+				Columns:    []*schema.Column{TokenAllowancesColumns[24]},
 				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -784,7 +786,7 @@ var (
 			{
 				Name:    "tokenallowance_unique_active_grant",
 				Unique:  true,
-				Columns: []*schema.Column{TokenAllowancesColumns[5], TokenAllowancesColumns[6], TokenAllowancesColumns[22]},
+				Columns: []*schema.Column{TokenAllowancesColumns[5], TokenAllowancesColumns[6], TokenAllowancesColumns[24]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status = 'ACTIVE'",
 				},

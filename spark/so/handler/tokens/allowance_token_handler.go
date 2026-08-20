@@ -297,17 +297,19 @@ func allowanceRowToInfo(row *ent.TokenAllowance) (*tokenpb.TokenAllowanceInfo, e
 	}
 
 	payload := &tokenpb.TokenAllowancePayload{
-		Version:                uint32(row.Version),
-		AllowanceId:            append([]byte(nil), row.AllowanceID[:]...),
-		OwnerPublicKey:         row.OwnerPublicKey.Serialize(),
-		SpenderPublicKey:       row.SpenderPublicKey.Serialize(),
-		TokenIdentifier:        row.TokenIdentifier,
-		PerTransactionCap:      row.PerTransactionCap,
-		TotalLimit:             row.TotalLimit,
-		RecipientAllowlist:     row.RecipientAllowlist,
-		ExpiryTime:             timestamppb.New(row.ExpiryTime),
-		Network:                protoNetwork,
-		OwnerProvidedTimestamp: row.OwnerProvidedTimestamp,
+		Version:                 uint32(row.Version),
+		AllowanceId:             append([]byte(nil), row.AllowanceID[:]...),
+		OwnerPublicKey:          row.OwnerPublicKey.Serialize(),
+		SpenderPublicKey:        row.SpenderPublicKey.Serialize(),
+		TokenIdentifier:         row.TokenIdentifier,
+		PerTransactionCap:       row.PerTransactionCap,
+		TotalLimit:              row.TotalLimit,
+		PerTransactionUnlimited: row.PerTransactionUnlimited,
+		TotalUnlimited:          row.TotalUnlimited,
+		RecipientAllowlist:      row.RecipientAllowlist,
+		ExpiryTime:              timestamppb.New(row.ExpiryTime),
+		Network:                 protoNetwork,
+		OwnerProvidedTimestamp:  row.OwnerProvidedTimestamp,
 	}
 
 	info := &tokenpb.TokenAllowanceInfo{

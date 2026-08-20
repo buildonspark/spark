@@ -298,6 +298,79 @@ func TestCreateTokenAllowance_TruncatesExpiryToSignedSeconds(t *testing.T) {
 // The signed statement hash covers the expiry as whole Unix seconds, so an intermediary can
 // alter the sub-second component without invalidating the owner signature. The SO must never
 // persist or enforce more expiry precision than the owner actually signed.
+// TestCreateTokenAllowance_UnlimitedStoresFlags: a payload with owner-signed unlimited
+// flags (zero caps) installs, persists the flags, and round-trips them through query.
+func TestCreateTokenAllowance_UnlimitedStoresFlags(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+	payload.PerTransactionUnlimited = true
+	payload.TotalUnlimited = true
+	payload.PerTransactionCap = u128(0)
+	payload.TotalLimit = u128(0)
+	req := &tokenpb.CreateTokenAllowanceRequest{
+		AllowancePayload: payload,
+		OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+	}
+
+	_, err := handler.CreateTokenAllowance(ctx, req)
+	require.NoError(t, err)
+
+	row, err := tc.Client.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(t.Context())
+	require.NoError(t, err)
+	assert.True(t, row.PerTransactionUnlimited)
+	assert.True(t, row.TotalUnlimited)
+
+	info, err := allowanceRowToInfo(row)
+	require.NoError(t, err)
+	assert.True(t, info.GetAllowancePayload().GetPerTransactionUnlimited())
+	assert.True(t, info.GetAllowancePayload().GetTotalUnlimited())
+}
+
+// TestCreateTokenAllowance_FailClosedCapRules: the unlimited union has exactly one canonical
+// encoding per cap; every ambiguous combination is rejected before installation.
+func TestCreateTokenAllowance_FailClosedCapRules(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	tests := []struct {
+		name   string
+		mutate func(*tokenpb.TokenAllowancePayload)
+	}{
+		{
+			name: "zero cap without unlimited flag",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.PerTransactionCap = u128(0)
+			},
+		},
+		{
+			name: "unlimited flag with nonzero cap",
+			mutate: func(p *tokenpb.TokenAllowancePayload) {
+				p.TotalUnlimited = true
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), uuid.New(), recentTimestamp(10*time.Second))
+			tt.mutate(payload)
+			_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+				AllowancePayload: payload,
+				OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+			})
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}
+
+// TestCreateTokenAllowance_ExpiryNanosecondsCannotDivergeFromSignedValue: the signed statement
+// hash covers the expiry as whole Unix seconds, so an intermediary can alter the sub-second
+// component without invalidating the owner signature. The SO must therefore never persist or
+// enforce more expiry precision than the owner signed: the stored expiry has to be exactly the
+// whole-second value covered by the hash.
 func TestCreateTokenAllowance_ExpiryNanosecondsCannotDivergeFromSignedValue(t *testing.T) {
 	ctx, tc, cfg, _ := setupAllowanceTest(t)
 	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)

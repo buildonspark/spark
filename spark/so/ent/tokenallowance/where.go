@@ -104,6 +104,16 @@ func TotalLimit(v []byte) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldEQ(FieldTotalLimit, v))
 }
 
+// PerTransactionUnlimited applies equality check predicate on the "per_transaction_unlimited" field. It's identical to PerTransactionUnlimitedEQ.
+func PerTransactionUnlimited(v bool) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldPerTransactionUnlimited, v))
+}
+
+// TotalUnlimited applies equality check predicate on the "total_unlimited" field. It's identical to TotalUnlimitedEQ.
+func TotalUnlimited(v bool) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldTotalUnlimited, v))
+}
+
 // SpentAmount applies equality check predicate on the "spent_amount" field. It's identical to SpentAmountEQ.
 func SpentAmount(v []byte) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldEQ(FieldSpentAmount, v))
@@ -522,6 +532,46 @@ func TotalLimitLT(v []byte) predicate.TokenAllowance {
 // TotalLimitLTE applies the LTE predicate on the "total_limit" field.
 func TotalLimitLTE(v []byte) predicate.TokenAllowance {
 	return predicate.TokenAllowance(sql.FieldLTE(FieldTotalLimit, v))
+}
+
+// PerTransactionUnlimitedEQ applies the EQ predicate on the "per_transaction_unlimited" field.
+func PerTransactionUnlimitedEQ(v bool) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldPerTransactionUnlimited, v))
+}
+
+// PerTransactionUnlimitedNEQ applies the NEQ predicate on the "per_transaction_unlimited" field.
+func PerTransactionUnlimitedNEQ(v bool) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNEQ(FieldPerTransactionUnlimited, v))
+}
+
+// PerTransactionUnlimitedIsNil applies the IsNil predicate on the "per_transaction_unlimited" field.
+func PerTransactionUnlimitedIsNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldIsNull(FieldPerTransactionUnlimited))
+}
+
+// PerTransactionUnlimitedNotNil applies the NotNil predicate on the "per_transaction_unlimited" field.
+func PerTransactionUnlimitedNotNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNotNull(FieldPerTransactionUnlimited))
+}
+
+// TotalUnlimitedEQ applies the EQ predicate on the "total_unlimited" field.
+func TotalUnlimitedEQ(v bool) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldEQ(FieldTotalUnlimited, v))
+}
+
+// TotalUnlimitedNEQ applies the NEQ predicate on the "total_unlimited" field.
+func TotalUnlimitedNEQ(v bool) predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNEQ(FieldTotalUnlimited, v))
+}
+
+// TotalUnlimitedIsNil applies the IsNil predicate on the "total_unlimited" field.
+func TotalUnlimitedIsNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldIsNull(FieldTotalUnlimited))
+}
+
+// TotalUnlimitedNotNil applies the NotNil predicate on the "total_unlimited" field.
+func TotalUnlimitedNotNil() predicate.TokenAllowance {
+	return predicate.TokenAllowance(sql.FieldNotNull(FieldTotalUnlimited))
 }
 
 // SpentAmountEQ applies the EQ predicate on the "spent_amount" field.

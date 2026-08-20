@@ -729,12 +729,20 @@ func init() {
 	tokenallowance.DefaultUpdateTime = tokenallowanceDescUpdateTime.Default.(func() time.Time)
 	// tokenallowance.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenallowance.UpdateDefaultUpdateTime = tokenallowanceDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenallowanceDescPerTransactionUnlimited is the schema descriptor for per_transaction_unlimited field.
+	tokenallowanceDescPerTransactionUnlimited := tokenallowanceFields[8].Descriptor()
+	// tokenallowance.DefaultPerTransactionUnlimited holds the default value on creation for the per_transaction_unlimited field.
+	tokenallowance.DefaultPerTransactionUnlimited = tokenallowanceDescPerTransactionUnlimited.Default.(bool)
+	// tokenallowanceDescTotalUnlimited is the schema descriptor for total_unlimited field.
+	tokenallowanceDescTotalUnlimited := tokenallowanceFields[9].Descriptor()
+	// tokenallowance.DefaultTotalUnlimited holds the default value on creation for the total_unlimited field.
+	tokenallowance.DefaultTotalUnlimited = tokenallowanceDescTotalUnlimited.Default.(bool)
 	// tokenallowanceDescSpentAmount is the schema descriptor for spent_amount field.
-	tokenallowanceDescSpentAmount := tokenallowanceFields[8].Descriptor()
+	tokenallowanceDescSpentAmount := tokenallowanceFields[10].Descriptor()
 	// tokenallowance.DefaultSpentAmount holds the default value on creation for the spent_amount field.
 	tokenallowance.DefaultSpentAmount = tokenallowanceDescSpentAmount.Default.([]byte)
 	// tokenallowanceDescOwnerSignature is the schema descriptor for owner_signature field.
-	tokenallowanceDescOwnerSignature := tokenallowanceFields[12].Descriptor()
+	tokenallowanceDescOwnerSignature := tokenallowanceFields[14].Descriptor()
 	// tokenallowance.OwnerSignatureValidator is a validator for the "owner_signature" field. It is called by the builders before save.
 	tokenallowance.OwnerSignatureValidator = tokenallowanceDescOwnerSignature.Validators[0].(func([]byte) error)
 	// tokenallowanceDescID is the schema descriptor for id field.

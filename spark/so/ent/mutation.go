@@ -18075,6 +18075,8 @@ type TokenAllowanceMutation struct {
 	token_identifier                   *[]byte
 	per_transaction_cap                *[]byte
 	total_limit                        *[]byte
+	per_transaction_unlimited          *bool
+	total_unlimited                    *bool
 	spent_amount                       *[]byte
 	recipient_allowlist                *[][]uint8
 	appendrecipient_allowlist          [][]uint8
@@ -18565,6 +18567,104 @@ func (m *TokenAllowanceMutation) OldTotalLimit(ctx context.Context) (v []byte, e
 // ResetTotalLimit resets all changes to the "total_limit" field.
 func (m *TokenAllowanceMutation) ResetTotalLimit() {
 	m.total_limit = nil
+}
+
+// SetPerTransactionUnlimited sets the "per_transaction_unlimited" field.
+func (m *TokenAllowanceMutation) SetPerTransactionUnlimited(b bool) {
+	m.per_transaction_unlimited = &b
+}
+
+// PerTransactionUnlimited returns the value of the "per_transaction_unlimited" field in the mutation.
+func (m *TokenAllowanceMutation) PerTransactionUnlimited() (r bool, exists bool) {
+	v := m.per_transaction_unlimited
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPerTransactionUnlimited returns the old "per_transaction_unlimited" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldPerTransactionUnlimited(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPerTransactionUnlimited is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPerTransactionUnlimited requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPerTransactionUnlimited: %w", err)
+	}
+	return oldValue.PerTransactionUnlimited, nil
+}
+
+// ClearPerTransactionUnlimited clears the value of the "per_transaction_unlimited" field.
+func (m *TokenAllowanceMutation) ClearPerTransactionUnlimited() {
+	m.per_transaction_unlimited = nil
+	m.clearedFields[tokenallowance.FieldPerTransactionUnlimited] = struct{}{}
+}
+
+// PerTransactionUnlimitedCleared returns if the "per_transaction_unlimited" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) PerTransactionUnlimitedCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldPerTransactionUnlimited]
+	return ok
+}
+
+// ResetPerTransactionUnlimited resets all changes to the "per_transaction_unlimited" field.
+func (m *TokenAllowanceMutation) ResetPerTransactionUnlimited() {
+	m.per_transaction_unlimited = nil
+	delete(m.clearedFields, tokenallowance.FieldPerTransactionUnlimited)
+}
+
+// SetTotalUnlimited sets the "total_unlimited" field.
+func (m *TokenAllowanceMutation) SetTotalUnlimited(b bool) {
+	m.total_unlimited = &b
+}
+
+// TotalUnlimited returns the value of the "total_unlimited" field in the mutation.
+func (m *TokenAllowanceMutation) TotalUnlimited() (r bool, exists bool) {
+	v := m.total_unlimited
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTotalUnlimited returns the old "total_unlimited" field's value of the TokenAllowance entity.
+// If the TokenAllowance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenAllowanceMutation) OldTotalUnlimited(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTotalUnlimited is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTotalUnlimited requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTotalUnlimited: %w", err)
+	}
+	return oldValue.TotalUnlimited, nil
+}
+
+// ClearTotalUnlimited clears the value of the "total_unlimited" field.
+func (m *TokenAllowanceMutation) ClearTotalUnlimited() {
+	m.total_unlimited = nil
+	m.clearedFields[tokenallowance.FieldTotalUnlimited] = struct{}{}
+}
+
+// TotalUnlimitedCleared returns if the "total_unlimited" field was cleared in this mutation.
+func (m *TokenAllowanceMutation) TotalUnlimitedCleared() bool {
+	_, ok := m.clearedFields[tokenallowance.FieldTotalUnlimited]
+	return ok
+}
+
+// ResetTotalUnlimited resets all changes to the "total_unlimited" field.
+func (m *TokenAllowanceMutation) ResetTotalUnlimited() {
+	m.total_unlimited = nil
+	delete(m.clearedFields, tokenallowance.FieldTotalUnlimited)
 }
 
 // SetSpentAmount sets the "spent_amount" field.
@@ -19277,7 +19377,7 @@ func (m *TokenAllowanceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenAllowanceMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 24)
 	if m.create_time != nil {
 		fields = append(fields, tokenallowance.FieldCreateTime)
 	}
@@ -19307,6 +19407,12 @@ func (m *TokenAllowanceMutation) Fields() []string {
 	}
 	if m.total_limit != nil {
 		fields = append(fields, tokenallowance.FieldTotalLimit)
+	}
+	if m.per_transaction_unlimited != nil {
+		fields = append(fields, tokenallowance.FieldPerTransactionUnlimited)
+	}
+	if m.total_unlimited != nil {
+		fields = append(fields, tokenallowance.FieldTotalUnlimited)
 	}
 	if m.spent_amount != nil {
 		fields = append(fields, tokenallowance.FieldSpentAmount)
@@ -19372,6 +19478,10 @@ func (m *TokenAllowanceMutation) Field(name string) (ent.Value, bool) {
 		return m.PerTransactionCap()
 	case tokenallowance.FieldTotalLimit:
 		return m.TotalLimit()
+	case tokenallowance.FieldPerTransactionUnlimited:
+		return m.PerTransactionUnlimited()
+	case tokenallowance.FieldTotalUnlimited:
+		return m.TotalUnlimited()
 	case tokenallowance.FieldSpentAmount:
 		return m.SpentAmount()
 	case tokenallowance.FieldRecipientAllowlist:
@@ -19425,6 +19535,10 @@ func (m *TokenAllowanceMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldPerTransactionCap(ctx)
 	case tokenallowance.FieldTotalLimit:
 		return m.OldTotalLimit(ctx)
+	case tokenallowance.FieldPerTransactionUnlimited:
+		return m.OldPerTransactionUnlimited(ctx)
+	case tokenallowance.FieldTotalUnlimited:
+		return m.OldTotalUnlimited(ctx)
 	case tokenallowance.FieldSpentAmount:
 		return m.OldSpentAmount(ctx)
 	case tokenallowance.FieldRecipientAllowlist:
@@ -19527,6 +19641,20 @@ func (m *TokenAllowanceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTotalLimit(v)
+		return nil
+	case tokenallowance.FieldPerTransactionUnlimited:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPerTransactionUnlimited(v)
+		return nil
+	case tokenallowance.FieldTotalUnlimited:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTotalUnlimited(v)
 		return nil
 	case tokenallowance.FieldSpentAmount:
 		v, ok := value.([]byte)
@@ -19693,6 +19821,12 @@ func (m *TokenAllowanceMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TokenAllowanceMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(tokenallowance.FieldPerTransactionUnlimited) {
+		fields = append(fields, tokenallowance.FieldPerTransactionUnlimited)
+	}
+	if m.FieldCleared(tokenallowance.FieldTotalUnlimited) {
+		fields = append(fields, tokenallowance.FieldTotalUnlimited)
+	}
 	if m.FieldCleared(tokenallowance.FieldRecipientAllowlist) {
 		fields = append(fields, tokenallowance.FieldRecipientAllowlist)
 	}
@@ -19722,6 +19856,12 @@ func (m *TokenAllowanceMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TokenAllowanceMutation) ClearField(name string) error {
 	switch name {
+	case tokenallowance.FieldPerTransactionUnlimited:
+		m.ClearPerTransactionUnlimited()
+		return nil
+	case tokenallowance.FieldTotalUnlimited:
+		m.ClearTotalUnlimited()
+		return nil
 	case tokenallowance.FieldRecipientAllowlist:
 		m.ClearRecipientAllowlist()
 		return nil
@@ -19774,6 +19914,12 @@ func (m *TokenAllowanceMutation) ResetField(name string) error {
 		return nil
 	case tokenallowance.FieldTotalLimit:
 		m.ResetTotalLimit()
+		return nil
+	case tokenallowance.FieldPerTransactionUnlimited:
+		m.ResetPerTransactionUnlimited()
+		return nil
+	case tokenallowance.FieldTotalUnlimited:
+		m.ResetTotalUnlimited()
 		return nil
 	case tokenallowance.FieldSpentAmount:
 		m.ResetSpentAmount()

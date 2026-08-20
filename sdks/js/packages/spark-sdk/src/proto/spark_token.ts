@@ -740,6 +740,17 @@ export interface TokenAllowancePayload {
   network: Network;
   /** Wallet-provided creation timestamp in milliseconds, used to order updates. */
   ownerProvidedTimestamp: number;
+  /**
+   * Waives the per-transaction ceiling. Requires a per_transaction_cap of all
+   * zero bytes; the statement hash always binds this flag. Absent/false always
+   * means bounded, so a stripped flag fails closed.
+   */
+  perTransactionUnlimited: boolean;
+  /**
+   * Waives the lifetime total ceiling. Same zero-cap rule as
+   * per_transaction_unlimited; spent_amount still accumulates for observability.
+   */
+  totalUnlimited: boolean;
 }
 
 export interface CreateTokenAllowanceRequest {
@@ -5602,6 +5613,8 @@ function createBaseTokenAllowancePayload(): TokenAllowancePayload {
     expiryTime: undefined,
     network: 0,
     ownerProvidedTimestamp: 0,
+    perTransactionUnlimited: false,
+    totalUnlimited: false,
   };
 }
 
@@ -5639,6 +5652,12 @@ export const TokenAllowancePayload: MessageFns<TokenAllowancePayload> = {
     }
     if (message.ownerProvidedTimestamp !== 0) {
       writer.uint32(112).uint64(message.ownerProvidedTimestamp);
+    }
+    if (message.perTransactionUnlimited !== false) {
+      writer.uint32(120).bool(message.perTransactionUnlimited);
+    }
+    if (message.totalUnlimited !== false) {
+      writer.uint32(128).bool(message.totalUnlimited);
     }
     return writer;
   },
@@ -5738,6 +5757,22 @@ export const TokenAllowancePayload: MessageFns<TokenAllowancePayload> = {
           message.ownerProvidedTimestamp = longToNumber(reader.uint64());
           continue;
         }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.perTransactionUnlimited = reader.bool();
+          continue;
+        }
+        case 16: {
+          if (tag !== 128) {
+            break;
+          }
+
+          message.totalUnlimited = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5766,6 +5801,10 @@ export const TokenAllowancePayload: MessageFns<TokenAllowancePayload> = {
       ownerProvidedTimestamp: isSet(object.ownerProvidedTimestamp)
         ? globalThis.Number(object.ownerProvidedTimestamp)
         : 0,
+      perTransactionUnlimited: isSet(object.perTransactionUnlimited)
+        ? globalThis.Boolean(object.perTransactionUnlimited)
+        : false,
+      totalUnlimited: isSet(object.totalUnlimited) ? globalThis.Boolean(object.totalUnlimited) : false,
     };
   },
 
@@ -5804,6 +5843,12 @@ export const TokenAllowancePayload: MessageFns<TokenAllowancePayload> = {
     if (message.ownerProvidedTimestamp !== 0) {
       obj.ownerProvidedTimestamp = Math.round(message.ownerProvidedTimestamp);
     }
+    if (message.perTransactionUnlimited !== false) {
+      obj.perTransactionUnlimited = message.perTransactionUnlimited;
+    }
+    if (message.totalUnlimited !== false) {
+      obj.totalUnlimited = message.totalUnlimited;
+    }
     return obj;
   },
 
@@ -5823,6 +5868,8 @@ export const TokenAllowancePayload: MessageFns<TokenAllowancePayload> = {
     message.expiryTime = object.expiryTime ?? undefined;
     message.network = object.network ?? 0;
     message.ownerProvidedTimestamp = object.ownerProvidedTimestamp ?? 0;
+    message.perTransactionUnlimited = object.perTransactionUnlimited ?? false;
+    message.totalUnlimited = object.totalUnlimited ?? false;
     return message;
   },
 };

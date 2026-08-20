@@ -1,4 +1,4 @@
-h1:Ir0OqhRGo0Bd7nkZ7M1sHiTrcdC2ZSsHxeO3SyVaBNo=
+h1:lZOknDkIvY81GJJRAqQEWnVyJ8AxWT55G5JG5b7Z+/8=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -184,3 +184,4 @@ h1:Ir0OqhRGo0Bd7nkZ7M1sHiTrcdC2ZSsHxeO3SyVaBNo=
 20260818223238_add_token_allowance_revoke_version.sql h1:dXNEgotj+P2g+a2nG9k7D/8xrEgvvmDJKAT9rQwQ5k4=
 20260818224238_add_token_allowance_spends.sql h1:SWVelhZ4Ef1ZlVrubA4Iv517Dg6wnHmKbNNY0AyhFmA=
 20260818225238_add_token_allowance_spend_allowance_status_index.sql h1:xvrJ1KkXP/way8Rs+ealIrrYIkrIeA5AxvjGWd5eHKQ=
+20260818226238_add_unlimited_flags_to_token_allowances.sql h1:BvCL696ayQA1Y1yntqaONoHyxh+jaBzZSmJUuaXprbg=
