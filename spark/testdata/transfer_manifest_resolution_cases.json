@@ -1,0 +1,242 @@
+{
+  "description": "Resolution of ManifestAmount.bps against a server-observed gross, for the SO's manifest binding. Sats edges are flat and come off the top; bps edges divide the remainder. resolved is each edge's amount and allowed its inclusive upper bound, which exceeds resolved by one for a bps edge so the SSP places the rounding dust. Go consumer: so/transfer/manifest_resolution_vectors_test.go. SP-3696.",
+  "testCases": [
+    {
+      "name": "exact_split_no_remainder",
+      "description": "60/40 of 1000 divides evenly",
+      "gross": 1000,
+      "edges": [
+        {
+          "bps": 6000
+        },
+        {
+          "bps": 4000
+        }
+      ],
+      "resolved": [
+        600,
+        400
+      ],
+      "allowed": [
+        601,
+        401
+      ]
+    },
+    {
+      "name": "remainder_one_sat",
+      "description": "999 at 60/40 floors to 599+399, one short of the gross",
+      "gross": 999,
+      "edges": [
+        {
+          "bps": 6000
+        },
+        {
+          "bps": 4000
+        }
+      ],
+      "resolved": [
+        599,
+        399
+      ],
+      "allowed": [
+        600,
+        400
+      ]
+    },
+    {
+      "name": "remainder_three_sats",
+      "description": "A four-way split shorts by three; the remainder is bounded by the edge count, not by one",
+      "gross": 999,
+      "edges": [
+        {
+          "bps": 9700
+        },
+        {
+          "bps": 100
+        },
+        {
+          "bps": 150
+        },
+        {
+          "bps": 50
+        }
+      ],
+      "resolved": [
+        969,
+        9,
+        14,
+        4
+      ],
+      "allowed": [
+        970,
+        10,
+        15,
+        5
+      ]
+    },
+    {
+      "name": "flat_fee_off_the_top",
+      "description": "A 100-sat flat fee leaves 900 for the bps edges to divide",
+      "gross": 1000,
+      "edges": [
+        {
+          "sats": 100
+        },
+        {
+          "bps": 6000
+        },
+        {
+          "bps": 4000
+        }
+      ],
+      "resolved": [
+        100,
+        540,
+        360
+      ],
+      "allowed": [
+        100,
+        541,
+        361
+      ]
+    },
+    {
+      "name": "floors_to_zero",
+      "description": "A 1-bps edge on 40 sats floors to zero and is not levied",
+      "gross": 40,
+      "edges": [
+        {
+          "bps": 9999
+        },
+        {
+          "bps": 1
+        }
+      ],
+      "resolved": [
+        39,
+        0
+      ],
+      "allowed": [
+        40,
+        1
+      ]
+    },
+    {
+      "name": "sats_only_is_identity",
+      "description": "With no bps edge the declared sats resolve to themselves",
+      "gross": 1000,
+      "edges": [
+        {
+          "sats": 600
+        },
+        {
+          "sats": 400
+        }
+      ],
+      "resolved": [
+        600,
+        400
+      ],
+      "allowed": [
+        600,
+        400
+      ]
+    },
+    {
+      "name": "max_satoshi_gross",
+      "description": "The whole bitcoin supply as gross; gross*10000 exceeds uint64, so resolution must widen",
+      "gross": 2100000000000000,
+      "edges": [
+        {
+          "bps": 9800
+        },
+        {
+          "bps": 200
+        }
+      ],
+      "resolved": [
+        2058000000000000,
+        42000000000000
+      ],
+      "allowed": [
+        2058000000000001,
+        42000000000001
+      ]
+    }
+  ],
+  "invalidCases": [
+    {
+      "name": "bps_sum_under_ten_thousand",
+      "description": "Declares half the gross; without the sum check the window would admit it at small grosses",
+      "gross": 8,
+      "edges": [
+        {
+          "bps": 1250
+        },
+        {
+          "bps": 1250
+        },
+        {
+          "bps": 1250
+        },
+        {
+          "bps": 1250
+        }
+      ],
+      "expectedError": "manifest bps edges must sum to 10000: edges sum to 5000"
+    },
+    {
+      "name": "bps_sum_over_ten_thousand",
+      "description": "Declares more than the gross",
+      "gross": 1000,
+      "edges": [
+        {
+          "bps": 7000
+        },
+        {
+          "bps": 4000
+        }
+      ],
+      "expectedError": "manifest bps edges must sum to 10000: edges sum to 11000"
+    },
+    {
+      "name": "flat_fees_exceed_gross",
+      "description": "The flat fee is larger than the gross, so the remainder would underflow",
+      "gross": 1000,
+      "edges": [
+        {
+          "sats": 1001
+        },
+        {
+          "bps": 10000
+        }
+      ],
+      "expectedError": "manifest sats edges leave nothing for the bps edges to divide: 1001 sats of 1000"
+    },
+    {
+      "name": "flat_fees_consume_gross",
+      "description": "The flat fee takes the whole gross, leaving the payee nothing",
+      "gross": 1000,
+      "edges": [
+        {
+          "sats": 1000
+        },
+        {
+          "bps": 10000
+        }
+      ],
+      "expectedError": "manifest sats edges leave nothing for the bps edges to divide: 1000 sats of 1000"
+    },
+    {
+      "name": "zero_gross_with_bps_edge",
+      "description": "No executed value for the bps edges to divide",
+      "gross": 0,
+      "edges": [
+        {
+          "bps": 10000
+        }
+      ],
+      "expectedError": "manifest sats edges leave nothing for the bps edges to divide: no executed value to divide"
+    }
+  ]
+}
