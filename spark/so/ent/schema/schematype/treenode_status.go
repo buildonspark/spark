@@ -54,6 +54,12 @@ const (
 	// and WATCHTOWER_EXITED explicitly, never IsExitedToL1 — three of that
 	// predicate's five statuses have no such output to spend.
 	TreeNodeStatusWatchtowerExitRecovered TreeNodeStatus = "WATCHTOWER_EXIT_RECOVERED"
+	// TreeNodeStatusCreationAbandoned is the status of a node in a tree whose
+	// creation was abandoned: the tree never left PENDING, no node was ever
+	// signed, and the funding transaction was never confirmed — so no
+	// transaction in the tree can ever reach the chain. Written by the
+	// retire_abandoned_pending_trees task. Terminal.
+	TreeNodeStatusCreationAbandoned TreeNodeStatus = "CREATION_ABANDONED"
 )
 
 // CanBecomeAvailable reports whether a tree node currently in this status is
@@ -70,7 +76,8 @@ func (s TreeNodeStatus) CanBecomeAvailable() bool {
 		TreeNodeStatusReimbursed,
 		TreeNodeStatusConsolidated,
 		TreeNodeStatusWatchtowerExited,
-		TreeNodeStatusWatchtowerExitRecovered:
+		TreeNodeStatusWatchtowerExitRecovered,
+		TreeNodeStatusCreationAbandoned:
 		return false
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,
@@ -174,6 +181,12 @@ func (s TreeNodeStatus) ShouldMarkParentExited() bool {
 		// parent until the next pass).
 		return false
 
+	case TreeNodeStatusCreationAbandoned:
+		// The funding transaction never reached the chain, so no ancestor exit
+		// can affect this node; the sweep would only destroy the abandonment
+		// marker and re-admit the node to the watchtower's work set.
+		return false
+
 	case TreeNodeStatusReimbursed:
 		// Already settled: the operator has paid this node out. PARENT_EXITED is
 		// the weaker claim and the write is one-way — nothing un-sets it, and
@@ -258,6 +271,7 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusConsolidated),
 		string(TreeNodeStatusWatchtowerExited),
 		string(TreeNodeStatusWatchtowerExitRecovered),
+		string(TreeNodeStatusCreationAbandoned),
 	}
 }
 
@@ -275,7 +289,8 @@ func (s TreeNodeStatus) IsTerminal() bool {
 		TreeNodeStatusExited,
 		TreeNodeStatusReimbursed,
 		TreeNodeStatusWatchtowerExited,
-		TreeNodeStatusWatchtowerExitRecovered:
+		TreeNodeStatusWatchtowerExitRecovered,
+		TreeNodeStatusCreationAbandoned:
 		return true
 	case TreeNodeStatusCreating,
 		TreeNodeStatusAvailable,

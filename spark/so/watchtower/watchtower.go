@@ -43,6 +43,7 @@ var (
 		st.TreeNodeStatusReimbursed,
 		st.TreeNodeStatusWatchtowerExited,
 		st.TreeNodeStatusWatchtowerExitRecovered,
+		st.TreeNodeStatusCreationAbandoned,
 	}
 )
 

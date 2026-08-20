@@ -94,7 +94,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		}
 
 		if len(req.GetStatuses()) == 0 {
-			query = query.Where(treenode.StatusNotIn(st.TreeNodeStatusCreating, st.TreeNodeStatusSplitted))
+			query = query.Where(treenode.StatusNotIn(st.TreeNodeStatusCreating, st.TreeNodeStatusSplitted, st.TreeNodeStatusCreationAbandoned))
 		}
 
 		query = query.
