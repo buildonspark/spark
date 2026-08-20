@@ -202,7 +202,8 @@ func isIdenticalAllowanceCreate(ctx context.Context, payload *tokenpb.TokenAllow
 // this SO. It is shared by coordinator-local and participant Prepare work; every operator runs
 // the full validation independently and does not trust the coordinator's decision.
 //
-// Timestamp freshness is deliberately NOT enforced here. It is enforced only at the public
+// Timestamp freshness (the symmetric window) is deliberately NOT enforced here; only the
+// future bound above is. The freshness window is enforced at the public
 // coordinator edge: participant recovery replays the identical signed payload, and a peer that
 // was down longer than the freshness window would otherwise reject the original timestamp
 // forever, permanently stranding a partially-replicated grant. Replay is blocked structurally
@@ -216,6 +217,11 @@ func ValidateAndApplyCreateAllowance(
 ) error {
 	if err := utils.ValidateTokenAllowancePayload(payload, config.SupportedNetworks); err != nil {
 		return errors.InvalidArgumentMalformedField(fmt.Errorf("token allowance payload validation failed: %w", err))
+	}
+	// Bounded on every operator, not just the coordinator edge: a future-dated grant can never
+	// be revoked, because a revoke that predates the grant timestamp is refused as stale.
+	if err := ValidateTimestampNotFutureDated(payload.GetOwnerProvidedTimestamp()); err != nil {
+		return err
 	}
 
 	statementHash, err := utils.HashCreateTokenAllowancePayload(payload)
@@ -373,7 +379,7 @@ func duplicateAllowanceCreateError(allowanceID uuid.UUID, err error) error {
 // on this SO. Rows are never deleted; the tombstone is the replay protection. Shared between the
 // coordinator and the peer entry point, with each operator validating independently.
 //
-// Like ValidateAndApplyCreateAllowance, timestamp freshness is enforced only at the public
+// Like ValidateAndApplyCreateAllowance, the symmetric freshness window is enforced only at the public
 // coordinator edge so replication recovery can replay the original signed payload indefinitely.
 func ValidateAndApplyRevokeAllowance(
 	ctx context.Context,
@@ -382,6 +388,11 @@ func ValidateAndApplyRevokeAllowance(
 	ownerSignature []byte,
 ) error {
 	if err := utils.ValidateRevokeTokenAllowancePayload(revokePayload); err != nil {
+		return err
+	}
+	// Bounded on every operator for the same reason as create: a future-dated tombstone would
+	// win the proof comparison against every later honest revoke.
+	if err := ValidateTimestampNotFutureDated(revokePayload.GetOwnerProvidedTimestamp()); err != nil {
 		return err
 	}
 

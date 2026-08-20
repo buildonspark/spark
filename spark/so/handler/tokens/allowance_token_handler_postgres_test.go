@@ -1474,3 +1474,51 @@ func loadAllowanceRow(t *testing.T, tc *db.TestContext, allowanceID uuid.UUID) *
 	require.NoError(t, err)
 	return row
 }
+
+// A future-dated grant is refused by every operator, not just the public edge.
+//
+// The freshness window at the public edge is the only symmetric check, so a coordinator that
+// skips it could otherwise install a grant whose owner-signed timestamp is years ahead. That is
+// permanent rather than merely stale: ValidateAndApplyRevokeAllowance refuses a revoke whose
+// timestamp predates the grant's, so the owner could never revoke it.
+func TestValidateAndApplyCreateAllowance_RejectsFutureDatedTimestamp(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+	// Far beyond MaxTimestampFutureSkew, as a poisoned server-time sample would produce.
+	payload.OwnerProvidedTimestamp = uint64(time.Now().Add(365 * 24 * time.Hour).UnixMilli())
+
+	err := ValidateAndApplyCreateAllowance(ctx, cfg, payload, signCreateAllowance(t, payload, allowanceOwnerKey))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too far in the future")
+}
+
+// The internal path must still accept an old timestamp: a participant replaying a recovery, or
+// one that was down longer than the freshness window, applies the original signed payload.
+func TestValidateAndApplyCreateAllowance_AcceptsOldTimestamp(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+	payload.OwnerProvidedTimestamp = uint64(time.Now().Add(-48 * time.Hour).UnixMilli())
+
+	require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, payload, signCreateAllowance(t, payload, allowanceOwnerKey)))
+}
+
+// The same bound applies to revoke: a future-dated tombstone would beat every later honest one.
+func TestValidateAndApplyRevokeAllowance_RejectsFutureDatedTimestamp(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	createPayload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(20*time.Second))
+	require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, createPayload, signCreateAllowance(t, createPayload, allowanceOwnerKey)))
+
+	revokePayload := newRevokePayload(allowanceID, allowanceOwnerKey.Public(), uint64(time.Now().Add(365*24*time.Hour).UnixMilli()))
+	err := ValidateAndApplyRevokeAllowance(ctx, cfg, revokePayload, signRevokeAllowance(t, revokePayload, allowanceOwnerKey))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too far in the future")
+}

@@ -24,6 +24,39 @@ import (
 // and server time. Timestamps must be within ±MaxTimestampSkew of the current time.
 const MaxTimestampSkew = 1 * time.Minute
 
+// MaxTimestampFutureSkew bounds how far ahead of an operator's own clock an owner-signed
+// timestamp may be. Unlike the symmetric MaxTimestampSkew freshness check, this bound is
+// enforced by every operator rather than only at the public coordinator edge.
+//
+// The reason is that a future-dated timestamp is not merely stale, it is permanent: a revoke
+// whose timestamp predates the grant's is refused as stale, so a grant carrying a far-future
+// timestamp can never be revoked by its owner. Leaving the only check at the coordinator edge
+// means a coordinator that skips its own check can install such a grant fleet-wide.
+//
+// Only the future side is bounded here. Accepting old timestamps on the internal path is
+// deliberate and stays that way: a participant applying a recovery replay, or one that was down
+// longer than the freshness window, must still be able to apply the original signed payload, and
+// an old timestamp carries none of the risk a future one does.
+const MaxTimestampFutureSkew = 5 * time.Minute
+
+// ValidateTimestampNotFutureDated rejects an owner-signed timestamp that is implausibly far
+// ahead of this operator's clock. Every operator runs it, including on the internal replication
+// and consensus prepare paths.
+func ValidateTimestampNotFutureDated(timestampMillis uint64) error {
+	latestAllowed := time.Now().Add(MaxTimestampFutureSkew)
+	// Compared as uint64: converting to int64 first would wrap a high-bit value into the past
+	// and wave through the very timestamps this bound exists to reject. The stored value keeps
+	// its full uint64 range, and revoke orders against it, so a wrapped accept would leave the
+	// grant unrevocable.
+	if timestampMillis > uint64(latestAllowed.UnixMilli()) {
+		return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
+			"timestamp %d is too far in the future (max allowed: %d)",
+			timestampMillis, latestAllowed.UnixMilli(),
+		))
+	}
+	return nil
+}
+
 // ValidateTimestampMillis validates that a timestamp (in milliseconds) is within acceptable bounds.
 // Timestamps must be within ±MaxTimestampSkew of the current server time.
 func ValidateTimestampMillis(timestampMillis uint64) error {
