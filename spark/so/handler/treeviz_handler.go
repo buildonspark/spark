@@ -557,6 +557,8 @@ func treeStatusToProto(s st.TreeStatus) pb.TreeVizTreeStatus {
 		return pb.TreeVizTreeStatus_TREE_VIZ_TREE_STATUS_AVAILABLE
 	case st.TreeStatusExited:
 		return pb.TreeVizTreeStatus_TREE_VIZ_TREE_STATUS_EXITED
+	case st.TreeStatusCreationAbandoned:
+		return pb.TreeVizTreeStatus_TREE_VIZ_TREE_STATUS_CREATION_ABANDONED
 	default:
 		return pb.TreeVizTreeStatus_TREE_VIZ_TREE_STATUS_UNSPECIFIED
 	}
@@ -600,6 +602,8 @@ func nodeStatusToProto(s st.TreeNodeStatus) pb.TreeVizNodeStatus {
 		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_WATCHTOWER_EXITED
 	case st.TreeNodeStatusWatchtowerExitRecovered:
 		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED
+	case st.TreeNodeStatusCreationAbandoned:
+		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_CREATION_ABANDONED
 	default:
 		return pb.TreeVizNodeStatus_TREE_VIZ_NODE_STATUS_UNSPECIFIED
 	}
