@@ -134,6 +134,7 @@ export const LOG_SERVICE_NAMES = [
   "lightningService",
   "depositService",
   "tokenTransactionService",
+  "tokenAllowanceService",
   "tokenOutputManager",
   "coopExitService",
   "swapService",

@@ -13,6 +13,8 @@ export * from "./secret-sharing.js";
 export * from "./signature.js";
 export * from "./signing.js";
 export * from "./spark-invoice-comparison.js";
+export * from "./token-allowance-hashing.js";
+export * from "./token-allowance-verification.js";
 export * from "./token-hashing.js";
 export * from "./token-identifier.js";
 export * from "./token-transactions.js";

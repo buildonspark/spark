@@ -56,6 +56,7 @@ const SERVICE_LOGGER_NAMES = {
   lightningService: "LightningService",
   depositService: "DepositService",
   tokenTransactionService: "TokenTransactionService",
+  tokenAllowanceService: "TokenAllowanceService",
   tokenOutputManager: "TokenOutputManager",
   coopExitService: "CoopExitService",
   swapService: "SwapService",

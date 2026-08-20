@@ -44,7 +44,10 @@ import {
 } from "../../utils/token-identifier.js";
 import { validateTokenTransaction } from "../../utils/token-transaction-validation.js";
 import { sumTokenOutputs } from "../../utils/token-transactions.js";
-import { LoggingService } from "../../utils/logging-service.js";
+import {
+  LoggingService,
+  type LogServiceDisplayName,
+} from "../../utils/logging-service.js";
 import { type WalletConfigService } from "../config.js";
 import { type ConnectionManager } from "../connection/connection.js";
 import { type SigningOperator } from "../wallet-config.js";
@@ -60,7 +63,7 @@ export const MAX_TOKEN_OUTPUTS_TX = 500;
 // DEADLINE_EXCEEDED instead of leaving the await pending forever.
 const TOKEN_TRANSACTION_RPC_TIMEOUT_MS = 30_000;
 
-function tokenTransactionCallOptions(): SparkCallOptions {
+export function tokenTransactionCallOptions(): SparkCallOptions {
   return {
     retry: true,
     retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],
@@ -106,11 +109,12 @@ export class TokenTransactionService {
     config: WalletConfigService,
     connectionManager: ConnectionManager,
     logging = LoggingService.fromConfig(config),
+    serviceName: LogServiceDisplayName = "TokenTransactionService",
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
-    this.logger = logging.logger("TokenTransactionService");
-    logging.wrapPrototypeMethods("TokenTransactionService", this);
+    this.logger = logging.logger(serviceName);
+    logging.wrapPrototypeMethods(serviceName, this);
   }
 
   private shouldUseTokenPrimitivesBindings(): boolean {

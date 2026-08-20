@@ -32,6 +32,17 @@ export { CoopExitService } from "./services/coop-exit.js";
 export { default as LeafManager } from "./services/leaf-manager.js";
 export { SigningService } from "./services/signing.js";
 export { default as SwapService } from "./services/swap.js";
+export {
+  TokenAllowanceService,
+  type AllowancePullOutput,
+  type CommitAllowancePullResult,
+  type CreateTokenAllowanceParams,
+  type CreateTokenAllowanceResult,
+  type PreparedAllowancePull,
+  type QueryTokenAllowancesFilter,
+  type StartAllowancePullParams,
+  type TokenAllowanceResult,
+} from "./services/tokens/allowances.js";
 export { TokenTransactionService } from "./services/tokens/token-transactions.js";
 export { type LeafKeyTweak, TransferService } from "./services/transfer.js";
 export {
