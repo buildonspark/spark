@@ -2,13 +2,16 @@ import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = "http://127.0.0.1:4173";
-const outputDir =
-  process.env["HERMETIC_TEST"] === "true" && process.env["GITHUB_WORKSPACE"]
-    ? path.join(
-        process.env["GITHUB_WORKSPACE"],
-        "logs/playwright/spark-vite-app",
-      )
-    : "../../../../output/playwright/spark-vite-app";
+const githubWorkspace = process.env["GITHUB_WORKSPACE"];
+const artifactRoot =
+  process.env["HERMETIC_TEST"] === "true" && githubWorkspace
+    ? path.join(githubWorkspace, "logs")
+    : path.resolve("../../../../output");
+const outputDir = path.join(artifactRoot, "playwright/spark-vite-app");
+const htmlReportDir = path.join(
+  artifactRoot,
+  "playwright-report/spark-vite-app",
+);
 
 export default defineConfig({
   testDir: "./playwright",
@@ -18,7 +21,10 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
   },
-  reporter: "list",
+  reporter: [
+    ["list"],
+    ["html", { open: "never", outputFolder: htmlReportDir }],
+  ],
   outputDir,
   use: {
     baseURL,
