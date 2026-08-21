@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,21 +32,18 @@ func ParseSchemaDir(dir string) ([]Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	var schemas []Schema
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 			continue
 		}
 		// Skip mixin.go and other non-schema files
-		if entry.Name() == "mixin.go" || strings.HasPrefix(entry.Name(), "mixin") {
+		if strings.HasPrefix(entry.Name(), "mixin") {
 			continue
 		}
-
 		filePath := filepath.Join(dir, entry.Name())
 		schema, err := ParseSchemaFile(filePath)
-		if err != nil {
-			// Skip files that don't parse as schemas
+		if err != nil { // Skip files that don't parse as schemas
 			continue
 		}
 		if schema != nil {
@@ -67,7 +65,7 @@ func ParseSchemaFile(filePath string) (*Schema, error) {
 	var schemaName string
 	var fields []Field
 
-	ast.Inspect(node, func(n ast.Node) bool {
+	for n := range ast.Preorder(node) {
 		switch x := n.(type) {
 		case *ast.TypeSpec:
 			// Find type declarations that embed ent.Schema
@@ -85,34 +83,30 @@ func ParseSchemaFile(filePath string) (*Schema, error) {
 			// Find the Fields() method
 			if x.Name.Name == "Fields" && x.Recv != nil && len(x.Recv.List) > 0 {
 				// Extract fields from the return statement
-				ast.Inspect(x.Body, func(n ast.Node) bool {
-					if ret, ok := n.(*ast.ReturnStmt); ok {
-						for _, result := range ret.Results {
-							if comp, ok := result.(*ast.CompositeLit); ok {
-								for _, elt := range comp.Elts {
-									field := parseFieldExpr(elt, filePath, fset, schemaName)
-									if field != nil {
-										fields = append(fields, *field)
-									}
+				for n := range ast.Preorder(x.Body) {
+					ret, ok := n.(*ast.ReturnStmt)
+					if !ok {
+						continue
+					}
+					for _, result := range ret.Results {
+						if comp, ok := result.(*ast.CompositeLit); ok {
+							for _, elt := range comp.Elts {
+								if field := parseFieldExpr(elt, filePath, fset, schemaName); field != nil {
+									fields = append(fields, *field)
 								}
 							}
 						}
 					}
-					return true
-				})
+				}
 			}
 		}
-		return true
-	})
+	}
 
 	if schemaName == "" {
 		return nil, nil
 	}
 
-	return &Schema{
-		Name:   schemaName,
-		Fields: fields,
-	}, nil
+	return &Schema{Name: schemaName, Fields: fields}, nil
 }
 
 // parseFieldExpr parses a field expression from an Ent schema and extracts metadata.
@@ -121,8 +115,7 @@ func parseFieldExpr(expr ast.Expr, filePath string, fset *token.FileSet, schemaN
 	var deprecated bool
 	var line int
 
-	// Walk through the chained method calls
-	walkFieldChain(expr, func(call *ast.CallExpr, methodName string) {
+	for call, methodName := range fieldChain(expr) {
 		switch methodName {
 		case "String", "Int", "Int64", "Uint64", "Float", "Bool", "Time", "Bytes", "UUID", "JSON", "Enum", "Other":
 			// This is a field type call - extract the field name
@@ -135,7 +128,7 @@ func parseFieldExpr(expr ast.Expr, filePath string, fset *token.FileSet, schemaN
 		case "Deprecated":
 			deprecated = true
 		}
-	})
+	}
 
 	if fieldName == "" {
 		return nil
@@ -150,27 +143,24 @@ func parseFieldExpr(expr ast.Expr, filePath string, fset *token.FileSet, schemaN
 	}
 }
 
-// walkFieldChain walks through a chain of method calls and invokes the callback for each.
-func walkFieldChain(expr ast.Expr, fn func(*ast.CallExpr, string)) {
-	current := expr
-	for {
-		call, ok := current.(*ast.CallExpr)
-		if !ok {
-			return
-		}
-
-		// Get the method name
-		var methodName string
-		switch fun := call.Fun.(type) {
-		case *ast.SelectorExpr:
-			methodName = fun.Sel.Name
-			fn(call, methodName)
-			current = fun.X
-		case *ast.Ident:
-			// This is the end of the chain (e.g., field.String)
-			return
-		default:
-			return
+// fieldChain yields each call in a chain of method calls with its method name, from the outermost call inwards. It
+// stops at the head of the chain, where the callee is a plain identifier rather than a selector (e.g. field.String).
+func fieldChain(expr ast.Expr) iter.Seq2[*ast.CallExpr, string] {
+	return func(yield func(*ast.CallExpr, string) bool) {
+		current := expr
+		for {
+			call, ok := current.(*ast.CallExpr)
+			if !ok {
+				return
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return
+			}
+			if !yield(call, sel.Sel.Name) {
+				return
+			}
+			current = sel.X
 		}
 	}
 }
