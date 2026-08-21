@@ -5,12 +5,13 @@ package entexample
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/keys/jwt"
@@ -1041,7 +1042,7 @@ type IdempotencyKeyExample struct {
 	// Fields - use pointers to distinguish between "not set" and "set to zero value"
 	IdempotencyKey *string
 	MethodName     *string
-	Response       *json.RawMessage
+	Response       *jsontext.Value
 
 	// Edges - if set, use the provided entity; if nil, create a default one
 }
@@ -1067,7 +1068,7 @@ func (ik *IdempotencyKeyExample) SetMethodName(v string) *IdempotencyKeyExample 
 }
 
 // SetResponse sets the response field.
-func (ik *IdempotencyKeyExample) SetResponse(v json.RawMessage) *IdempotencyKeyExample {
+func (ik *IdempotencyKeyExample) SetResponse(v jsontext.Value) *IdempotencyKeyExample {
 	ik.Response = &v
 	return ik
 }

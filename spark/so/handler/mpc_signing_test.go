@@ -159,10 +159,8 @@ func TestAddMpcJob_RejectsAdaptor(t *testing.T) {
 		t.Context(),
 		"job-key",
 		&helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				SigningScheme:    pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
-				AdaptorPublicKey: &adaptor,
-			},
+			SigningScheme:    pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
+			AdaptorPublicKey: &adaptor,
 		},
 		nil,
 		keys.GeneratePrivateKey().Public(),

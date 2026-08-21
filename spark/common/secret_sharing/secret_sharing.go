@@ -190,13 +190,11 @@ func SplitSecretWithProofs(secret *big.Int, fieldModulus *big.Int, threshold int
 	for i := 1; i <= numberOfShares; i++ {
 		share := polynomial.Evaluate(big.NewInt(int64(i)))
 		shares = append(shares, &VerifiableSecretShare{
-			SecretShare: SecretShare{
-				FieldModulus: fieldModulus,
-				Threshold:    threshold,
-				Index:        big.NewInt(int64(i)),
-				Share:        share,
-			},
-			Proofs: polynomial.Proofs,
+			FieldModulus: fieldModulus,
+			Threshold:    threshold,
+			Index:        big.NewInt(int64(i)),
+			Share:        share,
+			Proofs:       polynomial.Proofs,
 		})
 	}
 	return shares, nil

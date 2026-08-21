@@ -90,14 +90,12 @@ func buildMpcSigningJobForRefund(
 	}
 
 	return &helper.SigningJobWithPregeneratedNonce{
-		SigningJob: helper.SigningJob{
-			JobID:              jobID,
-			SigningKeyshareID:  signingKeyshareID,
-			Message:            sigHash,
-			VerifyingKey:       &verifyingKey,
-			SigningScheme:      pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
-			SubUserCommitments: mpcSubUserCommitments(job.Contributions()),
-		},
-		Round1Packages: round1,
+		JobID:              jobID,
+		SigningKeyshareID:  signingKeyshareID,
+		Message:            sigHash,
+		VerifyingKey:       &verifyingKey,
+		SigningScheme:      pbfrost.SigningScheme_SIGNING_SCHEME_MPC_USER_GROUP,
+		SubUserCommitments: mpcSubUserCommitments(job.Contributions()),
+		Round1Packages:     round1,
 	}, nil
 }

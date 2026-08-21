@@ -333,12 +333,10 @@ func addJobFixture(t *testing.T) (context.Context, *frostAggregationBatch, *help
 	commitment, err := frost.NewSigningCommitment(keys.GeneratePrivateKey().Public(), keys.GeneratePrivateKey().Public())
 	require.NoError(t, err)
 	job := &helper.SigningJobWithPregeneratedNonce{
-		SigningJob: helper.SigningJob{
-			JobID:             uuid.New(),
-			SigningKeyshareID: keyshare.ID,
-			UserCommitment:    &commitment,
-		},
-		Round1Packages: map[string]frost.SigningCommitment{"op1": commitment},
+		JobID:             uuid.New(),
+		SigningKeyshareID: keyshare.ID,
+		UserCommitment:    &commitment,
+		Round1Packages:    map[string]frost.SigningCommitment{"op1": commitment},
 	}
 	allShares := map[string]map[string][]byte{
 		job.JobID.String(): {"op1": []byte("share-bytes")},
@@ -441,13 +439,11 @@ func TestAggregateSendTransferLeafSignaturesWiresVariants(t *testing.T) {
 	allShares := make(map[string]map[string][]byte)
 	newJob := func(message byte) *helper.SigningJobWithPregeneratedNonce {
 		job := &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:             uuid.New(),
-				SigningKeyshareID: keyshare.ID,
-				Message:           sighash.Hash{message},
-				UserCommitment:    &commitment,
-			},
-			Round1Packages: map[string]frost.SigningCommitment{"op1": commitment},
+			JobID:             uuid.New(),
+			SigningKeyshareID: keyshare.ID,
+			Message:           sighash.Hash{message},
+			UserCommitment:    &commitment,
+			Round1Packages:    map[string]frost.SigningCommitment{"op1": commitment},
 		}
 		allShares[job.JobID.String()] = map[string][]byte{"op1": []byte("share")}
 		return job
@@ -616,7 +612,7 @@ func TestAggregateRenewLeafSignaturesPairsJobsPositionally(t *testing.T) {
 	allShares := make(map[string]map[string][]byte, 3)
 	for i := range signingJobHelpers {
 		signingJobHelpers[i] = &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{JobID: uuid.New(), Message: sighash.Hash{byte(i + 1)}},
+			JobID: uuid.New(), Message: sighash.Hash{byte(i + 1)},
 		}
 		userSigningJobs[i] = &pbspark.UserSignedTxSigningJob{}
 		allShares[signingJobHelpers[i].JobID.String()] = map[string][]byte{"op1": []byte("share")}

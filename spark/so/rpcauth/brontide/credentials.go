@@ -154,9 +154,9 @@ func (c *clientCreds) ClientHandshake(ctx context.Context, authority string, raw
 	}
 
 	info := AuthInfo{
-		CommonAuthInfo: credentials.CommonAuthInfo{SecurityLevel: credentials.PrivacyAndIntegrity},
-		Peer:           &Peer{IdentityPublicKey: c.cfg.RemotePublicKey},
-		TLS:            tlsInfo,
+		SecurityLevel: credentials.PrivacyAndIntegrity,
+		Peer:          &Peer{IdentityPublicKey: c.cfg.RemotePublicKey},
+		TLS:           tlsInfo,
 	}
 	return newWrappedConn(tlsConn, m), info, nil
 }
@@ -236,9 +236,9 @@ func (s *serverCreds) ServerHandshake(raw net.Conn) (net.Conn, credentials.AuthI
 	// effect as a tighter bound until gRPC clears it, which is the safer side to err on.
 
 	info := AuthInfo{
-		CommonAuthInfo: credentials.CommonAuthInfo{SecurityLevel: credentials.PrivacyAndIntegrity},
-		Peer:           peerInfo,
-		TLS:            tlsInfo,
+		SecurityLevel: credentials.PrivacyAndIntegrity,
+		Peer:          peerInfo,
+		TLS:           tlsInfo,
 	}
 	return newWrappedConn(tlsConn, m), info, nil
 }

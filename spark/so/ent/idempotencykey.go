@@ -4,6 +4,7 @@ package ent
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type IdempotencyKey struct {
 	// Compressed public key of the authenticated user who created this idempotency record. Empty for internal SO-to-SO calls.
 	IdentityPublicKey []byte `json:"identity_public_key,omitempty"`
 	// JSON-Marshalled proto response to return for subsequent requests with the same idempotency key. A NULL value indicates we're not done processing the request.
-	Response     json.RawMessage `json:"response,omitempty"`
+	Response     jsontext.Value `json:"response,omitempty"`
 	selectValues sql.SelectValues
 }
 

@@ -1507,13 +1507,11 @@ func validateClaimLeafKeyTweak(config *so.Config, leafTweak *pb.ClaimLeafKeyTwea
 	}
 	if err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
-			SecretShare: secretsharing.SecretShare{
-				FieldModulus: secp256k1.S256().N,
-				Threshold:    int(config.Threshold),
-				Index:        big.NewInt(int64(config.Index + 1)),
-				Share:        new(big.Int).SetBytes(leafTweak.GetSecretShareTweak().GetSecretShare()),
-			},
-			Proofs: leafTweak.GetSecretShareTweak().GetProofs(),
+			FieldModulus: secp256k1.S256().N,
+			Threshold:    int(config.Threshold),
+			Index:        big.NewInt(int64(config.Index + 1)),
+			Share:        new(big.Int).SetBytes(leafTweak.GetSecretShareTweak().GetSecretShare()),
+			Proofs:       leafTweak.GetSecretShareTweak().GetProofs(),
 		},
 	); err != nil {
 		return fmt.Errorf("invalid secret share tweak for leaf %s: %w", leafTweak.GetLeafId(), err)
@@ -1772,14 +1770,12 @@ func buildClaimRefundSigningJob(
 		return nil, err
 	}
 	return &helper.SigningJobWithPregeneratedNonce{
-		SigningJob: helper.SigningJob{
-			JobID:             jobID,
-			SigningKeyshareID: signingKeyshare.ID,
-			Message:           sigHash,
-			VerifyingKey:      new(leaf.VerifyingPubkey),
-			UserCommitment:    &userCommitment,
-		},
-		Round1Packages: round1,
+		JobID:             jobID,
+		SigningKeyshareID: signingKeyshare.ID,
+		Message:           sigHash,
+		VerifyingKey:      new(leaf.VerifyingPubkey),
+		UserCommitment:    &userCommitment,
+		Round1Packages:    round1,
 	}, nil
 }
 

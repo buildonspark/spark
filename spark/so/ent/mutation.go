@@ -4,7 +4,7 @@ package ent
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"sync"
@@ -5587,8 +5587,8 @@ type IdempotencyKeyMutation struct {
 	idempotency_key     *string
 	method_name         *string
 	identity_public_key *[]byte
-	response            *json.RawMessage
-	appendresponse      json.RawMessage
+	response            *jsontext.Value
+	appendresponse      jsontext.Value
 	clearedFields       map[string]struct{}
 	done                bool
 	oldValue            func(context.Context) (*IdempotencyKey, error)
@@ -5880,13 +5880,13 @@ func (m *IdempotencyKeyMutation) ResetIdentityPublicKey() {
 }
 
 // SetResponse sets the "response" field.
-func (m *IdempotencyKeyMutation) SetResponse(jm json.RawMessage) {
-	m.response = &jm
+func (m *IdempotencyKeyMutation) SetResponse(j jsontext.Value) {
+	m.response = &j
 	m.appendresponse = nil
 }
 
 // Response returns the value of the "response" field in the mutation.
-func (m *IdempotencyKeyMutation) Response() (r json.RawMessage, exists bool) {
+func (m *IdempotencyKeyMutation) Response() (r jsontext.Value, exists bool) {
 	v := m.response
 	if v == nil {
 		return
@@ -5897,7 +5897,7 @@ func (m *IdempotencyKeyMutation) Response() (r json.RawMessage, exists bool) {
 // OldResponse returns the old "response" field's value of the IdempotencyKey entity.
 // If the IdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *IdempotencyKeyMutation) OldResponse(ctx context.Context) (v json.RawMessage, err error) {
+func (m *IdempotencyKeyMutation) OldResponse(ctx context.Context) (v jsontext.Value, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldResponse is only allowed on UpdateOne operations")
 	}
@@ -5911,13 +5911,13 @@ func (m *IdempotencyKeyMutation) OldResponse(ctx context.Context) (v json.RawMes
 	return oldValue.Response, nil
 }
 
-// AppendResponse adds jm to the "response" field.
-func (m *IdempotencyKeyMutation) AppendResponse(jm json.RawMessage) {
-	m.appendresponse = append(m.appendresponse, jm...)
+// AppendResponse adds j to the "response" field.
+func (m *IdempotencyKeyMutation) AppendResponse(j jsontext.Value) {
+	m.appendresponse = append(m.appendresponse, j...)
 }
 
 // AppendedResponse returns the list of values that were appended to the "response" field in this mutation.
-func (m *IdempotencyKeyMutation) AppendedResponse() (json.RawMessage, bool) {
+func (m *IdempotencyKeyMutation) AppendedResponse() (jsontext.Value, bool) {
 	if len(m.appendresponse) == 0 {
 		return nil, false
 	}
@@ -6083,7 +6083,7 @@ func (m *IdempotencyKeyMutation) SetField(name string, value ent.Value) error {
 		m.SetIdentityPublicKey(v)
 		return nil
 	case idempotencykey.FieldResponse:
-		v, ok := value.(json.RawMessage)
+		v, ok := value.(jsontext.Value)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

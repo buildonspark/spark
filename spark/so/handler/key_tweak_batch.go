@@ -25,8 +25,7 @@ func rotateLeafKeyshares(
 ) (map[uuid.UUID]*ent.SigningKeyshare, error) {
 	rotated, err := ent.TweakSigningKeyshares(ctx, tweaks)
 	if err != nil {
-		var rotationErr *ent.KeyshareRotationError
-		if errors.As(err, &rotationErr) {
+		if rotationErr, ok := errors.AsType[*ent.KeyshareRotationError](err); ok {
 			if leafID, ok := leafIDByKeyshareID[rotationErr.KeyshareID]; ok {
 				return nil, fmt.Errorf("unable to tweak keyshare %s for leaf %s in transfer %s: %w",
 					rotationErr.KeyshareID, leafID, transferID, err)

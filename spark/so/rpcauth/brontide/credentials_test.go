@@ -30,7 +30,7 @@ func (passthroughCreds) ServerHandshake(raw net.Conn) (net.Conn, credentials.Aut
 }
 
 func tlsInfo() credentials.TLSInfo {
-	return credentials.TLSInfo{CommonAuthInfo: credentials.CommonAuthInfo{SecurityLevel: credentials.PrivacyAndIntegrity}}
+	return credentials.TLSInfo{SecurityLevel: credentials.PrivacyAndIntegrity}
 }
 
 func (passthroughCreds) Info() credentials.ProtocolInfo { return credentials.ProtocolInfo{} }

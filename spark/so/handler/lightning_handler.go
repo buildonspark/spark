@@ -92,13 +92,11 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pbspark.
 	// invoices and store preimage shares on behalf of wallet users.
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
-			SecretShare: secretsharing.SecretShare{
-				FieldModulus: secp256k1.S256().N,
-				Threshold:    int(h.config.Threshold),
-				Index:        big.NewInt(int64(h.config.Index + 1)),
-				Share:        new(big.Int).SetBytes(req.GetPreimageShare().GetSecretShare()),
-			},
-			Proofs: req.GetPreimageShare().GetProofs(),
+			FieldModulus: secp256k1.S256().N,
+			Threshold:    int(h.config.Threshold),
+			Index:        big.NewInt(int64(h.config.Index + 1)),
+			Share:        new(big.Int).SetBytes(req.GetPreimageShare().GetSecretShare()),
+			Proofs:       req.GetPreimageShare().GetProofs(),
 		},
 	)
 	if err != nil {
@@ -232,13 +230,11 @@ func (h *LightningHandler) decryptAndStorePreimageShare(ctx context.Context, req
 
 	err = secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
-			SecretShare: secretsharing.SecretShare{
-				FieldModulus: secp256k1.S256().N,
-				Threshold:    int(h.config.Threshold),
-				Index:        big.NewInt(int64(h.config.Index + 1)),
-				Share:        new(big.Int).SetBytes(secretShare.GetSecretShare()),
-			},
-			Proofs: secretShare.GetProofs(),
+			FieldModulus: secp256k1.S256().N,
+			Threshold:    int(h.config.Threshold),
+			Index:        big.NewInt(int64(h.config.Index + 1)),
+			Share:        new(big.Int).SetBytes(secretShare.GetSecretShare()),
+			Proofs:       secretShare.GetProofs(),
 		},
 	)
 	if err != nil {
