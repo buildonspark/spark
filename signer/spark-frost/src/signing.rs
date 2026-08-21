@@ -368,18 +368,18 @@ fn sign_frost_job(job: &FrostSigningJob, req: &SignFrostRequest) -> Result<Signa
     Ok(signature_share)
 }
 
-/// The statechain side of an MPC (multi-sub-user) signing job. This
-/// operator's own round-2 share binds both groups' round-1 commitments
-/// through group-tagged binding factors, so the sub-user commitment set is
-/// required already at signing time. Sub-users produce their shares
-/// client-side; a signing job never carries user key material in this scheme.
+/// One participant's side of an MPC (multi-sub-user) signing job. Each
+/// participant's round-2 share binds both groups' round-1 commitments
+/// through group-tagged binding factors, so both commitment sets are
+/// required already at signing time. STATECHAIN callers sign as the primary
+/// group; USER callers sign as one sub-user of the secondary group, with the
+/// key package's identifier naming the sub-user's position. A signing job
+/// never carries single-user key material in this scheme.
 fn sign_frost_job_mpc(
     job: &FrostSigningJob,
     req: &SignFrostRequest,
 ) -> Result<SignatureShare, String> {
-    if req.role != SigningRole::Statechain as i32 {
-        return Err("MPC user-group signing jobs are statechain-side only".to_string());
-    }
+    let role = SigningRole::try_from(req.role).map_err(|_| "Invalid signing role".to_string())?;
     if job.user_commitments.is_some() {
         return Err(
             "user_commitments must be absent with SIGNING_SCHEME_MPC_USER_GROUP".to_string(),
@@ -403,6 +403,9 @@ fn sign_frost_job_mpc(
     };
     let verifying_key = verifying_key_from_bytes(job.verifying_key.clone())
         .map_err(|e| format!("Failed to parse verifying key: {e:?}"))?;
+    // For role USER the parse already applies the sub-user normalization
+    // (even-Y by the untweaked combined key's parity, under the tweaked
+    // combined key), so no further adjustment happens before signing.
     let key_package = match &job.key_package {
         Some(key_package) => {
             frost_key_package_from_proto(key_package, None, verifying_key, req.role)
@@ -418,10 +421,21 @@ fn sign_frost_job_mpc(
     // As on the single-user statechain path (sign_with_tweak with an empty
     // merkle root): the taproot tweak term rides with the statechain group;
     // sub-users sign without it.
-    let tweak = vec![];
-    let key_package = key_package.tweak(Some(tweak.as_slice()));
-    two_group::sign(&signing_package, &nonce, &key_package, SignerGroup::Primary)
-        .map_err(|e| format!("Failed to sign MPC frost: {e:?}"))
+    match role {
+        SigningRole::Statechain => {
+            let tweak = vec![];
+            let key_package = key_package.tweak(Some(tweak.as_slice()));
+            two_group::sign(&signing_package, &nonce, &key_package, SignerGroup::Primary)
+                .map_err(|e| format!("Failed to sign MPC frost: {e:?}"))
+        }
+        SigningRole::User => two_group::sign(
+            &signing_package,
+            &nonce,
+            &key_package,
+            SignerGroup::Secondary,
+        )
+        .map_err(|e| format!("Failed to sign MPC frost: {e:?}")),
+    }
 }
 
 pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
@@ -1018,11 +1032,60 @@ mod tests {
         }
     }
 
-    /// Runs one full MPC round-1 + round-2 pass: the SE signers through the
-    /// proto surface (sign_frost, SIGNING_SCHEME_MPC_USER_GROUP), the
-    /// sub-users client-side (two_group::sign, simulating the SDK: even-Y
-    /// normalized by the untweaked combined key's parity, no taptweak term,
-    /// under the tweaked combined key), and returns the aggregate request.
+    /// One sub-user's round-2 share through the proto surface: sign_frost
+    /// with role USER, SIGNING_SCHEME_MPC_USER_GROUP, the key package's
+    /// identifier naming the position.
+    fn subuser_proto_round2(
+        keys: &MpcKeys,
+        position: u16,
+        nonce: &FrostSigningNonces,
+        se_proto_commitments: &HashMap<String, SigningCommitment>,
+        subuser_proto_commitments: &[SubUserCommitment],
+        message: &[u8],
+    ) -> Vec<u8> {
+        let kp = &keys.subuser_key_packages[&position];
+        let identifier = id_to_hex(&Identifier::try_from(position).unwrap());
+        let proto_kp = KeyPackage {
+            identifier: identifier.clone(),
+            secret_share: kp.signing_share().serialize().to_vec(),
+            public_shares: HashMap::from([(
+                identifier.clone(),
+                kp.verifying_share().serialize().unwrap().to_vec(),
+            )]),
+            public_key: keys.legacy.combined_vk.serialize().unwrap().to_vec(),
+            min_signers: keys.user_min as u32,
+        };
+        let job = FrostSigningJob {
+            job_id: identifier.clone(),
+            message: message.to_vec(),
+            key_package: Some(proto_kp),
+            verifying_key: keys.legacy.combined_vk.serialize().unwrap().to_vec(),
+            nonce: Some(SigningNonce {
+                hiding: nonce.hiding().serialize().to_vec(),
+                binding: nonce.binding().serialize().to_vec(),
+            }),
+            commitments: se_proto_commitments.clone(),
+            user_commitments: None,
+            adaptor_public_key: vec![],
+            signing_scheme: SigningScheme::MpcUserGroup.into(),
+            subuser_commitments: subuser_proto_commitments.to_vec(),
+        };
+        let resp = sign_frost(&SignFrostRequest {
+            signing_jobs: vec![job],
+            role: 1,
+        })
+        .unwrap();
+        resp.results
+            .get(&identifier)
+            .unwrap()
+            .signature_share
+            .clone()
+    }
+
+    /// Runs one full MPC round-1 + round-2 pass, every participant through
+    /// the proto surface (sign_frost, SIGNING_SCHEME_MPC_USER_GROUP): the SE
+    /// signers with role STATECHAIN, the sub-users with role USER, and
+    /// returns the aggregate request.
     fn build_mpc_aggregate_request(keys: &MpcKeys, message: &[u8]) -> AggregateFrostRequest {
         let mut rng = thread_rng();
         let se_signers: Vec<Identifier> = keys
@@ -1036,18 +1099,15 @@ mod tests {
         // Round 1: SE signers.
         let mut se_nonces = BTreeMap::new();
         let mut se_proto_commitments: HashMap<String, SigningCommitment> = HashMap::new();
-        let mut se_frost_commitments = BTreeMap::new();
         for id in &se_signers {
             let kp = &keys.legacy.se_key_packages[id];
             let (nonce, commitment) = frost::round1::commit(kp.signing_share(), &mut rng);
             se_nonces.insert(*id, nonce);
             se_proto_commitments.insert(id_to_hex(id), commitment_to_proto(&commitment));
-            se_frost_commitments.insert(*id, commitment);
         }
 
         // Round 1: the participating sub-users.
         let mut subuser_nonces = BTreeMap::new();
-        let mut subuser_frost_commitments = BTreeMap::new();
         let mut subuser_proto_commitments = Vec::new();
         for (&position, kp) in keys
             .subuser_key_packages
@@ -1056,7 +1116,6 @@ mod tests {
         {
             let (nonce, commitment) = frost::round1::commit(kp.signing_share(), &mut rng);
             subuser_nonces.insert(position, nonce);
-            subuser_frost_commitments.insert(Identifier::try_from(position).unwrap(), commitment);
             subuser_proto_commitments.push(SubUserCommitment {
                 position: position as u32,
                 commitment: Some(commitment_to_proto(&commitment)),
@@ -1110,33 +1169,17 @@ mod tests {
             se_signature_shares.insert(id_to_hex(id), share.signature_share.clone());
         }
 
-        // Round 2 for the sub-users, client-side.
-        let signing_package =
-            TwoGroupSigningPackage::new(se_frost_commitments, subuser_frost_commitments, message)
-                .unwrap();
+        // Round 2 for the sub-users, through the proto surface.
         let mut subuser_share_protos = Vec::new();
-        for (&position, kp) in keys
-            .subuser_key_packages
-            .iter()
-            .take(keys.user_min as usize)
-        {
-            let even = kp
-                .clone()
-                .into_even_y(Some(keys.legacy.combined_vk.has_even_y()));
-            let signer_kp = FrostKP::new(
-                *even.identifier(),
-                *even.signing_share(),
-                *even.verifying_share(),
-                keys.tweaked_combined_vk,
-                keys.user_min,
-            );
-            let share = two_group::sign(
-                &signing_package,
+        for &position in subuser_nonces.keys() {
+            let share = subuser_proto_round2(
+                keys,
+                position,
                 &subuser_nonces[&position],
-                &signer_kp,
-                SignerGroup::Secondary,
-            )
-            .unwrap();
+                &se_proto_commitments,
+                &subuser_proto_commitments,
+                message,
+            );
             let commitment = subuser_proto_commitments
                 .iter()
                 .find(|c| c.position == position as u32)
@@ -1146,7 +1189,7 @@ mod tests {
             subuser_share_protos.push(SubUserSignatureShare {
                 position: position as u32,
                 commitment,
-                signature_share: share.serialize(),
+                signature_share: share,
             });
         }
 
@@ -1243,28 +1286,149 @@ mod tests {
     }
 
     #[test]
-    fn test_mpc_sign_rejects_user_role() {
+    fn test_mpc_sign_rejects_unknown_role() {
+        let keys = generate_mpc_keys(3, 2, 3, 2);
+        let message = b"unknown role";
+        let request = build_mpc_aggregate_request(&keys, message);
+
         let job = FrostSigningJob {
             job_id: "job".to_string(),
-            message: vec![],
+            message: message.to_vec(),
             key_package: None,
-            verifying_key: vec![],
+            verifying_key: request.verifying_key.clone(),
             nonce: None,
-            commitments: HashMap::new(),
+            commitments: request.commitments.clone(),
             user_commitments: None,
             adaptor_public_key: vec![],
             signing_scheme: SigningScheme::MpcUserGroup.into(),
-            subuser_commitments: vec![],
+            subuser_commitments: request
+                .subuser_shares
+                .iter()
+                .map(|s| SubUserCommitment {
+                    position: s.position,
+                    commitment: s.commitment.clone(),
+                })
+                .collect(),
         };
         let err = sign_frost(&SignFrostRequest {
             signing_jobs: vec![job],
-            role: 1,
+            role: 2,
         })
         .unwrap_err();
         assert!(
-            err.contains("statechain-side only"),
+            err.contains("Invalid signing role"),
             "unexpected error: {err}"
         );
+    }
+
+    /// Pins the proto-surface USER path to the client-side library
+    /// convention (two_group::sign as the secondary group: even-Y normalized
+    /// by the untweaked combined key's parity, no taptweak term, under the
+    /// tweaked combined key), for one key set. Round-2 shares are
+    /// deterministic given the round-1 nonces, so byte equality is the exact
+    /// check.
+    fn assert_subuser_proto_matches_client_side(keys: &MpcKeys, message: &[u8]) {
+        let mut rng = thread_rng();
+        let se_signers: Vec<Identifier> = keys
+            .legacy
+            .se_key_packages
+            .keys()
+            .take(keys.legacy.se_min as usize)
+            .cloned()
+            .collect();
+        let mut se_proto_commitments: HashMap<String, SigningCommitment> = HashMap::new();
+        let mut se_frost_commitments = BTreeMap::new();
+        for id in &se_signers {
+            let kp = &keys.legacy.se_key_packages[id];
+            let (_, commitment) = frost::round1::commit(kp.signing_share(), &mut rng);
+            se_proto_commitments.insert(id_to_hex(id), commitment_to_proto(&commitment));
+            se_frost_commitments.insert(*id, commitment);
+        }
+
+        let mut subuser_nonces = BTreeMap::new();
+        let mut subuser_frost_commitments = BTreeMap::new();
+        let mut subuser_proto_commitments = Vec::new();
+        for (&position, kp) in keys
+            .subuser_key_packages
+            .iter()
+            .take(keys.user_min as usize)
+        {
+            let (nonce, commitment) = frost::round1::commit(kp.signing_share(), &mut rng);
+            subuser_nonces.insert(position, nonce);
+            subuser_frost_commitments.insert(Identifier::try_from(position).unwrap(), commitment);
+            subuser_proto_commitments.push(SubUserCommitment {
+                position: position as u32,
+                commitment: Some(commitment_to_proto(&commitment)),
+            });
+        }
+
+        let signing_package =
+            TwoGroupSigningPackage::new(se_frost_commitments, subuser_frost_commitments, message)
+                .unwrap();
+        for (&position, kp) in keys
+            .subuser_key_packages
+            .iter()
+            .take(keys.user_min as usize)
+        {
+            let even = kp
+                .clone()
+                .into_even_y(Some(keys.legacy.combined_vk.has_even_y()));
+            let signer_kp = FrostKP::new(
+                *even.identifier(),
+                *even.signing_share(),
+                *even.verifying_share(),
+                keys.tweaked_combined_vk,
+                keys.user_min,
+            );
+            let client_share = two_group::sign(
+                &signing_package,
+                &subuser_nonces[&position],
+                &signer_kp,
+                SignerGroup::Secondary,
+            )
+            .unwrap();
+
+            let proto_share = subuser_proto_round2(
+                keys,
+                position,
+                &subuser_nonces[&position],
+                &se_proto_commitments,
+                &subuser_proto_commitments,
+                message,
+            );
+            assert_eq!(
+                proto_share,
+                client_share.serialize(),
+                "proto-surface share for position {position} diverges from client-side"
+            );
+        }
+    }
+
+    /// Runs the proto-vs-client-side pin under both parities of the untweaked
+    /// combined key. The even-Y normalization on the USER path is a no-op when
+    /// the combined key is already even-Y, so a single random key set leaves
+    /// the negation branch uncovered about half the time.
+    #[test]
+    fn test_mpc_subuser_proto_share_matches_client_side() {
+        let mut covered_even = false;
+        let mut covered_odd = false;
+        for attempt in 0..64 {
+            let keys = generate_mpc_keys(3, 2, 3, 2);
+            let is_even = keys.legacy.combined_vk.has_even_y();
+            if (is_even && covered_even) || (!is_even && covered_odd) {
+                continue;
+            }
+            assert_subuser_proto_matches_client_side(
+                &keys,
+                format!("proto matches client side {attempt}").as_bytes(),
+            );
+            covered_even |= is_even;
+            covered_odd |= !is_even;
+            if covered_even && covered_odd {
+                return;
+            }
+        }
+        panic!("no key set generated for one parity: even {covered_even}, odd {covered_odd}");
     }
 
     #[test]
