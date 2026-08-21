@@ -667,6 +667,62 @@ message StaticDepositUtxoRefundRollbackRequest {
     spark.UTXO on_chain_utxo = 1;
 }
 
+// StaticDepositSweepInput mirrors spark_ssp_internal.SweepInput for the
+// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_SWEEP flow, adding the FROST round-1
+// commitments the coordinator collected for this input. It is mirrored here
+// rather than imported because the SO is open sourced without
+// spark_ssp_internal.proto.
+message StaticDepositSweepInput {
+    spark.UTXO on_chain_utxo = 1;
+    // Index of this UTXO in the sweep transaction's input list.
+    uint32 vin = 2;
+    // The SSP's round-1 commitment for this input.
+    common.SigningCommitment user_signing_commitment = 3;
+    // Operator round-1 commitments for this input, keyed by operator identifier.
+    // Every input carries its own map so a share can never be matched to the
+    // wrong input by position.
+    map<string, common.SigningCommitment> signing_commitments = 4;
+}
+
+// StaticDepositSweepPrepareRequest is the Prepare payload for the
+// CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_SWEEP 2PC flow, which co-signs one
+// transaction sweeping many already-claimed static deposit UTXOs into the
+// owning SSP's wallet.
+//
+// Every SO independently re-derives each input's prevout from its own Utxo row,
+// re-checks that the swap is COMPLETED, non-refund and owned by ssp_identity_public_key,
+// and only then produces its round-2 share. A participant that disagrees aborts
+// the flow rather than signing.
+//
+// The consensus channel authenticates an operator, not the original SSP session,
+// so ssp_identity_public_key on its own would be a coordinator assertion. It is
+// paired with ssp_signature over the sweep txid, which every participant verifies
+// against that key: a coordinator that names a different owner cannot produce the
+// matching signature, and one that alters the transaction changes the txid the
+// signature commits to.
+message StaticDepositSweepPrepareRequest {
+    spark.Network network = 1;
+    bytes raw_tx = 2;
+    repeated StaticDepositSweepInput inputs = 3;
+    bytes ssp_identity_public_key = 4;
+    bytes ssp_signature = 5;
+}
+
+// StaticDepositSweepCommitRequest is the 2PC commit payload. The flow writes no
+// durable state — a settled swap stays settled and stays re-signable, which is
+// what lets a stalled sweep be replaced at a higher fee — so participants have
+// nothing to apply and the txid is carried for traceability only.
+message StaticDepositSweepCommitRequest {
+    bytes sweep_txid = 1;
+}
+
+// StaticDepositSweepRollbackRequest is the 2PC rollback payload. Prepare takes
+// no locks and writes nothing, so rollback is a no-op; the txid is carried for
+// traceability only.
+message StaticDepositSweepRollbackRequest {
+    bytes sweep_txid = 1;
+}
+
 // RecoverWatchtowerExitedLeafPrepareRequest is the Prepare payload for the
 // CONSENSUS_OPERATION_TYPE_RECOVER_WATCHTOWER_EXITED_LEAF 2PC flow: the public
 // request plus the coordinator's FROST round-1 commitments, so the public RPC

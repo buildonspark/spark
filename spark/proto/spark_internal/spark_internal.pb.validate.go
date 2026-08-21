@@ -8640,6 +8640,573 @@ var _ interface {
 	ErrorName() string
 } = StaticDepositUtxoRefundRollbackRequestValidationError{}
 
+// Validate checks the field values on StaticDepositSweepInput with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StaticDepositSweepInput) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StaticDepositSweepInput with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// StaticDepositSweepInputMultiError, or nil if none found.
+func (m *StaticDepositSweepInput) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositSweepInput) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StaticDepositSweepInputValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StaticDepositSweepInputValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StaticDepositSweepInputValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Vin
+
+	if all {
+		switch v := interface{}(m.GetUserSigningCommitment()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StaticDepositSweepInputValidationError{
+					field:  "UserSigningCommitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StaticDepositSweepInputValidationError{
+					field:  "UserSigningCommitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetUserSigningCommitment()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StaticDepositSweepInputValidationError{
+				field:  "UserSigningCommitment",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetSigningCommitments()))
+		i := 0
+		for key := range m.GetSigningCommitments() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSigningCommitments()[key]
+			_ = val
+
+			// no validation rules for SigningCommitments[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, StaticDepositSweepInputValidationError{
+							field:  fmt.Sprintf("SigningCommitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, StaticDepositSweepInputValidationError{
+							field:  fmt.Sprintf("SigningCommitments[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return StaticDepositSweepInputValidationError{
+						field:  fmt.Sprintf("SigningCommitments[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return StaticDepositSweepInputMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositSweepInputMultiError is an error wrapping multiple validation
+// errors returned by StaticDepositSweepInput.ValidateAll() if the designated
+// constraints aren't met.
+type StaticDepositSweepInputMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositSweepInputMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositSweepInputMultiError) AllErrors() []error { return m }
+
+// StaticDepositSweepInputValidationError is the validation error returned by
+// StaticDepositSweepInput.Validate if the designated constraints aren't met.
+type StaticDepositSweepInputValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositSweepInputValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositSweepInputValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositSweepInputValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositSweepInputValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositSweepInputValidationError) ErrorName() string {
+	return "StaticDepositSweepInputValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositSweepInputValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositSweepInput.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositSweepInputValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositSweepInputValidationError{}
+
+// Validate checks the field values on StaticDepositSweepPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *StaticDepositSweepPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StaticDepositSweepPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// StaticDepositSweepPrepareRequestMultiError, or nil if none found.
+func (m *StaticDepositSweepPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositSweepPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Network
+
+	// no validation rules for RawTx
+
+	for idx, item := range m.GetInputs() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StaticDepositSweepPrepareRequestValidationError{
+						field:  fmt.Sprintf("Inputs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StaticDepositSweepPrepareRequestValidationError{
+						field:  fmt.Sprintf("Inputs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StaticDepositSweepPrepareRequestValidationError{
+					field:  fmt.Sprintf("Inputs[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for SspIdentityPublicKey
+
+	// no validation rules for SspSignature
+
+	if len(errors) > 0 {
+		return StaticDepositSweepPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositSweepPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// StaticDepositSweepPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StaticDepositSweepPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositSweepPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositSweepPrepareRequestMultiError) AllErrors() []error { return m }
+
+// StaticDepositSweepPrepareRequestValidationError is the validation error
+// returned by StaticDepositSweepPrepareRequest.Validate if the designated
+// constraints aren't met.
+type StaticDepositSweepPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositSweepPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositSweepPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositSweepPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositSweepPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositSweepPrepareRequestValidationError) ErrorName() string {
+	return "StaticDepositSweepPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositSweepPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositSweepPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositSweepPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositSweepPrepareRequestValidationError{}
+
+// Validate checks the field values on StaticDepositSweepCommitRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StaticDepositSweepCommitRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StaticDepositSweepCommitRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// StaticDepositSweepCommitRequestMultiError, or nil if none found.
+func (m *StaticDepositSweepCommitRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositSweepCommitRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SweepTxid
+
+	if len(errors) > 0 {
+		return StaticDepositSweepCommitRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositSweepCommitRequestMultiError is an error wrapping multiple
+// validation errors returned by StaticDepositSweepCommitRequest.ValidateAll()
+// if the designated constraints aren't met.
+type StaticDepositSweepCommitRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositSweepCommitRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositSweepCommitRequestMultiError) AllErrors() []error { return m }
+
+// StaticDepositSweepCommitRequestValidationError is the validation error
+// returned by StaticDepositSweepCommitRequest.Validate if the designated
+// constraints aren't met.
+type StaticDepositSweepCommitRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositSweepCommitRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositSweepCommitRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositSweepCommitRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositSweepCommitRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositSweepCommitRequestValidationError) ErrorName() string {
+	return "StaticDepositSweepCommitRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositSweepCommitRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositSweepCommitRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositSweepCommitRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositSweepCommitRequestValidationError{}
+
+// Validate checks the field values on StaticDepositSweepRollbackRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *StaticDepositSweepRollbackRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StaticDepositSweepRollbackRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// StaticDepositSweepRollbackRequestMultiError, or nil if none found.
+func (m *StaticDepositSweepRollbackRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StaticDepositSweepRollbackRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SweepTxid
+
+	if len(errors) > 0 {
+		return StaticDepositSweepRollbackRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StaticDepositSweepRollbackRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// StaticDepositSweepRollbackRequest.ValidateAll() if the designated
+// constraints aren't met.
+type StaticDepositSweepRollbackRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StaticDepositSweepRollbackRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StaticDepositSweepRollbackRequestMultiError) AllErrors() []error { return m }
+
+// StaticDepositSweepRollbackRequestValidationError is the validation error
+// returned by StaticDepositSweepRollbackRequest.Validate if the designated
+// constraints aren't met.
+type StaticDepositSweepRollbackRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StaticDepositSweepRollbackRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StaticDepositSweepRollbackRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StaticDepositSweepRollbackRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StaticDepositSweepRollbackRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StaticDepositSweepRollbackRequestValidationError) ErrorName() string {
+	return "StaticDepositSweepRollbackRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StaticDepositSweepRollbackRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStaticDepositSweepRollbackRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StaticDepositSweepRollbackRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StaticDepositSweepRollbackRequestValidationError{}
+
 // Validate checks the field values on
 // RecoverWatchtowerExitedLeafPrepareRequest with the rules defined in the
 // proto definition for this message. If any rules are violated, the first

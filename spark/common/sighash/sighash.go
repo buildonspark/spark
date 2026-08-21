@@ -157,11 +157,34 @@ func FromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) (Hash, error
 }
 
 // FromMultiPrevOutTx computes the BIP-341 taproot sighash for the given input of a multi-prevout transaction.
+// Signing several inputs of one transaction should use [MultiPrevOutSigHasher] instead.
 func FromMultiPrevOutTx(tx *wire.MsgTx, inputIndex int, prevOutputs map[wire.OutPoint]*wire.TxOut) (Hash, error) {
-	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOutputs)
-	sighashes := txscript.NewTxSigHashes(tx, prevOutFetcher)
+	return NewMultiPrevOutSigHasher(tx, prevOutputs).For(inputIndex)
+}
 
-	raw, err := txscript.CalcTaprootSignatureHash(sighashes, txscript.SigHashDefault, tx, inputIndex, prevOutFetcher)
+// MultiPrevOutSigHasher computes taproot sighashes for several inputs of one
+// transaction. The BIP-341 digest commits to every input's outpoint, amount and
+// script, so those hashes are shared across inputs: building one hasher and
+// reusing it is linear in the input count, where calling FromMultiPrevOutTx per
+// input is quadratic — each call re-hashes all of them.
+type MultiPrevOutSigHasher struct {
+	tx        *wire.MsgTx
+	fetcher   txscript.PrevOutputFetcher
+	sigHashes *txscript.TxSigHashes
+}
+
+func NewMultiPrevOutSigHasher(tx *wire.MsgTx, prevOutputs map[wire.OutPoint]*wire.TxOut) *MultiPrevOutSigHasher {
+	fetcher := txscript.NewMultiPrevOutFetcher(prevOutputs)
+	return &MultiPrevOutSigHasher{
+		tx:        tx,
+		fetcher:   fetcher,
+		sigHashes: txscript.NewTxSigHashes(tx, fetcher),
+	}
+}
+
+// For computes the sighash for one input of the transaction the hasher was built from.
+func (h *MultiPrevOutSigHasher) For(inputIndex int) (Hash, error) {
+	raw, err := txscript.CalcTaprootSignatureHash(h.sigHashes, txscript.SigHashDefault, h.tx, inputIndex, h.fetcher)
 	if err != nil {
 		return Hash{}, err
 	}
